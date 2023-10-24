@@ -66,7 +66,7 @@ class SharedLibraryManager final {
 
   public:
     SharedLibraryManager() = delete;
-    SharedLibraryManager(std::string filename)
+    explicit SharedLibraryManager(std::string filename)
     {
         // RTLD_DEEPBIND is incompatible with sanitizers.
         // If you have compiled this file with sanitizers and you reach this line
