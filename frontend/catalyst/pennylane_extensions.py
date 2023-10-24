@@ -136,12 +136,13 @@ class QFunc:
                     f"The {name} device is not " "supported for compilation at the moment."
                 )
 
+            backend_path_or_name = name
             if implements_c_interface:
                 impl = self.device.get_c_interface()
                 if not pathlib.Path(impl).is_file():
                     raise CompileError(f"Device at {impl} cannot be found!")
 
-                self.device.short_name = self.device.get_c_interface()
+                backend_path_or_name = self.device.get_c_interface()
 
             backend_kwargs = {}
             if hasattr(self.device, "shots"):
@@ -154,7 +155,7 @@ class QFunc:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
 
             device = QJITDevice(
-                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
+                self.device.shots, self.device.wires, backend_path_or_name, backend_kwargs
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
