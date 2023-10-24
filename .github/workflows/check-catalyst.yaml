@@ -476,7 +476,8 @@ jobs:
       run: |
         # TODO: Use the latest version of boto3 after fixing the issue with
         # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
-        pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
+        # TODO: Pin amazon braket pennylane to a released version
+        pip install numpy amazon-braket-sdk git+https://github.com/amazon-braket/amazon-braket-pennylane-plugin-python.git@main "boto3==1.26"
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Add Frontend Dependencies to PATH
