@@ -82,7 +82,7 @@ class SharedLibraryManager final {
         // then we don't really need to worry about dlclose.
         // In other words, there is a one to one correspondance between an instance
         // of SharedLibraryManager and an increase in the reference count for the dynamic library.
-        // dlopen returns non-zero on error.
+        // dlclose returns non-zero on error.
         //
         // Errors in dlclose are implementation dependent.
         // There are two possible errors during dlclose in glibc: "shared object not open"
@@ -196,24 +196,6 @@ class ExecutionContext final {
 
     [[nodiscard]] bool initDevice(std::string_view name)
     {
-        try {
-            // TODO: Once all devices are shared libraries, they all need to be loaded.
-            // During this transition period, there are several ways in which we can do this.
-            // This try catch is just for allowing the previous mechanism to still succeed
-            // while keeping the implementation of SharedLibraryManager as a minimal as possible.
-            // Once all devices are shared libraries, we can replace initDevice with loadDevice.
-            //
-            // Yes, I know there is a performance impact. But this try-catch will be removed once
-            // all devices are shared libraries.
-            QuantumDevice *impl = loadDevice(std::string(name));
-            _driver_ptr.reset(impl);
-            return true;
-        }
-        catch (RuntimeException &e) {
-            // fall-through
-            // We are falling-through to allow the previous initialization of device to succeed.
-        }
-
         if (name != "default") {
             _device_name = name;
         }
@@ -237,6 +219,23 @@ class ExecutionContext final {
 #endif
 
             return true;
+        }
+
+        try {
+            // TODO: Once all devices are shared libraries, they all need to be loaded.
+            // During this transition period, there are several ways in which we can do this.
+            // This try catch is just for allowing the previous mechanism to still succeed
+            // while keeping the implementation of SharedLibraryManager as a minimal as possible.
+            // Once all devices are shared libraries, we can replace initDevice with loadDevice.
+            //
+            // Yes, I know there is a performance impact. But this try-catch will be removed once
+            // all devices are shared libraries.
+            QuantumDevice *impl = loadDevice(std::string(name));
+            _driver_ptr.reset(impl);
+            return true;
+        }
+        catch (RuntimeException &e) {
+            // fall-through
         }
 
         return false;
