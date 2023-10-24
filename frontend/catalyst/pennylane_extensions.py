@@ -133,7 +133,7 @@ class QFunc:
             is_valid_device = is_known_device or implements_c_interface
             if not is_valid_device:
                 raise CompileError(
-                    f"The {name} device is not " "supported for compilation at the moment."
+                    f"The {name} device is not supported for compilation at the moment."
                 )
 
             backend_path_or_name = name

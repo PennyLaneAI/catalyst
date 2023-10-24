@@ -81,7 +81,7 @@ class SharedLibraryManager final {
         // dlopen and dlclose increment and decrement reference counters.
         // Since we have a guaranteed _handler in a valid SharedLibraryManager instance
         // then we don't really need to worry about dlclose.
-        // In other words, there is a one to one correspondance between an instance
+        // In other words, there is an one to one correspondence between an instance
         // of SharedLibraryManager and an increase in the reference count for the dynamic library.
         // dlclose returns non-zero on error.
         //
@@ -89,7 +89,7 @@ class SharedLibraryManager final {
         // There are two possible errors during dlclose in glibc: "shared object not open"
         // and "cannot create scope list". Look for _dl_signal_error in:
         //
-        //     codebrowser.dev/glibc/glibc/elf/dl-close.c.html/
+        //     https://codebrowser.dev/glibc/glibc/elf/dl-close.c.html
         //
         // This means that at the very least, one could trigger an error in the following line by
         // doing the following: dlopen the same library and closing it multiple times in a different
