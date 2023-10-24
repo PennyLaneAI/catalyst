@@ -1,6 +1,6 @@
 PYTHON := python3
-C_COMPILER?=gcc-10
-CXX_COMPILER?=g++-10
+C_COMPILER?=clang
+CXX_COMPILER?=clang++
 COMPILER_LAUNCHER?=ccache
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
@@ -53,7 +53,6 @@ configure:
 		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DBUILD_QIR_STDLIB_FROM_SRC=$(BUILD_QIR_STDLIB_FROM_SRC) \
-		-DENABLE_SANITIZER=ON \
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
