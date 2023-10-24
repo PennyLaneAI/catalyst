@@ -32,7 +32,7 @@ from pennylane import numpy as pnp
 from pennylane_lightning.lightning_qubit import LightningQubit
 import numpy as np
 import pytest
-from catalyst.jax_tracer import QJITDevice
+from catalyst.pennylane_extensions import QJITDevice
 from jax import numpy as jnp
 from pennylane.transforms import mitigate_with_zne, richardson_extrapolate, fold_global
 from pennylane.transforms import hamiltonian_expand, sum_expand
