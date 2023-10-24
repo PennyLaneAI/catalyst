@@ -221,15 +221,15 @@ class ExecutionContext final {
             return true;
         }
 
+        // TODO: Once all devices are shared libraries, they all need to be loaded.
+        // During this transition period, there are several ways in which we can do this.
+        // This try catch is just for allowing the previous mechanism to still succeed
+        // while keeping the implementation of SharedLibraryManager as a minimal as possible.
+        // Once all devices are shared libraries, we can replace initDevice with loadDevice.
+        //
+        // Yes, I know there is a performance impact. But this try-catch will be removed once
+        // all devices are shared libraries.
         try {
-            // TODO: Once all devices are shared libraries, they all need to be loaded.
-            // During this transition period, there are several ways in which we can do this.
-            // This try catch is just for allowing the previous mechanism to still succeed
-            // while keeping the implementation of SharedLibraryManager as a minimal as possible.
-            // Once all devices are shared libraries, we can replace initDevice with loadDevice.
-            //
-            // Yes, I know there is a performance impact. But this try-catch will be removed once
-            // all devices are shared libraries.
             QuantumDevice *impl = loadDevice(std::string(name));
             _driver_ptr.reset(impl);
             return true;
