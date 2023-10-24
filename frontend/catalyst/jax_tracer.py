@@ -554,9 +554,18 @@ def trace_quantum_function(
             # 2. Create a new tree that has measurements as leaves
             ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
 
-            out_classical_tracers_or_measurements = [
-                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
-            ]
+            out_classical_tracers = []
+            out_measurements = []
+            out_classical_tracers_or_measurements = []
+            for ret_val in ans:
+                if isinstance(ret_val, DynamicJaxprTracer):
+                    ret_val_variable = trace.full_raise(ret_val)
+                    out_classical_tracers.append(ret_val_variable)
+                else:
+                    ret_val_variable = ret_val
+                    out_measurements.append(ret_val_variable)
+
+                out_classical_tracers_or_measurements.append(ret_val_variable)
 
             params = quantum_tape.get_parameters(trainable_only=False)
             quantum_tape.trainable_params = qml.math.get_trainable_indices(params)
@@ -573,15 +582,24 @@ def trace_quantum_function(
             is_measurement = lambda maybe: isinstance(maybe, MeasurementProcess)
             is_out_measurements = map(is_measurement, out_measurements)
             is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
-            is_out_measurement_sequence = is_all_out_measurements and isinstance(out_tree_promise().unflatten(out_measurements), Sequence)
-            is_out_measurement_sequence_one_element = is_out_measurement_sequence and len(out_tree_promise().unflatten(out_measurements)) == 1
-            is_out_single_measurement = is_all_out_measurements and isinstance(out_tree_promise().unflatten(out_measurements), MeasurementProcess)
+            is_out_measurement_sequence = is_all_out_measurements and isinstance(
+                out_tree_promise().unflatten(out_measurements), Sequence
+            )
+            is_out_measurement_sequence_one_element = (
+                is_out_measurement_sequence
+                and len(out_tree_promise().unflatten(out_measurements)) == 1
+            )
+            is_out_single_measurement = is_all_out_measurements and isinstance(
+                out_tree_promise().unflatten(out_measurements), MeasurementProcess
+            )
             is_valid_output = is_out_measurement_sequence or is_out_single_measurement
             # TODO: check if there were mid circuit measurements in the original tape.
             is_wave_function_collapsed = False
             # TODO: check if the device is noisy.
             is_noise_present = False
-            are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed and not is_noise_present
+            are_batch_transforms_valid = (
+                is_valid_output and not is_wave_function_collapsed and not is_noise_present
+            )
 
             is_program_transformed = qnode and qnode.transform_program
             if is_program_transformed:
@@ -611,7 +629,9 @@ def trace_quantum_function(
                     # If the program is batched, that means that it was transformed.
                     # If it was transformed, that means that the program might have
                     # changed the output. See `split_non_commuting`
-                    out_classical_tracers_or_measurements if not is_program_transformed else tape.measurements,
+                    out_classical_tracers_or_measurements
+                    if not is_program_transformed
+                    else tape.measurements,
                     out_tree_promise() if not is_program_transformed else pytree_measurements,
                 )
                 out_quantum_tracers = [qrp_out.actualize()]
