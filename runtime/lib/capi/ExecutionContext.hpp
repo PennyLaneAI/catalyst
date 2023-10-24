@@ -68,6 +68,10 @@ class SharedLibraryManager final {
     SharedLibraryManager() = delete;
     SharedLibraryManager(std::string filename)
     {
+        // RTLD_DEEPBIND is incompatible with sanitizers.
+        // If you have compiled this file with sanitizers and you reach this line
+        // you will get an error.
+        // Please re-compile without sanitizers.
         _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
         if (!_handler) {
             char *error_msg = dlerror();
