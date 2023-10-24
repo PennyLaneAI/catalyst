@@ -27,9 +27,10 @@ add_executable(runner_tests runner_main.cpp)
 add_subdirectory(third_party)
 
 if (ENABLE_SANITIZER)
-    set(third_party_tests "")
+    set(dl_manager_tests "")
 else()
-    # Third party tests are incompatible with sanitizers.
+    # Tests which use dlopen and RTLD_DEEPBIND are incompatible with sanitizers.
+    # All tests which go through dlopen need to be tested without sanitizers.
     # They produce the following error message:
     # You are trying to dlopen a this-file-does-not-exist.so shared
     # library with RTLD_DEEPBIND flag which is incompatible with sanitizer
@@ -37,7 +38,7 @@ else()
     # details). If you want to run this-file-does-not-exist.so library under
     # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
     add_dependencies(runner_tests dummy_device)
-    set(third_party_tests Test_LoadingThirdParty.cpp)
+    set(dl_manager_tests Test_DLManager.cpp)
 endif()
 
 if(ENABLE_OPENQASM)
@@ -84,7 +85,7 @@ endif()
 
 target_sources(runner_tests PRIVATE ${cov_helper_src}
             ${openqasm_tests}
-            ${third_party_tests}
+            ${dl_manager_tests}
             Test_QubitManager.cpp
             Test_CacheManager.cpp
             Test_LightningDriver.cpp
