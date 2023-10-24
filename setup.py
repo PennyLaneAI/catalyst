@@ -68,12 +68,26 @@ for ext in intree_extension_list:
     ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
 ext_modules = intree_extension_list
 
+# For any compiler packages seeking to be registered in PennyLane, it is imperative that they
+# expose the entry_points metadata under the designated group name `pennylane.compilers`, with
+# the following entry points:
+# - `context`: Path to the compilation evaluation context manager.
+# - `ops`: Path to the compiler operations module.
+# - `qjit`: Path to the JIT compiler decorator provided by the compiler.
+
 setup(
     classifiers=classifiers,
     name="pennylane-catalyst",
     provides=["catalyst"],
     version=version,
     python_requires=">=3.9",
+    entry_points={
+        "pennylane.compilers": [
+            "context = catalyst.utils.contexts:EvaluationContext",
+            "ops = catalyst:pennylane_extensions",
+            "qjit = catalyst:qjit",
+        ]
+    },
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
