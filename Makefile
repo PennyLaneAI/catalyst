@@ -153,7 +153,7 @@ else
 	black .
 	isort .
 endif
-	pylint .
+	pylint frontend
 
 .PHONY: docs clean-docs
 docs:
