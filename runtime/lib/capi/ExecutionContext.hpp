@@ -65,6 +65,7 @@ class SharedLibraryManager final {
     void *_handler{NULL};
 
   public:
+    SharedLibraryManager() = delete;
     SharedLibraryManager(std::string filename)
     {
         _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
@@ -90,14 +91,16 @@ class SharedLibraryManager final {
         //     codebrowser.dev/glibc/glibc/elf/dl-close.c.html/
         //
         // This means that at the very least, one could trigger an error in the following line by
-        // doing the following: dlopen the same library and closing it multiple times.
+        // doing the following: dlopen the same library and closing it multiple times in a different
+        // location.
+        //
         // This would mean that the reference count would be less than the number of instances
         // of SharedLibraryManager.
         //
         // There really is no way to protect against this error, except to always use
         // SharedLibraryManager to manage shared libraries.
         //
-        // Exercise for the reader, how could one trigger "cannot create scope list"?
+        // Exercise for the reader, how could one trigger the "cannot create scope list" error?
         dlclose(_handler);
     }
 
@@ -193,6 +196,24 @@ class ExecutionContext final {
 
     [[nodiscard]] bool initDevice(std::string_view name)
     {
+        try {
+            // TODO: Once all devices are shared libraries, they all need to be loaded.
+            // During this transition period, there are several ways in which we can do this.
+            // This try catch is just for allowing the previous mechanism to still succeed
+            // while keeping the implementation of SharedLibraryManager as a minimal as possible.
+            // Once all devices are shared libraries, we can replace initDevice with loadDevice.
+            //
+            // Yes, I know there is a performance impact. But this try-catch will be removed once
+            // all devices are shared libraries.
+            QuantumDevice *impl = loadDevice(std::string(name));
+            _driver_ptr.reset(impl);
+            return true;
+        }
+        catch (RuntimeException &e) {
+            // fall-through
+            // We are falling-through to allow the previous initialization of device to succeed.
+        }
+
         if (name != "default") {
             _device_name = name;
         }
@@ -218,12 +239,7 @@ class ExecutionContext final {
             return true;
         }
 
-        QuantumDevice *impl = loadDevice(std::string(name));
-        if (!impl)
-            return false;
-
-        _driver_ptr.reset(impl);
-        return true;
+        return false;
     }
 
     [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
