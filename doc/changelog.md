@@ -10,6 +10,10 @@
 
 <h3>Breaking changes</h3>
 
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+  `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
 <h3>Bug fixes</h3>
 
 * Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
@@ -18,6 +22,10 @@
 * Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the master
   branch of PennyLane-Lightning. This issue introduced in [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
   [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
+
+* Add a newer pip requirement to the `requirements.txt`. Recent version of pip contains a bug fix
+  allowing us to do editable installations even if system-wide site-packages is read-only.
+  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
 
 <h3>Contributors</h3>
 
