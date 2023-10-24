@@ -36,6 +36,13 @@ TEST_CASE("Test error message function not found", "[Third Party]")
                         Catch::Contains("undefined symbol: getCustomDevice"));
 }
 
+TEST_CASE("Test return false if cannot init device", "[Third Party]")
+{
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::string file("libm.so.6");
+    CHECK(!driver->initDevice(file));
+}
+
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
