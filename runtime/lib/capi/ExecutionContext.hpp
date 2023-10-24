@@ -65,13 +65,8 @@ class SharedLibraryManager final {
     void *_handler{NULL};
 
   public:
-    SharedLibraryManager() {}
-
     SharedLibraryManager(std::string filename)
     {
-        if (filename.find(".so") == std::string::npos) {
-            return;
-        }
         _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
         if (!_handler) {
             char *error_msg = dlerror();
@@ -81,18 +76,33 @@ class SharedLibraryManager final {
 
     ~SharedLibraryManager()
     {
-        // dlclose returns non-zero on error
-        // but we cannot throw exceptions in a destructor
-        // TODO: How to handle this case?
-        if (_handler)
-            dlclose(_handler);
+        // dlopen and dlclose increment and decrement reference counters.
+        // Since we have a guaranteed _handler in a valid SharedLibraryManager instance
+        // then we don't really need to worry about dlclose.
+        // In other words, there is a one to one correspondance between an instance
+        // of SharedLibraryManager and an increase in the reference count for the dynamic library.
+        // dlopen returns non-zero on error.
+        //
+        // Errors in dlclose are implementation dependent.
+        // There are two possible errors during dlclose in glibc: "shared object not open"
+        // and "cannot create scope list". Look for _dl_signal_error in:
+        //
+        //     codebrowser.dev/glibc/glibc/elf/dl-close.c.html/
+        //
+        // This means that at the very least, one could trigger an error in the following line by
+        // doing the following: dlopen the same library and closing it multiple times.
+        // This would mean that the reference count would be less than the number of instances
+        // of SharedLibraryManager.
+        //
+        // There really is no way to protect against this error, except to always use
+        // SharedLibraryManager to manage shared libraries.
+        //
+        // Exercise for the reader, how could one trigger "cannot create scope list"?
+        dlclose(_handler);
     }
 
     void *getSymbol(std::string symbol)
     {
-        if (!_handler)
-            return NULL;
-
         void *sym = dlsym(_handler, symbol.c_str());
         if (!sym) {
             char *error_msg = dlerror();
@@ -148,7 +158,6 @@ class ExecutionContext final {
         });
 #endif
         _driver_mm_ptr = std::make_unique<MemoryManager>();
-        _driver_so_ptr = std::make_unique<SharedLibraryManager>();
     };
 
     ~ExecutionContext()
