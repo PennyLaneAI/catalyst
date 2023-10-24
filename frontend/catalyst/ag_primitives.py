@@ -482,7 +482,7 @@ def or_(*args):
 
 
 def not_(arg):
-    """An implementation of the AutoGraph '.. not ..' statement."""
+    """An implementation of the AutoGraph 'not ..' statement."""
     return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x[0])
 
 
