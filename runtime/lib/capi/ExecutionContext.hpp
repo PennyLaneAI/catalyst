@@ -189,7 +189,7 @@ class ExecutionContext final {
     {
         _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
         void *f_ptr = _driver_so_ptr->getSymbol("getCustomDevice");
-        return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : NULL;
+        return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : nullptr;
     }
 
     [[nodiscard]] bool initDevice(std::string_view name)
