@@ -105,7 +105,7 @@ class SharedLibraryManager final {
         dlclose(_handler);
     }
 
-    void *getSymbol(std::string symbol)
+    void *getSymbol(const std::string &symbol)
     {
         void *sym = dlsym(_handler, symbol.c_str());
         RT_FAIL_IF(!sym, dlerror());
