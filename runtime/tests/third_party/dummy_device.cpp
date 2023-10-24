@@ -12,94 +12,63 @@ struct DummyDevice : public Catalyst::Runtime::QuantumDevice {
     virtual std::string getName(void) { return "DummyDevice"; }
 
     auto AllocateQubit() -> QubitIdType { return 0; }
-    virtual auto AllocateQubits(__attribute__((unused)) size_t num_qubits)
-        -> std::vector<QubitIdType>
+    virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
     {
         return std::vector<QubitIdType>(num_qubits);
     }
     [[nodiscard]] virtual auto Zero() const -> Result { return NULL; }
     [[nodiscard]] virtual auto One() const -> Result { return NULL; }
-    virtual auto Observable(__attribute__((unused)) ObsId id,
-                            __attribute__((unused)) const std::vector<std::complex<double>> &matrix,
-                            __attribute__((unused)) const std::vector<QubitIdType> &wires)
+    virtual auto Observable(ObsId, const std::vector<std::complex<double>> &,
+                            const std::vector<QubitIdType> &) -> ObsIdType
+    {
+        return 0;
+    }
+    virtual auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0; }
+    virtual auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
         -> ObsIdType
     {
         return 0;
     }
-    virtual auto TensorObservable(__attribute__((unused)) const std::vector<ObsIdType> &obs)
-        -> ObsIdType
-    {
-        return 0;
-    }
-    virtual auto HamiltonianObservable(__attribute__((unused)) const std::vector<double> &coeffs,
-                                       __attribute__((unused)) const std::vector<ObsIdType> &obs)
-        -> ObsIdType
-    {
-        return 0;
-    }
-    virtual auto Measure(__attribute__((unused)) QubitIdType wire) -> Result
+    virtual auto Measure(QubitIdType) -> Result
     {
         bool *ret = (bool *)malloc(sizeof(bool));
         *ret = true;
         return ret;
     }
 
-    virtual void ReleaseQubit(__attribute__((unused)) QubitIdType qubit) {}
+    virtual void ReleaseQubit(QubitIdType) {}
     virtual void ReleaseAllQubits() {}
     [[nodiscard]] virtual auto GetNumQubits() const -> size_t { return 0; }
-    virtual void SetDeviceShots(__attribute__((unused)) size_t shots) {}
+    virtual void SetDeviceShots(size_t shots) {}
     [[nodiscard]] virtual auto GetDeviceShots() const -> size_t { return 0; }
     virtual void StartTapeRecording() {}
     virtual void StopTapeRecording() {}
     virtual void PrintState() {}
-    virtual void NamedOperation(__attribute__((unused)) const std::string &name,
-                                __attribute__((unused)) const std::vector<double> &params,
-                                __attribute__((unused)) const std::vector<QubitIdType> &wires,
-                                __attribute__((unused)) bool inverse)
+    virtual void NamedOperation(const std::string &, const std::vector<double> &,
+                                const std::vector<QubitIdType> &, bool)
     {
     }
 
-    virtual void MatrixOperation(__attribute__((unused))
-                                 const std::vector<std::complex<double>> &matrix,
-                                 __attribute__((unused)) const std::vector<QubitIdType> &wires,
-                                 __attribute__((unused)) bool inverse)
+    virtual void MatrixOperation(const std::vector<std::complex<double>> &,
+                                 const std::vector<QubitIdType> &, bool)
     {
     }
 
-    virtual auto Expval(__attribute__((unused)) ObsIdType obsKey) -> double { return 0.0; }
-    virtual auto Var(__attribute__((unused)) ObsIdType obsKey) -> double { return 0.0; }
-    virtual void State(__attribute__((unused)) DataView<std::complex<double>, 1> &state) {}
-    virtual void Probs(__attribute__((unused)) DataView<double, 1> &probs) {}
-    virtual void PartialProbs(__attribute__((unused)) DataView<double, 1> &probs,
-                              __attribute__((unused)) const std::vector<QubitIdType> &wires)
-    {
-    }
-    virtual void Sample(__attribute__((unused)) DataView<double, 2> &samples,
-                        __attribute__((unused)) size_t shots)
-    {
-    }
-    virtual void PartialSample(__attribute__((unused)) DataView<double, 2> &samples,
-                               __attribute__((unused)) const std::vector<QubitIdType> &wires,
-                               __attribute__((unused)) size_t shots)
-    {
-    }
-    virtual void Counts(__attribute__((unused)) DataView<double, 1> &eigvals,
-                        __attribute__((unused)) DataView<int64_t, 1> &counts,
-                        __attribute__((unused)) size_t shots)
+    virtual auto Expval(ObsIdType) -> double { return 0.0; }
+    virtual auto Var(ObsIdType) -> double { return 0.0; }
+    virtual void State(DataView<std::complex<double>, 1> &) {}
+    virtual void Probs(DataView<double, 1> &) {}
+    virtual void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) {}
+    virtual void Sample(DataView<double, 2> &, size_t) {}
+    virtual void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) {}
+    virtual void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) {}
+
+    virtual void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                               const std::vector<QubitIdType> &, size_t)
     {
     }
 
-    virtual void PartialCounts(__attribute__((unused)) DataView<double, 1> &eigvals,
-                               __attribute__((unused)) DataView<int64_t, 1> &counts,
-                               __attribute__((unused)) const std::vector<QubitIdType> &wires,
-                               __attribute__((unused)) size_t shots)
-    {
-    }
-
-    virtual void Gradient(__attribute__((unused)) std::vector<DataView<double, 1>> &gradients,
-                          __attribute__((unused)) const std::vector<size_t> &trainParams)
-    {
-    }
+    virtual void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) {}
 };
 
 extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice() { return new DummyDevice(); }
