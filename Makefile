@@ -147,13 +147,13 @@ endif
 ifdef check
 	python3 ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
-	isort --check --diff frontend
+	isort --check --diff .
 else
 	python3 ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
-	isort frontend
+	isort .
 endif
-	pylint frontend
+	pylint .
 
 .PHONY: docs clean-docs
 docs:

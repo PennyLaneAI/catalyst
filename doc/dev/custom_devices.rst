@@ -106,7 +106,20 @@ where ``CustomDevice()`` is a constructor for your custom device.
 How to compile custom devices
 =============================
 
-One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` as an example.
+One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` `as an example. <https://github.com/PennyLaneAI/catalyst/blob/26b412b298f22565fea529d2019554e7ad9b9624/runtime/tests/third_party/CMakeLists.txt>`_
+
+.. code-block:: cmake
+
+        cmake_minimum_required(VERSION 3.20)
+
+        project(third_party_device)
+
+        set(CMAKE_CXX_STANDARD 20)
+        set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+        add_library(dummy_device SHARED dummy_device.cpp)
+        target_include_directories(dummy_device PUBLIC ${runtime_includes})
+        set_property(TARGET dummy_device PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 
 
@@ -116,3 +129,31 @@ Integration with Python devices
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
 After doing so, Catalyst should be able to interface with your custom device with no problem.
+
+.. code-block:: python
+
+    class DummyDevice(qml.QubitDevice):
+        """Dummy Device"""
+
+        name = "Dummy Device"
+        short_name = "dummy.device"
+        pennylane_requires = "0.32.0"
+        version = "0.0.1"
+        author = "Erick Ochoa"
+
+        def __init__(self, shots=None, wires=None):
+            super().__init__(wires=wires, shots=shots)
+
+        def apply(self, operations, **kwargs):
+            """Your normal definitions"""
+
+        @staticmethod
+        def get_c_interface():
+            """Location to shared object with C/C++ implementation"""
+            return "/libdummy_device.so"
+
+    @qjit
+    @qml.qnode(DummyDevice(wires=1))
+    def f():
+        return measure(0)
+
