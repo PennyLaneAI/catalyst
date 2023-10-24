@@ -136,6 +136,8 @@ class QFunc:
                     f"The {name} device is not supported for compilation at the moment."
                 )
 
+            # TODO:
+            # Once all devices get converted to shared libraries this name should just be the path.
             backend_path_or_name = name
             if implements_c_interface:
                 impl = self.device.get_c_interface()
