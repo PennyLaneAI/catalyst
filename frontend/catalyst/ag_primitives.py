@@ -389,6 +389,27 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
         (config, "CONVERSION_RULES", module_allowlist),
     ):
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in (
+            catalyst.adjoint,
+            catalyst.ctrl,
+            catalyst.grad,
+            catalyst.jacobian,
+            catalyst.vjp,
+            catalyst.jvp,
+        ):
+            assert args and callable(args[0])
+            wrapped_fn = args[0]
+
+            def passtrough_wrapper(*args, **kwargs):
+                return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
+
+            return fn(
+                passtrough_wrapper,
+                *args[1:],
+                **(kwargs if kwargs is not None else {}),
+            )
+
         # Dispatch range calls to a custom range class that enables constructs like
         # `for .. in range(..)` to be converted natively to `for_loop` calls. This is beneficial
         # since the Python range function does not allow tracers as arguments.
