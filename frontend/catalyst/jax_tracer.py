@@ -579,6 +579,7 @@ def trace_quantum_function(
             # check_jaxpr(jaxpr)
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+    # print("JJJJJJJJJJJ", closed_jaxpr)
     out_avals, _ = unzip2(out_type)
 
     abstract_results = tree_unflatten(

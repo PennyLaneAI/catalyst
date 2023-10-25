@@ -21,14 +21,17 @@ while using :func:`~.qjit`.
 import numbers
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
+from functools import reduce, partial
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from jax.lax import convert_element_type
 from jax._src.api_util import shaped_abstractify
-from jax._src.core import get_aval
+from jax._src.core import get_aval, eval_jaxpr
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax.numpy import promote_types
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
@@ -78,6 +81,33 @@ from catalyst.utils.jax_extras import (
     wrap_init,
 )
 from catalyst.utils.patching import Patcher
+
+
+def _promote_jaxpr_types(types: List[List[ShapedArray]]) -> List[ShapedArray]:
+    assert len(types) > 0, "Expected one or more set of types"
+    if not all(len(t) == len(types[0]) for t in types):
+        raise TypeError("Pytree type structure must be the same for all types")
+    with_qregs = all(isinstance(t[-1], AbstractQreg) for t in types)
+    if with_qregs:
+        types = [t[:-1] for t in types]
+    results = list(map(partial(reduce, promote_types), zip(*types)))
+    return results + ([AbstractQreg()] if with_qregs else [])
+
+
+def _apply_result_type_conversion(jaxpr:ClosedJaxpr, target_types:List[ShapedArray]) -> ClosedJaxpr:
+    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
+        with EvaluationContext.frame_tracing_context(ctx) as trace:
+            in_avals = list(map(shaped_abstractify, jaxpr.in_avals))
+            in_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            # print("- IIIIIIIINNNNNNNNTTTTTTTRRRRRRRR\n", in_tracers)
+            out_tracers = eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+            # print("- OOOOOUUUUUUTTTTTTTTTTTTRRRAAA\n", out_tracers)
+            out_tracers2 = [convert_element_type(tr, ty) for tr, ty in
+                            zip(out_tracers[:-1], target_types[:-1])]
+            # print("- OOOOOUUUUUUTTTTTTTTTTTTRRRAAA2222\n", out_tracers2)
+            jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(out_tracers2+[out_tracers[-1]])
+            # print("- OOOOOUUUUUUTTTTTTTTTTTTJJJJJJAAAAAAAA\n", jaxpr2)
+    return ClosedJaxpr(jaxpr2, consts)
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -926,13 +956,26 @@ class Cond(HybridOp):
 
         jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
+        # print("OUTVARS:")
+        # for j in jaxprs2:
+        #     print('- ', j.out_avals)
+
+        promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs2])
+        # print('PROMOTED:\n', promoted_types)
+
+        # print('CONVERTED:')
+        jj = []
+        for j in jaxprs2:
+            # print('- IIIIIIIINNNNNNNNNnJJJJJJJJAAA\n', j)
+            jj.append(_apply_result_type_conversion(j, promoted_types))
+
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 *(op.in_classical_tracers + combined_consts + [qreg]),
-                branch_jaxprs=jaxprs2,
+                branch_jaxprs=jj,
             )
         )
         return qrp2
@@ -1155,7 +1198,7 @@ class CondCallable:
             out_trees.append(out_tree())
             out_avals.append(res_classical_tracers)
 
-        _check_cond_same_types(out_trees, out_avals)
+        # _check_cond_same_types(out_trees, out_avals)
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
         Cond(in_classical_tracers, out_classical_tracers, regions)
