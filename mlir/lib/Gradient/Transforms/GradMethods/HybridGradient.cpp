@@ -170,7 +170,7 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
                 // argument, we need to insert a call to the parameter count function at the
                 // location of the grad op.
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPointAfterValue(gradOp.getArgOperands().back());
+                rewriter.setInsertionPoint(gradOp);
 
                 Value paramCount =
                     rewriter.create<func::CallOp>(loc, paramCountFn, gradOp.getArgOperands())
