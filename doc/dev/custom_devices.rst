@@ -10,7 +10,7 @@ In PennyLane, one is able to `define devices <https://docs.pennylane.ai/en/stabl
 Catalyst cannot interface with Python devices yet.
 Instead, Catalyst can only interact with devices that implement the `QuantumDevice <../api/file_runtime_include_QuantumDevice.hpp.html>`_ class.
 
-Here is an example of a custom ``QuantumDevice`` which every single quantum operation is implemented as a no-operation.
+Here is an example of a custom ``QuantumDevice`` in which every single quantum operation is implemented as a no-operation.
 Additionally, all measurements will always return ``true``.
 
 .. code-block:: c++
@@ -128,7 +128,7 @@ Integration with Python devices
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
-After doing so, Catalyst should be able to interface with your custom device with no problem.
+After doing so, Catalyst should be able to interface with your custom device.
 
 .. code-block:: python
 
