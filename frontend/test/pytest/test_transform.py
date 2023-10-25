@@ -34,11 +34,7 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
-from pennylane.transforms import (
-    hamiltonian_expand,
-    qcut,
-    sum_expand,
-)
+from pennylane.transforms import hamiltonian_expand, qcut, sum_expand
 from pennylane_lightning.lightning_qubit import LightningQubit
 
 from catalyst import qjit
@@ -53,9 +49,7 @@ def test_batch_input(backend):
         """Builder"""
 
         @partial(qml.batch_input, argnum=1)
-        @qml.qnode(
-            qml.device(backend_name, wires=2), interface="jax", diff_method="parameter-shift"
-        )
+        @qml.qnode(qml.device(device_name, wires=2), interface="jax", diff_method="parameter-shift")
         def qfunc(inputs, weights):
             """Example taken from tests"""
             qml.RY(weights[0], wires=0)
@@ -208,6 +202,9 @@ class TestBroadcastExpand:
     def test_expansion_qnode(self, backend, params, size, obs, exp_fn):
         """Test broadcast expand"""
 
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
         def qnode_builder(device_name):
             """Builder"""
 
@@ -235,6 +232,48 @@ class TestBroadcastExpand:
         observed = qjit(qnode_backend)(*params, obs)
 
         assert np.allclose(e, observed)
+
+    @pytest.mark.parametrize("params, size", parameters_and_size)
+    @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
+    def test_expansion_qnode_no_cache(self, backend, params, size, obs, exp_fn):
+        """Test broadcast expand.
+
+        This test is used as an alternative to test_expansion_qnode which cannot succeed due to bug.
+        The only difference here is that we specify cache=False on the qnode.
+
+        Delete me once cache=False is not necessary.
+        """
+
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
+        def qnode_builder(device_name):
+            """Builder"""
+
+            @qml.transforms.broadcast_expand
+            @qml.qnode(qml.device(device_name, wires=2), interface="jax", cache=False)
+            def circuit(x, y, z, obs):
+                """Example taken from PL tests"""
+                qml.StatePrep(
+                    np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
+                    wires=[0, 1],
+                )
+                RX_broadcasted(x, wires=0)
+                qml.PauliY(0)
+                RX_broadcasted(y, wires=1)
+                RZ_broadcasted(z, wires=1)
+                qml.Hadamard(1)
+                return [qml.expval(ob) for ob in obs]
+
+            return circuit
+
+        qnode_control = qnode_builder("default.qubit")
+        qnode_backend = qnode_builder(backend)
+
+        expected = jax.jit(qnode_control)(*params, obs)
+        observed = qjit(qnode_backend)(*params, obs)
+
+        assert np.allclose(expected, observed)
 
 
 class TestCutCircuitMCTransform:
