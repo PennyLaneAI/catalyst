@@ -120,12 +120,12 @@ DEFAULT_PIPELINES = [
             "convert-to-signless",
             "func.func(scalarize)",
             "canonicalize",
+            "scatter-lowering",
         ],
     ),
     (
         "QuantumCompilationPass",
         [
-            "scatter-lowering",
             "lower-gradients",
             "adjoint-lowering",
         ],
