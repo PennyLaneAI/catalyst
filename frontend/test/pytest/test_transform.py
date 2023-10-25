@@ -35,11 +35,8 @@ from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
 from pennylane.transforms import (
-    fold_global,
     hamiltonian_expand,
-    mitigate_with_zne,
     qcut,
-    richardson_extrapolate,
     sum_expand,
 )
 from pennylane_lightning.lightning_qubit import LightningQubit
@@ -52,34 +49,45 @@ from catalyst.pennylane_extensions import QJITDevice
 def test_batch_input(backend):
     """Test that batching works for a simple circuit"""
 
-    @partial(qml.batch_input, argnum=1)
-    @qml.qnode(qml.device(backend, wires=2), interface="jax", diff_method="parameter-shift")
-    def interpreted(inputs, weights):
-        qml.RY(weights[0], wires=0)
-        qml.AngleEmbedding(inputs, wires=range(2), rotation="Y")
-        qml.RY(weights[1], wires=1)
-        return qml.expval(qml.PauliZ(1))
+    def qnode_builder(device_name):
+        @partial(qml.batch_input, argnum=1)
+        @qml.qnode(
+            qml.device(backend_name, wires=2), interface="jax", diff_method="parameter-shift"
+        )
+        def qfunc(inputs, weights):
+            qml.RY(weights[0], wires=0)
+            qml.AngleEmbedding(inputs, wires=range(2), rotation="Y")
+            qml.RY(weights[1], wires=1)
+            return qml.expval(qml.PauliZ(1))
+
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
 
     batch_size = 5
     inputs = pnp.random.uniform(0, pnp.pi, (batch_size, 2), requires_grad=False)
     weights = pnp.random.uniform(-pnp.pi, pnp.pi, (2,))
 
-    jax_jit = jax.jit(interpreted)(inputs, weights)
-    compiled = qjit(interpreted, keep_intermediate=True)
+    expected_output = jax.jit(qnode_control)(inputs, weights)
+    observed_output = qjit(qnode_backend)(inputs, weights)
 
-    assert_allclose(jax_jit, compiled(inputs, weights))
+    assert_allclose(expected_output, observed_output)
 
 
 @pytest.mark.skip(reason="Temporary, please investigate")
 def test_batch_params(backend):
-    @qml.batch_params
-    @qml.qnode(qml.device(backend, wires=3), interface="jax")
-    def interpreted(data, x, weights):
-        qml.templates.AmplitudeEmbedding(data, wires=[0, 1, 2], normalize=True)
-        qml.RX(x, wires=0)
-        qml.RY(0.2, wires=1)
-        qml.templates.StronglyEntanglingLayers(weights, wires=[0, 1, 2])
-        return qml.probs(wires=[0, 2])
+    def qnode_builder(device_name):
+        @qml.batch_params
+        @qml.qnode(qml.device(device_name, wires=3), interface="jax")
+        def qfunc(data, x, weights):
+            qml.templates.AmplitudeEmbedding(data, wires=[0, 1, 2], normalize=True)
+            qml.RX(x, wires=0)
+            qml.RY(0.2, wires=1)
+            qml.templates.StronglyEntanglingLayers(weights, wires=[0, 1, 2])
+            return qml.probs(wires=[0, 2])
+
+        return qfunc
 
     batch_size = 5
     data = pnp.random.random((batch_size, 8))
@@ -87,37 +95,47 @@ def test_batch_params(backend):
     data = pnp.array([data, data, data, data, data])
     x = pnp.linspace(0.1, 0.5, batch_size, requires_grad=True)
     weights = pnp.ones((batch_size, 10, 3, 3), requires_grad=True)
-    jax_jit = jax.jit(interpreted)
-    compiled = qjit(interpreted)
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+
+    jax_jit = jax.jit(qnode_control)
+    compiled = qjit(qnode_backend)
     expected = jax_jit(data, x, weights)
     observed = compiled(data, x, weights)
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.skipif(backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+@pytest.mark.skipif(
+    backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731"
+)
 def test_split_non_commuting(backend):
-    @qml.transforms.split_non_commuting
-    @qml.qnode(qml.device(backend, wires=6), interface="jax")
-    def interpreted():
-        qml.Hadamard(1)
-        qml.Hadamard(0)
-        qml.PauliZ(0)
-        qml.Hadamard(3)
-        qml.Hadamard(5)
-        qml.T(5)
-        return (
-            qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
-            qml.expval(qml.PauliX(0)),
-            qml.expval(qml.PauliZ(1)),
-            qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
-            qml.expval(qml.PauliX(3)),
-            qml.expval(qml.PauliY(5)),
-        )
+    def qnode_builder(device_name):
+        @qml.transforms.split_non_commuting
+        @qml.qnode(qml.device(backend, wires=6), interface="jax")
+        def qfunc():
+            qml.Hadamard(1)
+            qml.Hadamard(0)
+            qml.PauliZ(0)
+            qml.Hadamard(3)
+            qml.Hadamard(5)
+            qml.T(5)
+            return (
+                qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliZ(1)),
+                qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
+                qml.expval(qml.PauliX(3)),
+                qml.expval(qml.PauliY(5)),
+            )
 
-    jax_jit = jax.jit(interpreted)
-    jax_jit()
-    compiled = qjit(interpreted)
-    assert np.allclose(jax_jit(), compiled())
+        return qfunc
+
+    qnode_control = qnode_builder("default.qubit")
+    qnode_backend = qnode_builder(backend)
+    expected = jax.jit(qnode_control)()
+    observed = qjit(qnode_backend)()
+    assert np.allclose(expected, observed)
 
 
 class RX_broadcasted(qml.RX):
@@ -200,45 +218,12 @@ class TestCutCircuitMCTransform:
         Tests that a circuit containing sampling measurements can be cut and
         postprocessed to return bitstrings of the original circuit size.
         """
-        """
-        shots = 1
-        dev = qml.device("default.qubit", wires=3, shots=shots)
-
-        @qml.qnode(dev, interface="jax")
-        def circuit(x):
-            qml.RX(x, wires=0)
-            qml.RY(0.5, wires=1)
-            qml.RX(1.3, wires=2)
-
-            qml.CNOT(wires=[0, 1])
-            qml.WireCut(wires=1)
-            qml.CNOT(wires=[1, 2])
-
-            qml.RX(x, wires=0)
-            qml.RY(0.7, wires=1)
-            qml.RX(2.3, wires=2)
-            return qml.sample(wires=[0, 2])
-
-        v = 0.319
-        target = circuit(v)
-
-        cut_circuit_bs = jax.jit(qcut.cut_circuit_mc(circuit))
-        cut_res_bs = cut_circuit_bs(v)
-
-        assert cut_res_bs.shape == target.shape
-        assert isinstance(cut_res_bs, type(target))
-
-        cut_circuit_bs_compiled = qjit(qcut.cut_circuit_mc(circuit))
-        cut_res_bs_compiled = cut_circuit_bs_compiled(v)
-
-        assert cut_res_bs_compiled.shape == target.shape
-        assert isinstance(cut_res_bs_compiled, type(target))
-        """
-
+        control_device = "default.qubit"
         dev = qml.device("lightning.qubit", wires=2, shots=None)
 
         @qml.qnode(dev)
         def circuit(x):
+            """Example"""
             qml.RX(x, wires=0)
             qml.RY(0.543, wires=1)
             qml.WireCut(wires=0)
@@ -264,6 +249,8 @@ class TestCutCircuitMCTransform:
 
 class TestHamiltonianExpand:
     def test_hamiltonian_expand(self):
+        """Test hamiltonian expand."""
+
         H4 = (
             qml.PauliX(0) @ qml.PauliZ(2)
             + 3 * qml.PauliZ(2)
