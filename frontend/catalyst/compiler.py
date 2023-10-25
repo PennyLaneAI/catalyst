@@ -120,6 +120,7 @@ DEFAULT_PIPELINES = [
             "convert-to-signless",
             "func.func(scalarize)",
             "canonicalize",
+            "scatter-lowering",
         ],
     ),
     (
@@ -132,7 +133,6 @@ DEFAULT_PIPELINES = [
     (
         "BufferizationPass",
         [
-            "scatter-lowering",
             "one-shot-bufferize{dialect-filter=memref}",
             "inline",
             "gradient-bufferize",
