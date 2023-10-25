@@ -150,7 +150,7 @@ After doing so, Catalyst should be able to interface with your custom device wit
         @staticmethod
         def get_c_interface():
             """Location to shared object with C/C++ implementation"""
-            return "/libdummy_device.so"
+            return "full/path/to/libdummy_device.so"
 
     @qjit
     @qml.qnode(DummyDevice(wires=1))
