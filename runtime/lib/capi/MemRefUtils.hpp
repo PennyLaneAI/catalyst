@@ -65,7 +65,7 @@ static inline void _gen_oss_dyn_memref(DynamicMemRefT &newMemref, int64_t rank)
 
     if (rank == 0) {
         if constexpr (std::is_same_v<T, CplxT_float> || std::is_same_v<T, CplxT_double>) {
-            newMemref.in_str << "{" << data[0].real << ", " << data[0].imag << "}";
+            newMemref.in_str << data[0].real << "+" << data[0].imag << "j";
         }
         else {
             newMemref.in_str << data[0];
@@ -76,7 +76,7 @@ static inline void _gen_oss_dyn_memref(DynamicMemRefT &newMemref, int64_t rank)
                             newMemref.strides.data());
         for (const auto elem : view) {
             if constexpr (std::is_same_v<T, CplxT_float> || std::is_same_v<T, CplxT_double>) {
-                newMemref.in_str << "{" << elem.real << ", " << elem.imag << "} ";
+                newMemref.in_str << elem.real << "+" << elem.imag << "j";
             }
             else {
                 newMemref.in_str << elem << " ";
@@ -95,7 +95,7 @@ static inline void _gen_oss_dyn_memref(DynamicMemRefT &newMemref, int64_t rank)
                 newMemref.in_str << ", [ ";
             }
             if constexpr (std::is_same_v<T, CplxT_float> || std::is_same_v<T, CplxT_double>) {
-                newMemref.in_str << "{" << elem.real << ", " << elem.imag << "} ";
+                newMemref.in_str << elem.real << "+" << elem.imag << "j";
             }
             else {
                 newMemref.in_str << elem << " ";

@@ -14,11 +14,11 @@ class TestDebugPrint:
             (True, "1\n"),  # TODO: is this ok?
             (3, "3\n"),
             (3.5, "3.5\n"),
-            (3 + 4j, "{3, 4}\n"),  # TODO: fixme, prettier complex numbers
+            (3 + 4j, "3+4j\n"),
             (np.array(3), "3\n"),
             (jnp.array(3), "3\n"),
             (jnp.array(3.000001), "3\n"),  # TODO: fixme, show more precision
-            (jnp.array(3.1 + 4j), "{3.1, 4}\n"),
+            (jnp.array(3.1 + 4j), "3.1+4j\n"),
             (jnp.array([3]), "[ 3 ]\n"),
             (jnp.array([3, 4, 5]), "[ 3 4 5 ]\n"),
             (
