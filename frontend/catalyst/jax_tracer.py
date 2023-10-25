@@ -432,6 +432,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
 
 
 def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    """Identity transform"""
     return [tape], lambda res: res[0]
 
 
@@ -575,14 +576,13 @@ def trace_quantum_function(
             # For example:
             #   * mid-circuit measurements (for batch-transforms)
             #   * that the output will be only a sequence of `MeasurementProcess`es.
-            is_measurement = lambda maybe: isinstance(maybe, MeasurementProcess)
+            def is_measurement(x):
+                """Only to avoid 100 character per line limit."""
+                return isinstance(x, MeasurementProcess)
             is_out_measurements = map(is_measurement, out_measurements)
             is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
             is_out_measurement_sequence = is_all_out_measurements and isinstance(
                 out_measurements, Sequence
-            )
-            is_out_measurement_sequence_one_element = (
-                is_out_measurement_sequence and len(out_measurements) == 1
             )
             is_out_single_measurement = is_all_out_measurements and isinstance(
                 out_measurements, MeasurementProcess
@@ -602,14 +602,12 @@ def trace_quantum_function(
             else:
                 tapes, callback = identity_qnode_transform(quantum_tape)
 
-            # I don't think we can now if a transform is a batch transform until we return more than 1 tape.
             invalid_state = is_program_transformed and not are_batch_transforms_valid
             # TODO: Consider whether issuing a warning, or an exception is better.
             assert not invalid_state
 
             del quantum_tape
         # (2) - Quantum tracing
-        results = []
         results_tracers = []
         results_abstract = []
         for tape in tapes:
