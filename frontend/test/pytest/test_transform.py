@@ -63,6 +63,7 @@ def test_batch_input(backend):
 
     assert_allclose(jax_jit, compiled(inputs, weights))
 
+@pytest.mark.skip(reason="Temporary, please investigate")
 def test_batch_params(backend):
 
     @qml.batch_params

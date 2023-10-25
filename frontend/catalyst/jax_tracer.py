@@ -623,6 +623,7 @@ def trace_quantum_function(
                 qdevice_p.bind(spec="backend", val=device.backend_name)
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
+                _, pytree_measurements = jax.tree_util.tree_flatten(tape.measurements, is_leaf=is_leaf)
                 out_classical_tracers, out_classical_tree = trace_quantum_measurements(
                     device,
                     qrp_out,
@@ -632,7 +633,7 @@ def trace_quantum_function(
                     out_classical_tracers_or_measurements
                     if not is_program_transformed
                     else tape.measurements,
-                    out_tree_promise() if not is_program_transformed else pytree_measurements,
+                    out_tree if not is_program_transformed else pytree_measurements,
                 )
                 out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
