@@ -166,7 +166,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         else {
                             updatedExtracted = updated;
                         }
-                        // Insert the update in the results and replace the previous value
+                        // Insert the computed update in the results and replace the previous value
                         Value res = builder.create<tensor::InsertOp>(loc, updatedExtracted, results,
                                                                      resultsIndicesValue);
                         builder.create<scf::YieldOp>(loc, res);
