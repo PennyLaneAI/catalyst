@@ -94,7 +94,7 @@ def test_batch_params(backend):
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.skipif(backend="lightning.kokkos", reason="temporary, please investigate")
+@pytest.mark.skipif(backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 def test_split_non_commuting(backend):
     @qml.transforms.split_non_commuting
     @qml.qnode(qml.device(backend, wires=6), interface="jax")
