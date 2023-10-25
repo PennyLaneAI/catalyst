@@ -14,9 +14,8 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-from typing import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
