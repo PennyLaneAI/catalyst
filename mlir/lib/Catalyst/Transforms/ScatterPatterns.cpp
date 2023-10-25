@@ -118,7 +118,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                               variables.scatterIndices, variables.indexVectorDim,
                                               variables.scatterDimsToOperandDims, builder, loc);
 
-                        // Tensor to vector rework
+                        // Right now the indices are stored in an IR tensor.
+                        // We need to extract them all to pass them to the tensor.extract op.
                         SmallVector<Value> updatesIndicesValue;
                         if (updatesIndices) {
                             if (isa<RankedTensorType>(updatesIndices.getType())) {
