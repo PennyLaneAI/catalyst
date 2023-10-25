@@ -186,8 +186,6 @@ observables_and_exp_fns = [
     # ([H0], exp_fn_H0),
 ]
 
-"""Broadcast expand appears to only work on default.qubit."""
-
 
 class TestBroadcastExpand:
     @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4734")
@@ -212,7 +210,6 @@ class TestBroadcastExpand:
             return circuit
 
         qnode_control = qnode_builder("lightning.qubit")
-        qnode_default = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
@@ -222,38 +219,37 @@ class TestBroadcastExpand:
 
 
 class TestCutCircuitMCTransform:
-    def test_cut_circuit_mc_sample(self):
+    def test_cut_circuit_mc_sample(self, backend):
         """
         Tests that a circuit containing sampling measurements can be cut and
         postprocessed to return bitstrings of the original circuit size.
         """
-        control_device = "default.qubit"
-        dev = qml.device("lightning.qubit", wires=2, shots=None)
 
-        @qml.qnode(dev)
-        def circuit(x):
-            """Example"""
-            qml.RX(x, wires=0)
-            qml.RY(0.543, wires=1)
-            qml.WireCut(wires=0)
-            qml.CNOT(wires=[0, 1])
-            qml.RZ(0.240, wires=0)
-            qml.RZ(0.133, wires=1)
-            return qml.expval(qml.PauliZ(wires=[0]))
+        def qnode_builder(device_name):
+            @qml.qnode(qml.device(device_name, wires=2, shots=None))
+            def qfunc(x):
+                """Example"""
+                qml.RX(x, wires=0)
+                qml.RY(0.543, wires=1)
+                qml.WireCut(wires=0)
+                qml.CNOT(wires=[0, 1])
+                qml.RZ(0.240, wires=0)
+                qml.RZ(0.133, wires=1)
+                return qml.expval(qml.PauliZ(wires=[0]))
+
+            return qfunc
+
+        qnode_default = qnode_builder("default.qubit")
+        qnode_backend = qnode_builder(backend)
 
         x = jnp.array(0.531)
-        cut_circuit_jit = jax.jit(qcut.cut_circuit(circuit, use_opt_einsum=False))
-        cut_circuit_qjit = qjit(qcut.cut_circuit(circuit, use_opt_einsum=False))
+        cut_circuit_jit = jax.jit(qcut.cut_circuit(qnode_default, use_opt_einsum=False))
+        cut_circuit_qjit = qjit(qcut.cut_circuit(qnode_backend, use_opt_einsum=False))
 
-        # Note we call the function twice but assert qcut_processing_fn is called once. We expect
-        # qcut_processing_fn to be called once during JIT compilation, with subsequent calls to
-        # cut_circuit_jit using the compiled code.
-        res = cut_circuit_jit(x)
-        res_qjit = cut_circuit_qjit(x)
-        res_expected = circuit(x)
+        expected = cut_circuit_jit(x)
+        observed = cut_circuit_qjit(x)
 
-        assert np.allclose(res_qjit, res_expected)
-        assert np.allclose(res, res_expected)
+        assert np.allclose(expected, observed)
 
 
 class TestHamiltonianExpand:
