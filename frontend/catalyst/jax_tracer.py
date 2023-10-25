@@ -583,14 +583,14 @@ def trace_quantum_function(
             is_out_measurements = map(is_measurement, out_measurements)
             is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
             is_out_measurement_sequence = is_all_out_measurements and isinstance(
-                out_tree_promise().unflatten(out_measurements), Sequence
+                out_measurements, Sequence
             )
             is_out_measurement_sequence_one_element = (
                 is_out_measurement_sequence
-                and len(out_tree_promise().unflatten(out_measurements)) == 1
+                and len(out_measurements) == 1
             )
             is_out_single_measurement = is_all_out_measurements and isinstance(
-                out_tree_promise().unflatten(out_measurements), MeasurementProcess
+                out_measurements, MeasurementProcess
             )
             is_valid_output = is_out_measurement_sequence or is_out_single_measurement
             # TODO: check if there were mid circuit measurements in the original tape.
