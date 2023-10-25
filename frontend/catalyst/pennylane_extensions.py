@@ -25,11 +25,11 @@ from typing import Any, Callable, Iterable, List, Optional, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.lax import convert_element_type
 from jax._src.api_util import shaped_abstractify
-from jax._src.core import get_aval, eval_jaxpr
+from jax._src.core import eval_jaxpr, get_aval
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax.lax import convert_element_type
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
@@ -849,9 +849,7 @@ def _check_cond_same_shapes(trees: List[PyTreeDef], avals: List[List[Any]]) -> N
     expected_tree = trees[0]
     for tree, aval in list(zip(trees, avals))[1:]:
         if tree != expected_tree:
-            raise TypeError(
-                "Conditional requires consistent return types across all branches"
-            )
+            raise TypeError("Conditional requires consistent return types across all branches")
 
 
 class ForLoop(HybridOp):

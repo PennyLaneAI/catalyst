@@ -15,19 +15,20 @@
 """
 
 from dataclasses import dataclass
+from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from functools import reduce, partial
 
 import jax
 import jax.numpy as jnp
-from jax.numpy import promote_types
 import pennylane as qml
+from jax.numpy import promote_types
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 
 from catalyst.jax_primitives import (
+    AbstractQreg,
     compbasis_p,
     counts_p,
     expval_p,
@@ -48,7 +49,6 @@ from catalyst.jax_primitives import (
     state_p,
     tensorobs_p,
     var_p,
-    AbstractQreg
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.jax_extras import (
@@ -58,9 +58,11 @@ from catalyst.utils.jax_extras import (
     PyTreeDef,
     ShapedArray,
     ShapeDtypeStruct,
-    _input_type_to_tracers,
     _abstractify,
+    _input_type_to_tracers,
+    convert_element_type,
     deduce_avals,
+    eval_jaxpr,
     jaxpr_to_mlir,
     pytree,
     sort_eqns,
@@ -68,8 +70,6 @@ from catalyst.utils.jax_extras import (
     tree_unflatten,
     unzip2,
     wrap_init,
-    eval_jaxpr,
-    convert_element_type,
 )
 
 
@@ -112,6 +112,7 @@ PAULI_NAMED_MAP = {
     "Z": "PauliZ",
 }
 
+
 def _promote_jaxpr_types(types: List[List[ShapedArray]]) -> List[ShapedArray]:
     assert len(types) > 0, "Expected one or more set of types"
     assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
@@ -122,32 +123,31 @@ def _promote_jaxpr_types(types: List[List[ShapedArray]]) -> List[ShapedArray]:
     return results + ([AbstractQreg()] if with_qregs else [])
 
 
-def _apply_result_type_conversion(jaxpr:ClosedJaxpr, target_types:List[ShapedArray]) -> ClosedJaxpr:
+def _apply_result_type_conversion(
+    jaxpr: ClosedJaxpr, target_types: List[ShapedArray]
+) -> ClosedJaxpr:
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context(ctx) as trace:
             in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
             out_tracers = [
-                trace.full_raise(t)
-                for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+                trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
             ]
             out_tracers_, target_types_ = (
-                (out_tracers[:-1], target_types[:-1])
-                if with_qreg
-                else (out_tracers, target_types)
+                (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
             )
             out_promoted_tracers = [
                 (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
                 for tr, ty in zip(out_tracers_, target_types_)
             ]
             jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(
-                out_promoted_tracers+([out_tracers[-1]] if with_qreg else [])
+                out_promoted_tracers + ([out_tracers[-1]] if with_qreg else [])
             )
     return ClosedJaxpr(jaxpr2, consts)
 
 
-def unify_result_types(jaxprs:List[ClosedJaxpr]) -> List[ClosedJaxpr]:
-    """ Unify result types of the jaxpr equations given.
+def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
+    """Unify result types of the jaxpr equations given.
     Args:
         jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
                                       matching pytree-shapes and numpy array shapes but dtypes might

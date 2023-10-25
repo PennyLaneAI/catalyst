@@ -49,7 +49,7 @@ class TestCondToJaxpr:
             return out
 
         def asline(text):
-            return ' '.join(map(lambda x:x.strip(), str(text).split('\n')))
+            return " ".join(map(lambda x: x.strip(), str(text).split("\n")))
 
         assert asline(expected) == asline(circuit._jaxpr)  # pylint: disable=protected-access
 
@@ -227,7 +227,7 @@ class TestCond:
         def circuit():
             @cond(True)
             def cond_fn():
-                return (1,1)
+                return (1, 1)
 
             @cond_fn.otherwise
             def cond_fn():

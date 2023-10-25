@@ -33,7 +33,6 @@ from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
 from jax.api_util import flatten_fun, shaped_abstractify
-from jax.lax import convert_element_type
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import ShapedArray, Trace, gensym, thread_local_state
@@ -50,6 +49,7 @@ from jax.interpreters.partial_eval import (
     convert_constvars_jaxpr,
     make_jaxpr_effects,
 )
+from jax.lax import convert_element_type
 from jax.linear_util import wrap_init
 from jax.tree_util import (
     PyTreeDef,
