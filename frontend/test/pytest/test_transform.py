@@ -219,6 +219,9 @@ class TestBroadcastExpand:
 
 
 class TestCutCircuitMCTransform:
+    @pytest.mark.skipif(
+        backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731"
+    )
     def test_cut_circuit_mc_sample(self, backend):
         """
         Tests that a circuit containing sampling measurements can be cut and
@@ -253,7 +256,10 @@ class TestCutCircuitMCTransform:
 
 
 class TestHamiltonianExpand:
-    def test_hamiltonian_expand(self):
+    @pytest.mark.skipif(
+        backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731"
+    )
+    def test_hamiltonian_expand(self, backend):
         """Test hamiltonian expand."""
 
         H4 = (
@@ -265,18 +271,24 @@ class TestHamiltonianExpand:
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
-        dev = qml.device("lightning.qubit", wires=3)
+        def qnode_builder(device_name):
+            @hamiltonian_expand
+            @qml.qnode(qml.device(device_name, wires=3))
+            def qfunc():
+                qml.Hadamard(0)
+                qml.Hadamard(1)
+                qml.PauliZ(1)
+                qml.PauliX(2)
+                return qml.expval(H4)
 
-        @hamiltonian_expand
-        @qml.qnode(dev)
-        def circuit():
-            qml.Hadamard(0)
-            qml.Hadamard(1)
-            qml.PauliZ(1)
-            qml.PauliX(2)
-            return qml.expval(H4)
+            return qfunc
 
-        assert np.allclose(circuit(), qjit(circuit)())
+        qnode_backend = qnode_builder(backend)
+        qnode_control = qnode_builder("default.qubit")
+        expected = jax.jit(qnode_control)()
+        observed = jax.jit(qnode_backend)()
+
+        assert np.allclose(expected, observed)
 
 
 class TestSumExpand:
