@@ -25,7 +25,6 @@ void populateBufferizationLegality(mlir::TypeConverter &, mlir::ConversionTarget
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populateAdjointPatterns(mlir::RewritePatternSet &);
-void populateScatterPatterns(mlir::RewritePatternSet &);
 
 } // namespace quantum
 } // namespace catalyst

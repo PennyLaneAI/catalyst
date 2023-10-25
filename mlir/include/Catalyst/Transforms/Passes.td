@@ -56,4 +56,16 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
     let constructor = "catalyst::createCatalystConversionPass()";
 }
 
+def ScatterLoweringPass : Pass<"scatter-lowering"> {
+    let summary = "Lower scatter op from Stable HLO to loops.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "mhlo::MhloDialect",
+        "scf::SCFDialect"
+    ];
+
+    let constructor = "catalyst::createScatterLoweringPass()";
+}
+
 #endif // CATALYST_PASSES

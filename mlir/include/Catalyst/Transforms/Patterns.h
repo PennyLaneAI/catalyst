@@ -21,4 +21,6 @@ namespace catalyst {
 
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 
+void populateScatterPatterns(mlir::RewritePatternSet &);
+
 } // namespace catalyst

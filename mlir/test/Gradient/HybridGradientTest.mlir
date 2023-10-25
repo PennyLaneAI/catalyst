@@ -205,32 +205,32 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
     return %res : tensor<2xf64>
 }
 
-// CHECK-LABEL: @funcTensorTensor.fullgrad0(%arg0: tensor<7x3x2x1xf64>, %arg1: index) -> tensor<7x3x2x1x2xf64>
+// CHECK-LABEL: @funcTensorTensor.fullgrad0(%arg0: tensor<7x3x2x1xf64>, %arg1: index) -> tensor<2x7x3x2x1xf64>
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
     // CHECK-DAG:    [[idx0:%.+]] = index.constant 0
     // CHECK-DAG:    [[idx1:%.+]] = index.constant 1
-    // CHECK-DAG:    [[jacobian0:%.+]] = tensor.empty() : tensor<7x3x2x1x2xf64>
+    // CHECK-DAG:    [[jacobian0:%.+]] = tensor.empty() : tensor<2x7x3x2x1xf64>
     // CHECK-DAG:    [[empty:%.+]] = tensor.empty() : tensor<2xf64>
     // CHECK:        [[zeroed:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
 
     // CHECK:        [[cotangent0:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx0]]]
     // CHECK:        [[jacSlice0:%.+]] = gradient.backprop @funcTensorTensor.preprocess(%arg0, %arg1) cotangents([[cotangent0]]
-    // CHECK:        [[jacobian1:%.+]] = tensor.insert_slice [[jacSlice0]] into [[jacobian0]][0, 0, 0, 0, [[idx0]]] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1]
+    // CHECK:        [[jacobian1:%.+]] = tensor.insert_slice [[jacSlice0]] into [[jacobian0]][[[idx0]], 0, 0, 0, 0] [1, 7, 3, 2, 1] [1, 1, 1, 1, 1]
 
     // CHECK:        [[cotangent1:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx1]]]
     // CHECK:        [[jacSlice1:%.+]] = gradient.backprop @funcTensorTensor.preprocess(%arg0, %arg1) cotangents([[cotangent1]]
-    // CHECK:        [[jacobian:%.+]] = tensor.insert_slice [[jacSlice1]] into [[jacobian1]][0, 0, 0, 0, [[idx1]]] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1]
+    // CHECK:        [[jacobian:%.+]] = tensor.insert_slice [[jacSlice1]] into [[jacobian1]][[[idx1]], 0, 0, 0, 0] [1, 7, 3, 2, 1] [1, 1, 1, 1, 1]
 
     // CHECK:        return [[jacobian]]
 
-// CHECK-LABEL: @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
-func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64> {
+// CHECK-LABEL: @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
+func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64> {
     // CHECK:        [[pcount:%.+]] = call @funcTensorTensor.pcount
     // CHECK:        [[grad:%.+]] = call @funcTensorTensor.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %2 = gradient.grad "auto" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
-    func.return %2 : tensor<7x3x2x1x2xf64>
+    %2 = gradient.grad "auto" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
+    func.return %2 : tensor<2x7x3x2x1xf64>
 }
 
 // -----

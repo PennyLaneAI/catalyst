@@ -10,13 +10,41 @@
 
 <h3>Breaking changes</h3>
 
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+  `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
 <h3>Bug fixes</h3>
+
+* Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
+  [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
+
+* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the master
+  branch of PennyLane-Lightning. This issue introduced in [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
+  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
+
+* Add a newer pip requirement to the `requirements.txt`. Recent version of pip contains a bug fix
+  allowing us to do editable installations even if system-wide site-packages is read-only.
+  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+
+* Add `pennylane.compilers` entry points interface.
+  [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
+
+  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points` metadata under the the group name `pennylane.compilers`, with the following entry points:
+
+  - `context`: Path to the compilation evaluation context manager. This context manager should have the method context.is_tracing(), which returns True if called within a program that is being traced or captured.
+
+  - `ops`: Path to the compiler operations module. This operations module may contain compiler specific versions of PennyLane operations. Within a JIT context, PennyLane operations may dispatch to these
+
+  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
-Sergei Mironov.
+Ali Asadi,
+Sergei Mironov,
+Romain Moyard.
 
 # Release 0.3.1
 
