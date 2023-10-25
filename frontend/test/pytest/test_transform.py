@@ -182,34 +182,43 @@ observables_and_exp_fns = [
     ([qml.PauliZ(0)], exp_fn_Z0),
     ([qml.PauliZ(0) @ qml.PauliY(1)], exp_fn_Z0Y1),
     ([qml.PauliZ(0), qml.PauliY(1)], exp_fn_Z0_and_Y1),
-    # TODO: Uncomment when fixed: https://github.com/PennyLaneAI/pennylane/issues/4601
-    #    ([H0], exp_fn_H0),
+    #  TODO: Uncomment when fixed: https://github.com/PennyLaneAI/pennylane/issues/4601
+    # ([H0], exp_fn_H0),
 ]
 
 """Broadcast expand appears to only work on default.qubit."""
 
 
 class TestBroadcastExpand:
+    @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4734")
     @pytest.mark.parametrize("params, size", parameters_and_size)
     @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
-    def test_expansion_qnode(self, params, size, obs, exp_fn):
-        @qml.transforms.broadcast_expand
-        @qml.qnode(qml.device("lightning.qubit", wires=2), interface="jax")
-        def circuit(x, y, z, obs):
-            qml.StatePrep(
-                np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]), wires=[0, 1]
-            )
-            RX_broadcasted(x, wires=0)
-            qml.PauliY(0)
-            RX_broadcasted(y, wires=1)
-            RZ_broadcasted(z, wires=1)
-            qml.Hadamard(1)
-            return [qml.expval(ob) for ob in obs]
+    def test_expansion_qnode(self, backend, params, size, obs, exp_fn):
+        def qnode_builder(device_name):
+            @qml.transforms.broadcast_expand
+            @qml.qnode(qml.device(device_name, wires=2), interface="jax")
+            def circuit(x, y, z, obs):
+                qml.StatePrep(
+                    np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
+                    wires=[0, 1],
+                )
+                RX_broadcasted(x, wires=0)
+                qml.PauliY(0)
+                RX_broadcasted(y, wires=1)
+                RZ_broadcasted(z, wires=1)
+                qml.Hadamard(1)
+                return [qml.expval(ob) for ob in obs]
 
-        expected = jax.jit(circuit)(*params, obs)
-        result = qjit(circuit)(*params, obs)
+            return circuit
 
-        assert np.allclose(result, expected)
+        qnode_control = qnode_builder("lightning.qubit")
+        qnode_default = qnode_builder("default.qubit")
+        qnode_backend = qnode_builder(backend)
+
+        expected = jax.jit(qnode_control)(*params, obs)
+        observed = qjit(qnode_backend)(*params, obs)
+
+        assert np.allclose(e, observed)
 
 
 class TestCutCircuitMCTransform:
