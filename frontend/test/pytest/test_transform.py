@@ -106,10 +106,10 @@ def test_batch_params(backend):
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.skipif(
-    backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731"
-)
 def test_split_non_commuting(backend):
+    if backend == "lightning.kokkos":
+        pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
     def qnode_builder(device_name):
         @qml.transforms.split_non_commuting
         @qml.qnode(qml.device(backend, wires=6), interface="jax")
@@ -219,14 +219,14 @@ class TestBroadcastExpand:
 
 
 class TestCutCircuitMCTransform:
-    @pytest.mark.skipif(
-        backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731"
-    )
     def test_cut_circuit_mc_sample(self, backend):
         """
         Tests that a circuit containing sampling measurements can be cut and
         postprocessed to return bitstrings of the original circuit size.
         """
+
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         def qnode_builder(device_name):
             @qml.qnode(qml.device(device_name, wires=2, shots=None))
@@ -256,11 +256,11 @@ class TestCutCircuitMCTransform:
 
 
 class TestHamiltonianExpand:
-    @pytest.mark.skipif(
-        backend="lightning.kokkos", reason="https://github.com/PennyLaneAI/pennylane/issues/4731"
-    )
     def test_hamiltonian_expand(self, backend):
         """Test hamiltonian expand."""
+
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         H4 = (
             qml.PauliX(0) @ qml.PauliZ(2)
@@ -286,20 +286,29 @@ class TestHamiltonianExpand:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = jax.jit(qnode_backend)()
+        observed = qjit(qnode_backend)()
 
         assert np.allclose(expected, observed)
 
 
 class TestSumExpand:
-    def test_sum_expand(self):
-        dev = qml.device("lightning.qubit", wires=2, shots=None)
+    def test_sum_expand(self, backend):
 
-        @sum_expand
-        @qml.qnode(dev)
-        def circuit():
-            obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
-            obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
-            return [qml.expval(obs1), qml.expval(obs2)]
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
-        assert np.allclose(circuit(), qjit(circuit)())
+        def qnode_builder(device_name):
+            @sum_expand
+            @qml.qnode(qml.device(device_name, wires=2, shots=None))
+            def qfunc():
+                obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
+                obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
+                return [qml.expval(obs1), qml.expval(obs2)]
+
+            return qfunc
+
+        qnode_backend = qnode_builder(backend)
+        qnode_control = qnode_builder("default.qubit")
+        expected = jax.jit(qnode_control)()
+        observed = qjit(qnode_backend)()
+        assert np.allclose(expected, observed)
