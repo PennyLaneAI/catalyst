@@ -30,7 +30,8 @@ class TestCondToJaxpr:
         expected = """{ lambda ; a:i64[]. let
     b:bool[] = eq a 5
     c:i64[] = qcond[
-      branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) }, { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+      branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                     { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
     ] b a a
   in (c,) }"""
 
@@ -47,7 +48,10 @@ class TestCondToJaxpr:
             out = cond_fn()
             return out
 
-        assert expected == str(circuit._jaxpr)  # pylint: disable=protected-access
+        def asline(text):
+            return ' '.join(map(lambda x:x.strip(), str(text).split('\n')))
+
+        assert asline(expected) == asline(circuit._jaxpr)  # pylint: disable=protected-access
 
 
 class TestCond:
@@ -192,9 +196,12 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_mismatch(self, backend):
-        """Test that an exception is raised when the return types of all branches do not match."""
+    def test_branch_multi_return_type_unification(self, backend):
+        """Test that an exception is not raised when the return types of all branches do not match
+        but could be unified."""
 
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @cond(True)
             def cond_fn():
@@ -210,12 +217,30 @@ class TestCond:
 
             return cond_fn()
 
+        assert 0 == circuit()
+
+    def test_branch_return_mismatch_classical(self):
+        """Test that an exception is raised when the true branch returns a different pytree-shape
+        than the else branch, given a classical tracing context (no QNode).
+        """
+
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return (1,1)
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return 2
+
+            return cond_fn()
+
         with pytest.raises(
             TypeError, match="Conditional requires consistent return types across all branches"
         ):
-            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
+            qjit(circuit)
 
-    def test_branch_return_mismatch_classical(self):
+    def test_branch_return_promotion_classical(self):
         """Test that an exception is raised when the true branch returns a different type than the
         else branch, given a classical tracing context (no QNode).
         """
@@ -231,10 +256,7 @@ class TestCond:
 
             return cond_fn()
 
-        with pytest.raises(
-            TypeError, match="Conditional requires consistent return types across all branches"
-        ):
-            qjit(circuit)
+        assert 1.0 == qjit(circuit)()
 
     def test_branch_with_arg(self):
         """Test that an exception is raised when an 'else if' branch function contains an arg"""

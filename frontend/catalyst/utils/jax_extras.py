@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state
+from jax._src.core import _update_thread_local_jit_state, eval_jaxpr
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -33,6 +33,7 @@ from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
 from jax.api_util import flatten_fun, shaped_abstractify
+from jax.lax import convert_element_type
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import ShapedArray, Trace, gensym, thread_local_state
@@ -68,8 +69,11 @@ __all__ = (
     "ShapedArray",
     "ShapeDtypeStruct",
     "convert_constvars_jaxpr",
+    "convert_element_type",
+    "eval_jaxpr",
     "initial_style_jaxprs_with_common_consts1",
     "initial_style_jaxprs_with_common_consts2",
+    "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "jaxpr_to_mlir",

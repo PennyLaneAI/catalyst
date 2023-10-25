@@ -21,7 +21,6 @@ while using :func:`~.qjit`.
 import numbers
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
-from functools import reduce, partial
 
 import jax
 import jax.numpy as jnp
@@ -31,7 +30,6 @@ from jax._src.api_util import shaped_abstractify
 from jax._src.core import get_aval, eval_jaxpr
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
-from jax.numpy import promote_types
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
@@ -63,6 +61,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
+    unify_result_types,
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -81,33 +80,6 @@ from catalyst.utils.jax_extras import (
     wrap_init,
 )
 from catalyst.utils.patching import Patcher
-
-
-def _promote_jaxpr_types(types: List[List[ShapedArray]]) -> List[ShapedArray]:
-    assert len(types) > 0, "Expected one or more set of types"
-    if not all(len(t) == len(types[0]) for t in types):
-        raise TypeError("Pytree type structure must be the same for all types")
-    with_qregs = all(isinstance(t[-1], AbstractQreg) for t in types)
-    if with_qregs:
-        types = [t[:-1] for t in types]
-    results = list(map(partial(reduce, promote_types), zip(*types)))
-    return results + ([AbstractQreg()] if with_qregs else [])
-
-
-def _apply_result_type_conversion(jaxpr:ClosedJaxpr, target_types:List[ShapedArray]) -> ClosedJaxpr:
-    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
-            in_avals = list(map(shaped_abstractify, jaxpr.in_avals))
-            in_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
-            # print("- IIIIIIIINNNNNNNNTTTTTTTRRRRRRRR\n", in_tracers)
-            out_tracers = eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
-            # print("- OOOOOUUUUUUTTTTTTTTTTTTRRRAAA\n", out_tracers)
-            out_tracers2 = [convert_element_type(tr, ty) for tr, ty in
-                            zip(out_tracers[:-1], target_types[:-1])]
-            # print("- OOOOOUUUUUUTTTTTTTTTTTTRRRAAA2222\n", out_tracers2)
-            jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(out_tracers2+[out_tracers[-1]])
-            # print("- OOOOOUUUUUUTTTTTTTTTTTTJJJJJJAAAAAAAA\n", jaxpr2)
-    return ClosedJaxpr(jaxpr2, consts)
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -872,15 +844,14 @@ def _check_single_bool_value(tree: PyTreeDef, avals: List[Any]) -> None:
         raise TypeError(f"A single boolean scalar was expected, got the value {avals[0]}.")
 
 
-def _check_cond_same_types(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
+def _check_cond_same_shapes(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
     assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
-    expected_tree, expected_dtypes = trees[0], [_aval_to_primitive_type(a) for a in avals[0]]
+    expected_tree = trees[0]
     for tree, aval in list(zip(trees, avals))[1:]:
         if tree != expected_tree:
-            raise TypeError("Conditional requires consistent return types across all branches")
-        dtypes = [_aval_to_primitive_type(a) for a in aval]
-        if dtypes != expected_dtypes:
-            raise TypeError("Conditional requires consistent return types across all branches")
+            raise TypeError(
+                "Conditional requires consistent return types across all branches"
+            )
 
 
 class ForLoop(HybridOp):
@@ -956,26 +927,13 @@ class Cond(HybridOp):
 
         jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
-        # print("OUTVARS:")
-        # for j in jaxprs2:
-        #     print('- ', j.out_avals)
-
-        promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs2])
-        # print('PROMOTED:\n', promoted_types)
-
-        # print('CONVERTED:')
-        jj = []
-        for j in jaxprs2:
-            # print('- IIIIIIIINNNNNNNNNnJJJJJJJJAAA\n', j)
-            jj.append(_apply_result_type_conversion(j, promoted_types))
-
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 *(op.in_classical_tracers + combined_consts + [qreg]),
-                branch_jaxprs=jj,
+                branch_jaxprs=unify_result_types(jaxprs2),
             )
         )
         return qrp2
@@ -1198,7 +1156,7 @@ class CondCallable:
             out_trees.append(out_tree())
             out_avals.append(res_classical_tracers)
 
-        # _check_cond_same_types(out_trees, out_avals)
+        _check_cond_same_shapes(out_trees, out_avals)
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
         Cond(in_classical_tracers, out_classical_tracers, regions)
@@ -1210,7 +1168,8 @@ class CondCallable:
         branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
-        _check_cond_same_types(out_trees, [j.out_avals for j in branch_jaxprs])
+        _check_cond_same_shapes(out_trees, [j.out_avals for j in branch_jaxprs])
+        branch_jaxprs = unify_result_types(branch_jaxprs)
         out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
 
