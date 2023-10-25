@@ -111,7 +111,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                             }
                         }
 
-                        // Get results indices from update indices
+                        // Get results indices from update indices.
+                        // The results indices are used to store the computed update of one element.
                         SmallVector<Value> resultsIndicesValue =
                             getResultsIndices(updateScatterIndices, updateWindowsIndices,
                                               variables.inputsShape, variables.insertedWindowsDims,
