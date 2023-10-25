@@ -50,11 +50,14 @@ def test_batch_input(backend):
     """Test that batching works for a simple circuit"""
 
     def qnode_builder(device_name):
+        """Builder"""
+
         @partial(qml.batch_input, argnum=1)
         @qml.qnode(
             qml.device(backend_name, wires=2), interface="jax", diff_method="parameter-shift"
         )
         def qfunc(inputs, weights):
+            """Example taken from tests"""
             qml.RY(weights[0], wires=0)
             qml.AngleEmbedding(inputs, wires=range(2), rotation="Y")
             qml.RY(weights[1], wires=1)
@@ -77,10 +80,15 @@ def test_batch_input(backend):
 
 @pytest.mark.skip(reason="Temporary, please investigate")
 def test_batch_params(backend):
+    """Test batch param"""
+
     def qnode_builder(device_name):
+        """Builder"""
+
         @qml.batch_params
         @qml.qnode(qml.device(device_name, wires=3), interface="jax")
         def qfunc(data, x, weights):
+            """Example taken from PL tests"""
             qml.templates.AmplitudeEmbedding(data, wires=[0, 1, 2], normalize=True)
             qml.RX(x, wires=0)
             qml.RY(0.2, wires=1)
@@ -107,13 +115,17 @@ def test_batch_params(backend):
 
 
 def test_split_non_commuting(backend):
+    """Test split non commuting"""
     if backend == "lightning.kokkos":
         pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
     def qnode_builder(device_name):
+        """Builder"""
+
         @qml.transforms.split_non_commuting
-        @qml.qnode(qml.device(backend, wires=6), interface="jax")
+        @qml.qnode(qml.device(device_name, wires=6), interface="jax")
         def qfunc():
+            """Example taken from PL tests"""
             qml.Hadamard(1)
             qml.Hadamard(0)
             qml.PauliZ(0)
@@ -188,14 +200,21 @@ observables_and_exp_fns = [
 
 
 class TestBroadcastExpand:
+    """Test Broadcast Expand"""
+
     @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4734")
     @pytest.mark.parametrize("params, size", parameters_and_size)
     @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
     def test_expansion_qnode(self, backend, params, size, obs, exp_fn):
+        """Test broadcast expand"""
+
         def qnode_builder(device_name):
+            """Builder"""
+
             @qml.transforms.broadcast_expand
             @qml.qnode(qml.device(device_name, wires=2), interface="jax")
             def circuit(x, y, z, obs):
+                """Example taken from PL tests"""
                 qml.StatePrep(
                     np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]),
                     wires=[0, 1],
@@ -209,7 +228,7 @@ class TestBroadcastExpand:
 
             return circuit
 
-        qnode_control = qnode_builder("lightning.qubit")
+        qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
@@ -219,6 +238,8 @@ class TestBroadcastExpand:
 
 
 class TestCutCircuitMCTransform:
+    """Test Cut Circuit MC Transform"""
+
     def test_cut_circuit_mc_sample(self, backend):
         """
         Tests that a circuit containing sampling measurements can be cut and
@@ -229,9 +250,11 @@ class TestCutCircuitMCTransform:
             pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         def qnode_builder(device_name):
+            """Builder"""
+
             @qml.qnode(qml.device(device_name, wires=2, shots=None))
             def qfunc(x):
-                """Example"""
+                """Example taken from PL tests."""
                 qml.RX(x, wires=0)
                 qml.RY(0.543, wires=1)
                 qml.WireCut(wires=0)
@@ -256,6 +279,8 @@ class TestCutCircuitMCTransform:
 
 
 class TestHamiltonianExpand:
+    """Test Hamiltonian Expand"""
+
     def test_hamiltonian_expand(self, backend):
         """Test hamiltonian expand."""
 
@@ -272,9 +297,12 @@ class TestHamiltonianExpand:
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
         def qnode_builder(device_name):
+            """Builder"""
+
             @hamiltonian_expand
             @qml.qnode(qml.device(device_name, wires=3))
             def qfunc():
+                """Example taken from PL tests."""
                 qml.Hadamard(0)
                 qml.Hadamard(1)
                 qml.PauliZ(1)
@@ -292,15 +320,21 @@ class TestHamiltonianExpand:
 
 
 class TestSumExpand:
+    """Test Sum Expand"""
+
     def test_sum_expand(self, backend):
+        """Test Sum Expand"""
 
         if backend == "lightning.kokkos":
             pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         def qnode_builder(device_name):
+            """Builder"""
+
             @sum_expand
             @qml.qnode(qml.device(device_name, wires=2, shots=None))
             def qfunc():
+                """Example taken from PL tests"""
                 obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
                 obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
                 return [qml.expval(obs1), qml.expval(obs2)]
