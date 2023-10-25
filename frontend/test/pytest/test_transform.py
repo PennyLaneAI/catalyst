@@ -31,8 +31,6 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from catalyst import qjit
-from catalyst.pennylane_extensions import QJITDevice
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
@@ -45,6 +43,9 @@ from pennylane.transforms import (
     sum_expand,
 )
 from pennylane_lightning.lightning_qubit import LightningQubit
+
+from catalyst import qjit
+from catalyst.pennylane_extensions import QJITDevice
 
 
 @pytest.mark.skip(reason="Uses part of old API")
