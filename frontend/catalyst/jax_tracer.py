@@ -579,6 +579,7 @@ def trace_quantum_function(
             def is_measurement(x):
                 """Only to avoid 100 character per line limit."""
                 return isinstance(x, MeasurementProcess)
+
             is_out_measurements = map(is_measurement, out_measurements)
             is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
             is_out_measurement_sequence = is_all_out_measurements and isinstance(
