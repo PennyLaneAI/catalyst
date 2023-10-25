@@ -25,22 +25,27 @@ https://github.com/PennyLaneAI/pennylane/pull/4440:
 which correspond to QNode transforms.
 """
 
-from numpy.testing import assert_allclose
 from functools import partial
-import pennylane as qml
-from pennylane import numpy as pnp
-from pennylane_lightning.lightning_qubit import LightningQubit
+
+import jax
 import numpy as np
+import pennylane as qml
 import pytest
+from catalyst import qjit
 from catalyst.pennylane_extensions import QJITDevice
 from jax import numpy as jnp
-from pennylane.transforms import mitigate_with_zne, richardson_extrapolate, fold_global
-from pennylane.transforms import hamiltonian_expand, sum_expand
-from pennylane.transforms import qcut
+from numpy.testing import assert_allclose
+from pennylane import numpy as pnp
+from pennylane.transforms import (
+    fold_global,
+    hamiltonian_expand,
+    mitigate_with_zne,
+    qcut,
+    richardson_extrapolate,
+    sum_expand,
+)
+from pennylane_lightning.lightning_qubit import LightningQubit
 
-
-from catalyst import qjit
-import jax
 
 @pytest.mark.skip(reason="Uses part of old API")
 def test_batch_input(backend):
@@ -63,9 +68,9 @@ def test_batch_input(backend):
 
     assert_allclose(jax_jit, compiled(inputs, weights))
 
+
 @pytest.mark.skip(reason="Temporary, please investigate")
 def test_batch_params(backend):
-
     @qml.batch_params
     @qml.qnode(qml.device(backend, wires=3), interface="jax")
     def interpreted(data, x, weights):
@@ -87,30 +92,31 @@ def test_batch_params(backend):
     observed = compiled(data, x, weights)
     assert np.allclose(expected, observed)
 
+
 def test_split_non_commuting(backend):
+    @qml.transforms.split_non_commuting
+    @qml.qnode(qml.device(backend, wires=6), interface="jax")
+    def interpreted():
+        qml.Hadamard(1)
+        qml.Hadamard(0)
+        qml.PauliZ(0)
+        qml.Hadamard(3)
+        qml.Hadamard(5)
+        qml.T(5)
+        return (
+            qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+            qml.expval(qml.PauliX(0)),
+            qml.expval(qml.PauliZ(1)),
+            qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
+            qml.expval(qml.PauliX(3)),
+            qml.expval(qml.PauliY(5)),
+        )
 
-        @qml.transforms.split_non_commuting
-        @qml.qnode(qml.device(backend, wires=6), interface="jax")
-        def interpreted():
-            qml.Hadamard(1)
-            qml.Hadamard(0)
-            qml.PauliZ(0)
-            qml.Hadamard(3)
-            qml.Hadamard(5)
-            qml.T(5)
-            return (
-                    qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
-                    qml.expval(qml.PauliX(0)),
-                    qml.expval(qml.PauliZ(1)),
-                    qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
-                    qml.expval(qml.PauliX(3)),
-                    qml.expval(qml.PauliY(5)),
-            )
+    jax_jit = jax.jit(interpreted)
+    jax_jit()
+    compiled = qjit(interpreted)
+    assert np.allclose(jax_jit(), compiled())
 
-        jax_jit = jax.jit(interpreted)
-        jax_jit()
-        compiled = qjit(interpreted)
-        assert np.allclose(jax_jit(), compiled())
 
 class RX_broadcasted(qml.RX):
     """A version of qml.RX that detects batching."""
@@ -125,6 +131,7 @@ class RZ_broadcasted(qml.RZ):
     ndim_params = (0,)
     compute_decomposition = staticmethod(lambda theta, wires=None: [qml.RZ(theta, wires=wires)])
 
+
 parameters_and_size = [
     [(0.2, np.array([0.1, 0.8, 2.1]), -1.5), 3],
     [(0.2, np.array([0.1]), np.array([-0.3])), 1],
@@ -133,7 +140,7 @@ parameters_and_size = [
             0.2,
             pnp.array([0.1, 0.3], requires_grad=True),
             pnp.array([-0.3, 2.1], requires_grad=False),
-       ),
+        ),
         2,
     ],
 ]
@@ -155,20 +162,23 @@ observables_and_exp_fns = [
     ([qml.PauliZ(0)], exp_fn_Z0),
     ([qml.PauliZ(0) @ qml.PauliY(1)], exp_fn_Z0Y1),
     ([qml.PauliZ(0), qml.PauliY(1)], exp_fn_Z0_and_Y1),
-# TODO: Uncomment when fixed: https://github.com/PennyLaneAI/pennylane/issues/4601
-#    ([H0], exp_fn_H0),
+    # TODO: Uncomment when fixed: https://github.com/PennyLaneAI/pennylane/issues/4601
+    #    ([H0], exp_fn_H0),
 ]
 
 """Broadcast expand appears to only work on default.qubit."""
+
+
 class TestBroadcastExpand:
     @pytest.mark.parametrize("params, size", parameters_and_size)
     @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
     def test_expansion_qnode(self, params, size, obs, exp_fn):
-
         @qml.transforms.broadcast_expand
         @qml.qnode(qml.device("lightning.qubit", wires=2), interface="jax")
         def circuit(x, y, z, obs):
-            qml.StatePrep(np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]), wires=[0, 1])
+            qml.StatePrep(
+                np.array([complex(1, 0), complex(0, 0), complex(0, 0), complex(0, 0)]), wires=[0, 1]
+            )
             RX_broadcasted(x, wires=0)
             qml.PauliY(0)
             RX_broadcasted(y, wires=1)
@@ -181,8 +191,8 @@ class TestBroadcastExpand:
 
         assert np.allclose(result, expected)
 
-class TestCutCircuitMCTransform:
 
+class TestCutCircuitMCTransform:
     def test_cut_circuit_mc_sample(self):
         """
         Tests that a circuit containing sampling measurements can be cut and
@@ -249,14 +259,15 @@ class TestCutCircuitMCTransform:
         assert np.allclose(res_qjit, res_expected)
         assert np.allclose(res, res_expected)
 
-class TestHamiltonianExpand:
 
+class TestHamiltonianExpand:
     def test_hamiltonian_expand(self):
-        H4 = (qml.PauliX(0) @ qml.PauliZ(2)
-                + 3 * qml.PauliZ(2)
-                - 2 * qml.PauliX(0)
-                + qml.PauliZ(2)
-                + qml.PauliZ(2)
+        H4 = (
+            qml.PauliX(0) @ qml.PauliZ(2)
+            + 3 * qml.PauliZ(2)
+            - 2 * qml.PauliX(0)
+            + qml.PauliZ(2)
+            + qml.PauliZ(2)
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
@@ -273,8 +284,8 @@ class TestHamiltonianExpand:
 
         assert np.allclose(circuit(), qjit(circuit)())
 
-class TestSumExpand:
 
+class TestSumExpand:
     def test_sum_expand(self):
         dev = qml.device("lightning.qubit", wires=2, shots=None)
 

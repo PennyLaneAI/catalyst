@@ -583,8 +583,7 @@ def trace_quantum_function(
                 out_measurements, Sequence
             )
             is_out_measurement_sequence_one_element = (
-                is_out_measurement_sequence
-                and len(out_measurements) == 1
+                is_out_measurement_sequence and len(out_measurements) == 1
             )
             is_out_single_measurement = is_all_out_measurements and isinstance(
                 out_measurements, MeasurementProcess
@@ -620,7 +619,9 @@ def trace_quantum_function(
                 qdevice_p.bind(spec="backend", val=device.backend_name)
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                _, pytree_measurements = jax.tree_util.tree_flatten(tape.measurements, is_leaf=is_leaf)
+                _, pytree_measurements = jax.tree_util.tree_flatten(
+                    tape.measurements, is_leaf=is_leaf
+                )
                 out_classical_tracers, out_classical_tree = trace_quantum_measurements(
                     device,
                     qrp_out,
