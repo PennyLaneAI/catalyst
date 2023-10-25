@@ -121,43 +121,43 @@ inline DynamicMemRefT get_dynamic_memref(OpaqueMemRefT memref)
 
     switch (memref.datatype) {
     case NumericType::i1:
-        newMemref.data_aligned = *((bool **)memref.descriptor);
-        newMemref.data_allocated = *((bool **)memref.descriptor + 1);
+        newMemref.data_allocated = *((bool **)memref.descriptor);
+        newMemref.data_aligned = *((bool **)memref.descriptor + 1);
         _gen_oss_dyn_memref<bool, bool *>(newMemref, rank);
         break;
     case NumericType::i16:
-        newMemref.data_aligned = *((int16_t **)memref.descriptor);
-        newMemref.data_allocated = *((int16_t **)memref.descriptor + 1);
+        newMemref.data_allocated = *((int16_t **)memref.descriptor);
+        newMemref.data_aligned = *((int16_t **)memref.descriptor + 1);
         _gen_oss_dyn_memref<int16_t, int16_t *>(newMemref, rank);
         break;
     case NumericType::i32:
-        newMemref.data_aligned = *((int32_t **)memref.descriptor);
-        newMemref.data_allocated = *((int32_t **)memref.descriptor + 1);
+        newMemref.data_allocated = *((int32_t **)memref.descriptor);
+        newMemref.data_aligned = *((int32_t **)memref.descriptor + 1);
         _gen_oss_dyn_memref<int32_t, int32_t *>(newMemref, rank);
         break;
     case NumericType::i64:
-        newMemref.data_aligned = *((int64_t **)memref.descriptor);
-        newMemref.data_allocated = *((int64_t **)memref.descriptor + 1);
+        newMemref.data_allocated = *((int64_t **)memref.descriptor);
+        newMemref.data_aligned = *((int64_t **)memref.descriptor + 1);
         _gen_oss_dyn_memref<int64_t, int64_t *>(newMemref, rank);
         break;
     case NumericType::f32:
-        newMemref.data_aligned = *((float **)memref.descriptor);
-        newMemref.data_allocated = *((float **)memref.descriptor + 1);
+        newMemref.data_allocated = *((float **)memref.descriptor);
+        newMemref.data_aligned = *((float **)memref.descriptor + 1);
         _gen_oss_dyn_memref<float, float *>(newMemref, rank);
         break;
     case NumericType::f64:
-        newMemref.data_aligned = *((double **)memref.descriptor);
-        newMemref.data_allocated = *((double **)memref.descriptor + 1);
+        newMemref.data_allocated = *((double **)memref.descriptor);
+        newMemref.data_aligned = *((double **)memref.descriptor + 1);
         _gen_oss_dyn_memref<double, double *>(newMemref, rank);
         break;
     case NumericType::c64:
-        newMemref.data_aligned = *((CplxT_float **)memref.descriptor);
-        newMemref.data_allocated = *((CplxT_float **)memref.descriptor + 1);
+        newMemref.data_allocated = *((CplxT_float **)memref.descriptor);
+        newMemref.data_aligned = *((CplxT_float **)memref.descriptor + 1);
         _gen_oss_dyn_memref<CplxT_float, CplxT_float *>(newMemref, rank);
         break;
     case NumericType::c128:
-        newMemref.data_aligned = *((CplxT_double **)memref.descriptor);
-        newMemref.data_allocated = *((CplxT_double **)memref.descriptor + 1);
+        newMemref.data_allocated = *((CplxT_double **)memref.descriptor);
+        newMemref.data_aligned = *((CplxT_double **)memref.descriptor + 1);
         _gen_oss_dyn_memref<CplxT_double, CplxT_double *>(newMemref, rank);
         break;
     default:
