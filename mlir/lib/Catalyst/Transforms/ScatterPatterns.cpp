@@ -157,7 +157,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         // Call the function that computes the update
                         Value updated =
                             builder.create<func::CallOp>(loc, updateFnOp, args).getResult(0);
-                        // Make it a scalar if necessary tensor<f64> -> f64
+                        // The update function from JAX always produces tensors.
+                        // Convert tensor<f64> -> f64 if necessary
                         Value updatedExtracted;
                         if (isa<RankedTensorType>(updated.getType())) {
                             updatedExtracted = builder.create<tensor::ExtractOp>(loc, updated);
