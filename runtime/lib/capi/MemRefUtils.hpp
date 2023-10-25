@@ -58,13 +58,17 @@ static inline void _gen_oss_dyn_memref(DynamicMemRefT &newMemref, int64_t rank)
 {
     const auto data = std::get<TPtr>(newMemref.data_aligned);
     const auto sizes = newMemref.sizes;
-    newMemref.in_str << "[ ";
+
+    if (rank > 0) {
+        newMemref.in_str << "[ ";
+    }
+
     if (rank == 0) {
         if constexpr (std::is_same_v<T, CplxT_float> || std::is_same_v<T, CplxT_double>) {
-            newMemref.in_str << "{" << data[0].real << ", " << data[0].imag << "} ";
+            newMemref.in_str << "{" << data[0].real << ", " << data[0].imag << "}";
         }
         else {
-            newMemref.in_str << data[0] << " ";
+            newMemref.in_str << data[0];
         }
     }
     else if (rank == 1) {
@@ -103,7 +107,10 @@ static inline void _gen_oss_dyn_memref(DynamicMemRefT &newMemref, int64_t rank)
     else {
         newMemref.in_str << "MemRef of Rank > 2 ";
     }
-    newMemref.in_str << "]";
+
+    if (rank > 0) {
+        newMemref.in_str << "]";
+    }
 }
 
 inline DynamicMemRefT get_dynamic_memref(OpaqueMemRefT memref)

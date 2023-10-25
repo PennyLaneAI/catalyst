@@ -11,14 +11,14 @@ class TestDebugPrint:
     @pytest.mark.parametrize(
         ("arg", "expected"),
         [
-            (True, "[ 1 ]\n"),  # TODO: is this ok?
-            (3, "[ 3 ]\n"),  # TODO: fixme, print scalars
-            (3.5, "[ 3.5 ]\n"),
-            (3 + 4j, "[ {3, 4} ]\n"),  # TODO: fixme, prettier complex numbers
-            (np.array(3), "[ 3 ]\n"),
-            (jnp.array(3), "[ 3 ]\n"),
-            (jnp.array(3.000001), "[ 3 ]\n"),  # TODO: fixme, show more precision
-            (jnp.array(3.1 + 4j), "[ {3.1, 4} ]\n"),
+            (True, "1\n"),  # TODO: is this ok?
+            (3, "3\n"),
+            (3.5, "3.5\n"),
+            (3 + 4j, "{3, 4}\n"),  # TODO: fixme, prettier complex numbers
+            (np.array(3), "3\n"),
+            (jnp.array(3), "3\n"),
+            (jnp.array(3.000001), "3\n"),  # TODO: fixme, show more precision
+            (jnp.array(3.1 + 4j), "{3.1, 4}\n"),
             (jnp.array([3]), "[ 3 ]\n"),
             (jnp.array([3, 4, 5]), "[ 3 4 5 ]\n"),
             (
@@ -48,8 +48,8 @@ class TestDebugPrint:
         ("arg", "expected"),
         [
             (0, ""),
-            (1, "[ 0 ]\n"),
-            (6, "[ 0 ]\n[ 1 ]\n[ 2 ]\n[ 3 ]\n[ 4 ]\n[ 5 ]\n"),
+            (1, "0\n"),
+            (6, "0\n1\n2\n3\n4\n5\n"),
         ],
     )
     def test_intermediate_values(self, capfd, arg, expected):
