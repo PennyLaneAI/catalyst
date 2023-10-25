@@ -50,7 +50,6 @@ class CustomDevice(qml.QubitDevice):
 dev = CustomDevice(wires=2)
 
 
-@pytest.mark.skip(reason="Temporary please investigate")
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
     @qjit()

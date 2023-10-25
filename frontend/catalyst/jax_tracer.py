@@ -570,9 +570,6 @@ def trace_quantum_function(
             params = quantum_tape.get_parameters(trainable_only=False)
             quantum_tape.trainable_params = qml.math.get_trainable_indices(params)
 
-            if isinstance(qnode.gradient_fn, qml.gradients.gradient_transform):
-                quantum_tape = qnode.gradient_fn.expand_fn(quantum_tape)
-
             # Can transforms be applied?
             # Since transforms are a PL feature and PL does not support the same things as
             # Catalyst, transforms may have invariants that rely on PL invariants.
