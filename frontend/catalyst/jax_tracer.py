@@ -548,7 +548,7 @@ def can_transform_be_applied(tape, trace, flat_results):
 def apply_transform(qnode, tape, trace, flat_results):
     is_program_transformed = qnode and qnode.transform_program
     if is_program_transformed and not can_transform_be_applied(tape, trace, flat_results):
-        raise RuntimeError("Give me a meaningful message.")
+        raise RuntimeError("The tape was transformed but transforms are not valid.")
 
     if is_program_transformed:
         tapes, callback = qnode.transform_program([tape])
