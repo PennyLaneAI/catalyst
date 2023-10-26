@@ -8,6 +8,10 @@
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
 
+* Add support for third party devices.
+  Third party `QuantumDevice` implementations can now be loaded into the runtime.
+  [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
+
 <h3>Breaking changes</h3>
 
 * The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
