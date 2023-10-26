@@ -188,8 +188,7 @@ observables_and_exp_fns = [
     ([qml.PauliZ(0)], exp_fn_Z0),
     ([qml.PauliZ(0) @ qml.PauliY(1)], exp_fn_Z0Y1),
     ([qml.PauliZ(0), qml.PauliY(1)], exp_fn_Z0_and_Y1),
-    #  TODO: Uncomment when fixed: https://github.com/PennyLaneAI/pennylane/issues/4601
-    # ([H0], exp_fn_H0),
+    ([H0], exp_fn_H0),
 ]
 
 
@@ -204,6 +203,9 @@ class TestBroadcastExpand:
 
         if backend == "lightning.kokkos":
             pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
+        if obs[0] == H0:
+            pytest.skip(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
 
         def qnode_builder(device_name):
             """Builder"""
@@ -246,6 +248,9 @@ class TestBroadcastExpand:
 
         if backend == "lightning.kokkos":
             pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
+        if obs[0] == H0:
+            pytest.skip(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
 
         def qnode_builder(device_name):
             """Builder"""
