@@ -546,6 +546,7 @@ def can_transform_be_applied(tape, trace, flat_results):
 
 
 def apply_transform(qnode, tape, trace, flat_results):
+    """Apply transform."""
     is_program_transformed = qnode and qnode.transform_program
     if is_program_transformed and not can_transform_be_applied(tape, trace, flat_results):
         raise RuntimeError("The tape was transformed but transforms are not valid.")
@@ -629,7 +630,7 @@ def trace_quantum_function(
 
             (
                 out_classical_tracers,
-                out_measurements,
+                _,
                 out_classical_tracers_or_measurements,
             ) = get_tracers_measurements_and_both(trace, return_values_flat)
             is_program_transformed = qnode and qnode.transform_program
