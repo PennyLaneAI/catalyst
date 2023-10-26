@@ -11,6 +11,17 @@
 * The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
   [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
 
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def circuit(n:int):
+      i = 0
+      while i < n:
+          qml.RX(pi/2, wires=i)
+          i += 1
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Breaking changes</h3>
 
 * The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
