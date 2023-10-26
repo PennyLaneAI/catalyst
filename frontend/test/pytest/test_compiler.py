@@ -315,7 +315,7 @@ module @workflow {
 }
 """
         with pytest.raises(CompileError) as e:
-            qjit(ir, keep_intermediate=True)(0.1)
+            qjit(ir)(0.1)
 
         assert "Failed to parse module as MLIR source" in e.value.args[0]
         assert "Failed to parse module as LLVM source" in e.value.args[0]

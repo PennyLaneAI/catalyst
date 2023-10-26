@@ -27,10 +27,22 @@
   allowing us to do editable installations even if system-wide site-packages is read-only.
   [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
 
+* Add `pennylane.compilers` entry points interface.
+  [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
+
+  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points` metadata under the the group name `pennylane.compilers`, with the following entry points:
+
+  - `context`: Path to the compilation evaluation context manager. This context manager should have the method context.is_tracing(), which returns True if called within a program that is being traced or captured.
+
+  - `ops`: Path to the compiler operations module. This operations module may contain compiler specific versions of PennyLane operations. Within a JIT context, PennyLane operations may dispatch to these
+
+  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Sergei Mironov,
 Romain Moyard.
 
