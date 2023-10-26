@@ -17,7 +17,7 @@
   def circuit(n:int):
       i = 0
       while i < n:
-          qml.RX(pi/2, wires=i)
+          qml.RX(jnp.pi/2, wires=i)
           i += 1
       return qml.expval(qml.PauliZ(0))
   ```
