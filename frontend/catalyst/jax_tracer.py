@@ -510,9 +510,9 @@ def trace_quantum_measurements(
 def can_transform_be_applied(tape, trace, flat_results):
     """Can transforms be applied?"""
     (
-        out_classical_tracers,
-        out_measurements,
-        out_classical_tracers_and_measurements,
+        class_tracers,
+        meas_tracers,
+        _,
     ) = get_tracers_measurements_and_both(trace, flat_results)
 
     # Can transforms be applied?
@@ -528,11 +528,11 @@ def can_transform_be_applied(tape, trace, flat_results):
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_out_measurements = map(is_measurement, out_measurements)
-    is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
-    is_out_measurement_sequence = is_all_out_measurements and isinstance(out_measurements, Sequence)
+    is_out_measurements = map(is_measurement, meas_tracers)
+    is_all_out_measurements = all(is_out_measurements) and not class_tracers
+    is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
     is_out_single_measurement = is_all_out_measurements and isinstance(
-        out_measurements, MeasurementProcess
+        meas_tracers, MeasurementProcess
     )
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     # TODO: check if there were mid circuit measurements in the original tape.
@@ -549,7 +549,8 @@ def apply_transform(qnode, tape, trace, flat_results):
     is_program_transformed = qnode and qnode.transform_program
     if is_program_transformed and not can_transform_be_applied(tape, trace, flat_results):
         raise RuntimeError("Give me a meaningful message.")
-    elif is_program_transformed:
+
+    if is_program_transformed:
         tapes, callback = qnode.transform_program([tape])
     else:
         tapes, callback = identity_qnode_transform(tape)
