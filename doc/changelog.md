@@ -8,6 +8,27 @@
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
 
+* Return values of conditional functions no longer need to be of exactly the same type. Catalyst
+  would apply type promotion to branch return values if their types don't match.
+  [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
+
+  ```python
+  @qjit
+  def func(i: int, f: float):
+      @cond(i < 3)
+      def cond_fn():
+          return i
+      @cond_fn.otherwise
+      def otherwise():
+          return f
+      return cond_fn()
+  ```
+
+  ```pycon
+  >>> func(1, 4.0)
+  array(1.0)
+  ```
+
 <h3>Breaking changes</h3>
 
 * The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
