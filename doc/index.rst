@@ -74,6 +74,7 @@ Catalyst
    modules/frontend
    modules/mlir
    modules/runtime
+   dev/transforms
    dev/debugging
    dev/roadmap
 
