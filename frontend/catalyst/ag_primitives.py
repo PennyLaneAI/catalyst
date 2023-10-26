@@ -401,11 +401,11 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             assert args and callable(args[0])
             wrapped_fn = args[0]
 
-            def passtrough_wrapper(*args, **kwargs):
+            def passthrough_wrapper(*args, **kwargs):
                 return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
 
             return fn(
-                passtrough_wrapper,
+                passthrough_wrapper,
                 *args[1:],
                 **(kwargs if kwargs is not None else {}),
             )
