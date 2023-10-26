@@ -16,6 +16,10 @@
 * Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
   [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
 
+* Add support for third party devices.
+  Third party `QuantumDevice` implementations can now be loaded into the runtime.
+  [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
+
 * Add `pennylane.compilers` entry points interface.
   [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
 
@@ -70,6 +74,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Sergei Mironov,
 Romain Moyard.
 
