@@ -23,7 +23,18 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import *
+from catalyst import (
+    adjoint,
+    cond,
+    ctrl,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    qjit,
+    vjp,
+)
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=import-outside-toplevel
@@ -277,6 +288,8 @@ class TestIntegration:
         assert fn(np.pi) == -1
 
     def test_adjoint_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
+
         def inner(x):
             qml.RY(x, wires=0)
 
@@ -291,6 +304,8 @@ class TestIntegration:
         assert np.allclose(fn(np.pi), [0.0, 1.0])
 
     def test_ctrl_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
+
         def inner(x):
             qml.RY(x, wires=0)
 
@@ -305,6 +320,8 @@ class TestIntegration:
         assert np.allclose(fn(np.pi), [1.0, 0.0, 0.0, 0.0])
 
     def test_grad_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'grad'."""
+
         def inner(x):
             return 2 * x
 
@@ -317,6 +334,8 @@ class TestIntegration:
         assert fn(3) == 2.0
 
     def test_jacobian_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jacobian'."""
+
         def inner(x):
             return 2 * x, x**2
 
@@ -329,6 +348,8 @@ class TestIntegration:
         assert fn(3) == [2.0, 6.0]
 
     def test_vjp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
+
         def inner(x):
             return 2 * x, x**2
 
@@ -341,6 +362,8 @@ class TestIntegration:
         assert fn(3) == [6.0, 9.0, 8.0]  # unusual vjp return structure, vjp result is 3rd elem
 
     def test_jvp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
+
         def inner(x):
             return 2 * x, x**2
 
