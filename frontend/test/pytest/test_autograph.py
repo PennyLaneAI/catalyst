@@ -1262,8 +1262,6 @@ class TestLogicalOps:
     def test_logical_basics(self, monkeypatch):
         """Test basic logical and behavior."""
 
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
-
         def f1(param):
             return param > 0.0 and param < 1.0 and param <= 2.0
 
@@ -1278,42 +1276,27 @@ class TestLogicalOps:
         assert qjit(autograph=True)(f3)(0.5) == np.array(True)
 
     # fmt:off
-    @pytest.mark.parametrize("python_object",["string", "", [0, 1, 2], [], {1: 2}, {}, ],)
+    @pytest.mark.parametrize("python_object",[[0, 1, 2], [], {1: 2}, {}, ],)
     # fmt:on
-    def test_logical_with_python_objects(self, monkeypatch, python_object):
+    def test_logical_with_jax_compatible_python_objects(self, monkeypatch, python_object):
         """Test fallback path of logical ops."""
 
-        with pytest.warns(UserWarning):
+        assert qjit(autograph=True)(lambda: True and python_object)() == (True and python_object)
+        assert qjit(autograph=True)(lambda: False or python_object)() == (False or python_object)
+        assert qjit(autograph=True)(lambda: not python_object)() == (not python_object)
 
-            @qjit(autograph=True)
-            def f():
-                return (True and python_object), (False or python_object), (not python_object)
+    # fmt:off
+    @pytest.mark.parametrize("python_object",["string", "", MonkeyPatch() ],)
+    # fmt:on
+    def test_logical_with_jax_incompatible_python_objects(self, monkeypatch, python_object):
+        """Test fallback path of logical ops."""
 
-            and_expr, or_expr, not_expr = f()
+        with pytest.raises(TypeError):
+            qjit(autograph=True)(lambda: True and python_object)()
+        with pytest.raises(TypeError):
+            qjit(autograph=True)(lambda: False or python_object)()
 
-        assert and_expr == np.array(True and bool(python_object))
-        assert or_expr == np.array(False or bool(python_object))
-        assert not_expr == np.array(not bool(python_object))
-
-    def test_logical_with_python_objects_ignore_fallbacks(self, monkeypatch):
-        """Test fallback path of logical ops with the ignore_fallbacks flag set."""
-
-        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
-
-        python_object = {1: 2}
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-
-            @qjit(autograph=True)
-            def f():
-                return (True and python_object), (False or python_object), (not python_object)
-
-            and_expr, or_expr, not_expr = f()
-
-        assert and_expr == np.array(True and bool(python_object))
-        assert or_expr == np.array(False or bool(python_object))
-        assert not_expr == np.array(not bool(python_object))
+        qjit(autograph=True)(lambda: not python_object)() == bool(python_object)
 
     @pytest.mark.parametrize("bad", [jnp.array([]), jnp.array([0.5, 1.0])])
     def test_logical_rejects_non_scalars(self, monkeypatch, bad):
@@ -1326,7 +1309,7 @@ class TestLogicalOps:
             return param > 1.0 or param < 0.0 or param == 0.5
 
         def f3(param):
-            return not param > 1.0
+            return not (param > 1.0)
 
         with pytest.raises(AutoGraphError, match="non-scalar"):
             qjit(autograph=True)(f1)(bad)
@@ -1335,20 +1318,13 @@ class TestLogicalOps:
         with pytest.raises(AutoGraphError, match="non-scalar"):
             qjit(autograph=True)(f3)(bad)
 
-    @pytest.mark.parametrize(
-        "static,dynamic", [(True, True), (True, False), (False, True), (False, False)]
-    )
-    def test_logical_mixture_static_dynamic_default(self, monkeypatch, static, dynamic):
-        """Test the useage of a mixture of static and dynamic variables."""
+    @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
+    def test_logical_mixture_static_dynamic_default(self, monkeypatch, s, d):
+        """Test the useage of a mixture of static(s) and dynamic(d) variables."""
 
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
-
-        @qjit(autograph=True)
-        def f(dynamic):
-            return ((static and dynamic), not ((not static) or (not dynamic)))
-
-        assert f(dynamic)[0] == np.array(static and dynamic)
-        assert f(dynamic)[1] == np.array(static and dynamic)
+        assert qjit(autograph=True)(lambda d: s and d)(d) == (s and d)
+        assert qjit(autograph=True)(lambda d: s or d)(d) == (s or d)
+        assert qjit(autograph=True)(lambda d: not d)(d) == (not d)
 
     @pytest.mark.parametrize(
         "a,b",
@@ -1361,25 +1337,11 @@ class TestLogicalOps:
     def test_logical_mixture_type(self, monkeypatch, a, b):
         """Test non-boolean compatibility."""
 
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
-
         @qjit(autograph=True)
         def f1(jaxvar, boolvar):
             return ((jaxvar > 0.0 and boolvar), not ((jaxvar <= 0.0) or (not boolvar)))
 
         assert f1(a, b)[0] == f1(a, b)[1]
-
-    def test_logical_strict_conversion_error(self, monkeypatch):
-        """Test that emulated strict conversion exception really works."""
-
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
-
-        def f1(a):
-            return a > 0.0 and a < 1.0
-
-        with pytest.raises(AutoGraphError, match="Emulated"):
-            qjit(autograph=True)(f1)(0.5)
 
 
 @pytest.mark.tf

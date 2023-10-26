@@ -47,7 +47,7 @@ from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
-from catalyst.utils.jax_extras import DynamicJaxprTracer
+from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
 __all__ = [
@@ -415,66 +415,40 @@ def _logical_op(*args, jax_fn, python_fn):
 
     values = [f() for f in args]
 
-    def _non_scalar_tracer(x) -> bool:
-        return isinstance(x, DynamicJaxprTracer) and reduce(lambda a, b: a * b, x.shape, 1) != 1
+    def _is_array_tracer(x: Any) -> bool:
+        return isinstance(x, DynamicJaxprTracer) and isinstance(x.aval, ShapedArray)
 
-    if any(map(_non_scalar_tracer, values)):
+    def _is_non_scalar_tracer(x) -> bool:
+        return _is_array_tracer(x) and reduce(lambda a, b: a * b, x.shape, 1) != 1
+
+    if any(map(_is_non_scalar_tracer, values)):
         raise AutoGraphError(
             "Using logical operations (and/or/not) with non-scalar tracers is not supported\n"
             "Consider using `jax.numpy.logical_and/..logical_or/..logical_not` functions.\n"
             f"arguments provided were: {args}"
         )
 
-    try:
-        if _emulate_fallback_errors:
-            raise AutoGraphError("Emulated autograph fallback error")
-
+    if all(_is_array_tracer(val) for val in values):
         result = jax_fn(*values)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        if catalyst.autograph_strict_conversion:
-            raise e
-
-        import inspect
-        import textwrap
-
-        expr_info = get_source_code_info(inspect.stack()[2])
-
-        fallback = True
-
-        if not catalyst.autograph_ignore_fallbacks:
-            warnings.warn(
-                f"Tracing of an AutoGraph converted logical expression failed with an exception:\n"
-                f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
-                f"\n"
-                f"The error ocurred within the body of the following expression:\n"
-                f"{expr_info}"
-                f"\n"
-                f"To understand different types of JAX tracing errors, please refer to the "
-                f"guide at: https://jax.readthedocs.io/en/latest/errors.html\n"
-                f"\n"
-                f"If you did not intend for the conversion to happen, you may safely ignore "
-                f"this warning."
-            )
-
-    if fallback:
-        result = python_fn(values)
+    else:
+        result = python_fn(*values)
 
     return result
 
 
-def and_(*args):
+def and_(a, b):
     """An implementation of the AutoGraph '.. and ..' statement."""
-    return _logical_op(*args, jax_fn=jax_logical_and, python_fn=all)
+    return _logical_op(a, b, jax_fn=jax_logical_and, python_fn=lambda a, b: a and b)
 
 
-def or_(*args):
+def or_(a, b):
     """An implementation of the AutoGraph '.. or ..' statement."""
-    return _logical_op(*args, jax_fn=jax_logical_or, python_fn=any)
+    return _logical_op(a, b, jax_fn=jax_logical_or, python_fn=lambda a, b: a or b)
 
 
 def not_(arg):
-    """An implementation of the AutoGraph 'not ..' statement."""
-    return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x[0])
+    """An implementation of the AutoGraph '.. not ..' statement."""
+    return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):
