@@ -847,7 +847,7 @@ def _check_single_bool_value(tree: PyTreeDef, avals: List[Any]) -> None:
 def _check_cond_same_shapes(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
     assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
     expected_tree = trees[0]
-    for tree, aval in list(zip(trees, avals))[1:]:
+    for tree in list(trees)[1:]:
         if tree != expected_tree:
             raise TypeError("Conditional requires consistent return types across all branches")
 
