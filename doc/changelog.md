@@ -26,6 +26,15 @@
   expressions.
   [(#325)](https://github.com/PennyLaneAI/catalyst/pull/325)
 
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def circuit(param:float):
+      if param >= 0 and param < jnp.pi:
+          qml.RX(param, wires=0)
+      return qml.probs()
+  ```
+
 * Add support for third party devices.
   Third party `QuantumDevice` implementations can now be loaded into the runtime.
   [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
