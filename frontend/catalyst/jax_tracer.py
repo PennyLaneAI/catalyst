@@ -507,6 +507,72 @@ def trace_quantum_measurements(
     return out_classical_tracers, out_tree
 
 
+def can_transform_be_applied(tape, trace, flat_results):
+    """Can transforms be applied?"""
+    (
+        out_classical_tracers,
+        out_measurements,
+        out_classical_tracers_and_measurements,
+    ) = get_tracers_measurements_and_both(trace, flat_results)
+
+    # Can transforms be applied?
+    # Since transforms are a PL feature and PL does not support the same things as
+    # Catalyst, transforms may have invariants that rely on PL invariants.
+    # For example:
+    #   * mid-circuit measurements (for batch-transforms)
+    #   * that the output will be only a sequence of `MeasurementProcess`es.
+    def is_measurement(x):
+        """Only to avoid 100 character per line limit."""
+        return isinstance(x, MeasurementProcess)
+
+    params = tape.get_parameters(trainable_only=False)
+    tape.trainable_params = qml.math.get_trainable_indices(params)
+
+    is_out_measurements = map(is_measurement, out_measurements)
+    is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
+    is_out_measurement_sequence = is_all_out_measurements and isinstance(out_measurements, Sequence)
+    is_out_single_measurement = is_all_out_measurements and isinstance(
+        out_measurements, MeasurementProcess
+    )
+    is_valid_output = is_out_measurement_sequence or is_out_single_measurement
+    # TODO: check if there were mid circuit measurements in the original tape.
+    is_wave_function_collapsed = False
+    # TODO: check if the device is noisy.
+    is_noise_present = False
+    are_batch_transforms_valid = (
+        is_valid_output and not is_wave_function_collapsed and not is_noise_present
+    )
+    return are_batch_transforms_valid
+
+
+def apply_transform(qnode, tape, trace, flat_results):
+    is_program_transformed = qnode and qnode.transform_program
+    if is_program_transformed and not can_transform_be_applied(tape, trace, flat_results):
+        raise RuntimeError("Give me a meaningful message.")
+    elif is_program_transformed:
+        tapes, callback = qnode.transform_program([tape])
+    else:
+        tapes, callback = identity_qnode_transform(tape)
+    return tapes, callback
+
+
+def get_tracers_measurements_and_both(trace, flat_values):
+    """Document me"""
+    classical = []
+    measurements = []
+    both = []
+    for flat_value in flat_values:
+        if isinstance(flat_value, DynamicJaxprTracer):
+            flat_value_trace = trace.full_raise(flat_value)
+            classical.append(flat_value_trace)
+        else:
+            flat_value_trace = flat_value
+            measurements.append(flat_value_trace)
+        both.append(flat_value_trace)
+
+    return classical, measurements, both
+
+
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:
@@ -537,7 +603,7 @@ def trace_quantum_function(
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
-                ans = wffa.call_wrapped(*in_classical_tracers)
+                return_values_flat = wffa.call_wrapped(*in_classical_tracers)
 
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
@@ -546,68 +612,27 @@ def trace_quantum_function(
 
             # 1. Recompute the original return
             with QueuingManager.stop_recording():
-                ans = tree_unflatten(out_tree_promise(), ans)
+                return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 
             def is_leaf(obj):
                 return isinstance(obj, qml.measurements.MeasurementProcess)
 
             # 2. Create a new tree that has measurements as leaves
-            ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
-
-            out_classical_tracers = []
-            out_measurements = []
-            out_classical_tracers_or_measurements = []
-            for ret_val in ans:
-                if isinstance(ret_val, DynamicJaxprTracer):
-                    ret_val_variable = trace.full_raise(ret_val)
-                    out_classical_tracers.append(ret_val_variable)
-                else:
-                    ret_val_variable = ret_val
-                    out_measurements.append(ret_val_variable)
-
-                out_classical_tracers_or_measurements.append(ret_val_variable)
-
-            params = quantum_tape.get_parameters(trainable_only=False)
-            quantum_tape.trainable_params = qml.math.get_trainable_indices(params)
-
-            # Can transforms be applied?
-            # Since transforms are a PL feature and PL does not support the same things as
-            # Catalyst, transforms may have invariants that rely on PL invariants.
-            # For example:
-            #   * mid-circuit measurements (for batch-transforms)
-            #   * that the output will be only a sequence of `MeasurementProcess`es.
-            def is_measurement(x):
-                """Only to avoid 100 character per line limit."""
-                return isinstance(x, MeasurementProcess)
-
-            is_out_measurements = map(is_measurement, out_measurements)
-            is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
-            is_out_measurement_sequence = is_all_out_measurements and isinstance(
-                out_measurements, Sequence
-            )
-            is_out_single_measurement = is_all_out_measurements and isinstance(
-                out_measurements, MeasurementProcess
-            )
-            is_valid_output = is_out_measurement_sequence or is_out_single_measurement
-            # TODO: check if there were mid circuit measurements in the original tape.
-            is_wave_function_collapsed = False
-            # TODO: check if the device is noisy.
-            is_noise_present = False
-            are_batch_transforms_valid = (
-                is_valid_output and not is_wave_function_collapsed and not is_noise_present
+            return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
+                return_values, is_leaf=is_leaf
             )
 
-            is_program_transformed = qnode and qnode.transform_program
-            if is_program_transformed:
-                tapes, callback = qnode.transform_program([quantum_tape])
-            else:
-                tapes, callback = identity_qnode_transform(quantum_tape)
-
-            invalid_state = is_program_transformed and not are_batch_transforms_valid
-            # TODO: Consider whether issuing a warning, or an exception is better.
-            assert not invalid_state
+            tapes, callback = apply_transform(qnode, quantum_tape, trace, return_values_flat)
 
             del quantum_tape
+
+            (
+                out_classical_tracers,
+                out_measurements,
+                out_classical_tracers_or_measurements,
+            ) = get_tracers_measurements_and_both(trace, return_values_flat)
+            is_program_transformed = qnode and qnode.transform_program
+
         # (2) - Quantum tracing
         results_tracers = []
         results_abstract = []
@@ -629,7 +654,7 @@ def trace_quantum_function(
                     out_classical_tracers_or_measurements
                     if not is_program_transformed
                     else tape.measurements,
-                    out_tree if not is_program_transformed else pytree_measurements,
+                    return_values_tree if not is_program_transformed else pytree_measurements,
                 )
                 out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
