@@ -64,6 +64,10 @@ runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_
 $(RT_BUILD_DIR)/tests/runner_tests: configure
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
 
+.PHONY: dummy_device
+dummy_device:
+	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
+
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests
 	@echo "test the Catalyst runtime test suite"

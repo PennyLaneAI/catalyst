@@ -36,6 +36,16 @@ jobs:
           ENABLE_OPENQASM=ON \
           make runtime
 
+          # This is needed in the artifact for the pytests
+          # Note the lack of sanitizers.
+          # Left other flags the same.
+          COMPILER_LAUNCHER="" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          ENABLE_LIGHTNING_KOKKOS=ON \
+          ENABLE_OPENQASM=ON \
+          make dummy_device
+
+
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v3
         with:
