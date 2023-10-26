@@ -34,7 +34,7 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
-from pennylane.transforms import hamiltonian_expand, qcut, sum_expand
+from pennylane.transforms import hamiltonian_expand, qcut, sum_expand, merge_rotations
 from pennylane_lightning.lightning_qubit import LightningQubit
 
 from catalyst import qjit
