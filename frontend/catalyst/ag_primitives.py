@@ -370,6 +370,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
     fallback = False
+    init_state = get_state()
 
     try:
         results = _call_catalyst_while(
@@ -404,6 +405,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
             )
 
     if fallback:
+        set_state(init_state)
         results = _call_python_while(
             loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
         )
