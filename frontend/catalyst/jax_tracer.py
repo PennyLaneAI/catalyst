@@ -626,8 +626,6 @@ def trace_quantum_function(
 
             tapes, callback = apply_transform(qnode, quantum_tape, trace, return_values_flat)
 
-            del quantum_tape
-
             (
                 out_classical_tracers,
                 _,
