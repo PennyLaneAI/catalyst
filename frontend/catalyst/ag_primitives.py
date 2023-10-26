@@ -106,13 +106,7 @@ def if_stmt(
         results = get_state()
         return assert_results(results, symbol_names)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
     results = functional_cond()
-    if not isinstance(results, tuple):
-        # TODO: Do we have a test-case for this?
-        results = (results,)  # pragma: nocover
-
     set_state(results)
 
 
@@ -324,11 +318,6 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-    if not isinstance(results, tuple):
-        # TODO: Do we have a use-case for this brnach?
-        results = (results,)  # pragma: nocover
     set_state(results)
 
 
