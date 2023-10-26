@@ -385,3 +385,36 @@ class TestSumExpand:
         expected = jax.jit(qnode_control)()
         observed = qjit(qnode_backend)()
         assert np.allclose(expected, observed)
+
+
+class TestMergeRotations:
+    """Test Merge Rotations"""
+
+    @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
+    def test_merge_rotations(self, backend, theta_1, theta_2):
+        """Merge rotations"""
+
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
+        def qnode_builder(device_name):
+            """Builder"""
+
+            @qml.qnode(qml.device(device_name, wires=3))
+            @merge_rotations
+            def qfunc(theta_1, theta_2):
+                qml.RZ(theta_1, wires=0)
+                qml.RZ(theta_2, wires=0)
+                return qml.state()
+
+            return qfunc
+
+        qnode_backend = qnode_builder(backend)
+        qnode_control = qnode_builder("default.qubit")
+        expected = jax.jit(qnode_control)(theta_1, theta_2)
+        compiled_function = qjit(qnode_backend)
+        observed = compiled_function(theta_1, theta_2)
+        assert np.allclose(expected, observed)
+
+        # Here we are asserting that there is only one RZ operation
+        assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
