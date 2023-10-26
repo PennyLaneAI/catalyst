@@ -633,11 +633,10 @@ def trace_quantum_function(
                 _,
                 out_classical_tracers_or_measurements,
             ) = get_tracers_measurements_and_both(trace, return_values_flat)
-            is_program_transformed = qnode and qnode.transform_program
 
         # (2) - Quantum tracing
-        results_tracers = []
-        results_abstract = []
+        results_tracers, results_abstract = [], []
+        is_program_transformed = qnode and qnode.transform_program
         for tape in tapes:
             # If the program is batched, that means that it was transformed.
             # If it was transformed, that means that the program might have
@@ -656,24 +655,20 @@ def trace_quantum_function(
                 qdevice_p.bind(spec="backend", val=device.backend_name)
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                out_classical_tracers, out_classical_tree = trace_quantum_measurements(
-                    device, qrp_out, output, trees
-                )
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
 
-                out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
-                results_tracers += out_classical_tracers
+                tracers = [trace.full_raise(m) for m in meas]
+                results_tracers += tracers
 
-                jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
-                    out_classical_tracers + out_quantum_tracers
-                )
+                jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
                 jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
                 out_type = out_type[:-1]
 
                 out_avals, _ = unzip2(out_type)
                 abstract_results = tree_unflatten(
-                    out_classical_tree,
+                    meas_trees,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
                 if is_program_transformed and len(abstract_results) == 1:
