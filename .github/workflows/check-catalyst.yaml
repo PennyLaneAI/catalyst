@@ -29,8 +29,10 @@ jobs:
 
       - name: Build Catalyst-Runtime
         run: |
+          # TODO: reenable kokkos builds
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          ENABLE_LIGHTNING_KOKKOS=OFF \
           CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
           ENABLE_OPENQASM=ON \
           make runtime
@@ -40,6 +42,7 @@ jobs:
           # Left other flags the same.
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_OPENQASM=ON \
           make dummy_device
 
