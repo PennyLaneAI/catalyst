@@ -34,9 +34,9 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
+from pennylane.transforms import hamiltonian_expand, merge_rotations, qcut, sum_expand
 
 from catalyst import qjit
-from pennylane.transforms import hamiltonian_expand, merge_rotations, qcut, sum_expand
 
 # pylint: disable=unnecessary-lambda-assignment
 
