@@ -231,7 +231,7 @@ class TestBroadcastExpand:
         expected = jax.jit(qnode_control)(*params, obs)
         observed = qjit(qnode_backend)(*params, obs)
 
-        assert np.allclose(e, observed)
+        assert np.allclose(expected, observed)
 
     @pytest.mark.parametrize("params, size", parameters_and_size)
     @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
