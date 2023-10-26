@@ -114,13 +114,7 @@ def if_stmt(
         results = get_state()
         return assert_results(results, symbol_names)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
     results = functional_cond()
-    if not isinstance(results, tuple):
-        # TODO: Do we have a test-case for this?
-        results = (results,)  # pragma: nocover
-
     set_state(results)
 
 
@@ -332,11 +326,6 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-    if not isinstance(results, tuple):
-        # TODO: Do we have a use-case for this brnach?
-        results = (results,)  # pragma: nocover
     set_state(results)
 
 
@@ -378,6 +367,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
     fallback = False
+    init_state = get_state()
 
     try:
         results = _call_catalyst_while(
@@ -412,6 +402,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
             )
 
     if fallback:
+        set_state(init_state)
         results = _call_python_while(
             loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
         )

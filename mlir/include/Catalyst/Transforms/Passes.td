@@ -34,4 +34,16 @@ def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
     let constructor = "catalyst::createArrayListToMemRefPass()";
 }
 
+def ScatterLoweringPass : Pass<"scatter-lowering"> {
+    let summary = "Lower scatter op from Stable HLO to loops.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "mhlo::MhloDialect",
+        "scf::SCFDialect"
+    ];
+
+    let constructor = "catalyst::createScatterLoweringPass()";
+}
+
 #endif // CATALYST_PASSES
