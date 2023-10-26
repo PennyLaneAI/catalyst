@@ -94,17 +94,42 @@ print_code(if_assign)
 # -----
 
 
+# CHECK-LABEL: def if_assign_no_type_mismatch
+@qjit  # needed to trigger Catalyst type checks during tracing
+@autograph
+def if_assign_no_type_mismatch(x: float):
+    """Verify the absense of error from a conditional that doesn't produce the same type across
+    branches."""
+
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4.0
+    if x < 3:
+        y = 4.0
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 5
+    else:
+        y = 5
+
+    return y
+
+print_code(if_assign_no_type_mismatch)
+
+# -----
+
+
 try:
 
-    @qjit  # needed to trigger Catalyst type checks during tracing
+    @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
     @autograph
-    def if_assign_type_mismatch(x: float):
-        """Verify error from a conditional that doesn't produce the same type across branches."""
+    def if_assign_pytree_shape_mismatch(x: float):
+        """Verify error from a conditional that doesn't produce a value in all branches."""
 
         if x < 3:
-            y = 4.0
+            y = (4,4)
         else:
-            y = 5
+            y = 4
 
         return y
 
@@ -222,25 +247,30 @@ print_code(if_assign_existing_partial)
 
 # -----
 
-try:
 
-    @qjit
-    @autograph
-    def if_assign_existing_partial_type_mismatch(x: float):
-        """Verify error from a conditional that assigns to an existing value with different type,
-        without defining a value in all branches. This should lead to a type mismatch error."""
+# CHECK-LABEL: def if_assign_existing_partial_no_type_mismatch
+@qjit
+@autograph
+def if_assign_existing_partial_no_type_mismatch(x: float):
+    """Verify error from a conditional that assigns to an existing value with different type,
+    without defining a value in all branches. This should lead to a type mismatch error."""
 
-        y = 0
+    # CHECK: y = 0
+    y = 0
 
-        if x < 3:
-            y = 4.0
+    # CHECK:       def if_body():
+    # CHECK:           nonlocal y
+    # CHECK:           y = 4.0
+    if x < 3:
+        y = 4.0
 
-        return y
+    # CHECK:       def else_body():
+    # CHECK:           nonlocal y
+    # CHECK:           pass
 
-except TypeError as e:
-    # CHECK:   Conditional requires consistent return types across all branches
-    print(e)
+    return y
 
+print_code(if_assign_existing_partial_no_type_mismatch)
 
 # -----
 

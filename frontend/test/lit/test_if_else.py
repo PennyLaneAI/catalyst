@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# RUN: %PYTHON %s | FileCheck %s
+# RUN: %PYTHON %s | FileCheck --implicit-check-not convert_element_type %s
 
 import pennylane as qml
 
@@ -53,3 +53,50 @@ def circuit(n: int):
 
 
 print(circuit.mlir)
+
+# -----
+
+# CHECK-LABEL: test_convert_element_type
+@qjit
+def test_convert_element_type(i: int, f: float):
+    # CHECK: qcond[
+    @cond(i <= 3)
+    def cond_fn():
+        # CHECK: convert_element_type
+        return i
+
+    @cond_fn.otherwise
+    def otherwise():
+        # CHECK: add {{[a-z]+}} 2
+        return f+2
+    # CHECK: ]
+
+    return cond_fn()
+
+print("test_convert_element_type")
+print(test_convert_element_type.jaxpr)
+
+
+# -----
+
+# CHECK-LABEL: test_no_convert_element_type
+@qjit
+def test_no_convert_element_type(i: int):
+    # CHECK: qcond[
+    @cond(i <= 3)
+    def cond_fn():
+        # CHECK: add {{[a-z]+}} 1
+        return i+1
+
+    @cond_fn.otherwise
+    def otherwise():
+        # CHECK: add {{[a-z]+}} 2
+        return i+2
+    # CHECK: ]
+
+    return cond_fn()
+
+print("test_no_convert_element_type")
+print(test_no_convert_element_type.jaxpr)
+
+
