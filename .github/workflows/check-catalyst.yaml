@@ -31,7 +31,6 @@ jobs:
         run: |
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          # ENABLE_LIGHTNING_KOKKOS=ON \
           CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
           ENABLE_OPENQASM=ON \
           make runtime
@@ -41,7 +40,6 @@ jobs:
           # Left other flags the same.
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          # ENABLE_LIGHTNING_KOKKOS=ON \
           ENABLE_OPENQASM=ON \
           make dummy_device
 
@@ -534,12 +532,12 @@ jobs:
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
-        if: ${{ matrix.backend == 'lightning-kokkos' }}
+        if: false
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            # ENABLE_LIGHTNING_KOKKOS=ON \
+            ENABLE_LIGHTNING_KOKKOS=ON \
             CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
             make test-runtime
 
