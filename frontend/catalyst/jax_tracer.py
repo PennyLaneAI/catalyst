@@ -639,24 +639,25 @@ def trace_quantum_function(
         results_tracers = []
         results_abstract = []
         for tape in tapes:
+            # If the program is batched, that means that it was transformed.
+            # If it was transformed, that means that the program might have
+            # changed the output. See `split_non_commuting`
+            if is_program_transformed:
+                # If the program is transformed
+                # trees == out_classical_tree in the next line section.
+                output = tape.measurements
+                _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
+            else:
+                output = out_classical_tracers_or_measurements
+                trees = return_values_tree
+
             with EvaluationContext.frame_tracing_context(ctx, trace):
                 qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
                 qdevice_p.bind(spec="backend", val=device.backend_name)
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                _, pytree_measurements = jax.tree_util.tree_flatten(
-                    tape.measurements, is_leaf=is_leaf
-                )
                 out_classical_tracers, out_classical_tree = trace_quantum_measurements(
-                    device,
-                    qrp_out,
-                    # If the program is batched, that means that it was transformed.
-                    # If it was transformed, that means that the program might have
-                    # changed the output. See `split_non_commuting`
-                    out_classical_tracers_or_measurements
-                    if not is_program_transformed
-                    else tape.measurements,
-                    return_values_tree if not is_program_transformed else pytree_measurements,
+                    device, qrp_out, output, trees
                 )
                 out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
@@ -672,7 +673,7 @@ def trace_quantum_function(
 
                 out_avals, _ = unzip2(out_type)
                 abstract_results = tree_unflatten(
-                    out_classical_tree if not is_program_transformed else pytree_measurements,
+                    out_classical_tree,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
                 if is_program_transformed and len(abstract_results) == 1:
