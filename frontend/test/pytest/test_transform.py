@@ -34,11 +34,11 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
-from pennylane.transforms import hamiltonian_expand, qcut, sum_expand, merge_rotations
-from pennylane_lightning.lightning_qubit import LightningQubit
 
 from catalyst import qjit
-from catalyst.pennylane_extensions import QJITDevice
+from pennylane.transforms import hamiltonian_expand, merge_rotations, qcut, sum_expand
+
+# pylint: disable=unnecessary-lambda-assignment
 
 
 @pytest.mark.skip(reason="Uses part of old API")
@@ -158,37 +158,24 @@ class RZ_broadcasted(qml.RZ):
     compute_decomposition = staticmethod(lambda theta, wires=None: [qml.RZ(theta, wires=wires)])
 
 
-parameters_and_size = [
-    [(0.2, np.array([0.1, 0.8, 2.1]), -1.5), 3],
-    [(0.2, np.array([0.1]), np.array([-0.3])), 1],
-    [
-        (
-            0.2,
-            pnp.array([0.1, 0.3], requires_grad=True),
-            pnp.array([-0.3, 2.1], requires_grad=False),
-        ),
-        2,
-    ],
+parameters = [
+    (0.2, np.array([0.1, 0.8, 2.1]), -1.5),
+    (0.2, np.array([0.1]), np.array([-0.3])),
+    (
+        0.2,
+        pnp.array([0.1, 0.3], requires_grad=True),
+        pnp.array([-0.3, 2.1], requires_grad=False),
+    ),
 ]
 
 coeffs0 = [0.3, -5.1]
 H0 = qml.Hamiltonian(qml.math.array(coeffs0), [qml.PauliZ(0), qml.PauliY(1)])
 
-# Here we exploit the product structure of our circuit
-exp_fn_Z0 = lambda x, y, z: -qml.math.cos(x) * qml.math.ones_like(y) * qml.math.ones_like(z)
-exp_fn_Y1 = lambda x, y, z: qml.math.sin(y) * qml.math.cos(z) * qml.math.ones_like(x)
-exp_fn_Z0Y1 = lambda x, y, z: exp_fn_Z0(x, y, z) * exp_fn_Y1(x, y, z)
-exp_fn_Z0_and_Y1 = lambda x, y, z: qml.math.array(
-    [exp_fn_Z0(x, y, z), exp_fn_Y1(x, y, z)],
-    like=exp_fn_Z0(x, y, z) + exp_fn_Y1(x, y, z),
-)
-exp_fn_H0 = lambda x, y, z: exp_fn_Z0(x, y, z) * coeffs0[0] + exp_fn_Y1(x, y, z) * coeffs0[1]
-
-observables_and_exp_fns = [
-    ([qml.PauliZ(0)], exp_fn_Z0),
-    ([qml.PauliZ(0) @ qml.PauliY(1)], exp_fn_Z0Y1),
-    ([qml.PauliZ(0), qml.PauliY(1)], exp_fn_Z0_and_Y1),
-    ([H0], exp_fn_H0),
+observables = [
+    [qml.PauliZ(0)],
+    [qml.PauliZ(0) @ qml.PauliY(1)],
+    [qml.PauliZ(0), qml.PauliY(1)],
+    [H0],
 ]
 
 
@@ -196,9 +183,9 @@ class TestBroadcastExpand:
     """Test Broadcast Expand"""
 
     @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4734")
-    @pytest.mark.parametrize("params, size", parameters_and_size)
-    @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
-    def test_expansion_qnode(self, backend, params, size, obs, exp_fn):
+    @pytest.mark.parametrize("params", parameters)
+    @pytest.mark.parametrize("obs", observables)
+    def test_expansion_qnode(self, backend, params, obs):
         """Test broadcast expand"""
 
         if backend == "lightning.kokkos":
@@ -235,9 +222,9 @@ class TestBroadcastExpand:
 
         assert np.allclose(expected, observed)
 
-    @pytest.mark.parametrize("params, size", parameters_and_size)
-    @pytest.mark.parametrize("obs, exp_fn", observables_and_exp_fns)
-    def test_expansion_qnode_no_cache(self, backend, params, size, obs, exp_fn):
+    @pytest.mark.parametrize("params", parameters)
+    @pytest.mark.parametrize("obs", observables)
+    def test_expansion_qnode_no_cache(self, backend, params, obs):
         """Test broadcast expand.
 
         This test is used as an alternative to test_expansion_qnode which cannot succeed due to bug.
