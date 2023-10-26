@@ -24,7 +24,6 @@ import numpy as np
 import pennylane as qml
 import pytest
 from numpy.testing import assert_allclose
-from pytest import MonkeyPatch
 
 from catalyst import cond, for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
