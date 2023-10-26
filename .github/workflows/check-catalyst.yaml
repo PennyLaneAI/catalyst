@@ -532,7 +532,7 @@ jobs:
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
-        if: false
+        if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
