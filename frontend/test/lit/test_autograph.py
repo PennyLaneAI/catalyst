@@ -114,6 +114,7 @@ def if_assign_no_type_mismatch(x: float):
 
     return y
 
+
 print_code(if_assign_no_type_mismatch)
 
 # -----
@@ -127,7 +128,7 @@ try:
         """Verify error from a conditional that doesn't produce a value in all branches."""
 
         if x < 3:
-            y = (4,4)
+            y = (4, 4)
         else:
             y = 4
 
@@ -269,6 +270,7 @@ def if_assign_existing_partial_no_type_mismatch(x: float):
     # CHECK:           pass
 
     return y
+
 
 print_code(if_assign_existing_partial_no_type_mismatch)
 
