@@ -557,6 +557,12 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 def apply_transform(qnode, tape, flat_results):
     """Apply transform."""
+
+    # Some transforms use trainability as a basis for transforming.
+    # See batch_params
+    params = tape.get_parameters(trainable_only=False)
+    tape.trainable_params = qml.math.get_trainable_indices(params)
+
     is_program_transformed = qnode and qnode.transform_program
     is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
 

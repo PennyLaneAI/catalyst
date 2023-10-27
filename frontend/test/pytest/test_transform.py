@@ -73,7 +73,6 @@ def test_batch_input(backend):
     assert_allclose(expected_output, observed_output)
 
 
-@pytest.mark.skip(reason="Temporary, please investigate")
 def test_batch_params(backend):
     """Test batch param"""
 
@@ -96,7 +95,7 @@ def test_batch_params(backend):
     data = pnp.random.random((batch_size, 8))
     data = data[0]
     data = pnp.array([data, data, data, data, data])
-    x = pnp.linspace(0.1, 0.5, batch_size, requires_grad=True)
+    x = pnp.array([0.1, 0.1, 0.1, 0.1, 0.1], requires_grad=True)
     weights = pnp.ones((batch_size, 10, 3, 3), requires_grad=True)
 
     qnode_control = qnode_builder("default.qubit")
