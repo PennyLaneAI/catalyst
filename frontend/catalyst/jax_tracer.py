@@ -578,12 +578,9 @@ def split_tracers_and_measurements(trace, flat_values):
     measurements = []
     for flat_value in flat_values:
         if isinstance(flat_value, DynamicJaxprTracer):
-            # TODO: Why do we need full_raise?
-            flat_value_trace = trace.full_raise(flat_value)
-            classical.append(flat_value_trace)
+            classical.append(flat_value)
         else:
-            flat_value_trace = flat_value
-            measurements.append(flat_value_trace)
+            measurements.append(flat_value)
 
     return classical, measurements
 
