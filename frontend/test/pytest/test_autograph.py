@@ -17,6 +17,7 @@
 import sys
 import traceback
 import warnings
+from collections import defaultdict
 
 import jax
 import jax.numpy as jnp
@@ -32,6 +33,24 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-lines
+
+
+class Failing:
+    """Test class that emulates failures in user-code"""
+
+    triggered = defaultdict(bool)
+
+    def __init__(self, ref, label: str = "default"):
+        self.label = label
+        self.ref = ref
+
+    @property
+    def val(self):
+        if not Failing.triggered[self.label]:
+            Failing.triggered[self.label] = True
+            raise Exception(f"Emulated failure with label {self.label}")
+        else:
+            return self.ref
 
 
 def test_unavailable(monkeypatch):
@@ -1202,43 +1221,44 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
-    def test_whileloop_warning(self, monkeypatch):
+    def test_whileloop_fallback(self, monkeypatch):
         """Test while-loop warning if strict conversion is disabled."""
         # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", False)
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         def f1():
             acc = 0
-            while acc < 5:
+            while Failing(acc).val < 5:
                 acc += 1
             return acc
 
         with pytest.warns(
             UserWarning,
-            match=(f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n    while acc < 5'),
+            match=(
+                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n'
+                "    while Failing\\(acc\\).val < 5"
+            ),
         ):
-            qjit(autograph=True)(f1)()
+            assert 5 == qjit(autograph=True)(f1)()
 
     def test_whileloop_no_warning(self, monkeypatch):
-        """Test while-loop warning if strict conversion is disabled."""
+        """Test the absence of warnings if fallbacks are ignored."""
         # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         def f1():
             acc = 0
-            while acc < 5:
+            while Failing(acc).val < 5:
                 acc = acc + 1
             return acc
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            qjit(autograph=True)(f1)()
+            assert 5 == qjit(autograph=True)(f1)()
 
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""
@@ -1263,17 +1283,15 @@ class TestMixed:
     def test_force_python_fallbacks(self, monkeypatch):
         """Test fallback modes of control-flow primitives."""
 
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
-
         with pytest.warns(UserWarning):
 
             @qjit(autograph=True)
             def f1():
                 acc = 0
                 while acc < 5:
-                    acc = acc + 1
+                    acc = Failing(acc, "while").val + 1
                     for x in [1, 2, 3]:
-                        acc += x
+                        acc += Failing(x, "for").val
                 return acc
 
             assert f1() == 0 + 1 + sum([1, 2, 3])
