@@ -705,19 +705,21 @@ def trace_quantum_function(
             # The shape is in a list of results_abstract.
 
             # We need to deduce the type/shape/tree of the post_processing.
-            wffa, in_avals, out_tree_promise = deduce_avals(post_processing, (results_abstract,), {})
-
-            # wffa will take as an input a flatten tracers.
-            ans = wffa.call_wrapped(*results_tracers)
-
-            # After wffa is called, then the shape becomes available in out_tree_promise.
-            out_classical_tracers = [trace.full_raise(t) for t in ans]
-            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers)
-            closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-            out_avals, _ = unzip2(out_type)
-            abstract_results = tree_unflatten(
-                out_tree_promise(),
-                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_classical_tracers],
+            wffa, in_avals, out_tree_promise = deduce_avals(
+                post_processing, (results_abstract,), {}
             )
 
-    return closed_jaxpr, abstract_results
+            # wffa will take as an input a flatten tracers.
+            callback_retval_flat = wffa.call_wrapped(*results_tracers)
+
+            # After wffa is called, then the shape becomes available in out_tree_promise.
+            callback_tracers = [trace.full_raise(t) for t in callback_retval_flat]
+            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(callback_tracers)
+            closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+            out_avals, _ = unzip2(out_type)
+            unflattened_callback_results = tree_unflatten(
+                out_tree_promise(),
+                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in callback_tracers],
+            )
+
+    return closed_jaxpr, unflattened_callback_results
