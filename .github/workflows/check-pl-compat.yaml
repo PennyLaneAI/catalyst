@@ -38,7 +38,7 @@ jobs:
 
     - name: Install deps
       run: |
-        sudo apt-get install -y cmake ninja-build ccache clang lld libomp-dev
+        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan5
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # TODO: Use the latest version of boto3 after fixing the issue with
@@ -101,6 +101,7 @@ jobs:
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
+        ENABLE_LLD=OFF \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
@@ -115,6 +116,7 @@ jobs:
         COMPILER_LAUNCHER="" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
+        ENABLE_LLD=OFF \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
         QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \

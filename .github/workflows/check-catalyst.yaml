@@ -375,7 +375,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan5
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
@@ -443,7 +443,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan5
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
@@ -496,7 +496,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev ninja-build make cmake clang
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan5
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
