@@ -71,14 +71,14 @@ class CFTransformer(transpiler.PyToPy):
         # First transform the top-level function to avoid infinite recursion.
         node = functions.transform(node, ctx)
 
-        # Convert logical expressions
-        node = logical_expressions.transform(node, ctx)
-
         # Convert function calls. This allows us to convert these called functions as well.
         node = call_trees.transform(node, ctx)
 
         # Convert Python control flow to custom 'ag__.if_stmt' ... functions.
         node = control_flow.transform(node, ctx)
+
+        # Convert logical expressions
+        node = logical_expressions.transform(node, ctx)
 
         return node
 
