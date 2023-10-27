@@ -111,8 +111,6 @@ def test_batch_params(backend):
 
 def test_split_non_commuting(backend):
     """Test split non commuting"""
-    if backend == "lightning.kokkos":
-        pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
     def qnode_builder(device_name):
         """Builder"""
@@ -189,9 +187,6 @@ class TestBroadcastExpand:
     def test_expansion_qnode(self, backend, params, obs):
         """Test broadcast expand"""
 
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
-
         if obs[0] == H0:
             pytest.skip(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
 
@@ -234,9 +229,6 @@ class TestBroadcastExpand:
         Delete me once cache=False is not necessary.
         """
 
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
-
         if obs[0] == H0:
             pytest.skip(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
 
@@ -278,9 +270,6 @@ class TestCutCircuitMCTransform:
         postprocessed to return bitstrings of the original circuit size.
         """
 
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
-
         def qnode_builder(device_name):
             """Builder"""
 
@@ -315,9 +304,6 @@ class TestHamiltonianExpand:
 
     def test_hamiltonian_expand(self, backend):
         """Test hamiltonian expand."""
-
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         H4 = (
             qml.PauliX(0) @ qml.PauliZ(2)
@@ -357,9 +343,6 @@ class TestSumExpand:
     def test_sum_expand(self, backend):
         """Test Sum Expand"""
 
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
-
         def qnode_builder(device_name):
             """Builder"""
 
@@ -386,9 +369,6 @@ class TestMergeRotations:
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
     def test_merge_rotations(self, backend, theta_1, theta_2):
         """Merge rotations"""
-
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         def qnode_builder(device_name):
             """Builder"""
@@ -418,8 +398,6 @@ class TestInvalidTransform:
 
     def test_split_invalid_non_commuting(self, backend):
         """Test split non commuting"""
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         def qnode_builder(device_name):
             """Builder"""
@@ -456,9 +434,6 @@ class TestInvalidTransform:
         This is because it will not create multiple tapes, and therefore not
         non-deterministic behaviour across the execution of multiple tapes.
         """
-
-        if backend == "lightning.kokkos":
-            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
 
         def qnode_builder(device_name):
             """Builder"""
