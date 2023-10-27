@@ -409,16 +409,6 @@ def _logical_op(*args, jax_fn, python_fn):
     def _is_array_tracer(x: Any) -> bool:
         return isinstance(x, DynamicJaxprTracer) and isinstance(x.aval, ShapedArray)
 
-    def _is_non_scalar_tracer(x) -> bool:
-        return _is_array_tracer(x) and reduce(lambda a, b: a * b, x.shape, 1) != 1
-
-    if any(map(_is_non_scalar_tracer, values)):
-        raise AutoGraphError(
-            "Using logical operations (and/or/not) with non-scalar tracers is not supported\n"
-            "Consider using `jax.numpy.logical_and/..logical_or/..logical_not` functions.\n"
-            f"arguments provided were: {args}"
-        )
-
     if all(_is_array_tracer(val) for val in values):
         result = jax_fn(*values)
     else:

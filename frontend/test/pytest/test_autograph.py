@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
 from catalyst import (
@@ -1395,72 +1396,57 @@ class TestLogicalOps:
         assert qjit(autograph=True)(f3)(0.5) == np.array(True)
 
     # fmt:off
-    @pytest.mark.parametrize("python_object",[[0, 1, 2], [], {1: 2}, {}, ],)
+    @pytest.mark.parametrize("python_object",["string", [0, 1, 2], [], {1: 2}, {}, ],)
     # fmt:on
-    def test_logical_with_jax_compatible_python_objects(self, monkeypatch, python_object):
-        """Test fallback path of logical ops."""
+    def test_logical_with_python_objects(self, monkeypatch, python_object):
+        """Test that logical ops still work with python objects."""
 
-        assert qjit(autograph=True)(lambda: True and python_object)() == (True and python_object)
-        assert qjit(autograph=True)(lambda: False or python_object)() == (False or python_object)
-        assert qjit(autograph=True)(lambda: not python_object)() == (not python_object)
+        @qjit(autograph=True)
+        def f():
+            r1 = True and python_object
+            assert r1 is python_object
+            r2 = False or python_object
+            assert r2 is python_object
+            r3 = not python_object
+            assert isinstance(r3, bool)
+            return 1
 
-    # fmt:off
-    @pytest.mark.parametrize("python_object",["string", "", MonkeyPatch() ],)
-    # fmt:on
-    def test_logical_with_jax_incompatible_python_objects(self, monkeypatch, python_object):
-        """Test fallback path of logical ops."""
+        assert 1 == f()
 
-        with pytest.raises(TypeError):
-            qjit(autograph=True)(lambda: True and python_object)()
-        with pytest.raises(TypeError):
-            qjit(autograph=True)(lambda: False or python_object)()
+    def test_logical_accepts_non_scalars(self, monkeypatch):
+        """Test that we accept logic with non-scalar tensors if both are traced"""
 
-        qjit(autograph=True)(lambda: not python_object)() == bool(python_object)
+        def f_and(a, b):
+            return a and b
 
-    @pytest.mark.parametrize("bad", [jnp.array([]), jnp.array([0.5, 1.0])])
-    def test_logical_rejects_non_scalars(self, monkeypatch, bad):
-        """Test that we reject using logic with non-scalar tensors"""
+        def f_or(a, b):
+            return a or b
 
-        def f1(param):
-            return param > 0.0 and param < 1.0
+        def f_not(a):
+            return not a
 
-        def f2(param):
-            return param > 1.0 or param < 0.0 or param == 0.5
-
-        def f3(param):
-            return not (param > 1.0)
-
-        with pytest.raises(AutoGraphError, match="non-scalar"):
-            qjit(autograph=True)(f1)(bad)
-        with pytest.raises(AutoGraphError, match="non-scalar"):
-            qjit(autograph=True)(f2)(bad)
-        with pytest.raises(AutoGraphError, match="non-scalar"):
-            qjit(autograph=True)(f3)(bad)
+        a, b = jnp.array([0, 1]), jnp.array([1, 1])
+        qjit(autograph=True)(f_and)(a, b) == jnp.logical_and(a, b)
+        qjit(autograph=True)(f_or)(a, b) == jnp.logical_or(a, b)
+        qjit(autograph=True)(f_not)(a) == jnp.logical_not(a)
 
     @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
     def test_logical_mixture_static_dynamic_default(self, monkeypatch, s, d):
         """Test the useage of a mixture of static(s) and dynamic(d) variables."""
 
+        # Here we either return bool or the dynamic object
         assert qjit(autograph=True)(lambda d: s and d)(d) == (s and d)
         assert qjit(autograph=True)(lambda d: s or d)(d) == (s or d)
+
+        # Here we perform boolean conversion of a tracer object
         assert qjit(autograph=True)(lambda d: not d)(d) == (not d)
+        assert qjit(autograph=True)(lambda: not s)() == (not s)
 
-    @pytest.mark.parametrize(
-        "a,b",
-        # fmt:off
-        [ (jnp.array(1.0), True), (1.0, False), (jnp.array(-1.0), True),
-          (-1.0, False), (np.array([1.2]), False), (np.array([-1.2]), False),
-        ],
-        # fmt:on
-    )
-    def test_logical_mixture_type(self, monkeypatch, a, b):
-        """Test non-boolean compatibility."""
-
-        @qjit(autograph=True)
-        def f1(jaxvar, boolvar):
-            return ((jaxvar > 0.0 and boolvar), not ((jaxvar <= 0.0) or (not boolvar)))
-
-        assert f1(a, b)[0] == f1(a, b)[1]
+        # Cases where `d` is 1-st argument are going to fail
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d and s)(d) == (d and s)
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
 
 
 @pytest.mark.tf
