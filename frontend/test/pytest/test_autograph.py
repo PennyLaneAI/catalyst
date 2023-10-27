@@ -47,11 +47,11 @@ class Failing:
     @property
     def val(self):
         """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
         if not Failing.triggered[self.label]:
             Failing.triggered[self.label] = True
             raise Exception(f"Emulated failure with label {self.label}")
-        else:
-            return self.ref
+        return self.ref
 
 
 def test_unavailable(monkeypatch):
@@ -1281,7 +1281,7 @@ class TestWhileLoops:
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
-    def test_force_python_fallbacks(self, monkeypatch):
+    def test_force_python_fallbacks(self):
         """Test fallback modes of control-flow primitives."""
 
         with pytest.warns(UserWarning):
