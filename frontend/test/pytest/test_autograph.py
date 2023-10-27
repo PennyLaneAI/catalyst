@@ -46,6 +46,7 @@ class Failing:
 
     @property
     def val(self):
+        """Get a reference to a variable or fail if programmed so."""
         if not Failing.triggered[self.label]:
             Failing.triggered[self.label] = True
             raise Exception(f"Emulated failure with label {self.label}")
