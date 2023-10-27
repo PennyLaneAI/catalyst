@@ -557,7 +557,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 def apply_transform(qnode, tape, flat_results):
     """Apply transform."""
-    if qnode.transform_program.is_informative:
+    if qnode.transform_program and qnode.transform_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
