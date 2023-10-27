@@ -26,6 +26,7 @@ which correspond to QNode transforms.
 """
 
 from functools import partial
+from typing import Callable, Sequence
 
 import jax
 import numpy as np
@@ -453,3 +454,20 @@ class TestInvalidTransform:
 
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
+
+    def test_informative_transform(self, backend):
+        """Informative transforms are not supported!"""
+
+        def id(tape: qml.tape.QuantumTape) -> (Sequence[qml.tape.QuantumTape], Callable):
+            return [tape], lambda res: res[0]
+
+        # Just fake that it is informative
+        id_transform = qml.transforms.core.transform(id, is_informative=True)
+
+        with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
+
+            @qjit
+            @id_transform
+            @qml.qnode(qml.device(backend, wires=1))
+            def f():
+                return qml.state()
