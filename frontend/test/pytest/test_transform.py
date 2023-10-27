@@ -36,7 +36,8 @@ from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
 from pennylane.transforms import hamiltonian_expand, merge_rotations, qcut, sum_expand
 
-from catalyst import qjit
+from catalyst import qjit, measure
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=unnecessary-lambda-assignment
 
@@ -410,3 +411,39 @@ class TestMergeRotations:
 
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
+
+
+class TestInvalidTransform:
+    def test_split_invalid_non_commuting(self, backend):
+        """Test split non commuting"""
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
+        def qnode_builder(device_name):
+            """Builder"""
+
+            @qml.transforms.split_non_commuting
+            @qml.qnode(qml.device(device_name, wires=6), interface="jax")
+            def qfunc():
+                """Example taken from PL tests"""
+                qml.Hadamard(1)
+                qml.Hadamard(0)
+                qml.PauliZ(0)
+                # There is a measure which is a source of uncertainty!
+                measure(0)
+                qml.Hadamard(3)
+                qml.Hadamard(5)
+                qml.T(5)
+                return (
+                    qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+                    qml.expval(qml.PauliX(0)),
+                    qml.expval(qml.PauliZ(1)),
+                    qml.expval(qml.PauliX(1) @ qml.PauliX(4)),
+                    qml.expval(qml.PauliX(3)),
+                    qml.expval(qml.PauliY(5)),
+                )
+
+            return qfunc
+
+        with pytest.raises(CompileError, match="Multiple tapes are generated") as e:
+            qjit(qnode_builder(backend))

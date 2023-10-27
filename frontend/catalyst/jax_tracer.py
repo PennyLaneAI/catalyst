@@ -48,6 +48,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -507,8 +508,15 @@ def trace_quantum_measurements(
     return out_classical_tracers, out_tree
 
 
-def can_transform_be_applied(tape, trace, flat_results):
-    """Can transforms be applied?"""
+def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
+    """Not all transforms are valid for batch transforms.
+    Batch transforms will increase the number of tapes from 1 to N.
+    However, if the wave function collapses or there is any other non-deterministic behaviour
+    such as noise present, then each tape would have different results.
+
+    Also, MidCircuitMeasure is a HybridOp, which PL does not handle at the moment.
+    Let's wait until mid-circuit measurements are better integrated into both PL
+    and Catalyst and discussed more as well."""
     (
         class_tracers,
         meas_tracers,
@@ -525,19 +533,24 @@ def can_transform_be_applied(tape, trace, flat_results):
         """Only to avoid 100 character per line limit."""
         return isinstance(x, MeasurementProcess)
 
-    params = tape.get_parameters(trainable_only=False)
-    tape.trainable_params = qml.math.get_trainable_indices(params)
-
     is_out_measurements = map(is_measurement, meas_tracers)
     is_all_out_measurements = all(is_out_measurements) and not class_tracers
     is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
     is_out_single_measurement = is_all_out_measurements and isinstance(
         meas_tracers, MeasurementProcess
     )
+
+    def is_midcircuit_measurement(op):
+        """Only to avoid 100 character per line limit."""
+        # Import here to avoid circuilar dependency.
+        from catalyst.pennylane_extensions import MidCircuitMeasure
+
+        return isinstance(op, MidCircuitMeasure)
+
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
-    # TODO: check if there were mid circuit measurements in the original tape.
-    is_wave_function_collapsed = False
+    is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
     # TODO: check if the device is noisy.
+    # How?
     is_noise_present = False
     are_batch_transforms_valid = (
         is_valid_output and not is_wave_function_collapsed and not is_noise_present
@@ -548,11 +561,13 @@ def can_transform_be_applied(tape, trace, flat_results):
 def apply_transform(qnode, tape, trace, flat_results):
     """Apply transform."""
     is_program_transformed = qnode and qnode.transform_program
-    if is_program_transformed and not can_transform_be_applied(tape, trace, flat_results):
-        raise RuntimeError("The tape was transformed but transforms are not valid.")
+    is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, trace, flat_results)
 
     if is_program_transformed:
         tapes, callback = qnode.transform_program([tape])
+        if not is_valid_for_batch and len(tapes) > 1:
+            msg = "Multiple tapes are generated, but each run might produce different results."
+            raise CompileError(msg)
     else:
         tapes, callback = identity_qnode_transform(tape)
     return tapes, callback
