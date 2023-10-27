@@ -645,7 +645,7 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(qnode, quantum_tape, trace, return_values_flat)
 
             (
-                out_classical_tracers,
+                _,
                 _,
                 out_classical_tracers_or_measurements,
             ) = get_tracers_measurements_and_both(trace, return_values_flat)
