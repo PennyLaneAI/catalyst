@@ -27,9 +27,7 @@ import jax.numpy as jnp
 # as well as various utility objects.
 import pennylane as qml
 import tensorflow.python.autograph.impl.api as tf_autograph_api
-from jax.numpy import logical_and as jax_logical_and
-from jax.numpy import logical_not as jax_logical_not
-from jax.numpy import logical_or as jax_logical_or
+from jax.numpy import logical_and, logical_not, logical_or
 from tensorflow.python.autograph.core import config
 from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
 from tensorflow.python.autograph.core.converter import ConversionOptions
@@ -419,17 +417,17 @@ def _logical_op(*args, jax_fn, python_fn):
 
 def and_(a, b):
     """An implementation of the AutoGraph '.. and ..' statement."""
-    return _logical_op(a, b, jax_fn=jax_logical_and, python_fn=lambda a, b: a and b)
+    return _logical_op(a, b, jax_fn=logical_and, python_fn=lambda a, b: a and b)
 
 
 def or_(a, b):
     """An implementation of the AutoGraph '.. or ..' statement."""
-    return _logical_op(a, b, jax_fn=jax_logical_or, python_fn=lambda a, b: a or b)
+    return _logical_op(a, b, jax_fn=logical_or, python_fn=lambda a, b: a or b)
 
 
 def not_(arg):
     """An implementation of the AutoGraph '.. not ..' statement."""
-    return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x)
+    return _logical_op(lambda: arg, jax_fn=logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):
