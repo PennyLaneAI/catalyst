@@ -517,11 +517,7 @@ def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
     Also, MidCircuitMeasure is a HybridOp, which PL does not handle at the moment.
     Let's wait until mid-circuit measurements are better integrated into both PL
     and Catalyst and discussed more as well."""
-    (
-        class_tracers,
-        meas_tracers,
-        _,
-    ) = get_tracers_measurements_and_both(trace, flat_results)
+    class_tracers, meas_tracers = split_tracers_and_measurements(trace, flat_results)
 
     # Can transforms be applied?
     # Since transforms are a PL feature and PL does not support the same things as
@@ -575,22 +571,21 @@ def apply_transform(qnode, tape, trace, flat_results):
     return tapes, post_processing
 
 
-def get_tracers_measurements_and_both(trace, flat_values):
+def split_tracers_and_measurements(trace, flat_values):
     """Return classical tracers, measurements, and a list of both in the order in which
     they were unflattened."""
     classical = []
     measurements = []
-    both = []
     for flat_value in flat_values:
         if isinstance(flat_value, DynamicJaxprTracer):
+            # TODO: Why do we need full_raise?
             flat_value_trace = trace.full_raise(flat_value)
             classical.append(flat_value_trace)
         else:
             flat_value_trace = flat_value
             measurements.append(flat_value_trace)
-        both.append(flat_value_trace)
 
-    return classical, measurements, both
+    return classical, measurements
 
 
 def trace_quantum_function(
@@ -644,8 +639,6 @@ def trace_quantum_function(
 
             tapes, post_processing = apply_transform(qnode, quantum_tape, trace, return_values_flat)
 
-            user_func_output = get_tracers_measurements_and_both(trace, return_values_flat)[-1]
-
         # (2) - Quantum tracing
         results_tracers, results_abstract = [], []
         is_program_transformed = qnode and qnode.transform_program
@@ -659,7 +652,7 @@ def trace_quantum_function(
                 output = tape.measurements
                 _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
             else:
-                output = user_func_output
+                output = return_values_flat
                 trees = return_values_tree
 
             with EvaluationContext.frame_tracing_context(ctx, trace):
