@@ -181,7 +181,7 @@ observables = [
 class TestBroadcastExpand:
     """Test Broadcast Expand"""
 
-    @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4734")
+    @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/2762")
     @pytest.mark.parametrize("params", parameters)
     @pytest.mark.parametrize("obs", observables)
     def test_expansion_qnode(self, backend, params, obs):
