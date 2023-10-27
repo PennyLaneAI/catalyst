@@ -565,14 +565,14 @@ def apply_transform(qnode, tape, trace, flat_results):
     is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, trace, flat_results)
 
     if is_program_transformed:
-        tapes, callback = qnode.transform_program([tape])
+        tapes, post_processing = qnode.transform_program([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
     else:
         # Apply the identity transform in order to keep generalization
-        tapes, callback = identity_qnode_transform(tape)
-    return tapes, callback
+        tapes, post_processing = identity_qnode_transform(tape)
+    return tapes, post_processing
 
 
 def get_tracers_measurements_and_both(trace, flat_values):
@@ -642,7 +642,7 @@ def trace_quantum_function(
                 return_values, is_leaf=is_leaf
             )
 
-            tapes, callback = apply_transform(qnode, quantum_tape, trace, return_values_flat)
+            tapes, post_processing = apply_transform(qnode, quantum_tape, trace, return_values_flat)
 
             (
                 out_classical_tracers,
@@ -697,15 +697,15 @@ def trace_quantum_function(
                 # check_jaxpr(jaxpr)
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            # What is the input to the callback function?
-            # The input to the callback function is going to be a list of values
+            # What is the input to the post_processing function?
+            # The input to the post_processing function is going to be a list of values
             # One for each tape.
 
             # The tracers are all flat in results_tracers.
             # The shape is in a list of results_abstract.
 
-            # We need to deduce the type/shape/tree of the callback.
-            wffa, in_avals, out_tree_promise = deduce_avals(callback, (results_abstract,), {})
+            # We need to deduce the type/shape/tree of the post_processing.
+            wffa, in_avals, out_tree_promise = deduce_avals(post_processing, (results_abstract,), {})
 
             # wffa will take as an input a flatten tracers.
             ans = wffa.call_wrapped(*results_tracers)
