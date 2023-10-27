@@ -615,7 +615,7 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
 
         # After wffa is called, then the shape becomes available in out_tree_promise.
         post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         post_processing_results = tree_unflatten(
             out_tree_promise(),
@@ -714,8 +714,8 @@ def trace_quantum_function(
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
                 # This mimics the return type from qnodes.
-                # I would prefer if qnodes didn't have special rules about whether they return a tuple,
-                # list, or value.
+                # I would prefer if qnodes didn't have special rules about whether they return a
+                # tuple, list, or value.
                 if is_program_transformed and len(abstract_results) == 1:
                     results_abstract.append(abstract_results[0])
                 elif is_program_transformed:
