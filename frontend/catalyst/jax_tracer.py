@@ -608,7 +608,7 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
         # The shape is in a list of args_types.
 
         # We need to deduce the type/shape/tree of the post_processing.
-        wffa, in_avals, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
+        wffa, _, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
 
         # wffa will take as an input a flatten tracers.
         post_processing_retval_flat = wffa.call_wrapped(*args)
@@ -617,7 +617,6 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
         post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
         jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        out_avals, _ = unzip2(out_type)
         post_processing_results = tree_unflatten(
             out_tree_promise(),
             [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
@@ -705,7 +704,7 @@ def trace_quantum_function(
                 tracers = [trace.full_raise(m) for m in meas]
                 results_tracers += tracers
 
-                jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
+                jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
                 jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
                 out_type = out_type[:-1]
 
