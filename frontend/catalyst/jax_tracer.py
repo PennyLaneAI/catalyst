@@ -557,9 +557,6 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 def apply_transform(qnode, tape, flat_results):
     """Apply transform."""
-    if qnode.transform_program and qnode.transform_program.is_informative:
-        msg = "Catalyst does not support informative transforms."
-        raise CompileError(msg)
 
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -567,6 +564,11 @@ def apply_transform(qnode, tape, flat_results):
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
     is_program_transformed = qnode and qnode.transform_program
+
+    if is_program_transformed and qnode.transform_program.is_informative:
+        msg = "Catalyst does not support informative transforms."
+        raise CompileError(msg)
+
     is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
 
     if is_program_transformed:
