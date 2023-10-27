@@ -14,10 +14,16 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    with:
+      multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
 
   runtime:
     name: Catalyst-Runtime Build
+    needs: [constants]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
       - name: Checkout Catalyst repo
@@ -31,6 +37,8 @@ jobs:
         run: |
           # TODO: reenable kokkos builds
           COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           ENABLE_LIGHTNING_KOKKOS=OFF \
           CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
@@ -41,6 +49,8 @@ jobs:
           # Note the lack of sanitizers.
           # Left other flags the same.
           COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_OPENQASM=ON \
@@ -50,7 +60,7 @@ jobs:
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: runtime-build
+          name: runtime-build-${{ matrix.compiler }}
           path: |
             runtime-build/lib/*.so
           retention-days: 1
@@ -59,6 +69,9 @@ jobs:
     name: LLVM Build
     needs: [constants]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -88,7 +101,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -104,6 +117,8 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         make llvm
@@ -112,6 +127,9 @@ jobs:
     name: MHLO Dialect Build
     needs: [constants, llvm]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -138,7 +156,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -156,7 +174,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Install Deps
@@ -167,6 +185,8 @@ jobs:
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         COMPILER_LAUNCHER="" \
@@ -176,6 +196,9 @@ jobs:
     name: Enzyme Build
     needs: [constants, llvm]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -202,7 +225,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -220,7 +243,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Install Deps
@@ -231,6 +254,8 @@ jobs:
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
@@ -240,6 +265,9 @@ jobs:
     name: Quantum Dialects Build
     needs: [constants, llvm, mhlo, enzyme]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -265,7 +293,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -282,7 +310,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -299,7 +327,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -316,6 +344,8 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
@@ -325,7 +355,7 @@ jobs:
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: |
           quantum-build/bin
           quantum-build/lib/lib*.so*
@@ -336,6 +366,9 @@ jobs:
     name: Frontend Tests
     needs: [constants, llvm, runtime, quantum]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -353,19 +386,19 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
-        name: runtime-build
+        name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
     - name: Add Frontend Dependencies to PATH
@@ -401,6 +434,9 @@ jobs:
     name: Frontend Tests (backend="lightning.kokkos")
     needs: [constants, llvm, runtime, quantum]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
     if: false
 
     steps:
@@ -419,19 +455,19 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
-        name: runtime-build
+        name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
     - name: Add Frontend Dependencies to PATH
@@ -452,6 +488,9 @@ jobs:
     name: Frontend Tests (backend="openqasm3")
     needs: [constants, llvm, runtime, quantum]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -469,19 +508,19 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
-        name: runtime-build
+        name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
     - name: Install additional dependencies (OpenQasm device)
@@ -510,6 +549,7 @@ jobs:
       fail-fast: false
       matrix:
         backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
       - name: Checkout the repo
@@ -528,30 +568,30 @@ jobs:
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            make coverage-runtime
-            mv runtime/build/coverage.info coverage-${{ github.job }}.info
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          make coverage-runtime
+          mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
-            make test-runtime
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          ENABLE_LIGHTNING_KOKKOS=ON \
+          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
+          make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            ENABLE_OPENQASM=ON \
-            make test-runtime
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          ENABLE_OPENQASM=ON \
+          make test-runtime
 
       - name: Upload to Codecov
         if: ${{ matrix.backend == 'lightning' }}
@@ -563,7 +603,7 @@ jobs:
       - name: Build examples
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
           make examples-runtime
