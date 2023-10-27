@@ -37,33 +37,73 @@
 
 <h3>Bug fixes</h3>
 
+* The `requirements.txt` file to build Catalyst from source has been updated with a minimum PIP
+  version, `>=22.3`. Previous versions of pip are unable to perform editable installs when the
+  system-wide site-packages are read-only, even when the `--user` flag is provided.
+  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+
 * Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
   [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
 
-* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the master
-  branch of PennyLane-Lightning. This issue introduced in [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
-  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
-
-* Add a newer pip requirement to the `requirements.txt`. Recent version of pip contains a bug fix
-  allowing us to do editable installations even if system-wide site-packages is read-only.
-  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+* Add support for third party devices.
+  Third party `QuantumDevice` implementations can now be loaded into the runtime.
+  [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
 
 * Add `pennylane.compilers` entry points interface.
   [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
 
-  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points` metadata under the the group name `pennylane.compilers`, with the following entry points:
+  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points`
+  metadata under the the group name `pennylane.compilers`, with the following entry points:
 
-  - `context`: Path to the compilation evaluation context manager. This context manager should have the method context.is_tracing(), which returns True if called within a program that is being traced or captured.
+  - `context`: Path to the compilation evaluation context manager. This context manager should have
+    the method context.is_tracing(), which returns True if called within a program that is being
+    traced or captured.
 
-  - `ops`: Path to the compiler operations module. This operations module may contain compiler specific versions of PennyLane operations. Within a JIT context, PennyLane operations may dispatch to these
+  - `ops`: Path to the compiler operations module. This operations module may contain compiler
+    specific versions of PennyLane operations. Within a JIT context, PennyLane operations may
+    dispatch to these.
 
-  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
+    the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+
+<h3>Breaking changes</h3>
+
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have
+  parameters of shape `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape
+  `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
+<h3>Bug fixes</h3>
+
+* Enable AutoGraph to convert functions even when they are invoked through functional wrappers such
+  as `adjoint`, `ctrl`, `grad`, `jacobian`, etc.
+  [(#336)](https://github.com/PennyLaneAI/catalyst/pull/336)
+
+  The following should now succeed:
+
+  ```python
+  def inner(n):
+    for i in range(n):
+      qml.T(i)
+
+  @qjit(autograph=True)
+  @qml.qnode(dev)
+  def f(n: int):
+      adjoint(inner)(n)
+      return qml.state()
+  ```
+
+* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the
+  master branch of PennyLane-Lightning. This issue was introduced in
+  [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
+  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Sergei Mironov,
 Romain Moyard.
 

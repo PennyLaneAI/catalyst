@@ -75,6 +75,7 @@ Catalyst
    modules/mlir
    modules/runtime
    dev/debugging
+   dev/custom_devices
    dev/roadmap
 
 .. toctree::
