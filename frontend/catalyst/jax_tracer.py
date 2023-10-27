@@ -584,6 +584,48 @@ def split_tracers_and_measurements(flat_values):
     return classical, measurements
 
 
+def trace_post_processing(ctx, trace, post_processing, args_types, args):
+    """Trace post processing function.
+
+    Args:
+        ctx (EvaluationContext): context
+        trace (DynamicJaxprTrace): trace
+        post_processing: post_processing function
+        args_types: unflattened args
+        args: input tracers
+
+    Returns:
+        closed_jaxpr: JAXPR expression for the whole frame
+        post_processing_results: Output
+    """
+
+    with EvaluationContext.frame_tracing_context(ctx, trace):
+        # What is the input to the post_processing function?
+        # The input to the post_processing function is going to be a list of values
+        # One for each tape.
+
+        # The tracers are all flat in args.
+        # The shape is in a list of args_types.
+
+        # We need to deduce the type/shape/tree of the post_processing.
+        wffa, in_avals, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
+
+        # wffa will take as an input a flatten tracers.
+        post_processing_retval_flat = wffa.call_wrapped(*args)
+
+        # After wffa is called, then the shape becomes available in out_tree_promise.
+        post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
+        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        out_avals, _ = unzip2(out_type)
+        post_processing_results = tree_unflatten(
+            out_tree_promise(),
+            [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
+        )
+
+        return closed_jaxpr, post_processing_results
+
+
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:
@@ -681,30 +723,7 @@ def trace_quantum_function(
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
                 # check_jaxpr(jaxpr)
 
-        with EvaluationContext.frame_tracing_context(ctx, trace):
-            # What is the input to the post_processing function?
-            # The input to the post_processing function is going to be a list of values
-            # One for each tape.
-
-            # The tracers are all flat in results_tracers.
-            # The shape is in a list of results_abstract.
-
-            # We need to deduce the type/shape/tree of the post_processing.
-            wffa, in_avals, out_tree_promise = deduce_avals(
-                post_processing, (results_abstract,), {}
-            )
-
-            # wffa will take as an input a flatten tracers.
-            callback_retval_flat = wffa.call_wrapped(*results_tracers)
-
-            # After wffa is called, then the shape becomes available in out_tree_promise.
-            callback_tracers = [trace.full_raise(t) for t in callback_retval_flat]
-            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(callback_tracers)
-            closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-            out_avals, _ = unzip2(out_type)
-            unflattened_callback_results = tree_unflatten(
-                out_tree_promise(),
-                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in callback_tracers],
-            )
-
+        closed_jaxpr, unflattened_callback_results = trace_post_processing(
+            ctx, trace, post_processing, results_abstract, results_tracers
+        )
     return closed_jaxpr, unflattened_callback_results
