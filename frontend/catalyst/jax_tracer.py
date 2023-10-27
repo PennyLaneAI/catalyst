@@ -683,6 +683,10 @@ def trace_quantum_function(
                 return_values, is_leaf=is_leaf
             )
 
+            # TODO: In order to compose transforms, we would need to recursively
+            # call apply_transform while popping the latest transform applied,
+            # until there are no more transforms to be applied.
+            # But first we should clean this up this method a bit more.
             tapes, post_processing = apply_transform(qnode, quantum_tape, return_values_flat)
 
         # (2) - Quantum tracing
@@ -693,8 +697,7 @@ def trace_quantum_function(
             # If it was transformed, that means that the program might have
             # changed the output. See `split_non_commuting`
             if is_program_transformed:
-                # If the program is transformed
-                # trees == out_classical_tree in the next line section.
+                # TODO: In the future support arbitrary output from the user function.
                 output = tape.measurements
                 _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
             else:
@@ -725,6 +728,7 @@ def trace_quantum_function(
                 # This mimics the return type from qnodes.
                 # I would prefer if qnodes didn't have special rules about whether they return a
                 # tuple, list, or value.
+                # TODO: Allow the user to return whatever types they specify.
                 if is_program_transformed and len(abstract_results) == 1:
                     results_abstract.append(abstract_results[0])
                 elif is_program_transformed:
