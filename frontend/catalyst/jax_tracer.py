@@ -714,6 +714,9 @@ def trace_quantum_function(
                     meas_trees,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
+                # This mimics the return type from qnodes.
+                # I would prefer if qnodes didn't have special rules about whether they return a tuple,
+                # list, or value.
                 if is_program_transformed and len(abstract_results) == 1:
                     results_abstract.append(abstract_results[0])
                 elif is_program_transformed:
