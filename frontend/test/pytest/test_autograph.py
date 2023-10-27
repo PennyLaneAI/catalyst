@@ -17,6 +17,7 @@
 import sys
 import traceback
 import warnings
+from collections import defaultdict
 
 import jax
 import jax.numpy as jnp
@@ -25,13 +26,43 @@ import pennylane as qml
 import pytest
 from numpy.testing import assert_allclose
 
-from catalyst import cond, for_loop, measure, qjit
+from catalyst import (
+    adjoint,
+    cond,
+    ctrl,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    qjit,
+    vjp,
+)
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-lines
+
+
+class Failing:
+    """Test class that emulates failures in user-code"""
+
+    triggered = defaultdict(bool)
+
+    def __init__(self, ref, label: str = "default"):
+        self.label = label
+        self.ref = ref
+
+    @property
+    def val(self):
+        """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
+        if not Failing.triggered[self.label]:
+            Failing.triggered[self.label] = True
+            raise Exception(f"Emulated failure with label {self.label}")
+        return self.ref
 
 
 def test_unavailable(monkeypatch):
@@ -277,6 +308,94 @@ class TestIntegration:
         assert check_cache(fn.original_function)
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
+
+    def test_adjoint_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
+
+        def inner(x):
+            qml.RY(x, wires=0)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def fn(x: float):
+            adjoint(inner)(x)
+            return qml.probs()
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(np.pi), [0.0, 1.0])
+
+    def test_ctrl_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
+
+        def inner(x):
+            qml.RY(x, wires=0)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def fn(x: float):
+            ctrl(inner, control=1)(x)
+            return qml.probs()
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(np.pi), [1.0, 0.0, 0.0, 0.0])
+
+    def test_grad_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'grad'."""
+
+        def inner(x):
+            return 2 * x
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return grad(inner)(x)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == 2.0
+
+    def test_jacobian_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jacobian'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return jacobian(inner)(x)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == [2.0, 6.0]
+
+    def test_vjp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return vjp(inner, (x,), (1.0, 1.0))
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == [6.0, 9.0, 8.0]  # unusual vjp return structure, vjp result is 3rd elem
+
+    def test_jvp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return jvp(inner, (x,), (1.0,))
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == [6.0, 9.0, 2.0, 6.0]  # unusual jvp return structure, jvp results start 3rd
 
 
 @pytest.mark.tf
@@ -1202,43 +1321,44 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
-    def test_whileloop_warning(self, monkeypatch):
+    def test_whileloop_fallback(self, monkeypatch):
         """Test while-loop warning if strict conversion is disabled."""
         # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", False)
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         def f1():
             acc = 0
-            while acc < 5:
+            while Failing(acc).val < 5:
                 acc += 1
             return acc
 
         with pytest.warns(
             UserWarning,
-            match=(f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n    while acc < 5'),
+            match=(
+                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n'
+                "    while Failing\\(acc\\).val < 5"
+            ),
         ):
-            qjit(autograph=True)(f1)()
+            assert 5 == qjit(autograph=True)(f1)()
 
     def test_whileloop_no_warning(self, monkeypatch):
-        """Test while-loop warning if strict conversion is disabled."""
+        """Test the absence of warnings if fallbacks are ignored."""
         # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         def f1():
             acc = 0
-            while acc < 5:
+            while Failing(acc).val < 5:
                 acc = acc + 1
             return acc
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            qjit(autograph=True)(f1)()
+            assert 5 == qjit(autograph=True)(f1)()
 
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""
@@ -1347,10 +1467,8 @@ class TestLogicalOps:
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
-    def test_force_python_fallbacks(self, monkeypatch):
+    def test_force_python_fallbacks(self):
         """Test fallback modes of control-flow primitives."""
-
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         with pytest.warns(UserWarning):
 
@@ -1358,9 +1476,9 @@ class TestMixed:
             def f1():
                 acc = 0
                 while acc < 5:
-                    acc = acc + 1
+                    acc = Failing(acc, "while").val + 1
                     for x in [1, 2, 3]:
-                        acc += x
+                        acc += Failing(x, "for").val
                 return acc
 
             assert f1() == 0 + 1 + sum([1, 2, 3])

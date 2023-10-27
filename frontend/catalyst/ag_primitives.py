@@ -67,9 +67,6 @@ __all__ = [
     "not_",
 ]
 
-# For testing: emulate autograph errors during processing of Catalyst control-flow primitives
-_emulate_fallback_errors = False
-
 
 def assert_results(results, var_names):
     """Assert that none of the results are undefined, i.e. have no value."""
@@ -173,9 +170,6 @@ def _call_catalyst_for(
     start, stop, step, body_fn, get_state, set_state, opts, enum_start=None, array_iterable=None
 ):
     """Dispatch to a Catalyst implementation of for loops."""
-
-    if _emulate_fallback_errors:
-        raise AutoGraphError("Emulated autograph fallback error")
 
     # Ensure iteration arguments are properly initialized. We cannot process uninitialized
     # loop carried values as we need their type information for tracing.
@@ -331,9 +325,6 @@ def for_stmt(
 
 def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
     """Dispatch to a Catalyst implementation of while loops."""
-
-    if _emulate_fallback_errors:
-        raise AutoGraphError("Emulated autograph fallback error")
 
     def _test(state):
         old = get_state()
@@ -518,6 +509,27 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
         (config, "CONVERSION_RULES", module_allowlist),
     ):
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in (
+            catalyst.adjoint,
+            catalyst.ctrl,
+            catalyst.grad,
+            catalyst.jacobian,
+            catalyst.vjp,
+            catalyst.jvp,
+        ):
+            assert args and callable(args[0])
+            wrapped_fn = args[0]
+
+            def passthrough_wrapper(*args, **kwargs):
+                return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
+
+            return fn(
+                passthrough_wrapper,
+                *args[1:],
+                **(kwargs if kwargs is not None else {}),
+            )
+
         # Dispatch range calls to a custom range class that enables constructs like
         # `for .. in range(..)` to be converted natively to `for_loop` calls. This is beneficial
         # since the Python range function does not allow tracers as arguments.
