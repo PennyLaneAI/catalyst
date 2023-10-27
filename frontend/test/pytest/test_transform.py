@@ -475,7 +475,7 @@ class TestInvalidTransform:
 
         qnode_backend = qnode_builder(backend)
         compiled_function = qjit(qnode_backend)
-        observed = compiled_function(theta_1, theta_2)
+        compiled_function(theta_1, theta_2)
 
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
