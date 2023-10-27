@@ -36,7 +36,7 @@ from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
 from pennylane.transforms import hamiltonian_expand, merge_rotations, qcut, sum_expand
 
-from catalyst import qjit, measure
+from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=unnecessary-lambda-assignment
@@ -414,6 +414,8 @@ class TestMergeRotations:
 
 
 class TestInvalidTransform:
+    """Test validity of transforms."""
+
     def test_split_invalid_non_commuting(self, backend):
         """Test split non commuting"""
         if backend == "lightning.kokkos":
@@ -445,5 +447,35 @@ class TestInvalidTransform:
 
             return qfunc
 
-        with pytest.raises(CompileError, match="Multiple tapes are generated") as e:
+        with pytest.raises(CompileError, match="Multiple tapes are generated"):
             qjit(qnode_builder(backend))
+
+    @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
+    def test_merge_rotations_valid(self, backend, theta_1, theta_2):
+        """This program is valid even in the presence of a mid circuit measurement.
+        This is because it will not create multiple tapes, and therefore not
+        non-deterministic behaviour across the execution of multiple tapes.
+        """
+
+        if backend == "lightning.kokkos":
+            pytest.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/4731")
+
+        def qnode_builder(device_name):
+            """Builder"""
+
+            @qml.qnode(qml.device(device_name, wires=3))
+            @merge_rotations
+            def qfunc(theta_1, theta_2):
+                measure(0)
+                qml.RZ(theta_1, wires=0)
+                qml.RZ(theta_2, wires=0)
+                return qml.state()
+
+            return qfunc
+
+        qnode_backend = qnode_builder(backend)
+        compiled_function = qjit(qnode_backend)
+        observed = compiled_function(theta_1, theta_2)
+
+        # Here we are asserting that there is only one RZ operation
+        assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')

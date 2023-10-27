@@ -529,9 +529,9 @@ def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
     # For example:
     #   * mid-circuit measurements (for batch-transforms)
     #   * that the output will be only a sequence of `MeasurementProcess`es.
-    def is_measurement(x):
+    def is_measurement(op):
         """Only to avoid 100 character per line limit."""
-        return isinstance(x, MeasurementProcess)
+        return isinstance(op, MeasurementProcess)
 
     is_out_measurements = map(is_measurement, meas_tracers)
     is_all_out_measurements = all(is_out_measurements) and not class_tracers
@@ -543,6 +543,7 @@ def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
         # Import here to avoid circuilar dependency.
+        # pylint: disable=import-outside-toplevel
         from catalyst.pennylane_extensions import MidCircuitMeasure
 
         return isinstance(op, MidCircuitMeasure)
@@ -569,12 +570,14 @@ def apply_transform(qnode, tape, trace, flat_results):
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
     else:
+        # Apply the identity transform in order to keep generalization
         tapes, callback = identity_qnode_transform(tape)
     return tapes, callback
 
 
 def get_tracers_measurements_and_both(trace, flat_values):
-    """Document me"""
+    """Return classical tracers, measurements, and a list of both in the order in which
+    they were unflattened."""
     classical = []
     measurements = []
     both = []
@@ -699,7 +702,7 @@ def trace_quantum_function(
             # One for each tape.
 
             # The tracers are all flat in results_tracers.
-            # The shape is in a list of abstract_results.
+            # The shape is in a list of results_abstract.
 
             # We need to deduce the type/shape/tree of the callback.
             wffa, in_avals, out_tree_promise = deduce_avals(callback, (results_abstract,), {})
