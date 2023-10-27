@@ -508,7 +508,7 @@ def trace_quantum_measurements(
     return out_classical_tracers, out_tree
 
 
-def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
+def is_transform_valid_for_batch_transforms(tape, flat_results):
     """Not all transforms are valid for batch transforms.
     Batch transforms will increase the number of tapes from 1 to N.
     However, if the wave function collapses or there is any other non-deterministic behaviour
@@ -517,7 +517,7 @@ def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
     Also, MidCircuitMeasure is a HybridOp, which PL does not handle at the moment.
     Let's wait until mid-circuit measurements are better integrated into both PL
     and Catalyst and discussed more as well."""
-    class_tracers, meas_tracers = split_tracers_and_measurements(trace, flat_results)
+    class_tracers, meas_tracers = split_tracers_and_measurements(flat_results)
 
     # Can transforms be applied?
     # Since transforms are a PL feature and PL does not support the same things as
@@ -555,10 +555,10 @@ def is_transform_valid_for_batch_transforms(tape, trace, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(qnode, tape, trace, flat_results):
+def apply_transform(qnode, tape, flat_results):
     """Apply transform."""
     is_program_transformed = qnode and qnode.transform_program
-    is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, trace, flat_results)
+    is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
 
     if is_program_transformed:
         tapes, post_processing = qnode.transform_program([tape])
@@ -571,9 +571,8 @@ def apply_transform(qnode, tape, trace, flat_results):
     return tapes, post_processing
 
 
-def split_tracers_and_measurements(trace, flat_values):
-    """Return classical tracers, measurements, and a list of both in the order in which
-    they were unflattened."""
+def split_tracers_and_measurements(flat_values):
+    """Return classical tracers and measurements"""
     classical = []
     measurements = []
     for flat_value in flat_values:
@@ -634,7 +633,7 @@ def trace_quantum_function(
                 return_values, is_leaf=is_leaf
             )
 
-            tapes, post_processing = apply_transform(qnode, quantum_tape, trace, return_values_flat)
+            tapes, post_processing = apply_transform(qnode, quantum_tape, return_values_flat)
 
         # (2) - Quantum tracing
         results_tracers, results_abstract = [], []
