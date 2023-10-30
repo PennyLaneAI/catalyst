@@ -96,7 +96,7 @@ A few things you might note in this representation:
 
 The representation above is very handy for traversing quantum operations, in effect providing the
 same capabilities of a directed acyclic graph (DAG) encoding of a quantum circuit. Meanwhile,
-classical instructions as well as side-effecting operations (e.g. print) can also be present in the
+classical instructions as well as side-effecting operations (e.g., print) can also be present in the
 same representation.
 
 
