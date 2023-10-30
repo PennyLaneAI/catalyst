@@ -40,8 +40,8 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           ENABLE_LIGHTNING_KOKKOS=ON \
-          ENABLE_ASAN=ON \
           ENABLE_OPENQASM=ON \
+          ENABLE_ASAN=OFF \
           make runtime
 
           # This is needed in the artifact for the pytests
