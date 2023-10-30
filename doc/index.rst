@@ -71,10 +71,10 @@ Catalyst
    :hidden:
 
    dev/architecture
-   modules/frontend
-   modules/mlir
-   modules/runtime
-   dev/transforms
+   PennyLane Frontend <modules/frontend>
+   Compiler Core <modules/mlir>
+   Compiler Passes <dev/transforms>
+   Quantum Runtime <modules/runtime>
    dev/debugging
    dev/roadmap
 
