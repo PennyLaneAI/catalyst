@@ -22,6 +22,7 @@ help:
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
+	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
@@ -30,6 +31,7 @@ help:
 	@echo "  coverage           to generate a coverage report"
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
+
 
 .PHONY: all
 all: runtime mlir frontend
@@ -57,6 +59,9 @@ dialects:
 
 runtime:
 	$(MAKE) -C runtime all
+
+dummy_device:
+	$(MAKE) -C runtime dummy_device
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
@@ -103,6 +108,7 @@ wheel:
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
+	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 

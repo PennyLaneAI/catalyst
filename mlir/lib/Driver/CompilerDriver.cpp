@@ -99,6 +99,15 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     }
 };
 
+// Run the callback with stack printing disabled
+void withoutStackTrace(MLIRContext *ctx, std::function<void()> callback)
+{
+    auto old = ctx->shouldPrintStackTraceOnDiagnostic();
+    ctx->printStackTraceOnDiagnostic(false);
+    callback();
+    ctx->printStackTraceOnDiagnostic(old);
+}
+
 } // namespace
 
 namespace {
@@ -142,13 +151,19 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
+    std::list<StringRef> visited;
     for (auto &function : llvmModule.functions()) {
-        emitRemark(loc) << "Found LLVM function: " << function.getName() << "\n";
+        visited.push_back(function.getName());
         if (function.getName().starts_with("catalyst.entry_point")) {
             return &function;
         }
     }
-    emitError(loc, "Failed to find JIT function");
+    withoutStackTrace(ctx, [&]() {
+        auto noteStream =
+            emitRemark(loc, "Failed to find entry-point function among the following: ");
+        llvm::interleaveComma(visited, noteStream, [&](StringRef t) { noteStream << t; });
+    });
+
     return failure();
 }
 
@@ -474,7 +489,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
         }
         else {
-            CO_MSG(options, Verbosity::Urgent, "Unable to infer jit_* function attributes\n");
+            CO_MSG(options, Verbosity::Urgent,
+                   "Unable to infer catalyst.entry_point* function attributes\n");
         }
 
         auto outfile = options.getObjectFile();

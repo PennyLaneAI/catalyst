@@ -2,6 +2,7 @@ PYTHON := python3
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
 COMPILER_LAUNCHER?=ccache
+ENABLE_ASAN?=OFF
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
@@ -13,7 +14,7 @@ ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 BUILD_QIR_STDLIB_FROM_SRC?=OFF
 # TODO: Update to latest_release after v0.33.0
-LIGHTNING_GIT_TAG_VALUE= "master"
+LIGHTNING_GIT_TAG_VALUE?="0bce777"
 NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
 coverage: CODE_COVERAGE=ON
@@ -53,6 +54,7 @@ configure:
 		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DBUILD_QIR_STDLIB_FROM_SRC=$(BUILD_QIR_STDLIB_FROM_SRC) \
+		-DENABLE_SANITIZER=$(ENABLE_ASAN) \
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
@@ -63,6 +65,10 @@ runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_
 
 $(RT_BUILD_DIR)/tests/runner_tests: configure
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
+
+.PHONY: dummy_device
+dummy_device:
+	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests
