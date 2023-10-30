@@ -14,12 +14,14 @@ below for further information beyond this document.
 
 - `Documentation on general MLIR transformations (or "passes") <https://mlir.llvm.org/docs/PassManagement/>`_.
 
-- `Information on specific transformations called pattern rewrites <https://mlir.llvm.org/docs/PatternRewriter/>`_.
 
-  Many transformations can be expressed via pattern rewriting. A pattern is a specific arrangement
-  of a group of operations into a directed acyclic graph (DAG). This allows the framework
-  developer to provide a generic transformation mechanism, for which the compiler developer only
-  needs to provide source and replacement patterns in order to implement a transformation.
+In addition, many transformations can be expressed via pattern rewriting. A pattern is a specific
+arrangement of a group of operations into a directed acyclic graph (DAG). This allows the framework
+developer to provide a generic transformation mechanism, for which the compiler developer only needs
+to provide source and replacement patterns in order to implement a transformation.
+See the following resource for information on pattern rewrites:
+
+- `Information on specific transformations called pattern rewrites <https://mlir.llvm.org/docs/PatternRewriter/>`_.
 
 
 What does Catalyst's IR look like?
@@ -94,8 +96,8 @@ classical instructions as well as side-effecting operations (e.g. print) can als
 same representation.
 
 
-How to write transformations on Catalyst's IR?
-==============================================
+Writing transformations on Catalyst's IR
+========================================
 
 We'll start with DAG-to-DAG transformations, which typically match small pieces of code at a time.
 In our example above, we might to consider merging the two ``quantum.unitary`` applications because
@@ -140,7 +142,7 @@ and ``rewrite`` methods (refer to the link for the full class and up to date inf
 
 Note that by inheriting from ``OpRewritePattern`` instead of the generic ``RewritePattern``,
 operations will automatically be filtered and our pattern will only be invoked on
-``QubitUnitaryOp``s.
+``QubitUnitaryOp`` objects.
 
 The first step in pattern rewriting is the matching phase. We want to match the following pattern of
 ``QubitUnitary`` operations (represented in graph form, where the first argument is the matrix, and
@@ -241,7 +243,7 @@ When writing transformations, the rewriter is the most important tool we have. I
 operations for us, delete others, or change the place in the IR where we are choosing to make
 changes (also called the insertion point). Let's have look at some of these elements:
 
-- *constructing new operations*:
+- **Constructing new operations**:
 
   New operations are created via the ``rewriter.create`` method. Here we want to generate a matrix
   multiplication instruction from the ``linalg`` dialect. C++ namespaces usually correspond to the
@@ -252,12 +254,12 @@ changes (also called the insertion point). Let's have look at some of these elem
   consult which arguments are required. Looking into ``LinalgStructuredOps.h.inc`` for example
   reveals the following options:
 
-    .. code-block:: cpp
+  .. code-block:: cpp
 
-      static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
-      static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
-      static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange operands, ArrayRef<NamedAttribute> attributes = {});
-      static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, Attribute cast, ArrayRef<NamedAttribute> attributes = {});
+    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
+    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
+    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange operands, ArrayRef<NamedAttribute> attributes = {});
+    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, Attribute cast, ArrayRef<NamedAttribute> attributes = {});
 
   We can always ignore the first two arguments, ``odsBuilder`` and ``odsState``, but the remaining
   ones are the arguments we'll need to provide to the rewriter. We chose the simplest one which
@@ -266,7 +268,7 @@ changes (also called the insertion point). Let's have look at some of these elem
   If necessary, the result types of an operation may be specified as can be seen in the second
   version, but for ``matmul`` the result types can be automatically deduced.
 
-- *removing operations*:
+- **Removing operations**:
 
   We can remove operations via the ``rewriter.replaceOp`` method (among others). The reason we
   don't straight up delete operations is that that would break the def-chains in the IR. Instead,
@@ -289,7 +291,7 @@ changes (also called the insertion point). Let's have look at some of these elem
   Note how the argument of the second unitary op was automatically swapped from ``%q2`` to
   ``%q1``.
 
-- *updating operations*:
+- **Updating operations**:
 
   Operation arguments and `attributes <https://mlir.llvm.org/docs/LangRef/#attributes>`_ can also
   be modified in-place (without creating a new operation). We use this to replace the matrix
@@ -372,7 +374,7 @@ inputs:
 
 We'll want to replace this with code that implements the finite difference method. The *pass*
 implementation will essentially look like the one above (say ``GradientPass``), but with a different
-pattern set. This pattern would instead act on all ``GradOp``s in the program:
+pattern set. This pattern would instead act on all ``GradOp`` objects in the program:
 
 .. code-block:: cpp
 
