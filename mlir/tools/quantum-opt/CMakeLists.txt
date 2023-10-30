@@ -12,6 +12,7 @@ set(LIBS
     quantum-transforms
     MLIRGradient
     gradient-transforms
+    MLIRMitigation
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest

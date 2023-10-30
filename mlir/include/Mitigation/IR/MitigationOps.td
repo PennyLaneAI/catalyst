@@ -23,24 +23,23 @@ include "mlir/IR/OpBase.td"
 include "Mitigation/IR/MitigationDialect.td"
 
 def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "Compute a quantum function with ZNE error mitigation.";
     let description = [{
         The `mitigation.zne` operation computes the quantum function with ZNE mitigation.
     }];
 
     let arguments = (ins
-        StrAttr:$method,
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$params,
-        RankedTensorOf<[AnyFloat]>:$scalarFactors
+        Variadic<AnyType>:$args,
+        RankedTensorOf<[Index]>:$scalarFactors
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $method $callee `(` $params `)` `(` $scalarFactors `,` type($scalarFactors) `)` attr-dict `:` functional-type($params, results)
+        $callee `(` $args `)` `scalarFactors` `(` $scalarFactors `:` type($scalarFactors) `)` attr-dict `:` functional-type($args, results)
     }];
 }
 

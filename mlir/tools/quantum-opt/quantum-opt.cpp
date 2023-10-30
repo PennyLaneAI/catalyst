@@ -30,6 +30,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
+#include "Mitigation/IR/MitigationDialect.h"
 
 int main(int argc, char **argv)
 {
@@ -45,6 +46,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
+    registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
 
     return mlir::asMainReturnCode(
