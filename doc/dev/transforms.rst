@@ -5,8 +5,8 @@ Catalyst Compiler Passes
     TODO: add MLIR syntax highlighting to these snippets
     TODO: add an end-to-end guide which includes compiling and using the custom pass
 
-External resources
-==================
+The MLIR Transformation Framework
+=================================
 
 Catalyst program transformations are implemented using the MLIR framework. A good starting point
 is to understand the IR structure and how MLIR transformations are written. Refer to the resources
