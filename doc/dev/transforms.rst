@@ -578,3 +578,17 @@ into:
     }
 
     %deriv:3 = func.call @my_func.finitediff(%x, %y, %z) : (f64, f64, f64) -> (f64, f64, f64)
+
+Catalyst's Transformation Library
+=================================
+
+Why don't you try writing a pass of your own? Or have a look at our existing transformations from
+
+- the `quantum dialect <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/lib/Quantum/Transforms>`_,
+- the `gradient dialect <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/lib/Gradient/Transforms>`_,
+- or the `catalyst utility dialect <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/lib/Catalyst/Transforms>`_.
+
+The pass declarations and headers for transformations are located in the include directory of each
+dialect: `quantum <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/include/Quantum/Transforms>`_,
+`gradient <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/include/Gradient/Transforms>`_,
+and `catalyst <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/include/Catalyst/Transforms>`_.
