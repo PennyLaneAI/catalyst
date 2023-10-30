@@ -38,7 +38,7 @@ jobs:
 
     - name: Install deps
       run: |
-        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan5
+        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # TODO: Use the latest version of boto3 after fixing the issue with
