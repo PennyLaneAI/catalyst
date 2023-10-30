@@ -342,7 +342,7 @@ and other function operations, which themselves can contain other operations, an
             RewritePatternSet quantumPatterns(ctx);
             quantumPatterns.add<QubitUnitaryFusion>(ctx);
 
-            // Apply patters in an iterative and greedy manner.
+            // Apply patterns in an iterative and greedy manner.
             if (failed(applyPatternsAndFoldGreedily(op, std::move(quantumPatterns)))) {
                 return signalPassFailure();
             }
@@ -360,7 +360,7 @@ Writing more general transformations
 
 The pattern-based approach to transformations is not limited to small peephole optimizations like
 the one above, in fact all transformation passes in Catalyst currently use either regular rewrite
-patters or dialect conversion patterns. Let's take a quick look at the finite-difference method
+patterns or dialect conversion patterns. Let's take a quick look at the finite-difference method
 in Catalyst for example.
 
 The starting point for the transformation is the differentiation instruction in our gradient dialect
