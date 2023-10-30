@@ -356,7 +356,7 @@ Writing more general transformations
 
 The pattern-based approach to transformations is not limited to small peephole optimizations like
 the one above, in fact all transformation passes in Catalyst currently use either regular rewrite
-patters or dialect conversion patterns. Let's take a quick look at the finite difference method
+patters or dialect conversion patterns. Let's take a quick look at the finite-difference method
 in Catalyst for example.
 
 The starting point for the transformation is the differentiation instruction in our gradient dialect
@@ -372,7 +372,7 @@ inputs:
 
     %deriv:3 = gradient.grad "fd" @my_func(%x, %y, %z) : (f64, f64, f64) -> (f64, f64, f64)
 
-We'll want to replace this with code that implements the finite difference method. The *pass*
+We'll want to replace this with code that implements the finite-difference method. The *pass*
 implementation will essentially look like the one above (say ``GradientPass``), but with a different
 pattern set. This pattern would instead act on all ``GradOp`` objects in the program:
 
@@ -381,7 +381,7 @@ pattern set. This pattern would instead act on all ``GradOp`` objects in the pro
     struct FiniteDiffLowering : public OpRewritePattern<GradOp>
 
 But since the gradient could be calculated in different ways, we want to filter matches to those
-gradient ops that specify the finite difference method, indicated via the ``"fd"``
+gradient ops that specify the finite-difference method, indicated via the ``"fd"``
 `attribute <https://mlir.llvm.org/docs/LangRef/#attributes>`_:
 
 .. code-block:: cpp
@@ -462,7 +462,7 @@ to the following IR:
 
     %deriv:3 = gradient.grad "fd" @my_func(%x, %y, %z) : (f64, f64, f64) -> (f64, f64, f64)
 
-Let's fill out the rest of the method. The finite difference method works by invoking the callee
+Let's fill out the rest of the method. The finite-difference method works by invoking the callee
 twice with slightly different parameter values, approximating the partial derivative as follows:
 
 .. math::
