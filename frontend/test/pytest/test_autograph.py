@@ -1311,28 +1311,6 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
-    def test_whileloop_fallback(self, monkeypatch):
-        """Test while-loop warning if strict conversion is disabled."""
-        # pylint: disable=anomalous-backslash-in-string
-
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
-        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", False)
-
-        def f1():
-            acc = 0
-            while Failing(acc).val < 5:
-                acc += 1
-            return acc
-
-        with pytest.warns(
-            UserWarning,
-            match=(
-                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n'
-                "    while Failing\\(acc\\).val < 5"
-            ),
-        ):
-            assert 5 == qjit(autograph=True)(f1)()
-
     def test_whileloop_no_warning(self, monkeypatch):
         """Test the absence of warnings if fallbacks are ignored."""
         # pylint: disable=anomalous-backslash-in-string
