@@ -50,12 +50,10 @@ config.substitutions.append(("%PYTHON", python_executable))
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
-    # Access to FileCheck, mlir-translate, opt
+    # Access to FileCheck
     llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
     # Access to quantum-opt
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
-    # Access to mlir-hlo-opt
-    llvm_config.with_environment("PATH", config.mhlo_bin_dir, append_path=True)
 
     # Define the location of runtime libraries when running frontend tests
     llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)
