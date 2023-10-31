@@ -18,3 +18,4 @@ graphviz
 pybind11
 m2r2
 mistune==0.8.4
+sphinxext-opengraph
