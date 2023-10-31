@@ -41,7 +41,10 @@ if "Address" in getattr(config, "llvm_use_sanitizer", ""):
     # With sanitized builds, Python tests require some preloading magic to run.
     assert "Linux" in config.host_os, "Testing with sanitized builds requires Linux/Clang"
 
-    python_executable = f"LD_PRELOAD=$({config.host_cxx} -print-file-name=libclang_rt.asan-{config.host_arch}.so) {python_executable}"
+    python_executable = (
+        f"LD_PRELOAD=$({config.host_cxx} -print-file-name=libclang_rt.asan-{config.host_arch}.so)"
+        f" {python_executable}"
+    )
 
 config.substitutions.append(("%PYTHON", python_executable))
 
