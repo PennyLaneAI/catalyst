@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-zne --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     %c0 = arith.constant 0 : index
@@ -35,8 +35,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 
     func.return %expval : f64
 }
-
-
+ 
 func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> f64 {
     %scalarFactors = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
     %0 = mitigation.zne @simpleCircuit(%arg0) scalarFactors (%scalarFactors : tensor<3xindex>) : (tensor<3xf64>) -> f64

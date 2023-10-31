@@ -13,6 +13,7 @@ set(LIBS
     MLIRGradient
     gradient-transforms
     MLIRMitigation
+    mitigation-transforms
     MhloRegisterDialects
     StablehloRegister
     MLIRCatalystTest

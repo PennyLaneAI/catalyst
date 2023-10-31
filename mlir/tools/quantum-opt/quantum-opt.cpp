@@ -31,6 +31,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "Mitigation/Transforms/Passes.h"
 
 int main(int argc, char **argv)
 {
