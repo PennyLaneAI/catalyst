@@ -130,8 +130,10 @@ intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # opengraph details
 ogp_type = "article"
-ogp_enable_meta_description = False
+# set the following two to False to activate custom
+# social media cards
 ogp_use_first_image = True
+ogp_image = "_static/catalyst_illustration.jpg"
 
 ogp_social_cards = {
     "image": "_static/catalyst_illustration.jpg",
