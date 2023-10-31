@@ -18,6 +18,7 @@ Pytest configuration file for Catalyst test suite.
 import pytest
 
 try:
+    import catalyst
     import tensorflow as tf
 except (ImportError, ModuleNotFoundError) as e:
     tf_available = False

@@ -54,17 +54,7 @@ add_mlir_python_common_capi_library(QuantumPythonCAPI
 add_library(compiler_driver MODULE PyCompilerDriver.cpp)
 set_target_properties(compiler_driver PROPERTIES PREFIX "")
 
-target_link_libraries(compiler_driver PRIVATE pybind11::headers pybind11::module CatalystCompilerDriver)
-if("${LLVM_USE_SANITIZER}" STREQUAL "Address")
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-fsanitize=address)
-        add_link_options(-fsanitize=address -static-libasan)
-    elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-        target_link_libraries(compiler_driver INTERFACE -fno-omit-frame-pointer -fsanitize=address)
-    endif()
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-ENDIF()
+target_link_libraries(compiler_driver PRIVATE pybind11::module CatalystCompilerDriver)
 
 set_target_properties(compiler_driver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum)
 

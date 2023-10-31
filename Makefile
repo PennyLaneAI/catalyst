@@ -23,6 +23,7 @@ help:
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
+	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
@@ -31,6 +32,7 @@ help:
 	@echo "  coverage           to generate a coverage report"
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
+
 
 .PHONY: all
 all: runtime mlir frontend
@@ -68,6 +70,9 @@ dialects:
 runtime:
 	$(MAKE) -C runtime all
 
+dummy_device:
+	$(MAKE) -C runtime dummy_device
+
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
 
@@ -90,28 +95,21 @@ test-demos:
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
-	# Copy bins to frontend/catalyst/bin
-	mkdir -p $(MK_DIR)/frontend/catalyst/bin
-	cp $(LLVM_BUILD_DIR)/bin/llc $(MK_DIR)/frontend/catalyst/bin
-	cp $(LLVM_BUILD_DIR)/bin/opt $(MK_DIR)/frontend/catalyst/bin
-	cp $(LLVM_BUILD_DIR)/bin/mlir-translate $(MK_DIR)/frontend/catalyst/bin
-	cp $(MHLO_BUILD_DIR)/bin/mlir-hlo-opt $(MK_DIR)/frontend/catalyst/bin
-	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
+
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_backend.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
-	# Copy enzyme to frontend
-	cp $(COPY_FLAGS) $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-18.* $(MK_DIR)/frontend/catalyst/lib
-	# Copy mlir bindings to frontend/mlir_quantum
+
+	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
-	for file in arith tensor scf gradient quantum _ods_common ; do \
+	for file in gradient quantum _ods_common ; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver.so $(MK_DIR)/frontend/mlir_quantum/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
@@ -120,6 +118,7 @@ wheel:
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
+	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 

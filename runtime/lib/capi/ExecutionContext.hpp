@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <dlfcn.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -59,6 +60,61 @@ class MemoryManager final {
     bool contains(void *ptr) { return _impl.contains(ptr); }
 };
 
+class SharedLibraryManager final {
+  private:
+    void *_handler{NULL};
+
+  public:
+    SharedLibraryManager() = delete;
+    explicit SharedLibraryManager(std::string filename)
+    {
+        // RTLD_DEEPBIND is incompatible with sanitizers.
+        // If you have compiled this file with sanitizers and you reach this line
+        // you will get an error.
+        // Please re-compile without sanitizers.
+        _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
+        RT_FAIL_IF(!_handler, dlerror());
+    }
+
+    ~SharedLibraryManager()
+    {
+        // dlopen and dlclose increment and decrement reference counters.
+        // Since we have a guaranteed _handler in a valid SharedLibraryManager instance
+        // then we don't really need to worry about dlclose.
+        // In other words, there is an one to one correspondence between an instance
+        // of SharedLibraryManager and an increase in the reference count for the dynamic library.
+        // dlclose returns non-zero on error.
+        //
+        // Errors in dlclose are implementation dependent.
+        // There are two possible errors during dlclose in glibc: "shared object not open"
+        // and "cannot create scope list". Look for _dl_signal_error in:
+        //
+        //     https://codebrowser.dev/glibc/glibc/elf/dl-close.c.html
+        //
+        // This means that at the very least, one could trigger an error in the following line by
+        // doing the following: dlopen the same library and closing it multiple times in a different
+        // location.
+        //
+        // This would mean that the reference count would be less than the number of instances
+        // of SharedLibraryManager.
+        //
+        // There really is no way to protect against this error, except to always use
+        // SharedLibraryManager to manage shared libraries.
+        //
+        // Exercise for the reader, how could one trigger the "cannot create scope list" error?
+        dlclose(_handler);
+    }
+
+    void *getSymbol(const std::string &symbol)
+    {
+        void *sym = dlsym(_handler, symbol.c_str());
+        RT_FAIL_IF(!sym, dlerror());
+        return sym;
+    }
+};
+
+extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice();
+
 class ExecutionContext final {
   private:
     using DeviceInitializer =
@@ -80,6 +136,7 @@ class ExecutionContext final {
     // ExecutionContext pointers
     std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
     std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
+    std::unique_ptr<SharedLibraryManager> _driver_so_ptr{nullptr};
 
 #ifdef __device_openqasm
     std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{nullptr};
@@ -108,6 +165,7 @@ class ExecutionContext final {
     {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
+        _driver_so_ptr.reset(nullptr);
 
 #ifdef __device_openqasm
         _py_guard.reset(nullptr);
@@ -127,7 +185,14 @@ class ExecutionContext final {
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
-    [[nodiscard]] bool initDevice(std::string_view name) noexcept
+    [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
+    {
+        _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
+        void *f_ptr = _driver_so_ptr->getSymbol("getCustomDevice");
+        return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : nullptr;
+    }
+
+    [[nodiscard]] bool initDevice(std::string_view name)
     {
         if (name != "default") {
             _device_name = name;
@@ -153,6 +218,24 @@ class ExecutionContext final {
 
             return true;
         }
+
+        // TODO: Once all devices are shared libraries, they all need to be loaded.
+        // During this transition period, there are several ways in which we can do this.
+        // This try catch is just for allowing the previous mechanism to still succeed
+        // while keeping the implementation of SharedLibraryManager as a minimal as possible.
+        // Once all devices are shared libraries, we can replace initDevice with loadDevice.
+        //
+        // Yes, I know there is a performance impact. But this try-catch will be removed once
+        // all devices are shared libraries.
+        try {
+            QuantumDevice *impl = loadDevice(std::string(name));
+            _driver_ptr.reset(impl);
+            return true;
+        }
+        catch (RuntimeException &e) {
+            // fall-through
+        }
+
         return false;
     }
 

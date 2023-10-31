@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
+import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -122,11 +123,28 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
-            if self.device.short_name not in QFunc.RUNTIME_DEVICES:
+            if isinstance(self.device, qml.Device):
+                name = self.device.short_name
+            else:
+                name = self.device.name
+
+            is_known_device = name in QFunc.RUNTIME_DEVICES
+            implements_c_interface = hasattr(self.device, "get_c_interface")
+            is_valid_device = is_known_device or implements_c_interface
+            if not is_valid_device:
                 raise CompileError(
-                    f"The {self.device.short_name} device is not "
-                    "supported for compilation at the moment."
+                    f"The {name} device is not supported for compilation at the moment."
                 )
+
+            # TODO:
+            # Once all devices get converted to shared libraries this name should just be the path.
+            backend_path_or_name = name
+            if implements_c_interface:
+                impl = self.device.get_c_interface()
+                if not pathlib.Path(impl).is_file():
+                    raise CompileError(f"Device at {impl} cannot be found!")
+
+                backend_path_or_name = self.device.get_c_interface()
 
             backend_kwargs = {}
             if hasattr(self.device, "shots"):
@@ -139,7 +157,7 @@ class QFunc:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
 
             device = QJITDevice(
-                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
+                self.device.shots, self.device.wires, backend_path_or_name, backend_kwargs
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
@@ -673,6 +691,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     )
 
 
+# pylint: disable=too-many-arguments
 def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
@@ -757,6 +776,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
+# pylint: disable=too-many-arguments
 def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
@@ -1272,7 +1292,7 @@ def cond(pred: DynamicJaxprTracer):
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
-    type. Note that this **does not** include PennyLane operations.
+    type.
 
     .. code-block:: python
 
@@ -1287,6 +1307,69 @@ def cond(pred: DynamicJaxprTracer):
             return "if provided, return types need to be identical in both branches"
 
         ret_val = conditional_fn()  # must invoke the defined function
+
+    .. details::
+        :title: Usage details
+        :href: usage-details
+
+        There are various constraints and restrictions that should be kept in mind
+        when working with conditionals in Catalyst.
+
+        The return values of all branches of :func:`~.cond` must be the same type.
+        Returning different types, or ommitting a return value in one branch (e.g.,
+        returning ``None``) but not in others will result in an error.
+
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2  # float
+        ...     @cond_fn.otherwise
+        ...     def else_branch():
+        ...         return 6  # int
+        ...     return cond_fn()
+        TypeError: Conditional requires consistent return types across all branches, got:
+        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
+        - Branch at index 1: [ShapedArray(int64[], weak_type=True)]
+        Please specify an else branch if none was specified.
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2  # float
+        ...     @cond_fn.otherwise
+        ...     def else_branch():
+        ...         return 6.  # float
+        ...     return cond_fn()
+        >>> f(1.5)
+        array(6.)
+
+        Similarly, the else (``my_cond_fn.otherwise``) may be omitted **as long as
+        other branches do not return any values**. If other branches do return values,
+        the else branch must be specified.
+
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2
+        ...     return cond_fn()
+        TypeError: Conditional requires consistent return types across all branches, got:
+        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
+        - Branch at index 1: []
+        Please specify an else branch if none was specified.
+
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2
+        ...     @cond_fn.otherwise
+        ...     def else_branch():
+        ...         return x
+        ...     return cond_fn()
+        >>> f(1.6)
+        array(2.56)
     """
 
     def _decorator(true_fn: Callable):

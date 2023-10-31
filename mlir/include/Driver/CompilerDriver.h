@@ -16,6 +16,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mlir/IR/MLIRContext.h"
@@ -93,6 +94,14 @@ struct CompilerOutput {
     std::string diagnosticMessages;
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
+    size_t pipelineCounter = 0;
+
+    // Gets the next pipeline dump file name, prefixed with number.
+    std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir")
+    {
+        return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
+            .replace_extension(ext);
+    };
 };
 
 }; // namespace driver

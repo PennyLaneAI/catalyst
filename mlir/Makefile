@@ -11,7 +11,8 @@ MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
-LLVM_CMAKE_ARGS?=""
+ENABLE_ZLIB?=ON
+ENABLE_ZSTD?=ON
 
 .PHONY: help
 help:
@@ -27,7 +28,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo dialects enzyme
+all: llvm mhlo enzyme dialects
 
 .PHONY: llvm
 llvm:
@@ -46,7 +47,8 @@ llvm:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
-		$(LLVM_CMAKE_ARGS)
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter
@@ -64,7 +66,8 @@ mhlo:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
-		$(LLVM_CMAKE_ARGS)
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
@@ -80,7 +83,7 @@ enzyme:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER)
 
-	cmake --build $(ENZYME_BUILD_DIR)
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-18
 
 .PHONY: dialects
 dialects:
@@ -90,8 +93,10 @@ dialects:
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython3_EXECUTABLE=$$(which $(PYTHON)) \
+		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
-		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
 		-DMHLO_BINARY_DIR=$(MHLO_BUILD_DIR)/bin \
@@ -102,7 +107,8 @@ dialects:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
-		$(LLVM_CMAKE_ARGS)
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
 
@@ -114,7 +120,7 @@ test:
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR)
+	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR) $(ENZYME_BUILD_DIR)
 
 .PHONY: format
 format:

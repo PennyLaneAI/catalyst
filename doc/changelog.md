@@ -1,31 +1,90 @@
-# Release 0.3.1-dev
+# Release 0.3.2-dev
 
 <h3>New features</h3>
 
-* Add lowering to tensor dialect for MHLO scatter. It unlocks indexing and updating jax arrays.
-  [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
+<h3>Improvements</h3>
+
+* Improve the compiler driver diagnostic output. The driver now provides more context for error
+  messages and includes a verbose trace if verbose mode is enabled.
+  [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
+
+* The `requirements.txt` file to build Catalyst from source has been updated with a minimum PIP
+  version, `>=22.3`. Previous versions of pip are unable to perform editable installs when the
+  system-wide site-packages are read-only, even when the `--user` flag is provided.
+  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+
+* Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
+  [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
+
+* Add support for third party devices.
+  Third party `QuantumDevice` implementations can now be loaded into the runtime.
+  [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
+
+* Add `pennylane.compilers` entry points interface.
+  [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
+
+  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points`
+  metadata under the the group name `pennylane.compilers`, with the following entry points:
+
+  - `context`: Path to the compilation evaluation context manager. This context manager should have
+    the method context.is_tracing(), which returns True if called within a program that is being
+    traced or captured.
+
+  - `ops`: Path to the compiler operations module. This operations module may contain compiler
+    specific versions of PennyLane operations. Within a JIT context, PennyLane operations may
+    dispatch to these.
+
+  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
+    the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+
+<h3>Breaking changes</h3>
+
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have
+  parameters of shape `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape
+  `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
+<h3>Bug fixes</h3>
+
+* Enable AutoGraph to convert functions even when they are invoked through functional wrappers such
+  as `adjoint`, `ctrl`, `grad`, `jacobian`, etc.
+  [(#336)](https://github.com/PennyLaneAI/catalyst/pull/336)
+
+  The following should now succeed:
 
   ```python
-  
-  @qjit
-  def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
-      res = l.at[idx].multiply(3)
-      res2 = l.at[idx].add(2)
-      return res + res2
+  def inner(n):
+    for i in range(n):
+      qml.T(i)
 
-  res = add_multiply(jnp.array([0, 1, 2]), 2)
+  @qjit(autograph=True)
+  @qml.qnode(dev)
+  def f(n: int):
+      adjoint(inner)(n)
+      return qml.state()
   ```
 
-  ```pycon
-  >>> res
-  [0, 2, 10]
+* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the
+  master branch of PennyLane-Lightning. This issue was introduced in
+  [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
+  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
 
-* Catalyst users can now use Python for loop statements in their programs without having to
-  explicitly use the functional `catalyst.for_loop` form!
-  [#258](https://github.com/PennyLaneAI/catalyst/pull/258)
+<h3>Contributors</h3>
 
-  This feature extends the existing AutoGraph support for Python if statements with Python for
-  loops. The following example is now supported:
+This release contains contributions from (in alphabetical order):
+
+Ali Asadi,
+David Ittah,
+Sergei Mironov,
+Romain Moyard.
+
+# Release 0.3.1
+
+<h3>New features</h3>
+
+* The experimental AutoGraph feature, now supports Python `for` loops, allowing native Python loops
+  to be captured and compiled with Catalyst.
+  [(#258)](https://github.com/PennyLaneAI/catalyst/pull/258)
 
   ```python
   dev = qml.device("lightning.qubit", wires=n)
@@ -36,17 +95,19 @@
       for i in range(n):
           qml.Hadamard(wires=i)
 
-      ...
-
       return qml.expval(qml.PauliZ(0))
   ```
 
+  This feature extends the existing AutoGraph support for Python `if` statements introduced in v0.3.
+  Note that TensorFlow must be installed for AutoGraph support.
+
 * The quantum control operation can now be used in conjunction with Catalyst control flow, such as
-  loops and conditionals. For this purpose a new instruction, `catalyst.ctrl`, has been added.
+  loops and conditionals, via the new `catalyst.ctrl` function.
   [(#282)](https://github.com/PennyLaneAI/catalyst/pull/282)
 
-  `catalyst.ctrl` can wrap around quantum functions which contain the Catalyst `cond`,
-  `for_loop`, and `while_loop` primitives.
+  Similar in behaviour to the `qml.ctrl` control modifier from PennyLane, `catalyst.ctrl` can
+  additionally wrap around quantum functions which contain control flow, such as the Catalyst
+  `cond`, `for_loop`, and `while_loop` primitives.
 
   ```python
   @qjit
@@ -67,12 +128,34 @@
   array(1.)
   ```
 
+* Catalyst now supports JAX's `array.at[index]` notation for array element assignment and updating.
+  [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
+
+  ```python
+  @qjit
+  def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
+      res = l.at[idx].multiply(3)
+      res2 = l.at[idx].add(2)
+      return res + res2
+
+  res = add_multiply(jnp.array([0, 1, 2]), 2)
+  ```
+
+  ```pycon
+  >>> res
+  [0, 2, 10]
+  ```
+
+  For more details on available methods, see the
+  [JAX documentation](https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html).
+
 <h3>Improvements</h3>
 
-* Update the Lightning backend device to work with the PL-Lightning monorepo.
+* The Lightning backend device has been updated to work with the new PL-Lightning monorepo.
   [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
 
-* Move to an alternate compiler driver in C++. This improves compile-time performance by
+* A new compiler driver has been implemented in C++. This improves compile-time performance by
   avoiding *round-tripping*, which is when the entire program being compiled is dumped to
   a textual form and re-parsed by another tool.
 
@@ -82,22 +165,50 @@
   approach.
   [(#216)](https://github.com/PennyLaneAI/catalyst/pull/216)
 
-* Build both `"lightning.qubit"` and `"lightning.kokkos"` against the PL-Lightning monorepo.
-  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
-
 * Support the `braket.devices.Devices` enum class and `s3_destination_folder`
-  for AWS Braket remove devices.
+  device options for AWS Braket remote devices.
   [(#278)](https://github.com/PennyLaneAI/catalyst/pull/278)
 
-<h3>Breaking changes</h3>
+* Improvements have been made to the build process, including avoiding unnecessary processes such
+  as removing `opt` and downloading the wheel.
+  [(#298)](https://github.com/PennyLaneAI/catalyst/pull/298)
+
+* Remove a linker warning about duplicate `rpath`s when Catalyst wheels are installed on macOS.
+  [(#314)](https://github.com/PennyLaneAI/catalyst/pull/314)
 
 <h3>Bug fixes</h3>
+
+* Fix incompatibilities with GCC on Linux introduced in v0.3.0 when compiling user programs.
+  Due to these, Catalyst v0.3.0 only works when clang is installed in the user environment.
+
+  - Resolve an issue with an empty linker flag, causing `ld` to error.
+    [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
+
+  - Resolve an issue with undefined symbols provided the Catalyst runtime.
+    [(#316)](https://github.com/PennyLaneAI/catalyst/pull/316)
+
+* Remove undocumented package dependency on the zlib/zstd compression library.
+  [(#308)](https://github.com/PennyLaneAI/catalyst/pull/308)
+
+* Fix filesystem issue when compiling multiple functions with the same name and
+  `keep_intermediate=True`.
+  [(#306)](https://github.com/PennyLaneAI/catalyst/pull/306)
+
+* Add support for applying the `adjoint` operation to `QubitUnitary` gates.
+  `QubitUnitary` was not able to be `adjoint`ed when the variable holding the unitary matrix might
+  change. This can happen, for instance, inside of a for loop.
+  To solve this issue, the unitary matrix gets stored in the array list via push and pops.
+  The unitary matrix is later reconstructed from the array list and `QubitUnitary` can be executed
+  in the `adjoint`ed context.
+  [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
+  [(#310)](https://github.com/PennyLaneAI/catalyst/pull/310)
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Erick Ochoa Lopez,
 Jacob Mai Peng,
 Sergei Mironov,
@@ -487,7 +598,7 @@ Romain Moyard.
   [(#211)](https://github.com/PennyLaneAI/catalyst/pull/211)
 
 * Fixed the incorrect return value data-type with functions returning `qml.counts`.
- [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
+  [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 * Fix segmentation fault when differentiating a function where a quantum measurement is used
   multiple times by the same operation.
@@ -971,7 +1082,6 @@ Sergei Mironov.
 * Allow ``catalyst.grad`` to be used on any traceable function (within a qjit context).
   This means the operation is no longer restricted to acting on ``qml.qnode``s only.
   [#75](https://github.com/PennyLaneAI/catalyst/pull/75)
-
 
 <h3>Improvements</h3>
 

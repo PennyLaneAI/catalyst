@@ -26,8 +26,7 @@ namespace catalyst {
 namespace driver {
 
 template <typename Obj>
-mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef fileName,
-                               const Obj &obj)
+void dumpToFile(const CompilerOptions &options, mlir::StringRef fileName, const Obj &obj)
 {
     using std::filesystem::path;
     std::error_code errCode;
@@ -37,16 +36,14 @@ mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef f
     llvm::raw_fd_ostream outfile{outFileName, errCode};
     if (errCode) {
         CO_MSG(options, Verbosity::Urgent, "Unable to open file: " << errCode.message() << "\n");
-        return mlir::failure();
+        return;
     }
     outfile << obj;
     outfile.flush();
     if (errCode) {
         CO_MSG(options, Verbosity::Urgent,
                "Unable to write to file: " << errCode.message() << "\n");
-        return mlir::failure();
     }
-    return mlir::success();
 }
 } // namespace driver
 } // namespace catalyst

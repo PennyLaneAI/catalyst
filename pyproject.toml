@@ -12,6 +12,7 @@ extend-exclude = '''
 
 [tool.isort]
 profile = "black"
+skip = ["frontend/test/pytest/conftest.py"]
 extend_skip_glob = ["mlir/llvm-project/*", "mlir/mlir-hlo/*", ".git/*", ".vscode/*"]
 
 [build-system]

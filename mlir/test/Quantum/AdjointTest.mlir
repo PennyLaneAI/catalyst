@@ -114,3 +114,56 @@ func.func @workflow_unhandled() {
   }
   return
 }
+
+
+// -----
+
+func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<4xcomplex<f64>> {
+    quantum.device ["kwargs", "{'shots': 0}"]
+    quantum.device ["backend", "lightning.qubit"]
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.adjoint(%0) : !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+      %6 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+      %7 = quantum.extract %arg1[ 1] : !quantum.reg -> !quantum.bit
+
+      // CHECK-DAG: [[idx0:%.+]] = index.constant 0
+      // CHECK-DAG: [[idx1:%.+]] = index.constant 1
+      // CHECK-DAG: [[idxN:%.+]] = index.constant
+      // CHECK: scf.for [[i:%.+]] = [[idx0]] to [[idxN]] step [[idx1]]
+      // CHECK:     scf.for [[j:%.+]] = [[idx0]] to [[idxN]] step [[idx1]]
+      // CHECK:     [[element:%.+]] = tensor.extract {{.*}}[[[i]], [[j]]
+      // CHECK:     [[real:%.+]] = complex.re [[element]]
+      // CHECK:     [[imag:%.+]] = complex.im [[element]]
+      // CHECK:     catalyst.list_push [[real]]
+      // CHECK:     catalyst.list_push [[imag]]
+
+      %8:2 = quantum.unitary(%arg0 : tensor<4x4xcomplex<f64>>) %6, %7 : !quantum.bit, !quantum.bit
+
+      // CHECK-DAG: [[result:%.+]] = tensor.empty
+      // CHECK: scf.for [[k:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_k:%.+]] = [[result]])
+      // CHECK:   [[kplus1:%.+]] = index.add [[k]], [[idx1]]
+      // CHECK:   [[k_idx:%.+]] = index.sub [[idxN]], [[kplus1]]
+      // CHECK:   [[last_tensor:%.+]] = scf.for [[l:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_l:%.+]] = [[curr_k]])
+      // CHECK:     [[imag2:%.+]] = catalyst.list_pop
+      // CHECK:     [[real2:%.+]] = catalyst.list_pop
+      // CHECK:     [[complex:%.+]] = complex.create [[real2]], [[imag2]]
+      // CHECK:     [[lplus1:%.+]] = index.add [[l]], [[idx1]]
+      // CHECK:     [[l_idx:%.+]] = index.sub [[idxN]], [[lplus1]]
+      // CHECK:     [[new_tensor:%.+]] = tensor.insert [[complex]] into [[curr_l]][[[k_idx]], [[l_idx]]]
+      // CHECK:     scf.yield [[new_tensor]]
+
+      // CHECK:   scf.yield [[last_tensor]]
+
+
+      %9 = quantum.insert %arg1[ 0], %8#0 : !quantum.reg, !quantum.bit
+      %10 = quantum.insert %9[ 1], %8#1 : !quantum.reg, !quantum.bit
+      quantum.yield %10 : !quantum.reg
+    }
+    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
+    %4 = quantum.compbasis %2, %3 : !quantum.obs
+    %5 = quantum.state %4 : tensor<4xcomplex<f64>>
+    quantum.dealloc %0 : !quantum.reg
+    return %5 : tensor<4xcomplex<f64>>
+  }
