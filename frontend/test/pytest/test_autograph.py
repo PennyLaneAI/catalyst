@@ -23,7 +23,18 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, for_loop, measure, qjit
+from catalyst import (
+    adjoint,
+    cond,
+    ctrl,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    qjit,
+    vjp,
+)
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=import-outside-toplevel
@@ -275,6 +286,94 @@ class TestIntegration:
         assert check_cache(fn.original_function)
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
+
+    def test_adjoint_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
+
+        def inner(x):
+            qml.RY(x, wires=0)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def fn(x: float):
+            adjoint(inner)(x)
+            return qml.probs()
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(np.pi), [0.0, 1.0])
+
+    def test_ctrl_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
+
+        def inner(x):
+            qml.RY(x, wires=0)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def fn(x: float):
+            ctrl(inner, control=1)(x)
+            return qml.probs()
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(np.pi), [1.0, 0.0, 0.0, 0.0])
+
+    def test_grad_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'grad'."""
+
+        def inner(x):
+            return 2 * x
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return grad(inner)(x)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == 2.0
+
+    def test_jacobian_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jacobian'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return jacobian(inner)(x)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == [2.0, 6.0]
+
+    def test_vjp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return vjp(inner, (x,), (1.0, 1.0))
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == [6.0, 9.0, 8.0]  # unusual vjp return structure, vjp result is 3rd elem
+
+    def test_jvp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return jvp(inner, (x,), (1.0,))
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == [6.0, 9.0, 2.0, 6.0]  # unusual jvp return structure, jvp results start 3rd
 
 
 @pytest.mark.tf
