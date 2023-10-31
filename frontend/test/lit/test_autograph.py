@@ -74,7 +74,7 @@ class Failing:
         # pylint: disable=broad-exception-raised
         if not Failing.triggered:
             Failing.triggered = True
-            raise Exception(f"Emulated failure")
+            raise Exception("Emulated failure")
         return self.ref
 
 
