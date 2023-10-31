@@ -27,6 +27,9 @@ struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
 
     LogicalResult match(mitigation::ZneOp op) const override;
     void rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const override;
+
+  private:
+    static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, OpBuilder &builder, mitigation::ZneOp op, Type scalarType);
 };
 
 } // namespace mitigation
