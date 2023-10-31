@@ -382,7 +382,7 @@ array(0.)
 >>> circuit(0.5)  # the precompiled quantum function is called
 array(0.)
 
-.. _ahead_of_time
+.. _ahead_of_time:
 
 Ahead-of-time
 -------------
@@ -699,7 +699,7 @@ Catalyst programs can also be used inside of a larger JAX workflow which uses
 JIT compilation, automatic differentiation, and other JAX transforms.
 
 .. note::
-    
+
     Note that, in general, best performance will be seen when the Catalyst
     ``@qjit`` decorator is used to JIT the entire hybrid workflow. However, there
     may be cases where you may want to delegate only the quantum part of your
