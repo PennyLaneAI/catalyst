@@ -21,14 +21,14 @@ with Context() as ctx:
     quantum_d.register_dialect()
     module = Module.parse(
         """
-    %c0 = "arith.constant"() {value = 0 : i64} : () -> i64
-    %0 = "quantum.alloc"() {nqubits_attr = 2} : () -> !quantum.reg
-    %1 = "quantum.extract"(%0, %c0) : (!quantum.reg, i64) -> !quantum.bit
-    %2 = "quantum.custom"(%1) { gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1> } : (!quantum.bit) -> !quantum.bit
-    %3, %4 = "quantum.measure"(%1) : (!quantum.bit) -> (i1, !quantum.bit)
-    %5 = "quantum.insert"(%0, %c0, %4) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
-    "quantum.dealloc"(%5) : (!quantum.reg) -> ()
-    """
+        %c0 = "arith.constant"() {value = 0 : i64} : () -> i64
+        %0 = "quantum.alloc"() {nqubits_attr = 2} : () -> !quantum.reg
+        %1 = "quantum.extract"(%0, %c0) : (!quantum.reg, i64) -> !quantum.bit
+        %2 = "quantum.custom"(%1) { gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1> } : (!quantum.bit) -> !quantum.bit
+        %3, %4 = "quantum.measure"(%1) : (!quantum.bit) -> (i1, !quantum.bit)
+        %5 = "quantum.insert"(%0, %c0, %4) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
+        "quantum.dealloc"(%5) : (!quantum.reg) -> ()
+        """
     )
 
     print(module)
