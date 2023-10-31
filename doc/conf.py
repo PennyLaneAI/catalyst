@@ -136,7 +136,9 @@ ogp_use_first_image = False
 
 ogp_social_cards = {
     "image": "_static/catalyst_illustration.jpg",
-    "enable": True
+    "enable": True,
+    "site_url": "https://docs.pennylane.ai/projects/catalyst",
+    "line_color": "#03b2ff"
 }
 
 autosummary_generate = True
