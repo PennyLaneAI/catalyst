@@ -31,7 +31,7 @@ config.test_source_root = path.dirname(__file__)
 # Define where to execute tests (and produce the output).
 config.test_exec_root = getattr(config, "frontend_test_dir", ".lit")
 
-# TODO: find out why we have odr violations
+# TODO: Ideally we would test with leak detection, but this may not be possible from Python.
 config.environment["ASAN_OPTIONS"] = "detect_leaks=0"
 
 # Define substitutions used at the top of lit test files, e.g. %PYTHON.
