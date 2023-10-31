@@ -128,12 +128,12 @@ extensions = [
 
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
-# opengraph details
-ogp_type = "article"
-# Comment the folloring two lines to activate custom
-# social media cards
-ogp_use_first_image = True
-ogp_image = "_static/catalyst_illustration.jpg"
+# OpenGraph Metadata
+ogp_title = "Catalyst Documentation"
+ogp_type = "website"
+ogp_description = "Catalyst is an experimental package that enables just-in-time (JIT) compilation of PennyLane programs. Compile the entire quantum-classical workflow."
+ogp_use_first_image = False
+# ogp_image = "_static/catalyst_illustration.jpg"
 
 ogp_social_cards = {
     "image": "_static/catalyst_illustration.jpg",
@@ -141,6 +141,7 @@ ogp_social_cards = {
     "site_url": "https://docs.pennylane.ai/projects/catalyst",
     "line_color": "#03b2ff",
 }
+
 # The base URL with a proper language and version.
 html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
 
