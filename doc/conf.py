@@ -120,12 +120,20 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinxext.opengraph",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
     "m2r2",
 ]
 
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
+
+# opengraph details
+ogp_site_url = "https://pennylane.ai/project/catalyst"
+ogp_image = "https://docs.pennylane.ai/projects/catalyst/en/stable/_static/catalyst.png"
+ogp_type = "article"
+ogp_enable_meta_description = True
+ogp_use_first_image = True
 
 autosummary_generate = True
 autosummary_imported_members = False
