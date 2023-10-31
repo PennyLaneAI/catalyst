@@ -130,8 +130,8 @@ intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # opengraph details
 ogp_type = "article"
-ogp_enable_meta_description = True
-ogp_use_first_image = False
+ogp_enable_meta_description = False
+ogp_use_first_image = True
 
 ogp_social_cards = {
     "image": "_static/catalyst_illustration.jpg",
