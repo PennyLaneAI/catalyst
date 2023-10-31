@@ -137,7 +137,7 @@ ogp_social_cards = {
     "image": "_static/catalyst_illustration.jpg",
     "enable": True,
     "site_url": "https://docs.pennylane.ai/projects/catalyst",
-    "line_color": "#03b2ff"
+    "line_color": "#03b2ff",
 }
 # The base URL with a proper language and version.
 html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
