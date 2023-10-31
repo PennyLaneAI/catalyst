@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
-option(ENABLE_CODE_COVERAGE "Enable address sanitizer" OFF)
+option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_LIGHTNING "Build Lightning backend device" ON)

@@ -26,7 +26,7 @@ add_executable(runner_tests runner_main.cpp)
 
 add_subdirectory(third_party)
 
-if (ENABLE_CODE_COVERAGE)
+if (ENABLE_ADDRESS_SANITIZER)
     set(dl_manager_tests "")
 else()
     # Tests which use dlopen and RTLD_DEEPBIND are incompatible with sanitizers.
