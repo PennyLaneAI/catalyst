@@ -1,4 +1,6 @@
 PYTHON ?= python3
+C_COMPILER ?= clang
+CXX_COMPILER ?= clang++
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
 BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
@@ -13,13 +15,13 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+ENABLE_ASAN ?= OFF
 COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
 
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
-	@echo "  sanitizer          to build and install all Catalyst modules and its MLIR dependencies with sanitize=address"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
@@ -36,15 +38,6 @@ help:
 
 .PHONY: all
 all: runtime mlir frontend
-
-.PHONY: sanitizer
-sanitizer:
-	LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address\"" make llvm
-	LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address\"" ASAN_OPTIONS=detect_leaks=0 make mhlo
-	LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address\"" make dialects
-	LLVM_BUILD_DIR=$(MK_DIR)/mlir/llvm-project/build-noasan make llvm enzyme
-	make frontend
-	LD_PRELOAD=$(shell clang -print-file-name=libclang_rt.asan-x86_64.so) make test-frontend
 
 .PHONY: frontend
 frontend:
@@ -87,11 +80,33 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
+ifeq ($(ENABLE_ASAN), ON)
+ifneq ($(findstring clang,$(C_COMPILER)), clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+	ASAN_OPTIONS=detect_leaks=0 \
+	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
 	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+else
+	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+endif
+
 test-demos:
 	@echo "check the Catalyst demos"
+ifeq ($(ENABLE_ASAN), ON)
+ifneq ($(findstring clang,$(C_COMPILER)), clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+	ASAN_OPTIONS=detect_leaks=0 \
+	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
 	MDD_BENCHMARK_PRECISION=1 \
 	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+else
+	MDD_BENCHMARK_PRECISION=1 \
+	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+endif
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
