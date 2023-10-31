@@ -66,7 +66,7 @@ llvm:
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter
-	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
+	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer opt
 
 .PHONY: mhlo
 mhlo:
