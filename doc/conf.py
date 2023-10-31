@@ -129,11 +129,15 @@ extensions = [
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # opengraph details
-ogp_site_url = "https://docs.pennylane.ai/projects/catalyst/en/stable/"
 ogp_image = "https://docs.pennylane.ai/projects/catalyst/en/stable/_static/catalyst.png"
 ogp_type = "article"
 ogp_enable_meta_description = True
 ogp_use_first_image = True
+
+ogp_social_cards = {
+    "image": "_static/catalyst_illustration.jpg",
+    "enable": True
+}
 
 autosummary_generate = True
 autosummary_imported_members = False
