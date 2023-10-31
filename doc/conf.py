@@ -129,7 +129,6 @@ extensions = [
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # opengraph details
-# ogp_image = "https://docs.pennylane.ai/projects/catalyst/en/stable/_static/catalyst.png"
 ogp_type = "article"
 ogp_enable_meta_description = True
 ogp_use_first_image = False
@@ -140,6 +139,8 @@ ogp_social_cards = {
     "site_url": "https://docs.pennylane.ai/projects/catalyst",
     "line_color": "#03b2ff"
 }
+# The base URL with a proper language and version.
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
 
 autosummary_generate = True
 autosummary_imported_members = False
