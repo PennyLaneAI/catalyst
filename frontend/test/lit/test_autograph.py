@@ -21,6 +21,88 @@ from catalyst.ag_utils import AutoGraphError, print_code
 from catalyst.autograph import autograph
 
 
+# CHECK-LABEL: def while_simple
+@autograph
+def while_simple(x: float):
+    """Test a simple while-loop statemnt."""
+
+    # CHECK:   def loop_body
+    # CHECK:   def loop_test
+    # CHECK:   ag__.while_stmt(loop_test, loop_body
+    while x < 1.0:
+        x *= 1.5
+    return x
+
+
+print_code(while_simple)
+
+
+# -----
+
+
+# CHECK-LABEL: def while_default_jax
+@qjit(autograph=True)
+def while_default_jax(a: int):
+    """Checks that failure during the while-loop tracing is detected and the fallback unrolling is
+    executed."""
+    i = 0
+    acc = 0
+    # CHECK: qwhile
+    while i < 5:
+        acc += a
+        i += 1
+    return acc
+
+
+print("def while_default_jax")
+print(while_default_jax.jaxpr)
+
+# -----
+
+
+class Failing:
+    """Test class that emulates failures in user-code"""
+
+    triggered = False
+
+    def __init__(self, ref):
+        self.ref = ref
+
+    @property
+    def val(self):
+        """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
+        if not Failing.triggered:
+            Failing.triggered = True
+            raise Exception("Emulated failure")
+        return self.ref
+
+
+# CHECK-LABEL: def while_fallback_jax
+@qjit(autograph=True)
+def while_fallback_jax(a: int):
+    """Checks that failure during the while-loop tracing is detected and the fallback unrolling is
+    executed."""
+    i = 0
+    acc = 0
+    # CHECK: add
+    # CHECK: add
+    # CHECK: add
+    # CHECK: add
+    # CHECK: add
+    while Failing(i).val < 5:
+        acc += a
+        i += 1
+    return acc
+
+
+print("def while_fallback_jax")
+print(while_fallback_jax.jaxpr)
+
+
+# -----
+
+
 # CHECK-LABEL: def if_simple
 @autograph
 def if_simple(x: float):
@@ -369,3 +451,39 @@ if_call(0.1)  # needed to generate the source code for nested functions
 
 print_code(nested_call)
 print_code(if_call)
+
+# -----
+
+
+# CHECK-LABEL: def logical_calls
+@autograph
+def logical_calls(x: float, y: float):
+    """Check that catalyst can handle ``and``, ``or`` and ``not`` using autograph."""
+    # pylint: disable=chained-comparison
+
+    # CHECK: a = ag__.and_
+    a = x >= 0.0 and x <= 1.0
+    # CHECK: b = ag__.not_
+    b = not y >= 1.0
+    # CHECK: return ag__.or_
+    return a or b
+
+
+print_code(logical_calls)
+
+
+# -----
+
+
+# CHECK-LABEL: def chain_logical_call
+@autograph
+def chain_logical_call(x: float):
+    """Check that catalyst can handle chained-``and`` using autograph."""
+
+    # CHECK: ag__.and_
+    # CHECK-SAME: 0.0 <= x
+    # CHECK-SAME: x <= 1.0
+    return 0.0 <= x <= 1.0
+
+
+print_code(chain_logical_call)
