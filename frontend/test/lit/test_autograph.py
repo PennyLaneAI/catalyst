@@ -459,7 +459,7 @@ print_code(if_call)
 @autograph
 def logical_calls(x: float, y: float):
     """Check that catalyst can handle ``and``, ``or`` and ``not`` using autograph."""
-    # pytest: disable=chained-comparison
+    # pylint: disable=chained-comparison
 
     # CHECK: a = ag__.and_
     a = x >= 0.0 and x <= 1.0
