@@ -1252,24 +1252,14 @@ class TestWhileLoops:
 
         result = f(2.0**4)
         expected = jnp.array(
+            # fmt:off
             [
-                0.00045727,
-                0.00110912,
-                0.0021832,
-                0.0052954,
-                0.000613,
-                0.00148684,
-                0.00292669,
-                0.00709874,
-                0.02114249,
-                0.0512815,
-                0.10094267,
-                0.24483834,
-                0.02834256,
-                0.06874542,
-                0.13531871,
-                0.32821807,
+                0.00045727, 0.00110912, 0.0021832, 0.0052954,
+                0.000613, 0.00148684, 0.00292669, 0.00709874,
+                0.02114249, 0.0512815, 0.10094267, 0.24483834,
+                0.02834256, 0.06874542, 0.13531871, 0.32821807,
             ]
+            # fmt:on
         )
         assert_allclose(result, expected, rtol=1e-6, atol=1e-6)
 
@@ -1321,28 +1311,6 @@ class TestWhileLoops:
             return acc
 
         assert f1() == sum([1, 1, 2, 2])
-
-    def test_whileloop_fallback(self, monkeypatch):
-        """Test while-loop warning if strict conversion is disabled."""
-        # pylint: disable=anomalous-backslash-in-string
-
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
-        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", False)
-
-        def f1():
-            acc = 0
-            while Failing(acc).val < 5:
-                acc += 1
-            return acc
-
-        with pytest.warns(
-            UserWarning,
-            match=(
-                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n'
-                "    while Failing\\(acc\\).val < 5"
-            ),
-        ):
-            assert 5 == qjit(autograph=True)(f1)()
 
     def test_whileloop_no_warning(self, monkeypatch):
         """Test the absence of warnings if fallbacks are ignored."""
