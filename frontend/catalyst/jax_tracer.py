@@ -21,7 +21,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.numpy import promote_types
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
@@ -121,7 +120,7 @@ def _promote_jaxpr_types(types: List[List[ShapedArray]]) -> List[ShapedArray]:
     with_qregs = all(isinstance(t[-1], AbstractQreg) for t in types)
     if with_qregs:  # [1]
         types = [t[:-1] for t in types]
-    results = list(map(partial(reduce, promote_types), zip(*types)))
+    results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
     return results + ([AbstractQreg()] if with_qregs else [])
 
 
