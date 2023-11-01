@@ -477,7 +477,7 @@ print_code(logical_calls)
 
 # CHECK-LABEL: def chain_logical_call
 @autograph
-def chain_logical_call(x: float, y: float):
+def chain_logical_call(x: float):
     """Check that catalyst can handle chained-``and`` using autograph."""
 
     # CHECK: ag__.and_
