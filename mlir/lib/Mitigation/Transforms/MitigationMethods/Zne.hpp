@@ -29,7 +29,7 @@ struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
     void rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const override;
 
   private:
-    static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, OpBuilder &builder, mitigation::ZneOp op, Type scalarType);
+    static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, PatternRewriter &builder, mitigation::ZneOp op, Type scalarType);
 };
 
 } // namespace mitigation

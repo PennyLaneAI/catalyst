@@ -15,6 +15,7 @@
 #include "Zne.hpp"
 
 #include <algorithm>
+#include <deque>
 #include <sstream>
 #include <vector>
 
@@ -23,6 +24,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+
+#include "Quantum/Utils/RemoveQuantumMeasurements.h"
 
 namespace catalyst {
 namespace mitigation {
@@ -61,7 +64,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     //                                                  builder.create<scf::YieldOp>(loc, iterArgs);
     //                                              })
     //                          .getResult(0);
-
     func::FuncOp circuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     auto resultsValues = rewriter.create<func::CallOp>(loc, circuit, op.getArgs());
@@ -69,14 +71,14 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     rewriter.replaceOp(op, resultsValues);
 }
 
-FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, OpBuilder &builder,
+FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
                                                         mitigation::ZneOp op, Type scalarType)
 {
-    MLIRContext *ctx = builder.getContext();
+    MLIRContext *ctx = rewriter.getContext();
 
-    OpBuilder::InsertionGuard guard(builder);
+    OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    builder.setInsertionPointToStart(moduleOp.getBody());
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
     // Original function
     func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
@@ -85,19 +87,35 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, OpBuilder 
 
     // Get callee arg types
     auto originalTypes = op.getArgs().getTypes();
-    SmallVector<Type> types = {originalTypes.begin(), originalTypes.end()};
-    types.push_back(scalarType);
+    SmallVector<Type> typesFolded = {originalTypes.begin(), originalTypes.end()};
+    typesFolded.push_back(scalarType);
 
     // Get the scalar factor type
 
     // Get the arguments and outputs types from the original block
     FunctionType updateFnType = FunctionType::get(ctx, /*inputs=*/
-                                                  types,
+                                                  typesFolded,
                                                   /*outputs=*/op.getResultTypes());
 
-    func::FuncOp updateFn = builder.create<func::FuncOp>(loc, fnName, updateFnType);
-    updateFn.setPrivate();
+    func::FuncOp updateFnOp = rewriter.create<func::FuncOp>(loc, fnName, updateFnType);
+    updateFnOp.setPrivate();
+    rewriter.cloneRegionBefore(fnOp.getBody(), updateFnOp.getBody(), updateFnOp.end());
+    Block &argMapBlock = updateFnOp.getFunctionBody().front();
+    argMapBlock.addArgument(scalarType, loc);
 
+    // // Walk through the blocks
+    // std::deque<Operation *> opsToDelete;
+
+    // argMapBlock.walk([&](Operation *op) { opsToDelete.push_back(op); });
+    // for (Operation *ptr : opsToDelete) {
+    //     ptr->dump();
+    //     // auto successors = ptr->getUsers();
+    //     // auto succ = *successors.begin();
+    //     // succ->dump();
+    // }
+    // // quantum::removeQuantumMeasurements(argMapBlock);
+
+    // rewriter.create<func::ReturnOp>(loc, c0float);
     return SymbolRefAttr::get(ctx, fnName);
 }
 } // namespace mitigation
