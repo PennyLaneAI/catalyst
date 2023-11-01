@@ -16,12 +16,16 @@
 
 import sys
 import traceback
+import warnings
+from collections import defaultdict
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.errors import TracerBoolConversionError
+from numpy.testing import assert_allclose
 
 from catalyst import (
     adjoint,
@@ -41,6 +45,25 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-lines
+
+
+class Failing:
+    """Test class that emulates failures in user-code"""
+
+    triggered = defaultdict(bool)
+
+    def __init__(self, ref, label: str = "default"):
+        self.label = label
+        self.ref = ref
+
+    @property
+    def val(self):
+        """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
+        if not Failing.triggered[self.label]:
+            Failing.triggered[self.label] = True
+            raise Exception(f"Emulated failure with label {self.label}")
+        return self.ref
 
 
 def test_unavailable(monkeypatch):
@@ -1177,8 +1200,245 @@ class TestForLoops:
 
 
 @pytest.mark.tf
+class TestWhileLoops:
+    """Test that the autograph transformations produce correct results on while loops."""
+
+    @pytest.mark.parametrize(
+        "init,inc,expected", [(0, 1, 3), (0.0, 1.0, 3.0), (0.0 + 0j, 1.0 + 0j, 3.0 + 0j)]
+    )
+    def test_whileloop_basic(self, monkeypatch, init, inc, expected):
+        """Test basic while-loop functionality"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(limit):
+            i = init
+            while i < limit:
+                i += inc
+            return i
+
+        result = f(expected)
+        assert result == expected
+
+    def test_whileloop_multiple_variables(self, monkeypatch):
+        """Test while-loop with a multiple state variables"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            a = 0
+            b = 0
+            while a < param:
+                a += 1
+                b += 1
+            return b
+
+        result = f(3)
+        assert result == 3
+
+    def test_whileloop_qjit(self, monkeypatch):
+        """Test while-loop used with qml calls"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(p):
+            w = int(0)
+            while w < 4:
+                qml.RY(p, wires=w)
+                p *= 0.5
+                w += 1
+            return qml.probs()
+
+        result = f(2.0**4)
+        expected = jnp.array(
+            # fmt:off
+            [
+                0.00045727, 0.00110912, 0.0021832, 0.0052954,
+                0.000613, 0.00148684, 0.00292669, 0.00709874,
+                0.02114249, 0.0512815, 0.10094267, 0.24483834,
+                0.02834256, 0.06874542, 0.13531871, 0.32821807,
+            ]
+            # fmt:on
+        )
+        assert_allclose(result, expected, rtol=1e-6, atol=1e-6)
+
+    def test_whileloop_temporary_variable(self, monkeypatch):
+        """Test that temporary (local) variables can be initialized inside a while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 3:
+                c = 2
+                acc = acc + c
+
+            return acc
+
+        assert f1() == 4
+
+    def test_whileloop_forloop_interop(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = acc + 1
+                for x in [1, 2, 3]:
+                    acc += x
+            return acc
+
+        assert f1() == 0 + 1 + sum([1, 2, 3])
+
+    def test_whileloop_cond_interop(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                if acc < 2:
+                    acc += 1
+                else:
+                    acc += 2
+            return acc
+
+        assert f1() == sum([1, 1, 2, 2])
+
+    def test_whileloop_no_warning(self, monkeypatch):
+        """Test the absence of warnings if fallbacks are ignored."""
+        # pylint: disable=anomalous-backslash-in-string
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+
+        def f1():
+            acc = 0
+            while Failing(acc).val < 5:
+                acc = acc + 1
+            return acc
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert 5 == qjit(autograph=True)(f1)()
+
+    def test_whileloop_exception(self, monkeypatch):
+        """Test for-loop error if strict-conversion is enabled."""
+        # pylint: disable=anomalous-backslash-in-string
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f1():
+            acc = 0
+            while acc < 5:
+                raise RuntimeError("Test failure")
+            return acc
+
+        with pytest.raises(RuntimeError):
+            qjit(autograph=True)(f1)()
+
+
+@pytest.mark.tf
+class TestLogicalOps:
+    """Test logical operations: and, or, not"""
+
+    def test_logical_basics(self):
+        """Test basic logical and behavior."""
+        # pylint: disable=chained-comparison
+
+        def f1(param):
+            return param > 0.0 and param < 1.0 and param <= 2.0
+
+        def f2(param):
+            return param > 1.0 or param < 0.0 or param == 0.5
+
+        def f3(param):
+            return not param > 1.0
+
+        assert qjit(autograph=True)(f1)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f2)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f3)(0.5) == np.array(True)
+
+    # fmt:off
+    @pytest.mark.parametrize("python_object",["string", [0, 1, 2], [], {1: 2}, {}, ],)
+    # fmt:on
+    def test_logical_with_python_objects(self, python_object):
+        """Test that logical ops still work with python objects."""
+
+        @qjit(autograph=True)
+        def f():
+            r1 = True and python_object
+            assert r1 is python_object
+            r2 = False or python_object
+            assert r2 is python_object
+            r3 = not python_object
+            assert isinstance(r3, bool)
+            return 1
+
+        assert 1 == f()
+
+    def test_logical_accepts_non_scalars(self):
+        """Test that we accept logic with non-scalar tensors if both are traced"""
+
+        def f_and(a, b):
+            return a and b
+
+        def f_or(a, b):
+            return a or b
+
+        def f_not(a):
+            return not a
+
+        a, b = jnp.array([0, 1]), jnp.array([1, 1])
+        assert_allclose(qjit(autograph=True)(f_and)(a, b), jnp.logical_and(a, b))
+        assert_allclose(qjit(autograph=True)(f_or)(a, b), jnp.logical_or(a, b))
+        assert_allclose(qjit(autograph=True)(f_not)(a), jnp.logical_not(a))
+
+    @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
+    def test_logical_mixture_static_dynamic_default(self, s, d):
+        """Test the useage of a mixture of static(s) and dynamic(d) variables."""
+
+        # Here we either return bool or the dynamic object
+        assert qjit(autograph=True)(lambda d: s and d)(d) == (s and d)
+        assert qjit(autograph=True)(lambda d: s or d)(d) == (s or d)
+
+        # Here we perform boolean conversion of a tracer object
+        assert qjit(autograph=True)(lambda d: not d)(d) == (not d)
+        assert qjit(autograph=True)(lambda: not s)() == (not s)
+
+        # Cases where `d` is 1-st argument are going to fail
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d and s)(d) == (d and s)
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
+
+
+@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
+
+    def test_force_python_fallbacks(self):
+        """Test fallback modes of control-flow primitives."""
+
+        with pytest.warns(UserWarning):
+
+            @qjit(autograph=True)
+            def f1():
+                acc = 0
+                while acc < 5:
+                    acc = Failing(acc, "while").val + 1
+                    for x in [1, 2, 3]:
+                        acc += Failing(x, "for").val
+                return acc
+
+            assert f1() == 0 + 1 + sum([1, 2, 3])
 
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
@@ -1231,6 +1491,39 @@ class TestMixed:
 
         assert f(2) == 18
         assert f(3) == 0
+
+    def test_cond_or(self, monkeypatch):
+        """Test Python conditionals in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(x):
+            if x <= 0.0 or x >= 1.0:
+                y = 1
+            else:
+                y = 0
+            return y
+
+        assert f(0) == 1
+        assert f(1) == 1
+        assert f(0.5) == 0
+
+    def test_while_and(self, monkeypatch):
+        """Test Python while-loops in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            n = 0
+            while param < 0.5 and n < 3:
+                param *= 1.5
+                n += 1
+            return n
+
+        assert f(0.4) == 1
+        assert f(0.1) == 3
 
 
 if __name__ == "__main__":

@@ -47,6 +47,7 @@ try:
         [
             os.path.join(config.quantum_build_dir, "python_packages", "quantum"),
             os.path.join(config.quantum_build_dir, "python_packages", "gradient"),
+            os.path.join(config.quantum_build_dir, "python_packages", "catalyst"),
         ],
         append_path=True,
     )
