@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2023 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +14,16 @@
 
 # RUN: %PYTHON %s
 
-from mlir_quantum.dialects import gradient as gradient_d
+from mlir_quantum._mlir_libs._quantumDialects import catalyst as catalyst_d
 from mlir_quantum.ir import *
 
 with Context() as ctx:
-    gradient_d.register_dialect()
+    catalyst_d.register_dialect()
     module = Module.parse(
         """
-        "func.func"() ({}) {function_type = (f64) -> f64, sym_name = "funcScalarScalar", sym_visibility = "private"} : () -> ()
-        "func.func"() ({
-        ^bb0(%arg0: f64):
-            %0 = "gradient.grad"(%arg0) {callee = @funcScalarScalar, method = "fd"} : (f64) -> f64
-            "func.return"(%0) : (f64) -> ()
-        }) {function_type = (f64) -> f64, sym_name = "gradCallScalarScalar"} : () -> ()
+        %0 = "catalyst.list_init"() : () -> !catalyst.arraylist<f64>
+        "catalyst.list_dealloc"(%0) : (!catalyst.arraylist<f64>) -> ()
         """
     )
 
-    print(str(module))
+    print(module)
