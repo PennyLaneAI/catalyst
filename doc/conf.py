@@ -120,12 +120,27 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinxext.opengraph",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
     "m2r2",
 ]
 
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
+
+# OpenGraph Metadata
+ogp_use_first_image = True  # set to False for autocards
+ogp_image = "_static/catalyst_illustration.jpg"  # comment for autocards
+
+ogp_social_cards = {
+    "image": "_static/catalyst_illustration.jpg",
+    "enable": True,
+    "site_url": "https://docs.pennylane.ai/projects/catalyst",
+    "line_color": "#03b2ff",
+}
+
+# The base URL with a proper language and version.
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
 
 autosummary_generate = True
 autosummary_imported_members = False
