@@ -455,10 +455,12 @@ print_code(if_call)
 # -----
 
 
-# CHECK-LABEL: def and_or_calls
+# CHECK-LABEL: def logical_calls
 @autograph
-def and_or_calls(x: float, y: float):
+def logical_calls(x: float, y: float):
     """Check that catalyst can handle ``and``, ``or`` and ``not`` using autograph."""
+    # pytest: disable=chained-comparison
+
     # CHECK: a = ag__.and_
     a = x >= 0.0 and x <= 1.0
     # CHECK: b = ag__.not_
@@ -467,4 +469,21 @@ def and_or_calls(x: float, y: float):
     return a or b
 
 
-print_code(and_or_calls)
+print_code(logical_calls)
+
+
+# -----
+
+
+# CHECK-LABEL: def chain_logical_call
+@autograph
+def chain_logical_call(x: float, y: float):
+    """Check that catalyst can handle chained-``and`` using autograph."""
+
+    # CHECK: ag__.and_
+    # CHECK-SAME: 0.0 <= x
+    # CHECK-SAME: x <= 1.0
+    return 0.0 <= x <= 1.0
+
+
+print_code(chain_logical_call)

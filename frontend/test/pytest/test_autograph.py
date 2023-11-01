@@ -1347,8 +1347,11 @@ class TestWhileLoops:
 
 @pytest.mark.tf
 class TestLogicalOps:
-    def test_logical_basics(self, monkeypatch):
+    """Test logical operations: and, or, not"""
+
+    def test_logical_basics(self):
         """Test basic logical and behavior."""
+        # pylint: disable=chained-comparison
 
         def f1(param):
             return param > 0.0 and param < 1.0 and param <= 2.0
@@ -1366,7 +1369,7 @@ class TestLogicalOps:
     # fmt:off
     @pytest.mark.parametrize("python_object",["string", [0, 1, 2], [], {1: 2}, {}, ],)
     # fmt:on
-    def test_logical_with_python_objects(self, monkeypatch, python_object):
+    def test_logical_with_python_objects(self, python_object):
         """Test that logical ops still work with python objects."""
 
         @qjit(autograph=True)
@@ -1381,7 +1384,7 @@ class TestLogicalOps:
 
         assert 1 == f()
 
-    def test_logical_accepts_non_scalars(self, monkeypatch):
+    def test_logical_accepts_non_scalars(self):
         """Test that we accept logic with non-scalar tensors if both are traced"""
 
         def f_and(a, b):
@@ -1394,12 +1397,12 @@ class TestLogicalOps:
             return not a
 
         a, b = jnp.array([0, 1]), jnp.array([1, 1])
-        qjit(autograph=True)(f_and)(a, b) == jnp.logical_and(a, b)
-        qjit(autograph=True)(f_or)(a, b) == jnp.logical_or(a, b)
-        qjit(autograph=True)(f_not)(a) == jnp.logical_not(a)
+        assert_allclose(qjit(autograph=True)(f_and)(a, b), jnp.logical_and(a, b))
+        assert_allclose(qjit(autograph=True)(f_or)(a, b), jnp.logical_or(a, b))
+        assert_allclose(qjit(autograph=True)(f_not)(a), jnp.logical_not(a))
 
     @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
-    def test_logical_mixture_static_dynamic_default(self, monkeypatch, s, d):
+    def test_logical_mixture_static_dynamic_default(self, s, d):
         """Test the useage of a mixture of static(s) and dynamic(d) variables."""
 
         # Here we either return bool or the dynamic object
