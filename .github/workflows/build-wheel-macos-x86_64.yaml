@@ -1,6 +1,8 @@
 name: Build Catalyst Wheel on macOS (x86_64)
 
+# TODO: remove on pull_request before merging
 on:
+  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -25,21 +27,16 @@ jobs:
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
-        container_img: ["quay.io/pypa/manylinux2014_x86_64"]
+        python_version: ['3.9']
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-12
-    arch: x86_64
-    container: ${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
     # Cache external project sources
-    # Note that these caches will not be the same as for our main check-catalyst action, since
-    # GH doesn't support using caches across un-/containerized actions (those with `container_img`).
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
@@ -110,17 +107,24 @@ jobs:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python_version }}
+
     - name: Install dependencies (macOS)
       if: |
         steps.cache-llvm-build.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
         steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        brew install libomp cmake ninja
+        # TODO: remove libomp?
+        brew install libomp
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+        # TODO: remove PyYAML?
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -142,7 +146,7 @@ jobs:
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
         # This tests fails on CI/CD not locally.
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -168,19 +172,17 @@ jobs:
 
         cmake --build enzyme-build --target EnzymeStatic-18
 
-  catalyst-linux-wheels-x86-64:
+  catalyst-macos-wheels-x86-64:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
-        container_img: ["quay.io/pypa/manylinux2014_x86_64"]
+        python_version: ['3.9']
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -188,12 +190,12 @@ jobs:
 
     - name: Install dependencies (macOS)
       run: |
-        # Reduce wait time for repos not responding
-        brew install libomp cmake ninja
+        brew install libomp
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+        # TODO: remove PyYAML?
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -294,18 +296,18 @@ jobs:
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist/
         retention-days: 14
 
   test-wheels:
-    needs: [constants, catalyst-linux-wheels-x86-64]
+    needs: [constants, catalyst-macos-wheels-x86-64]
     strategy:
       fail-fast: false
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ['3.9']
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
@@ -318,7 +320,7 @@ jobs:
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
-        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
 
     - name: Set up Python ${{ matrix.python_version }}
@@ -338,7 +340,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
     - name: Run Python Pytest Tests
       run: |
