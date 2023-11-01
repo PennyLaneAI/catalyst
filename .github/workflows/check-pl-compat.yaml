@@ -41,11 +41,7 @@ jobs:
         sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # TODO: Use the latest version of boto3 after fixing the issue with
-        # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
-        pip install "boto3==1.26"
-        # TODO: remove pin after PL v0.33 release
-        pip install git+https://github.com/amazon-braket/amazon-braket-pennylane-plugin-python@main
+        pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)

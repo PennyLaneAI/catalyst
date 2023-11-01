@@ -377,6 +377,62 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
     set_state(results)
 
 
+def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
+    """Dispatch to a Catalyst implementation of while loops."""
+
+    def _test(state):
+        old = get_state()
+        set_state(state)
+        res = loop_test()
+        set_state(old)
+        return res
+
+    @catalyst.while_loop(_test)
+    def _functional_while(iter_args):
+        set_state(iter_args)
+        loop_body()
+        return get_state()
+
+    iter_inits = get_state()
+    iter_results = _functional_while(iter_inits)
+    return iter_results
+
+
+def _call_python_while(loop_test, loop_body, get_state, _set_state, _nonlocals, _symbol_names):
+    """Fallback to a Python implementation of while loops."""
+
+    while loop_test():
+        loop_body()
+
+    return get_state()
+
+
+def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
+    """An implementation of the AutoGraph 'while ..' statement. The interface is defined by
+    AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
+
+    fallback = False
+    init_state = get_state()
+
+    try:
+        results = _call_catalyst_while(
+            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
+        )
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if catalyst.autograph_strict_conversion:
+            raise e
+        fallback = True
+
+    if fallback:
+        set_state(init_state)
+        results = _call_python_while(
+            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
+        )
+
+    set_state(results)
+
+
 def _logical_op(*args, jax_fn, python_fn):
     fallback = False
 

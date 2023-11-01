@@ -72,6 +72,9 @@
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
     the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
 
+* Include the "Catalyst" utility dialect in our MLIR C-API.
+  [(#345)](https://github.com/PennyLaneAI/catalyst/pull/345)
+
 <h3>Breaking changes</h3>
 
 * The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have
