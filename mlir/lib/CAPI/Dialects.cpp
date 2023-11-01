@@ -14,6 +14,9 @@
 
 #include "CAPI/Dialects.h"
 
+#include "mlir/CAPI/Registration.h"
+
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
