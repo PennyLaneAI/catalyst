@@ -129,13 +129,6 @@ extensions = [
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}
 
 # OpenGraph Metadata
-ogp_title = "Catalyst Documentation"
-ogp_type = "website"
-ogp_description = (
-    "Catalyst is an experimental package that enables just-in-time (JIT) "
-    "compilation of PennyLane programs. Compile the entire "
-    "quantum-classical workflow."
-)
 ogp_use_first_image = True  # set to False for autocards
 ogp_image = "_static/catalyst_illustration.jpg"  # comment for autocards
 
