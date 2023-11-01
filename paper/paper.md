@@ -61,12 +61,12 @@ measurement statistics, and hardware-compatible automatic differentiation (AD).
 The rapid development and availability of quantum software and hardware has had significant
 influence on quantum algorithm development and general quantum computing research. Through direct
 access to full-featured quantum programming SDKs [@qiskit; @cirq; @pennylane], high-performance
-simulators[@pennylane; @cuquantum], and near-term noisy hardware
+simulators [@pennylane; @cuquantum], and near-term noisy hardware
 [@borealis; @braket; @ibmq], researchers have new tools available to prototype, execute, analyze,
 and iterate during algorithm development. Notably, this has resulted in the development and
 exploration of new categories of quantum algorithms that take advantage of the strong integration
 with advanced classical tooling; an example being auto-differentiation and variational quantum
-algorithms[@mcclean2016theory; @farhi2014quantum; @delgado2021variational].
+algorithms [@mcclean2016theory; @farhi2014quantum; @delgado2021variational].
 
 However, as our hardware capabilities scale, it is becoming clear that we cannot separate classical
 and quantum parts of the program; classical processing remains essential for processing quantum
@@ -109,8 +109,8 @@ program to a lower level of abstraction, outputting LLVM IR with QIR syntax. In 
 lowering process, various transformations take place, including quantum optimizations
 (adjoint cancellation, operator fusion), classical optimizations (code elimination), and automatic
 differentiation. In the latter case, classical auto-differentiation is provided via the Enzyme
-[@enzyme] framework, while hardware-compatible quantum gradient methods(such as the parameter-shift
-rule[@schuld2018gradients; @wierichs2021general]) are provided as Catalyst compiler transforms.
+[@enzyme] framework, while hardware-compatible quantum gradient methods (such as the parameter-shift
+rule [@schuld2018gradients; @wierichs2021general]) are provided as Catalyst compiler transforms.
 
 ## Runtime
 
@@ -120,7 +120,7 @@ host, although it also supports more restrictive execution models. Execution of 
 proceeds on the host’s native architecture, while the runtime provides an abstract communication
 API for quantum devices that the user program is free to invoke at any time during its execution.
 Currently, Catalyst provides runtime integration for the high-performance PennyLane Lightning suite
-of simulators[URL ref may be acceptable as a citation here], as well as an OpenQASM3 pipeline with
+of simulators [@lightning], as well as an OpenQASM3 pipeline with
 Amazon Braket simulator and hardware support.
 
 # Examples
@@ -197,7 +197,7 @@ params = jnp.array([0.54, 0.3154])
 workflow(params)
 ```
 
-Here, we are using the JAXopt gradient optimization library[@blondel2022efficient] alongside the
+Here, we are using the JAXopt gradient optimization library [@blondel2022efficient] alongside the
 built-in auto-differentiation capabilities of Catalyst, to compile the entire optimization
 workflow. For this small toy example on 6 qubits, we can time the execution after compilation on
 the same system, as a non-rigorous demonstration of the advantage of performing this for loop
@@ -230,8 +230,8 @@ documentation and tutorials are available on our online documentation\footnote
 {https://docs.pennylane.ai/projects/catalyst}.
 
 Quantum software is driving many new results and ideas in quantum computing research, and the
-PennyLane framework has already been used in a number of scientific publications [citation needed]
-and educational materials[citation needed]. By enabling researchers to scale up their ideas and
+PennyLane framework has already been used in a number of scientific publications [@delgado2021variational; @wierichs2021general]
+and educational materials [@demos]. By enabling researchers to scale up their ideas and
 algorithms, and execute on both near-term and future quantum hardware, the software presented here
 will help drive future research in quantum computing.
 
