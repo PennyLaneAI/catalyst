@@ -30,6 +30,8 @@ struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
 
   private:
     static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, PatternRewriter &builder, mitigation::ZneOp op, Type scalarType);
+    static void exploreTreeAndStoreLeafValues(Operation* op, std::vector<ValueRange>& leafValues);
+    static void removeQuantumMeasurements(Block &block);
 };
 
 } // namespace mitigation

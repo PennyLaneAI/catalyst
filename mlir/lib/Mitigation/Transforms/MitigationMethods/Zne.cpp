@@ -19,6 +19,8 @@
 #include <sstream>
 #include <vector>
 
+#include "llvm/ADT/SmallPtrSet.h"
+
 #include "Mitigation/IR/MitigationOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -104,19 +106,55 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     argMapBlock.addArgument(scalarType, loc);
 
     // // Walk through the blocks
-    // std::deque<Operation *> opsToDelete;
-
-    // argMapBlock.walk([&](Operation *op) { opsToDelete.push_back(op); });
-    // for (Operation *ptr : opsToDelete) {
-    //     ptr->dump();
-    //     // auto successors = ptr->getUsers();
-    //     // auto succ = *successors.begin();
-    //     // succ->dump();
-    // }
-    // // quantum::removeQuantumMeasurements(argMapBlock);
-
-    // rewriter.create<func::ReturnOp>(loc, c0float);
+    std::vector<Operation *> extractOps;
+    argMapBlock.walk([&](quantum::ExtractOp op) { extractOps.push_back(op); });
+    std::vector<ValueRange> leaves;
+    exploreTreeAndStoreLeafValues(extractOps.front(), leaves);
     return SymbolRefAttr::get(ctx, fnName);
+}
+
+// Recursive search in the tree
+void ZneLowering::exploreTreeAndStoreLeafValues(Operation *op, std::vector<ValueRange> &leafValues)
+{
+    if (op->getUsers().empty()) {
+        leafValues.push_back(op->getResults());
+    }
+    // else if (isa<quantum::NamedObsOp>(op)) {
+    //     quantum::NamedObsOp obsOp = dyn_cast<quantum::NamedObsOp>(op);
+    //     obsOp.getQubit().dump();
+    //     leafValues.push_back(obsOp.getQubit());
+    // }
+    else {
+        for (Operation *user : op->getUsers()) {
+            exploreTreeAndStoreLeafValues(user, leafValues);
+        }
+    }
+}
+
+void ZneLowering::removeQuantumMeasurements(Block &block)
+{
+    // Delete measurement operations.
+    std::deque<Operation *> opsToDelete;
+    block.walk([&](quantum::NamedObsOp op) { opsToDelete.push_back(op); });
+    SmallPtrSet<Operation *, 4> visited{opsToDelete.begin(), opsToDelete.end()};
+
+    while (!opsToDelete.empty()) {
+        Operation *currentOp = opsToDelete.front();
+        opsToDelete.pop_front();
+        currentOp->dropAllReferences();
+        for (Operation *user : currentOp->getUsers()) {
+            if (!visited.contains(user)) {
+                visited.insert(user);
+                opsToDelete.push_back(user);
+            }
+        }
+        if (currentOp->use_empty()) {
+            currentOp->erase();
+        }
+        else {
+            opsToDelete.push_back(currentOp);
+        }
+    }
 }
 } // namespace mitigation
 } // namespace catalyst
