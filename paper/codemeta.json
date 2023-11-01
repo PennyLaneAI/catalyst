@@ -1,0 +1,60 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+    {
+      "@id": "http://orcid.org/0000-0003-0975-6448",
+      "@type": "Person",
+      "name": "David Ittah",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@type": "Person",
+      "name": "Ali Asadi",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@type": "Person",
+      "name": "Erick Ochoa Lopez",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@type": "Person",
+      "name": "Sergei Mironov",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@type": "Person",
+      "name": "Samuel Banning",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@id": "http://orcid.org/0000-0003-0837-6451",
+      "@type": "Person",
+      "name": "Romain Moyard",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@id": "http://orcid.org/0000-0002-2377-264X",
+      "@type": "Person",
+      "name": "Mai Jacob Peng",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    },
+    {
+      "@id": "http://orcid.org/0000-0003-0975-6448",
+      "@type": "Person",
+      "name": "Josh Izaac",
+      "email": "josh@xanadu.ai",
+      "affiliation": "Xanadu, Toronto, ON, M5G 2C8, Canada"
+    }
+  ],
+  "codeRepository": "https://github.com/PennyLaneAI/catalyst",
+  "title": "Catalyst: a Python JIT compiler for auto-differentiable hybrid quantum programs",
+  "datePublished": "2023-11-01",
+  "dateModified": "2023-11-01",
+  "dateCreated": "2023-11-01",
+  "description": "A JIT compiler for hybrid quantum programs in PennyLane",
+  "keywords": "python, quantum, llvm, machine learning, jit, automatic differentiation, autodiff, compiler, jax",
+  "license": "Apache 2.0",
+  "version": "v0.3.1"
+}
