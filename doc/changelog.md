@@ -8,6 +8,20 @@
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
 
+* The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
+  [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def circuit(n:int):
+      i = 0
+      while i < n:
+          qml.RX(jnp.pi/2, wires=i)
+          i += 1
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 * The `requirements.txt` file to build Catalyst from source has been updated with a minimum PIP
   version, `>=22.3`. Previous versions of pip are unable to perform editable installs when the
   system-wide site-packages are read-only, even when the `--user` flag is provided.

@@ -16,12 +16,15 @@
 
 import sys
 import traceback
+import warnings
+from collections import defaultdict
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from numpy.testing import assert_allclose
 
 from catalyst import (
     adjoint,
@@ -41,6 +44,25 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-lines
+
+
+class Failing:
+    """Test class that emulates failures in user-code"""
+
+    triggered = defaultdict(bool)
+
+    def __init__(self, ref, label: str = "default"):
+        self.label = label
+        self.ref = ref
+
+    @property
+    def val(self):
+        """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
+        if not Failing.triggered[self.label]:
+            Failing.triggered[self.label] = True
+            raise Exception(f"Emulated failure with label {self.label}")
+        return self.ref
 
 
 def test_unavailable(monkeypatch):
@@ -1177,8 +1199,170 @@ class TestForLoops:
 
 
 @pytest.mark.tf
+class TestWhileLoops:
+    """Test that the autograph transformations produce correct results on while loops."""
+
+    @pytest.mark.parametrize(
+        "init,inc,expected", [(0, 1, 3), (0.0, 1.0, 3.0), (0.0 + 0j, 1.0 + 0j, 3.0 + 0j)]
+    )
+    def test_whileloop_basic(self, monkeypatch, init, inc, expected):
+        """Test basic while-loop functionality"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(limit):
+            i = init
+            while i < limit:
+                i += inc
+            return i
+
+        result = f(expected)
+        assert result == expected
+
+    def test_whileloop_multiple_variables(self, monkeypatch):
+        """Test while-loop with a multiple state variables"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            a = 0
+            b = 0
+            while a < param:
+                a += 1
+                b += 1
+            return b
+
+        result = f(3)
+        assert result == 3
+
+    def test_whileloop_qjit(self, monkeypatch):
+        """Test while-loop used with qml calls"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(p):
+            w = int(0)
+            while w < 4:
+                qml.RY(p, wires=w)
+                p *= 0.5
+                w += 1
+            return qml.probs()
+
+        result = f(2.0**4)
+        expected = jnp.array(
+            # fmt:off
+            [
+                0.00045727, 0.00110912, 0.0021832, 0.0052954,
+                0.000613, 0.00148684, 0.00292669, 0.00709874,
+                0.02114249, 0.0512815, 0.10094267, 0.24483834,
+                0.02834256, 0.06874542, 0.13531871, 0.32821807,
+            ]
+            # fmt:on
+        )
+        assert_allclose(result, expected, rtol=1e-6, atol=1e-6)
+
+    def test_whileloop_temporary_variable(self, monkeypatch):
+        """Test that temporary (local) variables can be initialized inside a while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 3:
+                c = 2
+                acc = acc + c
+
+            return acc
+
+        assert f1() == 4
+
+    def test_whileloop_forloop_interop(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = acc + 1
+                for x in [1, 2, 3]:
+                    acc += x
+            return acc
+
+        assert f1() == 0 + 1 + sum([1, 2, 3])
+
+    def test_whileloop_cond_interop(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                if acc < 2:
+                    acc += 1
+                else:
+                    acc += 2
+            return acc
+
+        assert f1() == sum([1, 1, 2, 2])
+
+    def test_whileloop_no_warning(self, monkeypatch):
+        """Test the absence of warnings if fallbacks are ignored."""
+        # pylint: disable=anomalous-backslash-in-string
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+
+        def f1():
+            acc = 0
+            while Failing(acc).val < 5:
+                acc = acc + 1
+            return acc
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert 5 == qjit(autograph=True)(f1)()
+
+    def test_whileloop_exception(self, monkeypatch):
+        """Test for-loop error if strict-conversion is enabled."""
+        # pylint: disable=anomalous-backslash-in-string
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f1():
+            acc = 0
+            while acc < 5:
+                raise RuntimeError("Test failure")
+            return acc
+
+        with pytest.raises(RuntimeError):
+            qjit(autograph=True)(f1)()
+
+
+@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
+
+    def test_force_python_fallbacks(self):
+        """Test fallback modes of control-flow primitives."""
+
+        with pytest.warns(UserWarning):
+
+            @qjit(autograph=True)
+            def f1():
+                acc = 0
+                while acc < 5:
+                    acc = Failing(acc, "while").val + 1
+                    for x in [1, 2, 3]:
+                        acc += Failing(x, "for").val
+                return acc
+
+            assert f1() == 0 + 1 + sum([1, 2, 3])
 
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
