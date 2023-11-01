@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
 from catalyst import (
@@ -1345,6 +1346,81 @@ class TestWhileLoops:
 
 
 @pytest.mark.tf
+class TestLogicalOps:
+    """Test logical operations: and, or, not"""
+
+    def test_logical_basics(self):
+        """Test basic logical and behavior."""
+        # pylint: disable=chained-comparison
+
+        def f1(param):
+            return param > 0.0 and param < 1.0 and param <= 2.0
+
+        def f2(param):
+            return param > 1.0 or param < 0.0 or param == 0.5
+
+        def f3(param):
+            return not param > 1.0
+
+        assert qjit(autograph=True)(f1)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f2)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f3)(0.5) == np.array(True)
+
+    # fmt:off
+    @pytest.mark.parametrize("python_object",["string", [0, 1, 2], [], {1: 2}, {}, ],)
+    # fmt:on
+    def test_logical_with_python_objects(self, python_object):
+        """Test that logical ops still work with python objects."""
+
+        @qjit(autograph=True)
+        def f():
+            r1 = True and python_object
+            assert r1 is python_object
+            r2 = False or python_object
+            assert r2 is python_object
+            r3 = not python_object
+            assert isinstance(r3, bool)
+            return 1
+
+        assert 1 == f()
+
+    def test_logical_accepts_non_scalars(self):
+        """Test that we accept logic with non-scalar tensors if both are traced"""
+
+        def f_and(a, b):
+            return a and b
+
+        def f_or(a, b):
+            return a or b
+
+        def f_not(a):
+            return not a
+
+        a, b = jnp.array([0, 1]), jnp.array([1, 1])
+        assert_allclose(qjit(autograph=True)(f_and)(a, b), jnp.logical_and(a, b))
+        assert_allclose(qjit(autograph=True)(f_or)(a, b), jnp.logical_or(a, b))
+        assert_allclose(qjit(autograph=True)(f_not)(a), jnp.logical_not(a))
+
+    @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
+    def test_logical_mixture_static_dynamic_default(self, s, d):
+        """Test the useage of a mixture of static(s) and dynamic(d) variables."""
+
+        # Here we either return bool or the dynamic object
+        assert qjit(autograph=True)(lambda d: s and d)(d) == (s and d)
+        assert qjit(autograph=True)(lambda d: s or d)(d) == (s or d)
+
+        # Here we perform boolean conversion of a tracer object
+        assert qjit(autograph=True)(lambda d: not d)(d) == (not d)
+        assert qjit(autograph=True)(lambda: not s)() == (not s)
+
+        # Cases where `d` is 1-st argument are going to fail
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d and s)(d) == (d and s)
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
+
+
+@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
@@ -1415,6 +1491,39 @@ class TestMixed:
 
         assert f(2) == 18
         assert f(3) == 0
+
+    def test_cond_or(self, monkeypatch):
+        """Test Python conditionals in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(x):
+            if x <= 0.0 or x >= 1.0:
+                y = 1
+            else:
+                y = 0
+            return y
+
+        assert f(0) == 1
+        assert f(1) == 1
+        assert f(0.5) == 0
+
+    def test_while_and(self, monkeypatch):
+        """Test Python while-loops in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            n = 0
+            while param < 0.5 and n < 3:
+                param *= 1.5
+                n += 1
+            return n
+
+        assert f(0.4) == 1
+        assert f(0.1) == 3
 
 
 if __name__ == "__main__":

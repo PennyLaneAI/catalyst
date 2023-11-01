@@ -43,6 +43,7 @@ from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
+from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
 __all__ = [
@@ -57,6 +58,9 @@ __all__ = [
     "for_stmt",
     "while_stmt",
     "converted_call",
+    "and_",
+    "or_",
+    "not_",
 ]
 
 
@@ -369,6 +373,35 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
         )
 
     set_state(results)
+
+
+def _logical_op(*args, jax_fn, python_fn):
+    values = [f() for f in args]
+
+    def _is_array_tracer(x: Any) -> bool:
+        return isinstance(x, DynamicJaxprTracer) and isinstance(x.aval, ShapedArray)
+
+    if all(_is_array_tracer(val) for val in values):
+        result = jax_fn(*values)
+    else:
+        result = python_fn(*values)
+
+    return result
+
+
+def and_(a, b):
+    """An implementation of the AutoGraph '.. and ..' statement."""
+    return _logical_op(a, b, jax_fn=jnp.logical_and, python_fn=lambda a, b: a and b)
+
+
+def or_(a, b):
+    """An implementation of the AutoGraph '.. or ..' statement."""
+    return _logical_op(a, b, jax_fn=jnp.logical_or, python_fn=lambda a, b: a or b)
+
+
+def not_(arg):
+    """An implementation of the AutoGraph '.. not ..' statement."""
+    return _logical_op(lambda: arg, jax_fn=jnp.logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):

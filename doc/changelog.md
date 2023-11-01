@@ -22,6 +22,27 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+* The AutoGraph feature now also supports native Python `and`, `or` and `not` operators in Boolean
+  expressions.
+  [(#325)](https://github.com/PennyLaneAI/catalyst/pull/325)
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def circuit(param:float):
+      if param >= 0 and param < jnp.pi:
+          qml.RX(param, wires=0)
+      return qml.probs()
+  ```
+
+<h3>Breaking changes</h3>
+
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+  `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
+<h3>Bug fixes</h3>
+
 * The `requirements.txt` file to build Catalyst from source has been updated with a minimum PIP
   version, `>=22.3`. Previous versions of pip are unable to perform editable installs when the
   system-wide site-packages are read-only, even when the `--user` flag is provided.
