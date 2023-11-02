@@ -368,8 +368,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                                  << "of the '" << res->second << "' pipeline\n";
         llvm::raw_string_ostream s{outputs[res->second]};
         s << *op;
-        dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"),
-                   outputs[res->second]);
+        if (options.keepIntermediate) {
+            dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"),
+                       outputs[res->second]);
+        }
     };
 
     // Output pipeline names on failures
