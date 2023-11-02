@@ -60,3 +60,25 @@ func.func public @wrapper() -> memref<1xf64> attributes {llvm.emit_c_interface} 
   // CHECK: return [[res]]
   func.return %alloc : memref<1xf64>
 }
+
+
+// -----
+
+// Test that transformation supports dynamic shapes.
+// CHECK-LABEL: @wrapper
+// CHECK-SAME: [[arg:%.+]]:
+// CHECK-SAME: llvm.copy_memref
+func.func public @wrapper(%x: memref<3x?x?xf64>) -> memref<3x?x?xf64> attributes {llvm.emit_c_interface} {
+  // CHECK: [[res:%.+]] = scf.if [[cmp]]
+  // CHECK-NEXT: [[d0:%.+]] = memref.dim
+  // CHECK-NEXT: [[d1:%.+]] = memref.dim
+  // CHECK-NEXT: [[new:%.+]] = memref.alloc([[d0]], [[d1]])
+  // CHECK-NEXT: memref.copy [[arg]], [[new]]
+  // CHECK-NEXT: scf.yield [[new]]
+  // CHECK-NEXT: else
+  // CHECK-NEXT: scf.yield [[arg]]
+  // CHECK: return [[res]]
+  func.return %x : memref<3x?x?xf64>
+}
+
+

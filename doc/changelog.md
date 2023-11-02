@@ -4,9 +4,59 @@
 
 <h3>Improvements</h3>
 
+* Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
+  prints names of failing passes.
+  [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
+
+* Return values of conditional functions no longer need to be of exactly the same type. Catalyst
+  would apply type promotion to branch return values if their types don't match.
+  [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
+
+  ```python
+  @qjit
+  def func(i: int, f: float):
+      @cond(i < 3)
+      def cond_fn():
+          return i
+      @cond_fn.otherwise
+      def otherwise():
+          return f
+      return cond_fn()
+  ```
+
+  ```pycon
+  >>> func(1, 4.0)
+  array(1.0)
+  ```
+
+* Improve the `CopyGlobalMemRefPass` of our MLIR processing pipeline by adding the support of
+  dynamically shaped arrays.
+  [(#348)](https://github.com/PennyLaneAI/catalyst/pull/348)
+
 * Improve the compiler driver diagnostic output. The driver now provides more context for error
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
+
+* Return values of conditional functions no longer need to be of exactly the same type. Catalyst
+  would apply type promotion to branch return values if their types don't match.
+  [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
+
+  ```python
+  @qjit
+  def func(i: int, f: float):
+      @cond(i < 3)
+      def cond_fn():
+          return i
+      @cond_fn.otherwise
+      def otherwise():
+          return f
+      return cond_fn()
+  ```
+
+  ```pycon
+  >>> func(1, 4.0)
+  array(1.0)
+  ```
 
 * The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
   [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
