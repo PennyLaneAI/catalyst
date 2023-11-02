@@ -114,7 +114,8 @@ PAULI_NAMED_MAP = {
 
 def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
     # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid abstact
-    # value. One need to investigate how to use it correctly and remove the condition [1].
+    # value. One need to investigate how to use it correctly and remove the condition [1]. Should we
+    # add AbstractQreg into the `_weak_types` list of JAX?
     assert len(types) > 0, "Expected one or more set of types"
     assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
 
