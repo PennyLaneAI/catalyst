@@ -114,7 +114,6 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        # TODO: remove PyYAML?
         python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
@@ -186,7 +185,6 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        # TODO: remove PyYAML?
         python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Get Cached LLVM Source
