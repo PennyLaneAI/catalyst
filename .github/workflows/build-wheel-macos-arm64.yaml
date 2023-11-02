@@ -1,4 +1,4 @@
-name: Build Catalyst Wheel on macOS (x86_64)
+name: Build Catalyst Wheel on macOS (arm64)
 
 # TODO: remove on pull_request before merging
 on:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 10.15
+  MACOSX_DEPLOYMENT_TARGET: 11.0
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,12 +25,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
+        os: [macos-latest-xlarge]
+        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-12
+    runs-on: macos-latest-xlarge
 
     steps:
     - name: Checkout Catalyst repo
@@ -114,8 +114,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        # TODO: remove PyYAML?
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -168,8 +167,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
+        os: [macos-latest-xlarge]
+        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
@@ -186,8 +185,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        # TODO: remove PyYAML?
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 cmake ninja
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -247,10 +245,11 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG="latest_release" \
               -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DLIGHTNING_GIT_TAG="latest_release" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
+              -DBUILD_QIR_STDLIB_FROM_SRC=ON \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi
@@ -288,7 +287,7 @@ jobs:
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist/
         retention-days: 14
 
@@ -297,8 +296,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12]
-        arch: [x86_64]
+        os: [macos-latest-xlarge]
+        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
@@ -312,7 +311,7 @@ jobs:
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
-        name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
 
     - name: Set up Python ${{ matrix.python_version }}
@@ -322,8 +321,9 @@ jobs:
 
     - name: Install Python dependencies
       run: |
+        # tensorflow-cpu is not distributed for macOS ARM
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist
-        python${{ matrix.python_version }} -m pip install tensorflow-cpu  # for autograph tests
+        python${{ matrix.python_version }} -m pip install tensorflow  # for autograph tests
 
     - name: Install Catalyst
       run: |
