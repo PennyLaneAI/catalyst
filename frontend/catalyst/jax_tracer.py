@@ -112,16 +112,25 @@ PAULI_NAMED_MAP = {
 }
 
 
-def _promote_jaxpr_types(types: List[List[ShapedArray]]) -> List[ShapedArray]:
+def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
     # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid abstact
     # value. One need to investigate how to use it correctly and remove the condition [1].
     assert len(types) > 0, "Expected one or more set of types"
     assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
-    with_qregs = all(isinstance(t[-1], AbstractQreg) for t in types)
-    if with_qregs:  # [1]
+
+    def _shapes(ts):
+        return [t.shape for t in ts if isinstance(t, ShapedArray)]
+
+    assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
+    all_ends_with_qreg = all(isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(not isinstance(t[-1], AbstractQreg) for t in types)
+    assert (
+        all_ends_with_qreg or all_not_ends_with_qreg
+    ), "We require either all-qregs or all-non-qregs as last items of the type lists"
+    if all_ends_with_qreg:
         types = [t[:-1] for t in types]
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg()] if with_qregs else [])
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
 
 
 def _apply_result_type_conversion(
@@ -158,7 +167,7 @@ def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
         Same number of jaxprs with equal result dtypes.
 
     Raises:
-        TypeError: Unification is not possible.
+        TypePromotionError: Unification is not possible.
 
     """
     promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs])
