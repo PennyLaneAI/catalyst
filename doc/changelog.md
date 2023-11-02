@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
+  prints names of failing passes.
+  [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
+
 * Return values of conditional functions no longer need to be of exactly the same type. Catalyst
   would apply type promotion to branch return values if their types don't match.
   [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
