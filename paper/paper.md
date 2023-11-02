@@ -222,8 +222,8 @@ For more code examples, please see the Catalyst documentation\footnote
 
 # Installation and contribution
 
-The Catalyst source code is available under the Apache 2.0 license on GitHub\footnote{\url
-{https://github.com/PennyLaneAI/catalyst}}, and binaries are available for `pip` installation on
+The Catalyst source code is available under the Apache 2.0 license on GitHub\footnote{
+{https://github.com/PennyLaneAI/catalyst}, and binaries are available for `pip` installation on
 Linux and macOS\footnote{https://pypi.org/project/pennylane-catalyst}. Contributions to
 Catalyst --- via feedback, issues, or pull requests on GitHub --- are welcomed. Additional Catalyst
 documentation and tutorials are available on our online documentation\footnote
