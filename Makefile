@@ -1,4 +1,6 @@
 PYTHON ?= python3
+C_COMPILER ?= clang
+CXX_COMPILER ?= clang++
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
 BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
@@ -13,6 +15,7 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+ENABLE_ASAN ?= OFF
 COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
 
 .PHONY: help
@@ -77,11 +80,33 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
+ifeq ($(ENABLE_ASAN), ON)
+ifneq ($(findstring clang,$(C_COMPILER)), clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+	ASAN_OPTIONS=detect_leaks=0 \
+	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
 	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+else
+	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+endif
+
 test-demos:
 	@echo "check the Catalyst demos"
+ifeq ($(ENABLE_ASAN), ON)
+ifneq ($(findstring clang,$(C_COMPILER)), clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+	ASAN_OPTIONS=detect_leaks=0 \
+	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
 	MDD_BENCHMARK_PRECISION=1 \
 	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+else
+	MDD_BENCHMARK_PRECISION=1 \
+	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+endif
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
