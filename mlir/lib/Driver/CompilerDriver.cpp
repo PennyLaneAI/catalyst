@@ -364,7 +364,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPassFailedCallback = [&](Pass *pass, Operation *op) {
         auto res = passPipelineNames.find(pass);
         assert(res != passPipelineNames.end() && "Unexpected pass");
-        options.diagnosticStream << "While processing pipeline: " << res->second << "\n";
+        options.diagnosticStream << "While processing '" << pass->getName() << "' pass "
+                                 << "of the '" << res->second << "' pipeline\n";
+        llvm::raw_string_ostream s{outputs[res->second]};
+        s << *op;
+        dumpToFile(options, output.nextPipelineDumpFilename(res->second+"_FAILED"),
+                   outputs[res->second]);
     };
 
     // Output pipeline names on failures
