@@ -21,7 +21,12 @@ by Catalyst."""
 import inspect
 
 import pennylane as qml
-from tensorflow.python.autograph.converters import call_trees, control_flow, functions
+from tensorflow.python.autograph.converters import (
+    call_trees,
+    control_flow,
+    functions,
+    logical_expressions,
+)
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
 from tensorflow.python.autograph.pyct import transpiler
 
@@ -71,6 +76,9 @@ class CFTransformer(transpiler.PyToPy):
 
         # Convert Python control flow to custom 'ag__.if_stmt' ... functions.
         node = control_flow.transform(node, ctx)
+
+        # Convert logical expressions
+        node = logical_expressions.transform(node, ctx)
 
         return node
 

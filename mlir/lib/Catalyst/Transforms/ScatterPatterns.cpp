@@ -313,7 +313,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     // Given the shape of update, it generates all the possible indices configuration as a single
     // vector
     void generateIndicesRecursive(const std::vector<int64_t> &shape,
-                                  std::vector<int64_t> &currentIndex, int64_t dimension,
+                                  std::vector<int64_t> &currentIndex, size_t dimension,
                                   SmallVector<Value> &configurations,
                                   mlir::PatternRewriter &rewriter, Location loc) const
     {

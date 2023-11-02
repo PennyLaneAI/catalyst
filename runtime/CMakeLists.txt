@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
-option(ENABLE_SANITIZER "Enable address sanitizer" OFF)
+option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
@@ -98,17 +98,12 @@ if(ENABLE_CODE_COVERAGE)
     target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
 endif()
 
-if(ENABLE_SANITIZER)
-    message(STATUS "ENABLE_SANITIZER is ON.")
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-fsanitize=address)
-        add_link_options(-fsanitize=address -static-libasan)
-    elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-        target_link_libraries(catalyst_qir_runtime INTERFACE -fno-omit-frame-pointer -fsanitize=address)
-    endif()
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-ENDIF()
+
+if(ENABLE_ADDRESS_SANITIZER)
+    message(STATUS "ENABLE_ADDRESS_SANITIZER is ON.")
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+endif()
 
 add_subdirectory(extensions)
 add_subdirectory(lib)

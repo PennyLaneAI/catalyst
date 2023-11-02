@@ -4,6 +4,31 @@
 
 <h3>Improvements</h3>
 
+* Return values of conditional functions no longer need to be of exactly the same type. Catalyst
+  would apply type promotion to branch return values if their types don't match.
+  [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
+
+  ```python
+  @qjit
+  def func(i: int, f: float):
+      @cond(i < 3)
+      def cond_fn():
+          return i
+      @cond_fn.otherwise
+      def otherwise():
+          return f
+      return cond_fn()
+  ```
+
+  ```pycon
+  >>> func(1, 4.0)
+  array(1.0)
+  ```
+
+* Improve the `CopyGlobalMemRefPass` of our MLIR processing pipeline by adding the support of
+  dynamically shaped arrays.
+  [(#348)](https://github.com/PennyLaneAI/catalyst/pull/348)
+
 * Improve the compiler driver diagnostic output. The driver now provides more context for error
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
@@ -28,6 +53,41 @@
   >>> func(1, 4.0)
   array(1.0)
   ```
+
+* The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
+  [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def circuit(n:int):
+      i = 0
+      while i < n:
+          qml.RX(jnp.pi/2, wires=i)
+          i += 1
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+* The AutoGraph feature now also supports native Python `and`, `or` and `not` operators in Boolean
+  expressions.
+  [(#325)](https://github.com/PennyLaneAI/catalyst/pull/325)
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def circuit(param:float):
+      if param >= 0 and param < jnp.pi:
+          qml.RX(param, wires=0)
+      return qml.probs()
+  ```
+
+<h3>Breaking changes</h3>
+
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+  `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
+<h3>Bug fixes</h3>
 
 * The `requirements.txt` file to build Catalyst from source has been updated with a minimum PIP
   version, `>=22.3`. Previous versions of pip are unable to perform editable installs when the
@@ -57,6 +117,9 @@
 
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
     the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+
+* Include the "Catalyst" utility dialect in our MLIR C-API.
+  [(#345)](https://github.com/PennyLaneAI/catalyst/pull/345)
 
 <h3>Breaking changes</h3>
 
