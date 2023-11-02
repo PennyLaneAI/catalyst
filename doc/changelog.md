@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
+  prints names of failing passes.
+  [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
+
 * Improve the compiler driver diagnostic output. The driver now provides more context for error
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
