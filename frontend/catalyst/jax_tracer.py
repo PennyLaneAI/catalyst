@@ -161,8 +161,8 @@ def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
     """Unify result types of the jaxpr equations given.
     Args:
         jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
-                                      matching pytree-shapes and numpy array shapes but dtypes might
-                                      be different.
+                                      matching sizes and numpy array shapes but dtypes might be
+                                      different.
 
     Returns (list of ClosedJaxpr):
         Same number of jaxprs with equal result dtypes.
