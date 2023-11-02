@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Improve the `CopyGlobalMemRefPass` of our MLIR processing pipeline by adding the support of
+  dynamically shaped arrays.
+  [(#348)](https://github.com/PennyLaneAI/catalyst/pull/348)
+
 * Improve the compiler driver diagnostic output. The driver now provides more context for error
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
