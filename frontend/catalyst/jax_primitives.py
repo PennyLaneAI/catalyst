@@ -212,10 +212,13 @@ print_p.multiple_results = True
 # print
 #
 def debug_print(x):
+    """A runtime print function for Catalyst."""
+
     if isinstance(x, jax.core.Tracer):
         prim = print_p.bind(x)
     else:
         prim = print_p.bind(string=str(x))
+
     return prim
 
 
