@@ -625,24 +625,23 @@ class TestConditionals:
         ):
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_mismatch(self, backend):
-        """Test that an exception is raised when the return types of all branches do not match."""
+    def test_branch_no_multi_return_mismatch(self, backend):
+        """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
 
+        @qjit(autograph=True)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             if True:
                 res = measure(wires=0)
             elif False:
-                res = 0
+                res = 0.0
             else:
                 res = measure(wires=0)
 
             return res
 
-        with pytest.raises(
-            TypeError, match="Conditional requires consistent return types across all branches"
-        ):
-            qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+        assert 0.0 == circuit()
 
 
 @pytest.mark.tf

@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state
+from jax._src.core import _update_thread_local_jit_state, eval_jaxpr
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -49,6 +49,7 @@ from jax.interpreters.partial_eval import (
     convert_constvars_jaxpr,
     make_jaxpr_effects,
 )
+from jax.lax import convert_element_type
 from jax.linear_util import wrap_init
 from jax.tree_util import (
     PyTreeDef,
@@ -68,8 +69,11 @@ __all__ = (
     "ShapedArray",
     "ShapeDtypeStruct",
     "convert_constvars_jaxpr",
+    "convert_element_type",
+    "eval_jaxpr",
     "initial_style_jaxprs_with_common_consts1",
     "initial_style_jaxprs_with_common_consts2",
+    "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "jaxpr_to_mlir",

@@ -26,6 +26,13 @@ set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
+if(LLVM_USE_SANITIZER)
+  if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+  endif()
+endif()
+
 # Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
 set(ALL_MHLO_PASSES
