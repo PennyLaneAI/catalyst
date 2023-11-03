@@ -20,5 +20,6 @@
 namespace catalyst {
 
 void populateScatterPatterns(mlir::RewritePatternSet &);
+void populateTensorInitPatterns(mlir::RewritePatternSet &);
 
 } // namespace catalyst

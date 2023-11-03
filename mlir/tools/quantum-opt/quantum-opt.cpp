@@ -46,6 +46,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
+    registry.insert<mlir::tensor::TensorDialect>();
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

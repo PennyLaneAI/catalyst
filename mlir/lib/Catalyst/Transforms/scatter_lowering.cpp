@@ -26,6 +26,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Transforms/DialectConversion.h"
+
 #include "Catalyst/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -44,8 +48,16 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
         LLVM_DEBUG(dbgs() << "scatter lowering pass"
                           << "\n");
 
+
+        /* FIXME */
+        MLIRContext *context = &getContext();
+        ConversionTarget target(*context);
+        target.addLegalDialect<arith::ArithDialect, tensor::TensorDialect>();
+        ////////////////
+
         RewritePatternSet patterns(&getContext());
         populateScatterPatterns(patterns);
+        populateTensorInitPatterns(patterns); // FIXME: move to a separate pass?
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }

@@ -3,6 +3,7 @@ add_mlir_library(MLIRCatalystTransforms
     scatter_lowering.cpp
     ScatterPatterns.cpp
     RegisterAllPasses.cpp
+    TensorInitPatterns.cpp
 
     DEPENDS
     MLIRCatalystPassIncGen
