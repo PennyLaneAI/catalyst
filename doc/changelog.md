@@ -4,9 +4,86 @@
 
 <h3>Improvements</h3>
 
+* Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
+  prints names of failing passes.
+  [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
+
+* Return values of conditional functions no longer need to be of exactly the same type. Catalyst
+  would apply type promotion to branch return values if their types don't match.
+  [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
+
+  ```python
+  @qjit
+  def func(i: int, f: float):
+      @cond(i < 3)
+      def cond_fn():
+          return i
+      @cond_fn.otherwise
+      def otherwise():
+          return f
+      return cond_fn()
+  ```
+
+  ```pycon
+  >>> func(1, 4.0)
+  array(1.0)
+  ```
+
+* Improve the `CopyGlobalMemRefPass` of our MLIR processing pipeline by adding the support of
+  dynamically shaped arrays.
+  [(#348)](https://github.com/PennyLaneAI/catalyst/pull/348)
+
 * Improve the compiler driver diagnostic output. The driver now provides more context for error
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
+
+* Return values of conditional functions no longer need to be of exactly the same type. Catalyst
+  would apply type promotion to branch return values if their types don't match.
+  [(#333)](https://github.com/PennyLaneAI/catalyst/pull/333)
+
+  ```python
+  @qjit
+  def func(i: int, f: float):
+      @cond(i < 3)
+      def cond_fn():
+          return i
+      @cond_fn.otherwise
+      def otherwise():
+          return f
+      return cond_fn()
+  ```
+
+  ```pycon
+  >>> func(1, 4.0)
+  array(1.0)
+  ```
+
+* The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
+  [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def circuit(n:int):
+      i = 0
+      while i < n:
+          qml.RX(jnp.pi/2, wires=i)
+          i += 1
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+* The AutoGraph feature now also supports native Python `and`, `or` and `not` operators in Boolean
+  expressions.
+  [(#325)](https://github.com/PennyLaneAI/catalyst/pull/325)
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def circuit(param:float):
+      if param >= 0 and param < jnp.pi:
+          qml.RX(param, wires=0)
+      return qml.probs()
+  ```
 
 <h3>Breaking changes</h3>
 
@@ -16,33 +93,76 @@
 
 <h3>Bug fixes</h3>
 
+* The `requirements.txt` file to build Catalyst from source has been updated with a minimum PIP
+  version, `>=22.3`. Previous versions of pip are unable to perform editable installs when the
+  system-wide site-packages are read-only, even when the `--user` flag is provided.
+  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+
 * Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
   [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
 
-* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the master
-  branch of PennyLane-Lightning. This issue introduced in [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
-  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
-
-* Add a newer pip requirement to the `requirements.txt`. Recent version of pip contains a bug fix
-  allowing us to do editable installations even if system-wide site-packages is read-only.
-  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+* Add support for third party devices.
+  Third party `QuantumDevice` implementations can now be loaded into the runtime.
+  [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
 
 * Add `pennylane.compilers` entry points interface.
   [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
 
-  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points` metadata under the the group name `pennylane.compilers`, with the following entry points:
+  For any compiler packages seeking to be registered in PennyLane, this PR adds the `entry_points`
+  metadata under the the group name `pennylane.compilers`, with the following entry points:
 
-  - `context`: Path to the compilation evaluation context manager. This context manager should have the method context.is_tracing(), which returns True if called within a program that is being traced or captured.
+  - `context`: Path to the compilation evaluation context manager. This context manager should have
+    the method context.is_tracing(), which returns True if called within a program that is being
+    traced or captured.
 
-  - `ops`: Path to the compiler operations module. This operations module may contain compiler specific versions of PennyLane operations. Within a JIT context, PennyLane operations may dispatch to these
+  - `ops`: Path to the compiler operations module. This operations module may contain compiler
+    specific versions of PennyLane operations. Within a JIT context, PennyLane operations may
+    dispatch to these.
 
-  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+  - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
+    the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
+
+* Include the "Catalyst" utility dialect in our MLIR C-API.
+  [(#345)](https://github.com/PennyLaneAI/catalyst/pull/345)
+
+<h3>Breaking changes</h3>
+
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have
+  parameters of shape `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape
+  `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
+<h3>Bug fixes</h3>
+
+* Enable AutoGraph to convert functions even when they are invoked through functional wrappers such
+  as `adjoint`, `ctrl`, `grad`, `jacobian`, etc.
+  [(#336)](https://github.com/PennyLaneAI/catalyst/pull/336)
+
+  The following should now succeed:
+
+  ```python
+  def inner(n):
+    for i in range(n):
+      qml.T(i)
+
+  @qjit(autograph=True)
+  @qml.qnode(dev)
+  def f(n: int):
+      adjoint(inner)(n)
+      return qml.state()
+  ```
+
+* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the
+  master branch of PennyLane-Lightning. This issue was introduced in
+  [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
+  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Sergei Mironov,
 Romain Moyard.
 

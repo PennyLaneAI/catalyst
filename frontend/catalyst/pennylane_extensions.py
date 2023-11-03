@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
+import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -26,9 +27,9 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
-from jax._src.core import get_aval
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
@@ -61,6 +62,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
+    unify_result_types,
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -127,10 +129,24 @@ class QFunc:
                 name = self.device.short_name
             else:
                 name = self.device.name
-            if name not in QFunc.RUNTIME_DEVICES:
+
+            is_known_device = name in QFunc.RUNTIME_DEVICES
+            implements_c_interface = hasattr(self.device, "get_c_interface")
+            is_valid_device = is_known_device or implements_c_interface
+            if not is_valid_device:
                 raise CompileError(
-                    f"The {name} device is not " "supported for compilation at the moment."
+                    f"The {name} device is not supported for compilation at the moment."
                 )
+
+            # TODO:
+            # Once all devices get converted to shared libraries this name should just be the path.
+            backend_path_or_name = name
+            if implements_c_interface:
+                impl = self.device.get_c_interface()
+                if not pathlib.Path(impl).is_file():
+                    raise CompileError(f"Device at {impl} cannot be found!")
+
+                backend_path_or_name = self.device.get_c_interface()
 
             backend_kwargs = {}
             if hasattr(self.device, "shots"):
@@ -143,7 +159,7 @@ class QFunc:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
 
             device = QJITDevice(
-                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
+                self.device.shots, self.device.wires, backend_path_or_name, backend_kwargs
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
@@ -155,7 +171,7 @@ class QFunc:
         retval_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):
-            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+            return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
         args_data, _ = tree_flatten(args)
 
@@ -843,14 +859,11 @@ def _check_single_bool_value(tree: PyTreeDef, avals: List[Any]) -> None:
         raise TypeError(f"A single boolean scalar was expected, got the value {avals[0]}.")
 
 
-def _check_cond_same_types(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
+def _check_cond_same_shapes(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
     assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
-    expected_tree, expected_dtypes = trees[0], [_aval_to_primitive_type(a) for a in avals[0]]
-    for tree, aval in list(zip(trees, avals))[1:]:
+    expected_tree = trees[0]
+    for tree in list(trees)[1:]:
         if tree != expected_tree:
-            raise TypeError("Conditional requires consistent return types across all branches")
-        dtypes = [_aval_to_primitive_type(a) for a in aval]
-        if dtypes != expected_dtypes:
             raise TypeError("Conditional requires consistent return types across all branches")
 
 
@@ -933,7 +946,7 @@ class Cond(HybridOp):
                 ctx,
                 trace,
                 *(op.in_classical_tracers + combined_consts + [qreg]),
-                branch_jaxprs=jaxprs2,
+                branch_jaxprs=unify_result_types(jaxprs2),
             )
         )
         return qrp2
@@ -1156,7 +1169,7 @@ class CondCallable:
             out_trees.append(out_tree())
             out_avals.append(res_classical_tracers)
 
-        _check_cond_same_types(out_trees, out_avals)
+        _check_cond_same_shapes(out_trees, out_avals)
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
         Cond(in_classical_tracers, out_classical_tracers, regions)
@@ -1168,7 +1181,8 @@ class CondCallable:
         branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
-        _check_cond_same_types(out_trees, [j.out_avals for j in branch_jaxprs])
+        _check_cond_same_shapes(out_trees, [j.out_avals for j in branch_jaxprs])
+        branch_jaxprs = unify_result_types(branch_jaxprs)
         out_classical_tracers = cond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
 

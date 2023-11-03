@@ -43,6 +43,7 @@ from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
+from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
 __all__ = [
@@ -55,7 +56,11 @@ __all__ = [
     "with_function_scope",
     "if_stmt",
     "for_stmt",
+    "while_stmt",
     "converted_call",
+    "and_",
+    "or_",
+    "not_",
 ]
 
 
@@ -102,11 +107,7 @@ def if_stmt(
         results = get_state()
         return assert_results(results, symbol_names)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
     results = functional_cond()
-    if not isinstance(results, tuple):
-        results = (results,)
     set_state(results)
 
 
@@ -315,11 +316,92 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-    if not isinstance(results, tuple):
-        results = (results,)
     set_state(results)
+
+
+def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
+    """Dispatch to a Catalyst implementation of while loops."""
+
+    def _test(state):
+        old = get_state()
+        set_state(state)
+        res = loop_test()
+        set_state(old)
+        return res
+
+    @catalyst.while_loop(_test)
+    def _functional_while(iter_args):
+        set_state(iter_args)
+        loop_body()
+        return get_state()
+
+    iter_inits = get_state()
+    iter_results = _functional_while(iter_inits)
+    return iter_results
+
+
+def _call_python_while(loop_test, loop_body, get_state, _set_state, _nonlocals, _symbol_names):
+    """Fallback to a Python implementation of while loops."""
+
+    while loop_test():
+        loop_body()
+
+    return get_state()
+
+
+def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
+    """An implementation of the AutoGraph 'while ..' statement. The interface is defined by
+    AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
+
+    fallback = False
+    init_state = get_state()
+
+    try:
+        results = _call_catalyst_while(
+            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
+        )
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if catalyst.autograph_strict_conversion:
+            raise e
+        fallback = True
+
+    if fallback:
+        set_state(init_state)
+        results = _call_python_while(
+            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
+        )
+
+    set_state(results)
+
+
+def _logical_op(*args, jax_fn, python_fn):
+    values = [f() for f in args]
+
+    def _is_array_tracer(x: Any) -> bool:
+        return isinstance(x, DynamicJaxprTracer) and isinstance(x.aval, ShapedArray)
+
+    if all(_is_array_tracer(val) for val in values):
+        result = jax_fn(*values)
+    else:
+        result = python_fn(*values)
+
+    return result
+
+
+def and_(a, b):
+    """An implementation of the AutoGraph '.. and ..' statement."""
+    return _logical_op(a, b, jax_fn=jnp.logical_and, python_fn=lambda a, b: a and b)
+
+
+def or_(a, b):
+    """An implementation of the AutoGraph '.. or ..' statement."""
+    return _logical_op(a, b, jax_fn=jnp.logical_or, python_fn=lambda a, b: a or b)
+
+
+def not_(arg):
+    """An implementation of the AutoGraph '.. not ..' statement."""
+    return _logical_op(lambda: arg, jax_fn=jnp.logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):
@@ -389,6 +471,27 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
         (config, "CONVERSION_RULES", module_allowlist),
     ):
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in (
+            catalyst.adjoint,
+            catalyst.ctrl,
+            catalyst.grad,
+            catalyst.jacobian,
+            catalyst.vjp,
+            catalyst.jvp,
+        ):
+            assert args and callable(args[0])
+            wrapped_fn = args[0]
+
+            def passthrough_wrapper(*args, **kwargs):
+                return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
+
+            return fn(
+                passthrough_wrapper,
+                *args[1:],
+                **(kwargs if kwargs is not None else {}),
+            )
+
         # Dispatch range calls to a custom range class that enables constructs like
         # `for .. in range(..)` to be converted natively to `for_loop` calls. This is beneficial
         # since the Python range function does not allow tracers as arguments.
