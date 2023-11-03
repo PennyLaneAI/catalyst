@@ -249,9 +249,15 @@ jobs:
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
+              -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi
+
+    - name: Test Catalyst-Runtime
+      run: |
+        cmake --build runtime-build --target runner_tests
+        ./runtime-build/tests/runner_tests
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -329,9 +335,11 @@ jobs:
 
     - name: Install PennyLane Plugins
       run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto

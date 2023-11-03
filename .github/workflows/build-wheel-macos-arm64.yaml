@@ -247,10 +247,14 @@ jobs:
               -DLIGHTNING_GIT_TAG="latest_release" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
-              -DBUILD_QIR_STDLIB_FROM_SRC=ON \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi
+
+    - name: Test Catalyst-Runtime
+      run: |
+        cmake --build runtime-build --target runner_tests
+        ./runtime-build/tests/runner_tests
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects

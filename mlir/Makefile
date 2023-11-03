@@ -1,4 +1,3 @@
-
 PYTHON?=python3
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
@@ -7,7 +6,7 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
-MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/mhlo-build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
