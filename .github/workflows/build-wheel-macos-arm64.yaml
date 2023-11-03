@@ -107,10 +107,9 @@ jobs:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
+    - name: Set up Python via brew
+      run: |
+        brew install python@${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
       run: |
@@ -178,10 +177,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
+    - name: Setup Python3.9 via brew
+      if: ${{ matrix.python_version }} == '3.9'
+      run: |
+        brew install python@3.9
 
     - name: Install Dependencies (Python)
       run: |
@@ -314,10 +313,9 @@ jobs:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
 
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
+    - name: Set up Python via brew
+      run: |
+        brew install python@${{ matrix.python_version }}
 
     - name: Install Python dependencies
       run: |
