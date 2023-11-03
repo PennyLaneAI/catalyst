@@ -2,6 +2,28 @@
 
 <h3>New features</h3>
 
+* Debug your compiled programs with Catalyst's new ``debug_print`` statement.
+  [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
+
+  You can now print arbitrary values from your running program, whether they are arrays, constants,
+  strings, or abitrary Python objects. Note that while Python objects that are not arrays *will* be
+  printed at runtime, their output will always be the same regardless of program inputs.
+  The output for arrays also includes a descriptor for how the data is stored in memory ("memref").
+
+  ```python
+  @qjit
+  def func(x: float):
+      debug_print(x)
+      debug_print("exit")
+  ```
+
+  ```pycon
+  >>> func(jnp.array(0.43))
+  Unranked Memref base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
+  [0.43]
+  exit
+  ```
+
 <h3>Improvements</h3>
 
 * Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
@@ -87,7 +109,7 @@
 
 <h3>Breaking changes</h3>
 
-* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape
   `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
   [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
 

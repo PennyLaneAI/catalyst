@@ -1735,15 +1735,36 @@ def measure(wires) -> DynamicJaxprTracer:
     return out_classical_tracer
 
 
-# name to be defined, but "print" would alias built-in
+# Note that "print" would alias the built-in print function.
 def debug_print(x):
-    """ "A :func:`qjit` compatible print function for debugging.
+    """A :func:`qjit` compatible print function for debugging.
 
     Enables printing of numeric values at runtime. Can also print objects or strings as constants.
 
     Args:
-        x: A single jax array whose numeric values are printed at runtime, or any objects whose
+        x: A single jax array whose numeric values are printed at runtime, or any object whose
            string representation will be treated as a constant and printed at runtime.
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        def func(x: float):
+            debug_print(x)
+            debug_print("exit")
+
+    >>> func(jnp.array(0.43))
+    Unranked Memref base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
+    [0.43]
+    exit
+
+    Note that the output for arrays also includes information about how the array is stored in
+    memory, via the so-called "memref" descriptor. This includes the base memory address of the data
+    buffer, as well as the rank of the array, the size of each dimension, and the strides between
+    elements.
+
+    Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
     """
     if EvaluationContext.is_tracing():
         if isinstance(x, jax.core.Tracer):
