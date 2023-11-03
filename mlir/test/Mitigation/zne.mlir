@@ -30,9 +30,10 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     %q_2 = quantum.custom "rz"(%f0) %q_1 : !quantum.bit
     %q_3 = quantum.custom "u3"(%f0, %f1, %f2) %q_2 : !quantum.bit
 
+    %12 = quantum.insert %r[ 0], %q_3 : !quantum.reg, !quantum.bit
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
-
+    quantum.dealloc %r : !quantum.reg
     func.return %expval : f64
 }
  

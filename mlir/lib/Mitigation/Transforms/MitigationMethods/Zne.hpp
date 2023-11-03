@@ -15,7 +15,9 @@
 #pragma once
 
 #include "Mitigation/IR/MitigationOps.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/IRMapping.h"
 
 using namespace mlir;
 
@@ -30,8 +32,8 @@ struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
 
   private:
     static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, PatternRewriter &builder, mitigation::ZneOp op, Type scalarType);
-    static void exploreTreeAndStoreLeafValues(Operation* op, std::vector<ValueRange>& leafValues);
-    static void removeQuantumMeasurements(Block &block);
+    static std::vector<Operation *> removeAndStoreQuantumMeasurements(Block &block);
+    static IRMapping createQubitMap(Block &block);
 };
 
 } // namespace mitigation
