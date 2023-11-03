@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 
 namespace catalyst {
@@ -38,8 +39,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
 
-    auto scalarFactor = op.getScalarFactors();
-    RankedTensorType scalarFactorType = scalarFactor.getType().cast<RankedTensorType>();
+    auto scalarFactors = op.getScalarFactors();
+    RankedTensorType scalarFactorType = scalarFactors.getType().cast<RankedTensorType>();
     auto sizeInt = scalarFactorType.getDimSize(0);
 
     // Create the folded circuit function
@@ -66,8 +67,11 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     //                                                  builder.create<scf::YieldOp>(loc, iterArgs);
     //                                              })
     //                          .getResult(0);
-
-    auto resultsValues = rewriter.create<func::CallOp>(loc, foldedCircuit, op.getArgs());
+    std::vector<Value> newArgs{op.getArgs().begin(), op.getArgs().end()};
+    Value indexValue = rewriter.create<index::ConstantOp>(loc, 0);
+    auto scalarFactor = rewriter.create<tensor::ExtractOp>(loc, scalarFactors, indexValue);
+    newArgs.push_back(scalarFactor);
+    auto resultsValues = rewriter.create<func::CallOp>(loc, foldedCircuit, newArgs);
     // Call the folded circuit
     rewriter.replaceOp(op, resultsValues);
 }
@@ -87,9 +91,9 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     Type qregType = quantum::QuregType::get(rewriter.getContext());
     // Alloc function
     std::string fnNameAlloc = op.getCallee().str() + ".alloc";
-    Type indexType = rewriter.getI64Type();
+    Type i64Type = rewriter.getI64Type();
     FunctionType fnAllocType = FunctionType::get(ctx, /*inputs=*/
-                                                 indexType,
+                                                 i64Type,
                                                  /*outputs=*/qregType);
 
     func::FuncOp fnAlloc = rewriter.create<func::FuncOp>(loc, fnNameAlloc, fnAllocType);
@@ -161,8 +165,11 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Function folded
     rewriter.setInsertionPointToStart(moduleOp.getBody());
     std::string fnNameFolded = op.getCallee().str() + ".folded";
+    SmallVector<Type> typesFolded = {originalTypes.begin(), originalTypes.end()};
+    Type indexType = rewriter.getIndexType();
+    typesFolded.push_back(indexType);
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
-                                                  originalTypes,
+                                                  typesFolded,
                                                   /*outputs=*/fnOp.getResultTypes());
 
     func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnNameFolded, fnFoldedType);
@@ -174,22 +181,42 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     Value nQubitsValue = rewriter.create<arith::ConstantOp>(loc, nQubitsAttr);
     Value allocQreg = rewriter.create<func::CallOp>(loc, fnAlloc, nQubitsValue).getResult(0);
 
+    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
+    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
     // Add scf for loop
-    std::vector<Value> argsAndReg = {fnFoldedOp.getArguments().begin(), fnFoldedOp.getArguments().end()};
-    argsAndReg.push_back(allocQreg);
-    Value funcQreg =
-        rewriter.create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndReg).getResult(0);
+    Value loopedQreg =
+        rewriter
+            .create<scf::ForOp>(
+                loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
+                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                    Value qreg = iterArgs.front();
+                    std::vector<Value> argsAndReg = {fnFoldedOp.getArguments().begin(),
+                                                     fnFoldedOp.getArguments().end()};
+                    argsAndReg.pop_back();
+                    argsAndReg.push_back(qreg);
+                    Value funcQreg =
+                        builder.create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndReg)
+                            .getResult(0);
 
-    std::vector<Value> argsAndRegAdjoint = {fnFoldedOp.getArguments().begin(), fnFoldedOp.getArguments().end()};
-    argsAndRegAdjoint.push_back(funcQreg);
-    Value funcQregAdjoint =
-        rewriter.create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndRegAdjoint).getResult(0);
-
+                    std::vector<Value> argsAndRegAdjoint = {fnFoldedOp.getArguments().begin(),
+                                                            fnFoldedOp.getArguments().end()};
+                    argsAndRegAdjoint.pop_back();
+                    argsAndRegAdjoint.push_back(funcQreg);
+                    Value funcQregAdjoint =
+                        builder
+                            .create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndRegAdjoint)
+                            .getResult(0);
+                    builder.create<scf::YieldOp>(loc, funcQregAdjoint);
+                })
+            .getResult(0);
     std::vector<Value> argsAndRegMeasurement = {fnFoldedOp.getArguments().begin(),
                                                 fnFoldedOp.getArguments().end()};
-    argsAndRegMeasurement.push_back(funcQregAdjoint);
-    Value funcFolded =
-        rewriter.create<func::CallOp>(loc, fnWithQregArg, argsAndRegMeasurement).getResult(0);
+    argsAndRegMeasurement.pop_back();
+    argsAndRegMeasurement.push_back(loopedQreg);
+    ValueRange funcFolded =
+        rewriter.create<func::CallOp>(loc, fnWithQregArg, argsAndRegMeasurement).getResults();
     rewriter.create<func::ReturnOp>(loc, funcFolded);
     return SymbolRefAttr::get(ctx, fnNameFolded);
 }
