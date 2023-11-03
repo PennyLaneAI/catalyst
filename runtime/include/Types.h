@@ -62,7 +62,9 @@ struct CplxT_double {
 };
 
 enum NumericType : int8_t {
-    i1 = 0,
+    idx = 0,
+    i1,
+    i8,
     i16,
     i32,
     i64,

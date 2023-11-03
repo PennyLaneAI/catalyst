@@ -1,3 +1,5 @@
+import re
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -11,20 +13,20 @@ class TestDebugPrint:
     @pytest.mark.parametrize(
         ("arg", "expected"),
         [
-            (True, "1\n"),  # TODO: is this ok?
-            (3, "3\n"),
-            (3.5, "3.5\n"),
-            (3 + 4j, "3+4j\n"),
-            (np.array(3), "3\n"),
-            (jnp.array(3), "3\n"),
-            (jnp.array(3.000001), "3\n"),  # TODO: fixme, show more precision
-            (jnp.array(3.1 + 4j), "3.1+4j\n"),
-            (jnp.array([3]), "[ 3 ]\n"),
-            (jnp.array([3, 4, 5]), "[ 3 4 5 ]\n"),
+            (True, "[1]"),  # TODO: True/False would be nice
+            (3, "[3]"),  # TODO: scalars without brackets would be nice
+            (3.5, "[3.5]"),
+            (3 + 4j, "[(3,4)]"),
+            (np.array(3), "[3]"),
+            (jnp.array(3), "[3]"),
+            (jnp.array(3.000001), "[3]"),  # TODO: show more precision
+            (jnp.array(3.1 + 4j), "[(3.1,4)]"),
+            (jnp.array([3]), "[3]"),
+            (jnp.array([3, 4, 5]), "[3,  4,  5]"),
             (
                 jnp.array([[3, 4], [5, 6], [7, 8]]),
-                "[ [ 3 4 ], [ 5 6 ], [ 7 8 ] ]\n",
-            ),  # TODO: fixme, print n-d arrays over multiple lines, with proper indents
+                "[[3,   4], \n [5,   6], \n [7,   8]]",
+            ),
         ],
     )
     def test_function_arguments(self, capfd, arg, expected):
@@ -42,14 +44,14 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert out == expected
+        assert expected in out
 
     @pytest.mark.parametrize(
         ("arg", "expected"),
         [
-            (0, ""),
-            (1, "0\n"),
-            (6, "0\n1\n2\n3\n4\n5\n"),
+            (0, ()),
+            (1, ("[0]",)),
+            (6, ("[0]", "[1]", "[2]", "[3]", "[4]", "[5]")),
         ],
     )
     def test_intermediate_values(self, capfd, arg, expected):
@@ -69,9 +71,18 @@ class TestDebugPrint:
 
         test(arg)
 
+        memref_descriptor = (
+            r"Unranked Memref base\@ = [0-9a-fx]+ rank = 0 "
+            r"offset = 0 sizes = \[\] strides = \[\] data = "
+            "\n"
+        )
+
+        expected_full = "".join(memref_descriptor + re.escape(exp) + "\n" for exp in expected)
+        regex = re.compile("^" + expected_full + "$")  # match exactly: ^ - start, $ - end
+
         out, err = capfd.readouterr()
         assert err == ""
-        assert out == expected
+        assert regex.match(out)
 
     class MyObject:
         def __init__(self, string):

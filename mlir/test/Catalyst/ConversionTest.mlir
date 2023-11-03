@@ -34,7 +34,7 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
     // CHECK: [[memref_ptr_cast:%.+]] = llvm.bitcast [[memref_ptr]] : {{.*}} to !llvm.ptr
     // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr_cast]], [[struct0]][1]
 
-    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(3 : i8)
+    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(5 : i8)
     // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
 
     // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>

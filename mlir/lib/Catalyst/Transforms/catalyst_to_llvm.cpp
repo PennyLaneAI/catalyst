@@ -70,22 +70,41 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
         rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
 }
 
+enum NumericType : int8_t {
+    index = 0,
+    i1,
+    i8,
+    i16,
+    i32,
+    i64,
+    f32,
+    f64,
+    c64,
+    c128,
+};
+
 std::optional<int8_t> encodeNumericType(Type elemType)
 {
     int8_t typeEncoding;
-    if (auto intType = dyn_cast<IntegerType>(elemType)) {
+    if (isa<IndexType>(elemType)) {
+        typeEncoding = NumericType::index;
+    }
+    else if (auto intType = dyn_cast<IntegerType>(elemType)) {
         switch (intType.getWidth()) {
         case 1:
-            typeEncoding = 0;
+            typeEncoding = NumericType::i1;
+            break;
+        case 8:
+            typeEncoding = NumericType::i8;
             break;
         case 16:
-            typeEncoding = 1;
+            typeEncoding = NumericType::i16;
             break;
         case 32:
-            typeEncoding = 2;
+            typeEncoding = NumericType::i32;
             break;
         case 64:
-            typeEncoding = 3;
+            typeEncoding = NumericType::i64;
             break;
         default:
             return std::nullopt;
@@ -94,10 +113,10 @@ std::optional<int8_t> encodeNumericType(Type elemType)
     else if (auto floatType = dyn_cast<FloatType>(elemType)) {
         switch (floatType.getWidth()) {
         case 32:
-            typeEncoding = 4;
+            typeEncoding = NumericType::f32;
             break;
         case 64:
-            typeEncoding = 5;
+            typeEncoding = NumericType::f64;
             break;
         default:
             return std::nullopt;
@@ -110,10 +129,10 @@ std::optional<int8_t> encodeNumericType(Type elemType)
 
         switch (floatType.getWidth()) {
         case 32:
-            typeEncoding = 6;
+            typeEncoding = NumericType::c64;
             break;
         case 64:
-            typeEncoding = 7;
+            typeEncoding = NumericType::c128;
             break;
         default:
             return std::nullopt;
