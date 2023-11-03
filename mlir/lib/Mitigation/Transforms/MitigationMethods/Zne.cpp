@@ -49,31 +49,35 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
         getOrInsertFoldedCircuit(loc, rewriter, op, scalarFactorType.getElementType());
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
-
+    RankedTensorType resultType = op.getResultTypes().front().cast<RankedTensorType>();
     // Loop over the scalars
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
     Value size = rewriter.create<index::ConstantOp>(loc, sizeInt);
-    Value results;
+    Value results = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
+                                                     resultType.getElementType());
+    Value resultValues =
+        rewriter
+            .create<scf::ForOp>(
+                loc, c0, size, c1, /*iterArgsInit=*/results,
+                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                    std::vector<Value> newArgs{op.getArgs().begin(), op.getArgs().end()};
+                    std::vector<Value> index;
+                    index.push_back(i);
+                    Value scalarFactor =
+                        builder.create<tensor::ExtractOp>(loc, scalarFactors, index);
+                    newArgs.push_back(scalarFactor);
+                    Value resultValue =
+                        builder.create<func::CallOp>(loc, foldedCircuit, newArgs).getResult(0);
 
-    // Value resultValues = rewriter
-    //                          .create<scf::ForOp>(loc, c0, size, c1, /*iterArgsInit=*/results,
-    //                                              [&](OpBuilder &builder, Location loc, Value i,
-    //                                                  ValueRange iterArgs) {
-    //                                                  // Extract scalar factor
-    //                                                  // Call the folded circuit function for each
-    //                                                  // scalar factor and insert in the tensor
-    //                                                  // results
-    //                                                  builder.create<scf::YieldOp>(loc, iterArgs);
-    //                                              })
-    //                          .getResult(0);
-    std::vector<Value> newArgs{op.getArgs().begin(), op.getArgs().end()};
-    Value indexValue = rewriter.create<index::ConstantOp>(loc, 0);
-    auto scalarFactor = rewriter.create<tensor::ExtractOp>(loc, scalarFactors, indexValue);
-    newArgs.push_back(scalarFactor);
-    auto resultsValues = rewriter.create<func::CallOp>(loc, foldedCircuit, newArgs);
+                    Value res =
+                        builder.create<tensor::InsertOp>(loc, resultValue, iterArgs.front(), index);
+                    builder.create<scf::YieldOp>(loc, res);
+                })
+            .getResult(0);
+
     // Call the folded circuit
-    rewriter.replaceOp(op, resultsValues);
+    rewriter.replaceOp(op, resultValues);
 }
 
 FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,

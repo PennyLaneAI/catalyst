@@ -37,8 +37,8 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     func.return %expval : f64
 }
  
-func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> f64 {
-    %scalarFactors = arith.constant dense<[1, 2, 3]> : tensor<3xindex>
-    %0 = mitigation.zne @simpleCircuit(%arg0) scalarFactors (%scalarFactors : tensor<3xindex>) : (tensor<3xf64>) -> f64
-    func.return %0 : f64
+func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
+    %scalarFactors = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
+    %0 = mitigation.zne @simpleCircuit(%arg0) scalarFactors (%scalarFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
+    func.return %0 : tensor<5xf64>
 }
