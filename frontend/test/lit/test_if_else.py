@@ -62,7 +62,7 @@ print(circuit.mlir)
 def test_convert_element_type(i: int, f: float):
     """Test the presence of convert_element_type JAX primitive when the type conversion is required"""
 
-    # CHECK: qcond[
+    # CHECK: cond[
     @cond(i <= 3)
     def cond_fn():
         # CHECK: convert_element_type
@@ -90,7 +90,7 @@ print(test_convert_element_type.jaxpr)
 def test_no_convert_element_type(i: int):
     """Test the absense of convert_element_type JAX primitive when no type conversion is required"""
 
-    # CHECK: qcond[
+    # CHECK: cond[
     @cond(i <= 3)
     def cond_fn():
         # CHECK: add {{[a-z]+}} 1

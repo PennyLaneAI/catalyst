@@ -47,7 +47,7 @@ def while_default_jax(a: int):
     executed."""
     i = 0
     acc = 0
-    # CHECK: qwhile
+    # CHECK: while
     while i < 5:
         acc += a
         i += 1
