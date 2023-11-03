@@ -177,10 +177,9 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Setup Python3.9 via brew
-      if: ${{ matrix.python_version }} == '3.9'
+    - name: Set up Python via brew
       run: |
-        brew install python@3.9
+        brew install python@${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
       run: |
