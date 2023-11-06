@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "scatter"
+#define DEBUG_TYPE "tensor-init"
 
 #include <vector>
 
@@ -37,28 +37,28 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
-#define GEN_PASS_DEF_SCATTERLOWERINGPASS
+#define GEN_PASS_DEF_TENSORINITLOWERINGPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
-    using ScatterLoweringPassBase::ScatterLoweringPassBase;
+struct TensorInitLoweringPass : impl::TensorInitLoweringPassBase<TensorInitLoweringPass> {
+    using TensorInitLoweringPassBase::TensorInitLoweringPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "scatter lowering pass"
+        LLVM_DEBUG(dbgs() << "tensor init lowering pass"
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
-        populateScatterPatterns(patterns);
+        populateTensorInitPatterns(patterns);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
 
-std::unique_ptr<Pass> createScatterLoweringPass()
+std::unique_ptr<Pass> createTensorInitLoweringPass()
 {
-    return std::make_unique<ScatterLoweringPass>();
+    return std::make_unique<TensorInitLoweringPass>();
 }
 
 } // namespace catalyst

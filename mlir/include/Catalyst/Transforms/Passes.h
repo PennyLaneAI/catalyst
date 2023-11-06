@@ -22,6 +22,7 @@ namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
 std::unique_ptr<mlir::Pass> createScatterLoweringPass();
+std::unique_ptr<mlir::Pass> createTensorInitLoweringPass();
 
 void registerAllCatalystPasses();
 

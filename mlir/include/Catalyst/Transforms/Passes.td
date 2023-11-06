@@ -48,4 +48,16 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     let constructor = "catalyst::createScatterLoweringPass()";
 }
 
+def TensorInitLoweringPass : Pass<"tensor-init-lowering"> {
+    let summary = "Lowers catalyst tensor initialization operations.";
+
+    let dependentDialects = [
+        "mhlo::MhloDialect",
+        "tensor::TensorDialect",
+        "arith::ArithDialect"
+    ];
+
+    let constructor = "catalyst::createTensorInitLoweringPass()";
+}
+
 #endif // CATALYST_PASSES

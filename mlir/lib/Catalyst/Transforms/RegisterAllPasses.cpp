@@ -30,4 +30,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createTestPass);
+    mlir::registerPass(catalyst::createTensorInitLoweringPass);
 }

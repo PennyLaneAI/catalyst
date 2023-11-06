@@ -1467,11 +1467,12 @@ def _tensor_init_lowering(
         except ValueError:
             return None
 
+    init_value = initializer if initializer is not None else 0
     initializer_attr = None
     if (ti := _tryinfo(jnp.finfo)) is not None:
-        initializer_attr = ir.FloatAttr.get(output_type.element_type, float(initializer))
+        initializer_attr = ir.FloatAttr.get(output_type.element_type, float(init_value))
     elif (ti := _tryinfo(jnp.iinfo)) is not None:
-        initializer_attr = ir.IntegerAttr.get(output_type.element_type, int(initializer))
+        initializer_attr = ir.IntegerAttr.get(output_type.element_type, int(init_value))
     else:
         assert False, f"Unsupported initializer {initializer} of type {dtype}"
 

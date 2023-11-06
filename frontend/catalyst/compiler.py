@@ -112,6 +112,7 @@ DEFAULT_PIPELINES = [
         "HLOLoweringPass",
         [
             "canonicalize",
+            "tensor-init-lowering",
             "func.func(chlo-legalize-to-hlo)",
             "stablehlo-legalize-to-hlo",
             "func.func(mhlo-legalize-control-flow)",

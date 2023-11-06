@@ -1949,12 +1949,15 @@ def ctrl(
 
 
 def ones(shape, dtype):
+    """Create a tensor filled with ones"""
     return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=1, dtype=dtype)
 
 
 def zeros(shape, dtype):
+    """Create a tensor filled with zeros"""
     return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=0, dtype=dtype)
 
 
 def empty(shape, dtype):
+    """Create an empty tensor"""
     return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=None, dtype=dtype)

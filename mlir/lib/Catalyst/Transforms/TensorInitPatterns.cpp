@@ -33,6 +33,7 @@ using namespace catalyst;
 
 namespace {
 
+// Extract and return the type and a value of the initializer.
 std::tuple<Type, std::optional<Value>> getInitTypeValue(TensorInitOp op, PatternRewriter &rewriter)
 {
     using llvm::cast, llvm::isa;
@@ -49,6 +50,7 @@ std::tuple<Type, std::optional<Value>> getInitTypeValue(TensorInitOp op, Pattern
     return tuple(type, value);
 }
 
+// Rewrite catalyst.tensor_init as tensor.empty optionally followed by linalg.fill
 struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
     using OpRewritePattern<TensorInitOp>::OpRewritePattern;
 
