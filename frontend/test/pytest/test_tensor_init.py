@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test integration for the lowering of MHLO scatter."""
+"""Test integration for the lowering of catalyst.tensor_init."""
 
 import numpy as np
 import pytest
