@@ -15,7 +15,6 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-import sys
 from dataclasses import dataclass
 from itertools import chain
 from typing import Dict, Iterable, List
@@ -1456,10 +1455,8 @@ def _tensor_init_abstract(shape, *, initializer, dtype):
 def _tensor_init_lowering(
     jax_ctx: mlir.LoweringRuleContext, shape: ir.Value, *, initializer, dtype
 ) -> ir.Value:
-    empty_ir = mlir.ir_constants(True) if initializer is None else None
+    empty = mlir.ir_constants(True) if initializer is None else None  # do not initialize
     output_type = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out][0]
-
-    ctx = jax_ctx.module_context.context
 
     def _tryinfo(f):
         try:
@@ -1467,16 +1464,16 @@ def _tensor_init_lowering(
         except ValueError:
             return None
 
-    init_value = initializer if initializer is not None else 0
+    init_value = initializer if not empty else 0
     initializer_attr = None
-    if (ti := _tryinfo(jnp.finfo)) is not None:
+    if _tryinfo(jnp.finfo) is not None:
         initializer_attr = ir.FloatAttr.get(output_type.element_type, float(init_value))
-    elif (ti := _tryinfo(jnp.iinfo)) is not None:
+    elif _tryinfo(jnp.iinfo) is not None:
         initializer_attr = ir.IntegerAttr.get(output_type.element_type, int(init_value))
     else:
         assert False, f"Unsupported initializer {initializer} of type {dtype}"
 
-    op = TensorInitOp(output_type, shape=shape, empty=empty_ir, initializer=initializer_attr)
+    op = TensorInitOp(output_type, shape=shape, empty=empty, initializer=initializer_attr)
     return op.results
 
 
