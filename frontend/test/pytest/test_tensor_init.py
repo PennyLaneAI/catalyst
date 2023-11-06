@@ -14,7 +14,6 @@
 
 """Test integration for the lowering of MHLO scatter."""
 
-import jax
 import numpy as np
 import pytest
 from jax import numpy as jnp
