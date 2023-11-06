@@ -334,7 +334,9 @@ TEST_CASE("Test memref alloc", "[CoreQIS]")
 TEST_CASE("Test memref aligned alloc", "[CoreQIS]")
 {
     __quantum__rt__initialize();
-    int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(sizeof(int), sizeof(int));
+
+    // macOS requires the alignment of 'aligned_alloc' is at least 8-byte
+    double *a = (double *)_mlir_memref_to_llvm_aligned_alloc(sizeof(double), sizeof(double));
     CHECK(a != NULL);
     *a = 1;
     __quantum__rt__finalize();

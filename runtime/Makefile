@@ -1,25 +1,33 @@
 PYTHON := python3
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
-COMPILER_LAUNCHER?=ccache
-ENABLE_ASAN?=OFF
+COMPILER_LAUNCHER?=$(shell which ccache)
+
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
-BUILD_TYPE?=Release
+BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
-BUILD_QIR_STDLIB_FROM_SRC?=OFF
+ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?=v0.33.0
 NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+
+ifeq ($(shell uname), Darwin)
+	DEFAULT_ENABLE_OPENMP := OFF
+else
+	DEFAULT_ENABLE_OPENMP := ON
+endif
+
+ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=Release
+test: BUILD_TYPE?=RelWithDebInfo
 
 .PHONY: help
 help:
@@ -36,7 +44,6 @@ help:
 .PHONY: all
 all: runtime
 
-
 .PHONY: configure
 configure:
 	@echo "Configure Catalyst Runtime"
@@ -50,10 +57,10 @@ configure:
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_OPENMP=$(ENABLE_OPENMP) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DBUILD_QIR_STDLIB_FROM_SRC=$(BUILD_QIR_STDLIB_FROM_SRC) \
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure

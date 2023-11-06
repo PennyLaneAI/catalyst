@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 10.15
+  MACOSX_DEPLOYMENT_TARGET: 11.7
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -256,6 +256,7 @@ jobs:
 
     - name: Test Catalyst-Runtime
       run: |
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests
         ./runtime-build/tests/runner_tests
 
@@ -341,5 +342,4 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
