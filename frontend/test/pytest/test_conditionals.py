@@ -179,7 +179,6 @@ class TestCond:
         assert circuit(3) == False
         assert circuit(6) == True
 
-
     def test_branch_return_pytree_mismatch(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
@@ -200,7 +199,6 @@ class TestCond:
             TypeError, match="Conditional requires consistent return types across all branches"
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
-
 
     def test_branch_return_mismatch(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else

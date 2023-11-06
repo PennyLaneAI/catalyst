@@ -15,75 +15,81 @@
 #define DEBUG_TYPE "tensorinit"
 
 #include <algorithm>
-#include <vector>
 #include <iostream> // FIXME
+#include <vector>
 
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "Catalyst/IR/CatalystOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/PatternMatch.h"
 
 #include "mlir/IR/BuiltinTypes.h"
 
 #include "mhlo/IR/hlo_ops.h"
-
 
 using namespace mlir;
 using namespace catalyst;
 
 namespace {
 
+std::tuple<Type, std::optional<Value>> getInitTypeValue(TensorInitOp op, PatternRewriter &rewriter)
+{
+    using llvm::cast, llvm::isa;
+    using std::tuple, std::optional, std::nullopt;
+
+    auto loc = op.getLoc();
+    auto empty = op.getEmpty().has_value();
+    auto initializer = op.getInitializerAttr();
+    auto type = initializer.getType();
+    std::optional<Value> emptyValue;
+
+    std::optional<Value> value =
+        empty ? emptyValue : rewriter.create<arith::ConstantOp>(loc, type, initializer);
+    return tuple(type, value);
+}
+
 struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
     using OpRewritePattern<TensorInitOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(TensorInitOp op,
-                                  PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(TensorInitOp op, PatternRewriter &rewriter) const override
     {
-        auto ctx = op.getContext();
         auto loc = op.getLoc();
-        auto method = op.getMethod();
-
-        if (method == "ones") {
-        }
-        else if (method == "zeros") {
-        }
-        else if (method == "empty") {
+        SmallVector<int64_t, 4> dimensions;
+        SmallVector<Value> shapeValues;
+        {
+            auto ctx = op.getContext();
             auto shape = op.getShape();
             auto shapeType = shape.getType();
-            auto elementType = shapeType.getElementType(); // FIXME: query from parameter
+            auto elementType = shapeType.getElementType();
 
-            SmallVector<Value> shapeValues;
             auto shapeShape = shapeType.getShape();
             assert(shapeShape.size() == 1 && "shape argument must have '1xi..' shape");
             assert(shapeShape[0] >= 0 && "dynamic elements in shapes are not supported!");
 
-            SmallVector<int64_t, 4> dimensions;
             for (int64_t i = 0; i < shapeShape[0]; i++) {
                 std::cerr << i << "\n";
                 Value axis = rewriter.create<arith::ConstantIndexOp>(loc, i);
                 Value val = rewriter.create<tensor::ExtractOp>(loc, elementType, shape, axis);
-                Value val2 = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);
-                shapeValues.push_back(val2);
+                Value ival = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);
+                shapeValues.push_back(ival);
                 dimensions.push_back(ShapedType::kDynamic);
             }
-
-            auto tt = RankedTensorType::get(dimensions, elementType);
-            Value result = rewriter.create<tensor::EmptyOp>(loc, tt, shapeValues);
-
-            rewriter.replaceOp(op, result);
-            return success();
         }
-        else {
-            assert(false && "invalid method attribute");
+
+        auto [type, value] = getInitTypeValue(op, rewriter);
+        auto tensorType = RankedTensorType::get(dimensions, type);
+        Value result = rewriter.create<tensor::EmptyOp>(loc, tensorType, shapeValues);
+        if (value.has_value()) {
+            result = rewriter.create<linalg::FillOp>(loc, value.value(), result).getResult(0);
         }
-        return failure();
+
+        rewriter.replaceOp(op, result);
+        return success();
     }
-
 };
 
 } // namespace
-
 
 namespace catalyst {
 
@@ -92,4 +98,4 @@ void populateTensorInitPatterns(RewritePatternSet &patterns)
     patterns.add<TensorInitOpRewritePattern>(patterns.getContext(), 1);
 }
 
-}
+} // namespace catalyst

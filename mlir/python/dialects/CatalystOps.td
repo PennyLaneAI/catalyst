@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef PYTHON_BINDINGS_GRADIENT_OPS
-#define PYTHON_BINDINGS_GRADIENT_OPS
+#ifndef PYTHON_BINDINGS_CATALYST_OPS
+#define PYTHON_BINDINGS_CATALYST_OPS
 
-include "Gradient/IR/GradientOps.td"
+include "Catalyst/IR/CatalystOps.td"
 
 #endif

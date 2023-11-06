@@ -48,7 +48,6 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
         LLVM_DEBUG(dbgs() << "scatter lowering pass"
                           << "\n");
 
-
         /* FIXME */
         MLIRContext *context = &getContext();
         ConversionTarget target(*context);

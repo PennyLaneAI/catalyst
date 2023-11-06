@@ -15,11 +15,13 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import sys
 from dataclasses import dataclass
 from itertools import chain
 from typing import Dict, Iterable, List
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
@@ -31,6 +33,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
+from mlir_quantum.dialects.catalyst import TensorInitOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -203,6 +206,7 @@ vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
 adjoint_p = jax.core.Primitive("adjoint")
 adjoint_p.multiple_results = True
+tensor_init_p = jax.core.Primitive("tensor_init")
 
 #
 # func
@@ -1437,6 +1441,45 @@ def _adjoint_lowering(
 
 
 #
+# tensor_init
+#
+@tensor_init_p.def_impl
+def _tensor_init_def_impl(ctx, shape, *, initializer, dtype):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@tensor_init_p.def_abstract_eval
+def _tensor_init_abstract(shape, *, initializer, dtype):
+    return core.ShapedArray([ir.ShapedType.get_dynamic_size()] * shape.shape[0], dtype=dtype)
+
+
+def _tensor_init_lowering(
+    jax_ctx: mlir.LoweringRuleContext, shape: ir.Value, *, initializer, dtype
+) -> ir.Value:
+    empty_ir = mlir.ir_constants(True) if initializer is None else None
+    output_type = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out][0]
+
+    ctx = jax_ctx.module_context.context
+
+    def _tryinfo(f):
+        try:
+            return f(dtype)
+        except ValueError:
+            return None
+
+    initializer_attr = None
+    if (ti := _tryinfo(jnp.finfo)) is not None:
+        initializer_attr = ir.FloatAttr.get(output_type.element_type, float(initializer))
+    elif (ti := _tryinfo(jnp.iinfo)) is not None:
+        initializer_attr = ir.IntegerAttr.get(output_type.element_type, int(initializer))
+    else:
+        assert False, f"Unsupported initializer {initializer} of type {dtype}"
+
+    op = TensorInitOp(output_type, shape=shape, empty=empty_ir, initializer=initializer_attr)
+    return op.results
+
+
+#
 # registration
 #
 
@@ -1467,6 +1510,7 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
+mlir.register_lowering(tensor_init_p, _tensor_init_lowering)
 
 
 def _scalar_abstractify(t):

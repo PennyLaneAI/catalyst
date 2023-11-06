@@ -66,13 +66,16 @@ from catalyst.pennylane_extensions import (
     adjoint,
     cond,
     ctrl,
+    empty,
     for_loop,
     grad,
     jacobian,
     jvp,
     measure,
+    ones,
     vjp,
     while_loop,
+    zeros,
 )
 from catalyst.utils.exceptions import CompileError
 

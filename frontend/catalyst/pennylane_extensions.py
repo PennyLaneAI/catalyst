@@ -50,6 +50,7 @@ from catalyst.jax_primitives import (
     qfor_p,
     qmeasure_p,
     qwhile_p,
+    tensor_init_p,
     vjp_p,
 )
 from catalyst.jax_tracer import (
@@ -1945,3 +1946,15 @@ def ctrl(
         return _call_handler(_callee=_callee)
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
+
+
+def ones(shape, dtype):
+    return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=1, dtype=dtype)
+
+
+def zeros(shape, dtype):
+    return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=0, dtype=dtype)
+
+
+def empty(shape, dtype):
+    return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=None, dtype=dtype)
