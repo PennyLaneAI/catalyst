@@ -24,6 +24,7 @@
 #include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -48,6 +49,16 @@ namespace {
 /// Clone the region of the adjoint operation `op` to the insertion point specified by the
 /// `builder`. Build and return the value mapping `mapping`.
 Value cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping)
+{
+    Block &block = op.getRegion().front();
+    for (Operation &op : block.without_terminator()) {
+        builder.clone(op, mapping);
+    }
+    auto yieldOp = cast<quantum::YieldOp>(block.getTerminator());
+    return mapping.lookupOrDefault(yieldOp.getOperand(0));
+}
+
+Value cloneFuncOpRegion(func::FuncOp op, OpBuilder &builder, IRMapping &mapping)
 {
     Block &block = op.getRegion().front();
     for (Operation &op : block.without_terminator()) {
@@ -82,7 +93,10 @@ class AdjointGenerator {
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
             LLVM_DEBUG(dbgs() << "generating adjoint for: " << op << "\n");
-            if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+            if (auto callOp = dyn_cast<func::CallOp>(op)) {
+                visitOperation(callOp, builder);
+            }
+            else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 visitOperation(forOp, builder);
             }
             else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
@@ -268,6 +282,42 @@ class AdjointGenerator {
     {
         std::optional<Value> yieldedQureg =
             getQuantumReg(forOp.getBody()->getTerminator()->getOperands());
+        if (!yieldedQureg.has_value()) {
+            // This operation is purely classical
+            return;
+        }
+
+        Value tape = cache.controlFlowTapes.at(forOp);
+        // Popping the start, stop, and step implies that these are backwards relative to
+        // the order they were pushed.
+        Value step = builder.create<ListPopOp>(forOp.getLoc(), tape);
+        Value stop = builder.create<ListPopOp>(forOp.getLoc(), tape);
+        Value start = builder.create<ListPopOp>(forOp.getLoc(), tape);
+
+        Value reversedResult = remappedValues.lookup(getQuantumReg(forOp.getResults()).value());
+        auto replacedFor = builder.create<scf::ForOp>(
+            forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResult,
+            [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
+                OpBuilder::InsertionGuard insertionGuard(builder);
+                builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
+
+                remappedValues.map(yieldedQureg.value(), iterArgs[0]);
+                generateImpl(forOp.getBodyRegion(), builder);
+                builder.create<scf::YieldOp>(
+                    loc, remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
+            });
+        remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
+    }
+
+    void visitOperation(func::CallOp callOp, OpBuilder &builder)
+    {
+        // Get the func op
+        SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
+        func::FuncOp funcOp =
+            dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
+
+        std::optional<Value> yieldedQureg =
+            getQuantumReg(funcOp.front().getTerminator()->getOperands());
         if (!yieldedQureg.has_value()) {
             // This operation is purely classical
             return;
