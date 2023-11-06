@@ -52,6 +52,9 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 # C++ extensions to the dialects are mocked out.
+sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleType(
+    "mlir_quantum._mlir_libs._quantumDialects.catalyst"
+)
 sys.modules["mlir_quantum._mlir_libs._quantumDialects.gradient"] = types.ModuleType(
     "mlir_quantum._mlir_libs._quantumDialects.gradient"
 )
