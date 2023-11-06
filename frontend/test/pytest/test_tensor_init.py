@@ -63,5 +63,18 @@ def test_empty(dtype, shape):
     assert res.dtype == dtype
 
 
+def test_unsupported():
+    """Test the unsupported initializer error"""
+
+    def f():
+        return empty(shape=[2, 3], dtype=bool)
+
+    with pytest.raises(
+        ValueError,
+        match="Unsupported initializer",
+    ):
+        qjit(f)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
