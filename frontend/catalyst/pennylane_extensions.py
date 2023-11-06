@@ -1765,6 +1765,12 @@ def debug_print(x):
     elements.
 
     Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
+
+    .. note::
+
+        Python f-strings will not work as expected since they will be treated as Python objects.
+        This means that array values embeded in them will have their compile-time representation
+        printed, instead of actual data.
     """
     if EvaluationContext.is_tracing():
         if isinstance(x, jax.core.Tracer):
