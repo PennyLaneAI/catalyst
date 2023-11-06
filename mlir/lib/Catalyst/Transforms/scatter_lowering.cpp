@@ -58,4 +58,3 @@ std::unique_ptr<Pass> createScatterLoweringPass()
 }
 
 } // namespace catalyst
-
