@@ -87,7 +87,7 @@
 
 <h3>Breaking changes</h3>
 
-* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape
   `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
   [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
 
@@ -124,6 +124,21 @@
 
 * Include the "Catalyst" utility dialect in our MLIR C-API.
   [(#345)](https://github.com/PennyLaneAI/catalyst/pull/345)
+
+* Fix an issue with the AutoGraph conversion system that would prevent the fallback to Python from
+  working correctly in certain instances.
+  [(#352)](https://github.com/PennyLaneAI/catalyst/pull/352)
+
+  The following type of code is now supported:
+
+  ```python
+  @qjit(autograph=True)
+  def f():
+    l = jnp.array([1, 2])
+    for _ in range(2):
+        l = jnp.kron(l, l)
+    return l
+  ```
 
 <h3>Breaking changes</h3>
 
