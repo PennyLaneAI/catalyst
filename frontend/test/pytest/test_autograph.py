@@ -1343,6 +1343,50 @@ class TestWhileLoops:
         with pytest.raises(RuntimeError):
             qjit(autograph=True)(f1)()
 
+    def test_uninitialized_variables(self, monkeypatch):
+        """Verify errors for (potentially) uninitialized loop variables."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_invalid_jax_type(self, monkeypatch):
+        """Test loop carried values initialized with an invalid JAX type."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            x = ""
+
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_mismatched_type(self, monkeypatch):
+        """Test loop carried values initialized with a mismatched type compared to the values used
+        inside the loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            x = 0.0
+
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
+            qjit(autograph=True)(f)
+
 
 @pytest.mark.tf
 class TestLogicalOps:

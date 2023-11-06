@@ -111,7 +111,7 @@ def if_stmt(
     set_state(results)
 
 
-def assert_for_loop_inputs(inputs, symbol_names):
+def assert_iteration_inputs(inputs, symbol_names):
     """All loop carried values, variables that are updated each iteration or accessed after the
     loop terminates, need to be initialized prior to entering the loop.
 
@@ -147,7 +147,7 @@ def assert_for_loop_inputs(inputs, symbol_names):
             ) from e
 
 
-def assert_for_loop_results(inputs, outputs, symbol_names):
+def assert_iteration_results(inputs, outputs, symbol_names):
     """The results of a for loop should have the identical type as the inputs, since they are
     "passed" as inputs to the next iteration. A mismatch here may indicate that a loop carried
     variable was initialized with wrong type.
@@ -178,7 +178,7 @@ def _call_catalyst_for(
     # Ensure iteration arguments are properly initialized. We cannot process uninitialized
     # loop carried values as we need their type information for tracing.
     init_iter_args = get_state()
-    assert_for_loop_inputs(init_iter_args, symbol_names)
+    assert_iteration_inputs(init_iter_args, symbol_names)
 
     @catalyst.for_loop(start, stop, step)
     def functional_for(i, *iter_args):
@@ -202,7 +202,7 @@ def _call_catalyst_for(
         return get_state()
 
     final_iter_args = functional_for(*init_iter_args)
-    assert_for_loop_results(init_iter_args, final_iter_args, symbol_names)
+    assert_iteration_results(init_iter_args, final_iter_args, symbol_names)
     return final_iter_args
 
 
@@ -336,28 +336,31 @@ def for_stmt(
     set_state(results)
 
 
-def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
+def _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names):
     """Dispatch to a Catalyst implementation of while loops."""
 
-    def _test(state):
+    init_iter_args = get_state()
+    assert_iteration_inputs(init_iter_args, symbol_names)
+
+    def test(state):
         old = get_state()
         set_state(state)
         res = loop_test()
         set_state(old)
         return res
 
-    @catalyst.while_loop(_test)
-    def _functional_while(iter_args):
+    @catalyst.while_loop(test)
+    def functional_while(iter_args):
         set_state(iter_args)
         loop_body()
         return get_state()
 
-    iter_inits = get_state()
-    iter_results = _functional_while(iter_inits)
-    return iter_results
+    final_iter_args = functional_while(init_iter_args)
+    assert_iteration_results(init_iter_args, final_iter_args, symbol_names)
+    return final_iter_args
 
 
-def _call_python_while(loop_test, loop_body, get_state, _set_state, _nonlocals, _symbol_names):
+def _call_python_while(loop_test, loop_body, get_state, _set_state):
     """Fallback to a Python implementation of while loops."""
 
     while loop_test():
@@ -366,7 +369,7 @@ def _call_python_while(loop_test, loop_body, get_state, _set_state, _nonlocals, 
     return get_state()
 
 
-def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
+def while_stmt(loop_test, loop_body, get_state, set_state, symbol_names, _opts):
     """An implementation of the AutoGraph 'while ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
@@ -374,9 +377,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
     init_state = get_state()
 
     try:
-        results = _call_catalyst_while(
-            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
-        )
+        results = _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         if catalyst.autograph_strict_conversion:
@@ -385,9 +386,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
 
     if fallback:
         set_state(init_state)
-        results = _call_python_while(
-            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
-        )
+        results = _call_python_while(loop_test, loop_body, get_state, set_state)
 
     set_state(results)
 
