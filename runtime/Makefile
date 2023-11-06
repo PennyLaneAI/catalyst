@@ -1,4 +1,4 @@
-PYTHON := python3
+PYTHON := $(shell which python3)
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
 COMPILER_LAUNCHER?=$(shell which ccache)
@@ -14,7 +14,7 @@ ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?=v0.33.0
-NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 ifeq ($(shell uname), Darwin)
 	DEFAULT_ENABLE_OPENMP := OFF
