@@ -17,12 +17,19 @@
 import numpy as np
 import pytest
 from jax import numpy as jnp
-from numpy.testing import assert_allclose
+from numpy import array_equal
 
 from catalyst import empty, ones, qjit, zeros
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, np.float32, np.float64]
 SHAPES = [(2, 3, 1), ()]
+
+
+def _assert_equal(a, b):
+    """Check that two arrays have exactly the same values and types"""
+
+    assert array_equal(a, b)
+    assert a.dtype == b.dtype
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
@@ -34,7 +41,7 @@ def test_ones(dtype, shape):
     def f(s):
         return ones(shape=s, dtype=dtype)
 
-    assert_allclose(f(shape), jnp.ones(shape, dtype=dtype))
+    _assert_equal(f(shape), jnp.ones(shape, dtype=dtype))
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
@@ -46,7 +53,7 @@ def test_zeros(dtype, shape):
     def f(s):
         return zeros(shape=s, dtype=dtype)
 
-    assert_allclose(f(shape), jnp.zeros(shape, dtype=dtype))
+    _assert_equal(f(shape), jnp.zeros(shape, dtype=dtype))
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
