@@ -21,9 +21,7 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Quant/QuantTypes.h"
-#include "stablehlo/dialect/Base.h"
 
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.h.inc"
