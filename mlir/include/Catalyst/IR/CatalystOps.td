@@ -16,12 +16,10 @@
 #ifndef CATALYST_OPS
 #define CATALYST_OPS
 
-include "mlir/IR/AttrTypeBase.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
 include "stablehlo/dialect/Base.td"
-include "mlir/Dialect/Complex/IR/ComplexAttributes.td"
 
 
 include "Catalyst/IR/CatalystDialect.td"
@@ -75,7 +73,6 @@ def TensorInitOp : Catalyst_Op<"tensor_init"> {
     let arguments = (ins
       HLO_DimensionTensor:$shape,
       OptionalAttr<UnitAttr>:$empty,
-      /* AnyAttrOf<[Complex_NumberAttr, F64Attr, F32Attr, AnyI32Attr, AnyI64Attr]>:$initializer */
       TypedAttrInterface:$initializer
     );
     let results = (outs
