@@ -1737,12 +1737,12 @@ def measure(wires) -> DynamicJaxprTracer:
 
 # Note that "print" would alias the built-in print function.
 def debug_print(x):
-    """A :func:`qjit` compatible print function for debugging.
+    """A :func:`qjit` compatible print function for printing values at runtime.
 
     Enables printing of numeric values at runtime. Can also print objects or strings as constants.
 
     Args:
-        x: A single jax array whose numeric values are printed at runtime, or any object whose
+        x (jax.Arrar, Any): A single jax array whose numeric values are printed at runtime, or any object whose
            string representation will be treated as a constant and printed at runtime.
 
     **Example**

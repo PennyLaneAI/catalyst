@@ -6,8 +6,9 @@
   [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
 
   You can now print arbitrary values from your running program, whether they are arrays, constants,
-  strings, or abitrary Python objects. Note that while Python objects that are not arrays *will* be
-  printed at runtime, their output will always be the same regardless of program inputs.
+  strings, or abitrary Python objects. Note that while non-array Python objects
+  *will* be printed at runtime, their string representation is captured at
+  compile time, and thus will always be the same regardless of program inputs.
   The output for arrays also includes a descriptor for how the data is stored in memory ("memref").
 
   ```python
