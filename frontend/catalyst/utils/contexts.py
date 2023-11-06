@@ -29,6 +29,7 @@ from jax._src.interpreters.partial_eval import (
     extend_jaxpr_stack,
 )
 from jax._src.source_info_util import reset_name_stack
+from jax.core import find_top_trace
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import new_dynamic_main2
@@ -213,3 +214,12 @@ class EvaluationContext:
         """
         if cls.is_tracing():
             raise CompileError(msg)
+
+    @classmethod
+    def find_jaxpr_frame(cls, *args):
+        """Obtain the current JAXPR frame, in which primitives are being inserted.
+
+        Raises: CompileError
+        """
+        cls.check_is_tracing("No JAXPR frames exist outside a tracing context.")
+        return find_top_trace(args).frame

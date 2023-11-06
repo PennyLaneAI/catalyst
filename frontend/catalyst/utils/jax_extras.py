@@ -262,7 +262,7 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 
 
 def deduce_avals(f: Callable, args, kwargs):
-    """Wrapes the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
+    """Wraps the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
     and output_tree promise. The promise must be called after the resulting wrapped function is
     evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
