@@ -43,6 +43,8 @@ from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
+from catalyst.jax_primitives import qfor_p, qwhile_p
+from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
@@ -157,7 +159,8 @@ def assert_iteration_results(inputs, outputs, symbol_names):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
-                f"The variable '{symbol_names[i]}' was initialized with the wrong type. "
+                f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
+                f"be trying to change its type from one iteration to the next. "
                 f"Expected: {out_t}, Got: {inp_t}"
             )
 
@@ -201,6 +204,10 @@ def _call_catalyst_for(
 
         return get_state()
 
+    # Needed in case we need to uniquely identify this for loop instance in the JAXPR,
+    # for example on recovery from tracing errors.
+    functional_for._set_id(id(body_fn))  # pylint: disable=protected-access
+
     final_iter_args = functional_for(*init_iter_args)
     assert_iteration_results(init_iter_args, final_iter_args, symbol_names)
     return final_iter_args
@@ -215,6 +222,7 @@ def _call_python_for(body_fn, get_state, non_array_iterable):
     return get_state()
 
 
+# pylint: disable=too-many-statements,too-many-branches
 def for_stmt(
     iteration_target: Any,
     _extra_test: Union[Callable[[], bool], None],
@@ -297,9 +305,17 @@ def for_stmt(
                 enum_start,
                 iteration_array,
             )
+
         except Exception as e:  # pylint: disable=broad-exception-caught
             if catalyst.autograph_strict_conversion:
                 raise e
+
+            if EvaluationContext.is_tracing():
+                jaxpr_frame = EvaluationContext.find_jaxpr_frame((start, stop, step, *init_state))
+                last_prim_is_for = jaxpr_frame.eqns and jaxpr_frame.eqns[-1].primitive is qfor_p
+                last_prim_id = jaxpr_frame.eqns[-1].params["_id"] if last_prim_is_for else None
+                if last_prim_id == id(body_fn):
+                    jaxpr_frame.eqns.pop()
 
             # pylint: disable=import-outside-toplevel
             import inspect
@@ -355,6 +371,10 @@ def _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_name
         loop_body()
         return get_state()
 
+    # Needed in case we need to uniquely identify this for loop instance in the JAXPR,
+    # for example on recovery from tracing errors.
+    functional_while._set_id(id(loop_body))  # pylint: disable=protected-access
+
     final_iter_args = functional_while(init_iter_args)
     assert_iteration_results(init_iter_args, final_iter_args, symbol_names)
     return final_iter_args
@@ -382,6 +402,14 @@ def while_stmt(loop_test, loop_body, get_state, set_state, symbol_names, _opts):
     except Exception as e:  # pylint: disable=broad-exception-caught
         if catalyst.autograph_strict_conversion:
             raise e
+
+        if EvaluationContext.is_tracing():
+            jaxpr_frame = EvaluationContext.find_jaxpr_frame(init_state)
+            last_prim_is_while = jaxpr_frame.eqns and jaxpr_frame.eqns[-1].primitive is qwhile_p
+            last_prim_id = jaxpr_frame.eqns[-1].params["_id"] if last_prim_is_while else None
+            if last_prim_id == id(loop_body):
+                jaxpr_frame.eqns.pop()
+
         fallback = True
 
     if fallback:
