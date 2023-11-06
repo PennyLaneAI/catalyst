@@ -1106,6 +1106,7 @@ def _qcond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
+    _id: int,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -1193,6 +1194,7 @@ def _qwhile_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
+    _id: int,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
@@ -1279,6 +1281,7 @@ def _qfor_lowering(
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
+    _id: int,
 ):
     # Separate constants from iteration arguments.
     # The MLIR value provided by JAX for the iteration index is not needed
