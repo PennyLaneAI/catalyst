@@ -310,6 +310,8 @@ def for_stmt(
             if catalyst.autograph_strict_conversion:
                 raise e
 
+            # On fallback to Python we need to remove the jax primitive for this loop, if it was
+            # queued. The reason is that it may be malformed which can cause issues during lowering.
             if EvaluationContext.is_tracing():
                 jaxpr_frame = EvaluationContext.find_jaxpr_frame((start, stop, step, *init_state))
                 last_prim_is_for = jaxpr_frame.eqns and jaxpr_frame.eqns[-1].primitive is qfor_p
@@ -403,6 +405,8 @@ def while_stmt(loop_test, loop_body, get_state, set_state, symbol_names, _opts):
         if catalyst.autograph_strict_conversion:
             raise e
 
+        # On fallback to Python we need to remove the jax primitive for this loop, if it was
+        # queued. The reason is that it may be malformed which can cause issues during lowering.
         if EvaluationContext.is_tracing():
             jaxpr_frame = EvaluationContext.find_jaxpr_frame(init_state)
             last_prim_is_while = jaxpr_frame.eqns and jaxpr_frame.eqns[-1].primitive is qwhile_p
