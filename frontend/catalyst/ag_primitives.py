@@ -312,7 +312,7 @@ def for_stmt(
 
             # On fallback to Python we need to remove the jax primitive for this loop, if it was
             # queued. The reason is that it may be malformed which can cause issues during lowering.
-            if EvaluationContext.is_tracing():
+            if EvaluationContext.is_tracing():  # pragma: no branch
                 jaxpr_frame = EvaluationContext.find_jaxpr_frame((start, stop, step, *init_state))
                 last_prim_is_for = jaxpr_frame.eqns and jaxpr_frame.eqns[-1].primitive is qfor_p
                 last_prim_id = jaxpr_frame.eqns[-1].params["_id"] if last_prim_is_for else None
@@ -407,7 +407,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, symbol_names, _opts):
 
         # On fallback to Python we need to remove the jax primitive for this loop, if it was
         # queued. The reason is that it may be malformed which can cause issues during lowering.
-        if EvaluationContext.is_tracing():
+        if EvaluationContext.is_tracing():  # pragma: no branch
             jaxpr_frame = EvaluationContext.find_jaxpr_frame(init_state)
             last_prim_is_while = jaxpr_frame.eqns and jaxpr_frame.eqns[-1].primitive is qwhile_p
             last_prim_id = jaxpr_frame.eqns[-1].params["_id"] if last_prim_is_while else None

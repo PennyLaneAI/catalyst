@@ -1210,7 +1210,8 @@ class CondCallable:
             return self._call_during_interpretation()
 
     def _set_id(self, x):
-        self._id = x
+        # TODO: remove nocover once the conditional obtains an autograph fallback
+        self._id = x  # pragma: nocover
 
 
 def cond(pred: DynamicJaxprTracer):
