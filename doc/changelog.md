@@ -21,7 +21,7 @@
 
   ```pycon
   >>> func(jnp.array(0.43))
-  Unranked Memref base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
+  MemRef: base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
   [0.43]
   exit
   ```
