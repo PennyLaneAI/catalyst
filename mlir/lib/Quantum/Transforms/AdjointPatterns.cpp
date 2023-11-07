@@ -58,16 +58,6 @@ Value cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping)
     return mapping.lookupOrDefault(yieldOp.getOperand(0));
 }
 
-Value cloneFuncOpRegion(func::FuncOp op, OpBuilder &builder, IRMapping &mapping)
-{
-    Block &block = op.getRegion().front();
-    for (Operation &op : block.without_terminator()) {
-        builder.clone(op, mapping);
-    }
-    auto yieldOp = cast<quantum::YieldOp>(block.getTerminator());
-    return mapping.lookupOrDefault(yieldOp.getOperand(0));
-}
-
 /// A class that generates the quantum "backwards pass" of the adjoint operation using the stored
 /// gate parameters and cached control flow.
 class AdjointGenerator {
@@ -316,33 +306,47 @@ class AdjointGenerator {
         func::FuncOp funcOp =
             dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
 
-        std::optional<Value> yieldedQureg =
+        std::optional<Value> returnedQureg =
             getQuantumReg(funcOp.front().getTerminator()->getOperands());
-        if (!yieldedQureg.has_value()) {
+        if (!returnedQureg.has_value()) {
             // This operation is purely classical
             return;
         }
 
-        Value tape = cache.controlFlowTapes.at(forOp);
-        // Popping the start, stop, and step implies that these are backwards relative to
-        // the order they were pushed.
-        Value step = builder.create<ListPopOp>(forOp.getLoc(), tape);
-        Value stop = builder.create<ListPopOp>(forOp.getLoc(), tape);
-        Value start = builder.create<ListPopOp>(forOp.getLoc(), tape);
+        auto insertionSaved = builder.saveInsertionPoint();
+        MLIRContext *ctx = builder.getContext();
+        ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
+        builder.setInsertionPointToStart(moduleOp.getBody());
 
-        Value reversedResult = remappedValues.lookup(getQuantumReg(forOp.getResults()).value());
-        auto replacedFor = builder.create<scf::ForOp>(
-            forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResult,
-            [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
-                OpBuilder::InsertionGuard insertionGuard(builder);
-                builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
+        Block *originalBlock = &funcOp.front();
+        Operation *originalTerminator = originalBlock->getTerminator();
+        ValueRange originalArguments = originalBlock->getArguments();
 
-                remappedValues.map(yieldedQureg.value(), iterArgs[0]);
-                generateImpl(forOp.getBodyRegion(), builder);
-                builder.create<scf::YieldOp>(
-                    loc, remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
-            });
-        remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
+        // Get the arguments and outputs types from the original block
+        FunctionType adjointFnType =
+            FunctionType::get(ctx, /*inputs=*/
+                              originalArguments.getTypes(),
+                              /*outputs=*/originalTerminator->getOperandTypes());
+        std::string adjointName = funcOp.getName().str() + ".adjoint";
+        Location loc = funcOp.getLoc();
+        func::FuncOp adjointFnOp = builder.create<func::FuncOp>(loc, adjointName, adjointFnType);
+        adjointFnOp.setPrivate();
+
+        auto funcBody = &funcOp.front();
+        builder.setInsertionPointToStart(funcBody);
+        generateImpl(funcOp.getBody(), builder);
+        builder.create<func::ReturnOp>(
+            loc, remappedValues.lookup(getQuantumReg(callOp.getArgOperands().back()).value()));
+        builder.restoreInsertionPoint(insertionSaved);
+
+        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
+        remappedValues.map(returnedQureg.value(), reversedResult);
+        std::vector<Value> args = {funcOp.getArguments().begin(), funcOp.getArguments().end()};
+        args.pop_back();
+        args.push_back(reversedResult);
+        auto reversedCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
+        remappedValues.map(getQuantumReg(funcOp.getArguments()).value(),
+                           reversedCallOp.getResult(0));
     }
 
     void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
