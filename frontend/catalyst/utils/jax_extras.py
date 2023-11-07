@@ -330,7 +330,8 @@ def custom_lower_jaxpr_to_module(
 
     Copyright 2021 The JAX Authors.
     """
-    if any(lowerable_effects.filter_not_in(jaxpr.effects)):
+
+    if any(lowerable_effects.filter_not_in(jaxpr.effects)):  # pragma: no cover
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
 
     assert platform == "cpu"
