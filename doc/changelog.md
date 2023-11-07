@@ -9,12 +9,13 @@
   strings, or abitrary Python objects. Note that while non-array Python objects
   *will* be printed at runtime, their string representation is captured at
   compile time, and thus will always be the same regardless of program inputs.
-  The output for arrays also includes a descriptor for how the data is stored in memory ("memref").
+  The output for arrays optionally includes a descriptor for how the data is stored in memory
+  ("memref").
 
   ```python
   @qjit
   def func(x: float):
-      debug_print(x)
+      debug_print(x, memref=True)
       debug_print("exit")
   ```
 

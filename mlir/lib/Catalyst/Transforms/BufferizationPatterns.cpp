@@ -30,7 +30,8 @@ struct BufferizePrintOp : public OpConversionPattern<PrintOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         if (op.getVal()) {
-            rewriter.replaceOpWithNewOp<PrintOp>(op, adaptor.getVal(), adaptor.getConstValAttr());
+            rewriter.replaceOpWithNewOp<PrintOp>(op, adaptor.getVal(), adaptor.getConstValAttr(),
+                                                 adaptor.getPrintDescriptorAttr());
         }
         return success();
     }

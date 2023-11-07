@@ -23,7 +23,7 @@
 #include <memory>
 #include <ostream>
 
-#include "mlir/ExecutionEngine/RunnerUtils.h"
+#include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
@@ -81,51 +81,43 @@ void __quantum__rt__print_string(char *string)
     std::cout << string << std::endl;
 }
 
-void __quantum__rt__print_tensor(OpaqueMemRefT *c_memref)
+void __quantum__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
 {
     if (c_memref->datatype == NumericType::idx) {
-        auto memref = UnrankedMemRefType<impl::index_type>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<impl::index_type>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::i1) {
-        auto memref = UnrankedMemRefType<bool>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<bool>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::i8) {
-        auto memref = UnrankedMemRefType<int8_t>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<int8_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::i16) {
-        auto memref = UnrankedMemRefType<int16_t>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<int16_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::i32) {
-        auto memref = UnrankedMemRefType<int32_t>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<int32_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::i64) {
-        auto memref = UnrankedMemRefType<int64_t>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<int64_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::f32) {
-        auto memref = UnrankedMemRefType<float>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<float>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::f64) {
-        auto memref = UnrankedMemRefType<double>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<double>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::c64) {
-        auto memref = UnrankedMemRefType<impl::complex32>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<impl::complex32>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else if (c_memref->datatype == NumericType::c128) {
-        auto memref = UnrankedMemRefType<impl::complex64>{c_memref->rank, c_memref->descriptor};
-        impl::printMemRef(memref);
+        printMemref<impl::complex64>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     }
     else {
         RT_FAIL("Unkown numeric type encoding for array printing.");
     }
+
+    std::cout << std::endl;
 }
 
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }

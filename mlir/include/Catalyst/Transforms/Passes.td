@@ -50,7 +50,7 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
     let summary = "Lower catalyst utility operations to the LLVM dialect.";
 
     let dependentDialects = [
-        "mlir::func::FuncDialect",
+        "mlir::LLVM::LLVMDialect",
     ];
 
     let constructor = "catalyst::createCatalystConversionPass()";

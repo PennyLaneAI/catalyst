@@ -31,7 +31,7 @@ void __quantum__rt__device(int8_t *, int8_t *);
 void __quantum__rt__finalize();
 void __quantum__rt__toggle_recorder(bool);
 void __quantum__rt__print_state();
-void __quantum__rt__print_tensor(OpaqueMemRefT *);
+void __quantum__rt__print_tensor(OpaqueMemRefT *, bool);
 void __quantum__rt__print_string(char *);
 
 QUBIT *__quantum__rt__qubit_allocate();

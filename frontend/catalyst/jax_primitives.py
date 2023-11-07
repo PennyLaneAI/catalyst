@@ -211,31 +211,20 @@ print_p.multiple_results = True
 #
 # print
 #
-def debug_print(x):
-    """A runtime print function for Catalyst."""
-
-    if isinstance(x, jax.core.Tracer):
-        prim = print_p.bind(x)
-    else:
-        prim = print_p.bind(string=str(x))
-
-    return prim
-
-
 @print_p.def_abstract_eval
-def _print_abstract_eval(*args, string=None):
+def _print_abstract_eval(*args, string=None, memref=False):
     return ()
 
 
 @print_p.def_impl
-def _print_def_impl(*args, string=None):  # pragma: no cover
+def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None):
+def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
     const_val = ir.StringAttr.get(string) if string else None
-    return PrintOp(val=val, const_val=const_val).results
+    return PrintOp(val=val, const_val=const_val, print_descriptor=memref).results
 
 
 #

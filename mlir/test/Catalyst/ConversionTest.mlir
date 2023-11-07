@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --finalize-memref-to-llvm --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
 //////////////////////
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK: llvm.func @__quantum__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>)
+// CHECK: llvm.func @__quantum__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>, i1)
 
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {
@@ -39,8 +39,13 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 
     // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>
     // CHECK: llvm.store [[struct2]], [[struct_ptr]]
-    // CHECK: llvm.call @__quantum__rt__print_tensor([[struct_ptr]])
+    // CHECK: [[memref_flag:%.+]] = llvm.mlir.constant(false)
+    // CHECK: llvm.call @__quantum__rt__print_tensor([[struct_ptr]], [[memref_flag]])
     "catalyst.print"(%arg0) : (memref<1xi64>) -> ()
+
+    // CHECK: [[memref_flag2:%.+]] = llvm.mlir.constant(true)
+    // CHECK: llvm.call @__quantum__rt__print_tensor({{%.+}}, [[memref_flag2]])
+    "catalyst.print"(%arg0) {print_descriptor} : (memref<1xi64>) -> ()
 
     return
 }

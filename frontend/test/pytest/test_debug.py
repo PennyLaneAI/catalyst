@@ -24,19 +24,19 @@ class TestDebugPrint:
     @pytest.mark.parametrize(
         ("arg", "expected"),
         [
-            (True, "[1]"),  # TODO: True/False would be nice
-            (3, "[3]"),  # TODO: scalars without brackets would be nice
-            (3.5, "[3.5]"),
-            (3 + 4j, "[(3,4)]"),
-            (np.array(3), "[3]"),
-            (jnp.array(3), "[3]"),
-            (jnp.array(3.000001), "[3]"),  # TODO: show more precision
-            (jnp.array(3.1 + 4j), "[(3.1,4)]"),
-            (jnp.array([3]), "[3]"),
-            (jnp.array([3, 4, 5]), "[3,  4,  5]"),
+            (True, "1\n"),  # TODO: True/False would be nice
+            (3, "3\n"),
+            (3.5, "3.5\n"),
+            (3 + 4j, "(3,4)\n"),
+            (np.array(3), "3\n"),
+            (jnp.array(3), "3\n"),
+            (jnp.array(3.000001), "3\n"),  # TODO: show more precision
+            (jnp.array(3.1 + 4j), "(3.1,4)\n"),
+            (jnp.array([3]), "[3]\n"),
+            (jnp.array([3, 4, 5]), "[3,  4,  5]\n"),
             (
                 jnp.array([[3, 4], [5, 6], [7, 8]]),
-                "[[3,   4], \n [5,   6], \n [7,   8]]",
+                "[[3,   4], \n [5,   6], \n [7,   8]]\n",
             ),
         ],
     )
@@ -55,14 +55,39 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert expected in out
+        assert expected == out
+
+    def test_optional_descriptor(self, capfd):
+        """Test the optional memref descriptor functionality."""
+
+        @qjit
+        def test(x):
+            debug_print(x, memref=True)
+
+        out, err = capfd.readouterr()
+        assert err == ""
+        assert out == ""
+
+        test(jnp.array([[1, 2, 3], [4, 5, 6]]))
+
+        memref = (
+            r"MemRef: base\@ = [0-9a-fx]+ rank = 2 offset = 0 "
+            r"sizes = \[2, 3\] strides = \[3, 1\] data ="
+            "\n"
+        ) + re.escape("[[1,   2,   3], \n [4,   5,   6]]\n")
+
+        regex = re.compile("^" + memref + "$")  # match exactly: ^ - start, $ - end
+
+        out, err = capfd.readouterr()
+        assert err == ""
+        assert regex.match(out)
 
     @pytest.mark.parametrize(
         ("arg", "expected"),
         [
-            (0, ()),
-            (1, ("[0]",)),
-            (6, ("[0]", "[1]", "[2]", "[3]", "[4]", "[5]")),
+            (0, ""),
+            (1, "0\n"),
+            (6, "0\n1\n2\n3\n4\n5\n"),
         ],
     )
     def test_intermediate_values(self, capfd, arg, expected):
@@ -82,18 +107,9 @@ class TestDebugPrint:
 
         test(arg)
 
-        memref_descriptor = (
-            r"Unranked Memref base\@ = [0-9a-fx]+ rank = 0 "
-            r"offset = 0 sizes = \[\] strides = \[\] data = "
-            "\n"
-        )
-
-        expected_full = "".join(memref_descriptor + re.escape(exp) + "\n" for exp in expected)
-        regex = re.compile("^" + expected_full + "$")  # match exactly: ^ - start, $ - end
-
         out, err = capfd.readouterr()
         assert err == ""
-        assert regex.match(out)
+        assert expected == out
 
     class MyObject:
         def __init__(self, string):

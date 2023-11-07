@@ -187,7 +187,8 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Type structType = LLVM::LLVMStructType::getLiteral(
                 ctx, {IntegerType::get(ctx, 64), voidPtrType, IntegerType::get(ctx, 8)});
             Type structPtrType = LLVM::LLVMPointerType::get(structType);
-            Type qirSignature = LLVM::LLVMFunctionType::get(voidType, structPtrType);
+            SmallVector<Type> argTypes{structPtrType, IntegerType::get(ctx, 1)};
+            Type qirSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
@@ -220,7 +221,11 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Value structPtr =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(structType), c1);
             rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
-            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, structPtr);
+
+            Value printDescriptor = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
+                                                                      op.getPrintDescriptor());
+            SmallVector<Value> callArgs{structPtr, printDescriptor};
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, callArgs);
         }
 
         return success();
