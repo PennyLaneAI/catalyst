@@ -584,8 +584,6 @@ function within the loop --- do not have any type restrictions.
 Logical statements
 ------------------
 
-BOTH SIDES HAVE TO BE DYNAMIC.
-
 AutoGraph has support for capturing logical statements that involve dynamic variables --- that is,
 statements involving ``and``, ``not``, and ``or`` that return booleans --- allowing them to be
 computed at runtime.
@@ -600,7 +598,24 @@ array(True)
 >>> f(1.5, 1.6)
 array(False)
 
+Internally, logical statements are converted as follows:
 
+- ``x and y`` to ``jnp.logical_and(x, y)``
+- ``x or y`` to ``jnp.logical_or(x, y)``
+- ``not x`` to ``jnp.logical_not(x)``
+
+Note that there are a couple of important constraints and restrictions that must be
+considered when working with logical statements.
+
+Both arguments must be dynamic
+------------------------------
+
+Only cases
+
+
+
+- You can chain conditions on measurements
+- use ``logical_and`` otherwise
 
 .. _debugging:
 
