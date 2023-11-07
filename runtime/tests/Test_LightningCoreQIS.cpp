@@ -67,6 +67,13 @@ TEST_CASE("Test __quantum__rt__print_tensor i1, i8, i16, i32, f32, and c64", "[q
     CHECK(omr_i32_1d.rank == 1);
     __quantum__rt__print_tensor(&omr_i32_1d, false);
 
+    std::vector<size_t> buffer_idx(1, 1);
+    MemRefT<size_t, 1> mr_idx_1d{buffer_idx.data(), buffer_idx.data(), 0, {1}, {1}};
+    CHECK(mr_idx_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_idx_1d{1, (void *)(&mr_idx_1d), NumericType::idx};
+    CHECK(omr_idx_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_idx_1d, false);
+
     std::vector<float> buffer_f32(1, 1.0);
     MemRefT<float, 1> mr_f32_1d{buffer_f32.data(), buffer_f32.data(), 0, {1}, {1}};
     CHECK(mr_f32_1d.sizes[0] == 1);
@@ -83,6 +90,19 @@ TEST_CASE("Test __quantum__rt__print_tensor i1, i8, i16, i32, f32, and c64", "[q
     OpaqueMemRefT omr_c32_1d{1, (void *)(&mr_c32_1d), NumericType::c64};
     CHECK(omr_c32_1d.rank == 1);
     __quantum__rt__print_tensor(&omr_c32_1d, false);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor for an unsupported datatype", "[qir_lightning_core]")
+{
+    std::vector<std::vector<size_t>> buffer(2);
+    MemRefT<std::vector<size_t>, 1> mr_vidx_1d{buffer.data(), buffer.data(), 0, {2}, {1}};
+
+    OpaqueMemRefT omr_vidx_1d{1, (void *)(&mr_vidx_1d), static_cast<NumericType>(1000)};
+
+    REQUIRE_THROWS_WITH(
+        __quantum__rt__print_tensor(&omr_vidx_1d, false),
+        Catch::Contains("[Function:__quantum__rt__print_tensor] Error in Catalyst Runtime: Unkown "
+                        "numeric type encoding for array printing."));
 }
 
 TEST_CASE("Test __quantum__rt__print_tensor i64 1-dim", "[qir_lightning_core]")
