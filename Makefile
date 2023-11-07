@@ -144,7 +144,7 @@ clean-all:
 	rm -rf .coverage coverage_html_report/
 	$(MAKE) -C mlir clean
 	$(MAKE) -C runtime clean
-clang++
+
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
 
