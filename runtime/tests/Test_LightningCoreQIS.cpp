@@ -29,6 +29,13 @@
 
 using namespace Catalyst::Runtime;
 
+TEST_CASE("Test __quantum__rt__print_string", "[qir_lightning_core]")
+{
+    std::string str{"print_string_test"};
+    __quantum__rt__print_string(const_cast<char *>(str.c_str()));
+    __quantum__rt__print_string(nullptr);
+}
+
 TEST_CASE("Test __quantum__rt__print_tensor i64 1-dim", "[qir_lightning_core]")
 {
     std::vector<int64_t> buffer(100);
