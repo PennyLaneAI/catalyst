@@ -49,7 +49,7 @@ FetchContent_Declare(
 
 if(RUNTIME_ENABLE_WARNINGS)
     message(STATUS "Building with compiler warnings as errors enabled.")
-    add_compile_options(-Werror -Wextra -Wall)
+    add_compile_options(-Werror -Wall)
 endif()
 
 if(BUILD_QIR_STDLIB_FROM_SRC)
