@@ -21,7 +21,7 @@ while using :func:`~.qjit`.
 import numbers
 import pathlib
 from functools import update_wrapper
-from typing import Any, Callable, Iterable, List, Optional, Union
+from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -29,6 +29,7 @@ import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax._src.typing import DTypeLike
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
@@ -1948,16 +1949,72 @@ def ctrl(
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
 
 
-def ones(shape, dtype):
-    """Create a tensor filled with ones"""
-    return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=1, dtype=dtype)
+def _check_shape_dtype(shape, dtype: Optional[DTypeLike]) -> Tuple[jnp.array, DTypeLike]:
+    """Check shape and dtype according to numpy convensions"""
+    shape = jnp.array(shape, dtype=int)
+    if len(shape.shape) == 0:
+        shape = shape.reshape([1])
+    dtype = dtype if dtype is not None else jnp.float64
+    return shape, dtype
 
 
-def zeros(shape, dtype):
-    """Create a tensor filled with zeros"""
-    return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=0, dtype=dtype)
+def ones(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
+    """Return a new array of given shape and type, filled with ones.
+
+    Args:
+        shape : int or sequence of ints
+                Shape of the new array, e.g., ``(2, 3)`` or ``2``.
+        dtype : data-type, optional
+                The desired data-type for the array, e.g., `jax.numpy.int8`.  Default is
+                `jax.numpy.float64`.
+
+    Returns:
+        JAX array of ones with the given shape, dtype, and order.
+    """
+    if EvaluationContext.is_tracing():
+        shape, dtype = _check_shape_dtype(shape, dtype)
+        return tensor_init_p.bind(shape, initializer=1, dtype=dtype)
+    else:
+        return jnp.ones(shape=shape, dtype=dtype)
 
 
-def empty(shape, dtype):
-    """Create an empty tensor"""
-    return tensor_init_p.bind(jnp.array(shape, dtype=int), initializer=None, dtype=dtype)
+def zeros(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
+    """Return a new array of given shape and type, filled with zeros.
+
+    Args:
+        shape : int or tuple of ints
+                Shape of the new array, e.g., ``(2, 3)`` or ``2``.
+        dtype : data-type, optional
+                The desired data-type for the array, e.g., `jax.numpy.int8`.  Default is
+                `jax.numpy.float64`.
+
+    Returns:
+        JAX array of zeros with the given shape, dtype, and order.
+    """
+    if EvaluationContext.is_tracing():
+        shape, dtype = _check_shape_dtype(shape, dtype)
+        return tensor_init_p.bind(shape, initializer=0, dtype=dtype)
+    else:
+        return jnp.zeros(shape=shape, dtype=dtype)
+
+
+def empty(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
+    """Return a new array of given shape and type, without initializing entries.
+    This is a Catalyst implementation of :func:`numpy.empty` which supports JAX-tracing.
+
+    Args:
+        shape: int or tuple of int
+               Shape of the empty array, e.g., ``(2, 3)`` or ``2``.
+        dtype: data-type, optional
+               Desired output data-type for the array, e.g, `jax.numpy.int8`. Default is
+               `jax.numpy.float64`.
+
+    Returns:
+        JAX array of uninitialized (arbitrary) data of the given shape, dtype, and
+        order. Object arrays will be initialized to None.
+    """
+    if EvaluationContext.is_tracing():
+        shape, dtype = _check_shape_dtype(shape, dtype)
+        return tensor_init_p.bind(shape, initializer=None, dtype=dtype)
+    else:
+        return jnp.empty(shape=shape, dtype=dtype)

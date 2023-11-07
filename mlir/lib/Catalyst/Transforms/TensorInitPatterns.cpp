@@ -14,10 +14,6 @@
 
 #define DEBUG_TYPE "tensorinit"
 
-#include <algorithm>
-#include <iostream> // FIXME
-#include <vector>
-
 #include "Catalyst/IR/CatalystOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -70,7 +66,6 @@ struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
             assert(shapeShape[0] >= 0 && "dynamic elements in shapes are not supported!");
 
             for (int64_t i = 0; i < shapeShape[0]; i++) {
-                std::cerr << i << "\n";
                 Value axis = rewriter.create<arith::ConstantIndexOp>(loc, i);
                 Value val = rewriter.create<tensor::ExtractOp>(loc, elementType, shape, axis);
                 Value ival = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);

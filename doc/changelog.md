@@ -2,6 +2,17 @@
 
 <h3>New features</h3>
 
+* Catalyst now has its own versions of `numpy.zeros`, `numpy.ones` and `numpy.empty`, all compatible
+  with the JAX tracing that we use for compilation.
+  [(#350)](https://github.com/PennyLaneAI/catalyst/pull/350)
+
+  ```python
+  @qjit(autograph=True)
+  def func(shape):
+    a = catalyst.ones(shape, dtype=float)
+    return a + a
+  ```
+
 <h3>Improvements</h3>
 
 * Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
