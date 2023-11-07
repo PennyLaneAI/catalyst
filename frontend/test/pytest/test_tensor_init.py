@@ -38,6 +38,7 @@ def _assert_equal(a, b):
 @pytest.mark.parametrize("shape", SHAPES)
 def test_interpretation(shape, dtype):
     """Test that tensor primitive work in the interpretation mode"""
+    # pylint: disable=unnecessary-direct-lambda-call
 
     _assert_equal((lambda: zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
     _assert_equal((lambda: ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
