@@ -162,6 +162,10 @@
   names of failing passes.
   [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
 
+* The scatter operation in the Catalyst dialect now uses a SCF for loop to avoid ballooning
+  the compiled code.
+  [(#307)](https://github.com/PennyLaneAI/catalyst/pull/307)
+
 * The `CopyGlobalMemRefPass` pass of our MLIR processing pipeline now supports
   dynamically shaped arrays.
   [(#348)](https://github.com/PennyLaneAI/catalyst/pull/348)
@@ -198,7 +202,8 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 David Ittah,
 Sergei Mironov,
-Romain Moyard.
+Romain Moyard,
+Erick Ochoa Lopez.
 
 # Release 0.3.1
 

@@ -517,6 +517,70 @@ array(22)
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
 
+While loops
+-----------
+
+Most ``while`` loop constructs will be properly captured and compiled by
+AutoGraph:
+
+>>> @qjit(autograph=True)
+... def f(param):
+...     n = 0.
+...     while param < 0.5:
+...         param *= 1.2
+...         n += 1
+...     return n
+>>> f(0.1)
+array(9.)
+
+Break and continue
+~~~~~~~~~~~~~~~~~~
+
+Within a while loop, control flow statements ``break`` and ``continue``
+are not currently supported. Usage will result in an error:
+
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     while x < 5:
+...         if x < 0:
+...             continue
+...         x = x + x ** 2
+...     return x
+SyntaxError: 'continue' not properly in loop
+
+
+Updating and assigning variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As with for loops, while loops that update variables can also be converted with AutoGraph:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     while x < 5:
+...         x = x + 2
+...     return x
+>>> f(4)
+array(6.4)
+
+However, like with conditionals, a similar restriction applies: variables
+which are updated across iterations of the loop must have a JAX compileable
+type (Booleans, Python numeric types, and JAX arrays).
+
+You can also utilize temporary variables within a while loop:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     while x < 5:
+...         c = 2
+...         x = x + 2 * c
+...     return x
+>>> f(4)
+array(8.4)
+
+Temporary variables used inside a loop --- and that are **not** passed to a
+function within the loop --- do not have any type restrictions.
+
 .. _debugging:
 
 Debugging
