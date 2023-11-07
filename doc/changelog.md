@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* Debug your compiled programs with Catalyst's new ``debug.print`` statement.
+* Debug compiled programs and print dynamic values at runtime with ``debug.print``
   [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
 
   You can now print arbitrary values from your running program, whether they are arrays, constants,
@@ -22,7 +22,7 @@
   ```pycon
   >>> func(jnp.array(0.43))
   MemRef: base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
-  [0.43]
+  0.43
   exit
   ```
 

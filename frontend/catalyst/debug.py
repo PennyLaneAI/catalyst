@@ -31,7 +31,7 @@ def print(x, memref=False):
     Enables printing of numeric values at runtime. Can also print objects or strings as constants.
 
     Args:
-        x (jax.Arrar, Any): A single jax array whose numeric values are printed at runtime, or any
+        x (jax.Array, Any): A single jax array whose numeric values are printed at runtime, or any
             object whose string representation will be treated as a constant and printed at runtime.
         memref (Optional[bool]): When set to ``True``, additional information about how the array is
             stored in memory is printed, via the so-called "memref" descriptor. This includes the
