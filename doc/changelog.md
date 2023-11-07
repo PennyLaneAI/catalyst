@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* Debug your compiled programs with Catalyst's new ``debug_print`` statement.
+* Debug your compiled programs with Catalyst's new ``debug.print`` statement.
   [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
 
   You can now print arbitrary values from your running program, whether they are arrays, constants,
@@ -15,8 +15,8 @@
   ```python
   @qjit
   def func(x: float):
-      debug_print(x, memref=True)
-      debug_print("exit")
+      debug.print(x, memref=True)
+      debug.print("exit")
   ```
 
   ```pycon

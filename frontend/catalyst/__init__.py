@@ -63,13 +63,13 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleT
 )
 
 
+import catalyst.debug
 from catalyst.ag_utils import AutoGraphError, autograph_source
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
     cond,
     ctrl,
-    debug_print,
     for_loop,
     grad,
     jacobian,
@@ -173,7 +173,7 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
-    "debug_print",
+    "debug",
     "autograph_source",
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",

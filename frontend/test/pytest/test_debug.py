@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from catalyst import debug_print, for_loop, qjit
+from catalyst import debug, for_loop, qjit
 
 
 class TestDebugPrint:
@@ -45,7 +45,7 @@ class TestDebugPrint:
 
         @qjit
         def test(x):
-            debug_print(x)
+            debug.print(x)
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -62,7 +62,7 @@ class TestDebugPrint:
 
         @qjit
         def test(x):
-            debug_print(x, memref=True)
+            debug.print(x, memref=True)
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -97,7 +97,7 @@ class TestDebugPrint:
         def test(n):
             @for_loop(0, n, 1)
             def loop(i):
-                debug_print(i)
+                debug.print(i)
 
             loop()
 
@@ -126,7 +126,7 @@ class TestDebugPrint:
 
         @qjit
         def test():
-            debug_print(arg)
+            debug.print(arg)
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -157,7 +157,7 @@ class TestDebugPrint:
     def test_no_qjit(self, capfd, arg, expected):
         """Test printing in interpreted mode."""
 
-        debug_print(arg)
+        debug.print(arg)
 
         out, err = capfd.readouterr()
         assert err == ""

@@ -47,7 +47,6 @@ from catalyst.jax_primitives import (
     func_p,
     grad_p,
     jvp_p,
-    print_p,
     probs_p,
     qmeasure_p,
     vjp_p,
@@ -1733,52 +1732,6 @@ def measure(wires) -> DynamicJaxprTracer:
         in_classical_tracers=wires, out_classical_tracers=[out_classical_tracer], regions=[]
     )
     return out_classical_tracer
-
-
-# Note that "print" would alias the built-in print function.
-def debug_print(x, memref=False):
-    """A :func:`qjit` compatible print function for printing values at runtime.
-
-    Enables printing of numeric values at runtime. Can also print objects or strings as constants.
-
-    Args:
-        x (jax.Arrar, Any): A single jax array whose numeric values are printed at runtime, or any
-            object whose string representation will be treated as a constant and printed at runtime.
-        memref (Optional[bool]): When set to ``True``, additional information about how the array is
-            stored in memory is printed, via the so-called "memref" descriptor. This includes the
-            base memory address of the data buffer, as well as the rank of the array, the size of
-            each dimension, and the strides between elements.
-
-    **Example**
-
-    .. code-block:: python
-
-        @qjit
-        def func(x: float):
-            debug_print(x, memref=True)
-            debug_print("exit")
-
-    >>> func(jnp.array(0.43))
-    Unranked Memref base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
-    [0.43]
-    exit
-
-    Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
-
-    .. note::
-
-        Python f-strings will not work as expected since they will be treated as Python objects.
-        This means that array values embeded in them will have their compile-time representation
-        printed, instead of actual data.
-    """
-    if EvaluationContext.is_tracing():
-        if isinstance(x, jax.core.Tracer):
-            print_p.bind(x, memref=memref)
-        else:
-            print_p.bind(string=str(x))
-    else:
-        # Dispatch to Python print outside a qjit context.
-        print(x)
 
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
