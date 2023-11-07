@@ -332,21 +332,39 @@ class AdjointGenerator {
         func::FuncOp adjointFnOp = builder.create<func::FuncOp>(loc, adjointName, adjointFnType);
         adjointFnOp.setPrivate();
 
-        auto funcBody = &funcOp.front();
-        builder.setInsertionPointToStart(funcBody);
-        generateImpl(funcOp.getBody(), builder);
-        builder.create<func::ReturnOp>(
-            loc, remappedValues.lookup(getQuantumReg(callOp.getArgOperands().back()).value()));
-        builder.restoreInsertionPoint(insertionSaved);
+        auto adjointFnBlock = adjointFnOp.addEntryBlock();
+        builder.setInsertionPointToStart(adjointFnBlock);
+        Type qregType = quantum::QuregType::get(builder.getContext());
+        auto size = adjointFnOp.getArguments().size();
+        Value lastArg = adjointFnOp.getArgument(size - 1);
+        quantum::AdjointOp adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, lastArg);
+        Region *adjointRegion = &adjointOp.getRegion();
+        Region &originalRegion = funcOp.getRegion();
 
-        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
-        remappedValues.map(returnedQureg.value(), reversedResult);
-        std::vector<Value> args = {funcOp.getArguments().begin(), funcOp.getArguments().end()};
-        args.pop_back();
-        args.push_back(reversedResult);
-        auto reversedCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
-        remappedValues.map(getQuantumReg(funcOp.getArguments()).value(),
-                           reversedCallOp.getResult(0));
+        for (size_t i = 0; i < funcOp.getArguments().size()-1; i++) {
+            Value arg = adjointFnOp.front().getArgument(i);
+            Value argBlock = originalRegion.front().getArgument(i);
+            remappedValues.map(argBlock, arg);
+        }
+
+        Value firstArg = adjointFnOp.front().getArgument(0);
+        Value firstArgBlock = originalRegion.front().getArgument(0);
+        remappedValues.map(firstArgBlock, firstArg);
+        originalRegion.cloneInto(adjointRegion, remappedValues);
+        auto terminator = adjointRegion->front().getTerminator();
+        ValueRange res = terminator->getOperands();
+        TypeRange resTypes = terminator->getResultTypes();
+        builder.setInsertionPointAfter(terminator);
+        builder.create<quantum::YieldOp>(loc, resTypes, res);
+        IRRewriter rewriter(builder);
+        rewriter.eraseOp(terminator);
+        builder.setInsertionPointAfter(adjointOp);
+        builder.create<func::ReturnOp>(loc, adjointOp.getResult());
+        adjointFnOp.dump();
+
+        builder.restoreInsertionPoint(insertionSaved);
+        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, callOp.getArgOperands());
+        adjointCallOp.dump();
     }
 
     void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
