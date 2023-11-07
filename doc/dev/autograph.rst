@@ -607,15 +607,38 @@ Internally, logical statements are converted as follows:
 Note that there are a couple of important constraints and restrictions that must be
 considered when working with logical statements.
 
-Both arguments must be dynamic
-------------------------------
+All arguments must be dynamic
+-----------------------------
 
-Only cases
+Only cases where **all arguments to the logical statement are dynamic** (that is, dependent on
+runtime values) are captured and converted by AutoGraph. Cases where one or both of the arguments
+are static will result in the logical statement falling back to Python, and
+being interpreted at compile time.
 
+For example,
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     return x and True
+TracerBoolConversionError: Attempted boolean conversion of traced array with shape float64[]..
+The error occurred while tracing the function f_1 at /tmp/__autograph_generated_file3sgpmu5h.py:6 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument x.
+
+Here, ``x`` is dynamic, but the other argument is static. As a result, Python will attempt
+to evaluate this expression at compile time and fail.
+
+To avoid this, please use ``jnp.logical_and(x, y)``, ``jnp.logical_or(x, y)``,
+and ``jnp.logical_not(x)`` explicitly if one of your arguments is static:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     return jnp.logical_and(x, True)
+>>> f(False)
+array(False)
+>>> f(True)
+array(True)
 
 
 - You can chain conditions on measurements
-- use ``logical_and`` otherwise
 
 .. _debugging:
 
