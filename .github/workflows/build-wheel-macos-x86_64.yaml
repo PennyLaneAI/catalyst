@@ -248,6 +248,7 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
+              -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi
