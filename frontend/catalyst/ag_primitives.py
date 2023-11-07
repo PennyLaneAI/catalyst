@@ -26,6 +26,7 @@ import jax.numpy as jnp
 # as well as various utility objects.
 import pennylane as qml
 import tensorflow.python.autograph.impl.api as tf_autograph_api
+from pennylane.queuing import AnnotatedQueue
 from tensorflow.python.autograph.core import config
 from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
 from tensorflow.python.autograph.core.converter import ConversionOptions
@@ -43,6 +44,7 @@ from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
+from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
@@ -62,6 +64,42 @@ __all__ = [
     "or_",
     "not_",
 ]
+
+
+def get_program_length(reference_tracers):
+    """Get the current number of instructions of the quantum and classical program."""
+    # pylint: disable=unnecessary-dunder-call
+
+    num_jaxpr_eqns, num_tape_ops = 0, 0
+
+    if EvaluationContext.is_tracing():
+        jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
+        num_jaxpr_eqns = len(jaxpr_frame.eqns)
+
+    if EvaluationContext.is_quantum_tracing():
+        quantum_queue = EvaluationContext.find_quantum_queue()
+        # Using the the class methods directly allows this to work for both
+        # QuantumTape & AnnotatedQueue instances.
+        num_tape_ops = AnnotatedQueue.__len__(quantum_queue)
+
+    return num_jaxpr_eqns, num_tape_ops
+
+
+def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
+    """Reset the quantum and classical program back to a given length."""
+    # pylint: disable=unnecessary-dunder-call
+
+    if EvaluationContext.is_tracing():
+        jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
+        while len(jaxpr_frame.eqns) > num_jaxpr_eqns:
+            jaxpr_frame.eqns.pop()
+
+    if EvaluationContext.is_quantum_tracing():
+        quantum_queue = EvaluationContext.find_quantum_queue()
+        # Using the the class methods directly allows this to work for both
+        # QuantumTape & AnnotatedQueue instances.
+        while AnnotatedQueue.__len__(quantum_queue) > num_tape_ops:
+            AnnotatedQueue.popitem(quantum_queue)
 
 
 def assert_results(results, var_names):
@@ -157,7 +195,8 @@ def assert_iteration_results(inputs, outputs, symbol_names):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
-                f"The variable '{symbol_names[i]}' was initialized with the wrong type. "
+                f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
+                f"be trying to change its type from one iteration to the next. "
                 f"Expected: {out_t}, Got: {inp_t}"
             )
 
@@ -284,6 +323,9 @@ def for_stmt(
 
     # Attempt to trace the Catalyst for loop.
     if not fallback:
+        reference_tracers = (start, stop, step, *init_state)
+        num_instructions = get_program_length(reference_tracers)
+
         try:
             set_state(init_state)
             results = _call_catalyst_for(
@@ -297,15 +339,17 @@ def for_stmt(
                 enum_start,
                 iteration_array,
             )
+
         except Exception as e:  # pylint: disable=broad-exception-caught
             if catalyst.autograph_strict_conversion:
                 raise e
 
+            fallback = True
+            reset_program_to_length(reference_tracers, *num_instructions)
+
             # pylint: disable=import-outside-toplevel
             import inspect
             import textwrap
-
-            fallback = True
 
             for_loop_info = get_source_code_info(inspect.stack()[1])
 
@@ -376,13 +420,18 @@ def while_stmt(loop_test, loop_body, get_state, set_state, symbol_names, _opts):
     fallback = False
     init_state = get_state()
 
+    reference_tracers = init_state
+    num_instructions = get_program_length(reference_tracers)
+
     try:
         results = _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         if catalyst.autograph_strict_conversion:
             raise e
+
         fallback = True
+        reset_program_to_length(reference_tracers, *num_instructions)
 
     if fallback:
         set_state(init_state)

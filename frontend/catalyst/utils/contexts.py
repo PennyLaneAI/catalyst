@@ -30,6 +30,7 @@ from jax._src.interpreters.partial_eval import (
 )
 from jax._src.source_info_util import reset_name_stack
 from jax.core import find_top_trace
+from pennylane.queuing import QueuingManager
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import new_dynamic_main2
@@ -172,6 +173,13 @@ class EvaluationContext:
         ]
 
     @classmethod
+    def is_quantum_tracing(cls):
+        """Returns true or false depending on whether the execution is currently being
+        traced.
+        """
+        return cls.get_mode() == EvaluationMode.QUANTUM_COMPILATION
+
+    @classmethod
     def check_modes(cls, modes, msg):
         """Asserts if the execution mode is not among the expected ``modes``.
 
@@ -223,3 +231,16 @@ class EvaluationContext:
         """
         cls.check_is_tracing("No JAXPR frames exist outside a tracing context.")
         return find_top_trace(args).frame
+
+    @classmethod
+    def find_quantum_queue(cls):
+        """Obtain the current quantum queuing context, in which operations are being inserted.
+
+        Raises: CompileError
+        """
+        cls.check_is_quantum_tracing("No quantum queueing context found.")
+
+        queuing_context = QueuingManager.active_context()
+        assert queuing_context is not None
+
+        return queuing_context
