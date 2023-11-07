@@ -192,7 +192,8 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
   %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
   %4 = quantum.adjoint(%3) : !quantum.reg {
-      %5 = func.call @circuit(%arg0, %3): (f64, !quantum.reg) -> !quantum.reg
+    ^bb0(%arg1: !quantum.reg):
+      %5 = func.call @circuit(%arg0, %arg1): (f64, !quantum.reg) -> !quantum.reg
       quantum.yield %5 : !quantum.reg
   }
   %6 = quantum.extract %4[%c0_i64] : !quantum.reg -> !quantum.bit
