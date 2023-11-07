@@ -608,7 +608,7 @@ Note that there are a couple of important constraints and restrictions that must
 considered when working with logical statements.
 
 All arguments must be dynamic
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Only cases where **all arguments to the logical statement are dynamic** (that is, dependent on
 runtime values) are captured and converted by AutoGraph. Cases where one or both of the arguments
