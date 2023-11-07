@@ -26,6 +26,9 @@ add_executable(runner_tests runner_main.cpp)
 
 add_subdirectory(third_party)
 
+# Skip dynamic device loading test when sanitizers are enabled or when building on mac,
+# due to the fact that our current support is not fully compatible on macOS.
+# RTLD_DEEPBIND incompatibility.
 if (ENABLE_ADDRESS_SANITIZER OR APPLE)
     set(dl_manager_tests "")
 else()

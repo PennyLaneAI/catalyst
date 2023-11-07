@@ -1,8 +1,6 @@
 name: Build Catalyst Wheel on macOS (x86_64)
 
-# TODO: remove on pull_request before merging
 on:
-  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:
