@@ -52,8 +52,10 @@ if(RUNTIME_ENABLE_WARNINGS)
     add_compile_options(-Werror -Wall)
 endif()
 
-if(BUILD_QIR_STDLIB_FROM_SRC)
+if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
     message(STATUS "Building qir-stdlib from source.")
+
+    include(FetchContent)
 
     FetchContent_Declare(
         qir_runner
@@ -71,9 +73,7 @@ if(BUILD_QIR_STDLIB_FROM_SRC)
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
 elseif(NOT DEFINED QIR_STDLIB_PATH)
-    if (APPLE)
-        set(QIRSTDLIB_PLATFORM "macos-11-amd64")
-    elseif(UNIX)
+    if(UNIX)
         set(QIRSTDLIB_PLATFORM "ubuntu-20.04-amd64")
     elseif(MSVC)
         set(QIRSTDLIB_PLATFORM "windows-2019-amd64")

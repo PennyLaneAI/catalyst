@@ -26,6 +26,11 @@
   exit
   ```
 
+* Catalyst now officially supports macOS X86_64 devices, with macOS binary wheels
+  available for both AARCH64 and X86_64 on PyPI.
+  [(#347)](https://github.com/PennyLaneAI/catalyst/pull/347)
+  [(#313)](https://github.com/PennyLaneAI/catalyst/pull/313)
+
 <h3>Improvements</h3>
 
 * Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
