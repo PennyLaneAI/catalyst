@@ -1,6 +1,6 @@
 PYTHON := $(shell which python3)
-C_COMPILER?=clang
-CXX_COMPILER?=clang++
+C_COMPILER?=$(shell which clang)
+CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -26,6 +26,8 @@ ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=Release
 

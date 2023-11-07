@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -34,6 +35,54 @@ TEST_CASE("Test __quantum__rt__print_string", "[qir_lightning_core]")
     std::string str{"print_string_test"};
     __quantum__rt__print_string(const_cast<char *>(str.c_str()));
     __quantum__rt__print_string(nullptr);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor i1, i8, i16, i32, f32, and c64", "[qir_lightning_core]")
+{
+    std::array<bool, 2> buffer_i1;
+    MemRefT<bool, 1> mr_i1_1d{buffer_i1.data(), buffer_i1.data(), 0, {2}, {1}};
+    CHECK(mr_i1_1d.sizes[0] == 2);
+    OpaqueMemRefT omr_i1_1d{1, (void *)(&mr_i1_1d), NumericType::i1};
+    CHECK(omr_i1_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i1_1d, false);
+
+    std::vector<int8_t> buffer_i8(2, 1);
+    MemRefT<int8_t, 1> mr_i8_1d{buffer_i8.data(), buffer_i8.data(), 0, {2}, {1}};
+    CHECK(mr_i8_1d.sizes[0] == 2);
+    OpaqueMemRefT omr_i8_1d{1, (void *)(&mr_i8_1d), NumericType::i8};
+    CHECK(omr_i8_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i8_1d, false);
+
+    std::vector<int16_t> buffer_i16(1, 1);
+    MemRefT<int16_t, 1> mr_i16_1d{buffer_i16.data(), buffer_i16.data(), 0, {1}, {1}};
+    CHECK(mr_i16_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_i16_1d{1, (void *)(&mr_i16_1d), NumericType::i16};
+    CHECK(omr_i16_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i16_1d, false);
+
+    std::vector<int32_t> buffer_i32(1, 1);
+    MemRefT<int32_t, 1> mr_i32_1d{buffer_i32.data(), buffer_i32.data(), 0, {1}, {1}};
+    CHECK(mr_i32_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_i32_1d{1, (void *)(&mr_i32_1d), NumericType::i32};
+    CHECK(omr_i32_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i32_1d, false);
+
+    std::vector<float> buffer_f32(1, 1.0);
+    MemRefT<float, 1> mr_f32_1d{buffer_f32.data(), buffer_f32.data(), 0, {1}, {1}};
+    CHECK(mr_f32_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_f32_1d{1, (void *)(&mr_f32_1d), NumericType::f32};
+    CHECK(omr_f32_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_f32_1d, false);
+
+    CplxT_float matrix_data[2] = {
+        {-0.67, -0.63},
+        {-0.14, 0.36},
+    };
+    MemRefT<CplxT_float, 1> mr_c32_1d{matrix_data, matrix_data, 0, {2}, {1}};
+    CHECK(mr_c32_1d.sizes[0] == 2);
+    OpaqueMemRefT omr_c32_1d{1, (void *)(&mr_c32_1d), NumericType::c64};
+    CHECK(omr_c32_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_c32_1d, false);
 }
 
 TEST_CASE("Test __quantum__rt__print_tensor i64 1-dim", "[qir_lightning_core]")
