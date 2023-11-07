@@ -32,9 +32,11 @@ using namespace Catalyst::Runtime;
 
 TEST_CASE("Test __quantum__rt__print_string", "[qir_lightning_core]")
 {
-    std::string str{"print_string_test"};
-    __quantum__rt__print_string(const_cast<char *>(str.c_str()));
-    __quantum__rt__print_string(nullptr);
+    char str[] = "print_string_test";
+    __quantum__rt__print_string(str);
+
+    char *str_null = nullptr;
+    __quantum__rt__print_string(str_null);
 }
 
 TEST_CASE("Test __quantum__rt__print_tensor i1, i8, i16, i32, f32, and c64", "[qir_lightning_core]")
