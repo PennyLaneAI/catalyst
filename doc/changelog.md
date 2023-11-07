@@ -26,7 +26,7 @@
   array(0.94923542)
   ```
 
-  This feature extends the existing AutoGraph support for Python `for` loops and if` statements
+  This feature extends the existing AutoGraph support for Python `for` loops and `if` statements
   introduced in v0.3. Note that TensorFlow must be installed for AutoGraph support.
 
   For more details, please see the
@@ -60,7 +60,7 @@
   one of the arguments is a numeric object.
 
 * It is now possible to dynamically load third-party Catalyst compatible devices directly
-  into a pre-installed Catalyst runtime.
+  into a pre-installed Catalyst runtime on Linux.
   [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)
 
   To take advantage of this, third-party devices must implement the `Catalyst::Runtime::QuantumDevice`
@@ -148,7 +148,7 @@
   metadata under the the group name `pennylane.compilers` must be added, with the following entry points:
 
   - `context`: Path to the compilation evaluation context manager. This context manager should have
-    the method `context.is_tracing()``, which returns True if called within a program that is being
+    the method `context.is_tracing()`, which returns True if called within a program that is being
     traced or captured.
 
   - `ops`: Path to the compiler operations module. This operations module may contain compiler
@@ -156,8 +156,7 @@
     dispatch to these.
 
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
-    the signature `qjit(fn, *args, **kwargs)`, where fn is the function to be compiled.
-
+    the signature `qjit(fn, *args, **kwargs)`, where `fn` is the function to be compiled.
 * The compiler driver diagnostic output has been improved, and now includes failing IR as well as
   names of failing passes.
   [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
