@@ -581,6 +581,27 @@ array(8.4)
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
 
+Logical statements
+------------------
+
+BOTH SIDES HAVE TO BE DYNAMIC.
+
+AutoGraph has support for capturing logical statements that involve dynamic variables --- that is,
+statements involving ``and``, ``not``, and ``or`` that return booleans --- allowing them to be
+computed at runtime.
+
+>>> @qjit(autograph=True)
+... def f(x: float, y: float):
+...     a = x >= 0.0 and x <= 1.0
+...     b = not y >= 1.0
+...     return a or b
+>>> f(0.5, 1.1)
+array(True)
+>>> f(1.5, 1.6)
+array(False)
+
+
+
 .. _debugging:
 
 Debugging
