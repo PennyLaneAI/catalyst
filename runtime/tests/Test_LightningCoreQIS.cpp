@@ -38,7 +38,7 @@ TEST_CASE("Test __quantum__rt__print_string", "[qir_lightning_core]")
     char *str_null = nullptr;
     __quantum__rt__print_string(str_null);
 
-    CHECK(true)
+    CHECK(true);
 }
 
 TEST_CASE("Test __quantum__rt__print_tensor i1, i8, i16, i32, f32, and c64", "[qir_lightning_core]")
