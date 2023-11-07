@@ -72,7 +72,7 @@ def get_program_length(reference_tracers):
 
     num_jaxpr_eqns, num_tape_ops = 0, 0
 
-    if EvaluationContext.is_tracing():
+    if EvaluationContext.is_tracing():  # pragma: no branch
         jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
         num_jaxpr_eqns = len(jaxpr_frame.eqns)
 
@@ -89,7 +89,7 @@ def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
     """Reset the quantum and classical program back to a given length."""
     # pylint: disable=unnecessary-dunder-call
 
-    if EvaluationContext.is_tracing():
+    if EvaluationContext.is_tracing():  # pragma: no branch
         jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
         while len(jaxpr_frame.eqns) > num_jaxpr_eqns:
             jaxpr_frame.eqns.pop()
