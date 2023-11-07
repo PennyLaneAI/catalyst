@@ -59,6 +59,11 @@
   Note that Boolean expressions will only be captured by AutoGraph if at least
   one of the arguments is a numeric object.
 
+* Catalyst now officially supports macOS X86_64 devices, with macOS binary wheels
+  available for both AARCH64 and X86_64.
+  [(#347)](https://github.com/PennyLaneAI/catalyst/pull/347)
+  [(#313)](https://github.com/PennyLaneAI/catalyst/pull/313)
+
 * It is now possible to dynamically load third-party Catalyst compatible devices directly
   into a pre-installed Catalyst runtime on Linux.
   [(#327)](https://github.com/PennyLaneAI/catalyst/pull/327)

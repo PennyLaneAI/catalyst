@@ -1,4 +1,4 @@
-PYTHON ?= python3
+PYTHON ?= $(shell which python3)
 C_COMPILER ?= clang
 CXX_COMPILER ?= clang++
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
@@ -8,7 +8,7 @@ BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
-MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/build
+MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/mhlo-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
