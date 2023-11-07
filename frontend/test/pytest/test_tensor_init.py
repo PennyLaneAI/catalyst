@@ -83,5 +83,31 @@ def test_unsupported():
         qjit(f)
 
 
+def test_invalid_shape_of_shape():
+    """Test the unsupported shape format"""
+
+    def f():
+        return empty(shape=[[2, 3]], dtype=int)
+
+    with pytest.raises(
+        ValueError,
+        match="The shape is expected to have rank one and contain integers",
+    ):
+        qjit(f)
+
+
+def test_invalid_dtype_of_shape():
+    """Test the unsupported shape format"""
+
+    def f():
+        return empty(shape=[[2.0, 3.0]], dtype=int)
+
+    with pytest.raises(
+        ValueError,
+        match="The shape is expected to have rank one and contain integers",
+    ):
+        qjit(f)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

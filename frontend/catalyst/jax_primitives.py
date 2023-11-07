@@ -17,7 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import dataclass
 from itertools import chain
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 import jax
 import jax.numpy as jnp
@@ -1442,6 +1442,26 @@ def _adjoint_lowering(
 #
 # tensor_init
 #
+
+
+def _tryinfo(f, dtype) -> Optional[Any]:
+    """Wrapper around jnp.iinfo/jnp.finfo functions"""
+    try:
+        return f(dtype)
+    except ValueError:
+        return None
+
+
+def _iinfo(dtype) -> Optional[Any]:
+    """Return integer-type information or None"""
+    return _tryinfo(jnp.iinfo, dtype)
+
+
+def _finfo(dtype) -> Optional[Any]:
+    """Return float-type information or None"""
+    return _tryinfo(jnp.finfo, dtype)
+
+
 @tensor_init_p.def_impl
 def _tensor_init_def_impl(ctx, shape, *, initializer, dtype):  # pragma: no cover
     raise NotImplementedError()
@@ -1449,6 +1469,8 @@ def _tensor_init_def_impl(ctx, shape, *, initializer, dtype):  # pragma: no cove
 
 @tensor_init_p.def_abstract_eval
 def _tensor_init_abstract(shape, *, initializer, dtype):
+    if len(shape.shape) != 1 or _iinfo(shape.dtype) is None:
+        raise ValueError("The shape is expected to have rank one and contain integers")
     return core.ShapedArray([ir.ShapedType.get_dynamic_size()] * shape.shape[0], dtype=dtype)
 
 
@@ -1458,17 +1480,11 @@ def _tensor_init_lowering(
     empty = mlir.ir_constants(True) if initializer is None else None  # do not initialize
     output_type = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out][0]
 
-    def _tryinfo(f):
-        try:
-            return f(dtype)
-        except ValueError:
-            return None
-
     init_value = initializer if not empty else 0
     initializer_attr = None
-    if _tryinfo(jnp.finfo) is not None:
+    if _finfo(dtype) is not None:
         initializer_attr = ir.FloatAttr.get(output_type.element_type, float(init_value))
-    elif _tryinfo(jnp.iinfo) is not None:
+    elif _iinfo(dtype) is not None:
         initializer_attr = ir.IntegerAttr.get(output_type.element_type, int(init_value))
     else:
         raise ValueError(f"Unsupported initializer {initializer} of type {dtype}")
