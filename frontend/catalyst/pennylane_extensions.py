@@ -1287,7 +1287,7 @@ def cond(pred: DynamicJaxprTracer):
 
             cond_fn()
 
-            eturn qml.probs(wires=0)
+            return qml.probs(wires=0)
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return

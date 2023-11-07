@@ -1,19 +1,30 @@
-
-PYTHON?=python3
+PYTHON?=$(shell which python3)
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
-COMPILER_LAUNCHER?=ccache
+COMPILER_LAUNCHER?=$(shell which ccache)
+
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
-MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/mhlo-build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
-ENABLE_LLD?=ON
-ENABLE_ZLIB?=ON
-ENABLE_ZSTD?=ON
+
+ifeq ($(shell uname), Darwin)
+	DEFAULT_ENABLE_LLD := OFF
+	DEFAULT_ENABLE_ZLIB := OFF
+	DEFAULT_ENABLE_ZSTD := OFF
+else
+	DEFAULT_ENABLE_LLD := ON
+	DEFAULT_ENABLE_ZLIB := ON
+	DEFAULT_ENABLE_ZSTD := ON
+endif
+
+ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
+ENABLE_ZLIB?=$(DEFAULT_ENABLE_LLD)
+ENABLE_ZSTD?=$(DEFAULT_ENABLE_LLD)
 
 ifeq ($(ENABLE_ASAN), ON)
 ifneq ($(findstring clang,$(C_COMPILER)), clang)
