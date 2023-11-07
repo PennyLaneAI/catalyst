@@ -26,7 +26,7 @@ from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.interpreters.partial_eval import _input_type_to_tracers
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
-from jax._src.lax.lax import _abstractify, xb, xla
+from jax._src.lax.lax import _abstractify, xla
 from jax._src.linear_util import annotate
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
@@ -290,7 +290,7 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
     """
 
     nrep = jaxpr_replicas(jaxpr)
-    effects = [eff for eff in jaxpr.effects if eff in jax_ordered_effects]
+    effects = jax_ordered_effects.filter_in(jaxpr.effects)
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
@@ -330,16 +330,13 @@ def custom_lower_jaxpr_to_module(
 
     Copyright 2021 The JAX Authors.
     """
-    platform = xb.canonicalize_platform(platform)
-    if not xb.is_known_platform(platform):  # pragma: no cover
-        raise ValueError(f"Unknown platform {platform}")
+
+    if any(lowerable_effects.filter_not_in(jaxpr.effects)):  # pragma: no cover
+        raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
+
+    assert platform == "cpu"
     assert arg_shardings is None
     assert result_shardings is None
-    platforms_with_donation = ("cuda", "rocm", "tpu")
-    assert platform not in platforms_with_donation
-    assert all(
-        eff in lowerable_effects for eff in jaxpr.effects
-    ), f"Unloweable effects: {jaxpr.effects}"
 
     # MHLO channels need to start at 1
     channel_iter = 1

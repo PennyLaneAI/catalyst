@@ -1,6 +1,6 @@
 PYTHON ?= $(shell which python3)
-C_COMPILER ?= clang
-CXX_COMPILER ?= clang++
+C_COMPILER ?= $(shell which clang)
+CXX_COMPILER ?= $(shell which clang++)
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
 BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)

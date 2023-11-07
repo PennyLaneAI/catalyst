@@ -1,6 +1,6 @@
 PYTHON := $(shell which python3)
-C_COMPILER?=clang
-CXX_COMPILER?=clang++
+C_COMPILER?=$(shell which clang)
+CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -26,6 +26,8 @@ ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=Release
 
@@ -56,9 +58,10 @@ configure:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
-		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_OPENMP=$(ENABLE_OPENMP) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
+		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_WARNINGS=OFF \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
@@ -87,7 +90,7 @@ coverage: $(RT_BUILD_DIR)/tests/runner_tests
 
 	$(RT_BUILD_DIR)/tests/runner_tests
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' --output-file $(RT_BUILD_DIR)/coverage.info
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples
