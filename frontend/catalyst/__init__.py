@@ -63,7 +63,7 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleT
 )
 
 
-import catalyst.debug
+from catalyst import debug
 from catalyst.ag_utils import AutoGraphError, autograph_source
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
