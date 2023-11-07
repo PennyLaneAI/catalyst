@@ -106,13 +106,14 @@ AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
 >>> cost(weights, data)
 array(0.30455313)
 
-Currently, AutoGraph supports converting the following Python control
-flow statements:
+Currently, AutoGraph supports converting the following Python statements:
 
 - ``if`` statements (including ``elif`` and ``else``)
 - ``for`` loops
+- ``while`` loops
+- ``and`` and ``or`` in certain cases
 
-``while`` loops are currently not supported, alongside ``break`` and ``continue`` statements.
+``break`` and ``continue`` statements are currently not supported.
 
 Nested functions
 ----------------
@@ -214,10 +215,12 @@ Instead of utilizing a return statement, use the following approach instead:
             y = x ** 3
         return y
 
-Different branches must assign the same type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Automatic type promotion in branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following will result in an error:
+Different branches of an if statement may assign external variables with different types ---
+Catalyst will automatically perform type promotion (such as converting integers to floats):
+
 
 >>> @qjit(autograph=True)
 ... def f(x):
@@ -225,18 +228,6 @@ The following will result in an error:
 ...         y = 5.0
 ...     else:
 ...         y = 4
-...     return y
->>> f(0.5)
-TypeError: Conditional requires consistent return types across all branches
-
-Instead, make sure that all branches assign the same type to variables:
-
->>> @qjit(autograph=True)
-... def f(x):
-...     if x > 5:
-...         y = 5.0
-...     else:
-...         y = 4.0
 ...     return y
 >>> f(0.5)
 array(4.)
