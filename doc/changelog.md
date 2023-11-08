@@ -7,7 +7,7 @@
   [(#350)](https://github.com/PennyLaneAI/catalyst/pull/350)
 
   ```python
-  @qjit(autograph=True)
+  @qjit
   def func(shape):
     a = catalyst.ones(shape, dtype=float)
     return a + a
