@@ -646,6 +646,34 @@ Internally, logical statements are converted as follows:
 - ``x or y`` to ``jnp.logical_or(x, y)``
 - ``not x`` to ``jnp.logical_not(x)``
 
+This can be useful when building dynamic circuits, with gates dependent on the output
+of multiple measurements. For example,
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit(autograph=True)
+    @qml.qnode(dev)
+    def circuit():
+        qml.RX(0.1, wires=0)
+        qml.RY(0.5, wires=1)
+
+        m1 = measure(0)
+        m2 = measure(1)  
+
+        if m1 and not m2:
+            qml.Hadamard(wires=1)
+        elif m1 and m2:
+            qml.RX(0.5, wires=1)
+        else:
+            qml.RY(0.5, wires=1)
+
+        return qml.expval(qml.PauliZ(1))
+
+>>> circuit()
+array(0.87758256)
+
 Note that there are a couple of important constraints and restrictions that must be
 considered when working with logical statements.
 
@@ -679,8 +707,29 @@ array(False)
 >>> f(True)
 array(True)
 
+Array arguments
+~~~~~~~~~~~~~~~
 
-- You can chain conditions on measurements
+Note that, like with NumPy and JAX, logical operators apply elementwise to array arguments:
+
+>>> @qjit(autograph=True)  
+... def f(x, y):  
+...     return x and y
+>>> f(jnp.array([0, 1]), jnp.array([1, 1]))
+array([False,  True])
+
+Care must therefore be taken when using logical operators within conditional branches;
+``jnp.all`` and ``jnp.any`` can be used to generate a single boolean for conditionals:
+
+>>> @qjit(autograph=True)  
+... def f(x, y):  
+...     if jnp.all(x and y):
+...         z = 1
+...     else:
+...         z = -1
+...     return z
+>>> f(jnp.array([0, 1]), jnp.array([1, 1]))
+array(-1)
 
 .. _debugging:
 
