@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 11.7
+  MACOSX_DEPLOYMENT_TARGET: 12
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -248,6 +248,7 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
+              -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi

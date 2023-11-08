@@ -77,6 +77,7 @@ void __quantum__rt__print_string(char *string)
 {
     if (!string) {
         std::cout << "None" << std::endl;
+        return;
     }
     std::cout << string << std::endl;
 }

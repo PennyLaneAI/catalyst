@@ -4,6 +4,7 @@
 
 * Debug compiled programs and print dynamic values at runtime with ``debug.print``
   [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
+  [(#356)](https://github.com/PennyLaneAI/catalyst/pull/356)
 
   You can now print arbitrary values from your running program, whether they are arrays, constants,
   strings, or abitrary Python objects. Note that while non-array Python objects
