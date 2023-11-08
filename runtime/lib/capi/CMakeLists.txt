@@ -4,6 +4,10 @@
 
 add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 
+# include external MLIR runner utils
+FetchContent_MakeAvailable(MLIRRunnerUtils)
+FetchContent_MakeAvailable(MLIRCRunnerUtils)
+
 # link to rt_backend
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS}
                                             "-L${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
@@ -32,7 +36,13 @@ target_include_directories(catalyst_qir_qis_obj PUBLIC .
                                                         ${QIR_STDLIB_PATH}
                                                         ${runtime_includes}
                                                         ${backend_includes}
-                                                        ${extensions_includes})
+                                                        ${extensions_includes}
+                                                        ${mlirrunnerutils_SOURCE_DIR}/../..)  # includes are relative to mlir/ExecutionEngine
+
+# The MLIR Runner Utils raises this warning so we need to disable it for our -Werror builds.
+if(RUNTIME_ENABLE_WARNINGS)
+    target_compile_options(catalyst_qir_qis_obj PRIVATE "-Wno-unused-parameter")
+endif()
 
 set_property(TARGET catalyst_qir_qis_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
 

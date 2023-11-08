@@ -14,6 +14,7 @@ set(TEST_SUITES
     Catalyst
     Quantum
     Gradient
+    Catalyst
 )
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)

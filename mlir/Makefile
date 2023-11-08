@@ -1,6 +1,6 @@
 PYTHON?=$(shell which python3)
-C_COMPILER?=clang
-CXX_COMPILER?=clang++
+C_COMPILER?=$(shell which clang)
+CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))

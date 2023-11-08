@@ -1,6 +1,6 @@
 PYTHON ?= $(shell which python3)
-C_COMPILER ?= clang
-CXX_COMPILER ?= clang++
+C_COMPILER ?= $(shell which clang)
+CXX_COMPILER ?= $(shell which clang++)
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
 BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
@@ -121,7 +121,7 @@ wheel:
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common ; do \
+	for file in gradient quantum _ods_common catalyst ; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver.so $(MK_DIR)/frontend/mlir_quantum/
