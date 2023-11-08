@@ -60,18 +60,19 @@ struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
         {
             auto ctx = op.getContext();
             auto shape = op.getShape();
-            auto shapeType = shape ? shape.getType() : RankedTensorType::get({0}, IndexType::get(ctx));
+            auto shapeType =
+                shape ? shape.getType() : RankedTensorType::get({0}, IndexType::get(ctx));
             auto elementType = shapeType.getElementType();
             auto dynShapeShape = shapeType.getShape();
             auto staticShapeShape = shapeType.getShape();
 
             assert(staticShapeShape.size() == 1 && "static shape argument must have '1xi..' shape");
-            assert(dynShapeShape.size() == 1 && "static shape argument must have '1xi..' shape");
-            assert(dynShapeShape[0] >= 0 && "dynamic shapes of unknow lengths are not supported!");
 
-            size_t d = 0;
+            int64_t d = 0;
             for (size_t s = 0; s < staticShape.size(); s++) {
                 if (staticShape[s] < 0) {
+                    assert(dynShapeShape.size() == 1 && "dynamic shape argument must be '1xi..'");
+                    assert(d < dynShapeShape[0] && "not enough dynamic shape arguments");
                     Value axis = rewriter.create<arith::ConstantIndexOp>(loc, s);
                     Value val = rewriter.create<tensor::ExtractOp>(loc, elementType, shape, axis);
                     Value ival = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);
@@ -79,7 +80,9 @@ struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
                     d++;
                 }
             }
-            assert(d == size_t(dynShapeShape[0]) && "Number of dynamic items must match the number of static placeholders");
+            assert(d == 0 ||
+                   d == dynShapeShape[0] &&
+                       "Number of dynamic items must match the number of static placeholders");
         }
 
         auto [type, value] = getInitTypeValue(op, rewriter);

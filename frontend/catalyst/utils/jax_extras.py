@@ -51,6 +51,7 @@ from jax.interpreters.partial_eval import (
 )
 from jax.lax import convert_element_type
 from jax.linear_util import wrap_init
+from jax.numpy import finfo, iinfo
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -88,6 +89,8 @@ __all__ = (
     "tree_unflatten",
     "unzip2",
     "wrap_init",
+    "iinfo_or_none",
+    "finfo_or_none",
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
@@ -386,3 +389,21 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
+
+
+def _tryinfo(f, dtype) -> Optional[Any]:
+    """Wrapper around jnp.iinfo/jnp.finfo functions"""
+    try:
+        return f(dtype)
+    except ValueError:
+        return None
+
+
+def iinfo_or_none(dtype) -> Optional[Any]:
+    """Return integer-type information or None"""
+    return _tryinfo(iinfo, dtype)
+
+
+def finfo_or_none(dtype) -> Optional[Any]:
+    """Return float-type information or None"""
+    return _tryinfo(finfo, dtype)

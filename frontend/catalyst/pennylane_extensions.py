@@ -75,6 +75,7 @@ from catalyst.utils.jax_extras import (
     _initial_style_jaxpr,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
+    iinfo_or_none,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
@@ -1949,13 +1950,31 @@ def ctrl(
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
 
 
-def _check_shape_dtype(shape, dtype: Optional[DTypeLike]) -> Tuple[jnp.array, DTypeLike]:
+def _check_shape_dtype(shape, dtype: Optional[DTypeLike]) -> Tuple[jnp.array, jnp.array, DTypeLike]:
     """Check shape and dtype according to numpy convensions"""
-    shape = jnp.array(shape, dtype=int)
-    if len(shape.shape) == 0:
-        shape = shape.reshape([1])
+    invalid_shape_err = "The shape is expected to have rank one and contain integers"
+    if isinstance(shape, int):
+        shape = (shape,)
+
+    if isinstance(shape, (tuple, list)):
+        for dim in shape:
+            if isinstance(dim, DynamicJaxprTracer):
+                if iinfo_or_none(dim.dtype) is None:
+                    raise ValueError(invalid_shape_err + f", got {dim.dtype}")
+            else:
+                if not isinstance(dim, int):
+                    raise ValueError(invalid_shape_err + f", got {dim}")
+        static_shape = [(dim if isinstance(dim, int) else -1) for dim in shape]
+        dynamic_shape = jnp.array([dim for dim in shape if not isinstance(dim, int)], dtype=int)
+    else:
+        if len(shape.shape) == 0:
+            shape = shape.reshape([1])
+        if len(shape.shape) != 1 or (iinfo_or_none(shape.dtype) is None):
+            raise ValueError(invalid_shape_err)
+        static_shape = [-1] * shape.shape[0]
+        dynamic_shape = shape
     dtype = dtype if dtype is not None else jnp.float64
-    return shape, dtype
+    return static_shape, dynamic_shape, dtype
 
 
 def ones(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
@@ -1972,8 +1991,10 @@ def ones(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
         JAX array of ones with the given shape, dtype, and order.
     """
     if EvaluationContext.is_tracing():
-        shape, dtype = _check_shape_dtype(shape, dtype)
-        return tensor_init_p.bind(shape, initializer=1, dtype=dtype)
+        static_shape, dynamic_shape, dtype = _check_shape_dtype(shape, dtype)
+        return tensor_init_p.bind(
+            dynamic_shape, static_shape=static_shape, initializer=1, dtype=dtype
+        )
     else:
         return jnp.ones(shape=shape, dtype=dtype)
 
@@ -1992,8 +2013,10 @@ def zeros(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
         JAX array of zeros with the given shape, dtype, and order.
     """
     if EvaluationContext.is_tracing():
-        shape, dtype = _check_shape_dtype(shape, dtype)
-        return tensor_init_p.bind(shape, initializer=0, dtype=dtype)
+        static_shape, dynamic_shape, dtype = _check_shape_dtype(shape, dtype)
+        return tensor_init_p.bind(
+            dynamic_shape, static_shape=static_shape, initializer=0, dtype=dtype
+        )
     else:
         return jnp.zeros(shape=shape, dtype=dtype)
 
@@ -2014,7 +2037,9 @@ def empty(shape, dtype: Optional[DTypeLike] = None) -> jnp.array:
         order. Object arrays will be initialized to None.
     """
     if EvaluationContext.is_tracing():
-        shape, dtype = _check_shape_dtype(shape, dtype)
-        return tensor_init_p.bind(shape, initializer=None, dtype=dtype)
+        static_shape, dynamic_shape, dtype = _check_shape_dtype(shape, dtype)
+        return tensor_init_p.bind(
+            dynamic_shape, static_shape=static_shape, initializer=None, dtype=dtype
+        )
     else:
         return jnp.empty(shape=shape, dtype=dtype)
