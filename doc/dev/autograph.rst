@@ -215,12 +215,55 @@ Instead of utilizing a return statement, use the following approach instead:
             y = x ** 3
         return y
 
-Automatic type promotion in branches
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Different branches must assign the same type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Different branches of an if statement may assign external variables with different types ---
-Catalyst will automatically perform type promotion (such as converting integers to floats):
+Different branches of an if statement must always assign external variables
+of the same type, in the sense that the *structure* of the variable
+should not change across branches.
 
+In particular, this requires that if an external variable is assigned an array in one
+branch, other branches must also assign arrays of the same shape:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     if x > 1:
+...         y = jnp.array([0.1, 0.2])
+...     else:
+...         y = jnp.array([0.4, 0.5, -0.1])
+...     return jnp.sum(y)
+>>> f(0.5)
+AssertionError: Expected matching shapes
+>>> @qjit(autograph=True)
+... def f(x):
+...     if x > 1:
+...         y = jnp.array([0.1, 0.2, 0.3])
+...     else:
+...         y = jnp.array([0.4, 0.5, -0.1])
+...     return jnp.sum(y)
+>>> f(0.5)
+array(0.8)
+
+More generally, this also applies to common container classes such as
+`dict`, `list`, and `tuple`. If one branch assigns an external variable,
+then all other branches must also assign the external variable with the same
+type, nested structure, number of elements, element types, and array shapes.
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     if x > 1:
+...         y = {"a": jnp.array([0.1, 0.2, 0.3]), "b": 6}
+...     else:
+...         y = {"a": jnp.array([0.5, 0., -0.2]), "b": -1}
+...     return y
+>>> f(1.5)
+{'a': array([0.1, 0.2, 0.3]), 'b': array(6)}
+
+Automatic data type promotion in branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Different branches of an if statement may assign external variables with different data types (dtypes) ---
+Catalyst will automatically perform data type promotion (such as converting integers to floats):
 
 >>> @qjit(autograph=True)
 ... def f(x):
@@ -231,7 +274,6 @@ Catalyst will automatically perform type promotion (such as converting integers 
 ...     return y
 >>> f(0.5)
 array(4.)
-
 
 New variable assignments
 ~~~~~~~~~~~~~~~~~~~~~~~~
