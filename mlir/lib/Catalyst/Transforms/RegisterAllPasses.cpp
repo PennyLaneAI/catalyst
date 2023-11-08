@@ -21,6 +21,7 @@
 void catalyst::registerAllCatalystPasses()
 {
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
+    mlir::registerPass(catalyst::createCatalystBufferizationPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
@@ -31,5 +32,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createMitigationLoweringPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
+    mlir::registerPass(catalyst::createCatalystConversionPass);
     mlir::registerPass(catalyst::createTestPass);
 }

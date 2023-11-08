@@ -12,19 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef PYTHON_BINDINGS_CATALYST_OPS
+#define PYTHON_BINDINGS_CATALYST_OPS
 
-#include <memory>
+include "Catalyst/IR/CatalystOps.td"
 
-#include "mlir/Pass/Pass.h"
-
-namespace catalyst {
-
-std::unique_ptr<mlir::Pass> createCatalystBufferizationPass();
-std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
-std::unique_ptr<mlir::Pass> createCatalystConversionPass();
-std::unique_ptr<mlir::Pass> createScatterLoweringPass();
-
-void registerAllCatalystPasses();
-
-} // namespace catalyst
+#endif
