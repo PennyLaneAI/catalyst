@@ -136,7 +136,7 @@
   array(1.0)
   ```
 
-  Automatic type promotion across conditional branches also now works with AutoGraph:
+  Automatic type promotion across conditional branches also works with AutoGraph:
 
   ```python
   @qjit(autograph=True)

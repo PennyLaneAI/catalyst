@@ -218,9 +218,10 @@ Instead of utilizing a return statement, use the following approach instead:
 Different branches must assign the same type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Different branches of an if statement must always assign external variables
-of the same type, in the sense that the *structure* of the variable
-should not change across branches.
+Different branches of an if statement must always assign variables with the same type across branches,
+if those variables are used in the outer scope (external variables). The type must be the same in the sense
+that the *structure* of the variable should not change across branches. The underlying data type (`dtype`)
+may be different, since data type promotion is applied across branches.
 
 In particular, this requires that if an external variable is assigned an array in one
 branch, other branches must also assign arrays of the same shape:
