@@ -54,7 +54,6 @@ class AugmentedCircuitGenerator {
     void visitOperation(mlir::scf::ForOp forOp, mlir::OpBuilder &builder);
     void visitOperation(mlir::scf::WhileOp forOp, mlir::OpBuilder &builder);
     void visitOperation(mlir::scf::IfOp forOp, mlir::OpBuilder &builder);
-    void visitOperation(mlir::func::CallOp forOp, mlir::OpBuilder &builder);
 
     void cloneTerminatorClassicalOperands(mlir::Operation *terminator, mlir::OpBuilder &builder);
 

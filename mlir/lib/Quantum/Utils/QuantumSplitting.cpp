@@ -219,20 +219,17 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             visitOperation(whileOp, builder);
         }
         else if (auto callOp = dyn_cast<func::CallOp>(op)) {
-            visitOperation(callOp, builder);
+            auto results = callOp.getResultTypes();
+            auto qreg = results.front();
+            if (!(results.size() == 1 && isa<QuregType>(qreg))) {
+                builder.clone(op, oldToCloned);
+            }
         }
         else {
             // Purely classical ops are deeply cloned as-is.
             builder.clone(op, oldToCloned);
         }
     }
-}
-
-void AugmentedCircuitGenerator::visitOperation(func::CallOp callOp, OpBuilder &builder)
-{   
-    auto results = callOp.getResultTypes();
-    auto qreg = results.front();
-    assert(results.size() == 1 && isa<QuregType>(qreg) && "Expected only quantum return in CallOp");
 }
 
 void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder)
