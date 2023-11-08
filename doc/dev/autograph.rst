@@ -111,7 +111,7 @@ Currently, AutoGraph supports converting the following Python statements:
 - ``if`` statements (including ``elif`` and ``else``)
 - ``for`` loops
 - ``while`` loops
-- ``and`` and ``or`` in certain cases
+- ``and``, ``or`, and ``not`` in certain cases
 
 ``break`` and ``continue`` statements are currently not supported.
 
@@ -572,8 +572,8 @@ You can also utilize temporary variables within a while loop:
 >>> @qjit(autograph=True)
 ... def f(x):
 ...     while x < 5:
-...         c = 2
-...         x = x + 2 * c
+...         c = "hi"
+...         x = x + 2 * len(c)
 ...     return x
 >>> f(4)
 array(8.4)

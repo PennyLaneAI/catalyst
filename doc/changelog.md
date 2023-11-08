@@ -56,8 +56,11 @@
   array([1., 0.])
   ```
 
-  Note that Boolean expressions will only be captured by AutoGraph if at least
-  one of the arguments is a numeric object.
+  Note that logical Boolean operators will only be captured by AutoGraph if all
+  operands are dynamic variables (that is, a value known only at runtime, such
+  as a measurement result or function argument). For other use
+  cases, it is recommended to use the `jax.numpy.logical_*` set of functions where
+  appropriate.
 
 * Catalyst now officially supports macOS X86_64 devices, with macOS binary wheels
   available for both AARCH64 and X86_64.
@@ -145,8 +148,8 @@
       return qml.state()
   ```
 
-* To prepare for frontend integration with PennyLane, the `pennylane.compilers` entry points interface
-  has added to Catalyst.
+* To prepare for Catalyst's frontend being integrated with PennyLane, the appropriate plugin entry point
+  interface has been added to Catalyst.
   [(#331)](https://github.com/PennyLaneAI/catalyst/pull/331)
 
   For any compiler packages seeking to be registered in PennyLane, the `entry_points`
@@ -162,11 +165,12 @@
 
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
     the signature `qjit(fn, *args, **kwargs)`, where `fn` is the function to be compiled.
+  
 * The compiler driver diagnostic output has been improved, and now includes failing IR as well as
-  names of failing passes.
+  the names of failing passes.
   [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
 
-* The scatter operation in the Catalyst dialect now uses a SCF for loop to avoid ballooning
+* The scatter operation in the Catalyst dialect now uses an SCF for loop to avoid ballooning
   the compiled code.
   [(#307)](https://github.com/PennyLaneAI/catalyst/pull/307)
 
@@ -176,15 +180,16 @@
 
 <h3>Breaking changes</h3>
 
-* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assuming we have
   parameters of shape `[a,b]` and results of shape `[c,d]`, the returned Jacobian will now have
   shape `[c, d, a, b]` instead of `[a, b, c, d]`.
   [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
 
 <h3>Bug fixes</h3>
 
-* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the
-  master branch of PennyLane-Lightning. This issue was introduced in [(#499)](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
+* An upstream change in the PennyLane-Lightning project was addressed to prevent compilation issues
+  in the `StateVectorLQubitDynamic` class in the runtime.
+  The issue was introduced in [#499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
   [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
 
 * The `requirements.txt` file to build Catalyst from source has been updated with a minimum pip
