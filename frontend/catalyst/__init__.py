@@ -58,8 +58,12 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.gradient"] = types.ModuleT
 sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleType(
     "mlir_quantum._mlir_libs._quantumDialects.quantum"
 )
+sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleType(
+    "mlir_quantum._mlir_libs._quantumDialects.catalyst"
+)
 
 
+from catalyst import debug
 from catalyst.ag_utils import AutoGraphError, autograph_source
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
@@ -169,6 +173,7 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
+    "debug",
     "autograph_source",
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",

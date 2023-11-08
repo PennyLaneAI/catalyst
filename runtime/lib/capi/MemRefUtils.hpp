@@ -16,6 +16,8 @@
 
 #include <cstddef>
 
+#include "mlir/ExecutionEngine/RunnerUtils.h"
+
 extern "C" {
 void *_mlir_memref_to_llvm_alloc(size_t size);
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
@@ -31,3 +33,16 @@ template <typename T, size_t R> struct MemRefT {
     size_t sizes[R];
     size_t strides[R];
 };
+
+template <typename T>
+inline void printMemref(const UnrankedMemRefType<T> &memref, bool printDescriptor = false)
+{
+    auto m = DynamicMemRefType<T>(memref);
+    if (printDescriptor) {
+        std::cout << "MemRef: ";
+        printMemRefMetaData(std::cout, m);
+        std::cout << " data =" << std::endl;
+    }
+    impl::MemRefDataPrinter<T>::print(std::cout, m.data, m.rank, m.rank, m.offset, m.sizes,
+                                      m.strides);
+}

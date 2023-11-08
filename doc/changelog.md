@@ -2,6 +2,35 @@
 
 <h3>New features</h3>
 
+* Debug compiled programs and print dynamic values at runtime with ``debug.print``
+  [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
+
+  You can now print arbitrary values from your running program, whether they are arrays, constants,
+  strings, or abitrary Python objects. Note that while non-array Python objects
+  *will* be printed at runtime, their string representation is captured at
+  compile time, and thus will always be the same regardless of program inputs.
+  The output for arrays optionally includes a descriptor for how the data is stored in memory
+  ("memref").
+
+  ```python
+  @qjit
+  def func(x: float):
+      debug.print(x, memref=True)
+      debug.print("exit")
+  ```
+
+  ```pycon
+  >>> func(jnp.array(0.43))
+  MemRef: base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
+  0.43
+  exit
+  ```
+
+* Catalyst now officially supports macOS X86_64 devices, with macOS binary wheels
+  available for both AARCH64 and X86_64 on PyPI.
+  [(#347)](https://github.com/PennyLaneAI/catalyst/pull/347)
+  [(#313)](https://github.com/PennyLaneAI/catalyst/pull/313)
+
 <h3>Improvements</h3>
 
 * Improve the compiler driver diagnostic output even more. Now it dumps the failing IR as well as
