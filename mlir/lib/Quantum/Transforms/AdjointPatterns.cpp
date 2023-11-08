@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
+#include <iostream>
 #include <iterator>
 #include <string>
 #include <unordered_map>
@@ -340,17 +341,13 @@ class AdjointGenerator {
         quantum::AdjointOp adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, lastArg);
         Region *adjointRegion = &adjointOp.getRegion();
         Region &originalRegion = funcOp.getRegion();
-
-        for (size_t i = 0; i < funcOp.getArguments().size()-1; i++) {
+        IRMapping map;
+        for (size_t i = 0; i < funcOp.getArguments().size() - 1; i++) {
             Value arg = adjointFnOp.front().getArgument(i);
             Value argBlock = originalRegion.front().getArgument(i);
-            remappedValues.map(argBlock, arg);
+            map.map(argBlock, arg);
         }
-
-        Value firstArg = adjointFnOp.front().getArgument(0);
-        Value firstArgBlock = originalRegion.front().getArgument(0);
-        remappedValues.map(firstArgBlock, firstArg);
-        originalRegion.cloneInto(adjointRegion, remappedValues);
+        originalRegion.cloneInto(adjointRegion, map);
         auto terminator = adjointRegion->front().getTerminator();
         ValueRange res = terminator->getOperands();
         TypeRange resTypes = terminator->getResultTypes();
@@ -360,11 +357,15 @@ class AdjointGenerator {
         rewriter.eraseOp(terminator);
         builder.setInsertionPointAfter(adjointOp);
         builder.create<func::ReturnOp>(loc, adjointOp.getResult());
-        adjointFnOp.dump();
 
         builder.restoreInsertionPoint(insertionSaved);
-        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, callOp.getArgOperands());
-        adjointCallOp.dump();
+        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
+        std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
+        args.pop_back();
+        args.push_back(reversedResult);
+        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
+        ValueRange initQreg = callOp.getArgOperands();
+        remappedValues.map(getQuantumReg(initQreg).value(), adjointCallOp.getResult(0));
     }
 
     void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
@@ -463,7 +464,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
     {
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
         auto cache = QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());
-
         // First, copy the classical computations directly to the target insertion point.
         IRMapping oldToCloned;
         AugmentedCircuitGenerator augmentedGenerator{oldToCloned, cache};
@@ -482,12 +482,12 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
         // Explicitly free the memory of the caches.
         cache.emitDealloc(rewriter, adjoint.getLoc());
-
         // The final register is the re-mapped region argument of the original adjoint op.
         SmallVector<Value> reversedOutputs;
         for (BlockArgument arg : adjoint.getRegion().getArguments()) {
             reversedOutputs.push_back(oldToCloned.lookup(arg));
         }
+        adjoint.dump();
         rewriter.replaceOp(adjoint, reversedOutputs);
         return success();
     }

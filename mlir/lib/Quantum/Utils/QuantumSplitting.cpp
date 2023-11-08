@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -217,11 +218,21 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
         }
+        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
+            visitOperation(callOp, builder);
+        }
         else {
             // Purely classical ops are deeply cloned as-is.
             builder.clone(op, oldToCloned);
         }
     }
+}
+
+void AugmentedCircuitGenerator::visitOperation(func::CallOp callOp, OpBuilder &builder)
+{   
+    auto results = callOp.getResultTypes();
+    auto qreg = results.front();
+    assert(results.size() == 1 && isa<QuregType>(qreg) && "Expected only quantum return in CallOp");
 }
 
 void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder)
