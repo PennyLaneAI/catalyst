@@ -51,7 +51,7 @@ func.func public @tinit3(%arg: tensor<2xi32>) -> tensor<?x?xf16> attributes {llv
 
 // CHECK-LABEL: tinit4
 func.func public @tinit4(%arg: tensor<1xi32>) -> tensor<1x?x3xi32> attributes {llvm.emit_c_interface} {
-  // CHECK: [[c:%.*]] = arith.constant 1
+  // CHECK: [[c:%.*]] = arith.constant 0
   // CHECK: [[e:%.*]] = tensor.extract {{%[^[]*}}[[[c]]] : tensor<1xi32>
   // CHECK: [[i:%.*]] = arith.index_cast [[e]]
   // CHECK: [[E:%.*]] = tensor.empty([[i]]) : tensor<1x?x3xi32>

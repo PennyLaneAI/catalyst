@@ -17,10 +17,9 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import dataclass
 from itertools import chain
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir

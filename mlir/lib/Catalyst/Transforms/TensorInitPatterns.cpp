@@ -73,7 +73,7 @@ struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
                 if (staticShape[s] < 0) {
                     assert(dynShapeShape.size() == 1 && "dynamic shape argument must be '1xi..'");
                     assert(d < dynShapeShape[0] && "not enough dynamic shape arguments");
-                    Value axis = rewriter.create<arith::ConstantIndexOp>(loc, s);
+                    Value axis = rewriter.create<arith::ConstantIndexOp>(loc, d);
                     Value val = rewriter.create<tensor::ExtractOp>(loc, elementType, shape, axis);
                     Value ival = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);
                     dynamicShapeValues.push_back(ival);
