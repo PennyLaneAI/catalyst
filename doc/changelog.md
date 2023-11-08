@@ -178,6 +178,9 @@
   dynamically shaped arrays.
   [(#348)](https://github.com/PennyLaneAI/catalyst/pull/348)
 
+* The Catalyst utility dialect is now included in the Catalyst MLIR C-API.
+  [(#345)](https://github.com/PennyLaneAI/catalyst/pull/345)
+
 <h3>Breaking changes</h3>
 
 * The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assuming we have
@@ -200,9 +203,6 @@
 * The frontend has been updated to make it compatible with PennyLane `MeasurementProcess` objects
   now being PyTrees in PennyLane version 0.33.
   [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
-
-* The Catalyst utility dialect is now included in the Catalyst MLIR C-API.
-  [(#345)](https://github.com/PennyLaneAI/catalyst/pull/345)
 
 <h3>Contributors</h3>
 
