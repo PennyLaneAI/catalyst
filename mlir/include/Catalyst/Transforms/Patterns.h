@@ -19,6 +19,8 @@
 
 namespace catalyst {
 
+void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
+
 void populateScatterPatterns(mlir::RewritePatternSet &);
 void populateTensorInitPatterns(mlir::RewritePatternSet &);
 

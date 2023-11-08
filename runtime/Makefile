@@ -1,8 +1,8 @@
-PYTHON := python3
-C_COMPILER?=clang
-CXX_COMPILER?=clang++
-COMPILER_LAUNCHER?=ccache
-ENABLE_ASAN?=OFF
+PYTHON := $(shell which python3)
+C_COMPILER?=$(shell which clang)
+CXX_COMPILER?=$(shell which clang++)
+COMPILER_LAUNCHER?=$(shell which ccache)
+
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
@@ -12,12 +12,22 @@ BUILD_TYPE?=Release
 ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
-BUILD_QIR_STDLIB_FROM_SRC?=OFF
+ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?=v0.33.0
-NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+
+ifeq ($(shell uname), Darwin)
+	DEFAULT_ENABLE_OPENMP := OFF
+else
+	DEFAULT_ENABLE_OPENMP := ON
+endif
+
+ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=Release
 
@@ -36,7 +46,6 @@ help:
 .PHONY: all
 all: runtime
 
-
 .PHONY: configure
 configure:
 	@echo "Configure Catalyst Runtime"
@@ -49,11 +58,12 @@ configure:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
-		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_OPENMP=$(ENABLE_OPENMP) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
+		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_WARNINGS=OFF \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DBUILD_QIR_STDLIB_FROM_SRC=$(BUILD_QIR_STDLIB_FROM_SRC) \
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
@@ -80,7 +90,7 @@ coverage: $(RT_BUILD_DIR)/tests/runner_tests
 
 	$(RT_BUILD_DIR)/tests/runner_tests
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' --output-file $(RT_BUILD_DIR)/coverage.info
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples

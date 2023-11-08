@@ -42,17 +42,18 @@ from catalyst.jax_primitives import (
     AbstractQreg,
     GradParams,
     adjoint_p,
+    cond_p,
     expval_p,
+    for_p,
     func_p,
     grad_p,
     jvp_p,
     probs_p,
-    qcond_p,
-    qfor_p,
     qmeasure_p,
     qwhile_p,
     tensor_init_p,
     vjp_p,
+    while_p,
 )
 from catalyst.jax_tracer import (
     Function,
@@ -872,7 +873,7 @@ def _check_cond_same_shapes(trees: List[PyTreeDef], avals: List[List[Any]]) -> N
 class ForLoop(HybridOp):
     """PennyLane ForLoop Operation."""
 
-    binder = qfor_p.bind
+    binder = for_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
@@ -922,7 +923,7 @@ class MidCircuitMeasure(HybridOp):
 class Cond(HybridOp):
     """PennyLane's conditional operation."""
 
-    binder = qcond_p.bind
+    binder = cond_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         jaxprs, consts = [], []
@@ -957,7 +958,7 @@ class Cond(HybridOp):
 class WhileLoop(HybridOp):
     """PennyLane's while loop operation."""
 
-    binder = qwhile_p.bind
+    binder = while_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
@@ -1185,7 +1186,7 @@ class CondCallable:
         )
         _check_cond_same_shapes(out_trees, [j.out_avals for j in branch_jaxprs])
         branch_jaxprs = unify_result_types(branch_jaxprs)
-        out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
+        out_classical_tracers = cond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
 
     def _call_during_interpretation(self):
@@ -1290,7 +1291,7 @@ def cond(pred: DynamicJaxprTracer):
 
             cond_fn()
 
-            eturn qml.probs(wires=0)
+            return qml.probs(wires=0)
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
@@ -1503,7 +1504,7 @@ def for_loop(lower_bound, upper_bound, step):
                 )
 
                 apply_reverse_transform = isinstance(step, int) and step < 0
-                out_classical_tracers = qfor_p.bind(
+                out_classical_tracers = for_p.bind(
                     lower_bound,
                     upper_bound,
                     step,
@@ -1650,7 +1651,7 @@ def while_loop(cond_fn):
                     body_fn, in_tree, init_avals, "while_loop"
                 )
                 _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
-                out_classical_tracers = qwhile_p.bind(
+                out_classical_tracers = while_p.bind(
                     *(cond_consts + body_consts + init_vals),
                     cond_jaxpr=cond_jaxpr,
                     body_jaxpr=body_jaxpr,

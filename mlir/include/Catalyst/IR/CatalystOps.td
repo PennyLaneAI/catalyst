@@ -84,4 +84,14 @@ def TensorInitOp : Catalyst_Op<"tensor_init"> {
     }];
 }
 
+def PrintOp : Catalyst_Op<"print"> {
+    let summary = "Prints numeric values or constant strings at runtime.";
+
+    let arguments = (ins
+        Optional<AnyType>:$val,
+        OptionalAttr<StrAttr>:$const_val,
+        UnitAttr:$print_descriptor
+    );
+}
+
 #endif // GRADIENT_OPS
