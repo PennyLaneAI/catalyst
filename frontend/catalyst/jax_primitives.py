@@ -31,7 +31,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
-from mlir_quantum.dialects.catalyst import TensorInitOp, PrintOp
+from mlir_quantum.dialects.catalyst import PrintOp, TensorInitOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,

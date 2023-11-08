@@ -50,7 +50,6 @@ from catalyst.jax_primitives import (
     jvp_p,
     probs_p,
     qmeasure_p,
-    qwhile_p,
     tensor_init_p,
     vjp_p,
     while_p,
