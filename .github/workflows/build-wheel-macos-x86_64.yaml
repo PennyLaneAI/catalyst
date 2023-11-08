@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 11.7
+  MACOSX_DEPLOYMENT_TARGET: 12
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
