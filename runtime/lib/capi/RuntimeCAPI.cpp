@@ -23,6 +23,8 @@
 #include <memory>
 #include <ostream>
 
+#include "mlir/ExecutionEngine/CRunnerUtils.h"
+
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
@@ -69,6 +71,54 @@ void _mlir_memref_to_llvm_free(void *ptr)
 {
     Catalyst::Runtime::CTX->getMemoryManager()->erase(ptr);
     free(ptr);
+}
+
+void __quantum__rt__print_string(char *string)
+{
+    if (!string) {
+        std::cout << "None" << std::endl;
+        return;
+    }
+    std::cout << string << std::endl;
+}
+
+void __quantum__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
+{
+    if (c_memref->datatype == NumericType::idx) {
+        printMemref<impl::index_type>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::i1) {
+        printMemref<bool>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::i8) {
+        printMemref<int8_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::i16) {
+        printMemref<int16_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::i32) {
+        printMemref<int32_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::i64) {
+        printMemref<int64_t>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::f32) {
+        printMemref<float>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::f64) {
+        printMemref<double>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::c64) {
+        printMemref<impl::complex32>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else if (c_memref->datatype == NumericType::c128) {
+        printMemref<impl::complex64>({c_memref->rank, c_memref->descriptor}, printDescriptor);
+    }
+    else {
+        RT_FAIL("Unkown numeric type encoding for array printing.");
+    }
+
+    std::cout << std::endl;
 }
 
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
@@ -203,8 +253,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     Catalyst::Runtime::CTX->getDevice()->Gradient(mem_views, {});
 }
 
-void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
-                                     [[maybe_unused]] int64_t numResults,
+void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
                                      /* results = */...)
 {
     RT_ASSERT(numResults >= 0);

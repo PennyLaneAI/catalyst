@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
+#include "DataView.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
@@ -25,6 +29,131 @@
 #include "TestUtils.hpp"
 
 using namespace Catalyst::Runtime;
+
+TEST_CASE("Test __quantum__rt__print_string", "[qir_lightning_core]")
+{
+    char str[] = "print_string_test";
+    __quantum__rt__print_string(str);
+
+    char *str_null = nullptr;
+    __quantum__rt__print_string(str_null);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor i1, i8, i16, i32, f32, and c64", "[qir_lightning_core]")
+{
+    std::array<bool, 2> buffer_i1;
+    MemRefT<bool, 1> mr_i1_1d{buffer_i1.data(), buffer_i1.data(), 0, {2}, {1}};
+    CHECK(mr_i1_1d.sizes[0] == 2);
+    OpaqueMemRefT omr_i1_1d{1, (void *)(&mr_i1_1d), NumericType::i1};
+    CHECK(omr_i1_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i1_1d, false);
+
+    std::vector<int8_t> buffer_i8(2, 1);
+    MemRefT<int8_t, 1> mr_i8_1d{buffer_i8.data(), buffer_i8.data(), 0, {2}, {1}};
+    CHECK(mr_i8_1d.sizes[0] == 2);
+    OpaqueMemRefT omr_i8_1d{1, (void *)(&mr_i8_1d), NumericType::i8};
+    CHECK(omr_i8_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i8_1d, false);
+
+    std::vector<int16_t> buffer_i16(1, 1);
+    MemRefT<int16_t, 1> mr_i16_1d{buffer_i16.data(), buffer_i16.data(), 0, {1}, {1}};
+    CHECK(mr_i16_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_i16_1d{1, (void *)(&mr_i16_1d), NumericType::i16};
+    CHECK(omr_i16_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i16_1d, false);
+
+    std::vector<int32_t> buffer_i32(1, 1);
+    MemRefT<int32_t, 1> mr_i32_1d{buffer_i32.data(), buffer_i32.data(), 0, {1}, {1}};
+    CHECK(mr_i32_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_i32_1d{1, (void *)(&mr_i32_1d), NumericType::i32};
+    CHECK(omr_i32_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_i32_1d, false);
+
+    std::vector<size_t> buffer_idx(1, 1);
+    MemRefT<size_t, 1> mr_idx_1d{buffer_idx.data(), buffer_idx.data(), 0, {1}, {1}};
+    CHECK(mr_idx_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_idx_1d{1, (void *)(&mr_idx_1d), NumericType::idx};
+    CHECK(omr_idx_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_idx_1d, false);
+
+    std::vector<float> buffer_f32(1, 1.0);
+    MemRefT<float, 1> mr_f32_1d{buffer_f32.data(), buffer_f32.data(), 0, {1}, {1}};
+    CHECK(mr_f32_1d.sizes[0] == 1);
+    OpaqueMemRefT omr_f32_1d{1, (void *)(&mr_f32_1d), NumericType::f32};
+    CHECK(omr_f32_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_f32_1d, false);
+
+    CplxT_float matrix_data[2] = {
+        {-0.67, -0.63},
+        {-0.14, 0.36},
+    };
+    MemRefT<CplxT_float, 1> mr_c32_1d{matrix_data, matrix_data, 0, {2}, {1}};
+    CHECK(mr_c32_1d.sizes[0] == 2);
+    OpaqueMemRefT omr_c32_1d{1, (void *)(&mr_c32_1d), NumericType::c64};
+    CHECK(omr_c32_1d.rank == 1);
+    __quantum__rt__print_tensor(&omr_c32_1d, false);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor for an unsupported datatype", "[qir_lightning_core]")
+{
+    std::vector<std::vector<size_t>> buffer(2);
+    MemRefT<std::vector<size_t>, 1> mr_vidx_1d{buffer.data(), buffer.data(), 0, {2}, {1}};
+
+    OpaqueMemRefT omr_vidx_1d{1, (void *)(&mr_vidx_1d), static_cast<NumericType>(1000)};
+
+    REQUIRE_THROWS_WITH(
+        __quantum__rt__print_tensor(&omr_vidx_1d, false),
+        Catch::Contains("[Function:__quantum__rt__print_tensor] Error in Catalyst Runtime: Unkown "
+                        "numeric type encoding for array printing."));
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor i64 1-dim", "[qir_lightning_core]")
+{
+    std::vector<int64_t> buffer(100);
+    std::iota(buffer.begin(), buffer.end(), 0);
+
+    MemRefT_int64_1d mr_i64_1d{buffer.data(), buffer.data(), 0, {100}, {1}};
+    CHECK(mr_i64_1d.sizes[0] == 100);
+
+    OpaqueMemRefT omr_i64_1d{1, (void *)(&mr_i64_1d), NumericType::i64};
+    CHECK(omr_i64_1d.rank == 1);
+
+    __quantum__rt__print_tensor(&omr_i64_1d, false);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor dbl 2-dim", "[qir_lightning_core]")
+{
+    std::vector<double> buffer(100 * 2);
+    buffer[0] = 1.0;
+
+    MemRefT_double_2d mr_dbl_2d{buffer.data(), buffer.data(), 0, {100, 2}, {2, 1}};
+    CHECK(mr_dbl_2d.sizes[0] == 100);
+    CHECK(mr_dbl_2d.sizes[1] == 2);
+
+    OpaqueMemRefT omr_dbl_2d{2, (void *)(&mr_dbl_2d), NumericType::f64};
+    CHECK(omr_dbl_2d.rank == 2);
+
+    __quantum__rt__print_tensor(&omr_dbl_2d, true);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor cplx 2-dim", "[qir_lightning_core]")
+{
+    CplxT_double matrix_data[4] = {
+        {-0.67, -0.63},
+        {-0.14, 0.36},
+        {-0.23, 0.30},
+        {-0.88, -0.26},
+    };
+
+    MemRefT_CplxT_double_2d mr_cplx_2d{matrix_data, matrix_data, 0, {2, 2}, {1, 0}};
+    CHECK(mr_cplx_2d.sizes[0] == 2);
+    CHECK(mr_cplx_2d.sizes[1] == 2);
+
+    OpaqueMemRefT omr_cplx_2d{2, (void *)(&mr_cplx_2d), NumericType::c128};
+    CHECK(omr_cplx_2d.rank == 2);
+
+    __quantum__rt__print_tensor(&omr_cplx_2d, false);
+}
 
 MemRefT_CplxT_double_1d getState(size_t buffer_len)
 {
@@ -334,7 +463,9 @@ TEST_CASE("Test memref alloc", "[CoreQIS]")
 TEST_CASE("Test memref aligned alloc", "[CoreQIS]")
 {
     __quantum__rt__initialize();
-    int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(sizeof(int), sizeof(int));
+
+    // macOS requires the alignment of 'aligned_alloc' is at least 8-byte
+    int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(8, 2 * sizeof(int));
     CHECK(a != NULL);
     *a = 1;
     __quantum__rt__finalize();

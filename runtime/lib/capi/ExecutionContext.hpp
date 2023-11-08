@@ -72,7 +72,12 @@ class SharedLibraryManager final {
         // If you have compiled this file with sanitizers and you reach this line
         // you will get an error.
         // Please re-compile without sanitizers.
+#ifdef __APPLE__
+        // macOS doesn't support RTLD_DEEPBIND
+        _handler = dlopen(filename.c_str(), RTLD_LAZY);
+#else
         _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
+#endif
         RT_FAIL_IF(!_handler, dlerror());
     }
 

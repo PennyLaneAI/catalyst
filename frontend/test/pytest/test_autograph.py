@@ -16,7 +16,6 @@
 
 import sys
 import traceback
-import warnings
 from collections import defaultdict
 
 import jax
@@ -1264,7 +1263,6 @@ class TestWhileLoops:
 
     def test_whileloop_temporary_variable(self, monkeypatch):
         """Test that temporary (local) variables can be initialized inside a while loop."""
-
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
 
         @qjit(autograph=True)
@@ -1280,7 +1278,6 @@ class TestWhileLoops:
 
     def test_whileloop_forloop_interop(self, monkeypatch):
         """Test for-loop co-existing with while loop."""
-
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
 
         @qjit(autograph=True)
@@ -1296,7 +1293,6 @@ class TestWhileLoops:
 
     def test_whileloop_cond_interop(self, monkeypatch):
         """Test for-loop co-existing with while loop."""
-
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
 
         @qjit(autograph=True)
@@ -1311,27 +1307,23 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
+    @pytest.mark.xfail(reason="this won't run warning-free until we fix the resource warning issue")
+    @pytest.mark.filterwarnings("error")
     def test_whileloop_no_warning(self, monkeypatch):
         """Test the absence of warnings if fallbacks are ignored."""
-        # pylint: disable=anomalous-backslash-in-string
-
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
 
-        def f1():
+        @qjit(autograph=True)
+        def f():
             acc = 0
             while Failing(acc).val < 5:
                 acc = acc + 1
             return acc
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            assert 5 == qjit(autograph=True)(f1)()
+        assert f() == 5
 
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""
-        # pylint: disable=anomalous-backslash-in-string
-
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
 
         def f1():
@@ -1342,6 +1334,160 @@ class TestWhileLoops:
 
         with pytest.raises(RuntimeError):
             qjit(autograph=True)(f1)()
+
+    def test_uninitialized_variables(self, monkeypatch):
+        """Verify errors for (potentially) uninitialized loop variables."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_invalid_jax_type(self, monkeypatch):
+        """Test loop carried values initialized with an invalid JAX type."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            x = ""
+
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_mismatched_type(self, monkeypatch):
+        """Test loop carried values initialized with a mismatched type compared to the values used
+        inside the loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            x = 0.0
+
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
+            qjit(autograph=True)(f)
+
+
+@pytest.mark.tf
+@pytest.mark.parametrize(
+    "execution_context", (lambda fn: fn, qml.qnode(qml.device("lightning.qubit", wires=1)))
+)
+class TestFallback:
+    """Test that Python fallbacks still produce correct results."""
+
+    def test_postbinding_errors_for(self, execution_context):
+        """Test that errors are handled correctly if they trigger after the JAX primitive binding
+        step (e.g. during result verification), and that no errors occur after the AG tracing step
+        (e.g. during lowering) because of malformed primitives in the JAXPR.
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case, the loop primitive should be removed since the exception happens after binding.
+        """
+
+        @execution_context
+        def f():
+            arr = jnp.array([1, 2])
+            for _ in range(2):
+                # fails result verification, will trigger fallback
+                # would raise an error during lowering if left in the JAXPR
+                arr = jnp.kron(arr, arr)
+            return arr
+
+        with pytest.warns(
+            UserWarning, match="Tracing of an AutoGraph converted for loop failed with an exception"
+        ):
+            f_jit = qjit(autograph=True)(f)
+
+        arr = jnp.array([1, 2])
+        expected = jnp.kron(*([jnp.kron(arr, arr)] * 2))
+        assert np.allclose(f_jit(), expected)
+
+    def test_prebinding_errors_for(self, execution_context):
+        """Test that errors are handled correctly if they trigger before the JAX primitive binding
+        step (e.g. during argument verification).
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case no primitive should be removed since the exception happens before binding.
+        """
+
+        @execution_context
+        def f():
+            string = "hi"
+            arr = jnp.array([1, 2])
+            for _ in range(2):
+                arr = arr + 3
+            for i in range(1, 4):
+                string = string * i  # fails return type verification, triggers fallback
+            return arr, len(string)
+
+        with pytest.warns(
+            UserWarning, match="Tracing of an AutoGraph converted for loop failed with an exception"
+        ):
+            f_jit = qjit(autograph=True)(f)
+
+        results = f_jit()
+        assert np.allclose(results[0], [7, 8])
+        assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
+
+    def test_postbinding_errors_while(self, execution_context):
+        """Test that errors are handled correctly if they trigger after the JAX primitive binding
+        step (e.g. during result verification), and that no errors occur after the AG tracing step
+        (e.g. during lowering) because of malformed primitives in the JAXPR.
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case, the loop primitive should be removed since the exception happens after binding.
+        """
+
+        @qjit(autograph=True)
+        @execution_context
+        def f():
+            arr = jnp.array([1, 2])
+            while len(arr) < 16:
+                # fails result verification, will trigger fallback
+                # would raise an error during lowering if left in the JAXPR
+                arr = jnp.kron(arr, arr)
+            return arr
+
+        arr = jnp.array([1, 2])
+        result = f()
+        expected = jnp.kron(*([jnp.kron(arr, arr)] * 2))
+        assert np.allclose(result, expected)
+
+    def test_prebinding_errors_while(self, execution_context):
+        """Test that errors are handled correctly if they trigger before the JAX primitive binding
+        step (e.g. during argument verification).
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case no primitive should be removed since the exception happens before binding.
+        """
+
+        @qjit(autograph=True)
+        @execution_context
+        def f():
+            string = "hi"
+            arr = jnp.array([1, 2])
+            i = 1
+
+            while arr[0] < 7:
+                arr = arr + 3
+
+            while len(string) < 12:
+                string = string * i  # fails return type verification, triggers fallback
+                i += 1
+
+            return arr, len(string)
+
+        results = f()
+        assert np.allclose(results[0], [7, 8])
+        assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
 
 
 @pytest.mark.tf
