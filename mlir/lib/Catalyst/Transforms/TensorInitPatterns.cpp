@@ -52,31 +52,39 @@ struct TensorInitOpRewritePattern : public OpRewritePattern<TensorInitOp> {
 
     LogicalResult matchAndRewrite(TensorInitOp op, PatternRewriter &rewriter) const override
     {
+        // Statically-known part of the shape, with possible kDynamic placeholders
+        // Dynamic part
+        SmallVector<Value> dynamicShapeValues;
+        auto staticShape = cast<RankedTensorType>(op.getResult().getType()).getShape();
         auto loc = op.getLoc();
-        SmallVector<int64_t, 4> dimensions;
-        SmallVector<Value> shapeValues;
         {
             auto ctx = op.getContext();
             auto shape = op.getShape();
-            auto shapeType = shape.getType();
+            auto shapeType = shape ? shape.getType() : RankedTensorType::get({0}, IndexType::get(ctx));
             auto elementType = shapeType.getElementType();
+            auto dynShapeShape = shapeType.getShape();
+            auto staticShapeShape = shapeType.getShape();
 
-            auto shapeShape = shapeType.getShape();
-            assert(shapeShape.size() == 1 && "shape argument must have '1xi..' shape");
-            assert(shapeShape[0] >= 0 && "dynamic elements in shapes are not supported!");
+            assert(staticShapeShape.size() == 1 && "static shape argument must have '1xi..' shape");
+            assert(dynShapeShape.size() == 1 && "static shape argument must have '1xi..' shape");
+            assert(dynShapeShape[0] >= 0 && "dynamic shapes of unknow lengths are not supported!");
 
-            for (int64_t i = 0; i < shapeShape[0]; i++) {
-                Value axis = rewriter.create<arith::ConstantIndexOp>(loc, i);
-                Value val = rewriter.create<tensor::ExtractOp>(loc, elementType, shape, axis);
-                Value ival = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);
-                shapeValues.push_back(ival);
-                dimensions.push_back(ShapedType::kDynamic);
+            size_t d = 0;
+            for (size_t s = 0; s < staticShape.size(); s++) {
+                if (staticShape[s] < 0) {
+                    Value axis = rewriter.create<arith::ConstantIndexOp>(loc, s);
+                    Value val = rewriter.create<tensor::ExtractOp>(loc, elementType, shape, axis);
+                    Value ival = rewriter.create<arith::IndexCastOp>(loc, IndexType::get(ctx), val);
+                    dynamicShapeValues.push_back(ival);
+                    d++;
+                }
             }
+            assert(d == size_t(dynShapeShape[0]) && "Number of dynamic items must match the number of static placeholders");
         }
 
         auto [type, value] = getInitTypeValue(op, rewriter);
-        auto tensorType = RankedTensorType::get(dimensions, type);
-        Value result = rewriter.create<tensor::EmptyOp>(loc, tensorType, shapeValues);
+        auto tensorType = RankedTensorType::get(staticShape, type);
+        Value result = rewriter.create<tensor::EmptyOp>(loc, tensorType, dynamicShapeValues);
         if (value.has_value()) {
             result = rewriter.create<linalg::FillOp>(loc, value.value(), result).getResult(0);
         }

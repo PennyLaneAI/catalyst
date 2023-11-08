@@ -71,7 +71,7 @@ def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
 
 def TensorInitOp : Catalyst_Op<"tensor_init"> {
     let arguments = (ins
-      HLO_DimensionTensor:$shape,
+      Optional<HLO_DimensionTensor>:$shape,
       OptionalAttr<UnitAttr>:$empty,
       TypedAttrInterface:$initializer
     );
@@ -80,7 +80,7 @@ def TensorInitOp : Catalyst_Op<"tensor_init"> {
     );
 
     let assemblyFormat = [{
-      $shape attr-dict `:` type($shape) `->` type($result)
+      ( `(` $shape^ `:` type($shape) `)` )? attr-dict `:` type($result)
     }];
 }
 
