@@ -26,6 +26,7 @@ from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 
+import catalyst
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -605,11 +606,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
-        # Import here to avoid circuilar dependency.
-        # pylint: disable=import-outside-toplevel
-        from catalyst.pennylane_extensions import MidCircuitMeasure
-
-        return isinstance(op, MidCircuitMeasure)
+        return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
