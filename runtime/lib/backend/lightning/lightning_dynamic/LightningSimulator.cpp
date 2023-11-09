@@ -14,6 +14,11 @@
 
 #include "LightningSimulator.hpp"
 
+#include "AdjointJacobianLQubit.hpp"
+#include "JacobianData.hpp"
+#include "LinearAlgebra.hpp"
+#include "MeasurementsLQubit.hpp"
+
 namespace Catalyst::Runtime::Simulator {
 
 auto LightningSimulator::AllocateQubit() -> QubitIdType

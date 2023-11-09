@@ -14,9 +14,9 @@
 
 #pragma once
 
-#if !__has_include("StateVectorLQubitDynamic.hpp")
-throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
-#endif
+// #if !__has_include("StateVectorLQubitDynamic.hpp")
+// throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
+// #endif
 
 #define __device_lightning
 
@@ -29,10 +29,6 @@ throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
 #include <random>
 #include <span>
 
-#include "AdjointJacobianLQubit.hpp"
-#include "JacobianData.hpp"
-#include "LinearAlgebra.hpp"
-#include "MeasurementsLQubit.hpp"
 #include "StateVectorLQubitDynamic.hpp"
 
 #include "CacheManager.hpp"

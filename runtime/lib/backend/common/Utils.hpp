@@ -26,10 +26,6 @@
 #include "Exception.hpp"
 #include "Types.h"
 
-#if __has_include("StateVectorLQubitDynamic.hpp")
-#include "Util.hpp"
-#endif
-
 namespace Catalyst::Runtime::Simulator {
 static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::string, std::string>
 {

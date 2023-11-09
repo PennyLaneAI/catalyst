@@ -35,7 +35,6 @@
 #if __has_include("OpenQasmDevice.hpp")
 // device: openqasm
 #include "OpenQasmDevice.hpp"
-#include <pybind11/embed.h>
 #endif
 
 namespace Catalyst::Runtime {

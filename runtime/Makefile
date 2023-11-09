@@ -7,7 +7,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
-BUILD_TYPE?=Release
+BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
@@ -19,7 +19,7 @@ NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=Release
+test: BUILD_TYPE?=RelWithDebInfo
 
 .PHONY: help
 help:

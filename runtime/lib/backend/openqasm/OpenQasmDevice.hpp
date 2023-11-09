@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <bitset>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -30,9 +31,11 @@
 #include "QubitManager.hpp"
 #include "Utils.hpp"
 
+#include <pybind11/embed.h>
+
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
-#include "OpenQasmRunner.hpp"
+#include "OpenQasmRunner.hpp" // <pybind11/embed.h>
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {

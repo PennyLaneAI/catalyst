@@ -48,12 +48,12 @@ target_link_libraries(runner_tests PRIVATE pybind11::embed)
 
 endif()
 
-target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
-            rt_interfaces
-            Catch2::Catch2)
+target_link_libraries(runner_tests PRIVATE Catch2::Catch2
+    catalyst_qir_runtime
+    )
 
 if(ENABLE_CODE_COVERAGE)
-    set(cov_helper_src  coverage_helper.cpp)
+    set(cov_helper_src coverage_helper.cpp)
 else()
     set(cov_helper_src  "")
 endif()
@@ -66,16 +66,17 @@ else()
 endif()
 
 target_sources(runner_tests PRIVATE ${cov_helper_src}
-            ${openqasm_tests}
-            Test_QubitManager.cpp
-            Test_CacheManager.cpp
-            Test_LightningDriver.cpp
-            Test_LightningGateSet.cpp
-            Test_LightningCoreQIS.cpp
-            Test_LightningMeasures.cpp
-            Test_LightningGradient.cpp
-            Test_SVDynamicCPU_Core.cpp
-            Test_SVDynamicCPU_Allocation.cpp)
+    ${openqasm_tests}
+    Test_QubitManager.cpp
+    Test_CacheManager.cpp
+    Test_LightningDriver.cpp
+    Test_LightningGateSet.cpp
+    Test_LightningCoreQIS.cpp
+    Test_LightningMeasures.cpp
+    Test_LightningGradient.cpp
+    Test_SVDynamicCPU_Core.cpp
+    Test_SVDynamicCPU_Allocation.cpp
+    )
 
 if(KOKKOS_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
