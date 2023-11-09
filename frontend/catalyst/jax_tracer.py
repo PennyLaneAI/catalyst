@@ -617,12 +617,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
         raise CompileError(msg)
 
     is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
-    # TODO: check if the device is noisy.
-    # How?
-    is_noise_present = False
-    are_batch_transforms_valid = (
-        is_valid_output and not is_wave_function_collapsed and not is_noise_present
-    )
+    are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed
     return are_batch_transforms_valid
 
 
@@ -658,7 +653,11 @@ def split_tracers_and_measurements(flat_values):
     measurements = []
     for flat_value in flat_values:
         if isinstance(flat_value, DynamicJaxprTracer):
-            classical.append(flat_value)
+            # classical should remain empty for all valid cases at the moment.
+            # This is because split_tracers_and_measurements is only called
+            # when checking the validity of transforms. And transforms cannot
+            # return any tracers.
+            classical.append(flat_value)  # pragma: no cover
         else:
             measurements.append(flat_value)
 
