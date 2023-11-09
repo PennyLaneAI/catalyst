@@ -54,7 +54,7 @@ print(circuit.mlir)
 def circuit_outer_scope_reference(n: int):
     # CHECK:   [[array0:%.+]] = quantum.alloc
 
-    # CHECK:   scf.while ([[v0:%.+]] = {{%.+}}, [[array_inner:%.+]] = {{%.+}})
+    # CHECK:   [[newqreg:%.+]]:2 = scf.while ([[v0:%.+]] = {{%.+}}, [[array_inner:%.+]] = {{%.+}})
     # CHECK:       [[ct:%.+]] = stablehlo.compare LT, [[v0]], %arg0, SIGNED
     # CHECK:       [[cond:%.+]] = tensor.extract [[ct]]
     # CHECK:       scf.condition([[cond]]) [[v0]], [[array_inner]]
@@ -70,7 +70,7 @@ def circuit_outer_scope_reference(n: int):
         qml.PauliX(wires=0)
         return i + 1
 
-    # CHECK:   quantum.dealloc [[array0]]
+    # CHECK:   quantum.dealloc [[newqreg]]#1
     # CHECK:   return
     return loop(0)
 
@@ -87,7 +87,7 @@ def circuit_multiple_args(n: int):
     # CHECK-DAG:   [[C0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
     # CHECK-DAG:   [[C1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
 
-    # CHECK:   scf.while ([[w0:%.+]] = [[C0]], [[w3:%.+]] = [[R0]])
+    # CHECK:   [[newqreg:%.+]]:2 = scf.while ([[w0:%.+]] = [[C0]], [[w3:%.+]] = [[R0]])
     # CHECK:       [[LT:%.+]] = stablehlo.compare LT, [[w0]], %arg0, SIGNED
     # CHECK:       [[COND:%.+]] = tensor.extract [[LT]]
     # CHECK:       scf.condition([[COND]]) [[w0]], [[w3]]
@@ -104,7 +104,7 @@ def circuit_multiple_args(n: int):
         return (v[0] + inc, v[1]), inc
 
     out = loop((0, n), 1)
-    # CHECK:   quantum.dealloc [[R0]]
+    # CHECK:   quantum.dealloc [[newqreg]]#1
     # CHECK:   return
     return out[0]
 
