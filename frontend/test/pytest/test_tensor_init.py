@@ -104,24 +104,21 @@ def test_unsupported():
         qjit(f)
 
 
-def test_invalid_shape_of_shape():
-    """Test the unsupported shape format"""
+@pytest.mark.parametrize(
+    "bad_shape",
+    [
+        [[2, 3]],
+        [2, 3.0],
+        [1, jnp.array(2, dtype=float)],
+        jnp.array([[3, 2]], dtype=int),
+        jnp.array([1.0], dtype=float),
+    ],
+)
+def test_invalid_shapes(bad_shape):
+    """Test the unsupported shape formats"""
 
     def f():
-        return empty(shape=[[2, 3]], dtype=int)
-
-    with pytest.raises(
-        ValueError,
-        match="The shape is expected to have rank one and contain integers",
-    ):
-        qjit(f)
-
-
-def test_invalid_dtype_of_shape():
-    """Test the unsupported shape format"""
-
-    def f():
-        return empty(shape=[[2.0, 3.0]], dtype=float)
+        return empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(
         ValueError,
