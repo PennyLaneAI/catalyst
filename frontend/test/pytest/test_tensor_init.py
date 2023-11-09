@@ -72,6 +72,16 @@ def test_classical_tracing(shape, dtype):
     assert res.dtype == dtype
 
 
+def test_classical_tracing_2():
+    """Test that tensor primitive work in the classical tracing mode, the traced dimention case"""
+
+    @qjit
+    def f(x):
+        return ones(shape=[1, x], dtype=int)
+
+    _assert_equal(f(3), jnp.ones((1, 3), dtype=int))
+
+
 def test_quantum_tracing():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
@@ -125,6 +135,19 @@ def test_invalid_shapes(bad_shape):
         match="The shape is expected to have rank one and contain integers",
     ):
         qjit(f)
+
+
+def test_invalid_shapes_2():
+    """Test the unsupported shape formats, the case of tracer dimention"""
+
+    def f(x):
+        return empty(shape=[1, x], dtype=int)
+
+    with pytest.raises(
+        ValueError,
+        match="The shape is expected to have rank one and contain integers",
+    ):
+        qjit(f)(3.0)
 
 
 if __name__ == "__main__":
