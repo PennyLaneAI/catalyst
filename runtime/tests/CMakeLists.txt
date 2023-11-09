@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(lightning_qir_runtime_tests)
 
+
 set(CMAKE_CXX_STANDARD 20)
 
 Include(FetchContent)
@@ -22,6 +23,26 @@ include(CTest)
 include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
+
+add_subdirectory(third_party)
+
+# Skip dynamic device loading test when sanitizers are enabled or when building on mac,
+# due to the fact that our current support is not fully compatible on macOS.
+# RTLD_DEEPBIND incompatibility.
+if (ENABLE_ADDRESS_SANITIZER OR APPLE)
+    set(dl_manager_tests "")
+else()
+    # Tests which use dlopen and RTLD_DEEPBIND are incompatible with sanitizers.
+    # All tests which go through dlopen need to be tested without sanitizers.
+    # They produce the following error message:
+    # You are trying to dlopen a this-file-does-not-exist.so shared
+    # library with RTLD_DEEPBIND flag which is incompatible with sanitizer
+    # runtime (see https://github.com/google/sanitizers/issues/611 for
+    # details). If you want to run this-file-does-not-exist.so library under
+    # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
+    add_dependencies(runner_tests dummy_device)
+    set(dl_manager_tests Test_DLManager.cpp)
+endif()
 
 if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
@@ -52,12 +73,6 @@ target_link_libraries(runner_tests PRIVATE Catch2::Catch2
     catalyst_qir_runtime
     )
 
-if(ENABLE_CODE_COVERAGE)
-    set(cov_helper_src coverage_helper.cpp)
-else()
-    set(cov_helper_src  "")
-endif()
-
 if (ENABLE_OPENQASM)
     set(openqasm_tests  Test_OpenQasmBuilder.cpp
             Test_OpenQasmDevice.cpp)
@@ -67,6 +82,7 @@ endif()
 
 target_sources(runner_tests PRIVATE ${cov_helper_src}
     ${openqasm_tests}
+    ${dl_manager_tests}
     Test_QubitManager.cpp
     Test_CacheManager.cpp
     Test_LightningDriver.cpp

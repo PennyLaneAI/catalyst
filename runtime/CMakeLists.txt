@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(catalyst_runtime)
+include(FetchContent)
 
 set(CMAKE_CXX_STANDARD  20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
-option(ENABLE_SANITIZER "Enable address sanitizer" OFF)
+option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
@@ -25,8 +26,34 @@ set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
 set(QIRSTDLIB_VERSION "0.4.0")
 set(QIRSTDLIB_REPO "https://github.com/qir-alliance/qir-runner")
 
-if(BUILD_QIR_STDLIB_FROM_SRC)
+# Get LLVM hash to target from source tree.
+file(READ ../.dep-versions DEPENDENCY_VERSIONS)
+string(REGEX MATCH "llvm=([0-9a-f]+)" _ ${DEPENDENCY_VERSIONS})
+set(LLVM_HASH ${CMAKE_MATCH_1})
+message(STATUS "Detected LLVM version - ${LLVM_HASH}")
+
+FetchContent_Declare(
+    MLIRRunnerUtils
+    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/RunnerUtils.h
+    DOWNLOAD_NO_EXTRACT True
+    SOURCE_DIR        mlir/ExecutionEngine
+)
+
+FetchContent_Declare(
+    MLIRCRunnerUtils
+    URL                 https://raw.githubusercontent.com/llvm/llvm-project/${LLVM_HASH}/mlir/include/mlir/ExecutionEngine/CRunnerUtils.h
+    DOWNLOAD_NO_EXTRACT True
+    SOURCE_DIR          mlir/ExecutionEngine
+)
+
+if(RUNTIME_ENABLE_WARNINGS)
+    message(STATUS "Building with compiler warnings as errors enabled.")
+    add_compile_options(-Werror -Wall)
+endif()
+
+if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
     message(STATUS "Building qir-stdlib from source.")
+
     include(FetchContent)
 
     FetchContent_Declare(
@@ -45,9 +72,7 @@ if(BUILD_QIR_STDLIB_FROM_SRC)
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
 elseif(NOT DEFINED QIR_STDLIB_PATH)
-    if (APPLE)
-        set(QIRSTDLIB_PLATFORM "macos-11-amd64")
-    elseif(UNIX)
+    if(UNIX)
         set(QIRSTDLIB_PLATFORM "ubuntu-20.04-amd64")
     elseif(MSVC)
         set(QIRSTDLIB_PLATFORM "windows-2019-amd64")
@@ -94,7 +119,7 @@ add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 
-target_include_directories(catalyst_qir_runtime INTERFACE runtime_includes ${QIR_STDLIB_PATH})
+target_include_directories(catalyst_qir_runtime INTERFACE ${runtime_includes} ${QIR_STDLIB_PATH})
 
 if(ENABLE_CODE_COVERAGE)
 	message(STATUS "ENABLE_CODE_COVERAGE is ON.")
@@ -103,17 +128,12 @@ if(ENABLE_CODE_COVERAGE)
     target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
 endif()
 
-if(ENABLE_SANITIZER)
-    message(STATUS "ENABLE_SANITIZER is ON.")
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-fsanitize=address)
-        add_link_options(-fsanitize=address -static-libasan)
-    elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-        target_link_libraries(catalyst_qir_runtime INTERFACE -fno-omit-frame-pointer -fsanitize=address)
-    endif()
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-ENDIF()
+
+if(ENABLE_ADDRESS_SANITIZER)
+    message(STATUS "ENABLE_ADDRESS_SANITIZER is ON.")
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+endif()
 
 add_subdirectory(lib)
 add_subdirectory(tests)

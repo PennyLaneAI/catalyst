@@ -75,15 +75,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
                            [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto getDeviceWires(size_t numWires, const QubitIdType *wires) -> std::vector<size_t>
-    {
-        std::vector<size_t> res;
-        res.reserve(numWires);
-        std::transform(wires, wires + numWires, std::back_inserter(res),
-                       [this](auto w) { return this->qubit_manager.getDeviceId(w); });
-        return res;
-    }
-
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
         std::vector<size_t> res;

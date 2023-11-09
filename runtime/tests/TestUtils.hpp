@@ -31,8 +31,7 @@
  */
 #if __has_include("LightningKokkosSimulator.hpp")
 #include "LightningKokkosSimulator.hpp"
-using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
-                            Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
+using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
 #else
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif

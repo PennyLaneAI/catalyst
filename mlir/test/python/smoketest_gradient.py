@@ -21,13 +21,13 @@ with Context() as ctx:
     gradient_d.register_dialect()
     module = Module.parse(
         """
-    "func.func"() ({}) {function_type = (f64) -> f64, sym_name = "funcScalarScalar", sym_visibility = "private"} : () -> ()
-    "func.func"() ({
-    ^bb0(%arg0: f64):
-        %0 = "gradient.grad"(%arg0) {callee = @funcScalarScalar, method = "fd"} : (f64) -> f64
-        "func.return"(%0) : (f64) -> ()
-    }) {function_type = (f64) -> f64, sym_name = "gradCallScalarScalar"} : () -> ()
-    """
+        "func.func"() ({}) {function_type = (f64) -> f64, sym_name = "funcScalarScalar", sym_visibility = "private"} : () -> ()
+        "func.func"() ({
+        ^bb0(%arg0: f64):
+            %0 = "gradient.grad"(%arg0) {callee = @funcScalarScalar, method = "fd"} : (f64) -> f64
+            "func.return"(%0) : (f64) -> ()
+        }) {function_type = (f64) -> f64, sym_name = "gradCallScalarScalar"} : () -> ()
+        """
     )
 
     print(str(module))

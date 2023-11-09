@@ -17,6 +17,18 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CatalystBufferizationPass : Pass<"catalyst-bufferize"> {
+    let summary = "Bufferize tensors in catalyst utility ops.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "memref::MemRefDialect",
+        "index::IndexDialect"
+    ];
+
+    let constructor = "catalyst::createCatalystBufferizationPass()";
+}
+
 def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
     let summary = "Lower array list operations to memref operations.";
     let description = [{
@@ -32,6 +44,28 @@ def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
     ];
 
     let constructor = "catalyst::createArrayListToMemRefPass()";
+}
+
+def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
+    let summary = "Lower catalyst utility operations to the LLVM dialect.";
+
+    let dependentDialects = [
+        "mlir::LLVM::LLVMDialect",
+    ];
+
+    let constructor = "catalyst::createCatalystConversionPass()";
+}
+
+def ScatterLoweringPass : Pass<"scatter-lowering"> {
+    let summary = "Lower scatter op from Stable HLO to loops.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "mhlo::MhloDialect",
+        "scf::SCFDialect"
+    ];
+
+    let constructor = "catalyst::createScatterLoweringPass()";
 }
 
 #endif // CATALYST_PASSES

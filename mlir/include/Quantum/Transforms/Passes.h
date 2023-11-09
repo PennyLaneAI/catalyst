@@ -25,6 +25,5 @@ std::unique_ptr<mlir::Pass> createQuantumConversionPass();
 std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
 std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
 std::unique_ptr<mlir::Pass> createAdjointLoweringPass();
-std::unique_ptr<mlir::Pass> createScatterLoweringPass();
 
 } // namespace catalyst

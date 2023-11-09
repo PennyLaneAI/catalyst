@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import warnings
+from os.path import isfile
 
 import pennylane as qml
 import pytest
@@ -315,7 +316,7 @@ module @workflow {
 }
 """
         with pytest.raises(CompileError) as e:
-            qjit(ir, keep_intermediate=True)(0.1)
+            qjit(ir)(0.1)
 
         assert "Failed to parse module as MLIR source" in e.value.args[0]
         assert "Failed to parse module as LLVM source" in e.value.args[0]
@@ -329,12 +330,16 @@ module @workflow {
 
         test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
         with pytest.raises(CompileError) as e:
-            qjit(circuit, pipelines=test_pipelines)()
+            compiled = qjit(
+                circuit, pipelines=test_pipelines, target="mlir", keep_intermediate=True
+            )
+            compiled.compile()
 
         assert "Failed to lower MLIR module" in e.value.args[0]
-        assert "While processing pipeline: PipelineB" in e.value.args[0]
+        assert "While processing 'TestPass' pass of the 'PipelineB' pipeline" in e.value.args[0]
         assert "PipelineA" not in e.value.args[0]
         assert "Trace" not in e.value.args[0]
+        assert isfile(os.path.join(str(compiled.workspace), "2_PipelineB_FAILED.mlir"))
 
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()

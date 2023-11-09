@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -24,7 +25,6 @@ void populateBufferizationLegality(mlir::TypeConverter &, mlir::ConversionTarget
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populateAdjointPatterns(mlir::RewritePatternSet &);
-void populateScatterPatterns(mlir::RewritePatternSet &);
 
 } // namespace quantum
 } // namespace catalyst
