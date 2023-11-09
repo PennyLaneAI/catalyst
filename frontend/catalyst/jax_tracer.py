@@ -635,7 +635,7 @@ def trace_quantum_function(
                 out_tree,
             )
             out_quantum_tracers = [qrp_out.actualize()]
-            qdealloc_p.bind(qreg_in)
+            qdealloc_p.bind(qrp_out.base)
 
             out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
 
