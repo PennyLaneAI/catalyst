@@ -80,8 +80,10 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+        bool oneUse = extract.getResult().hasOneUse();
 
-        if (staticallyEqual || dynamicallyEqual) {
+        if ((staticallyEqual || dynamicallyEqual) && oneUse) {
+            insert->getParentOp()->dump();
             rewriter.replaceOp(insert, extract.getQreg());
             rewriter.eraseOp(extract);
             return success();
