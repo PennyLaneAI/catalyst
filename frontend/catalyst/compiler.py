@@ -247,7 +247,6 @@ class LinkerDriver:
             *system_flags,
             *lib_path_flags,
             "-lrtd_lightning",
-            "-lrtd_openqasm",
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy

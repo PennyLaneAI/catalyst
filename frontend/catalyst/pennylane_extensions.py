@@ -139,13 +139,12 @@ class QFunc:
 
             # TODO:
             # Once all devices get converted to shared libraries this name should just be the path.
-            backend_path_or_name = name
+            backend_lib = name
+            backend_name = name
             if implements_c_interface:
-                impl = self.device.get_c_interface()
-                if not pathlib.Path(impl).is_file():
-                    raise CompileError(f"Device at {impl} cannot be found!")
-
-                backend_path_or_name = self.device.get_c_interface()
+                backend_name, backend_lib = self.device.get_c_interface()
+                if not pathlib.Path(backend_lib).is_file():
+                    raise CompileError(f"Device at {backend_lib} cannot be found!")
 
             backend_kwargs = {}
             if hasattr(self.device, "shots"):
@@ -158,7 +157,7 @@ class QFunc:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
 
             device = QJITDevice(
-                self.device.shots, self.device.wires, backend_path_or_name, backend_kwargs
+                self.device.shots, self.device.wires, backend_name, backend_lib, backend_kwargs
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
@@ -245,8 +244,11 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+    def __init__(
+        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+    ):
         self.backend_name = backend_name if backend_name else "default"
+        self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
         super().__init__(wires=wires, shots=shots)
 

@@ -624,8 +624,9 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
-            qdevice_p.bind(spec="backend", val=device.backend_name)
+            qdevice_p.bind(spec="rtd_kwargs", val=str(device.backend_kwargs))
+            qdevice_p.bind(spec="rtd_name", val=device.backend_name)
+            qdevice_p.bind(spec="rtd_lib", val=device.backend_lib)
             qreg_in = qalloc_p.bind(len(device.wires))
             qrp_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
             out_classical_tracers, out_classical_tree = trace_quantum_measurements(

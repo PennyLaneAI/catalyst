@@ -229,7 +229,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    const std::string dev("backend");
+    const std::string dev("rtd_lib");
     const std::string dev_value("lightning.qubit");
 
     for (const auto &p : param) {

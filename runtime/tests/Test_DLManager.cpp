@@ -25,6 +25,7 @@ TEST_CASE("Test dummy", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("this-file-does-not-exist.so");
+    driver->setDeviceName("DummyDevice");
     REQUIRE_THROWS_WITH(driver->loadDevice(file), Catch::Contains("No such file or directory"));
 }
 
@@ -32,8 +33,9 @@ TEST_CASE("Test error message function not found", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libm.so.6");
+    driver->setDeviceName("DummyDevice");
     REQUIRE_THROWS_WITH(driver->loadDevice(file),
-                        Catch::Contains("undefined symbol: getCustomDevice"));
+                        Catch::Contains("undefined symbol: DummyDeviceFactory"));
 }
 
 TEST_CASE("Test return false if cannot init device", "[Third Party]")
@@ -47,6 +49,7 @@ TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libdummy_device.so");
+    driver->setDeviceName("DummyDevice");
     CHECK(driver->initDevice(file));
 }
 
@@ -55,7 +58,7 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
 {
     __quantum__rt__initialize();
 
-    char dev[8] = "backend";
+    char dev[8] = "rtd_lib";
     char dev_value[17] = "lightning.qubit";
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 
@@ -81,7 +84,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 {
     __quantum__rt__initialize();
 
-    char dev[8] = "backend";
+    char dev[8] = "rtd_lib";
     char dev_value[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
@@ -95,7 +98,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 
     __quantum__rt__initialize();
 
-    char dev_kwargs[20] = "kwargs";
+    char dev_kwargs[20] = "rtd_kwargs";
     char dev_value_kwargs[70] = "device_arn : arn:aws:braket:::device/quantum-simulator/amazon/sv1";
 
     __quantum__rt__device((int8_t *)dev_kwargs, (int8_t *)dev_value_kwargs);
@@ -111,7 +114,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 
     __quantum__rt__initialize();
 
-    char dev_lcl[8] = "backend";
+    char dev_lcl[8] = "rtd_lib";
     char dev_value_lcl[30] = "braket.local.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")

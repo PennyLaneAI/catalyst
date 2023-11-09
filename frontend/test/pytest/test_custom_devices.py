@@ -52,8 +52,9 @@ def test_custom_device():
 
         @staticmethod
         def get_c_interface():
-            """Location to shared object with C/C++ implementation"""
-            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+            """A tuple of device name and location to shared object with C/C++ implementation"""
+
+            return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     @qjit
     @qml.qnode(DummyDevice(wires=1))
@@ -91,8 +92,9 @@ def test_custom_device_bad_directory():
 
         @staticmethod
         def get_c_interface():
-            """Location to shared object with C/C++ implementation"""
-            return "this-file-does-not-exist.so"
+            """A tuple of device name and location to shared object with C/C++ implementation"""
+
+            return "DummyDevice", "this-file-does-not-exist.so"
 
     with pytest.raises(CompileError, match="Device .* cannot be found"):
 

@@ -117,7 +117,8 @@ class SharedLibraryManager final {
     }
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice();
+extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(bool status,
+                                                                  const std::string &kwargs);
 
 class ExecutionContext final {
   private:
@@ -181,7 +182,9 @@ class ExecutionContext final {
 
     void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
 
-    void setDeviceKwArgs(std::string_view info) noexcept { _device_kwargs = info; }
+    void setDeviceKwArgs(std::string_view kwargs) noexcept { _device_kwargs = kwargs; }
+
+    void setDeviceName(std::string_view name) noexcept { _device_name = name; }
 
     [[nodiscard]] auto getDeviceName() const -> std::string_view { return _device_name; }
 
@@ -192,14 +195,18 @@ class ExecutionContext final {
     [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
     {
         _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
-        void *f_ptr = _driver_so_ptr->getSymbol("getCustomDevice");
-        return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : nullptr;
+        std::string factory_name{_device_name + "Factory"};
+        void *f_ptr = _driver_so_ptr->getSymbol(factory_name);
+        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_tape_recording,
+                                                                                 _device_kwargs)
+                     : nullptr;
     }
 
-    [[nodiscard]] bool initDevice(std::string_view name)
+    [[nodiscard]] bool initDevice(std::string_view rtd_lib)
     {
-        if (name != "default") {
-            _device_name = name;
+        if (rtd_lib != "default" &&
+            (_device_name == "lightning.qubit" || _device_name == "default")) {
+            _device_name = rtd_lib;
         }
 
         if (_device_name == "braket.aws.qubit" || _device_name == "braket.local.qubit") {
@@ -231,13 +238,15 @@ class ExecutionContext final {
         //
         // Yes, I know there is a performance impact. But this try-catch will be removed once
         // all devices are shared libraries.
-        try {
-            QuantumDevice *impl = loadDevice(std::string(name));
-            _driver_ptr.reset(impl);
-            return true;
-        }
-        catch (RuntimeException &e) {
-            // fall-through
+        if (_device_name != rtd_lib) {
+            try {
+                QuantumDevice *impl = loadDevice(std::string(rtd_lib));
+                _driver_ptr.reset(impl);
+                return true;
+            }
+            catch (RuntimeException &e) {
+                // fall-through
+            }
         }
 
         return false;

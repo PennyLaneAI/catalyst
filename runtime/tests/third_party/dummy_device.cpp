@@ -1,74 +1,78 @@
 #include <QuantumDevice.hpp>
 
-struct DummyDevice : public Catalyst::Runtime::QuantumDevice {
-    DummyDevice() = default;          // LCOV_EXCL_LINE
-    virtual ~DummyDevice() = default; // LCOV_EXCL_LINE
+struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
+    DummyDevice([[maybe_unused]] bool status, [[maybe_unused]] const std::string &kwargs) {}
+    ~DummyDevice() = default; // LCOV_EXCL_LINE
 
     DummyDevice &operator=(const QuantumDevice &) = delete;
     DummyDevice(const DummyDevice &) = delete;
     DummyDevice(DummyDevice &&) = delete;
     DummyDevice &operator=(QuantumDevice &&) = delete;
 
-    virtual std::string getName(void) { return "DummyDevice"; }
+    std::string GetDeviceName(void) override { return "DummyDevice"; }
 
-    auto AllocateQubit() -> QubitIdType { return 0; }
-    virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
+    auto AllocateQubit() -> QubitIdType override { return 0; }
+    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
     {
         return std::vector<QubitIdType>(num_qubits);
     }
-    [[nodiscard]] virtual auto Zero() const -> Result { return NULL; }
-    [[nodiscard]] virtual auto One() const -> Result { return NULL; }
-    virtual auto Observable(ObsId, const std::vector<std::complex<double>> &,
-                            const std::vector<QubitIdType> &) -> ObsIdType
+    [[nodiscard]] auto Zero() const -> Result override { return NULL; }
+    [[nodiscard]] auto One() const -> Result override { return NULL; }
+    auto Observable(ObsId, const std::vector<std::complex<double>> &,
+                    const std::vector<QubitIdType> &) -> ObsIdType override
     {
         return 0;
     }
-    virtual auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0; }
-    virtual auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
-        -> ObsIdType
+    auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType override { return 0; }
+    auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
+        -> ObsIdType override
     {
         return 0;
     }
-    virtual auto Measure(QubitIdType) -> Result
+    auto Measure(QubitIdType) -> Result override
     {
         bool *ret = (bool *)malloc(sizeof(bool));
         *ret = true;
         return ret;
     }
 
-    virtual void ReleaseQubit(QubitIdType) {}
-    virtual void ReleaseAllQubits() {}
-    [[nodiscard]] virtual auto GetNumQubits() const -> size_t { return 0; }
-    virtual void SetDeviceShots(size_t shots) {}
-    [[nodiscard]] virtual auto GetDeviceShots() const -> size_t { return 0; }
-    virtual void StartTapeRecording() {}
-    virtual void StopTapeRecording() {}
-    virtual void PrintState() {}
-    virtual void NamedOperation(const std::string &, const std::vector<double> &,
-                                const std::vector<QubitIdType> &, bool)
+    void ReleaseQubit(QubitIdType) override {}
+    void ReleaseAllQubits() override {}
+    [[nodiscard]] auto GetNumQubits() const -> size_t override { return 0; }
+    void SetDeviceShots(size_t shots) override {}
+    [[nodiscard]] auto GetDeviceShots() const -> size_t override { return 0; }
+    void StartTapeRecording() override {}
+    void StopTapeRecording() override {}
+    void PrintState() override {}
+    void NamedOperation(const std::string &, const std::vector<double> &,
+                        const std::vector<QubitIdType> &, bool) override
     {
     }
 
-    virtual void MatrixOperation(const std::vector<std::complex<double>> &,
-                                 const std::vector<QubitIdType> &, bool)
+    void MatrixOperation(const std::vector<std::complex<double>> &,
+                         const std::vector<QubitIdType> &, bool) override
     {
     }
 
-    virtual auto Expval(ObsIdType) -> double { return 0.0; }
-    virtual auto Var(ObsIdType) -> double { return 0.0; }
-    virtual void State(DataView<std::complex<double>, 1> &) {}
-    virtual void Probs(DataView<double, 1> &) {}
-    virtual void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) {}
-    virtual void Sample(DataView<double, 2> &, size_t) {}
-    virtual void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) {}
-    virtual void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) {}
+    auto Expval(ObsIdType) -> double override { return 0.0; }
+    auto Var(ObsIdType) -> double override { return 0.0; }
+    void State(DataView<std::complex<double>, 1> &) override {}
+    void Probs(DataView<double, 1> &) override {}
+    void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) override {}
+    void Sample(DataView<double, 2> &, size_t) override {}
+    void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) override {}
+    void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) override {}
 
-    virtual void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
-                               const std::vector<QubitIdType> &, size_t)
+    void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                       const std::vector<QubitIdType> &, size_t) override
     {
     }
 
-    virtual void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) {}
+    void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice() { return new DummyDevice(); }
+extern "C" Catalyst::Runtime::QuantumDevice *DummyDeviceFactory(bool status,
+                                                                const std::string &kwargs)
+{
+    return new DummyDevice(status, kwargs);
+}
