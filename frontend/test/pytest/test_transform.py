@@ -363,8 +363,8 @@ class TestSumExpand:
         assert np.allclose(expected, observed)
 
 
-class TestMergeRotations:
-    """Test Merge Rotations"""
+class TestQFuncTransforms:
+    """Test QFunc Transforms"""
 
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
     def test_merge_rotations(self, backend, theta_1, theta_2):
@@ -391,6 +391,49 @@ class TestMergeRotations:
 
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
+
+    def test_unroll_ccrz(self, backend):
+        """Test unroll_ccrz transform."""
+
+        @qml.qfunc_transform
+        def unroll_ccrz(tape):
+            """Needed for lightning.qubit, as it does not natively support expansion of
+            multi-controlled RZ."""
+
+            for op in tape:
+                if op.name == "C(RZ)":
+                    qml.CNOT(wires=[op.control_wires[0], op.target_wires[0]])
+                    qml.RZ(-op.data[0] / 4, wires=op.target_wires[0])
+                    qml.CNOT(wires=[op.control_wires[1], op.target_wires[0]])
+                    qml.RZ(op.data[0] / 4, wires=op.target_wires[0])
+                    qml.CNOT(wires=[op.control_wires[0], op.target_wires[0]])
+                    qml.RZ(-op.data[0] / 4, wires=op.target_wires[0])
+                    qml.CNOT(wires=[op.control_wires[1], op.target_wires[0]])
+                    qml.RZ(op.data[0] / 4, wires=op.target_wires[0])
+                else:
+                    qml.apply(op)
+
+        def sub_circuit():
+            """Just a controlled RZ operation."""
+            qml.ctrl(qml.RZ, [0, 1], control_values=[0, 0])(jnp.pi, wires=[2])
+
+        def qnode_builder(device_name):
+            """Builder"""
+
+            @qml.qnode(qml.device(device_name, wires=3))
+            def circuit():
+                """Example."""
+                unroll_ccrz(sub_circuit)()
+                return qml.state()
+
+            return circuit
+
+        qnode_backend = qnode_builder(backend)
+        qnode_control = qnode_builder("default.qubit")
+        expected = jax.jit(qnode_control)()
+        compiled = qjit(qnode_backend)
+        observed = compiled()
+        assert np.allclose(expected, observed)
 
 
 class TestTransformValidity:
