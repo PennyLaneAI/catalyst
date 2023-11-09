@@ -151,6 +151,7 @@ DEFAULT_PIPELINES = [
             "func.func(finalizing-bufferize)",
             "func.func(buffer-hoisting)",
             "func.func(buffer-loop-hoisting)",
+            "func.func(buffer-deallocation)",
             "convert-arraylist-to-memref",
             "convert-bufferization-to-memref",
             "canonicalize",
