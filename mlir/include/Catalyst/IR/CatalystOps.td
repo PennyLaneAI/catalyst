@@ -67,4 +67,14 @@ def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
     let assemblyFormat = [{ $list attr-dict `:` type($list) `->` type($data) }];
 }
 
+def PrintOp : Catalyst_Op<"print"> {
+    let summary = "Prints numeric values or constant strings at runtime.";
+
+    let arguments = (ins
+        Optional<AnyType>:$val,
+        OptionalAttr<StrAttr>:$const_val,
+        UnitAttr:$print_descriptor
+    );
+}
+
 #endif // GRADIENT_OPS

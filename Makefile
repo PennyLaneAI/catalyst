@@ -1,4 +1,6 @@
-PYTHON ?= python3
+PYTHON ?= $(shell which python3)
+C_COMPILER ?= $(shell which clang)
+CXX_COMPILER ?= $(shell which clang++)
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
 BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
@@ -6,13 +8,14 @@ BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
-MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/build
+MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/mhlo-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+ENABLE_ASAN ?= OFF
 COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
 
 .PHONY: help
@@ -77,11 +80,33 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
+ifeq ($(ENABLE_ASAN), ON)
+ifneq ($(findstring clang,$(C_COMPILER)), clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+	ASAN_OPTIONS=detect_leaks=0 \
+	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
 	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+else
+	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+endif
+
 test-demos:
 	@echo "check the Catalyst demos"
+ifeq ($(ENABLE_ASAN), ON)
+ifneq ($(findstring clang,$(C_COMPILER)), clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+	ASAN_OPTIONS=detect_leaks=0 \
+	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
 	MDD_BENCHMARK_PRECISION=1 \
 	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+else
+	MDD_BENCHMARK_PRECISION=1 \
+	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+endif
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -96,7 +121,7 @@ wheel:
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common ; do \
+	for file in gradient quantum _ods_common catalyst ; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver.so $(MK_DIR)/frontend/mlir_quantum/

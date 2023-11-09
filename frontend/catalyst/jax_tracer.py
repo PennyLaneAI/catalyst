@@ -15,6 +15,7 @@
 """
 
 from dataclasses import dataclass
+from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
@@ -26,6 +27,7 @@ from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 
 from catalyst.jax_primitives import (
+    AbstractQreg,
     compbasis_p,
     counts_p,
     expval_p,
@@ -54,9 +56,13 @@ from catalyst.utils.jax_extras import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     PyTreeDef,
+    ShapedArray,
     ShapeDtypeStruct,
+    _abstractify,
     _input_type_to_tracers,
+    convert_element_type,
     deduce_avals,
+    eval_jaxpr,
     jaxpr_to_mlir,
     pytree,
     sort_eqns,
@@ -105,6 +111,69 @@ PAULI_NAMED_MAP = {
     "Y": "PauliY",
     "Z": "PauliZ",
 }
+
+
+def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
+    # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid abstact
+    # value. One need to investigate how to use it correctly and remove the condition [1]. Should we
+    # add AbstractQreg into the `_weak_types` list of JAX?
+    assert len(types) > 0, "Expected one or more set of types"
+    assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
+
+    def _shapes(ts):
+        return [t.shape for t in ts if isinstance(t, ShapedArray)]
+
+    assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
+    all_ends_with_qreg = all(isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(not isinstance(t[-1], AbstractQreg) for t in types)
+    assert (
+        all_ends_with_qreg or all_not_ends_with_qreg
+    ), "We require either all-qregs or all-non-qregs as last items of the type lists"
+    if all_ends_with_qreg:
+        types = [t[:-1] for t in types]
+    results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
+
+
+def _apply_result_type_conversion(
+    jaxpr: ClosedJaxpr, target_types: List[ShapedArray]
+) -> ClosedJaxpr:
+    with_qreg = isinstance(target_types[-1], AbstractQreg)
+    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
+        with EvaluationContext.frame_tracing_context(ctx) as trace:
+            in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
+            out_tracers = [
+                trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
+            ]
+            out_tracers_, target_types_ = (
+                (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
+            )
+            out_promoted_tracers = [
+                (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+                for tr, ty in zip(out_tracers_, target_types_)
+            ]
+            jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(
+                out_promoted_tracers + ([out_tracers[-1]] if with_qreg else [])
+            )
+    return ClosedJaxpr(jaxpr2, consts)
+
+
+def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
+    """Unify result types of the jaxpr equations given.
+    Args:
+        jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
+                                      matching sizes and numpy array shapes but dtypes might be
+                                      different.
+
+    Returns (list of ClosedJaxpr):
+        Same number of jaxprs with equal result dtypes.
+
+    Raises:
+        TypePromotionError: Unification is not possible.
+
+    """
+    promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs])
+    return [_apply_result_type_conversion(j, promoted_types) for j in jaxprs]
 
 
 class QRegPromise:

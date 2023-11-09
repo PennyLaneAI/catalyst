@@ -1,7 +1,7 @@
 .. runtime-start-inclusion-marker-do-not-remove
 
-Catalyst Runtime
-################
+Catalyst Quantum Runtime
+########################
 
 The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
 quantum programs, and is currently backed by `PennyLane-Lightning <https://docs.pennylane.ai/projects/lightning/en/stable>`_
