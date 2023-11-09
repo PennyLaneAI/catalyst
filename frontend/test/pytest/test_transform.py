@@ -409,7 +409,8 @@ class TestTransformValidity:
         )
         H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
 
-        msg = "A transformed quantum function must return either a single measurement, or a nonempty sequence of measurements."
+        msg = "A transformed quantum function must return either a single measurement, "\
+                "or a nonempty sequence of measurements."
         with pytest.raises(CompileError, match=msg):
 
             @qjit
@@ -485,11 +486,11 @@ class TestTransformValidity:
     def test_informative_transform(self, backend):
         """Informative transforms are not supported!"""
 
-        def id(tape: qml.tape.QuantumTape) -> (Sequence[qml.tape.QuantumTape], Callable):
+        def _id(tape: qml.tape.QuantumTape) -> (Sequence[qml.tape.QuantumTape], Callable):
             return [tape], lambda res: res[0]
 
         # Just fake that it is informative
-        id_transform = qml.transforms.core.transform(id, is_informative=True)
+        id_transform = qml.transforms.core.transform(_id, is_informative=True)
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
 
