@@ -106,7 +106,7 @@ def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterfac
     );
 
     let results = (outs
-        Res<QuregType, "", []>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
@@ -120,7 +120,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        Arg<QuregType, "", []>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
