@@ -610,7 +610,8 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     if not is_valid_output:
-        msg = "A transformed quantum function must return either a single measurement, or a nonempty sequence of measurements."
+        msg = "A transformed quantum function must return either a single measurement, \
+                or a nonempty sequence of measurements."
         raise CompileError(msg)
 
     is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))

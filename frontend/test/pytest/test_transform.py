@@ -188,7 +188,7 @@ class TestBroadcastExpand:
         """Test broadcast expand"""
 
         if obs[0] == H0:
-            pytest.skip(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
+            pytest.xfail(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
 
         def qnode_builder(device_name):
             """Builder"""
@@ -230,7 +230,7 @@ class TestBroadcastExpand:
         """
 
         if obs[0] == H0:
-            pytest.skip(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
+            pytest.xfail(reason="https://github.com/PennyLaneAI/catalyst/issues/339")
 
         def qnode_builder(device_name):
             """Builder"""
