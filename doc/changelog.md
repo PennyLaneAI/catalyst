@@ -2,20 +2,6 @@
 
 <h3>New features</h3>
 
-<h3>Improvements</h3>
-
-<h3>Breaking changes</h3>
-
-<h3>Bug fixes</h3>
-
-<h3>Contributors</h3>
-
-This release contains contributions from (in alphabetical order):
-
-# Release 0.3.2
-
-<h3>New features</h3>
-
 * Catalyst now has its own versions of `numpy.zeros`, `numpy.ones` and `numpy.empty`, all compatible
   with the JAX tracing that we use for compilation.
   [(#350)](https://github.com/PennyLaneAI/catalyst/pull/350)
@@ -26,6 +12,22 @@ This release contains contributions from (in alphabetical order):
     a = catalyst.ones(shape, dtype=float)
     return a + a
   ```
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Sergei Mironov
+
+# Release 0.3.2
+
+<h3>New features</h3>
 
 * Debug compiled programs and print dynamic values at runtime with ``debug.print``
   [(#279)](https://github.com/PennyLaneAI/catalyst/pull/279)
