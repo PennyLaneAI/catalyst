@@ -393,7 +393,7 @@ class TestMergeRotations:
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
 
 
-class TestInvalidTransform:
+class TestTransformValidity:
     """Test validity of transforms."""
 
     def test_return_classical_value(self, backend):
@@ -423,7 +423,7 @@ class TestInvalidTransform:
                 qml.PauliX(2)
                 return [1, qml.expval(H4)]
 
-    def test_split_invalid_non_commuting(self, backend):
+    def test_invalid_batch_transform_due_to_measure(self, backend):
         """Test split non commuting"""
 
         def qnode_builder(device_name):
@@ -456,7 +456,7 @@ class TestInvalidTransform:
             qjit(qnode_builder(backend))
 
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
-    def test_merge_rotations_valid(self, backend, theta_1, theta_2):
+    def test_valid_due_to_non_batch(self, backend, theta_1, theta_2):
         """This program is valid even in the presence of a mid circuit measurement.
         This is because it will not create multiple tapes, and therefore not
         non-deterministic behaviour across the execution of multiple tapes.
