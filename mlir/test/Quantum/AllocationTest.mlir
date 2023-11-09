@@ -16,7 +16,9 @@
 
 // CHECK-LABEL: @existing_deallocation
 func.func @existing_deallocation() {
+    // CHECK: [[reg:%.+]] = quantum.alloc
     %0 = quantum.alloc( 1) : !quantum.reg
+    // CHECK: quantum.dealloc [[reg]]
     quantum.dealloc %0 : !quantum.reg
     return
 }
@@ -27,7 +29,7 @@ func.func @existing_deallocation() {
 func.func @missing_deallocation() {
     // CHECK: [[reg:%.+]] = quantum.alloc
     %0 = quantum.alloc( 1) : !quantum.reg
-    // CHECK: quantum.dealloc [[reg]]
+    // CHECK-NOT: quantum.dealloc [[reg]]
     return
 }
 
