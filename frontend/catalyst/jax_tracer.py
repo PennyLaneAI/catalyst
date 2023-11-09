@@ -601,9 +601,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     is_out_measurements = map(is_measurement, meas_tracers)
     is_all_out_measurements = all(is_out_measurements) and not class_tracers
     is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
-    is_out_single_measurement = is_all_out_measurements and isinstance(
-        meas_tracers, MeasurementProcess
-    )
+    is_out_single_measurement = is_all_out_measurements and is_measurement(meas_tracers)
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
