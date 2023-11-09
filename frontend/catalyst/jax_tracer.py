@@ -609,6 +609,10 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
         return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
+    if not is_valid_output:
+        msg = "A transformed quantum function must return either a single measurement, or a nonempty sequence of measurements."
+        raise CompileError(msg)
+
     is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
     # TODO: check if the device is noisy.
     # How?
@@ -633,9 +637,8 @@ def apply_transform(qnode, tape, flat_results):
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-
     if is_program_transformed:
+        is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         tapes, post_processing = qnode.transform_program([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."

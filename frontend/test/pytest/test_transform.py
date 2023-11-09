@@ -396,6 +396,33 @@ class TestMergeRotations:
 class TestInvalidTransform:
     """Test validity of transforms."""
 
+    def test_return_classical_value(self, backend):
+        """Test that there's an error raised if the users uses a transform and returns
+        a classical value."""
+
+        H4 = (
+            qml.PauliX(0) @ qml.PauliZ(2)
+            + 3 * qml.PauliZ(2)
+            - 2 * qml.PauliX(0)
+            + qml.PauliZ(2)
+            + qml.PauliZ(2)
+        )
+        H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
+
+        msg = "A transformed quantum function must return either a single measurement, or a nonempty sequence of measurements."
+        with pytest.raises(CompileError, match=msg):
+
+            @qjit
+            @hamiltonian_expand
+            @qml.qnode(qml.device(backend, wires=3))
+            def qfunc():
+                """Example taken from PL tests."""
+                qml.Hadamard(0)
+                qml.Hadamard(1)
+                qml.PauliZ(1)
+                qml.PauliX(2)
+                return [1, qml.expval(H4)]
+
     def test_split_invalid_non_commuting(self, backend):
         """Test split non commuting"""
 
