@@ -1034,7 +1034,7 @@ class QCtrl(HybridOp):
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError("QCtrl does not support JAX quantum tracing")  # pragma: no cover
 
-    def compute_decomposition(self, *params, wires=None, **hyperparameters):
+    def decomposition(self, *params, wires=None, **hyperparameters):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
         distributing the quantum control operaiton over the tape operations."""
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
