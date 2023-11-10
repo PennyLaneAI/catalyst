@@ -1038,8 +1038,6 @@ class QCtrl(HybridOp):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
         distributing the quantum control operaiton over the tape operations."""
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
-        assert len(self.params) == 0, "Decomposition parameters should be empty"
-        assert len(self.hyperparameters) == 0, "Decomposition hyperparameters should be empty"
 
         _check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
