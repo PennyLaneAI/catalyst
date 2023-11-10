@@ -129,6 +129,8 @@ wheel:
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
 
+	rm -r $(MK_DIR)/build
+
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
