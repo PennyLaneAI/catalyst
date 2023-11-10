@@ -242,3 +242,28 @@ The following target runs all available test suites in Catalyst:
 
 You can also test each module separately by using running the ``test-frontend``,
 ``test-dialects``, and ``test-runtime`` targets instead.
+
+Documentation
+^^^^^^^^^^^^^
+
+To build and test documentation for Catalyst, you will need to install
+`sphinx <https://www.sphinx-doc.org>`_ and other packages listed in ``doc/requirements.txt``:
+
+.. code-block:: console
+
+  pip install -r doc/requirements.txt
+
+Additionally, `doxygen <https://www.doxygen.nl>`_ is required to build C++ documentation, and
+`pandoc <https://pandoc.org>`_ to render Jupyter Notebooks.
+
+On **Debian/Ubuntu**, they can be installed via:
+
+.. code-block:: console
+
+  sudo apt install doxygen pandoc
+
+On **macOS**, `homebrew <https://brew.sh>`_ is the easiest way to install these packages:
+
+.. code-block:: console
+
+  brew install doxygen pandoc
