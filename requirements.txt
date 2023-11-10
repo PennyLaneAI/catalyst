@@ -6,7 +6,7 @@ pybind11>=2.8.0
 PyYAML
 
 # formatting/linting
-black[jupyter]
+black
 clang-format==14.*
 clang-tidy==14.*
 pylint
@@ -20,4 +20,4 @@ pytest-cov
 nbmake
 
 # optional rt dependencies
-tensorflow-cpu
+tensorflow
