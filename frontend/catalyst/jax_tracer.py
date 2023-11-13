@@ -62,7 +62,9 @@ from catalyst.utils.jax_extras import (
     convert_element_type,
     deduce_avals,
     eval_jaxpr,
+    jaxpr_filter_outputs,
     jaxpr_to_mlir,
+    make_jaxpr_pytree,
     pytree,
     sort_eqns,
     tree_structure,
@@ -90,8 +92,7 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
-        shape_tree = tree_structure(shape)
+        jaxpr, shape_tree = make_jaxpr_pytree(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -342,9 +343,9 @@ def trace_to_mlir(func, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
+        jaxpr, shape_tree = make_jaxpr_pytree(func)(*args, **kwargs)
 
-    return jaxpr_to_mlir(func.__name__, jaxpr, shape)
+    return jaxpr_to_mlir(func.__name__, jaxpr) + (shape_tree,)
 
 
 def trace_quantum_tape(
@@ -647,10 +648,5 @@ def trace_quantum_function(
             # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
 
-    closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-    out_avals, _ = unzip2(out_type)
-
-    abstract_results = tree_unflatten(
-        out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
-    )
-    return closed_jaxpr, abstract_results
+    closed_jaxpr = ClosedJaxpr(jaxpr_filter_outputs(jaxpr, unzip2(out_type)[1]), consts)
+    return closed_jaxpr, out_classical_tree

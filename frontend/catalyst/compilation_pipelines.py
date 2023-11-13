@@ -55,6 +55,7 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_dynamic_shapes", True)
 
 
 def are_params_annotated(f: typing.Callable):

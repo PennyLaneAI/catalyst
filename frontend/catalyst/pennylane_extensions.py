@@ -168,9 +168,9 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+            jaxpr, retval_tree = trace_quantum_function(self.func, device, args, kwargs)
 
-        retval_tree = tree_structure(shape)
+        # retval_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):
             return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
