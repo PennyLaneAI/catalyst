@@ -15,23 +15,29 @@
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
 
+import jax._src.core as jax_core
 from jax import ShapeDtypeStruct
 from jax._src import state, util
+from jax._src.api import _flat_axes_specs
 from jax._src.core import _update_thread_local_jit_state, eval_jaxpr
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
-from jax._src.interpreters.partial_eval import _input_type_to_tracers
+from jax._src.interpreters.partial_eval import (
+    _input_type_to_tracers,
+    infer_lambda_input_type,
+    trace_to_jaxpr_dynamic2,
+)
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
 from jax._src.linear_util import annotate
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
+from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
 from jax.api_util import flatten_fun, shaped_abstractify
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax.core import Primitive as JaxprPrimitive
@@ -88,6 +94,8 @@ __all__ = (
     "tree_unflatten",
     "unzip2",
     "wrap_init",
+    "make_jaxpr_pytree",
+    "jaxpr_filter_outputs",
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
@@ -274,7 +282,7 @@ def deduce_avals(f: Callable, args, kwargs):
     return wffa, in_avals, out_tree_promise
 
 
-def jaxpr_to_mlir(func_name, jaxpr, shape):
+def jaxpr_to_mlir(func_name, jaxpr):
     """Lower a Python function into an MLIR module.
 
     Args:
@@ -286,24 +294,32 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
         jaxpr: the jaxpr corresponding to ``func``
-        shape: the shape of the return values in ``PyTreeDef``
     """
 
-    nrep = jaxpr_replicas(jaxpr)
-    effects = jax_ordered_effects.filter_in(jaxpr.effects)
-    axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = new_name_stack(wrap_name("ok", "jit"))
-    module, context = custom_lower_jaxpr_to_module(
-        func_name="jit_" + func_name,
-        module_name=func_name,
-        jaxpr=jaxpr,
-        effects=effects,
-        platform="cpu",
-        axis_context=axis_context,
-        name_stack=name_stack,
-    )
+    def _stub(eqn, env, last_used):
+        pass
 
-    return module, context, jaxpr, tree_structure(shape)
+    old = jax_core.clean_up_dead_vars
+    jax_core.clean_up_dead_vars = _stub
+
+    try:
+        nrep = jaxpr_replicas(jaxpr)
+        effects = jax_ordered_effects.filter_in(jaxpr.effects)
+        axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+        name_stack = new_name_stack(wrap_name("ok", "jit"))
+        module, context = custom_lower_jaxpr_to_module(
+            func_name="jit_" + func_name,
+            module_name=func_name,
+            jaxpr=jaxpr,
+            effects=effects,
+            platform="cpu",
+            axis_context=axis_context,
+            name_stack=name_stack,
+        )
+    finally:
+        jax_core.clean_up_dead_vars = old
+
+    return module, context, jaxpr
 
 
 # pylint: disable=too-many-arguments
@@ -383,3 +399,48 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
+
+
+def jaxpr_filter_outputs(jaxpr: Jaxpr, whitelist: List[bool]) -> Jaxpr:
+    """ Filters outputs of the input ``jaxpr``. Only those corresponding to ``True`` values of the
+    ``whitelist`` are kept.  """
+    outvars = [o for o, keep in zip(jaxpr._outvars, whitelist) if keep]
+    new_jaxpr = Jaxpr(
+        jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
+    )
+    return new_jaxpr
+
+
+def make_jaxpr_pytree(
+    fun: Callable,
+    return_shape: bool = False,
+    abstracted_axes: Any | None = None,
+) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
+    """ A customized version of jax.make_jaxpr, compatible with the way we use JAX dynamic API. """
+    # Among the changes, the `return_shape` argument is removed, jaxpr is filered-out of implicit
+    # return values [1], PyTree-shape is returned in its pure form [2].
+    def abstractify(args, kwargs):
+        flat_args, in_tree = tree_flatten((args, kwargs))
+        if abstracted_axes is None:
+            return map(shaped_abstractify, flat_args), in_tree, [True] * len(flat_args)
+        else:
+            axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+            in_type = infer_lambda_input_type(axes_specs, flat_args)
+            in_avals, keep_inputs = unzip2(in_type)
+            return in_avals, in_tree, keep_inputs
+
+    @wraps(fun)
+    def make_jaxpr_f(*args, **kwargs):
+        f = wrap_init(fun)
+        in_avals, in_tree, keep_inputs = abstractify(args, kwargs)
+        in_type = tuple(zip(in_avals, keep_inputs))
+        f, out_tree = flatten_fun(f, in_tree)
+        f = annotate(f, in_type)
+        with ExitStack() as stack:
+            jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
+        jaxpr2 = jaxpr_filter_outputs(jaxpr, unzip2(out_type)[1]) # [1]
+        closed_jaxpr = ClosedJaxpr(jaxpr2, consts)
+        return closed_jaxpr, out_tree() # [2]
+
+    make_jaxpr_f.__name__ = f"make_jaxpr_pytree({make_jaxpr_pytree.__name__})"
+    return make_jaxpr_f

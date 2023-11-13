@@ -64,7 +64,9 @@ from catalyst.utils.jax_extras import (
     convert_element_type,
     deduce_avals,
     eval_jaxpr,
+    jaxpr_filter_outputs,
     jaxpr_to_mlir,
+    make_jaxpr_pytree,
     pytree,
     sort_eqns,
     tree_structure,
@@ -92,8 +94,7 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
-        shape_tree = tree_structure(shape)
+        jaxpr, shape_tree = make_jaxpr_pytree(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -344,9 +345,9 @@ def trace_to_mlir(func, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
+        jaxpr, shape_tree = make_jaxpr_pytree(func)(*args, **kwargs)
 
-    return jaxpr_to_mlir(func.__name__, jaxpr, shape)
+    return jaxpr_to_mlir(func.__name__, jaxpr) + (shape_tree,)
 
 
 def trace_quantum_tape(
@@ -695,14 +696,14 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
 
         # After wffa is called, then the shape becomes available in out_tree_promise.
         post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
-        jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
-        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        post_processing_results = tree_unflatten(
-            out_tree_promise(),
-            [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
-        )
-
-        return closed_jaxpr, post_processing_results
+        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        # closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        # post_processing_results = tree_unflatten(
+        #     out_tree_promise(),
+        #     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
+        # )
+        closed_jaxpr = ClosedJaxpr(jaxpr_filter_outputs(jaxpr, unzip2(out_type)[1]), consts)
+        return closed_jaxpr, out_tree_promise()
 
 
 def trace_quantum_function(
@@ -791,11 +792,17 @@ def trace_quantum_function(
                 jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
                 out_type = out_type[:-1]
 
+                print("OOOOOOOOOO", out_type)
+                print("JJJJJJJJJJJ\n", jaxpr)
                 out_avals, _ = unzip2(out_type)
+                print("OOOOOOOOOOO", out_avals)
+
+                assert all(isinstance(a,ShapedArray) for a in out_avals)
                 abstract_results = tree_unflatten(
                     meas_trees,
-                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
+                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
                 )
+                print("OOOOOOOOOOO", abstract_results)
                 # This mimics the return type from qnodes.
                 # I would prefer if qnodes didn't have special rules about whether they return a
                 # tuple, list, or value.
