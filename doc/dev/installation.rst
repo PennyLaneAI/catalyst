@@ -243,14 +243,47 @@ To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
 Tests
 ^^^^^
 
-The following target runs all available test suites in Catalyst:
+The following target runs all available test suites with the default execution device in Catalyst:
 
 .. code-block:: console
 
   make test
 
 You can also test each module separately by using running the ``test-frontend``,
-``test-dialects``, and ``test-runtime`` targets instead.
+``test-dialects``, and ``test-runtime`` targets instead. Jupyter Notebook demos are also testable
+via ``test-demos``.
+
+Additional Device Backends
+""""""""""""""""""""""""""
+
+The **runtime tests** can be run on additional devices via the same flags that were used to build
+them, but using the ``test-runtime`` target instead:
+
+.. code-block:: console
+
+  make test-runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
+
+.. Note::
+
+  The ``test-runtime`` targets rebuilds the runtime with the specified flags. Therefore,
+  running ``make runtime OPENQASM=ON`` and ``make test-runtime`` in succession will leave you
+  without the OpenQASM device installed.
+  In case of errors it can also help to delete the build directory.
+
+The **Python test suite** is also set up to run with different device backends. Assuming the
+respective device is available & compatible, they can be tested individually by specifying the
+PennyLane plugin device name in the test command:
+
+.. code-block:: console
+
+  make pytest TEST_BACKEND="lightning.kokkos"
+
+AWS Braket devices have their own set of tests, which can be run either locally (``LOCAL``) or on
+the AWS Braket service (``REMOTE``) as follows:
+
+.. code-block:: console
+
+  make pytest TEST_BRAKET=LOCAL
 
 Documentation
 ^^^^^^^^^^^^^
