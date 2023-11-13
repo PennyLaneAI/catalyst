@@ -159,7 +159,7 @@ jobs:
 
         cmake --build enzyme-build --target EnzymeStatic-18
 
-  catalyst-macos-wheels-x86-64:
+  catalyst-macos-wheels-arm64:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
