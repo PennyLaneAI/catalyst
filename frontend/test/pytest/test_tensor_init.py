@@ -21,10 +21,10 @@ from jax import numpy as jnp
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import empty, ones, qjit, zeros
+from catalyst import qjit
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
-SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1], dtype=int)]
+SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
 
 
 def _assert_equal(a, b):
@@ -40,13 +40,13 @@ def test_interpretation(shape, dtype):
     """Test that tensor primitive work in the interpretation mode"""
     # pylint: disable=unnecessary-direct-lambda-call
 
-    _assert_equal((lambda: zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
-    _assert_equal((lambda: ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
-    _assert_equal((lambda s: ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype))
-    _assert_equal((lambda s: zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype))
+    _assert_equal((lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
+    _assert_equal((lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
+    _assert_equal((lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype))
+    _assert_equal((lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype))
 
     def f(s):
-        return empty(shape=s, dtype=dtype)
+        return jnp.empty(shape=s, dtype=dtype)
 
     res = f(shape)
     assert_allclose(res.shape, shape)
@@ -58,14 +58,15 @@ def test_interpretation(shape, dtype):
 def test_classical_tracing(shape, dtype):
     """Test that tensor primitive work in the classical tracing mode"""
 
-    _assert_equal(qjit(lambda: zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
-    _assert_equal(qjit(lambda: ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
-    _assert_equal(qjit(lambda s: ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype))
-    _assert_equal(qjit(lambda s: zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype))
+    _assert_equal(qjit(lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
+    _assert_equal(qjit(lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
+    _assert_equal(qjit(lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype))
+    _assert_equal(qjit(lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype))
 
     @qjit
     def f(s):
-        return empty(shape=s, dtype=dtype)
+        res = jnp.empty(shape=s, dtype=dtype)
+        return res
 
     res = f(shape)
     assert_allclose(res.shape, shape)
@@ -77,7 +78,7 @@ def test_classical_tracing_2():
 
     @qjit
     def f(x):
-        return ones(shape=[1, x], dtype=int)
+        return jnp.ones(shape=[1, x], dtype=int)
 
     _assert_equal(f(3), jnp.ones((1, 3), dtype=int))
 
@@ -89,7 +90,7 @@ def test_quantum_tracing():
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(shape):
         i = 0
-        a = ones(shape, dtype=float)
+        a = jnp.ones(shape, dtype=float)
         while i < 3:
             a = a + a
             qml.PauliX(wires=0)
@@ -101,53 +102,46 @@ def test_quantum_tracing():
     assert array_equal(result, expected)
 
 
-def test_unsupported():
-    """Test the unsupported initializer error raising on invalid dtypes"""
-
-    def f():
-        return ones(shape=[2, 3], dtype=bool)
-
-    with pytest.raises(
-        ValueError,
-        match="Unsupported initializer",
-    ):
-        qjit(f)
-
-
 @pytest.mark.parametrize(
     "bad_shape",
     [
         [[2, 3]],
         [2, 3.0],
         [1, jnp.array(2, dtype=float)],
-        jnp.array([[3, 2]], dtype=int),
-        jnp.array([1.0], dtype=float),
     ],
 )
 def test_invalid_shapes(bad_shape):
     """Test the unsupported shape formats"""
 
     def f():
-        return empty(shape=bad_shape, dtype=int)
+        return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(
-        ValueError,
-        match="The shape is expected to have rank one and contain integers",
+        TypeError, match="Shapes must be 1D sequences of concrete values of integer type"
     ):
         qjit(f)
 
 
+@pytest.mark.skip(f"Jax does not detect error in this use-case")
 def test_invalid_shapes_2():
-    """Test the unsupported shape formats, the case of tracer dimention"""
+    """Test the unsupported shape formats"""
+    bad_shape = jnp.array([[3, 2]], dtype=int)
+
+    def f():
+        return jnp.empty(shape=bad_shape, dtype=int)
+
+    with pytest.raises(TypeError):
+        qjit(f)
+
+
+def test_shapes_type_conversion():
+    """Test fixes jax behavior regarding the shape conversions"""
 
     def f(x):
-        return empty(shape=[1, x], dtype=int)
+        return jnp.empty(shape=[2, x], dtype=int)
 
-    with pytest.raises(
-        ValueError,
-        match="The shape is expected to have rank one and contain integers",
-    ):
-        qjit(f)(3.0)
+    assert qjit(f)(3.1).shape == (2, 3)
+    assert qjit(f)(4.9).shape == (2, 4)
 
 
 if __name__ == "__main__":
