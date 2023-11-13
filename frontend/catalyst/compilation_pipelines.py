@@ -546,7 +546,13 @@ class QJIT:
         Returns:
             an MLIR module
         """
-        self.c_sig = CompiledFunction.get_runtime_signature(*args)
+        valid_types = (jax.core.ShapedArray,)
+        is_param_valid = lambda param: isinstance(param, valid_types)
+        is_signature_valid = all(map(is_param_valid, args))
+        if not is_signature_valid:
+            self.c_sig = CompiledFunction.get_runtime_signature(*args)
+        else:
+            self.c_sig = args
 
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
