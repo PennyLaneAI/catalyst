@@ -262,7 +262,8 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON
+              -DENABLE_OPENQASM=ON \
+              -DENABLE_OPENMP=ON
 
         cmake --build runtime-build --target rt_capi
 
