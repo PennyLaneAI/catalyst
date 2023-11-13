@@ -806,6 +806,7 @@ def qjit(
     verbose=False,
     logfile=None,
     pipelines=None,
+    abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -838,6 +839,7 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
+        abstracted_axes (Optional(Any)): TODO(@erick-xanadu): Add documentation.
 
     Returns:
         QJIT object.
@@ -940,12 +942,12 @@ def qjit(
 
     if fn is not None:
         return QJIT(
-            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph, abstracted_axes=abstracted_axes)
         )
 
     def wrap_fn(fn):
         return QJIT(
-            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph, abstracted_axes=abstracted_axes)
         )
 
     return wrap_fn

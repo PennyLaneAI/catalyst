@@ -54,6 +54,7 @@ class CompileOptions:
             be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
+        abstracted_axes (Optional[Any]): TODO(@erick-xanadu): Add documentation
     """
 
     verbose: Optional[bool] = False
@@ -63,6 +64,7 @@ class CompileOptions:
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
+    abstracted_axes: Optional[Any] = None
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
