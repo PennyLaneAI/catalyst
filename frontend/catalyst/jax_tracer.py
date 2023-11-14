@@ -782,7 +782,7 @@ def trace_quantum_function(
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 out_quantum_tracers = [qrp_out.actualize()]
-                qdealloc_p.bind(qreg_out.base)
+                qdealloc_p.bind(qrp_out.base)
 
                 tracers = [trace.full_raise(m) for m in meas]
                 results_tracers += tracers
