@@ -227,7 +227,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
                 quantum = isa<QuregType>(res);
                 break;
             }
-            
+
             // Classical call operations are cloned for the backward pass
             if (!quantum) {
                 builder.clone(op, oldToCloned);
