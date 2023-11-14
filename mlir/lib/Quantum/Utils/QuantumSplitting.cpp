@@ -233,7 +233,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
                 builder.clone(op, oldToCloned);
             }
 
-            assert(!(quantum && multiReturns) && "Adjoint does not support functiond with multiple "
+            assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
                                                  "returns that contain a quantum register.");
         }
         else {
