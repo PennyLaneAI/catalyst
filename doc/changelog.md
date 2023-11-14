@@ -9,6 +9,9 @@
   `MeasurementProcess`es.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
 
+* The adjoint operation now supports call operations with single quantum register returned.
+  [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
+
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
