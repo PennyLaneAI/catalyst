@@ -29,6 +29,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+#include "Quantum/Utils/RemoveQuantumMeasurements.h"
 
 namespace catalyst {
 namespace mitigation {
@@ -54,8 +55,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
     Value size = rewriter.create<index::ConstantOp>(loc, sizeInt);
-    Value results = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
-                                                     resultType.getElementType());
+    Value results =
+        rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
     Value resultValues =
         rewriter
             .create<scf::ForOp>(
@@ -165,6 +166,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
+    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp);
 
     // Function folded
     rewriter.setInsertionPointToStart(moduleOp.getBody());
@@ -203,16 +205,21 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                     Value funcQreg =
                         builder.create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndReg)
                             .getResult(0);
+                    auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, funcQreg);
+                    Region *adjointRegion = &adjointOp.getRegion();
+                    Block* newblock = builder.createBlock(adjointRegion, {}, qregType, loc);
 
                     std::vector<Value> argsAndRegAdjoint = {fnFoldedOp.getArguments().begin(),
                                                             fnFoldedOp.getArguments().end()};
                     argsAndRegAdjoint.pop_back();
-                    argsAndRegAdjoint.push_back(funcQreg);
+                    argsAndRegAdjoint.push_back(newblock->getArgument(0));
                     Value funcQregAdjoint =
                         builder
                             .create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndRegAdjoint)
                             .getResult(0);
-                    builder.create<scf::YieldOp>(loc, funcQregAdjoint);
+                    builder.create<quantum::YieldOp>(loc, funcQregAdjoint);
+                    builder.setInsertionPointAfter(adjointOp);
+                    builder.create<scf::YieldOp>(loc, adjointOp.getResult());
                 })
             .getResult(0);
     std::vector<Value> argsAndRegMeasurement = {fnFoldedOp.getArguments().begin(),
@@ -311,36 +318,4 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 //     regMap.map(firstReg, lastReg);
 
 //     return regMap;
-// }
-
-// std::vector<Operation *> ZneLowering::removeAndStoreQuantumMeasurements(Block &block)
-// {
-//     // Delete measurement operations.
-//     std::deque<Operation *> opsToDelete;
-//     block.walk([&](quantum::NamedObsOp op) { opsToDelete.push_back(op); });
-
-//     std::vector<Operation *> ops;
-//     std::copy(opsToDelete.begin(), opsToDelete.end(), std::back_inserter(ops));
-
-//     SmallPtrSet<Operation *, 4> visited{opsToDelete.begin(), opsToDelete.end()};
-
-//     while (!opsToDelete.empty()) {
-//         Operation *currentOp = opsToDelete.front();
-//         opsToDelete.pop_front();
-//         currentOp->dropAllReferences();
-//         for (Operation *user : currentOp->getUsers()) {
-//             if (!visited.contains(user)) {
-//                 visited.insert(user);
-//                 opsToDelete.push_back(user);
-//             }
-//         }
-//         if (currentOp->use_empty()) {
-//             currentOp->remove();
-//         }
-//         else {
-//             opsToDelete.push_back(currentOp);
-//         }
-//     }
-
-//     return ops;
 // }

@@ -45,14 +45,6 @@ struct MitigationLoweringPass : impl::MitigationLoweringPassBase<MitigationLower
         RewritePatternSet mitigationPatterns(&getContext());
         populateLoweringPatterns(mitigationPatterns);
 
-        // This is required to remove qubit values returned by if/for ops in the
-        // quantum gradient function of the parameter-shift pattern.
-        scf::IfOp::getCanonicalizationPatterns(mitigationPatterns, &getContext());
-        scf::ForOp::getCanonicalizationPatterns(mitigationPatterns, &getContext());
-        catalyst::quantum::InsertOp::getCanonicalizationPatterns(mitigationPatterns, &getContext());
-        catalyst::quantum::DeallocOp::getCanonicalizationPatterns(mitigationPatterns,
-                                                                  &getContext());
-
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(mitigationPatterns)))) {
             return signalPassFailure();
         }
