@@ -18,6 +18,7 @@ set(LIBS
     StablehloRegister
     MLIRCatalystTest
     ${ALL_MHLO_PASSES}
+    MLIROpenQASM
 )
 
 add_llvm_executable(quantum-opt quantum-opt.cpp)
