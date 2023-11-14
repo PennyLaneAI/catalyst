@@ -92,14 +92,14 @@ def test_quantum_tracing():
         i = 0
         a = jnp.ones(shape, dtype=float)
 
-        @while_loop(lambda _,i : i<3)
+        @while_loop(lambda _, i: i < 3)
         def loop(a, i):
             qml.PauliX(wires=0)
             a = a + a
             i += 1
             return (a, i)
 
-        a2,_ = loop(a,i)
+        a2, _ = loop(a, i)
         return a2
 
     result = f([2, 3])

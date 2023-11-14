@@ -72,13 +72,13 @@ from catalyst.utils.jax_extras import (
     ShapedArray,
     _initial_style_jaxpr,
     _input_type_to_tracers,
+    abstractify,
     convert_constvars_jaxpr,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
     tree_structure,
     wrap_init,
-    abstractify,
 )
 from catalyst.utils.patching import Patcher
 
@@ -1531,7 +1531,9 @@ def for_loop(lower_bound, upper_bound, step):
 
     return _body_query
 
-from jax._src.util import (unzip2)
+
+from jax._src.util import unzip2
+
 
 def while_loop(cond_fn):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
@@ -1608,7 +1610,9 @@ def while_loop(cond_fn):
                         cond_trace.new_arg, cond_in_avals
                     )
                     _, keep_inputs = unzip2(cond_wffa.in_type)
-                    arg_classical_tracers = [t for t, keep in zip(arg_classical_tracers, keep_inputs) if keep]
+                    arg_classical_tracers = [
+                        t for t, keep in zip(arg_classical_tracers, keep_inputs) if keep
+                    ]
                     res_classical_tracers = [
                         cond_trace.full_raise(t)
                         for t in cond_wffa.call_wrapped(*arg_classical_tracers)
@@ -1623,7 +1627,9 @@ def while_loop(cond_fn):
                     wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     _, keep_inputs = unzip2(wffa.in_type)
-                    arg_classical_tracers = [t for t, keep in zip(arg_classical_tracers, keep_inputs) if keep]
+                    arg_classical_tracers = [
+                        t for t, keep in zip(arg_classical_tracers, keep_inputs) if keep
+                    ]
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:
                         res_classical_tracers = [
@@ -1635,7 +1641,8 @@ def while_loop(cond_fn):
                     )
 
                 res_avals = list(map(shaped_abstractify, res_classical_tracers))
-                out_classical_tracers = [outer_trace.full_raise(aval) for aval in res_avals]
+                out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+                # out_classical_tracers = [outer_trace.full_raise(aval) for aval in res_avals]
 
                 WhileLoop(in_classical_tracers, out_classical_tracers, [cond_region, body_region])
                 return tree_unflatten(body_tree(), out_classical_tracers)

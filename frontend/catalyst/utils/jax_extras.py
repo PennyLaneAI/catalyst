@@ -273,7 +273,7 @@ def abstractify(flat_args, abstracted_axes=None):
     # if abstracted_axes is None:
     #     return list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
     # else:
-        # axes_specs = _flat_axes_specs(abstracted_axes, flat_args)
+    # axes_specs = _flat_axes_specs(abstracted_axes, flat_args)
     in_type = infer_lambda_input_type(None, flat_args)
     in_avals, keep_inputs = unzip2(in_type)
     return in_avals, keep_inputs
