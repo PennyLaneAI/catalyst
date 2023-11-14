@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass
 from functools import partial, reduce
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -26,6 +26,7 @@ from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 
+import catalyst
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -50,6 +51,7 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -500,6 +502,11 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
+def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    """Identity transform"""
+    return [tape], lambda res: res[0]
+
+
 def trace_quantum_measurements(
     device: QubitDevice,
     qrp: QRegPromise,
@@ -571,8 +578,135 @@ def trace_quantum_measurements(
     return out_classical_tracers, out_tree
 
 
+def is_transform_valid_for_batch_transforms(tape, flat_results):
+    """Not all transforms are valid for batch transforms.
+    Batch transforms will increase the number of tapes from 1 to N.
+    However, if the wave function collapses or there is any other non-deterministic behaviour
+    such as noise present, then each tape would have different results.
+
+    Also, MidCircuitMeasure is a HybridOp, which PL does not handle at the moment.
+    Let's wait until mid-circuit measurements are better integrated into both PL
+    and Catalyst and discussed more as well."""
+    class_tracers, meas_tracers = split_tracers_and_measurements(flat_results)
+
+    # Can transforms be applied?
+    # Since transforms are a PL feature and PL does not support the same things as
+    # Catalyst, transforms may have invariants that rely on PL invariants.
+    # For example:
+    #   * mid-circuit measurements (for batch-transforms)
+    #   * that the output will be only a sequence of `MeasurementProcess`es.
+    def is_measurement(op):
+        """Only to avoid 100 character per line limit."""
+        return isinstance(op, MeasurementProcess)
+
+    is_out_measurements = map(is_measurement, meas_tracers)
+    is_all_out_measurements = all(is_out_measurements) and not class_tracers
+    is_out_measurement_sequence = is_all_out_measurements and isinstance(meas_tracers, Sequence)
+    is_out_single_measurement = is_all_out_measurements and is_measurement(meas_tracers)
+
+    def is_midcircuit_measurement(op):
+        """Only to avoid 100 character per line limit."""
+        return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
+
+    is_valid_output = is_out_measurement_sequence or is_out_single_measurement
+    if not is_valid_output:
+        msg = (
+            "A transformed quantum function must return either a single measurement, "
+            "or a nonempty sequence of measurements."
+        )
+        raise CompileError(msg)
+
+    is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
+    are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed
+    return are_batch_transforms_valid
+
+
+def apply_transform(qnode, tape, flat_results):
+    """Apply transform."""
+
+    # Some transforms use trainability as a basis for transforming.
+    # See batch_params
+    params = tape.get_parameters(trainable_only=False)
+    tape.trainable_params = qml.math.get_trainable_indices(params)
+
+    is_program_transformed = qnode and qnode.transform_program
+
+    if is_program_transformed and qnode.transform_program.is_informative:
+        msg = "Catalyst does not support informative transforms."
+        raise CompileError(msg)
+
+    if is_program_transformed:
+        is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
+        tapes, post_processing = qnode.transform_program([tape])
+        if not is_valid_for_batch and len(tapes) > 1:
+            msg = "Multiple tapes are generated, but each run might produce different results."
+            raise CompileError(msg)
+    else:
+        # Apply the identity transform in order to keep generalization
+        tapes, post_processing = identity_qnode_transform(tape)
+    return tapes, post_processing
+
+
+def split_tracers_and_measurements(flat_values):
+    """Return classical tracers and measurements"""
+    classical = []
+    measurements = []
+    for flat_value in flat_values:
+        if isinstance(flat_value, DynamicJaxprTracer):
+            # classical should remain empty for all valid cases at the moment.
+            # This is because split_tracers_and_measurements is only called
+            # when checking the validity of transforms. And transforms cannot
+            # return any tracers.
+            classical.append(flat_value)  # pragma: no cover
+        else:
+            measurements.append(flat_value)
+
+    return classical, measurements
+
+
+def trace_post_processing(ctx, trace, post_processing, args_types, args):
+    """Trace post processing function.
+
+    Args:
+        ctx (EvaluationContext): context
+        trace (DynamicJaxprTrace): trace
+        post_processing: post_processing function
+        args_types: unflattened args
+        args: input tracers
+
+    Returns:
+        closed_jaxpr: JAXPR expression for the whole frame
+        post_processing_results: Output
+    """
+
+    with EvaluationContext.frame_tracing_context(ctx, trace):
+        # What is the input to the post_processing function?
+        # The input to the post_processing function is going to be a list of values
+        # One for each tape.
+
+        # The tracers are all flat in args.
+        # The shape is in a list of args_types.
+
+        # We need to deduce the type/shape/tree of the post_processing.
+        wffa, _, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
+
+        # wffa will take as an input a flatten tracers.
+        post_processing_retval_flat = wffa.call_wrapped(*args)
+
+        # After wffa is called, then the shape becomes available in out_tree_promise.
+        post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
+        jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        post_processing_results = tree_unflatten(
+            out_tree_promise(),
+            [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
+        )
+
+        return closed_jaxpr, post_processing_results
+
+
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs
+    f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -601,7 +735,7 @@ def trace_quantum_function(
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
-                ans = wffa.call_wrapped(*in_classical_tracers)
+                return_values_flat = wffa.call_wrapped(*in_classical_tracers)
 
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
@@ -610,47 +744,72 @@ def trace_quantum_function(
 
             # 1. Recompute the original return
             with QueuingManager.stop_recording():
-                ans = tree_unflatten(out_tree_promise(), ans)
+                return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 
             def is_leaf(obj):
                 return isinstance(obj, qml.measurements.MeasurementProcess)
 
             # 2. Create a new tree that has measurements as leaves
-            ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
+            return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
+                return_values, is_leaf=is_leaf
+            )
 
-            out_classical_tracers_or_measurements = [
-                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
-            ]
+            # TODO: In order to compose transforms, we would need to recursively
+            # call apply_transform while popping the latest transform applied,
+            # until there are no more transforms to be applied.
+            # But first we should clean this up this method a bit more.
+            tapes, post_processing = apply_transform(qnode, quantum_tape, return_values_flat)
 
         # (2) - Quantum tracing
-        with EvaluationContext.frame_tracing_context(ctx, trace):
-            qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
-            qdevice_p.bind(spec="backend", val=device.backend_name)
-            qreg_in = qalloc_p.bind(len(device.wires))
-            qrp_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
-            out_classical_tracers, out_classical_tree = trace_quantum_measurements(
-                device,
-                qrp_out,
-                out_classical_tracers_or_measurements,
-                out_tree,
-            )
-            out_quantum_tracers = [qrp_out.actualize()]
-            qdealloc_p.bind(qreg_in)
+        results_tracers, results_abstract = [], []
+        is_program_transformed = qnode and qnode.transform_program
+        for tape in tapes:
+            # If the program is batched, that means that it was transformed.
+            # If it was transformed, that means that the program might have
+            # changed the output. See `split_non_commuting`
+            if is_program_transformed:
+                # TODO: In the future support arbitrary output from the user function.
+                output = tape.measurements
+                _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
+            else:
+                output = return_values_flat
+                trees = return_values_tree
 
-            out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
+            with EvaluationContext.frame_tracing_context(ctx, trace):
+                qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
+                qdevice_p.bind(spec="backend", val=device.backend_name)
+                qreg_in = qalloc_p.bind(len(device.wires))
+                qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
+                out_quantum_tracers = [qrp_out.actualize()]
+                qdealloc_p.bind(qreg_in)
 
-            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
-                out_classical_tracers + out_quantum_tracers
-            )
-            jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
-            out_type = out_type[:-1]
-            # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
-            # check_jaxpr(jaxpr)
+                tracers = [trace.full_raise(m) for m in meas]
+                results_tracers += tracers
 
-    closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-    out_avals, _ = unzip2(out_type)
+                jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
+                jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
+                out_type = out_type[:-1]
 
-    abstract_results = tree_unflatten(
-        out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
-    )
-    return closed_jaxpr, abstract_results
+                out_avals, _ = unzip2(out_type)
+                abstract_results = tree_unflatten(
+                    meas_trees,
+                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
+                )
+                # This mimics the return type from qnodes.
+                # I would prefer if qnodes didn't have special rules about whether they return a
+                # tuple, list, or value.
+                # TODO: Allow the user to return whatever types they specify.
+                if is_program_transformed and len(abstract_results) == 1:
+                    results_abstract.append(abstract_results[0])
+                elif is_program_transformed:
+                    results_abstract.append(tuple(abstract_results))
+                else:
+                    results_abstract.append(abstract_results)
+                # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+                # check_jaxpr(jaxpr)
+
+        closed_jaxpr, unflattened_callback_results = trace_post_processing(
+            ctx, trace, post_processing, results_abstract, results_tracers
+        )
+    return closed_jaxpr, unflattened_callback_results
