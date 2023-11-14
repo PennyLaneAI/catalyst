@@ -269,13 +269,23 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     return closed_jaxprs, consts
 
 
+def abstractify(flat_args, abstracted_axes=None):
+    # if abstracted_axes is None:
+    #     return list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
+    # else:
+        # axes_specs = _flat_axes_specs(abstracted_axes, flat_args)
+    in_type = infer_lambda_input_type(None, flat_args)
+    in_avals, keep_inputs = unzip2(in_type)
+    return in_avals, keep_inputs
+
+
 def deduce_avals(f: Callable, args, kwargs):
     """Wraps the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
     and output_tree promise. The promise must be called after the resulting wrapped function is
     evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
     wf = wrap_init(f)
-    in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
+    in_avals, keep_inputs = abstractify(flat_args)
     in_type = tuple(zip(in_avals, keep_inputs))
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)

@@ -792,17 +792,12 @@ def trace_quantum_function(
                 jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
                 out_type = out_type[:-1]
 
-                print("OOOOOOOOOO", out_type)
-                print("JJJJJJJJJJJ\n", jaxpr)
                 out_avals, _ = unzip2(out_type)
-                print("OOOOOOOOOOO", out_avals)
-
                 assert all(isinstance(a, ShapedArray) for a in out_avals)
                 abstract_results = tree_unflatten(
                     meas_trees,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
-                print("OOOOOOOOOOO", abstract_results)
                 # This mimics the return type from qnodes.
                 # I would prefer if qnodes didn't have special rules about whether they return a
                 # tuple, list, or value.

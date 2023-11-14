@@ -21,7 +21,7 @@ from jax import numpy as jnp
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import qjit
+from catalyst import qjit, while_loop
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -83,21 +83,24 @@ def test_classical_tracing_2():
     _assert_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
-def test_quantum_tracing(monkeypatch):
+def test_quantum_tracing():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
-    monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
-
-    @qjit(autograph=True)
+    @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(shape):
         i = 0
         a = jnp.ones(shape, dtype=float)
-        while i < 3:
-            a = a + a
+
+        @while_loop(lambda _,i : i<3)
+        def loop(a, i):
             qml.PauliX(wires=0)
+            a = a + a
             i += 1
-        return a
+            return (a, i)
+
+        a2,_ = loop(a,i)
+        return a2
 
     result = f([2, 3])
     expected = jnp.ones([2, 3]) * 8
