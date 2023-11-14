@@ -10,6 +10,14 @@ pre-built binaries are being distributed via the Python Package Index (PyPI) for
 
     pip install pennylane-catalyst
 
+.. warning::
+
+    macOS does not ship with a system compiler by default, which Catalyst depends on. Please
+    ensure that `XCode <https://developer.apple.com/xcode/resources/`_ or the
+    ``XCode Command Line Tools`` are installed on your system before using Catalyst.
+
+    The easiest method of installation is to run ``xcode-select --install`` from the Terminal
+    app.
 
 Pre-built packages for Windows are not yet available, and comptability with other platforms is
 untested and cannot be guaranteed. If you are using one of these platforms, please
