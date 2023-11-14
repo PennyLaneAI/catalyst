@@ -82,6 +82,7 @@ from catalyst.utils.jax_extras import (
 )
 from catalyst.utils.patching import Patcher
 
+import jax._src.core as core
 
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
@@ -1640,9 +1641,27 @@ def while_loop(cond_fn):
                         body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
                     )
 
-                res_avals = list(map(shaped_abstractify, res_classical_tracers))
-                out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-                # out_classical_tracers = [outer_trace.full_raise(aval) for aval in res_avals]
+                    res_avals = list(map(shaped_abstractify, res_classical_tracers))
+
+                    # print("SSSSSSSS", res_avals)
+                    # out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+                    # out_classical_tracers = [outer_trace.full_raise(aval) for aval in res_avals]
+                    out_classical_tracers = []
+                    for aval in res_avals:
+                        if type(aval) is core.DShapedArray:
+                            shape = [args[d.val] if type(d) is core.InDBIdx else
+                                     out_classical_tracers[d.val] if type(d) is core.OutDBIdx else
+                                     d for d in aval.shape]
+                            aval = aval.update(shape=tuple(core.get_referent(d) for d in shape))
+                            print("DYNAMIC", aval)
+                        else:
+                            print("STATIC")
+
+                        dt = DynamicJaxprTracer(outer_trace, aval)
+                        frame = ctx.frames[outer_trace]
+                        frame.tracers.append(dt)
+                        frame.tracer_to_var[id(dt)] = frame.newvar(aval)
+                        out_classical_tracers.append(dt)
 
                 WhileLoop(in_classical_tracers, out_classical_tracers, [cond_region, body_region])
                 return tree_unflatten(body_tree(), out_classical_tracers)

@@ -128,7 +128,9 @@ class EvaluationContext:
                 ctx.frames[ctx.trace] = frame
                 ctx.mains[ctx.trace] = nmain
                 try:
+                    print("TRACE-BEGIN", ctx.trace)
                     yield ctx.trace
+                    print("TRACE-END", ctx.trace)
                 finally:
                     ctx.trace = parent_trace
 
