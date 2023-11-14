@@ -220,10 +220,21 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         }
         else if (auto callOp = dyn_cast<func::CallOp>(op)) {
             auto results = callOp.getResultTypes();
-            auto qreg = results.front();
-            if (!(results.size() == 1 && isa<QuregType>(qreg))) {
+
+            bool multiReturns = results.size() > 1;
+            bool quantum;
+            for (Type res : results) {
+                quantum = isa<QuregType>(res);
+                break;
+            }
+            
+            // Classical call operations are cloned for the backward pass
+            if (!quantum) {
                 builder.clone(op, oldToCloned);
             }
+
+            assert(!(quantum && multiReturns) && "Adjoint does not support functiond with multiple "
+                                                 "returns that contain a quantum register.");
         }
         else {
             // Purely classical ops are deeply cloned as-is.

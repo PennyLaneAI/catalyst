@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "adjoint"
 
 #include <algorithm>
-#include <iostream>
 #include <iterator>
 #include <string>
 #include <unordered_map>
@@ -269,6 +268,96 @@ class AdjointGenerator {
         }
     }
 
+    void visitOperation(func::CallOp callOp, OpBuilder &builder)
+    {
+        // Get the the original function
+        SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
+        func::FuncOp funcOp =
+            dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
+
+        std::optional<Value> returnedQureg =
+            getQuantumReg(funcOp.front().getTerminator()->getOperands());
+        if (!returnedQureg.has_value()) {
+            // This operation is purely classical
+            return;
+        }
+
+        // Save the insertion point to come back to it after creating the adjoint of the function
+        auto insertionSaved = builder.saveInsertionPoint();
+        MLIRContext *ctx = builder.getContext();
+
+        // Create the adjoint of the original function at the module level
+        ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
+        builder.setInsertionPointToStart(moduleOp.getBody());
+
+        Block *originalBlock = &funcOp.front();
+        Operation *originalTerminator = originalBlock->getTerminator();
+        ValueRange originalArguments = originalBlock->getArguments();
+
+        // Get the arguments and outputs types from the original function (same signature)
+        FunctionType adjointFnType =
+            FunctionType::get(ctx, /*inputs=*/
+                              originalArguments.getTypes(),
+                              /*outputs=*/originalTerminator->getOperandTypes());
+        std::string adjointName = funcOp.getName().str() + ".adjoint";
+        Location loc = funcOp.getLoc();
+        func::FuncOp adjointFnOp = builder.create<func::FuncOp>(loc, adjointName, adjointFnType);
+        adjointFnOp.setPrivate();
+
+        // Create the block of the adjoint function
+        Block *adjointFnBlock = adjointFnOp.addEntryBlock();
+        builder.setInsertionPointToStart(adjointFnBlock);
+        Type qregType = quantum::QuregType::get(builder.getContext());
+        auto argumentsSize = adjointFnOp.getArguments().size();
+
+        // The last argument is the quantum register
+        Value lastArg = adjointFnOp.getArgument(argumentsSize - 1);
+        assert(isa<QuregType>(lastArg.getType()) &&
+               "The last argument of the function must be the quantum register.");
+        quantum::AdjointOp adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, lastArg);
+
+        Region *adjointRegion = &adjointOp.getRegion();
+        Region &originalRegion = funcOp.getRegion();
+
+        // Map the arguments with the original function
+        IRMapping map;
+        for (size_t i = 0; i < funcOp.getArguments().size() - 1; i++) {
+            Value arg = adjointFnOp.front().getArgument(i);
+            Value argBlock = originalRegion.front().getArgument(i);
+            map.map(argBlock, arg);
+        }
+
+        // Copy the original region in the adjoint region
+        originalRegion.cloneInto(adjointRegion, map);
+
+        // Replace the return of the quantum register with a quantum yield
+        auto terminator = adjointRegion->front().getTerminator();
+        ValueRange res = terminator->getOperands();
+        TypeRange resTypes = terminator->getResultTypes();
+        builder.setInsertionPointAfter(terminator);
+        builder.create<quantum::YieldOp>(loc, resTypes, res);
+
+        // Return the adjoint operation in the adjoint function
+        IRRewriter rewriter(builder);
+        rewriter.eraseOp(terminator);
+        builder.setInsertionPointAfter(adjointOp);
+        builder.create<func::ReturnOp>(loc, adjointOp.getResult());
+
+        // Leave the adjoint func op to go back at the saved insertion
+        builder.restoreInsertionPoint(insertionSaved);
+
+        // Get the reversed result
+        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
+        std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
+        args.pop_back();
+        args.push_back(reversedResult);
+        // Call the adjoint func op
+        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
+        ValueRange initQreg = callOp.getArgOperands();
+        // Map the initial quantum register with the adjoint result
+        remappedValues.map(getQuantumReg(initQreg).value(), adjointCallOp.getResult(0));
+    }
+
     void visitOperation(scf::ForOp forOp, OpBuilder &builder)
     {
         std::optional<Value> yieldedQureg =
@@ -298,74 +387,6 @@ class AdjointGenerator {
                     loc, remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
             });
         remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
-    }
-
-    void visitOperation(func::CallOp callOp, OpBuilder &builder)
-    {
-        // Get the func op
-        SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
-        func::FuncOp funcOp =
-            dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
-
-        std::optional<Value> returnedQureg =
-            getQuantumReg(funcOp.front().getTerminator()->getOperands());
-        if (!returnedQureg.has_value()) {
-            // This operation is purely classical
-            return;
-        }
-
-        auto insertionSaved = builder.saveInsertionPoint();
-        MLIRContext *ctx = builder.getContext();
-        ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
-        builder.setInsertionPointToStart(moduleOp.getBody());
-
-        Block *originalBlock = &funcOp.front();
-        Operation *originalTerminator = originalBlock->getTerminator();
-        ValueRange originalArguments = originalBlock->getArguments();
-
-        // Get the arguments and outputs types from the original block
-        FunctionType adjointFnType =
-            FunctionType::get(ctx, /*inputs=*/
-                              originalArguments.getTypes(),
-                              /*outputs=*/originalTerminator->getOperandTypes());
-        std::string adjointName = funcOp.getName().str() + ".adjoint";
-        Location loc = funcOp.getLoc();
-        func::FuncOp adjointFnOp = builder.create<func::FuncOp>(loc, adjointName, adjointFnType);
-        adjointFnOp.setPrivate();
-
-        auto adjointFnBlock = adjointFnOp.addEntryBlock();
-        builder.setInsertionPointToStart(adjointFnBlock);
-        Type qregType = quantum::QuregType::get(builder.getContext());
-        auto size = adjointFnOp.getArguments().size();
-        Value lastArg = adjointFnOp.getArgument(size - 1);
-        quantum::AdjointOp adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, lastArg);
-        Region *adjointRegion = &adjointOp.getRegion();
-        Region &originalRegion = funcOp.getRegion();
-        IRMapping map;
-        for (size_t i = 0; i < funcOp.getArguments().size() - 1; i++) {
-            Value arg = adjointFnOp.front().getArgument(i);
-            Value argBlock = originalRegion.front().getArgument(i);
-            map.map(argBlock, arg);
-        }
-        originalRegion.cloneInto(adjointRegion, map);
-        auto terminator = adjointRegion->front().getTerminator();
-        ValueRange res = terminator->getOperands();
-        TypeRange resTypes = terminator->getResultTypes();
-        builder.setInsertionPointAfter(terminator);
-        builder.create<quantum::YieldOp>(loc, resTypes, res);
-        IRRewriter rewriter(builder);
-        rewriter.eraseOp(terminator);
-        builder.setInsertionPointAfter(adjointOp);
-        builder.create<func::ReturnOp>(loc, adjointOp.getResult());
-
-        builder.restoreInsertionPoint(insertionSaved);
-        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
-        std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
-        args.pop_back();
-        args.push_back(reversedResult);
-        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
-        ValueRange initQreg = callOp.getArgOperands();
-        remappedValues.map(getQuantumReg(initQreg).value(), adjointCallOp.getResult(0));
     }
 
     void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
@@ -487,7 +508,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         for (BlockArgument arg : adjoint.getRegion().getArguments()) {
             reversedOutputs.push_back(oldToCloned.lookup(arg));
         }
-        adjoint.dump();
         rewriter.replaceOp(adjoint, reversedOutputs);
         return success();
     }
