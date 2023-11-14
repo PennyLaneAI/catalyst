@@ -123,7 +123,9 @@ class QFunc:
         update_wrapper(self, fn)
 
     def __call__(self, *args, **kwargs):
+        qnode = None
         if isinstance(self, qml.QNode):
+            qnode = self
             if isinstance(self.device, qml.Device):
                 name = self.device.short_name
             else:
@@ -165,7 +167,7 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
         retval_tree = tree_structure(shape)
 
@@ -1032,13 +1034,10 @@ class QCtrl(HybridOp):
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError("QCtrl does not support JAX quantum tracing")  # pragma: no cover
 
-    def compute_decomposition(self, *params, wires=None, **hyperparameters):
+    def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
         distributing the quantum control operaiton over the tape operations."""
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
-        assert len(params) == 0, "Decomposition parameters should be empty"
-        assert len(hyperparameters) == 0, "Decomposition hyperparameters should be empty"
-        assert wires is self.wires, "Altering wires is not supported"
 
         _check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
