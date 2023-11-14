@@ -402,8 +402,8 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
 
 
 def jaxpr_filter_outputs(jaxpr: Jaxpr, whitelist: List[bool]) -> Jaxpr:
-    """ Filters outputs of the input ``jaxpr``. Only those corresponding to ``True`` values of the
-    ``whitelist`` are kept.  """
+    """Filters outputs of the input ``jaxpr``. Only those corresponding to ``True`` values of the
+    ``whitelist`` are kept."""
     outvars = [o for o, keep in zip(jaxpr._outvars, whitelist) if keep]
     new_jaxpr = Jaxpr(
         jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
@@ -416,7 +416,8 @@ def make_jaxpr_pytree(
     return_shape: bool = False,
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
-    """ A customized version of jax.make_jaxpr, compatible with the way we use JAX dynamic API. """
+    """A customized version of jax.make_jaxpr, compatible with the way we use JAX dynamic API."""
+
     # Among the changes, the `return_shape` argument is removed, jaxpr is filered-out of implicit
     # return values [1], PyTree-shape is returned in its pure form [2].
     def abstractify(args, kwargs):
@@ -438,9 +439,9 @@ def make_jaxpr_pytree(
         f = annotate(f, in_type)
         with ExitStack() as stack:
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
-        jaxpr2 = jaxpr_filter_outputs(jaxpr, unzip2(out_type)[1]) # [1]
+        jaxpr2 = jaxpr_filter_outputs(jaxpr, unzip2(out_type)[1])  # [1]
         closed_jaxpr = ClosedJaxpr(jaxpr2, consts)
-        return closed_jaxpr, out_tree() # [2]
+        return closed_jaxpr, out_tree()  # [2]
 
     make_jaxpr_f.__name__ = f"make_jaxpr_pytree({make_jaxpr_pytree.__name__})"
     return make_jaxpr_f

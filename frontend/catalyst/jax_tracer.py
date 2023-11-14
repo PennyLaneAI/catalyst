@@ -797,10 +797,10 @@ def trace_quantum_function(
                 out_avals, _ = unzip2(out_type)
                 print("OOOOOOOOOOO", out_avals)
 
-                assert all(isinstance(a,ShapedArray) for a in out_avals)
+                assert all(isinstance(a, ShapedArray) for a in out_avals)
                 abstract_results = tree_unflatten(
                     meas_trees,
-                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
+                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
                 print("OOOOOOOOOOO", abstract_results)
                 # This mimics the return type from qnodes.
