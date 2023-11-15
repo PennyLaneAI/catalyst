@@ -6,7 +6,7 @@ pybind11>=2.8.0
 PyYAML
 
 # formatting/linting
-black[jupyter]
+black
 clang-format==14.*
 clang-tidy==14.*
 pylint
@@ -19,5 +19,7 @@ pytest-xdist
 pytest-cov
 nbmake
 
-# optional rt dependencies
-tensorflow-cpu
+# optional rt/test dependencies
+tensorflow
+amazon-braket-pennylane-plugin>=1.23.0
+pennylane-lightning[kokkos]
