@@ -261,17 +261,30 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     return closed_jaxprs, consts
 
 
-def deduce_avals(f: Callable, args, kwargs):
+def deduce_avals(f: Callable, args, kwargs, abstracted_axes=None):
     """Wraps the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
     and output_tree promise. The promise must be called after the resulting wrapped function is
     evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
+
+    #if abstracted_axes is None:
+    #    wf = wrap_init(f)
+    #    in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
+    #    in_type = tuple(zip(in_avals, keep_inputs))
+    #    wff, out_tree_promise = flatten_fun(wf, in_tree)
+    #    wffa = annotate(wff, in_type)
+    #    return wffa, in_avals, keep_inputs, out_tree_promise
+
+    from jax._src.pjit import _flat_axes_specs
+    from jax._src.interpreters import partial_eval as pe
+    abstracted_axes = None
+    axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+    in_type = pe.infer_lambda_input_type(axes_specs, flat_args)
+    in_avals, keep_inputs = unzip2(in_type)
     wf = wrap_init(f)
-    in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
-    in_type = tuple(zip(in_avals, keep_inputs))
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
-    return wffa, in_avals, out_tree_promise
+    return wffa, in_avals, keep_inputs, out_tree_promise
 
 
 def jaxpr_to_mlir(func_name, jaxpr, shape):

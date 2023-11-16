@@ -689,7 +689,7 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
         # The shape is in a list of args_types.
 
         # We need to deduce the type/shape/tree of the post_processing.
-        wffa, _, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
+        wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
 
         # wffa will take as an input a flatten tracers.
         post_processing_retval_flat = wffa.call_wrapped(*args)
@@ -732,10 +732,11 @@ def trace_quantum_function(
         # (1) - Classical tracing
         quantum_tape = QuantumTape()
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
+            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
+                in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
                 return_values_flat = wffa.call_wrapped(*in_classical_tracers)
 
             # Ans contains the leaves of the pytree (empty for measurement without

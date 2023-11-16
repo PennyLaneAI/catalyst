@@ -1160,7 +1160,7 @@ class CondCallable:
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-                wffa, _, out_tree = deduce_avals(branch, [], {})
+                wffa, _, keep_inputs, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
@@ -1466,7 +1466,7 @@ def for_loop(lower_bound, upper_bound, step):
                         step,
                         lower_bound,
                     ] + tree_flatten(init_state)[0]
-                    wffa, in_avals, body_tree = deduce_avals(
+                    wffa, in_avals, keep_inputs, body_tree = deduce_avals(
                         body_fn, [lower_bound] + list(init_state), {}
                     )
                     arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
@@ -1603,7 +1603,7 @@ def while_loop(cond_fn):
                 in_classical_tracers, _ = tree_flatten(init_state)
 
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
+                    cond_wffa, cond_in_avals, keep_inputs, cond_tree = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(
                         cond_trace.new_arg, cond_in_avals
                     )
@@ -1618,7 +1618,7 @@ def while_loop(cond_fn):
                 _check_single_bool_value(cond_tree(), res_classical_tracers)
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
+                    wffa, in_avals, keep_inputs, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:
@@ -1801,7 +1801,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _ = deduce_avals(_callee, args, kwargs)
+            wffa, in_avals, keep_inputs, _ = deduce_avals(_callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
