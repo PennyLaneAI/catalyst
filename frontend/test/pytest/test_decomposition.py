@@ -38,6 +38,7 @@ class CustomDevice(qml.QubitDevice):
     operations = copy
     observables = lightning.observables.copy()
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
     ):

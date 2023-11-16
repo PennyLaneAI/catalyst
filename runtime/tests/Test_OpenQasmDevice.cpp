@@ -278,7 +278,6 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
 
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
-
     constexpr size_t shots{1000};
     constexpr bool status{false};
 

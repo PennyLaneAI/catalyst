@@ -19,7 +19,6 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
-import os
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
