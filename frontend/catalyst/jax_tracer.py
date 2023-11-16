@@ -322,11 +322,12 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
-def trace_to_mlir(func, *args, **kwargs):
+def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
         func: python function to be lowered
+        abstracted_axes: TODO(@erick-xanadu): Document me
         args: arguments to ``func``
         kwargs: keyword arguments to ``func``
 
@@ -344,7 +345,7 @@ def trace_to_mlir(func, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
+        jaxpr, shape = jax.make_jaxpr(func, abstracted_axes=abstracted_axes, return_shape=True)(*args, **kwargs)
 
     return jaxpr_to_mlir(func.__name__, jaxpr, shape)
 

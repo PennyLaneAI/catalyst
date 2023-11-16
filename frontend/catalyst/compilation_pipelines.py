@@ -557,7 +557,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, self.compile_options.abstracted_axes, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
