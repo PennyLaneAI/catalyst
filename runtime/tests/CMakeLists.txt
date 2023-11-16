@@ -41,10 +41,11 @@ else()
     # details). If you want to run this-file-does-not-exist.so library under
     # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
     add_dependencies(runner_tests dummy_device)
-    set(dl_manager_tests Test_DLManager.cpp)
+    set(dl_manager_tests 
+        Test_DLManager.cpp
+        )
 endif()
 
-if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
 
 if(pybind11_FOUND)
@@ -67,15 +68,15 @@ endif()
 # To avoid link to libpython, we use pybind11::module interface library.
 target_link_libraries(runner_tests PRIVATE pybind11::embed)
 
-endif()
-
 target_link_libraries(runner_tests PRIVATE Catch2::Catch2
     catalyst_qir_runtime
     )
 
 if (ENABLE_OPENQASM)
-    set(openqasm_tests  Test_OpenQasmBuilder.cpp
-            Test_OpenQasmDevice.cpp)
+    set(openqasm_tests  
+        Test_OpenQasmBuilder.cpp
+        Test_OpenQasmDevice.cpp
+        )
 else()
     set(openqasm_tests "")
 endif()

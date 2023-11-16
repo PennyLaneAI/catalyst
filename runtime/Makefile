@@ -8,8 +8,9 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
-BUILD_TYPE?=RelWithDebInfo
+BUILD_TYPE?=Debug
 ENABLE_WARNINGS?=ON
+ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 ENABLE_ASAN?=OFF
@@ -20,6 +21,16 @@ ifeq ($(shell uname), Darwin)
 	DEFAULT_ENABLE_OPENMP := OFF
 else
 	DEFAULT_ENABLE_OPENMP := ON
+endif
+
+BUILD_TARGETS := rt_capi
+
+ifeq ($(ENABLE_LIGHTNING), ON)
+	BUILD_TARGETS += rtd_lightning
+endif
+
+ifeq ($(ENABLE_OPENQASM), ON)
+	BUILD_TARGETS += rtd_openqasm
 endif
 
 ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
@@ -56,6 +67,7 @@ configure:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DENABLE_LIGHTNING=$(ENABLE_LIGHTNING) \
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OPENMP=$(ENABLE_OPENMP) \
@@ -66,11 +78,11 @@ configure:
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
 
-$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
+$(RT_BUILD_DIR)/lib/librt_capi.so: configure
+	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
 .PHONY: runtime
-runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
+runtime: $(RT_BUILD_DIR)/lib/librt_capi.so
 
 $(RT_BUILD_DIR)/tests/runner_tests: configure
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)

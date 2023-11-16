@@ -101,7 +101,7 @@ message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 set(devices_list)
 
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
-    list(APPEND rtd_lightning)
+    list(APPEND devices_list pennylane_lightning rtd_lightning)
     if(ENABLE_LIGHTNING)
         list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_dynamic")
     endif()
@@ -119,7 +119,11 @@ add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 
-target_include_directories(catalyst_qir_runtime INTERFACE ${runtime_includes} ${QIR_STDLIB_PATH})
+target_include_directories(catalyst_qir_runtime INTERFACE
+    ${runtime_includes}
+    ${backend_includes}
+    ${QIR_STDLIB_PATH}
+    )
 
 if(ENABLE_CODE_COVERAGE)
 	message(STATUS "ENABLE_CODE_COVERAGE is ON.")

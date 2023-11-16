@@ -538,3 +538,9 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
 }
 
 } // namespace Catalyst::Runtime::Simulator
+
+extern "C" Catalyst::Runtime::QuantumDevice *
+LightningKokkosSimulatorFactory(bool status, const std::string &kwargs)
+{
+    return new Catalyst::Runtime::Simulator::LightningKokkosSimulator(status, kwargs);
+}

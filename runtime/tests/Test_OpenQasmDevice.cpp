@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
 
 #include "OpenQasmBuilder.hpp"
@@ -23,7 +24,7 @@
 using namespace Catalyst::Runtime::Device;
 using BType = OpenQasm::BuilderType;
 
-OpenQasm::PythonInterpreterGuard guard{};
+Catalyst::Runtime::PythonInterpreterGuard guard{};
 
 TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
 {
@@ -277,9 +278,13 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
 
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
 
     constexpr size_t shots{1000};
+    constexpr bool status{false};
+
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        status, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+
     constexpr size_t n{5};
     constexpr size_t size{1UL << n};
     auto wires = device->AllocateQubits(n);
@@ -454,7 +459,8 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
 
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        false, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{5};
     constexpr size_t size{1UL << n};

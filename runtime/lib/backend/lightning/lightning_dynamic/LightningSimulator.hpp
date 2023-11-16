@@ -52,7 +52,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     QubitManager<QubitIdType, size_t> qubit_manager{};
     CacheManager cache_manager{};
     bool tape_recording{false};
-
     size_t device_shots;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);

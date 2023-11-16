@@ -28,24 +28,6 @@
 namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
- * A (RAII) class for `pybind11::initialize_interpreter` and `pybind11::finalize_interpreter`.
- *
- * @note This is not copiable or movable and used in C++ tests and the ExecutionContext manager
- * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
- * tests which also enables the runtime to reuse the same interpreter in the scope of the global
- * quantum device unique pointer.
- */
-struct PythonInterpreterGuard {
-    PythonInterpreterGuard() { pybind11::initialize_interpreter(); }
-    ~PythonInterpreterGuard() { pybind11::finalize_interpreter(); }
-
-    PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
-    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
-};
-
-/**
  * The OpenQasm circuit runner interface.
  */
 struct OpenQasmRunner {

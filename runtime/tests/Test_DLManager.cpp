@@ -21,6 +21,7 @@
 
 using namespace Catalyst::Runtime;
 
+#ifdef __linux__
 TEST_CASE("Test dummy", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
@@ -38,11 +39,12 @@ TEST_CASE("Test error message function not found", "[Third Party]")
                         Catch::Contains("undefined symbol: DummyDeviceFactory"));
 }
 
-TEST_CASE("Test return false if cannot init device", "[Third Party]")
+TEST_CASE("Test error message if init device fails", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libm.so.6");
-    CHECK(!driver->initDevice(file));
+    REQUIRE_THROWS_WITH(driver->initDevice(file),
+                        Catch::Contains("undefined symbol: defaultFactory"));
 }
 
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
@@ -52,6 +54,7 @@ TEST_CASE("Test success of loading dummy device", "[Third Party]")
     driver->setDeviceName("DummyDevice");
     CHECK(driver->initDevice(file));
 }
+#endif
 
 TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning",
           "[CoreQIS]")
@@ -69,7 +72,7 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
                                         "Runtime: Invalid device specification"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev2_value),
-                        Catch::Contains("Failed initialization of the backend device"));
+                        Catch::Contains("cannot open shared object file"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device(nullptr, nullptr),
                         Catch::Contains("Invalid device specification"));
@@ -91,7 +94,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 #else
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
-                        Catch::Contains("Failed initialization of the backend device"));
+                        Catch::Contains("cannot open shared object file"));
 #endif
 
     __quantum__rt__finalize();
@@ -107,7 +110,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 #else
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
-                        Catch::Contains("Failed initialization of the backend device"));
+                        Catch::Contains("cannot open shared object file:"));
 #endif
 
     __quantum__rt__finalize();
@@ -121,7 +124,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
     __quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl);
 #else
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl),
-                        Catch::Contains("Failed initialization of the backend device"));
+                        Catch::Contains("cannot open shared object file"));
 #endif
 
     __quantum__rt__finalize();
