@@ -6,7 +6,7 @@ Catalyst Quantum Runtime
 The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
 quantum programs, and is currently backed by `PennyLane-Lightning <https://docs.pennylane.ai/projects/lightning/en/stable>`_
 state-vector simulators, and `Amazon Braket <https://amazon-braket-pennylane-plugin-python.readthedocs.io>`_
-devices. Additional hardware support, including QPUs to come.
+devices. Additional hardware support, including QPUs, to come.
 
 The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
 public interface to support an extensible list of backend devices. This interface comprises two collections of abstract methods:
