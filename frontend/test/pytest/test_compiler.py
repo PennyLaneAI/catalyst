@@ -341,6 +341,7 @@ module @workflow {
         assert "PipelineA" not in e.value.args[0]
         assert "Trace" not in e.value.args[0]
         assert isfile(os.path.join(str(compiled.workspace), "2_PipelineB_FAILED.mlir"))
+        compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines, verbose=True)()

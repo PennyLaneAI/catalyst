@@ -2,6 +2,13 @@
 
 <h3>New features</h3>
 
+* Initial support for transforms. QFunc transforms are supported. QNode transforms have limited
+  support. QNode transforms cannot be composed, and transforms are limited to what is currently
+  available in PennyLane. This means that operations defined in Catalyst like `cond`, `for_loop`,
+  and `while_loop` are not supported by transforms. Additionally, transforms can only return
+  `MeasurementProcess`es.
+  [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
+
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
@@ -11,6 +18,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Erick Ochoa Lopez.
 
 # Release 0.3.2
 

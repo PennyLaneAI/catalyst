@@ -1,7 +1,7 @@
 #include <QuantumDevice.hpp>
 
 struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
-    DummyDevice([[maybe_unused]] const std::string &kwargs) {}
+    DummyDevice([[maybe_unused]] bool status, [[maybe_unused]] const std::string &kwargs) {}
     ~DummyDevice() = default; // LCOV_EXCL_LINE
 
     DummyDevice &operator=(const QuantumDevice &) = delete;
@@ -71,7 +71,8 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *DummyDeviceFactory(const std::string &kwargs)
+extern "C" Catalyst::Runtime::QuantumDevice *DummyDeviceFactory(bool status,
+                                                                const std::string &kwargs)
 {
-    return new DummyDevice(kwargs);
+    return new DummyDevice(status, kwargs);
 }
