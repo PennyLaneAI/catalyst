@@ -53,3 +53,19 @@ class TestBasicInterface:
         assert_allclose(param, result)
         print(identity.mlir)
 
+    def test_abstracted_axes_dictionary_3(self):
+        """This is a temporary test while dynamism is in development."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def foo(a, b):
+            return a, b
+
+        @qjit(abstracted_axes={0: "n"})
+        def identity(a, b):
+            return foo(a, b)
+
+        param = jax.numpy.array([1, 2, 3])
+        result = identity(param, param)
+
+        assert_allclose((param, param), result)
+        print(identity.mlir)
