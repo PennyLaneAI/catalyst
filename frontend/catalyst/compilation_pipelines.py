@@ -169,11 +169,13 @@ class CompiledFunction:
         shared_object_file,
         func_name,
         restype,
+        compile_options,
     ):
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
+        self.compile_options = compile_options
 
     @staticmethod
     def typecheck(compiled_signature, runtime_signature):
@@ -434,6 +436,17 @@ class CompiledFunction:
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
+        if self.compile_options.abstracted_axes is not None:
+            from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
+            from jax._src.interpreters import partial_eval as pe
+            axes_specs = _flat_axes_specs(self.compile_options.abstracted_axes, *args, **kwargs)
+            explicit_args, in_tree = tree_flatten(args)
+            in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
+            in_avals = tuple(a for a, e in in_type if e)
+            implicit_args = _extract_implicit_args(in_type, explicit_args)
+            args_flat = [*implicit_args, *explicit_args]
+            args = args_flat
+
         abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
@@ -549,10 +562,7 @@ class QJIT:
         valid_types = (jax.core.ShapedArray,)
         is_param_valid = lambda param: isinstance(param, valid_types)
         is_signature_valid = all(map(is_param_valid, args))
-        if not is_signature_valid:
-            self.c_sig = CompiledFunction.get_runtime_signature(*args)
-        else:
-            self.c_sig = args
+        self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
@@ -609,7 +619,7 @@ class QJIT:
             )
 
         self._llvmir = llvm_ir
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, self.compile_options)
         return compiled_function
 
     def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
