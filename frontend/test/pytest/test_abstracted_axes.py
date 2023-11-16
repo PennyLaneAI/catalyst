@@ -49,5 +49,7 @@ class TestBasicInterface:
 
         param = jax.numpy.array([1, 2, 3])
         result = identity(param)
+
         assert_allclose(param, result)
+        print(identity.mlir)
 

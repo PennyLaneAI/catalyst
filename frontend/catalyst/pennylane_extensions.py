@@ -174,10 +174,19 @@ class QFunc:
         def _eval_jaxpr(*args):
             return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        args_data, _ = tree_flatten(args)
+        from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
+        from jax._src.interpreters import partial_eval as pe
+        # None, really it is doing all the work
+        axes_specs = _flat_axes_specs(None, *args, **kwargs)
+        explicit_args, in_tree = tree_flatten(args)
+        in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
+        in_avals = tuple(a for a, e in in_type if e)
+        implicit_args = _extract_implicit_args(in_type, explicit_args)
+        args_flat = [*implicit_args, *explicit_args]
+        args = args_flat
 
-        wrapped = wrap_init(_eval_jaxpr)
-        retval = func_p.bind(wrapped, *args_data, fn=self)
+        wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
+        retval = func_p.bind(wffa, *args, fn=self)
 
         return tree_unflatten(retval_tree, retval)
 
