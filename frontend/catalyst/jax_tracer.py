@@ -690,10 +690,10 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
 
         # We need to deduce the type/shape/tree of the post_processing.
 
-        flat_args_types, tree = jax.tree_util.tree_flatten(args_types)
+        _, tree = jax.tree_util.tree_flatten(args_types)
         aval_flat_args = [arg.aval for arg in args]
         args_to_deduce = tree_unflatten(tree, aval_flat_args)
-        wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(post_processing, (args_to_deduce,), {})
+        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (args_to_deduce,), {})
 
         # wffa will take as an input a flatten tracers.
         post_processing_retval_flat = wffa.call_wrapped(*args)
