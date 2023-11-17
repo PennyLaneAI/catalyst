@@ -18,10 +18,12 @@ of quantum operations, measurements, and observables to JAXPR.
 from dataclasses import dataclass
 from itertools import chain
 from typing import Dict, Iterable, List
+from copy import copy
 
 import jax
 import numpy as np
 from jax._src import api_util, core, source_info_util, util
+from jax._src.core import DBIdx, InDBIdx, OutDBIdx, DShapedArray
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
@@ -61,6 +63,9 @@ from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+
+from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, JaxprStackFrame, Var)
+
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -1195,7 +1200,63 @@ def _cond_lowering(
 #
 @while_p.def_abstract_eval
 def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
-    return body_jaxpr.out_avals
+    print("WHILE ABSTRACT IN_AVALs")
+    for a in args: print("- ", a)
+
+    main = core.thread_local_state.trace_state.trace_stack.stack[-1]
+    frame:JaxprStackFrame = main.jaxpr_stack[-1]
+    # print([id(t) for t in frame.tracers])
+    # print(frame.tracer_to_var)
+
+    var_to_tracer = {str(v):[t for t in frame.tracers if id(t)==k][0] for k,v in frame.tracer_to_var.items()}
+    # for k,v in var_to_tracer.items():
+    #     print(k, v)
+
+    print("WHILE ABSTRACT BODY_JAXPR OUT_AVALs")
+    for a in body_jaxpr.out_avals: print("- ", a)
+
+    out_avals = body_jaxpr.out_avals
+
+    # out_avals = []
+    # for a in body_jaxpr.out_avals:
+    #     # a = copy(a_)
+    #     if isinstance(a, DShapedArray):
+    #         for d in a.shape:
+    #             if isinstance(d, Var):
+    #                 print(d, d.count, d.suffix, d.aval, str(d) in var_to_tracer)
+    #         a_ = DShapedArray(
+    #             shape=[
+    #                 var_to_tracer[str(d)] if isinstance(d, Var) else d for d in a.shape
+    #             ],
+    #             dtype=a.dtype, weak_type=a.weak_type)
+    #     else:
+    #         a_ = a
+    #     out_avals.append(a_)
+
+    #     # print("BINDBINDBIND=============================================")
+    #     # for ov,ot in zip(body_jaxpr.outvars, body_type):
+    #     #     print("- ", ov, ov.aval, ot)
+    #     #     ov.aval = ot[0]
+    #     #     if isinstance(ov.aval, DShapedArray):
+    #     #         assert isinstance(ot[0], DShapedArray)
+    #     #         ov.aval.shape = tuple([
+    #     #             (
+    #     #                 body_jaxpr.outvars[ot[0].shape[i].val]
+    #     #                 if isinstance(ot[0].shape[i], (DBIdx, InDBIdx, OutDBIdx))
+    #     #                 else ot[0].shape[i]
+    #     #             )
+    #     #             for i in range(len(ot[0].shape))
+    #     #         ])
+    #     #     print("------> ", ov.aval)
+
+    # print("WHILE ABSTRACT OUT_AVALs")
+    # for a in out_avals: print("- ", a)
+    out_avals2 = out_avals[:2] + [DShapedArray([DBIdx(0), DBIdx(1)], out_avals[2].dtype,
+                                          out_avals[2].weak_type)] + out_avals[3:]
+
+    print("WHILE ABSTRACT OUT_AVALs")
+    for a in out_avals2: print("- ", a)
+    return out_avals2
 
 
 @while_p.def_impl

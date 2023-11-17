@@ -29,6 +29,14 @@ import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, JaxprStackFrame)
+
+
+from jax._src.util import unzip2
+from jax._src.pjit import _extract_implicit_args
+
+
+
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
@@ -72,17 +80,19 @@ from catalyst.utils.jax_extras import (
     ShapedArray,
     _initial_style_jaxpr,
     _input_type_to_tracers,
-    abstractify,
+    # abstractify,
     convert_constvars_jaxpr,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
     tree_structure,
     wrap_init,
+    infer_lambda_input_type,
 )
 from catalyst.utils.patching import Patcher
 
 import jax._src.core as core
+from jax._src.core import DBIdx, InDBIdx, OutDBIdx, DShapedArray
 
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
@@ -169,10 +179,17 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, retval_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
+            closed_jaxpr, retval_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
         def _eval_jaxpr(*args):
-            return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+            print("=============+CJCJCJCJC")
+            print(closed_jaxpr.jaxpr)
+            print(closed_jaxpr.out_avals)
+            print("=============+CJCJCJCJC")
+            res = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args)
+            print("RRRRRRRRRRRR")
+            for t in res: print("- ", t)
+            return res
 
         args_data, _ = tree_flatten(args)
 
@@ -972,9 +989,13 @@ class WhileLoop(HybridOp):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
-            body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
+            body_jaxpr, body_type, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
+
+        print("BJBJBJBJBJBJ")
+        print(ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()))
+        print("BJBJBJBJBJBJ")
 
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
@@ -1160,7 +1181,7 @@ class CondCallable:
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-                wffa, _, out_tree = deduce_avals(branch, [], {})
+                wffa, _, _, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
@@ -1466,7 +1487,7 @@ def for_loop(lower_bound, upper_bound, step):
                         step,
                         lower_bound,
                     ] + tree_flatten(init_state)[0]
-                    wffa, in_avals, body_tree = deduce_avals(
+                    wffa, in_avals, _, body_tree = deduce_avals(
                         body_fn, [lower_bound] + list(init_state), {}
                     )
                     arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
@@ -1531,9 +1552,6 @@ def for_loop(lower_bound, upper_bound, step):
         return _call_handler
 
     return _body_query
-
-
-from jax._src.util import unzip2
 
 
 def while_loop(cond_fn):
@@ -1603,68 +1621,114 @@ def while_loop(cond_fn):
         def _call_handler(*init_state):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
-                in_classical_tracers, _ = tree_flatten(init_state)
+                in_api_classical_tracers = [
+                    outer_trace.full_raise(t) for t in tree_flatten(init_state)[0]
+                ]
 
+                print("IN_API_CLASSICAL_TRACERS")
+                for t in in_api_classical_tracers: print('- ', t)
+
+                cond_trace:DynamicJaxprTrace
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
+
+                    cond_wffa, cond_in_avals, cond_keep, cond_tree = deduce_avals(
+                        cond_fn, init_state, {}
+                    )
+
                     arg_classical_tracers = _input_type_to_tracers(
                         cond_trace.new_arg, cond_in_avals
                     )
-                    _, keep_inputs = unzip2(cond_wffa.in_type)
-                    arg_classical_tracers = [
-                        t for t, keep in zip(arg_classical_tracers, keep_inputs) if keep
+
+                    arg_api_classical_tracers = [
+                        t for t, k in zip(arg_classical_tracers, cond_keep) if k
                     ]
-                    res_classical_tracers = [
+
+                    res_api_classical_tracers = [
                         cond_trace.full_raise(t)
-                        for t in cond_wffa.call_wrapped(*arg_classical_tracers)
+                        for t in cond_wffa.call_wrapped(*arg_api_classical_tracers)
                     ]
+
                     cond_region = HybridOpRegion(
-                        cond_trace, None, arg_classical_tracers, res_classical_tracers
+                        # FIXME: Repalce res_api_classical_tracers API?
+                        cond_trace, None, arg_classical_tracers, res_api_classical_tracers
                     )
 
-                _check_single_bool_value(cond_tree(), res_classical_tracers)
+                _check_single_bool_value(cond_tree(), res_api_classical_tracers)
 
+                body_trace:DynamicJaxprTrace
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
-                    arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
-                    _, keep_inputs = unzip2(wffa.in_type)
-                    arg_classical_tracers = [
-                        t for t, keep in zip(arg_classical_tracers, keep_inputs) if keep
+                    body_wffa, body_avals, body_keep, body_tree_promise = deduce_avals(
+                        body_fn, init_state, {}
+                    )
+                    print("WHILE_BODY_AVALS")
+                    for b in body_avals: print("- ", b)
+
+                    arg_classical_tracers = _input_type_to_tracers(
+                        body_trace.new_arg, body_avals
+                    )
+                    print("WHILE_ARG_CLASSICAL_TRACERS")
+                    for b in arg_classical_tracers: print("- ", b)
+
+                    arg_api_classical_tracers = [
+                        t for t, k in zip(arg_classical_tracers, body_keep) if k
                     ]
+
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:
-                        res_classical_tracers = [
+                        res_api_classical_tracers = [
                             body_trace.full_raise(t)
-                            for t in wffa.call_wrapped(*arg_classical_tracers)
+                            for t in body_wffa.call_wrapped(*arg_api_classical_tracers)
                         ]
+
+                    res_type = infer_lambda_input_type(None, res_api_classical_tracers)
+
+                    res_classical_tracers = _extract_implicit_args(
+                        res_type, res_api_classical_tracers
+                    ) + res_api_classical_tracers
+
+                    print("WHILE_RES_API_CLASSICAL_TRACERS")
+                    for b in res_api_classical_tracers: print("- ", b)
+                    print("WHILE_RES_CLASSICAL_TRACERS")
+                    for b in res_classical_tracers: print("- ", b)
+                    print("WHILE_RES_TYPE")
+                    for b in res_type: print("- ", b)
+
                     body_region = HybridOpRegion(
                         body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
                     )
 
-                    res_avals = list(map(shaped_abstractify, res_classical_tracers))
+                out_type = res_type
+                out_avals, out_keep = zip(*res_type)
 
-                    # print("SSSSSSSS", res_avals)
-                    # out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-                    # out_classical_tracers = [outer_trace.full_raise(aval) for aval in res_avals]
-                    out_classical_tracers = []
-                    for aval in res_avals:
-                        if type(aval) is core.DShapedArray:
-                            shape = [args[d.val] if type(d) is core.InDBIdx else
-                                     out_classical_tracers[d.val] if type(d) is core.OutDBIdx else
-                                     d for d in aval.shape]
-                            aval = aval.update(shape=tuple(core.get_referent(d) for d in shape))
-                            print("DYNAMIC", aval)
-                        else:
-                            print("STATIC")
+                print("WHILE_BODY_AVALS")
+                for b in zip(body_avals,body_keep): print("- ", b)
 
-                        dt = DynamicJaxprTracer(outer_trace, aval)
-                        frame = ctx.frames[outer_trace]
-                        frame.tracers.append(dt)
-                        frame.tracer_to_var[id(dt)] = frame.newvar(aval)
-                        out_classical_tracers.append(dt)
+                in_classical_tracers = _extract_implicit_args(
+                    list(zip(body_avals, body_keep)), in_api_classical_tracers
+                ) + in_api_classical_tracers
+                print("WHILE_IN_CLASSICAL_TRACERS")
+                for t in in_classical_tracers: print('- ', t)
+
+                def _new(aval):
+                    # print("CREATING", aval)
+                    return new_inner_tracer(outer_trace, aval)
+                out_classical_tracers = _input_type_to_tracers(
+                    _new, out_avals
+                )
+
+                print("WHILE_OUT_CLASSICAL_TRACERS")
+                for t in out_classical_tracers: print('- ', t)
+
+                out_api_classical_tracers = [
+                    t for t, k in zip(out_classical_tracers, out_keep) if k
+                ]
+
+                print("WHILE_OUT_API_CLASSICAL_TRACERS")
+                for t in out_api_classical_tracers: print('- ', t)
 
                 WhileLoop(in_classical_tracers, out_classical_tracers, [cond_region, body_region])
-                return tree_unflatten(body_tree(), out_classical_tracers)
+                return tree_unflatten(body_tree_promise(), out_api_classical_tracers)
+
 
             def _call_with_classical_ctx():
                 init_vals, in_tree = tree_flatten(init_state)
@@ -1831,7 +1895,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _ = deduce_avals(_callee, args, kwargs)
+            wffa, in_avals, _, _ = deduce_avals(_callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:

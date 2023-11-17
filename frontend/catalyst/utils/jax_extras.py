@@ -41,7 +41,7 @@ from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, w
 from jax.api_util import flatten_fun, shaped_abstractify
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import ShapedArray, Trace, gensym, thread_local_state
+from jax.core import DShapedArray, ShapedArray, Trace, gensym, thread_local_state
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -73,6 +73,7 @@ __all__ = (
     "Jaxpr",
     "PyTreeDef",
     "ShapedArray",
+    "DShapedArray",
     "ShapeDtypeStruct",
     "convert_constvars_jaxpr",
     "convert_element_type",
@@ -96,6 +97,7 @@ __all__ = (
     "wrap_init",
     "make_jaxpr_pytree",
     "jaxpr_filter_outputs",
+    "infer_lambda_input_type",
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
@@ -269,14 +271,8 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     return closed_jaxprs, consts
 
 
-def abstractify(flat_args, abstracted_axes=None):
-    # if abstracted_axes is None:
-    #     return list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
-    # else:
-    # axes_specs = _flat_axes_specs(abstracted_axes, flat_args)
-    in_type = infer_lambda_input_type(None, flat_args)
-    in_avals, keep_inputs = unzip2(in_type)
-    return in_avals, keep_inputs
+# def abstractify(flat_args, abstracted_axes=None):
+#     return list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
 
 
 def deduce_avals(f: Callable, args, kwargs):
@@ -285,11 +281,11 @@ def deduce_avals(f: Callable, args, kwargs):
     evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
     wf = wrap_init(f)
-    in_avals, keep_inputs = abstractify(flat_args)
-    in_type = tuple(zip(in_avals, keep_inputs))
+    in_type = infer_lambda_input_type(None, flat_args)
+    in_avals, keep_inputs = list(zip(*in_type))
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
-    return wffa, in_avals, out_tree_promise
+    return wffa, in_avals, keep_inputs, out_tree_promise
 
 
 def jaxpr_to_mlir(func_name, jaxpr):
