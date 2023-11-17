@@ -14,10 +14,6 @@
 
 #pragma once
 
-// #if !__has_include("StateVectorLQubitDynamic.hpp")
-// throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
-// #endif
-
 #define __device_lightning
 
 #include <bitset>
@@ -97,8 +93,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     LightningSimulator &operator=(const LightningSimulator &) = delete;
     LightningSimulator(LightningSimulator &&) = delete;
     LightningSimulator &operator=(LightningSimulator &&) = delete;
-
-    auto GetDeviceName() -> std::string override { return "LightningSimulator"; }
 
     // RT
     auto AllocateQubit() -> QubitIdType override;

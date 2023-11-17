@@ -31,7 +31,8 @@
  */
 #if __has_include("LightningKokkosSimulator.hpp")
 #include "LightningKokkosSimulator.hpp"
-using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
+using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
+                            Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
 #else
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
@@ -45,10 +46,9 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
  */
 static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>>
 {
-#ifdef __device_lightning_kokkos
-    std::vector<std::pair<std::string, std::string>> devices{{"rtd_lib", "lightning.kokkos"}};
-#else
     std::vector<std::pair<std::string, std::string>> devices{{"rtd_lib", "lightning.qubit"}};
+#ifdef __device_lightning_kokkos
+    devices.emplace_back("rtd_lib", "lightning.kokkos");
 #endif
     return devices;
 }

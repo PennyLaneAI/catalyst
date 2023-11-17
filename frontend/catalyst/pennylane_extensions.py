@@ -210,11 +210,6 @@ class QJITDevice(qml.QubitDevice):
     def __init__(
         self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
     ):
-        # TODO: remove after testing...
-        print("backend_name: ", backend_name)
-        print("backend_lib: ", backend_lib)
-        print("backend_kwargs: ", backend_kwargs)
-
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}

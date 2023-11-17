@@ -48,7 +48,6 @@ namespace Catalyst::Runtime {
 #ifdef __build_with_pybind11
 // LCOV_EXCL_START
 struct PythonInterpreterGuard {
-
     // This ensures the guard scope to avoid Interpreter
     // conflicts with runtime calls from the frontend.
     bool _init_by_guard = false;
@@ -111,7 +110,6 @@ class SharedLibraryManager final {
         // If you have compiled this file with sanitizers and you reach this line
         // you will get an error.
         // Please re-compile without sanitizers.
-        // std::cerr << "filename: " << filename << std::endl;
 
 #ifdef __APPLE__
         // macOS doesn't support RTLD_DEEPBIND
@@ -119,11 +117,10 @@ class SharedLibraryManager final {
 #else
         // Closing the dynamic library of Lightning simulators with dlclose() where
         // OpenMP directives are in use would raise memory segfaults
-        // Ali: Adding RTLD_NODELETE would fix the issue.
+        // Ali: Adding RTLD_NODELETE fixed the issue.
 
         _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_NODELETE);
 #endif
-        // std::cerr << "_handler: " << _handler << std::endl;
         RT_FAIL_IF(!_handler, dlerror());
     }
 
@@ -153,7 +150,6 @@ class SharedLibraryManager final {
         // SharedLibraryManager to manage shared libraries.
         //
         // Exercise for the reader, how could one trigger the "cannot create scope list" error?
-
         dlclose(_handler);
     }
 
@@ -229,40 +225,46 @@ class ExecutionContext final {
         // Reset the driver pointer
         _driver_ptr.reset(nullptr);
 
-        // TODO: add this to a dictionary or function
-        // if the libraries are added to the system's PATH
         // LCOV_EXCL_START
-        if (rtd_lib == "lightning.qubit") {
-            _device_name = "LightningSimulator";
+        // TODO: This can be added to a dictionary or function
+        {
+            // The following is required for C++ tests where these
+            // backend devices are linked in the interface library
+            // of the runtime.
+            // Besides, it provides support for libraries added to
+            // the system path.
+            if (rtd_lib == "lightning.qubit") {
+                _device_name = "LightningSimulator";
 #ifdef __linux__
-            rtd_lib = "librtd_lightning.so";
+                rtd_lib = "librtd_lightning.so";
 #elif defined(__APPLE__)
-            rtd_lib = "librtd_lightning.dylib";
+                rtd_lib = "librtd_lightning.dylib";
 #endif
-        }
-        else if (rtd_lib == "lightning.kokkos") {
-            _device_name = "LightningKokkosSimulator";
+            }
+            else if (rtd_lib == "lightning.kokkos") {
+                _device_name = "LightningKokkosSimulator";
 #ifdef __linux__
-            rtd_lib = "librtd_lightning.so";
+                rtd_lib = "librtd_lightning.so";
 #elif defined(__APPLE__)
-            rtd_lib = "librtd_lightning.dylib";
+                rtd_lib = "librtd_lightning.dylib";
 #endif
-        }
-        else if (rtd_lib == "braket.aws.qubit") {
-            _device_name = "OpenQasmDevice";
+            }
+            else if (rtd_lib == "braket.aws.qubit") {
+                _device_name = "OpenQasmDevice";
 #ifdef __linux__
-            rtd_lib = "librtd_openqasm.so";
+                rtd_lib = "librtd_openqasm.so";
 #elif defined(__APPLE__)
-            rtd_lib = "librtd_openqasm.dylib";
+                rtd_lib = "librtd_openqasm.dylib";
 #endif
-        }
-        else if (rtd_lib == "braket.local.qubit") {
-            _device_name = "OpenQasmDevice";
+            }
+            else if (rtd_lib == "braket.local.qubit") {
+                _device_name = "OpenQasmDevice";
 #ifdef __linux__
-            rtd_lib = "librtd_openqasm.so";
+                rtd_lib = "librtd_openqasm.so";
 #elif defined(__APPLE__)
-            rtd_lib = "librtd_openqasm.dylib";
+                rtd_lib = "librtd_openqasm.dylib";
 #endif
+            }
         }
         // LCOV_EXCL_STOP
 

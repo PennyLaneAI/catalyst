@@ -27,8 +27,6 @@ Additionally, all measurements will always return ``true``.
             CustomDevice(CustomDevice &&) = delete;
             CustomDevice &operator=(QuantumDevice &&) = delete;
 
-            std::string GetDeviceName(void) override { return "CustomDevice"; }
-
             auto AllocateQubit() -> QubitIdType override { return 0; }
             auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
             {

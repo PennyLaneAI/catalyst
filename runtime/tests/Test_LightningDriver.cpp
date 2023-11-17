@@ -77,8 +77,6 @@ TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-    CHECK(!sim->GetDeviceName().empty());
-
     QubitIdType q = sim->AllocateQubit();
     q = sim->AllocateQubit();
     q = sim->AllocateQubit();

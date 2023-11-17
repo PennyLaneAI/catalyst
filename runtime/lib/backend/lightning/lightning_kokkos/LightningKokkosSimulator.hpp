@@ -13,10 +13,6 @@
 // limitations under the License.
 #pragma once
 
-#if !__has_include("StateVectorKokkos.hpp")
-throw std::logic_error("StateVectorKokkos.hpp: No such header file");
-#endif
-
 #define __device_lightning_kokkos
 
 #include <bitset>
@@ -94,14 +90,12 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
     }
-    ~LightningKokkosSimulator(){};
+    ~LightningKokkosSimulator() = default;
 
     LightningKokkosSimulator(const LightningKokkosSimulator &) = delete;
     LightningKokkosSimulator &operator=(const LightningKokkosSimulator &) = delete;
     LightningKokkosSimulator(LightningKokkosSimulator &&) = delete;
     LightningKokkosSimulator &operator=(LightningKokkosSimulator &&) = delete;
-
-    auto GetDeviceName() -> std::string override { return "LightningSimulator"; }
 
     // RT
     auto AllocateQubit() -> QubitIdType override;

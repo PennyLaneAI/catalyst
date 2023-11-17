@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Runtime utility methods.
 """
@@ -86,10 +85,14 @@ def extract_backend_info(device):
         device_kwargs["shots"] = device.shots if device.shots else 0
 
     if dname == "braket.local.qubit":  # pragma: no cover
-        device_kwargs["backend"] = device._device._delegate.DEVICE_ID
+        device_kwargs[
+            "backend"
+        ] = device._device._delegate.DEVICE_ID  # pylint: disable=protected-access
     elif dname == "braket.aws.qubit":  # pragma: no cover
-        device_kwargs["device_arn"] = device._device._arn
-        if device._s3_folder:
-            device_kwargs["s3_destination_folder"] = str(device._s3_folder)
+        device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
+        if device._s3_folder:  # pylint: disable=protected-access
+            device_kwargs["s3_destination_folder"] = str(
+                device._s3_folder  # pylint: disable=protected-access
+            )
 
     return device_name, device_lpath, device_kwargs

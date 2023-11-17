@@ -120,8 +120,6 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     OpenQasmDevice(OpenQasmDevice &&) = delete;
     OpenQasmDevice &operator=(OpenQasmDevice &&) = delete;
 
-    auto GetDeviceName() -> std::string override { return "OpenQasmDevice"; }
-
     // RT
     auto AllocateQubit() -> QubitIdType override;
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;

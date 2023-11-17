@@ -9,8 +9,6 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     DummyDevice(DummyDevice &&) = delete;
     DummyDevice &operator=(QuantumDevice &&) = delete;
 
-    std::string GetDeviceName(void) override { return "DummyDevice"; }
-
     auto AllocateQubit() -> QubitIdType override { return 0; }
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
     {

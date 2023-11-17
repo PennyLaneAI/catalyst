@@ -54,7 +54,7 @@ class CustomDevice(qml.QubitDevice):
 dev = CustomDevice(wires=2)
 
 
-@pytest.mark.skip(reason="no way to test this with the plugin system")
+@pytest.mark.skip(reason="skip this test with the plugin system on CI")
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
     @qjit()

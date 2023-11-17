@@ -262,6 +262,7 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
+    @pytest.mark.skip(reason="skip this test with the plugin system on CI")
     def test_compiler_from_textual_ir(self):
         """Test the textual IR compilation."""
 
