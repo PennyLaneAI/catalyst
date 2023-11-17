@@ -46,10 +46,11 @@ namespace Catalyst::Runtime {
  * @note This is only required for OpenQasmDevice and when CAPI is built with pybind11.
  */
 #ifdef __build_with_pybind11
+// LCOV_EXCL_START
 struct PythonInterpreterGuard {
 
-    // This ensures the guard scope to avoid Interpreter conflicts
-    // with runtime calls from the frontend.
+    // This ensures the guard scope to avoid Interpreter
+    // conflicts with runtime calls from the frontend.
     bool _init_by_guard = false;
 
     PythonInterpreterGuard()
@@ -71,7 +72,7 @@ struct PythonInterpreterGuard {
     PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
     PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
 };
-
+// LCOV_EXCL_STOP
 #else
 struct PythonInterpreterGuard {
     PythonInterpreterGuard() {}
@@ -100,7 +101,7 @@ class MemoryManager final {
 
 class SharedLibraryManager final {
   private:
-    void *_handler{NULL};
+    void *_handler{nullptr};
 
   public:
     SharedLibraryManager() = delete;
@@ -230,6 +231,7 @@ class ExecutionContext final {
 
         // TODO: add this to a dictionary or function
         // if the libraries are added to the system's PATH
+        // LCOV_EXCL_START
         if (rtd_lib == "lightning.qubit") {
             _device_name = "LightningSimulator";
 #ifdef __linux__
@@ -262,6 +264,7 @@ class ExecutionContext final {
             rtd_lib = "librtd_openqasm.dylib";
 #endif
         }
+        // LCOV_EXCL_STOP
 
 #ifdef __build_with_pybind11
         if (_device_name == "OpenQasmDevice" && !Py_IsInitialized()) {

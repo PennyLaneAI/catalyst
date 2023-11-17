@@ -214,6 +214,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     delete[] buffer_tp;
 }
 
+#ifndef __device_lightning_kokkos
 TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
           "Op=RY, Obs=X [lightning.qubit]",
           "[Gradient]")
@@ -262,6 +263,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     delete[] buffer;
     delete[] buffer_tp;
 }
+#endif
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
           "Obs=[X]",
