@@ -25,9 +25,11 @@ from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.interpreters.partial_eval import _input_type_to_tracers
+from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
 from jax._src.linear_util import annotate
+from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
@@ -399,8 +401,6 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
 
 def get_implicit_and_explicit_flat_args(options, *args, **kwargs):
     """Get implicit arguments from explicit arguments and abstracted_axes."""
-    from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
-    from jax._src.interpreters import partial_eval as pe
     axes_specs = _flat_axes_specs(options.abstracted_axes, *args, **kwargs)
     explicit_args, in_tree = tree_flatten(args)
     in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
