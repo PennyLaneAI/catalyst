@@ -437,15 +437,18 @@ class CompiledFunction:
 
     def __call__(self, *args, **kwargs):
         if self.compile_options.abstracted_axes is not None:
-            from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
-            from jax._src.interpreters import partial_eval as pe
-            axes_specs = _flat_axes_specs(self.compile_options.abstracted_axes, *args, **kwargs)
-            explicit_args, in_tree = tree_flatten(args)
-            in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
-            in_avals = tuple(a for a, e in in_type if e)
-            implicit_args = _extract_implicit_args(in_type, explicit_args)
-            args_flat = [*implicit_args, *explicit_args]
-            args = args_flat
+            def get_implicit_and_explicit_flat_args(options, *args, **kwargs):
+                from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
+                from jax._src.interpreters import partial_eval as pe
+                axes_specs = _flat_axes_specs(options.abstracted_axes, *args, **kwargs)
+                explicit_args, in_tree = tree_flatten(args)
+                in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
+                in_avals = tuple(a for a, e in in_type if e)
+                implicit_args = _extract_implicit_args(in_type, explicit_args)
+                args_flat = [*implicit_args, *explicit_args]
+                return args_flat
+
+            args = get_implicit_and_explicit_flat_args(self.compile_options, *args, **kwargs)
 
         abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
