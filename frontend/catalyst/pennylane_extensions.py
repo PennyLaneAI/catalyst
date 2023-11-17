@@ -78,6 +78,7 @@ from catalyst.utils.jax_extras import (
     new_inner_tracer,
     tree_structure,
     wrap_init,
+    get_implicit_and_explicit_flat_args,
 )
 from catalyst.utils.patching import Patcher
 
@@ -174,16 +175,7 @@ class QFunc:
         def _eval_jaxpr(*args):
             return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
-        from jax._src.interpreters import partial_eval as pe
-        # None, really it is doing all the work
-        axes_specs = _flat_axes_specs(None, *args, **kwargs)
-        explicit_args, in_tree = tree_flatten(args)
-        in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
-        in_avals = tuple(a for a, e in in_type if e)
-        implicit_args = _extract_implicit_args(in_type, explicit_args)
-        args_flat = [*implicit_args, *explicit_args]
-        args = args_flat
+        args = get_implicit_and_explicit_flat_args(None, *args, {})
 
         wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
         retval = func_p.bind(wffa, *args, fn=self)
@@ -1169,7 +1161,7 @@ class CondCallable:
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-                wffa, _, keep_inputs, out_tree = deduce_avals(branch, [], {})
+                wffa, _, _, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
@@ -1475,7 +1467,7 @@ def for_loop(lower_bound, upper_bound, step):
                         step,
                         lower_bound,
                     ] + tree_flatten(init_state)[0]
-                    wffa, in_avals, keep_inputs, body_tree = deduce_avals(
+                    wffa, in_avals, _, body_tree = deduce_avals(
                         body_fn, [lower_bound] + list(init_state), {}
                     )
                     arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
@@ -1612,7 +1604,7 @@ def while_loop(cond_fn):
                 in_classical_tracers, _ = tree_flatten(init_state)
 
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, keep_inputs, cond_tree = deduce_avals(cond_fn, init_state, {})
+                    cond_wffa, cond_in_avals, _, cond_tree = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(
                         cond_trace.new_arg, cond_in_avals
                     )
@@ -1810,7 +1802,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, keep_inputs, _ = deduce_avals(_callee, args, kwargs)
+            wffa, in_avals, _, _ = deduce_avals(_callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:

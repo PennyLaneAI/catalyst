@@ -439,7 +439,7 @@ class CompiledFunction:
     def __call__(self, *args, **kwargs):
         if self.compile_options.abstracted_axes is not None:
 
-            args = get_implicit_and_explicit_flat_args(self.compile_options, *args, **kwargs)
+            args = get_implicit_and_explicit_flat_args(self.compile_options.abstracted_axes, *args, **kwargs)
 
         abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 

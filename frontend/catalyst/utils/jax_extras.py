@@ -399,9 +399,9 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
 
-def get_implicit_and_explicit_flat_args(options, *args, **kwargs):
+def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     """Get implicit arguments from explicit arguments and abstracted_axes."""
-    axes_specs = _flat_axes_specs(options.abstracted_axes, *args, **kwargs)
+    axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
     explicit_args, _ = tree_flatten(args)
     in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
     implicit_args = _extract_implicit_args(in_type, explicit_args)
