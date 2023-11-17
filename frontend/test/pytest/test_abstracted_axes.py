@@ -51,7 +51,6 @@ class TestBasicInterface:
         result = identity(param)
 
         assert_allclose(param, result)
-        print(identity.mlir)
 
     def test_abstracted_axes_dictionary_3(self):
         """This is a temporary test while dynamism is in development."""
@@ -68,4 +67,3 @@ class TestBasicInterface:
         result = identity(param, param)
 
         assert_allclose((param, param), result)
-        print(identity.mlir)
