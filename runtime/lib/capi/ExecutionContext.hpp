@@ -27,11 +27,7 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
-#ifdef __linux__
 #include <dlfcn.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#endif
 
 namespace Catalyst::Runtime {
 
