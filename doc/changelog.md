@@ -9,6 +9,12 @@
   `MeasurementProcess`es.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
 
+* The plugin system of Catalyst for backend devices. This system in runtime
+  is backed by `dlopen` to load libraries at runtime instead of linking them
+  at compile time. This provides further flexibility and extensibility to
+  Catalyst allowing users to add and load custom quantum devices dynamically.
+  [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
@@ -19,6 +25,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Erick Ochoa Lopez.
 
 # Release 0.3.2
