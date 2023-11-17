@@ -702,9 +702,10 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
         post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
         jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        named_shape = lambda x: x.named_shape if hasattr(x, "named_shape") else {}
         post_processing_results = tree_unflatten(
             out_tree_promise(),
-            [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
+            [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in post_processing_tracers],
         )
 
         return closed_jaxpr, post_processing_results
@@ -798,9 +799,10 @@ def trace_quantum_function(
                 out_type = out_type[:-1]
 
                 out_avals, _ = unzip2(out_type)
+                get_named_shape = lambda x: x.named_shape if hasattr(x, "named_shape") else {}
                 abstract_results = tree_unflatten(
                     meas_trees,
-                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
+                    [ShapeDtypeStruct(a.shape, a.dtype, get_named_shape(a)) for a in out_avals],
                 )
                 # This mimics the return type from qnodes.
                 # I would prefer if qnodes didn't have special rules about whether they return a
