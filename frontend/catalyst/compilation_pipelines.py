@@ -553,9 +553,6 @@ class QJIT:
         Returns:
             an MLIR module
         """
-        valid_types = (jax.core.ShapedArray,)
-        is_param_valid = lambda param: isinstance(param, valid_types)
-        is_signature_valid = all(map(is_param_valid, args))
         self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
         with Patcher(
