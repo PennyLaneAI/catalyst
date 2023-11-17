@@ -14,17 +14,12 @@
 
 #pragma once
 
-#include "mlir/CAPI/Registration.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
-
-#ifdef __cplusplus
-}
-#endif
+#define GET_OP_CLASSES
+#include "Mitigation/IR/MitigationOps.h.inc"

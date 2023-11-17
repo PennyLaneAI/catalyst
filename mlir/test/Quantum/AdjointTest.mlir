@@ -167,3 +167,61 @@ func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor
     quantum.dealloc %0 : !quantum.reg
     return %5 : tensor<4xcomplex<f64>>
   }
+
+// -----
+
+func.func private @circuit(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
+    %c0_i64 = arith.constant 0 : i64
+    %c1_i64 = arith.constant 1 : i64
+    %1 = quantum.extract %arg1[%c0_i64] : !quantum.reg -> !quantum.bit
+    %2 = quantum.custom "PauliX"() %1 : !quantum.bit
+    %3 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
+    %4 = quantum.custom "PauliZ"() %3 : !quantum.bit
+    %5 = quantum.insert %arg1[%c1_i64], %4 : !quantum.reg, !quantum.bit
+    func.return %5: !quantum.reg
+}
+
+// CHECK:   func.func private @circuit.adjoint(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
+// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
+
+// CHECK:   func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> {
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   call @circuit.adjoint(%arg0, {{%.+}}) : (f64, !quantum.reg) -> !quantum.reg
+// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} : !quantum.bit
+
+func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attributes {} {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 4.000000e-01 : f64
+  %c0_i64 = arith.constant 0 : i64
+  quantum.device ["backend", "lightning.qubit"]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
+  %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
+  %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
+  %4 = quantum.adjoint(%3) : !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+      %5 = quantum.extract %arg1[%c0_i64] : !quantum.reg -> !quantum.bit
+      %6 = quantum.custom "PauliX"() %5 : !quantum.bit
+      %7 = quantum.custom "RX"(%arg0) %6 : !quantum.bit
+      %8 = quantum.custom "PauliZ"() %7 : !quantum.bit
+      %9 = quantum.insert %arg1[%c0_i64], %8 : !quantum.reg, !quantum.bit
+      %10 = func.call @circuit(%arg0, %9): (f64, !quantum.reg) -> !quantum.reg
+      %11 = quantum.extract %10[%c0_i64] : !quantum.reg -> !quantum.bit
+      %12 = quantum.custom "RY"(%arg0) %11 : !quantum.bit
+      %13 = quantum.insert %10[%c0_i64], %12 : !quantum.reg, !quantum.bit
+      quantum.yield %13 : !quantum.reg
+  }
+  %6 = quantum.extract %4[%c0_i64] : !quantum.reg -> !quantum.bit
+  %7 = quantum.custom "RY"(%cst) %6 : !quantum.bit
+  %8 = quantum.extract %4[%c1_i64] : !quantum.reg -> !quantum.bit
+  %9 = quantum.compbasis %8, %7 : !quantum.obs
+  %10 = quantum.state %9 : tensor<4xcomplex<f64>>
+  quantum.dealloc %0 : !quantum.reg
+  return %10 : tensor<4xcomplex<f64>>
+}

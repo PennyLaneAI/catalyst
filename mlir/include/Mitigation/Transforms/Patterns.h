@@ -14,17 +14,14 @@
 
 #pragma once
 
-#include "mlir/CAPI/Registration.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace catalyst {
+namespace mitigation {
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
+void populateLoweringPatterns(mlir::RewritePatternSet &);
 
-#ifdef __cplusplus
-}
-#endif
+} // namespace mitigation
+} // namespace catalyst
