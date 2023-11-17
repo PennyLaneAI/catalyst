@@ -181,54 +181,81 @@ class QFunc:
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
             closed_jaxpr, retval_type, retval_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
+        retval_aval, retval_keep = zip(*retval_type)
+
         def _eval_jaxpr(*args):
             print("=============+CJCJCJCJC")
             print(closed_jaxpr.jaxpr)
             print(closed_jaxpr.out_avals)
             print("=============+CJCJCJCJC")
-            res = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args)
-            print("RRRRRRRRRRRR")
-            for t in res: print("- ", t)
+            res_tracers = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args)
 
-                # if isinstance(t.aval, DShapedArray):
-                #     new_shape = []
-                #     for d in t.shape:
-                #         if isinstance(d, DBIdx):
-                #             new_shape.append(res[d.val])
-                #         else:
-                #             new_shape.append(d)
-                #     t.aval.shape = new_shape
-                #     print("->>>>>>> ", t)
+            print("RES_TRACERS")
+            for t in res_tracers:
+                print("- ", t)
+                if isinstance(t.aval, DShapedArray):
+                    new_shape = []
+                    for d in t.shape:
+                        if isinstance(d, DBIdx):
+                            new_shape.append(res_tracers[d.val])
+                        else:
+                            new_shape.append(d)
+                    t.aval.shape = new_shape
+                    print("->>>>>>> ", t)
 
-            return res
+            res_api_tracers = [t for t,k in zip(res_tracers, retval_keep) if k]
+            print("RES_API_TRACERS")
+            for t in res_api_tracers: print("- ", t)
 
-        args_data, _ = tree_flatten(args)
-
-        wrapped = wrap_init(_eval_jaxpr)
-        retval_tracers = func_p.bind(wrapped, *args_data, fn=self)
-
-        print("RETVAL_TRACERS")
-        for t in retval_tracers:
-            print("- ", t)
-            if isinstance(t.aval, DShapedArray):
-                new_shape = []
-                for d in t.shape:
-                    if isinstance(d, DBIdx):
-                        new_shape.append(retval_tracers[d.val])
-                    else:
-                        new_shape.append(d)
-                t.aval.shape = new_shape
-                print("->>>>>>> ", t)
+            return res_api_tracers
 
 
-        _, retval_keep = zip(*retval_type)
+        # args_data, _ = tree_flatten(args)
 
-        retval_api_tracers = [t for t,k in zip(retval_tracers,retval_keep) if k]
+        # wrapped = wrap_init(_eval_jaxpr)
+        # retval_tracers = func_p.bind(wrapped, *args_data, fn=self)
 
-        print("RETVAL_API_TRACERS")
-        for t in retval_api_tracers: print("- ", t)
+        # print("RETVAL_TRACERS")
+        # for t in retval_tracers:
+        #     print("- ", t)
+        #     if isinstance(t.aval, DShapedArray):
+        #         new_shape = []
+        #         for d in t.shape:
+        #             if isinstance(d, DBIdx):
+        #                 new_shape.append(retval_tracers[d.val])
+        #             else:
+        #                 new_shape.append(d)
+        #         t.aval.shape = new_shape
+        #         print("->>>>>>> ", t)
 
-        return tree_unflatten(retval_tree, retval_api_tracers)
+
+        # _, retval_keep = zip(*retval_type)
+
+        # retval_api_tracers = [t for t,k in zip(retval_tracers,retval_keep) if k]
+
+        # print("RETVAL_API_TRACERS")
+        # for t in retval_api_tracers: print("- ", t)
+        # return tree_unflatten(retval_tree, retval_api_tracers)
+
+        from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
+        from jax._src.interpreters import partial_eval as pe
+        # None, really it is doing all the work
+        axes_specs = _flat_axes_specs(None, *args, **kwargs)
+        explicit_args, in_tree = tree_flatten(args)
+        in_type = pe.infer_lambda_input_type(axes_specs, explicit_args)
+        # in_avals = tuple(a for a, e in in_type if e)
+        implicit_args = _extract_implicit_args(in_type, explicit_args)
+        args_flat = [*implicit_args, *explicit_args]
+        args = args_flat
+
+        print("ARGS")
+        for t in args: print("- ", t)
+        wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
+        retval = func_p.bind(wffa, *args, fn=self)
+        print("RETVAL")
+        for t in retval: print("- ", t)
+
+        return tree_unflatten(retval_tree, retval)
 
 
 class QJITDevice(qml.QubitDevice):

@@ -106,6 +106,9 @@ def test_quantum_tracing():
 
     result = f([2, 3])
     expected = jnp.ones([2, 3]) * 8
+    print("MLIR")
+    print(f.mlir)
+    print("MLIR")
     assert array_equal(result, expected)
 
 
