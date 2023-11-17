@@ -345,7 +345,8 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        jaxpr, shape = jax.make_jaxpr(func, abstracted_axes=abstracted_axes, return_shape=True)(*args, **kwargs)
+        make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes, "return_shape": True}
+        jaxpr, shape = jax.make_jaxpr(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr_to_mlir(func.__name__, jaxpr, shape)
 
@@ -702,7 +703,8 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
         post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
         jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        named_shape = lambda x: x.named_shape if hasattr(x, "named_shape") else {}
+        # pylint: disable=unnecessary-lambda-assignment
+        named_shape = lambda x: getattr(x, "named_shape", {})
         post_processing_results = tree_unflatten(
             out_tree_promise(),
             [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in post_processing_tracers],
@@ -799,10 +801,11 @@ def trace_quantum_function(
                 out_type = out_type[:-1]
 
                 out_avals, _ = unzip2(out_type)
-                get_named_shape = lambda x: x.named_shape if hasattr(x, "named_shape") else {}
+                # pylint: disable=unnecessary-lambda-assignment
+                named_shape = lambda x: getattr(x, "named_shape", {})
                 abstract_results = tree_unflatten(
                     meas_trees,
-                    [ShapeDtypeStruct(a.shape, a.dtype, get_named_shape(a)) for a in out_avals],
+                    [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in out_avals],
                 )
                 # This mimics the return type from qnodes.
                 # I would prefer if qnodes didn't have special rules about whether they return a

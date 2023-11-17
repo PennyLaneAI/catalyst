@@ -47,8 +47,8 @@ from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.patching import Patcher
 from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args
+from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
@@ -438,8 +438,8 @@ class CompiledFunction:
 
     def __call__(self, *args, **kwargs):
         if self.compile_options.abstracted_axes is not None:
-
-            args = get_implicit_and_explicit_flat_args(self.compile_options.abstracted_axes, *args, **kwargs)
+            abstracted_axes = self.compile_options.abstracted_axes
+            args = get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs)
 
         abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
@@ -558,7 +558,10 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, self.compile_options.abstracted_axes, *self.c_sig)
+            func = self.user_function
+            sig = self.c_sig
+            abstracted_axes = self.compile_options.abstracted_axes
+            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(func, abstracted_axes, *sig)
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
@@ -610,7 +613,8 @@ class QJIT:
             )
 
         self._llvmir = llvm_ir
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, self.compile_options)
+        options = self.compile_options
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
         return compiled_function
 
     def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
@@ -947,14 +951,33 @@ def qjit(
             :class:`~.pennylane_extensions.QJITDevice`.
     """
 
+    axes = abstracted_axes
     if fn is not None:
         return QJIT(
-            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph, abstracted_axes=abstracted_axes)
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                abstracted_axes=axes,
+            ),
         )
 
     def wrap_fn(fn):
         return QJIT(
-            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph, abstracted_axes=abstracted_axes)
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                abstracted_axes=axes,
+            ),
         )
 
     return wrap_fn

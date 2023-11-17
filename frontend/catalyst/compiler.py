@@ -36,6 +36,7 @@ from catalyst.utils.filesystem import Directory
 package_root = os.path.dirname(__file__)
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
     """Generic compilation options, for which reasonable default values exist.

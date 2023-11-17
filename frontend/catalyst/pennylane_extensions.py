@@ -73,12 +73,11 @@ from catalyst.utils.jax_extras import (
     _initial_style_jaxpr,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
+    get_implicit_and_explicit_flat_args,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
     tree_structure,
-    wrap_init,
-    get_implicit_and_explicit_flat_args,
 )
 from catalyst.utils.patching import Patcher
 
@@ -177,7 +176,7 @@ class QFunc:
 
         args = get_implicit_and_explicit_flat_args(None, *args, {})
 
-        wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
+        wffa, _, _, _ = deduce_avals(_eval_jaxpr, args, {})
         retval = func_p.bind(wffa, *args, fn=self)
 
         return tree_unflatten(retval_tree, retval)
@@ -1619,7 +1618,7 @@ def while_loop(cond_fn):
                 _check_single_bool_value(cond_tree(), res_classical_tracers)
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, keep_inputs, body_tree = deduce_avals(body_fn, init_state, {})
+                    wffa, in_avals, _, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:

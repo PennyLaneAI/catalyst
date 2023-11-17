@@ -23,18 +23,18 @@ from jax._src import state, util
 from jax._src.core import _update_thread_local_jit_state, eval_jaxpr
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
+from jax._src.interpreters import partial_eval as pe
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.interpreters.partial_eval import _input_type_to_tracers
-from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
 from jax._src.linear_util import annotate
-from jax._src.pjit import _flat_axes_specs, _extract_implicit_args
+from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
-from jax.api_util import flatten_fun, shaped_abstractify
+from jax.api_util import flatten_fun
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import ShapedArray, Trace, gensym, thread_local_state
@@ -387,6 +387,7 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
+
 
 def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     """Get implicit arguments from explicit arguments and abstracted_axes."""
