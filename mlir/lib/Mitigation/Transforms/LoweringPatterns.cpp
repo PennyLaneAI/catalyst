@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include "MitigationMethods/Zne.hpp"
 
-#include "mlir/CAPI/Registration.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "mlir/IR/PatternMatch.h"
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation);
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst);
+#include "Mitigation/Transforms/Patterns.h"
 
-#ifdef __cplusplus
+using namespace mlir;
+using namespace catalyst::mitigation;
+
+namespace catalyst {
+namespace mitigation {
+
+void populateLoweringPatterns(RewritePatternSet &patterns)
+{
+    patterns.add<ZneLowering>(patterns.getContext());
 }
-#endif
+
+} // namespace mitigation
+} // namespace catalyst

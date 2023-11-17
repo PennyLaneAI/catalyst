@@ -106,13 +106,14 @@ AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
 >>> cost(weights, data)
 array(0.30455313)
 
-Currently, AutoGraph supports converting the following Python control
-flow statements:
+Currently, AutoGraph supports converting the following Python statements:
 
 - ``if`` statements (including ``elif`` and ``else``)
 - ``for`` loops
+- ``while`` loops
+- ``and``, ``or`, and ``not`` in certain cases
 
-``while`` loops are currently not supported, alongside ``break`` and ``continue`` statements.
+``break`` and ``continue`` statements are currently not supported.
 
 Nested functions
 ----------------
@@ -217,7 +218,53 @@ Instead of utilizing a return statement, use the following approach instead:
 Different branches must assign the same type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following will result in an error:
+Different branches of an if statement must always assign variables with the same type across branches,
+if those variables are used in the outer scope (external variables). The type must be the same in the sense
+that the *structure* of the variable should not change across branches. The underlying data type (`dtype`)
+may be different, since data type promotion is applied across branches.
+
+In particular, this requires that if an external variable is assigned an array in one
+branch, other branches must also assign arrays of the same shape:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     if x > 1:
+...         y = jnp.array([0.1, 0.2])
+...     else:
+...         y = jnp.array([0.4, 0.5, -0.1])
+...     return jnp.sum(y)
+>>> f(0.5)
+AssertionError: Expected matching shapes
+>>> @qjit(autograph=True)
+... def f(x):
+...     if x > 1:
+...         y = jnp.array([0.1, 0.2, 0.3])
+...     else:
+...         y = jnp.array([0.4, 0.5, -0.1])
+...     return jnp.sum(y)
+>>> f(0.5)
+array(0.8)
+
+More generally, this also applies to common container classes such as
+`dict`, `list`, and `tuple`. If one branch assigns an external variable,
+then all other branches must also assign the external variable with the same
+type, nested structure, number of elements, element types, and array shapes.
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     if x > 1:
+...         y = {"a": jnp.array([0.1, 0.2, 0.3]), "b": 6}
+...     else:
+...         y = {"a": jnp.array([0.5, 0., -0.2]), "b": -1}
+...     return y
+>>> f(1.5)
+{'a': array([0.1, 0.2, 0.3]), 'b': array(6)}
+
+Automatic data type promotion in branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Different branches of an if statement may assign external variables with different data types (dtypes) ---
+Catalyst will automatically perform data type promotion (such as converting integers to floats):
 
 >>> @qjit(autograph=True)
 ... def f(x):
@@ -227,20 +274,7 @@ The following will result in an error:
 ...         y = 4
 ...     return y
 >>> f(0.5)
-TypeError: Conditional requires consistent return types across all branches
-
-Instead, make sure that all branches assign the same type to variables:
-
->>> @qjit(autograph=True)
-... def f(x):
-...     if x > 5:
-...         y = 5.0
-...     else:
-...         y = 4.0
-...     return y
->>> f(0.5)
 array(4.)
-
 
 New variable assignments
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -525,6 +559,178 @@ array(22)
 
 Temporary variables used inside a loop --- and that are **not** passed to a
 function within the loop --- do not have any type restrictions.
+
+While loops
+-----------
+
+Most ``while`` loop constructs will be properly captured and compiled by
+AutoGraph:
+
+>>> @qjit(autograph=True)
+... def f(param):
+...     n = 0.
+...     while param < 0.5:
+...         param *= 1.2
+...         n += 1
+...     return n
+>>> f(0.1)
+array(9.)
+
+Break and continue
+~~~~~~~~~~~~~~~~~~
+
+Within a while loop, control flow statements ``break`` and ``continue``
+are not currently supported. Usage will result in an error:
+
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     while x < 5:
+...         if x < 0:
+...             continue
+...         x = x + x ** 2
+...     return x
+SyntaxError: 'continue' not properly in loop
+
+
+Updating and assigning variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As with for loops, while loops that update variables can also be converted with AutoGraph:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     while x < 5:
+...         x = x + 2
+...     return x
+>>> f(4)
+array(6.4)
+
+However, like with conditionals, a similar restriction applies: variables
+which are updated across iterations of the loop must have a JAX compileable
+type (Booleans, Python numeric types, and JAX arrays).
+
+You can also utilize temporary variables within a while loop:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     while x < 5:
+...         c = "hi"
+...         x = x + 2 * len(c)
+...     return x
+>>> f(4)
+array(8.4)
+
+Temporary variables used inside a loop --- and that are **not** passed to a
+function within the loop --- do not have any type restrictions.
+
+Logical statements
+------------------
+
+AutoGraph has support for capturing logical statements that involve dynamic variables --- that is,
+statements involving ``and``, ``not``, and ``or`` that return booleans --- allowing them to be
+computed at runtime.
+
+>>> @qjit(autograph=True)
+... def f(x: float, y: float):
+...     a = x >= 0.0 and x <= 1.0
+...     b = not y >= 1.0
+...     return a or b
+>>> f(0.5, 1.1)
+array(True)
+>>> f(1.5, 1.6)
+array(False)
+
+Internally, logical statements are converted as follows:
+
+- ``x and y`` to ``jnp.logical_and(x, y)``
+- ``x or y`` to ``jnp.logical_or(x, y)``
+- ``not x`` to ``jnp.logical_not(x)``
+
+This can be useful when building dynamic circuits, with gates dependent on the output
+of multiple measurements. For example,
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit(autograph=True)
+    @qml.qnode(dev)
+    def circuit():
+        qml.RX(0.1, wires=0)
+        qml.RY(0.5, wires=1)
+
+        m1 = measure(0)
+        m2 = measure(1)  
+
+        if m1 and not m2:
+            qml.Hadamard(wires=1)
+        elif m1 and m2:
+            qml.RX(0.5, wires=1)
+        else:
+            qml.RY(0.5, wires=1)
+
+        return qml.expval(qml.PauliZ(1))
+
+>>> circuit()
+array(0.87758256)
+
+Note that there are a couple of important constraints and restrictions that must be
+considered when working with logical statements.
+
+All arguments must be dynamic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Only cases where **all arguments to the logical statement are dynamic** (that is, dependent on
+runtime values) are captured and converted by AutoGraph. Cases where one or both of the arguments
+are static will result in the logical statement falling back to Python, and
+being interpreted at compile time.
+
+For example,
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     return x and True
+TracerBoolConversionError: Attempted boolean conversion of traced array with shape float64[]..
+The error occurred while tracing the function f_1 at /tmp/__autograph_generated_file3sgpmu5h.py:6 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument x.
+
+Here, ``x`` is dynamic, but the other argument is static. As a result, Python will attempt
+to evaluate this expression at compile time and fail.
+
+To avoid this, please use ``jnp.logical_and(x, y)``, ``jnp.logical_or(x, y)``,
+and ``jnp.logical_not(x)`` explicitly if one of your arguments is static:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     return jnp.logical_and(x, True)
+>>> f(False)
+array(False)
+>>> f(True)
+array(True)
+
+Array arguments
+~~~~~~~~~~~~~~~
+
+Note that, like with NumPy and JAX, logical operators apply elementwise to array arguments:
+
+>>> @qjit(autograph=True)  
+... def f(x, y):  
+...     return x and y
+>>> f(jnp.array([0, 1]), jnp.array([1, 1]))
+array([False,  True])
+
+Care must therefore be taken when using logical operators within conditional branches;
+``jnp.all`` and ``jnp.any`` can be used to generate a single boolean for conditionals:
+
+>>> @qjit(autograph=True)  
+... def f(x, y):  
+...     if jnp.all(x and y):
+...         z = 1
+...     else:
+...         z = -1
+...     return z
+>>> f(jnp.array([0, 1]), jnp.array([1, 1]))
+array(-1)
 
 .. _debugging:
 
