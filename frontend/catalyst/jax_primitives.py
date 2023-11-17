@@ -1203,19 +1203,19 @@ def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     print("WHILE ABSTRACT IN_AVALs")
     for a in args: print("- ", a)
 
-    main = core.thread_local_state.trace_state.trace_stack.stack[-1]
-    frame:JaxprStackFrame = main.jaxpr_stack[-1]
+    # main = core.thread_local_state.trace_state.trace_stack.stack[-1]
+    # frame:JaxprStackFrame = main.jaxpr_stack[-1]
     # print([id(t) for t in frame.tracers])
     # print(frame.tracer_to_var)
-
-    var_to_tracer = {str(v):[t for t in frame.tracers if id(t)==k][0] for k,v in frame.tracer_to_var.items()}
+    # var_to_tracer = {str(v):[t for t in frame.tracers if id(t)==k][0] for k,v in frame.tracer_to_var.items()}
     # for k,v in var_to_tracer.items():
     #     print(k, v)
 
     print("WHILE ABSTRACT BODY_JAXPR OUT_AVALs")
     for a in body_jaxpr.out_avals: print("- ", a)
 
-    out_avals = body_jaxpr.out_avals
+    # return body_jaxpr.out_avals
+
 
     # out_avals = []
     # for a in body_jaxpr.out_avals:
@@ -1249,10 +1249,14 @@ def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     #     #         ])
     #     #     print("------> ", ov.aval)
 
-    # print("WHILE ABSTRACT OUT_AVALs")
-    # for a in out_avals: print("- ", a)
-    out_avals2 = out_avals[:2] + [DShapedArray([DBIdx(0), DBIdx(1)], out_avals[2].dtype,
-                                          out_avals[2].weak_type)] + out_avals[3:]
+    # # print("WHILE ABSTRACT OUT_AVALs")
+    # # for a in out_avals: print("- ", a)
+    out_avals = body_jaxpr.out_avals
+    out_avals2 = out_avals[:2] + [
+        DShapedArray([DBIdx(0), DBIdx(1)],
+                     out_avals[2].dtype,
+                     out_avals[2].weak_type)
+    ] + out_avals[3:]
 
     print("WHILE ABSTRACT OUT_AVALs")
     for a in out_avals2: print("- ", a)

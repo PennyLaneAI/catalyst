@@ -722,27 +722,27 @@ def trace_post_processing(ctx, trace, post_processing, pp_args):
         print("PP_RES_TRACERS")
         for t in pp_res_tracers: print("- ", t)
 
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(pp_res_tracers)
+        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(pp_res_api_tracers)
         # closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         # post_processing_results = tree_unflatten(
         #     out_tree_promise(),
         #     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
         # )
-        # print("JjJjJjJjJjJjJ")
-        # print(jaxpr)
-        # print("JjJjJjJjJjJjJ")
         # closed_jaxpr = ClosedJaxpr(jaxpr_filter_outputs(jaxpr, unzip2(out_type)[1]), consts)
         print("PP_RES_OUT_TYPE")
         for t in out_type: print("- ", t)
         print("PP_CJ_OUT_AVAL")
         for t in jaxpr.outvars: print("- ", t.aval)
-        for v,ot in zip(jaxpr.outvars, out_type):
-            v.aval = ot[0]
-        print("PP_CJ_OUT_AVAL2")
-        for t in jaxpr.outvars: print("- ", t.aval)
+        # for v,ot in zip(jaxpr.outvars, out_type):
+        #     v.aval = ot[0]
+        # print("PP_CJ_OUT_AVAL2")
+        # for t in jaxpr.outvars: print("- ", t.aval)
 
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        return closed_jaxpr, out_tree_promise()
+        # print("PPPPPPPPPPPPPPPPPPPPPPPPPPPP")
+        # print(closed_jaxpr)
+        # print("PPPPPPPPPPPPPPPPPPPPPPPPPPPP")
+        return closed_jaxpr, out_type, out_tree_promise()
 
 
 def trace_quantum_function(
@@ -845,12 +845,12 @@ def trace_quantum_function(
 
                 # results_tracers += [trace.full_raise(m) for m in meas_tracers]
 
-                jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(meas_tracers + res_quantum_tracers)
+                jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(meas_api_tracers + res_quantum_tracers)
                 # jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
                 # out_type = out_type[:-1]
-                # print("JJJJJJJJJJJJJJ")
-                # print(jaxpr)
-                # print("JJJJJJJJJJJJJJ")
+                print("MMMMMMMMMMMMMMMMMMMMM")
+                print(jaxpr)
+                print("MMMMMMMMMMMMMMMMMMMMMM")
 
                 print("OUT_TYPE")
                 for t in out_type: print("- ", t)
@@ -880,7 +880,7 @@ def trace_quantum_function(
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
                 # check_jaxpr(jaxpr)
 
-        closed_jaxpr, unflattened_callback_results = trace_post_processing(
+        closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transform_results
         )
-    return closed_jaxpr, unflattened_callback_results
+    return closed_jaxpr, out_type, out_tree

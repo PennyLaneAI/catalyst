@@ -100,8 +100,8 @@ def test_quantum_tracing():
             return (a, i)
 
         a2, _ = loop(a, i)
-        print("TEST_RET_VALUE")
-        print(a2)
+        # print("TEST_RET_VALUE")
+        # print(a2)
         return a2
 
     result = f([2, 3])

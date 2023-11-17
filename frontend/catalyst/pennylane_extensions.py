@@ -179,7 +179,7 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            closed_jaxpr, retval_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
+            closed_jaxpr, retval_type, retval_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
         def _eval_jaxpr(*args):
             print("=============+CJCJCJCJC")
@@ -189,14 +189,46 @@ class QFunc:
             res = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args)
             print("RRRRRRRRRRRR")
             for t in res: print("- ", t)
+
+                # if isinstance(t.aval, DShapedArray):
+                #     new_shape = []
+                #     for d in t.shape:
+                #         if isinstance(d, DBIdx):
+                #             new_shape.append(res[d.val])
+                #         else:
+                #             new_shape.append(d)
+                #     t.aval.shape = new_shape
+                #     print("->>>>>>> ", t)
+
             return res
 
         args_data, _ = tree_flatten(args)
 
         wrapped = wrap_init(_eval_jaxpr)
-        retval = func_p.bind(wrapped, *args_data, fn=self)
+        retval_tracers = func_p.bind(wrapped, *args_data, fn=self)
 
-        return tree_unflatten(retval_tree, retval)
+        print("RETVAL_TRACERS")
+        for t in retval_tracers:
+            print("- ", t)
+            if isinstance(t.aval, DShapedArray):
+                new_shape = []
+                for d in t.shape:
+                    if isinstance(d, DBIdx):
+                        new_shape.append(retval_tracers[d.val])
+                    else:
+                        new_shape.append(d)
+                t.aval.shape = new_shape
+                print("->>>>>>> ", t)
+
+
+        _, retval_keep = zip(*retval_type)
+
+        retval_api_tracers = [t for t,k in zip(retval_tracers,retval_keep) if k]
+
+        print("RETVAL_API_TRACERS")
+        for t in retval_api_tracers: print("- ", t)
+
+        return tree_unflatten(retval_tree, retval_api_tracers)
 
 
 class QJITDevice(qml.QubitDevice):
@@ -1625,9 +1657,6 @@ def while_loop(cond_fn):
                     outer_trace.full_raise(t) for t in tree_flatten(init_state)[0]
                 ]
 
-                print("IN_API_CLASSICAL_TRACERS")
-                for t in in_api_classical_tracers: print('- ', t)
-
                 cond_trace:DynamicJaxprTrace
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
 
@@ -1660,14 +1689,14 @@ def while_loop(cond_fn):
                     body_wffa, body_avals, body_keep, body_tree_promise = deduce_avals(
                         body_fn, init_state, {}
                     )
-                    print("WHILE_BODY_AVALS")
-                    for b in body_avals: print("- ", b)
+                    # print("WHILE_BODY_AVALS")
+                    # for b in body_avals: print("- ", b)
 
                     arg_classical_tracers = _input_type_to_tracers(
                         body_trace.new_arg, body_avals
                     )
-                    print("WHILE_ARG_CLASSICAL_TRACERS")
-                    for b in arg_classical_tracers: print("- ", b)
+                    # print("WHILE_ARG_CLASSICAL_TRACERS")
+                    # for b in arg_classical_tracers: print("- ", b)
 
                     arg_api_classical_tracers = [
                         t for t, k in zip(arg_classical_tracers, body_keep) if k
@@ -1686,12 +1715,12 @@ def while_loop(cond_fn):
                         res_type, res_api_classical_tracers
                     ) + res_api_classical_tracers
 
-                    print("WHILE_RES_API_CLASSICAL_TRACERS")
-                    for b in res_api_classical_tracers: print("- ", b)
                     print("WHILE_RES_CLASSICAL_TRACERS")
                     for b in res_classical_tracers: print("- ", b)
-                    print("WHILE_RES_TYPE")
-                    for b in res_type: print("- ", b)
+                    print("WHILE_RES_API_CLASSICAL_TRACERS")
+                    for b in res_api_classical_tracers: print("- ", b)
+                    # print("WHILE_RES_TYPE")
+                    # for b in res_type: print("- ", b)
 
                     body_region = HybridOpRegion(
                         body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
@@ -1700,14 +1729,18 @@ def while_loop(cond_fn):
                 out_type = res_type
                 out_avals, out_keep = zip(*res_type)
 
-                print("WHILE_BODY_AVALS")
-                for b in zip(body_avals,body_keep): print("- ", b)
+                # print("WHILE_BODY_AVALS")
+                # for b in zip(body_avals,body_keep): print("- ", b)
 
                 in_classical_tracers = _extract_implicit_args(
                     list(zip(body_avals, body_keep)), in_api_classical_tracers
                 ) + in_api_classical_tracers
+
                 print("WHILE_IN_CLASSICAL_TRACERS")
                 for t in in_classical_tracers: print('- ', t)
+                print("IN_API_CLASSICAL_TRACERS")
+                for t in in_api_classical_tracers: print('- ', t)
+
 
                 def _new(aval):
                     # print("CREATING", aval)
@@ -1716,13 +1749,13 @@ def while_loop(cond_fn):
                     _new, out_avals
                 )
 
-                print("WHILE_OUT_CLASSICAL_TRACERS")
-                for t in out_classical_tracers: print('- ', t)
 
                 out_api_classical_tracers = [
                     t for t, k in zip(out_classical_tracers, out_keep) if k
                 ]
 
+                print("WHILE_OUT_CLASSICAL_TRACERS")
+                for t in out_classical_tracers: print('- ', t)
                 print("WHILE_OUT_API_CLASSICAL_TRACERS")
                 for t in out_api_classical_tracers: print('- ', t)
 
