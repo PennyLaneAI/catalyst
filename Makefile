@@ -57,6 +57,7 @@ all: runtime mlir frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	$(PYTHON) -m pip install -e .
+	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime
 mlir:
