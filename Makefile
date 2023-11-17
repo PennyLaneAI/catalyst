@@ -16,7 +16,21 @@ COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
-COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
+PARALLELIZE := -n auto
+PLATFORM := $(shell uname -s)
+ifeq ($(PLATFORM),Linux)
+	COPY_FLAGS := --dereference
+	ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
+else ifeq ($(PLATFORM),Darwin)
+	ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
+	ifeq ($(ENABLE_ASAN),ON)
+		# Launching subprocesses with ASAN on macOS is not supported. See https://stackoverflow.com/a/47853433.
+		PARALLELIZE := -s
+	endif
+endif
+# TODO: Find out why we have container overflow on macOS.
+ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
+
 
 .PHONY: help
 help:
@@ -85,11 +99,10 @@ ifneq ($(findstring clang,$(C_COMPILER)), clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
-	ASAN_OPTIONS=detect_leaks=0 \
-	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
-	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+	$(ASAN_OPTIONS) $(ASAN_FLAGS) \
+	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 else
-	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 endif
 
 test-demos:
@@ -99,13 +112,16 @@ ifneq ($(findstring clang,$(C_COMPILER)), clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
-	ASAN_OPTIONS=detect_leaks=0 \
-	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
+ifeq ($(PLATFORM),Darwin)
+	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
+	@exit 1
+endif
+	$(ASAN_OPTIONS) $(ASAN_FLAGS) \
 	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+	$(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
 else
 	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+	$(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
 endif
 
 wheel:
@@ -152,7 +168,7 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
-	$(PYTHON) -m pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
