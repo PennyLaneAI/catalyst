@@ -83,7 +83,7 @@ def test_classical_tracing_2():
     _assert_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
-def test_quantum_tracing():
+def test_quantum_tracing1():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
     @qjit()
@@ -96,16 +96,44 @@ def test_quantum_tracing():
         def loop(a, i):
             qml.PauliX(wires=0)
             a = a + a
+            # b = jnp.ones(shape, dtype=float)
             i += 1
-            return (a, i)
+            return (b, i)
 
         a2, _ = loop(a, i)
-        # print("TEST_RET_VALUE")
-        # print(a2)
         return a2
 
     result = f([2, 3])
     expected = jnp.ones([2, 3]) * 8
+    print("MLIR")
+    print(f.mlir)
+    print("MLIR")
+    assert array_equal(result, expected)
+
+
+def test_quantum_tracing2():
+    """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(x,y):
+        i = 0
+        a = jnp.ones((x,y+1), dtype=float)
+
+        @while_loop(lambda _, i: i < 3)
+        def loop(a, i):
+            qml.PauliX(wires=0)
+            # a = a + a
+            b = jnp.ones((x,y+1), dtype=float)
+            i += 1
+            return (b, i)
+
+        a2, _ = loop(a, i)
+        return a2
+
+    result = f(2, 3)
+    print(result)
+    expected = jnp.ones((2, 4))
     print("MLIR")
     print(f.mlir)
     print("MLIR")

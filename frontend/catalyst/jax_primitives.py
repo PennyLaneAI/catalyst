@@ -1202,56 +1202,35 @@ def _cond_lowering(
 def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     print("WHILE ABSTRACT IN_AVALs")
     for a in args: print("- ", a)
-
-    # main = core.thread_local_state.trace_state.trace_stack.stack[-1]
-    # frame:JaxprStackFrame = main.jaxpr_stack[-1]
-    # print([id(t) for t in frame.tracers])
-    # print(frame.tracer_to_var)
-    # var_to_tracer = {str(v):[t for t in frame.tracers if id(t)==k][0] for k,v in frame.tracer_to_var.items()}
-    # for k,v in var_to_tracer.items():
-    #     print(k, v)
-
     print("WHILE ABSTRACT BODY_JAXPR OUT_AVALs")
     for a in body_jaxpr.out_avals: print("- ", a)
 
-    # return body_jaxpr.out_avals
+    # Static
+    # *args
+    # ShapedArray([3,4,3])
+    # ShapedArray([3,4,3])
+    #
+    # return
+    # ShapedArray([3,4,3])
+    # ShapedArray([3,4,3])
 
+    # Dynamic
+    # *args
+    # ShapedArray([??,4,3])
+    # 1. Trace function
+    # ShapedArray([Tr<aval[i64[]]>,4,3])
+    # (vs
+    #      ShapedArray([DBIdx(0),4,3]) ??
+    # )
+    # 2. Trace jaxpr
+    # ShapedArray([Var('a'),4,3])
+    #
+    # return
+    # ShapedArray([3,4,3])
+    # ShapedArray([3,4,3])
 
-    # out_avals = []
-    # for a in body_jaxpr.out_avals:
-    #     # a = copy(a_)
-    #     if isinstance(a, DShapedArray):
-    #         for d in a.shape:
-    #             if isinstance(d, Var):
-    #                 print(d, d.count, d.suffix, d.aval, str(d) in var_to_tracer)
-    #         a_ = DShapedArray(
-    #             shape=[
-    #                 var_to_tracer[str(d)] if isinstance(d, Var) else d for d in a.shape
-    #             ],
-    #             dtype=a.dtype, weak_type=a.weak_type)
-    #     else:
-    #         a_ = a
-    #     out_avals.append(a_)
-
-    #     # print("BINDBINDBIND=============================================")
-    #     # for ov,ot in zip(body_jaxpr.outvars, body_type):
-    #     #     print("- ", ov, ov.aval, ot)
-    #     #     ov.aval = ot[0]
-    #     #     if isinstance(ov.aval, DShapedArray):
-    #     #         assert isinstance(ot[0], DShapedArray)
-    #     #         ov.aval.shape = tuple([
-    #     #             (
-    #     #                 body_jaxpr.outvars[ot[0].shape[i].val]
-    #     #                 if isinstance(ot[0].shape[i], (DBIdx, InDBIdx, OutDBIdx))
-    #     #                 else ot[0].shape[i]
-    #     #             )
-    #     #             for i in range(len(ot[0].shape))
-    #     #         ])
-    #     #     print("------> ", ov.aval)
-
-    # # print("WHILE ABSTRACT OUT_AVALs")
-    # # for a in out_avals: print("- ", a)
     out_avals = body_jaxpr.out_avals
+
     out_avals2 = out_avals[:2] + [
         DShapedArray([DBIdx(0), DBIdx(1)],
                      out_avals[2].dtype,
