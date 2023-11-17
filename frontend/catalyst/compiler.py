@@ -105,6 +105,7 @@ DEFAULT_PIPELINES = [
             "func.func(scalarize)",
             "canonicalize",
             "scatter-lowering",
+            "hlo-custom-call-lowering",
         ],
     ),
     (
