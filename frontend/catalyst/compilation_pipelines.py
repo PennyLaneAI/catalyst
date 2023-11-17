@@ -850,7 +850,22 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        abstracted_axes (Optional(Any)): TODO(@erick-xanadu): Add documentation.
+        abstracted_axes (Optional(Any)): Experimental, a way to specify dynamic tensor shapes.
+            There are two ways to use abstracted_axes, one is passing a sequence of tuples and the
+            other is passing a dictionary. When passing a sequence of tuples
+
+                abstracted_axes=(('n',), ('m', 'n'))
+
+            The intended meaning is that the first argument will have the 0th axis be the symbolic
+            variable "n" and the second argument will have the 0th axis be the symbolic variable
+            "n" and the 1st axist will be the symbolic vairable "m".
+
+            When passing a dictionary:
+
+                abstracted_axes={0: 'n'}
+
+            it specifies that for all parameters, the 0th axis will be the symbolic variable "n".
+            This allows the user to express relationships between axes in different parameters.
 
     Returns:
         QJIT object.

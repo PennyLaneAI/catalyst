@@ -55,7 +55,7 @@ class CompileOptions:
             be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
-        abstracted_axes (Optional[Any]): TODO(@erick-xanadu): Add documentation
+        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
     """
 
     verbose: Optional[bool] = False

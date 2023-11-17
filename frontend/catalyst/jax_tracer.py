@@ -327,7 +327,8 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
 
     Args:
         func: python function to be lowered
-        abstracted_axes: TODO(@erick-xanadu): Document me
+        abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
+            sizes.
         args: arguments to ``func``
         kwargs: keyword arguments to ``func``
 
