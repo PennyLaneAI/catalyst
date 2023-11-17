@@ -68,4 +68,15 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     let constructor = "catalyst::createScatterLoweringPass()";
 }
 
+def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
+    let summary = "Lower custom calls op from Stable HLO to CallOp.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "mlir::func::FuncDialect",
+    ];
+
+    let constructor = "catalyst::createHloCustomCallLoweringPass()";
+}
+
 #endif // CATALYST_PASSES
