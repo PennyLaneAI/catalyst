@@ -94,7 +94,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
     }
-    ~LightningKokkosSimulator() = default;
+    ~LightningKokkosSimulator(){};
 
     LightningKokkosSimulator(const LightningKokkosSimulator &) = delete;
     LightningKokkosSimulator &operator=(const LightningKokkosSimulator &) = delete;

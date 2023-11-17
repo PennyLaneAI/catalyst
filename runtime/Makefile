@@ -24,13 +24,19 @@ else
 endif
 
 BUILD_TARGETS := rt_capi
+TEST_TARGETS := ""
 
 ifeq ($(ENABLE_LIGHTNING), ON)
 	BUILD_TARGETS += rtd_lightning
+	TEST_TARGETS += runner_tests_lightning
+else ifeq ($(ENABLE_LIGHTNING_KOKKOS), ON)
+	BUILD_TARGETS += rtd_lightning
+	TEST_TARGETS += runner_tests_lightning
 endif
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
+	TEST_TARGETS += runner_tests_openqasm
 endif
 
 ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
@@ -84,23 +90,27 @@ $(RT_BUILD_DIR)/lib/librt_capi.so: configure
 .PHONY: runtime
 runtime: $(RT_BUILD_DIR)/lib/librt_capi.so
 
-$(RT_BUILD_DIR)/tests/runner_tests: configure
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
+$(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
+	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: dummy_device
 dummy_device:
 	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
 
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests
+test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "test the Catalyst runtime test suite"
-	$(RT_BUILD_DIR)/tests/runner_tests
+	$(RT_BUILD_DIR)/tests/runner_tests_lightning
+
+ifeq ($(ENABLE_OPENQASM), ON)
+	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
+endif
 
 .PHONY: coverage
-coverage: $(RT_BUILD_DIR)/tests/runner_tests
+coverage: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "check C++ code coverage"
 
-	$(RT_BUILD_DIR)/tests/runner_tests
+	$(RT_BUILD_DIR)/tests/runner_tests_lightning
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4

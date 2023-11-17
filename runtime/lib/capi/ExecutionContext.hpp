@@ -19,7 +19,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#if __has_include("pybind11/embed.h")
 #include <pybind11/embed.h>
+#define __build_with_pybind11
+#endif
 
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
@@ -39,16 +42,42 @@ namespace Catalyst::Runtime {
  * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
  * tests which also enables the runtime to reuse the same interpreter in the scope of the global
  * quantum device unique pointer.
+ *
+ * @note This is only required for OpenQasmDevice and when CAPI is built with pybind11.
  */
+#ifdef __build_with_pybind11
 struct PythonInterpreterGuard {
-    PythonInterpreterGuard() { pybind11::initialize_interpreter(); }
-    ~PythonInterpreterGuard() { pybind11::finalize_interpreter(); }
+
+    // This ensures the guard scope to avoid Interpreter conflicts
+    // with runtime calls from the frontend.
+    bool _init_by_guard = false;
+
+    PythonInterpreterGuard()
+    {
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+            _init_by_guard = true;
+        }
+    }
+    ~PythonInterpreterGuard()
+    {
+        if (_init_by_guard) {
+            pybind11::finalize_interpreter();
+        }
+    }
 
     PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
     PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
     PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
     PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
 };
+
+#else
+struct PythonInterpreterGuard {
+    PythonInterpreterGuard() {}
+    ~PythonInterpreterGuard() {}
+};
+#endif
 
 class MemoryManager final {
   private:
@@ -234,9 +263,11 @@ class ExecutionContext final {
 #endif
         }
 
+#ifdef __build_with_pybind11
         if (_device_name == "OpenQasmDevice" && !Py_IsInitialized()) {
             _py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
         }
+#endif
 
         QuantumDevice *impl = loadDevice(std::string(rtd_lib));
         _driver_ptr.reset(impl);

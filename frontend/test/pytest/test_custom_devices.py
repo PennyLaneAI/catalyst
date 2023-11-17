@@ -35,7 +35,7 @@ def test_custom_device():
 
         name = "Dummy Device"
         short_name = "dummy.device"
-        pennylane_requires = "0.32.0"
+        pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 
@@ -75,7 +75,7 @@ def test_custom_device_bad_directory():
 
         name = "Dummy Device"
         short_name = "dummy.device"
-        pennylane_requires = "0.32.0"
+        pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
 

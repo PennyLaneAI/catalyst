@@ -17,16 +17,17 @@ Additionally, all measurements will always return ``true``.
 
         #include <QuantumDevice.hpp>
 
-        struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
-            DummyDevice() = default;          // LCOV_EXCL_LINE
-            ~DummyDevice() = default; // LCOV_EXCL_LINE
+        struct CustomDevice final : public Catalyst::Runtime::QuantumDevice {
+            CustomDevice([[maybe_unused]] bool status = false,
+                [[maybe_unused]] const std::string &kwargs = "{}") {}
+            ~CustomDevice() = default; // LCOV_EXCL_LINE
 
-            DummyDevice &operator=(const QuantumDevice &) = delete;
-            DummyDevice(const DummyDevice &) = delete;
-            DummyDevice(DummyDevice &&) = delete;
-            DummyDevice &operator=(QuantumDevice &&) = delete;
+            CustomDevice &operator=(const QuantumDevice &) = delete;
+            CustomDevice(const CustomDevice &) = delete;
+            CustomDevice(CustomDevice &&) = delete;
+            CustomDevice &operator=(QuantumDevice &&) = delete;
 
-            std::string GetDeviceName(void) override { return "DummyDevice"; }
+            std::string GetDeviceName(void) override { return "CustomDevice"; }
 
             auto AllocateQubit() -> QubitIdType override { return 0; }
             auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
@@ -93,15 +94,20 @@ In addition to implementing the ``QuantumDevice`` class, one must implement the 
 .. code-block:: c++
 
     extern "C" Catalyst::Runtime::QuantumDevice*
-    getCustomDevice() { return new CustomDevice(); }
+    CustomDeviceFactory(bool status, const std::string &kwargs)
+    { 
+        return new CustomDevice(status, kwargs); }
 
-where ``CustomDevice()`` is a constructor for your custom device.
-``CustomDevice``'s destructor will be called by the runtime.
+where ``CustomDevice(status, kwargs)`` serves as a constructor for your custom device,
+with `status` representing the initial state of the tape recording system, and `kwargs`
+representing a dictionary of device specifications in string format. The destructor of
+``CustomDevice`` will be automatically called by the runtime.
 
 .. note::
 
     This interface might change quickly in the near future.
-    Please check back regularly for updates and to ensure your device is compatible with a specific version of Catalyst.
+    Please check back regularly for updates and to ensure your device is compatible with
+    a specific version of Catalyst.
 
 How to compile custom devices
 =============================
@@ -132,7 +138,7 @@ After doing so, Catalyst should be able to interface with your custom device.
 
 .. code-block:: python
 
-    class DummyDevice(qml.QubitDevice):
+    class CustomDevice(qml.QubitDevice):
         """Dummy Device"""
 
         name = "Dummy Device"
@@ -149,11 +155,14 @@ After doing so, Catalyst should be able to interface with your custom device.
 
         @staticmethod
         def get_c_interface():
-            """The tuple of davice name and location to shared object with C/C++ implementation"""
-            return "DummyDevice", "full/path/to/libdummy_device.so"
+            """ The tuple of davice name and the location
+                to shared object with C/C++ implementation.
+            """
+
+            return "CustomDevice", "full/path/to/libdummy_device.so"
 
     @qjit
-    @qml.qnode(DummyDevice(wires=1))
+    @qml.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
 
