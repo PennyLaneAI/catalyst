@@ -1,3 +1,6 @@
+
+
+
 // Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +15,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#define DEBUG_TYPE "scatter"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+
+#include "mhlo/IR/hlo_ops.h"
+
+using namespace mlir;
 
 namespace catalyst {
 
-void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
+struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<mhlo::CustomCallOp> {
+    using mlir::OpRewritePattern<mhlo::CustomCallOp>::OpRewritePattern;
 
-void populateScatterPatterns(mlir::RewritePatternSet &);
+    mlir::LogicalResult matchAndRewrite(mhlo::CustomCallOp op,
+                                        mlir::PatternRewriter &rewriter) const override
+    {
+        return success();
+    }
 
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
+};
+
+void populateHloCustomCallPatterns(RewritePatternSet &patterns)
+{
+    patterns.add<catalyst::HloCustomCallOpRewritePattern>(patterns.getContext(), 1);
+}
 
 } // namespace catalyst
