@@ -11,11 +11,12 @@
 
 <h3>Improvements</h3>
 
-<h3>Breaking changes</h3>
-
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last 
-  quantum register is deallocated instead of the first one.
+  quantum register is deallocated instead of the first one. This allows to return the quantum
+  register in functions and can be given to another function (useful for quantum transformation).
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
+
+<h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
 

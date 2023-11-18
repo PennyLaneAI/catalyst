@@ -95,6 +95,8 @@ def DeviceOp : Quantum_Op<"device"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
+// The operation has no memory effect and is pure, therefore two similar alloc would be removed
+// by a CSE pass. This needs to be changed in the future.
 def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
