@@ -34,7 +34,7 @@ def loop_circuit(n: int, inc: float):
     # CHECK-DAG:   [[n_1:%.+]] = tensor.extract [[n_1_t]]
     # CHECK-DAG:   [[ub:%.+]] = arith.index_cast [[n_1]]
 
-    # CHECK:       scf.for [[i:%.+]] = [[c0]] to [[ub]] step [[c1]] iter_args([[phi0:%.+]] = [[init]], [[r0:%.+]] = [[qreg]])
+    # CHECK:       [[newqreg:%.+]]:2 = scf.for [[i:%.+]] = [[c0]] to [[ub]] step [[c1]] iter_args([[phi0:%.+]] = [[init]], [[r0:%.+]] = [[qreg]])
     @for_loop(0, n - 1, 1)
     def loop_fn(i, phi):
         # CHECK:       [[i_cast:%.+]] = arith.index_cast [[i]]
@@ -50,7 +50,7 @@ def loop_circuit(n: int, inc: float):
         return phi + inc
 
     loop_fn(0.0)
-    # CHECK:       quantum.dealloc [[qreg]]
+    # CHECK:       quantum.dealloc [[newqreg]]#1
     # CHECK:       return
     return qml.state()
 
