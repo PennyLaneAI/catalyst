@@ -13,13 +13,13 @@ RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_ASAN?=OFF
 
 ifeq ($(shell uname), Darwin)
-	DEFAULT_ENABLE_LLD := OFF
-	DEFAULT_ENABLE_ZLIB := OFF
-	DEFAULT_ENABLE_ZSTD := OFF
+DEFAULT_ENABLE_LLD := OFF
+DEFAULT_ENABLE_ZLIB := OFF
+DEFAULT_ENABLE_ZSTD := OFF
 else
-	DEFAULT_ENABLE_LLD := ON
-	DEFAULT_ENABLE_ZLIB := ON
-	DEFAULT_ENABLE_ZSTD := ON
+DEFAULT_ENABLE_LLD := ON
+DEFAULT_ENABLE_ZLIB := ON
+DEFAULT_ENABLE_ZSTD := ON
 endif
 
 ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
@@ -27,10 +27,6 @@ ENABLE_ZLIB?=$(DEFAULT_ENABLE_LLD)
 ENABLE_ZSTD?=$(DEFAULT_ENABLE_LLD)
 
 ifeq ($(ENABLE_ASAN), ON)
-ifneq ($(findstring clang,$(C_COMPILER)), clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
-	@exit 1
-endif
 USE_SANITIZER_NAMES="Address"
 USE_SANITIZER_FLAGS="-fsanitize=address"
 else
