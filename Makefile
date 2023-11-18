@@ -20,7 +20,12 @@ ENABLE_ASAN ?= OFF
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
 COPY_FLAGS := --dereference
+endif
+
+ifeq ($(PLATFORM) $(findstring clang,$(C_COMPILER)),Linux clang)
 ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
+else ifeq ($(PLATFORM) $(findstring gcc,$(C_COMPILER)),Linux gcc)
+ASAN_FLAGS := LD_PRELOAD="$(shell gcc  -print-file-name=libasan.so)"
 else ifeq ($(PLATFORM),Darwin)
 ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
 endif
