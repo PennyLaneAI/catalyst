@@ -104,6 +104,9 @@ test-runtime:
 test-runtime-all:
 	$(MAKE) -C runtime test ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
+test-mlir:
+	$(MAKE) -C mlir test
+
 test-frontend: lit pytest
 
 lit:
