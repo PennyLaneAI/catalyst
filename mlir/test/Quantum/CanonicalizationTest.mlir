@@ -106,3 +106,15 @@ func.func @test_extract_insert_constant(%r1: !quantum.reg) -> !quantum.reg {
     %r2 = quantum.insert %r1[%c2], %q1 : !quantum.reg, !quantum.bit
     return %r2 : !quantum.reg
 }
+
+// CHECK-LABEL: test_insert_canonicalize
+func.func @test_insert_canonicalize(%r1: !quantum.reg, %i: i64) -> !quantum.bit {
+    // CHECK:  quantum.extract
+    %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
+    // CHECK:  quantum.insert
+    %r2 = quantum.insert %r1[0], %q1 : !quantum.reg, !quantum.bit
+    %4 = quantum.custom "Hadamard"() %q1 : !quantum.bit
+    // CHECK:  quantum.dealloc
+    quantum.dealloc %r2 : !quantum.reg
+    return %4 : !quantum.bit
+}
