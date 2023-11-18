@@ -16,21 +16,32 @@ COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
-PARALLELIZE := -n auto
+
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
-	COPY_FLAGS := --dereference
-	ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
+COPY_FLAGS := --dereference
+ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
 else ifeq ($(PLATFORM),Darwin)
-	ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
-	ifeq ($(ENABLE_ASAN),ON)
-		# Launching subprocesses with ASAN on macOS is not supported. See https://stackoverflow.com/a/47853433.
-		PARALLELIZE := -s
-	endif
+ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
 endif
+
+PARALLELIZE := -n auto
+ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
+# Launching subprocesses with ASAN on macOS is not supported (see https://stackoverflow.com/a/47853433).
+PARALLELIZE :=
+endif
+
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
 
+ifeq ($(ENABLE_ASAN),ON)
+ASAN_COMMAND := $(ASAN_OPTIONS) $(ASAN_FLAGS)
+else
+ASAN_COMMAND :=
+endif
+
+# Export variables so that they can be set here without needing to also set them in sub-make files.
+export ENABLE_ASAN ASAN_COMMAND
 
 .PHONY: help
 help:
@@ -96,40 +107,33 @@ test-runtime-all:
 test-frontend: lit pytest
 
 lit:
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+endif
 	@echo "check the Catalyst lit test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:
-	@echo "check the Catalyst PyTest suite"
-ifeq ($(ENABLE_ASAN), ON)
-ifneq ($(findstring clang,$(C_COMPILER)), clang)
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
-	$(ASAN_OPTIONS) $(ASAN_FLAGS) \
-	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
-else
-	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 endif
+	@echo "check the Catalyst PyTest suite"
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 
 test-demos:
-	@echo "check the Catalyst demos"
-ifeq ($(ENABLE_ASAN), ON)
-ifneq ($(findstring clang,$(C_COMPILER)), clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
-	@exit 1
-endif
-ifeq ($(PLATFORM),Darwin)
+ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
 	@exit 1
 endif
-	$(ASAN_OPTIONS) $(ASAN_FLAGS) \
+	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
-else
-	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
-endif
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -175,7 +179,7 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
-	$(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
