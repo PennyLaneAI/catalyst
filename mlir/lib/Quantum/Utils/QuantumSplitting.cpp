@@ -222,11 +222,9 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             auto results = callOp.getResultTypes();
 
             bool multiReturns = results.size() > 1;
-            bool quantum;
-            for (Type res : results) {
-                quantum = isa<QuregType>(res);
-                break;
-            }
+
+            bool quantum = std::any_of(results.begin(), results.end(),
+                                       [](const auto &value) { return isa<QuregType>(value); });
 
             // Classical call operations are cloned for the backward pass
             if (!quantum) {
