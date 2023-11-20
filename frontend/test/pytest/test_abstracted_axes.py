@@ -70,3 +70,19 @@ class TestBasicInterface:
 
         assert_allclose((param, param), result)
         assert "tensor<?xi64>" in identity.mlir
+
+    def test_calculation(self):
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(a):
+            return jax.numpy.ones((a + 1,))
+
+        @qjit
+        def identity(a):
+            return circuit(a)
+
+        result = identity(3)
+        print(result)
+        print(identity.jaxpr)
+        print(identity.mlir)
+

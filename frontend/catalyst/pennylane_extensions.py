@@ -176,10 +176,10 @@ class QFunc:
 
         args = get_implicit_and_explicit_flat_args(None, *args, {})
 
-        wffa, _, _, _ = deduce_avals(_eval_jaxpr, args, {})
+        wffa, _, _, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
         retval = func_p.bind(wffa, *args, fn=self)
 
-        return tree_unflatten(retval_tree, retval)
+        return tree_unflatten(out_tree_promise(), retval)
 
 
 class QJITDevice(qml.QubitDevice):

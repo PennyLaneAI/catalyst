@@ -800,8 +800,7 @@ def trace_quantum_function(
                 jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
                 jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
                 out_type = out_type[:-1]
-
-                out_avals, _ = unzip2(out_type)
+                out_avals = [out_aval for out_aval, keep in out_type if keep]
                 # pylint: disable=unnecessary-lambda-assignment
                 named_shape = lambda x: getattr(x, "named_shape", {})
                 abstract_results = tree_unflatten(
