@@ -274,10 +274,17 @@ class AdjointGenerator {
         SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
         func::FuncOp funcOp =
             dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
+        assert(funcOp != nullptr && "The funcOp is null and therefore not supported.");
 
-        std::optional<Value> returnedQureg =
-            getQuantumReg(funcOp.front().getTerminator()->getOperands());
-        if (!returnedQureg.has_value()) {
+        auto resultTypes = funcOp.getResultTypes();
+        bool multiReturns = resultTypes.size() > 1;
+
+        bool quantum = std::any_of(resultTypes.begin(), resultTypes.end(),
+                                   [](const auto &value) { return isa<QuregType>(value); });
+        assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
+                                             "returns that contain a quantum register.");
+
+        if (!quantum) {
             // This operation is purely classical
             return;
         }
