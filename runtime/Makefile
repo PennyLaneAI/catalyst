@@ -82,7 +82,7 @@ dummy_device:
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests
 	@echo "test the Catalyst runtime test suite"
-	$(RT_BUILD_DIR)/tests/runner_tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests
 
 .PHONY: coverage
 coverage: $(RT_BUILD_DIR)/tests/runner_tests

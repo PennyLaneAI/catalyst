@@ -8,7 +8,7 @@ BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
-MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/mhlo-build
+MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
@@ -16,7 +16,37 @@ COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
-COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
+
+PLATFORM := $(shell uname -s)
+ifeq ($(PLATFORM),Linux)
+COPY_FLAGS := --dereference
+endif
+
+ifeq ($(PLATFORM) $(findstring clang,$(C_COMPILER)),Linux clang)
+ASAN_FLAGS := LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)"
+else ifeq ($(PLATFORM) $(findstring gcc,$(C_COMPILER)),Linux gcc)
+ASAN_FLAGS := LD_PRELOAD="$(shell gcc  -print-file-name=libasan.so)"
+else ifeq ($(PLATFORM),Darwin)
+ASAN_FLAGS := DYLD_INSERT_LIBRARIES="$(shell clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
+endif
+
+PARALLELIZE := -n auto
+ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
+# Launching subprocesses with ASAN on macOS is not supported (see https://stackoverflow.com/a/47853433).
+PARALLELIZE :=
+endif
+
+# TODO: Find out why we have container overflow on macOS.
+ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
+
+ifeq ($(ENABLE_ASAN),ON)
+ASAN_COMMAND := $(ASAN_OPTIONS) $(ASAN_FLAGS)
+else
+ASAN_COMMAND :=
+endif
+
+# Export variables so that they can be set here without needing to also set them in sub-make files.
+export ENABLE_ASAN ASAN_COMMAND
 
 .PHONY: help
 help:
@@ -43,6 +73,7 @@ all: runtime mlir frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	$(PYTHON) -m pip install -e .
+	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime
 mlir:
@@ -61,7 +92,10 @@ dialects:
 	$(MAKE) -C mlir dialects
 
 runtime:
-	$(MAKE) -C runtime all
+	$(MAKE) -C runtime runtime
+
+runtime-all:
+	$(MAKE) -C runtime runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
 dummy_device:
 	$(MAKE) -C runtime dummy_device
@@ -72,41 +106,42 @@ test: test-runtime test-frontend test-demos
 test-runtime:
 	$(MAKE) -C runtime test
 
+test-runtime-all:
+	$(MAKE) -C runtime test ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
+
+test-mlir:
+	$(MAKE) -C mlir test
+
 test-frontend: lit pytest
 
 lit:
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
+	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+	@exit 1
+endif
+endif
 	@echo "check the Catalyst lit test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 
 pytest:
-	@echo "check the Catalyst PyTest suite"
-ifeq ($(ENABLE_ASAN), ON)
-ifneq ($(findstring clang,$(C_COMPILER)), clang)
+ifeq ($(ENABLE_ASAN),ON)
+ifneq ($(findstring clang,$(C_COMPILER)),clang)
 	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
 	@exit 1
 endif
-	ASAN_OPTIONS=detect_leaks=0 \
-	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
-	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
-else
-	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
 endif
+	@echo "check the Catalyst PyTest suite"
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 
 test-demos:
-	@echo "check the Catalyst demos"
-ifeq ($(ENABLE_ASAN), ON)
-ifneq ($(findstring clang,$(C_COMPILER)), clang)
-	@echo "Build and Test with Address Sanitizer are only supported by Clang, but provided $(C_COMPILER)"
+ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
+	@echo "Cannot run Jupyter Notebooks with ASAN on macOS, likely due to subprocess invocation."
 	@exit 1
 endif
-	ASAN_OPTIONS=detect_leaks=0 \
-	LD_PRELOAD="$(shell clang  -print-file-name=libclang_rt.asan-x86_64.so)" \
+	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
-else
-	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
-endif
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -129,6 +164,8 @@ wheel:
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
 
+	rm -r $(MK_DIR)/build
+
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
@@ -150,7 +187,7 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
-	$(PYTHON) -m pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
