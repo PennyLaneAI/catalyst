@@ -670,7 +670,7 @@ def split_tracers_and_measurements(flat_values):
     return classical, measurements
 
 
-def trace_post_processing(ctx, trace, post_processing, pp_args):
+def trace_post_processing(ctx, trace, post_processing:Callable, pp_args):
     """Trace post processing function.
 
     Args:
@@ -682,27 +682,20 @@ def trace_post_processing(ctx, trace, post_processing, pp_args):
 
     Returns:
         closed_jaxpr: JAXPR expression for the whole frame
-        post_processing_results: Output
+        out_types: List of abstract values with explicitness flag
     """
 
     with EvaluationContext.frame_tracing_context(ctx, trace):
         # What is the input to the post_processing function?
-        # The input to the post_processing function is going to be a list of values
-        # One for each tape.
-
-        # The tracers are all flat in args.
-        # The shape is in a list of args_types.
+        # The input to the post_processing function is going to be a list of values One for each
+        # tape. The tracers are all flat in pp_args.
 
         # We need to deduce the type/shape/tree of the post_processing.
-
-        # _, tree = jax.tree_util.tree_flatten(args_types)
-        # aval_flat_args = [arg.aval for arg in args]
-        # args_to_deduce = tree_unflatten(tree, aval_flat_args)
-        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
-        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (in_tracers,), {})
+        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
 
         # wffa will take as an input a flatten tracers.
         # After wffa is called, then the shape becomes available in out_tree_promise.
+        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
         out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
         jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
