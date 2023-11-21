@@ -1738,6 +1738,8 @@ def while_loop(cond_fn):
 
                     res_type = infer_lambda_input_type(None, res_api_classical_tracers)
 
+                    print("WHILE_RES_TYPE")
+                    for b in res_type: print("- ", b)
                     res_classical_tracers = _extract_implicit_args(
                         res_type, res_api_classical_tracers
                     ) + res_api_classical_tracers
@@ -1746,8 +1748,6 @@ def while_loop(cond_fn):
                     for b in res_classical_tracers: print("- ", b)
                     print("WHILE_RES_API_CLASSICAL_TRACERS")
                     for b in res_api_classical_tracers: print("- ", b)
-                    # print("WHILE_RES_TYPE")
-                    # for b in res_type: print("- ", b)
 
                     body_region = HybridOpRegion(
                         body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
