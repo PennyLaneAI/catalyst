@@ -168,9 +168,7 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, shape, out_type = trace_quantum_function(self.func, device, args, kwargs, qnode)
-
-        retval_tree = tree_structure(shape)
+            jaxpr, out_type, out_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
         def _eval_jaxpr(*args):
             return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -183,7 +181,7 @@ class QFunc:
         results_flat = tree_unflatten(out_tree_promise(), retval)
         out_aval_original, keep_original = unzip2(out_type)
         retval_original = [res for res, k in zip(results_flat, keep_original) if k]
-        return tree_unflatten(retval_tree, retval_original)
+        return tree_unflatten(out_tree, retval_original)
 
 
 class QJITDevice(qml.QubitDevice):

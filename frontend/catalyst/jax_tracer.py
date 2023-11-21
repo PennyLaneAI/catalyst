@@ -69,6 +69,7 @@ from catalyst.utils.jax_extras import (
     sort_eqns,
     tree_structure,
     tree_unflatten,
+    tree_flatten,
     unzip2,
     wrap_init,
 )
@@ -350,7 +351,7 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
         jaxpr, unflat_shape = jax.make_jaxpr(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     module, context, jaxpr, tree_structure = jaxpr_to_mlir(func.__name__, jaxpr, unflat_shape)
-    flat_shape, tree = jax.tree_util.tree_flatten(unflat_shape)
+    flat_shape, tree = tree_flatten(unflat_shape)
     return module, context, jaxpr, tree_structure, flat_shape
 
 
@@ -669,7 +670,7 @@ def split_tracers_and_measurements(flat_values):
     return classical, measurements
 
 
-def trace_post_processing(ctx, trace, post_processing, args_types, args):
+def trace_post_processing(ctx, trace, post_processing, pp_args):
     """Trace post processing function.
 
     Args:
@@ -694,27 +695,18 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
 
         # We need to deduce the type/shape/tree of the post_processing.
 
-        _, tree = jax.tree_util.tree_flatten(args_types)
-        aval_flat_args = [arg.aval for arg in args]
-        args_to_deduce = tree_unflatten(tree, aval_flat_args)
-        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (args_to_deduce,), {})
+        # _, tree = jax.tree_util.tree_flatten(args_types)
+        # aval_flat_args = [arg.aval for arg in args]
+        # args_to_deduce = tree_unflatten(tree, aval_flat_args)
+        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
+        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (in_tracers,), {})
 
         # wffa will take as an input a flatten tracers.
-        post_processing_retval_flat = wffa.call_wrapped(*args)
-
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
-        out_avals = [out_aval for out_aval, keep in out_type if keep]
+        out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
+        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        # pylint: disable=unnecessary-lambda-assignment
-        named_shape = lambda x: getattr(x, "named_shape", {})
-        post_processing_results = tree_unflatten(
-            out_tree_promise(),
-            [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in out_avals],
-        )
-
-        return closed_jaxpr, post_processing_results, out_type
+        return closed_jaxpr, out_type, out_tree_promise()
 
 
 def trace_quantum_function(
@@ -774,7 +766,7 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(qnode, quantum_tape, return_values_flat)
 
         # (2) - Quantum tracing
-        results_tracers, results_abstract = [], []
+        transformed_results = []
         is_program_transformed = qnode and qnode.transform_program
         for tape in tapes:
             # If the program is batched, that means that it was transformed.
@@ -797,33 +789,22 @@ def trace_quantum_function(
                 out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
 
-                tracers = [trace.full_raise(m) for m in meas]
-                results_tracers += tracers
+                meas_tracers = [trace.full_raise(m) for m in meas]
+                meas_results = tree_unflatten(meas_trees, meas_tracers)
 
-                jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
-                jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
-                out_type = out_type[:-1]
-                out_avals = [out_aval for out_aval, keep in out_type if keep]
-                # pylint: disable=unnecessary-lambda-assignment
-                named_shape = lambda x: getattr(x, "named_shape", {})
-                abstract_results = tree_unflatten(
-                    meas_trees,
-                    [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in out_avals],
-                )
-                # This mimics the return type from qnodes.
-                # I would prefer if qnodes didn't have special rules about whether they return a
-                # tuple, list, or value.
                 # TODO: Allow the user to return whatever types they specify.
-                if is_program_transformed and len(abstract_results) == 1:
-                    results_abstract.append(abstract_results[0])
-                elif is_program_transformed:
-                    results_abstract.append(tuple(abstract_results))
+                if is_program_transformed:
+                    assert isinstance(meas_results, list)
+                    if len(meas_results) == 1:
+                        transformed_results.append(meas_results[0])
+                    else:
+                        transformed_results.append(tuple(meas_results))
                 else:
-                    results_abstract.append(abstract_results)
-                # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
-                # check_jaxpr(jaxpr)
+                    transformed_results.append(meas_results)
 
-        closed_jaxpr, unflattened_callback_results, out_avals = trace_post_processing(
-            ctx, trace, post_processing, results_abstract, results_tracers
+        closed_jaxpr, out_type, out_tree = trace_post_processing(
+            ctx, trace, post_processing, transformed_results
         )
-    return closed_jaxpr, unflattened_callback_results, out_avals
+        # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+        # check_jaxpr(jaxpr)
+    return closed_jaxpr, out_type, out_tree
