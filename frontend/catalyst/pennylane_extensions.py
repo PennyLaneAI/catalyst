@@ -179,7 +179,7 @@ class QFunc:
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 
-        wffa, in_aval, in_keep, out_tree_promise = deduce_avals(_eval_quantum, args, {})
+        wffa, _, _, out_tree_promise = deduce_avals(_eval_quantum, args, {})
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(wffa, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)
