@@ -70,6 +70,7 @@ from catalyst.utils.jax_extras import (
     DynamicJaxprTracer,
     Jaxpr,
     ShapedArray,
+    _extract_implicit_args,
     _initial_style_jaxpr,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
@@ -79,6 +80,7 @@ from catalyst.utils.jax_extras import (
     new_inner_tracer,
     tree_structure,
     unzip2,
+    wrap_init,
 )
 from catalyst.utils.patching import Patcher
 
@@ -167,23 +169,20 @@ class QFunc:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, out_type, out_tree = trace_quantum_function(
+        def _eval_quantum(*args):
+            closed_jaxpr, out_type, out_tree = trace_quantum_function(
                 self.func, device, args, kwargs, qnode
             )
+            args_expanded = get_implicit_and_explicit_flat_args(None, *args)
+            res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
+            out_aval, out_keep = unzip2(out_type)
+            res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
+            return tree_unflatten(out_tree, res_flat)
 
-        def _eval_jaxpr(*args):
-            return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
-
-        args = get_implicit_and_explicit_flat_args(None, *args, {})
-
-        wffa, _, _, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
-        retval = func_p.bind(wffa, *args, fn=self)
-
-        results_flat = tree_unflatten(out_tree_promise(), retval)
-        out_aval_original, keep_original = unzip2(out_type)
-        retval_original = [res for res, k in zip(results_flat, keep_original) if k]
-        return tree_unflatten(out_tree, retval_original)
+        wffa, in_aval, in_keep, out_tree_promise = deduce_avals(_eval_quantum, args, {})
+        args_flat = tree_flatten(args)[0]
+        res_flat = func_p.bind(wffa, *args_flat, fn=self)
+        return tree_unflatten(out_tree_promise(), res_flat)
 
 
 class QJITDevice(qml.QubitDevice):

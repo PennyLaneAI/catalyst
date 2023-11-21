@@ -282,9 +282,9 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 
 
 def deduce_avals(f: Callable, args, kwargs):
-    """Wraps the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
-    and output_tree promise. The promise must be called after the resulting wrapped function is
-    evaluated."""
+    """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
+    and returning expanded flatten results. Calculate input abstract values and output_tree promise.
+    The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
     abstracted_axes = None
     axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
@@ -452,7 +452,7 @@ def jaxpr_remove_implicit(
 
 
 def get_aval2(x):
-    """ An extended version of `jax.core.get_aval` which also accepts AbstractValues. """
+    """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
     if isinstance(x, AbstractValue):
         return x
     elif isinstance(x, Tracer):
