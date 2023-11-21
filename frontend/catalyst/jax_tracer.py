@@ -95,14 +95,13 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
-        shape_tree = tree_structure(shape)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
         retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
-        return tree_unflatten(shape_tree, retval)
+        return tree_unflatten(out_tree, retval)
 
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)

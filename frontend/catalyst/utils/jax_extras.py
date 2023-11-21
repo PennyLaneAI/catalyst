@@ -420,7 +420,7 @@ def jaxpr_remove_implicit(cjaxpr: ClosedJaxpr, out_type: OutputType) -> Tuple[Cl
     """Filters outputs of the input ``jaxpr``. Only those corresponding to ``True`` values of the
     ``whitelist`` are kept."""
     jaxpr = cjaxpr.jaxpr
-    out_keep = list(tuple(zip(*out_type))[1])
+    out_keep = list(tuple(zip(*out_type))[1]) if len(out_type) > 0 else []
     outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
     out_type2 = [o for o, keep in zip(out_type, out_keep) if keep]
     jaxpr2 = Jaxpr(
