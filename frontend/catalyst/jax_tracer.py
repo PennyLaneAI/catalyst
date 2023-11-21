@@ -64,16 +64,16 @@ from catalyst.utils.jax_extras import (
     convert_element_type,
     deduce_avals,
     eval_jaxpr,
+    jaxpr_remove_implicit,
     jaxpr_to_mlir,
+    make_jaxpr2,
     pytree,
     sort_eqns,
+    tree_flatten,
     tree_structure,
     tree_unflatten,
-    tree_flatten,
     unzip2,
     wrap_init,
-    make_jaxpr2,
-    jaxpr_remove_implicit
 )
 
 
@@ -672,7 +672,7 @@ def split_tracers_and_measurements(flat_values):
     return classical, measurements
 
 
-def trace_post_processing(ctx, trace, post_processing:Callable, pp_args):
+def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
     """Trace post processing function.
 
     Args:

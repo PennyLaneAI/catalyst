@@ -47,7 +47,10 @@ from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args, get_implicit_return_types
+from catalyst.utils.jax_extras import (
+    get_implicit_and_explicit_flat_args,
+    get_implicit_return_types,
+)
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.

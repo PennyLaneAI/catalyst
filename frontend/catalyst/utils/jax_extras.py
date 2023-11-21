@@ -21,27 +21,40 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state, eval_jaxpr, concrete_aval
+from jax._src.core import _update_thread_local_jit_state, concrete_aval, eval_jaxpr
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters import partial_eval as pe
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.interpreters.partial_eval import (
-    _input_type_to_tracers, infer_lambda_input_type, trace_to_jaxpr_dynamic2, _arg_type,
-    _collect_implicit, _complete_specs, _canonicalize_specs
+    _arg_type,
+    _canonicalize_specs,
+    _collect_implicit,
+    _complete_specs,
+    _input_type_to_tracers,
+    infer_lambda_input_type,
+    trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
-from jax._src.linear_util import annotate, _check_input_type
+from jax._src.linear_util import _check_input_type, annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
 from jax.api_util import flatten_fun, shaped_abstractify
-from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType, AbstractValue, Tracer
+from jax.core import (
+    AbstractValue,
+    ClosedJaxpr,
+    DShapedArray,
+    Jaxpr,
+    JaxprEqn,
+    MainTrace,
+    OutputType,
+)
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import Var, DShapedArray, ShapedArray, Trace, gensym, thread_local_state
+from jax.core import ShapedArray, Trace, Tracer, Var, gensym, thread_local_state
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -85,8 +98,7 @@ __all__ = (
     "jaxpr_to_mlir",
     "jaxpr_remove_implicit",
     "make_jaxpr_effects",
-    "make_jaxpr2"
-    "new_dynamic_main2",
+    "make_jaxpr2" "new_dynamic_main2",
     "new_inner_tracer",
     "pytree",
     "sort_eqns",
@@ -402,21 +414,30 @@ def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     args_flat = [*implicit_args, *explicit_args]
     return args_flat
 
-def get_implicit_return_types(jaxpr):
 
+def get_implicit_return_types(jaxpr):
     invars = [*jaxpr.constvars, *jaxpr.invars]
     expl_outvars = jaxpr.outvars
 
     # First do a pass to collect implicit outputs, meaning variables which occur
     # in explicit_outvars types but not in invars or to the left in outvars.
     seen: set[Var] = set(invars)
-    impl_outvars = [seen.add(d) or d for x in expl_outvars if type(x) is Var and  # type: ignore
-                (seen.add(x) or type(x.aval) is DShapedArray)  # type: ignore
-                for d in x.aval.shape if type(d) is Var and d not in seen]
+    impl_outvars = [
+        seen.add(d) or d
+        for x in expl_outvars
+        if type(x) is Var
+        and (  # type: ignore
+            seen.add(x) or type(x.aval) is DShapedArray
+        )  # type: ignore
+        for d in x.aval.shape
+        if type(d) is Var and d not in seen
+    ]
     return impl_outvars
 
 
-def jaxpr_remove_implicit(cjaxpr: ClosedJaxpr, out_type: OutputType) -> Tuple[ClosedJaxpr, OutputType]:
+def jaxpr_remove_implicit(
+    cjaxpr: ClosedJaxpr, out_type: OutputType
+) -> Tuple[ClosedJaxpr, OutputType]:
     """Filters outputs of the input ``jaxpr``. Only those corresponding to ``True`` values of the
     ``whitelist`` are kept."""
     jaxpr = cjaxpr.jaxpr
@@ -438,7 +459,9 @@ def get_aval2(x):
     else:
         return concrete_aval(x)
 
+
 import jax._src.interpreters.partial_eval
+
 jax._src.interpreters.partial_eval.get_aval = get_aval2
 
 
@@ -475,4 +498,3 @@ def make_jaxpr2(
 
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
     return make_jaxpr_f
-

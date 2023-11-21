@@ -168,7 +168,9 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, out_type, out_tree = trace_quantum_function(self.func, device, args, kwargs, qnode)
+            jaxpr, out_type, out_tree = trace_quantum_function(
+                self.func, device, args, kwargs, qnode
+            )
 
         def _eval_jaxpr(*args):
             return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)

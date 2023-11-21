@@ -72,7 +72,6 @@ class TestBasicInterface:
         assert "tensor<?xi64>" in identity.mlir
 
     def test_calculation(self):
-
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(a):
             return jax.numpy.ones((a + 1,))
@@ -87,10 +86,11 @@ class TestBasicInterface:
         print(identity.mlir)
 
     def test_kalculation(self):
-
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(a):
-            return jax.numpy.ones((a + 1,)), jax.numpy.ones((a + 2),)
+            return jax.numpy.ones((a + 1,)), jax.numpy.ones(
+                (a + 2),
+            )
 
         @qjit
         def identity(a):
@@ -100,4 +100,3 @@ class TestBasicInterface:
         print(result)
         print(identity.jaxpr)
         print(identity.mlir)
-
