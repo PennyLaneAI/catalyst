@@ -452,7 +452,7 @@ def jaxpr_remove_implicit(
 
 
 def get_aval2(x):
-    # TODO: consider removing when https://github.com/google/jax/pull/18579 is merged
+    """ An extended version of `jax.core.get_aval` which also accepts AbstractValues. """
     if isinstance(x, AbstractValue):
         return x
     elif isinstance(x, Tracer):
@@ -463,6 +463,7 @@ def get_aval2(x):
 
 import jax._src.interpreters.partial_eval
 
+# TODO: consider removing when https://github.com/google/jax/pull/18579 is merged
 jax._src.interpreters.partial_eval.get_aval = get_aval2
 
 
