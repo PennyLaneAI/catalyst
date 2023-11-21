@@ -72,6 +72,8 @@ from catalyst.utils.jax_extras import (
     tree_flatten,
     unzip2,
     wrap_init,
+    make_jaxpr2,
+    jaxpr_remove_implicit
 )
 
 
@@ -337,7 +339,8 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
         jaxpr: the jaxpr corresponding to ``func``
-        shape: the shape of the return values in ``PyTreeDef``
+        out_type: Jaxpr output type (a list of abstract values paired with explicintess flags).
+        out_tree: Shape of the return values in ``PyTreeDef``
     """
 
     # The compilation cache must be clear for each translation unit.
@@ -347,12 +350,12 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes, "return_shape": True}
-        jaxpr, unflat_shape = jax.make_jaxpr(func, **make_jaxpr_kwargs)(*args, **kwargs)
+        make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes}
+        jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    module, context, jaxpr, tree_structure = jaxpr_to_mlir(func.__name__, jaxpr, unflat_shape)
-    flat_shape, tree = tree_flatten(unflat_shape)
-    return module, context, jaxpr, tree_structure, flat_shape
+    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+    module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
+    return module, context, jaxpr, out_type2, out_tree
 
 
 def trace_quantum_tape(
@@ -721,7 +724,8 @@ def trace_quantum_function(
 
     Returns:
         closed_jaxpr: JAXPR expression of the function ``f``.
-        abstract_results: Output structure filled with abstract return values of ``f``.
+        out_type: JAXPR output type (list of abstract values with explicitness flags).
+        out_tree: PyTree shapen of the result
     """
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:

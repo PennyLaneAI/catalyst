@@ -170,14 +170,12 @@ class CompiledFunction:
         shared_object_file,
         func_name,
         restype,
-        flat_restype,
         compile_options,
     ):
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
-        self.flat_restype = flat_restype
         self.compile_options = compile_options
 
     @staticmethod
@@ -454,8 +452,6 @@ class CompiledFunction:
             *abi_args,
         )
 
-        result = result[-len(self.flat_restype):]
-
         return result
 
 
@@ -484,7 +480,7 @@ class QJIT:
         self.mlir_module = None
         self.user_typed = False
         self.c_sig = None
-        self.shape = None
+        self.out_tree = None
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -565,9 +561,8 @@ class QJIT:
             func = self.user_function
             sig = self.c_sig
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, self.shape, flat_shape = trace_to_mlir(func, abstracted_axes, *sig)
+            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(func, abstracted_axes, *sig)
 
-        self.flat_shape = flat_shape
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
         canonicalizer_options = deepcopy(self.compile_options)
@@ -618,7 +613,7 @@ class QJIT:
 
         self._llvmir = llvm_ir
         options = self.compile_options
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, self.flat_shape, options)
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
         return compiled_function
 
     def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
@@ -696,8 +691,8 @@ class QJIT:
         data = self.compiled_function(*args, **kwargs)
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        if self.shape is not None:
-            data = tree_unflatten(self.shape, data)
+        if self.out_tree is not None:
+            data = tree_unflatten(self.out_tree, data)
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:
@@ -737,8 +732,8 @@ class JAX_QJIT:
         )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        assert qjit_function.shape is not None, "Shape must not be none."
-        return tree_unflatten(qjit_function.shape, data)
+        assert qjit_function.out_tree is not None, "PyTree shape must not be none."
+        return tree_unflatten(qjit_function.out_tree, data)
 
     def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
