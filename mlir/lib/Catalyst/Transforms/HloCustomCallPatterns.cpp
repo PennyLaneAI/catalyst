@@ -20,6 +20,7 @@
 #include "mlir/IR/PatternMatch.h"
 
 #include "mhlo/IR/hlo_ops.h"
+#include "Catalyst/IR/CatalystOps.h"
 
 using namespace mlir;
 
@@ -31,22 +32,10 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<mhlo::Custo
     mlir::LogicalResult matchAndRewrite(mhlo::CustomCallOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        auto *ctx = rewriter.getContext();
-        auto fnType = FunctionType::get(
-            ctx, /*inputs=*/
-            op.getOperandTypes(),
-            /*outputs=*/op.getResultTypes());
-        auto calleeName = op.getCallTargetName();
-        assert(calleeName=="lapack_dgesdd" && "This custom call is currently not supported.");
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto savedPoint = rewriter.saveInsertionPoint();
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
-        auto declaration = rewriter.create<func::FuncOp>(op.getLoc(), calleeName, fnType);
-        declaration.setPrivate();
-        rewriter.restoreInsertionPoint(savedPoint);
+        StringRef calleeName = op.getCallTargetName();
         auto operands = op.getOperands();
         TypeRange resultsType = op.getResultTypes();
-        rewriter.replaceOpWithNewOp<func::CallOp>(op, declaration.getName(), resultsType, operands);
+        rewriter.replaceOpWithNewOp<catalyst::CustomCallOp>(op, resultsType, operands, calleeName, nullptr);
         return success();
     }
 };
