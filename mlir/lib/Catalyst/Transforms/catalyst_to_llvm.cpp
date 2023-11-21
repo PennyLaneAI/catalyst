@@ -232,6 +232,17 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     }
 };
 
+struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -248,6 +259,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         LLVMTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
+        patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);

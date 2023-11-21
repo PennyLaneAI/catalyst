@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -37,12 +38,55 @@ struct BufferizePrintOp : public OpConversionPattern<PrintOp> {
     }
 };
 
+struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CustomCallOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        // Check arguments
+        SmallVector<Value> bufferArgs;
+        auto operands = op.getOperands();
+        for (auto operand : operands) {
+            if (!operand.getType().isa<TensorType>())
+                return failure();
+            bufferArgs.push_back(operand);
+        }
+
+        // Allocate returns.
+        auto results = op.getResults();
+        for (Value result : results) {
+            auto &newBuffer = bufferArgs.emplace_back();
+            auto resultType = result.getType();
+            auto tensorType = resultType.dyn_cast<RankedTensorType>();
+            if (!tensorType)
+                return failure();
+            auto options = bufferization::BufferizationOptions();
+            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
+                rewriter, op->getLoc(), result, false, options, false);
+            auto memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            newBuffer =
+                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
+        }
+        auto numArguments = static_cast<int32_t>(op.getNumOperands());
+        auto numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
+        rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs,
+                                                          op.getCallTargetName(), numArgumentsDenseAttr);
+
+        size_t startIndex = bufferArgs.size() - op.getNumResults();
+        SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
+    patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
 }
 
