@@ -86,3 +86,18 @@ class TestBasicInterface:
         print(identity.jaxpr)
         print(identity.mlir)
 
+    def test_kalculation(self):
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(a):
+            return jax.numpy.ones((a + 1,)), jax.numpy.ones((a + 2),)
+
+        @qjit
+        def identity(a):
+            return circuit(a)
+
+        result = identity(3)
+        print(result)
+        print(identity.jaxpr)
+        print(identity.mlir)
+

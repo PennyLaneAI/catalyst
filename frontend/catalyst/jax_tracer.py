@@ -347,9 +347,11 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
         make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes, "return_shape": True}
-        jaxpr, shape = jax.make_jaxpr(func, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr, unflat_shape = jax.make_jaxpr(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    return jaxpr_to_mlir(func.__name__, jaxpr, shape)
+    module, context, jaxpr, tree_structure = jaxpr_to_mlir(func.__name__, jaxpr, unflat_shape)
+    flat_shape, tree = jax.tree_util.tree_flatten(unflat_shape)
+    return module, context, jaxpr, tree_structure, flat_shape
 
 
 def trace_quantum_tape(
@@ -702,16 +704,17 @@ def trace_post_processing(ctx, trace, post_processing, args_types, args):
 
         # After wffa is called, then the shape becomes available in out_tree_promise.
         post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
-        jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        out_avals = [out_aval for out_aval, keep in out_type if keep]
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         # pylint: disable=unnecessary-lambda-assignment
         named_shape = lambda x: getattr(x, "named_shape", {})
         post_processing_results = tree_unflatten(
             out_tree_promise(),
-            [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in post_processing_tracers],
+            [ShapeDtypeStruct(a.shape, a.dtype, named_shape(a)) for a in out_avals],
         )
 
-        return closed_jaxpr, post_processing_results
+        return closed_jaxpr, post_processing_results, out_type
 
 
 def trace_quantum_function(
@@ -820,7 +823,7 @@ def trace_quantum_function(
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
                 # check_jaxpr(jaxpr)
 
-        closed_jaxpr, unflattened_callback_results = trace_post_processing(
+        closed_jaxpr, unflattened_callback_results, out_avals = trace_post_processing(
             ctx, trace, post_processing, results_abstract, results_tracers
         )
-    return closed_jaxpr, unflattened_callback_results
+    return closed_jaxpr, unflattened_callback_results, out_avals

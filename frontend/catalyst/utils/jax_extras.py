@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state, eval_jaxpr
+from jax._src.core import _update_thread_local_jit_state, eval_jaxpr, Var, DShapedArray
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters import partial_eval as pe
@@ -397,3 +397,17 @@ def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     implicit_args = _extract_implicit_args(in_type, explicit_args)
     args_flat = [*implicit_args, *explicit_args]
     return args_flat
+
+def get_implicit_return_types(jaxpr):
+
+    invars = [*jaxpr.constvars, *jaxpr.invars]
+    expl_outvars = jaxpr.outvars
+
+    # First do a pass to collect implicit outputs, meaning variables which occur
+    # in explicit_outvars types but not in invars or to the left in outvars.
+    seen: set[Var] = set(invars)
+    impl_outvars = [seen.add(d) or d for x in expl_outvars if type(x) is Var and  # type: ignore
+                (seen.add(x) or type(x.aval) is DShapedArray)  # type: ignore
+                for d in x.aval.shape if type(d) is Var and d not in seen]
+    return impl_outvars
+

@@ -78,6 +78,7 @@ from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
     tree_structure,
+    unzip2,
 )
 from catalyst.utils.patching import Patcher
 
@@ -167,7 +168,7 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs, qnode)
+            jaxpr, shape, out_type = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
         retval_tree = tree_structure(shape)
 
@@ -179,7 +180,10 @@ class QFunc:
         wffa, _, _, out_tree_promise = deduce_avals(_eval_jaxpr, args, {})
         retval = func_p.bind(wffa, *args, fn=self)
 
-        return tree_unflatten(out_tree_promise(), retval)
+        results_flat = tree_unflatten(out_tree_promise(), retval)
+        out_aval_original, keep_original = unzip2(out_type)
+        retval_original = [res for res, k in zip(results_flat, keep_original) if k]
+        return tree_unflatten(retval_tree, retval_original)
 
 
 class QJITDevice(qml.QubitDevice):

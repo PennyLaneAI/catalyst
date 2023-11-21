@@ -47,7 +47,7 @@ from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args
+from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args, get_implicit_return_types
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -170,12 +170,14 @@ class CompiledFunction:
         shared_object_file,
         func_name,
         restype,
+        flat_restype,
         compile_options,
     ):
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
+        self.flat_restype = flat_restype
         self.compile_options = compile_options
 
     @staticmethod
@@ -452,6 +454,8 @@ class CompiledFunction:
             *abi_args,
         )
 
+        result = result[-len(self.flat_restype):]
+
         return result
 
 
@@ -561,11 +565,11 @@ class QJIT:
             func = self.user_function
             sig = self.c_sig
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(func, abstracted_axes, *sig)
+            mlir_module, ctx, jaxpr, self.shape, flat_shape = trace_to_mlir(func, abstracted_axes, *sig)
 
+        self.flat_shape = flat_shape
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
-
         canonicalizer_options = deepcopy(self.compile_options)
         canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
         canonicalizer_options.lower_to_llvm = False
@@ -614,7 +618,7 @@ class QJIT:
 
         self._llvmir = llvm_ir
         options = self.compile_options
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, self.flat_shape, options)
         return compiled_function
 
     def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
