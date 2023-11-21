@@ -678,13 +678,14 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
     Args:
         ctx (EvaluationContext): context
         trace (DynamicJaxprTrace): trace
-        post_processing: post_processing function
-        args_types: unflattened args
-        args: input tracers
+        post_processing(Callable): PennyLane transform post_processing function
+        pp_args(structured Jax tracers): List of results returned from the PennyLane quantum
+                                         transform function
 
     Returns:
-        closed_jaxpr: JAXPR expression for the whole frame
-        out_types: List of abstract values with explicitness flag
+        closed_jaxpr(ClosedJaxpr): JAXPR expression for the whole frame
+        out_type(jax.OutputType) : List of abstract values with explicitness flag
+        out_tree(PyTreeDef): PyTree shape of the qnode result
     """
 
     with EvaluationContext.frame_tracing_context(ctx, trace):
