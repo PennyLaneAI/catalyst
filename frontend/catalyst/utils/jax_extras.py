@@ -436,18 +436,19 @@ def get_implicit_return_types(jaxpr):
 
 
 def jaxpr_remove_implicit(
-    cjaxpr: ClosedJaxpr, out_type: OutputType
+    closed_jaxpr: ClosedJaxpr, out_type: OutputType
 ) -> Tuple[ClosedJaxpr, OutputType]:
-    """Filters outputs of the input ``jaxpr``. Only those corresponding to ``True`` values of the
-    ``whitelist`` are kept."""
-    jaxpr = cjaxpr.jaxpr
+    """Remove all the implicit result values of the ``closed_jaxpr``."""
+    # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the unneeded
+    # tracers.
+    jaxpr = closed_jaxpr.jaxpr
     out_keep = list(tuple(zip(*out_type))[1]) if len(out_type) > 0 else []
     outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
     out_type2 = [o for o, keep in zip(out_type, out_keep) if keep]
     jaxpr2 = Jaxpr(
         jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
     )
-    return ClosedJaxpr(jaxpr2, cjaxpr.consts), out_type2
+    return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
 
 
 def get_aval2(x):

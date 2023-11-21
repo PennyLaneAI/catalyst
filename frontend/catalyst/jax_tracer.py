@@ -337,22 +337,26 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
     Returns:
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
-        jaxpr: the jaxpr corresponding to ``func``
-        out_type: Jaxpr output type (a list of abstract values paired with explicintess flags).
-        out_tree: Shape of the return values in ``PyTreeDef``
+        jaxpr(ClosedJaxpr): the jaxpr corresponding to ``func``
+        out_type(jax.OutputType): Jaxpr output type (a list of abstract values paired with
+                                  explicintess flags).
+        out_tree(PyTreeDef): PyTree shape of the return values in ``PyTreeDef``
     """
+    # Notes:
+    # [1] - The compilation cache must be clear for each translation unit.
+    #       Otherwise, MLIR functions which do not exist in the current translation unit will be
+    #       assumed to exist if an equivalent python function is seen in the cache. This happens
+    #       during testing or if we wanted to compile a single python function multiple times with
+    #       different options.
+    # [2] - We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
 
-    # The compilation cache must be clear for each translation unit.
-    # Otherwise, MLIR functions which do not exist in the current translation unit will be assumed
-    # to exist if an equivalent python function is seen in the cache. This happens during testing or
-    # if we wanted to compile a single python function multiple times with different options.
-    mlir_fn_cache.clear()
+    mlir_fn_cache.clear()  # [1]
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
         make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes}
         jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)  # [2]
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
     return module, context, jaxpr, out_type2, out_tree
 
