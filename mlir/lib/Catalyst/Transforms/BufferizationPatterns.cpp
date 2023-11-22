@@ -48,9 +48,13 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
         SmallVector<Value> bufferArgs;
         auto operands = op.getOperands();
         for (auto operand : operands) {
-            if (!operand.getType().isa<TensorType>())
-                return failure();
-            bufferArgs.push_back(operand);
+            auto &newBuffer = bufferArgs.emplace_back();
+            auto operandType = operand.getType();
+            auto tensorOperandType = operandType.dyn_cast<RankedTensorType>();
+            auto memrefType =
+                MemRefType::get(tensorOperandType.getShape(), tensorOperandType.getElementType());
+            newBuffer =
+                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, operand);
         }
 
         // Allocate returns.
@@ -71,11 +75,10 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
         auto numArguments = static_cast<int32_t>(op.getNumOperands());
         auto numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
         rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs,
-                                                          op.getCallTargetName(), numArgumentsDenseAttr);
-
+                                                   op.getCallTargetName(), numArgumentsDenseAttr);
         size_t startIndex = bufferArgs.size() - op.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
-        bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
+        rewriter.replaceOp(op, bufferResults);
         return success();
     }
 };

@@ -238,6 +238,13 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        // Encode args
+
+        // Encode res
+
+        // Call op
+
+        // Decode res
 
         return success();
     }
