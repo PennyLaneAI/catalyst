@@ -9,9 +9,28 @@
   `MeasurementProcess`es.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
 
+* Jax dynamic API is enabled and the intial support for dynamically-shaped arrays is added.
+  Catalyst now accepts tensors whose dimensions are not known at the compile time in the top-level
+  programs. Standard tensor initialisation functions `jax.numpy.ones/zeros/empty` now accept
+  variables in shapes. Support for dynamic arrays in control-flow primitives is yet to be done.
+  [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
+
+  ``` python
+  @qjit
+  def func(size:int):
+      return jax.numpy.ones([size,size], dtype=float)
+  ```
+
+  ``` pycon
+  >>> func(3)
+  [[1. 1. 1.]
+   [1. 1. 1.]
+   [1. 1. 1.]]
+  ```
+
 <h3>Improvements</h3>
 
-* ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last 
+* ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
   register in functions and can be given to another function (useful for quantum transformation).
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
@@ -32,8 +51,9 @@
 
 This release contains contributions from (in alphabetical order):
 
+Erick Ochoa Lopez,
 Romain Moyard,
-Erick Ochoa Lopez.
+Sergei Mironov.
 
 # Release 0.3.2
 
