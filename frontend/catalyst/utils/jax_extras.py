@@ -463,7 +463,7 @@ def get_aval2(x):
 
 import jax._src.interpreters.partial_eval
 
-# TODO: consider removing when https://github.com/google/jax/pull/18579 is merged
+# TODO: consider removing this patch when https://github.com/google/jax/pull/18579 is merged
 jax._src.interpreters.partial_eval.get_aval = get_aval2
 
 
@@ -472,19 +472,19 @@ def make_jaxpr2(
     return_shape: bool = False,
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
-    """A customized version of jax.make_jaxpr, compatible with the way we use JAX dynamic API."""
+    """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
+    # Notes:
+    # [1] - We always infer implicit arguments, regardless of the presence of the abstracted_axes
+    #       parameter.
+    # [2] - Unlike the upstream version, `return_shape` argument is not supported, output type and
+    #       PyTree-shape are returned as PyTreeDef instance.
 
-    # Among the changes, the `return_shape` argument is removed, jaxpr is filered-out of implicit
-    # return values [1], PyTree-shape is returned in its pure form [2].
     def abstractify(args, kwargs):
         flat_args, in_tree = tree_flatten((args, kwargs))
-        if abstracted_axes is None:
-            return map(shaped_abstractify, flat_args), in_tree, [True] * len(flat_args)
-        else:
-            axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
-            in_type = infer_lambda_input_type(axes_specs, flat_args)
-            in_avals, keep_inputs = unzip2(in_type)
-            return in_avals, in_tree, keep_inputs
+        axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+        in_type = infer_lambda_input_type(axes_specs, flat_args) # [1]
+        in_avals, keep_inputs = unzip2(in_type)
+        return in_avals, in_tree, keep_inputs
 
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
