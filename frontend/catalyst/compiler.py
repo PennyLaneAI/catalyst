@@ -128,9 +128,9 @@ DEFAULT_PIPELINES = [
             "empty-tensor-to-alloc-tensor",
             "func.func(bufferization-bufferize)",
             "func.func(tensor-bufferize)",
+            "catalyst-bufferize", #figure out why before linalg.
             "func.func(linalg-bufferize)",
             "func.func(tensor-bufferize)",
-            "catalyst-bufferize",
             "quantum-bufferize",
             "func-bufferize",
             "func.func(finalizing-bufferize)",
