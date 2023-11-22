@@ -242,6 +242,16 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
+        from catalyst.utils.toml import toml_load
+
+        # At the moment assume QJIT Device's decomposition logic is guided by the specification of
+        # lightning.qubit. All "full" gates are allowed. All "matrix" gates are decomposed to
+        # to qml.QubitUnitary
+        with open("./runtime/lib/backend/lightning/lightning-spec.toml", "rb") as f:
+            spec = toml_load(f)
+        valid_gate_names = spec["operations"]["gates"][0]["full"]
+        decompose_to_qubit_unitary = spec["operations"]["gates"][0]["matrix"]
+
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
         # numbers of qubits, a unitary gate might be faster, while for large qubit numbers prior
@@ -249,18 +259,17 @@ class QJITDevice(qml.QubitDevice):
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
-        def _decomp_controlled(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
-        def _decomp_orbital_rotation(self, *_args, **_kwargs):
+        def _decomp_to_unitary(self, *_args, **_kwargs):
             return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
-        with Patcher(
+        overriden_methods = [
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
-            (qml.ops.Controlled, "decomposition", _decomp_controlled),
-            # TODO: Remove once work_wires is no longer needed for decomposition.
-            (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
-            (qml.OrbitalRotation, "decomposition", _decomp_orbital_rotation),
-        ):
+            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
+        ]
+        for gate in decompose_to_qubit_unitary:
+            overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
+
+        with Patcher(*overriden_methods):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
         self.check_validity(expanded_tape.operations, [])
