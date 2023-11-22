@@ -57,8 +57,8 @@ from catalyst.utils.jax_extras import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     PyTreeDef,
+    PyTreeRegistry,
     ShapedArray,
-    ShapeDtypeStruct,
     _abstractify,
     _input_type_to_tracers,
     convert_element_type,
@@ -67,12 +67,10 @@ from catalyst.utils.jax_extras import (
     jaxpr_remove_implicit,
     jaxpr_to_mlir,
     make_jaxpr2,
-    pytree,
     sort_eqns,
     tree_flatten,
     tree_structure,
     tree_unflatten,
-    unzip2,
     wrap_init,
 )
 
@@ -567,7 +565,7 @@ def trace_quantum_measurements(
                 if len(meas_return_trees_children):
                     meas_return_trees_children[i] = counts_tree
                     out_tree = out_tree.make_from_node_data_and_children(
-                        pytree.PyTreeRegistry(),
+                        PyTreeRegistry(),
                         out_tree.node_data(),
                         meas_return_trees_children,
                     )
@@ -787,7 +785,6 @@ def trace_quantum_function(
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
-                out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
 
                 meas_tracers = [trace.full_raise(m) for m in meas]

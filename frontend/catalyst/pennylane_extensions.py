@@ -70,7 +70,6 @@ from catalyst.utils.jax_extras import (
     DynamicJaxprTracer,
     Jaxpr,
     ShapedArray,
-    _extract_implicit_args,
     _initial_style_jaxpr,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
@@ -78,9 +77,7 @@ from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
-    tree_structure,
     unzip2,
-    wrap_init,
 )
 from catalyst.utils.patching import Patcher
 
@@ -175,7 +172,7 @@ class QFunc:
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
-            out_aval, out_keep = unzip2(out_type)
+            _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 

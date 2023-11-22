@@ -21,40 +21,35 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state, concrete_aval, eval_jaxpr
+from jax._src.core import _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
-from jax._src.interpreters import partial_eval as pe
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.interpreters.partial_eval import (
-    _arg_type,
-    _canonicalize_specs,
-    _collect_implicit,
-    _complete_specs,
     _input_type_to_tracers,
     infer_lambda_input_type,
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
-from jax._src.linear_util import _check_input_type, annotate
+from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
-from jax.api_util import flatten_fun, shaped_abstractify
-from jax.core import (
-    AbstractValue,
-    ClosedJaxpr,
-    DShapedArray,
-    Jaxpr,
-    JaxprEqn,
-    MainTrace,
-    OutputType,
-)
+from jax.api_util import flatten_fun
+from jax.core import AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import ShapedArray, Trace, Tracer, Var, gensym, thread_local_state
+from jax.core import (
+    ShapedArray,
+    Trace,
+    Tracer,
+    concrete_aval,
+    eval_jaxpr,
+    gensym,
+    thread_local_state,
+)
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -77,7 +72,9 @@ from jax.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jaxlib.xla_extension import pytree
+from jaxlib.xla_extension import PyTreeRegistry
+
+# pylint: disable=protected-access
 
 __all__ = (
     "ClosedJaxpr",
@@ -85,6 +82,7 @@ __all__ = (
     "DynamicJaxprTracer",
     "Jaxpr",
     "PyTreeDef",
+    "PyTreeRegistry",
     "ShapedArray",
     "ShapeDtypeStruct",
     "convert_constvars_jaxpr",
@@ -98,9 +96,9 @@ __all__ = (
     "jaxpr_to_mlir",
     "jaxpr_remove_implicit",
     "make_jaxpr_effects",
-    "make_jaxpr2" "new_dynamic_main2",
+    "make_jaxpr2",
+    "new_dynamic_main2",
     "new_inner_tracer",
-    "pytree",
     "sort_eqns",
     "treedef_is_leaf",
     "tree_flatten",
@@ -415,29 +413,9 @@ def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     return args_flat
 
 
-def get_implicit_return_types(jaxpr):
-    invars = [*jaxpr.constvars, *jaxpr.invars]
-    expl_outvars = jaxpr.outvars
-
-    # First do a pass to collect implicit outputs, meaning variables which occur
-    # in explicit_outvars types but not in invars or to the left in outvars.
-    seen: set[Var] = set(invars)
-    impl_outvars = [
-        seen.add(d) or d
-        for x in expl_outvars
-        if type(x) is Var
-        and (  # type: ignore
-            seen.add(x) or type(x.aval) is DShapedArray
-        )  # type: ignore
-        for d in x.aval.shape
-        if type(d) is Var and d not in seen
-    ]
-    return impl_outvars
-
-
 def jaxpr_remove_implicit(
     closed_jaxpr: ClosedJaxpr, out_type: OutputType
-) -> Tuple[ClosedJaxpr, OutputType]:
+) -> tuple[ClosedJaxpr, OutputType]:
     """Remove all the implicit result values of the ``closed_jaxpr``."""
     # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the unneeded
     # tracers.
@@ -451,6 +429,8 @@ def jaxpr_remove_implicit(
     return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
 
 
+# fmt:off
+# TODO: remove this patch when https://github.com/google/jax/pull/18579 is merged
 def get_aval2(x):
     """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
     if isinstance(x, AbstractValue):
@@ -460,16 +440,14 @@ def get_aval2(x):
     else:
         return concrete_aval(x)
 
+import jax._src.interpreters.partial_eval  # pylint: disable=wrong-import-position, ungrouped-imports
 
-import jax._src.interpreters.partial_eval
-
-# TODO: consider removing this patch when https://github.com/google/jax/pull/18579 is merged
 jax._src.interpreters.partial_eval.get_aval = get_aval2
+# fmt:on
 
 
 def make_jaxpr2(
     fun: Callable,
-    return_shape: bool = False,
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
@@ -493,7 +471,7 @@ def make_jaxpr2(
         in_type, in_tree = abstractify(args, kwargs)
         f, out_tree_promise = flatten_fun(f, in_tree)
         f = annotate(f, in_type)
-        with ExitStack() as stack:
+        with ExitStack():
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()  # [2]
