@@ -23,6 +23,7 @@ from catalyst import qjit
 
 
 def print_attr(f, attr, *args, **kwargs):
+    """Print function attribute"""
     name = f"TEST {f.__name__}"
     print("\n" + "-" * len(name))
     print(f"{name}\n")
@@ -32,16 +33,19 @@ def print_attr(f, attr, *args, **kwargs):
 
 
 def print_jaxpr(f, *args, **kwargs):
+    """Print jaxpr code of a function"""
     return print_attr(f, "jaxpr", *args, **kwargs)
 
 
 def print_mlir(f, *args, **kwargs):
+    """Print mlir code of a function"""
     return print_attr(f, "mlir", *args, **kwargs)
 
 
 # CHECK-LABEL: test_qjit_dynamic_argument
 @qjit(abstracted_axes={0: "n"})
 def test_qjit_dynamic_argument(a):
+    """Test passing a dynamic argument"""
     # CHECK:        tensor<?xi64>
     return a
 
@@ -52,6 +56,8 @@ print_mlir(test_qjit_dynamic_argument, jnp.array([1, 2, 3]))
 # CHECK-LABEL: test_qnode_dynamic_arg
 @qjit(abstracted_axes={0: "n"})
 def test_qnode_dynamic_arg(a):
+    """Test passing a dynamic argument to qnode"""
+
     # CHECK:       { lambda ; [[a:.]]:i64[] [[b:.]]:i64[[[a]]]. let
     # CHECK:         [[c:.]]:i64[[[a]]] = func[
     # CHECK:                                  ] [[a]] [[b]]
@@ -69,6 +75,7 @@ print_jaxpr(test_qnode_dynamic_arg, jnp.array([1, 2, 3]))
 # CHECK-LABEL: test_qjit_dynamic_result
 @qjit
 def test_qjit_dynamic_result(a):
+    """Test getting a dynamic result from qjit"""
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
     # CHECK:         [[b:.]]:i64[] = add [[a]] 1
     # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*\]}} 1.0 [[b]]
@@ -82,6 +89,8 @@ print_jaxpr(test_qjit_dynamic_result, 3)
 # CHECK-LABEL: test_qnode_dynamic_result
 @qjit
 def test_qnode_dynamic_result(a):
+    """Test getting a dynamic result from qnode"""
+
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
     # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[[[b]]] = func[
     # CHECK:                                                ] [[a]]

@@ -150,7 +150,7 @@ def test_classical_tracing_2():
     _assert_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
-@pytest.mark.skip(f"Dynamic arrays support in quantum control flow is not implemented")
+@pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
 def test_quantum_tracing_1():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
@@ -161,10 +161,9 @@ def test_quantum_tracing_1():
         a = jnp.ones(shape, dtype=float)
 
         @while_loop(lambda _, i: i < 3)
-        def loop(a, i):
+        def loop(_, i):
             qml.PauliX(wires=0)
-            a = a + a
-            # b = jnp.ones(shape, dtype=float)
+            b = jnp.ones(shape, dtype=float)
             i += 1
             return (b, i)
 
@@ -176,7 +175,7 @@ def test_quantum_tracing_1():
     _assert_equal(result, expected)
 
 
-@pytest.mark.skip(f"Dynamic arrays support in quantum control flow is not implemented")
+@pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
 def test_quantum_tracing_2():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
@@ -187,7 +186,7 @@ def test_quantum_tracing_2():
         a = jnp.ones((x, y + 1), dtype=float)
 
         @while_loop(lambda _, i: i < 3)
-        def loop(a, i):
+        def loop(_, i):
             qml.PauliX(wires=0)
             b = jnp.ones((x, y + 1), dtype=float)
             i += 1
@@ -222,7 +221,7 @@ def test_invalid_shapes(bad_shape):
         qjit(f)
 
 
-@pytest.mark.skip(f"Jax does not detect error in this use-case")
+@pytest.mark.skip("Jax does not detect error in this use-case")
 def test_invalid_shapes_2():
     """Test the unsupported shape formats"""
     bad_shape = jnp.array([[3, 2]], dtype=int)
