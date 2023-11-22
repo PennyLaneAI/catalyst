@@ -1,0 +1,73 @@
+schema = 1
+
+[device]
+name = "lightning.qubit"
+version = "v0.31.0"
+precision = ['float32', 'float64']
+
+[operations]
+observables = [
+	"NamedObs",
+	"HermitianObs",
+	"TensorObs",
+	"HamiltonianObs",
+]
+
+[[operations.gates]]
+full = [
+	"Identity",
+	"PauliX",
+	"PauliY",
+	"PauliZ",
+	"Hadamard",
+	"S",
+	"T",
+	"PhaseShift",
+	"RX",
+	"RY",
+	"RZ",
+	"Rot",
+	"CNOT",
+	"CY",
+	"CZ",
+	"SWAP",
+	"IsingXX",
+	"IsingXY",
+	"IsingYY",
+	"IsingZZ",
+	"ControlledPhaseShift",
+	"CRX",
+	"CRY",
+	"CRZ",
+	"CRot",
+	"SingleExcitation",
+	"SingleExcitationMinus",
+	"SingleExcitationPlus",
+	"Toffoli",
+	"CSWAP",
+	"DoubleExcitation",
+	"DoubleExcitationMinus",
+	"DoubleExcitationPlus",
+	"MultiRZ",
+]
+matrix = [
+	# "QubitUnitary",
+	"OrbitalRotation",
+	# other gates supported via applying matrices
+]
+
+[measurements]
+exactshots = [
+	"Expval",
+	"Var",
+]
+finiteshots = [
+	"Probs",
+	"Sample",
+	"Measure", # mid-circuit measurement
+]
+
+[compilation]
+qjit_compatible = true
+control_flow = true
+dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo
