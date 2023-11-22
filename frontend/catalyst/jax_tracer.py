@@ -785,7 +785,7 @@ def trace_quantum_function(
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
-                qdealloc_p.bind(qreg_in)
+                qdealloc_p.bind(qrp_out.actualize())
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
                 meas_results = tree_unflatten(meas_trees, meas_tracers)

@@ -95,7 +95,9 @@ def DeviceOp : Quantum_Op<"device"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterface, ["buildDealloc"]>]> {
+// The operation has no memory effect and is pure, therefore two similar alloc would be removed
+// by a CSE pass. This needs to be changed in the future.
+def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -106,7 +108,7 @@ def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterfac
     );
 
     let results = (outs
-        Res<QuregType, "", [MemAlloc<QuantumMemory>]>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
@@ -120,7 +122,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        Arg<QuregType, "", [MemFree<QuantumMemory>]>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{

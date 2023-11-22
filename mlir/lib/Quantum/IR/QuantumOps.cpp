@@ -32,15 +32,6 @@ using namespace catalyst::quantum;
 #include "Quantum/IR/QuantumOps.cpp.inc"
 
 //===----------------------------------------------------------------------===//
-// Quantum op interfaces.
-//===----------------------------------------------------------------------===//
-
-std::optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
-{
-    return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
-}
-
-//===----------------------------------------------------------------------===//
 // Quantum op canonicalizers.
 //===----------------------------------------------------------------------===//
 
@@ -89,8 +80,9 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+        bool oneUse = extract.getResult().hasOneUse();
 
-        if (staticallyEqual || dynamicallyEqual) {
+        if ((staticallyEqual || dynamicallyEqual) && oneUse) {
             rewriter.replaceOp(insert, extract.getQreg());
             rewriter.eraseOp(extract);
             return success();
