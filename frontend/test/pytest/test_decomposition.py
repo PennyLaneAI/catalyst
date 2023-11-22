@@ -17,6 +17,7 @@ import pytest
 from jax import numpy as jnp
 
 from catalyst import for_loop, measure, qjit
+from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
@@ -27,13 +28,14 @@ copy.discard("MultiControlledX")
 copy.discard("Rot")
 copy.discard("S")
 
-
 class CustomDevice(qml.QubitDevice):
-    name = "Device without MultiControlledX, Rot, and S gates"
+    """Dummy Device"""
+
+    name = "Dummy Device"
     short_name = "dummy.device"
-    pennylane_requires = "0.1.0"
+    pennylane_requires = "0.32.0"
     version = "0.0.1"
-    author = "CV quantum"
+    author = "Dummy"
 
     operations = copy
     observables = lightning.observables.copy()
@@ -47,9 +49,15 @@ class CustomDevice(qml.QubitDevice):
         self.backend_kwargs = backend_kwargs if backend_kwargs else ""
         super().__init__(wires=wires, shots=shots)
 
-    def apply(self, operations, **kwargs):
-        pass
 
+    def apply(self, operations, **kwargs):
+        """Unused"""
+        raise RuntimeError("Only C/C++ interface is defined")
+
+    @staticmethod
+    def get_c_interface():
+        """Location to shared object with C/C++ implementation"""
+        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 dev = CustomDevice(wires=2)
 

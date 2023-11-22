@@ -254,7 +254,9 @@ class QJITDevice(qml.QubitDevice):
         def get_spec_path(name_or_path_str):
             name_or_path = pathlib.Path(name_or_path_str)
             if name_or_path.exists():
-                return name_or_path.parents[0]
+                path = name_or_path.parent
+                path = path / (name + ".toml")
+                return path
 
             from catalyst.compiler import get_lib_path
             name = name_or_path_str
