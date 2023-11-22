@@ -1,5 +1,6 @@
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
 add_subdirectory(lightning)
+configure_file(lightning/lightning.qubit.toml lightning.qubit.toml)
 endif()
 if(ENABLE_OPENQASM)
 add_subdirectory(openqasm)

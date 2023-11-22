@@ -213,6 +213,7 @@ class QJITDevice(qml.QubitDevice):
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
+        self.backend_name_canonical = self.backend_kwargs.get("device_type")
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
@@ -243,14 +244,34 @@ class QJITDevice(qml.QubitDevice):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         from catalyst.utils.toml import toml_load
+        import pathlib
+
+        # TODO: At the moment, lightning.qubit and other lightning devices are special because
+        # backend_name is indeed a name. However, for non-lightning devices, backend_name is
+        # actually a path to a shared library.
+        # So, let's try to find the path to this configuration file based on the name.
+        # The assumption is that it has to live in the same directory as the C library.
+        def get_spec_path(name_or_path_str):
+            name_or_path = pathlib.Path(name_or_path_str)
+            if name_or_path.exists():
+                return name_or_path.parents[0]
+
+            from catalyst.compiler import get_lib_path
+            name = name_or_path_str
+            path_to_spec_str = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+            path = pathlib.Path(path_to_spec_str) / "backend" / (name + ".toml")
+            assert path.exists(), path
+            return path
+
+        spec_path = get_spec_path(self.backend_name_canonical)
+        with open(spec_path, "rb") as f:
+            spec = toml_load(f)
 
         # At the moment assume QJIT Device's decomposition logic is guided by the specification of
         # lightning.qubit. All "full" gates are allowed. All "matrix" gates are decomposed to
         # to qml.QubitUnitary
-        with open("./runtime/lib/backend/lightning/lightning-spec.toml", "rb") as f:
-            spec = toml_load(f)
-        valid_gate_names = spec["operations"]["gates"][0]["full"]
         decompose_to_qubit_unitary = spec["operations"]["gates"][0]["matrix"]
+        valid_gate_names = spec["operations"]["gates"][0]["full"]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
