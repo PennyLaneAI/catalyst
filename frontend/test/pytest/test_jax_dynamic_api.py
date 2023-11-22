@@ -62,7 +62,7 @@ def test_qnode_abstracted_axis():
     result = identity(param)
 
     _assert_equal(param, result)
-    assert "tensor<?xi64>" in identity.mlir, func.mlir
+    assert "tensor<?xi64>" in identity.mlir, identity.mlir
 
 
 def test_qnode_dynamic_structured_args():
