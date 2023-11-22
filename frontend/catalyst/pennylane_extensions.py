@@ -251,12 +251,15 @@ class QJITDevice(qml.QubitDevice):
 
         def _decomp_controlled(self, *_args, **_kwargs):
             return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+        def _decomp_orbital_rotation(self, *_args, **_kwargs):
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
         with Patcher(
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
             (qml.ops.Controlled, "decomposition", _decomp_controlled),
             # TODO: Remove once work_wires is no longer needed for decomposition.
             (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
+            (qml.OrbitalRotation, "decomposition", _decomp_orbital_rotation),
         ):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
