@@ -32,7 +32,7 @@ from catalyst import qjit
 from catalyst.compilation_pipelines import WorkspaceManager
 from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import trace_to_mlir
-from catalyst.pennylane_extensions import measure, qfunc
+from catalyst.pennylane_extensions import QFunc, measure
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
@@ -358,6 +358,30 @@ module @workflow {
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
         assert "Trace" in e.value.args[0]
+
+
+class TestQFunc:
+    def test_validate_qnode(self):
+        class CustomDevice(qml.QubitDevice):
+            """Custom Device without c interface."""
+
+            name = "Custom Device"
+            short_name = "custom.device"
+            pennylane_requires = "0.32.0"
+            version = "0.0.1"
+            author = "Anonymous"
+
+            operations = []
+            observables = []
+
+            def apply(self, operations, **kwargs):
+                ...
+
+        qnode = qml.QNode(lambda x: x, CustomDevice(wires=1))
+
+        regex = "The .* device is not supported for compilation at the moment."
+        with pytest.raises(CompileError, match=regex):
+            QFunc._validate_qnode(qnode)
 
 
 if __name__ == "__main__":
