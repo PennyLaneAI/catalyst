@@ -25,12 +25,17 @@ from catalyst.pennylane_extensions import qfunc
 
 
 def get_custom_device_without(num_wires, discards):
+    """Generate a custom device without gates in discards."""
+
     lightning = qml.device("lightning.qubit", wires=3)
     copy = lightning.operations.copy()
+    observables_copy = lightning.observables.copy()
     for discard in discards:
         copy.discard(discard)
 
     class CustomDevice(qml.QubitDevice):
+        """Custom Device"""
+
         name = "Device without some operations"
         short_name = "dummy.device"
         pennylane_requires = "0.1.0"
@@ -38,7 +43,7 @@ def get_custom_device_without(num_wires, discards):
         author = "CV quantum"
 
         operations = copy
-        observables = discard
+        observables = observables_copy
 
         # pylint: disable=too-many-arguments
         def __init__(
@@ -47,7 +52,6 @@ def get_custom_device_without(num_wires, discards):
             self.backend_name = backend_name if backend_name else "default"
             self.backend_lib = backend_lib if backend_lib else "default"
             self.backend_kwargs = backend_kwargs if backend_kwargs else ""
-            self.backend_path = CustomDevice.get_c_interface()
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
@@ -58,11 +62,11 @@ def get_custom_device_without(num_wires, discards):
             """Location to shared object with C/C++ implementation"""
             return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
-
     return CustomDevice(wires=num_wires)
 
 
 def test_decompose_multicontrolledx():
+    """Test decomposition of MultiControlledX."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -90,6 +94,7 @@ test_decompose_multicontrolledx()
 
 
 def test_decompose_multicontrolledx_in_conditional():
+    """Test decomposition of MultiControlledX in conditional."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -111,7 +116,6 @@ def test_decompose_multicontrolledx_in_conditional():
         @cond(n > 1)
         def cond_fn():
             qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-            return
 
         cond_fn()
         return qml.state()
@@ -123,6 +127,7 @@ test_decompose_multicontrolledx_in_conditional()
 
 
 def test_decompose_multicontrolledx_in_while_loop():
+    """Test decomposition of MultiControlledX in while loop."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -156,6 +161,7 @@ test_decompose_multicontrolledx_in_while_loop()
 
 
 def test_decompose_multicontrolledx_in_for_loop():
+    """Test decomposition of MultiControlledX in for loop."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -175,7 +181,7 @@ def test_decompose_multicontrolledx_in_for_loop():
         # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @for_loop(0, n, 1)
-        def loop(i):
+        def loop(_):
             qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
 
         loop()
@@ -188,6 +194,7 @@ test_decompose_multicontrolledx_in_for_loop()
 
 
 def test_decompose_rot():
+    """Test decomposition of Rot gate."""
     dev = get_custom_device_without(1, {"Rot"})
 
     @qjit(target="mlir")
@@ -217,6 +224,7 @@ test_decompose_rot()
 
 
 def test_decompose_s():
+    """Test decomposition of S gate."""
     dev = get_custom_device_without(1, {"S"})
 
     @qjit(target="mlir")
@@ -238,6 +246,7 @@ test_decompose_s()
 
 
 def test_decompose_qubitunitary():
+    """Test decomposition of QubitUnitary"""
     dev = get_custom_device_without(1, {"QubitUnitary"})
 
     @qjit(target="mlir")
@@ -259,6 +268,7 @@ test_decompose_qubitunitary()
 
 
 def test_decompose_singleexcitationplus():
+    """Test decomposition of single excitation plus."""
     dev = get_custom_device_without(2, {"SingleExcitationPlus"})
 
     @qjit(target="mlir")
