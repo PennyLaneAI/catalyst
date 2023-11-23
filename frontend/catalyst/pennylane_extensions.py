@@ -346,10 +346,10 @@ class QJITDevice(qml.QubitDevice):
         def _decomp_to_unitary(self, *_args, **_kwargs):
             return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
-        overriden_methods = [
-            (qml.ops.Controlled, "has_decomposition", lambda self: True),
-            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
-        ]
+        overriden_methods = [  # pragma: no cover
+            (qml.ops.Controlled, "has_decomposition", lambda self: True),  # pragma: no cover
+            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),  # pragma: no cover
+        ]  # pragma: no cover
         for gate in decompose_to_qubit_unitary:
             overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
 
