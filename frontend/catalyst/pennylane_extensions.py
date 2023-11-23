@@ -251,21 +251,20 @@ class QJITDevice(qml.QubitDevice):
         # actually a path to a shared library.
         # So, let's try to find the path to this configuration file based on the name.
         # The assumption is that it has to live in the same directory as the C library.
-        def get_spec_path(name_or_path_str):
+        def get_spec_path(name, name_or_path_str):
             name_or_path = pathlib.Path(name_or_path_str)
             if name_or_path.exists():
                 path = name_or_path.parent
-                path = path / (name + ".toml")
+                path = path / "backend" / (name + ".toml")
                 return path
 
             from catalyst.compiler import get_lib_path
-            name = name_or_path_str
             path_to_spec_str = get_lib_path("runtime", "RUNTIME_LIB_DIR")
             path = pathlib.Path(path_to_spec_str) / "backend" / (name + ".toml")
             assert path.exists(), path
             return path
 
-        spec_path = get_spec_path(self.backend_name_canonical)
+        spec_path = get_spec_path(self.backend_name_canonical, self.backend_lib)
         with open(spec_path, "rb") as f:
             spec = toml_load(f)
 
