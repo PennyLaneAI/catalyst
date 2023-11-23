@@ -28,6 +28,7 @@ copy.discard("MultiControlledX")
 copy.discard("Rot")
 copy.discard("S")
 
+
 class CustomDevice(qml.QubitDevice):
     """Dummy Device"""
 
@@ -40,15 +41,11 @@ class CustomDevice(qml.QubitDevice):
     operations = copy
     observables = lightning.observables.copy()
 
-    # pylint: disable=too-many-arguments
-    def __init__(
-        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
-    ):
-        self.backend_name = backend_name if backend_name else "default"
-        self.backend_lib = backend_lib if backend_lib else "default"
-        self.backend_kwargs = backend_kwargs if backend_kwargs else ""
+    def __init__(self, shots=None, wires=None):
+        self.backend_name = "default"
+        self.backend_lib = "default"
+        self.backend_kwargs = {}
         super().__init__(wires=wires, shots=shots)
-
 
     def apply(self, operations, **kwargs):
         """Unused"""
@@ -58,6 +55,7 @@ class CustomDevice(qml.QubitDevice):
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
         return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
 
 dev = CustomDevice(wires=2)
 
