@@ -100,4 +100,11 @@ def extract_backend_info(device):
                 device._s3_folder  # pylint: disable=protected-access
             )
 
+    if hasattr(device, "_mcmc"):
+        device_kwargs["mcmc"] = device._mcmc
+    if hasattr(device, "_num_burnin"):
+        device_kwargs["num_burnin"] = device._num_burnin
+    if hasattr(device, "_kernel_name"):
+        device_kwargs["kernel_name"] = device._kernel_name
+
     return device_name, device_lpath, device_kwargs
