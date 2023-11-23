@@ -5,4 +5,6 @@ configure_file(lightning/lightning_kokkos/lightning.kokkos.toml lightning.kokkos
 endif()
 if(ENABLE_OPENQASM)
 add_subdirectory(openqasm)
+configure_file(openqasm/braket.local.qubit.toml braket.local.qubit.toml)
+configure_file(openqasm/braket.aws.qubit.toml braket.aws.qubit.toml)
 endif()
