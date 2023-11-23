@@ -270,7 +270,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             // Start the lifetime of encoded value.
             rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
             // Use volatile store to suppress expensive LLVM optimizations.
-            rewriter.create<LLVM::StoreOp>(loc, encoded_arg, alloca, /*alignment=*/0, /*isVolatile=*/true);
+            rewriter.create<LLVM::StoreOp>(loc, encoded_arg, alloca, /*alignment=*/0,
+                                           /*isVolatile=*/true);
             encoded.push_back(alloca);
         }
 
@@ -302,9 +303,52 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Alloca that encodes the custom call arguments.
         auto encodedArguments = alloca.getResult();
 
-        // Encode res
+        // Results: ########
+
+        // Encode all returns as a set of pointers
+        SmallVector<mlir::LLVM::AllocaOp> encodedRes;
+        for (auto tuple : llvm::zip(res, resConverted)) {
+            auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
+            auto encoded_res = EncodeMemRef(loc, rewriter, memref_type, std::get<1>(tuple));
+            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, type, c1, 0);
+            // Start the lifetime of encoded value.
+            rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
+            // Use volatile store to suppress expensive LLVM optimizations.
+            rewriter.create<LLVM::StoreOp>(loc, encoded_res, alloca, /*alignment=*/0,
+                                           /*isVolatile=*/true);
+            encodedRes.push_back(alloca);
+        }
+
+        // We store encoded results as `!llvm.array<ptr x len>`.
+        size_t len = encodedRes.size();
+        Type ptr = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type type = LLVM::LLVMArrayType::get(ptr, len);
+
+        // Prepare an array for encoding results.
+        Value arr = rewriter.create<LLVM::UndefOp>(loc, type);
+
+        // Store encoded results into the allocated storage.
+        for (const auto &pair : llvm::enumerate(encodedRes)) {
+            int64_t offset = pair.index();
+            insert_value(pair.value(), offset);
+        }
+
+        // Get allocation for packed results pointers.
+        LLVM::AllocaOp alloca = a.GetOrCreate(b, type);
+
+        // Start the lifetime of the encoded results pointers allocation.
+        b.create<LLVM::LifetimeStartOp>(b.getI64IntegerAttr(-1), alloca);
+
+        // Store constructed results pointers array on the stack. Use volatile
+        // store to suppress expensive LLVM optimizations.
+        b.create<LLVM::StoreOp>(arr, alloca, /*alignment=*/0, /*isVolatile=*/true);
+
+        // Alloca that encodes the custom call returns.
+        auto encodedResults = alloca;
 
         // Call op
+
+        
 
         // Decode res
 
