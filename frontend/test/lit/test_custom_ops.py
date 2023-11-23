@@ -77,8 +77,11 @@ class CustomDeviceWithSupport(CustomDeviceWithoutSupport):
     operations = operations
     observables = lightning.observables.copy()
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_path=None, backend_kwargs=None):
+    def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
+        self.backend_name = "default"
+        self.backend_kwargs = ""
+        self.backend_path = CustomDeviceWithoutSupport.get_c_interface()
 
 
 # lightning does not support PauliRot, so it will be decomposed
