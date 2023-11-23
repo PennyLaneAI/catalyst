@@ -78,7 +78,7 @@ def test_unsupported_device():
 
     with pytest.raises(
         CompileError,
-        match="device is not supported for compilation at the moment.",
+        match="is not supported for compilation at the moment.",
     ):
         qjit(func)
 

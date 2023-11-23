@@ -17,9 +17,11 @@ while using :func:`~.qjit`.
 """
 
 # pylint: disable=too-many-lines
+# pylint: disable=protected-access
 
 import numbers
 from functools import update_wrapper
+import pathlib
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -36,6 +38,7 @@ from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.compiler import get_lib_path
 from catalyst.jax_primitives import (
     AbstractQreg,
     GradParams,
@@ -80,6 +83,7 @@ from catalyst.utils.jax_extras import (
 )
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.toml import toml_load
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -113,6 +117,70 @@ class QFunc:
         self.func = fn
         self.device = device
         update_wrapper(self, fn)
+
+    @staticmethod
+    def _validate_qnode(qnode):
+        if not isinstance(qnode.device, qml.Device):
+            msg = "Device is not supported for compilation at the moment."
+            raise CompileError(msg)
+
+        name = qnode.device.short_name
+        is_known_device = name in QFunc.RUNTIME_DEVICES
+        implements_c_interface = hasattr(qnode.device, "get_c_interface")
+        is_valid_device = is_known_device or implements_c_interface
+        if not is_valid_device:
+            msg = f"The {name} device is not supported for compilation at the moment."
+            raise CompileError(msg)
+
+    @staticmethod
+    def _validate_library_path(lib_path):
+        if not pathlib.Path(lib_path).is_file():
+            msg = f"Device's library cannot be found at {lib_path}."
+            raise CompileError(msg)
+
+    @staticmethod
+    def get_library_path(device):
+        """Return C library for interfacing with the device.
+
+        For legacy purposes, returns the short name if no C library path is
+        implemented."""
+        if hasattr(device, "get_c_interface"):
+            lib_path = device.get_c_interface()
+            QFunc._validate_library_path(lib_path)
+            return lib_path
+
+        return device.short_name
+
+    @staticmethod
+    def _get_device_kwargs(qnode):
+        QFunc._validate_qnode(qnode)
+        name = qnode.device.short_name
+
+        # TODO:
+        # Once all devices get converted to shared libraries this name should just be the path.
+        device = qnode.device
+        backend_path = QFunc.get_library_path(device)
+
+        backend_kwargs = {}
+        if hasattr(device, "shots"):
+            backend_kwargs["shots"] = device.shots if device.shots else 0
+        if device.short_name == "braket.local.qubit":  # pragma: no cover
+            backend_kwargs["backend"] = device._device._delegate.DEVICE_ID
+        elif device.short_name == "braket.aws.qubit":  # pragma: no cover
+            backend_kwargs["device_arn"] = device._device._arn
+            if device._s3_folder:
+                backend_kwargs["s3_destination_folder"] = str(device._s3_folder)
+
+        # TODO: Maybe we should have a **device_kwargs stored in device.
+        # that way we avoid hand coding these and looking into the spec file
+        backend_kwargs["mcmc"] = getattr(device, "_mcmc", None)
+        backend_kwargs["num_burnin"] = getattr(device, "_num_burnin", None)
+        backend_kwargs["kernel_name"] = getattr(device, "_kernel_name", None)
+        return {
+            "backend_name": name,
+            "backend_path": backend_path,
+            "backend_kwargs": backend_kwargs,
+        }
 
     def __call__(self, *args, **kwargs):
         qnode = None
@@ -243,9 +311,6 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
-        from catalyst.utils.toml import toml_load
-        import pathlib
-
         # TODO: At the moment, lightning.qubit and other lightning devices are special because
         # backend_name is indeed a name. However, for non-lightning devices, backend_name is
         # actually a path to a shared library.
@@ -258,7 +323,6 @@ class QJITDevice(qml.QubitDevice):
                 path = path / "backend" / (name + ".toml")
                 return path
 
-            from catalyst.compiler import get_lib_path
             path_to_spec_str = get_lib_path("runtime", "RUNTIME_LIB_DIR")
             path = pathlib.Path(path_to_spec_str) / "backend" / (name + ".toml")
             assert path.exists(), path
@@ -272,7 +336,6 @@ class QJITDevice(qml.QubitDevice):
         # lightning.qubit. All "full" gates are allowed. All "matrix" gates are decomposed to
         # to qml.QubitUnitary
         decompose_to_qubit_unitary = spec["operations"]["gates"][0]["matrix"]
-        valid_gate_names = spec["operations"]["gates"][0]["full"]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low

@@ -100,7 +100,7 @@ def test_custom_device_bad_directory():
 
             return "DummyDevice", "this-file-does-not-exist.so"
 
-    with pytest.raises(CompileError, match="Device .* cannot be found"):
+    with pytest.raises(CompileError, match="Device at this-file-does-not-exist.so cannot be found!"):
 
         @qjit
         @qml.qnode(DummyDevice(wires=1))
