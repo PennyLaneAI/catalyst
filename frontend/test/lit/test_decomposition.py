@@ -18,6 +18,7 @@ import jax
 import pennylane as qml
 
 from catalyst import cond, for_loop, measure, qjit, while_loop
+from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
@@ -46,10 +47,17 @@ def get_custom_device_without(num_wires, discards):
             self.backend_name = backend_name if backend_name else "default"
             self.backend_lib = backend_lib if backend_lib else "default"
             self.backend_kwargs = backend_kwargs if backend_kwargs else ""
+            self.backend_path = CustomDevice.get_c_interface()
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
             pass
+
+        @staticmethod
+        def get_c_interface():
+            """Location to shared object with C/C++ implementation"""
+            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
 
     return CustomDevice(wires=num_wires)
 
