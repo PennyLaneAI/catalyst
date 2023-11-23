@@ -232,13 +232,77 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     }
 };
 
+struct EncodedArguments {
+    LLVM::AllocaOp encoded; // `args` argument
+    SmallVector<LLVM::AllocaOp> values;
+};
+
 struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        MLIRContext *ctx = op.getContext();
+        Location loc = op.getLoc();
+        // Create function
+        auto ptr = LLVM::LLVMPointerType::get(ctx);
+        auto type = FunctionType::get(ctx, {/*args=*/ptr, /*rets=*/ptr}, {});
+
+        auto customCallFnOp = rewriter.create<func::FuncOp>(loc, op.getCallTargetName(), type);
+        customCallFnOp.setPrivate();
+
+        // Setup args and res
+        int32_t numberArg = op.getNumberOriginalArgAttr()[0];
+        SmallVector<Value> operands = op.getOperands();
+        SmallVector<Value> args = {operands.begin(), operands.end() - numberArg};
+        SmallVector<Value> res = {operands.begin() + numberArg, operands.end()};
+
+        SmallVector<Value> operandsConverted = adaptor.getOperands();
+        SmallVector<Value> argsConverted = {operandsConverted.begin(),
+                                            operandsConverted.end() - numberArg};
+        SmallVector<Value> resConverted = {operandsConverted.begin() + numberArg,
+                                           operandsConverted.end()};
+
         // Encode args
+        EncodedArguments arguments;
+
+        for (auto tuple : llvm::drop_begin(llvm::zip(operands, operandsConverted))) {
+            auto encoded_arg = encodeMemref(std::get<0>(tuple), std::get<1>(tuple));
+            encoded.push_back(*encoded_arg);
+        }
+
+        // We store encoded arguments as `!llvm.array<ptr x len>`.
+        size_t len = 2 + encoded.size();
+        Type ptr = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type type = LLVM::LLVMArrayType::get(ptr, len);
+
+        // Prepare an array for encoded arguments.
+        Value arr = rewriter.create<LLVM::UndefOp>(type);
+        auto insert_value = [&](Value value, int64_t offset) {
+            arr = rewriter.create<LLVM::InsertValueOp>(arr, value, offset);
+        };
+
+        // Store pointer to encoded arguments into the allocated storage.
+        for (const auto &pair : llvm::enumerate(encoded)) {
+            CustomCallArgEncoding::Encoded encoded = pair.value();
+            int64_t offset = 2 + pair.index();
+            insert_value(AsPtr(b, encoded.value), offset);
+            arguments.values.push_back(encoded.value);
+        }
+
+        // Get allocation for packed arguments pointers.
+        LLVM::AllocaOp alloca = a.GetOrCreate(b, type);
+
+        // Start the lifetime of the encoded arguments pointers.
+        b.create<LLVM::LifetimeStartOp>(b.getI64IntegerAttr(-1), alloca);
+
+        // Store constructed arguments pointers array into the alloca. Use volatile
+        // store to suppress expensive LLVM optimizations.
+        b.create<LLVM::StoreOp>(arr, alloca, /*alignment=*/0, /*isVolatile=*/true);
+
+        // Alloca that encodes the custom call arguments.
+        arguments.encoded = alloca;
 
         // Encode res
 
