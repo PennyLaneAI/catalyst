@@ -172,8 +172,8 @@ class QFunc:
 
         # TODO: Maybe we should have a **device_kwargs stored in device.
         # that way we avoid hand coding these and looking into the spec file
-        backend_kwargs["mcmc"] = getattr(device, "_mcmc", None)
-        backend_kwargs["num_burnin"] = getattr(device, "_num_burnin", None)
+        backend_kwargs["mcmc"] = getattr(device, "_mcmc", False)
+        backend_kwargs["num_burnin"] = getattr(device, "_num_burnin", 0)
         backend_kwargs["kernel_name"] = getattr(device, "_kernel_name", None)
         return {
             "backend_name": name,
