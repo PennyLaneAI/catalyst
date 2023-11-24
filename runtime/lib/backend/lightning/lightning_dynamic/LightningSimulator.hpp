@@ -44,11 +44,18 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
     static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+    static constexpr size_t default_num_burning{100};   // tidy: readability-magic-numbers
+    static constexpr std::string_view default_kernel_name{
+        "Local"}; // tidy: readability-magic-numbers
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
+
+    bool mcmc{false};
+    size_t num_burning{0};
+    std::string kernel_name;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
     LightningObsManager<double> obs_manager{};
@@ -85,6 +92,11 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
+        mcmc = args.contains("mcmc") ? args["mcmc"].compare("True") : false;
+        num_burning = args.contains("num_burning")
+                          ? static_cast<size_t>(std::stoll(args["num_burning"]))
+                          : default_num_burning;
+        kernel_name = args.contains("kernel_name") ? args["kernel_name"] : default_kernel_name;
     }
     ~LightningSimulator() override = default;
 
