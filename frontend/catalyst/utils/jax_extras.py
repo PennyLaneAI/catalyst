@@ -21,7 +21,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state
+from jax._src.core import (_update_thread_local_jit_state, DBIdx)
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -39,16 +39,22 @@ from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
 from jax.api_util import flatten_fun
-from jax.core import AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
-from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
+    AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType,
+    Primitive,
     ShapedArray,
+    DShapedArray,
+    InDBIdx,
+    OutDBIdx,
     Trace,
     Tracer,
     concrete_aval,
     eval_jaxpr,
     gensym,
     thread_local_state,
+    get_referent,
+    new_jaxpr_eqn,
+    find_top_trace
 )
 from jax.interpreters.mlir import (
     AxisContext,
@@ -64,7 +70,7 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.linear_util import wrap_init
+from jax.linear_util import wrap_init, transformation
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -86,17 +92,25 @@ __all__ = (
     "PyTreeDef",
     "PyTreeRegistry",
     "ShapedArray",
+    "DShapedArray",
     "ShapeDtypeStruct",
+    "DynshapePrimitive",
     "convert_constvars_jaxpr",
     "convert_element_type",
+    "deduce_avals",
+    "deduce_avals2",
     "eval_jaxpr",
     "initial_style_jaxprs_with_common_consts1",
     "initial_style_jaxprs_with_common_consts2",
     "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
+    "_input_type_to_tracers2",
+    "_extract_implicit_args",
+    "_output_type_to_tracers",
     "jaxpr_to_mlir",
     "jaxpr_remove_implicit",
+    "jaxpr_force_outvars",
     "make_jaxpr_effects",
     "make_jaxpr2",
     "new_dynamic_main2",
@@ -180,7 +194,7 @@ def stable_toposort(end_nodes: list) -> list:
     return sorted_nodes
 
 
-def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]) -> List[JaxprEqn]:
+def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[Primitive]) -> List[JaxprEqn]:
     """Topologically sort JAXRR equations in a unsorted list of equations, based on their
     input/output variables and additional criterias."""
 
@@ -279,6 +293,29 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
     closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
     return closed_jaxprs, consts
+
+
+@transformation
+def expanded_fun(in_type, *args_expanded):
+    args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
+    ans = yield args_collapsed, {}
+    yield ans
+
+
+def deduce_avals2(f: Callable, args, kwargs):
+    """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
+    and returning expanded flatten results. Calculate input abstract values and output_tree promise.
+    The promise must be called after the resulting wrapped function is evaluated."""
+    flat_args, in_tree = tree_flatten((args, kwargs))
+    abstracted_axes = None
+    axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+    in_type = infer_lambda_input_type(axes_specs, flat_args)
+    in_avals, keep_inputs = unzip2(in_type)
+    wf = wrap_init(f)
+    wf, out_tree_promise = flatten_fun(wf, in_tree)
+    wf = expanded_fun(wf, in_type)
+    wf = annotate(wf, in_type)
+    return wf, in_avals, keep_inputs, out_tree_promise
 
 
 def deduce_avals(f: Callable, args, kwargs):
@@ -416,6 +453,15 @@ def custom_lower_jaxpr_to_module(
     return ctx.module, ctx.context
 
 
+def new_inner_tracer2(frame, trace, aval) -> DynamicJaxprTracer:
+    """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
+    primitive."""
+    dt = DynamicJaxprTracer(trace, aval, jax_current())
+    frame.tracers.append(dt)
+    frame.tracer_to_var[id(dt)] = frame.newvar(aval)
+    return dt
+
+
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
@@ -451,6 +497,37 @@ def jaxpr_remove_implicit(
     return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
 
 
+def jaxpr_force_outvars(
+    closed_jaxpr: ClosedJaxpr, out_type: OutputType
+) -> tuple[ClosedJaxpr, OutputType]:
+    """Turn all the InDBIdx references into OutDBIdx ones."""
+    jaxpr = closed_jaxpr.jaxpr
+    out_aval, out_keep = unzip2(out_type)
+    num_inrefs = max(sum(([d.val for d in a.shape if isinstance(d, InDBIdx)] for a in out_aval
+                              if hasattr(a, "shape")), [0]))
+    def _new_shape(shape):
+        shape2 = []
+        for d in shape:
+            if isinstance(d, InDBIdx):
+                d2 = OutDBIdx(d.val)
+            elif isinstance(d, OutDBIdx):
+                d2 = OutDBIdx(d.val + num_inrefs)
+            else:
+                d2 = d
+            shape2.append(d2)
+        return tuple(shape2)
+
+    for v in out_aval:
+        if hasattr(v, "shape"):
+            v.update(shape=_new_shape(v.shape))
+    outvars2 = jaxpr.invars[:num_inrefs] + jaxpr.outvars
+    out_type2 = tuple((i.aval,False) for i in jaxpr.invars[:num_inrefs]) + tuple(zip(out_aval, out_keep))
+    jaxpr2 = Jaxpr(
+        jaxpr.constvars, jaxpr.invars, outvars2, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
+    )
+    return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
+
+
 def make_jaxpr2(
     fun: Callable,
     abstracted_axes: Any | None = None,
@@ -477,3 +554,61 @@ def make_jaxpr2(
 
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
     return make_jaxpr_f
+
+def _input_type_to_tracers2(in_type: InputType,
+                            maker: Callable[[AbstractValue],DynamicJaxprTracer]
+                            ) -> List[DynamicJaxprTracer]:
+    """ Creates an expanded list of tracers representing an input values of a Jaxpr program """
+    in_aval, in_keep = unzip2(in_type)
+    return _input_type_to_tracers(maker, in_aval)
+
+
+def get_referent_frame(self, frame):
+    """ Find referents in the specific frame """
+    # TODO: clarify the logic! Can we need other frames?
+    val = frame.constvar_to_val.get(frame.tracer_to_var.get(id(self)))
+    return self if val is None else get_referent_frame(val)
+
+
+def _output_type_to_tracers(out_type: OutputType,
+                            in_tracers: List[DynamicJaxprTracer],
+                            consts,
+                            maker: Callable[[AbstractValue],DynamicJaxprTracer]
+                            ) -> List[DynamicJaxprTracer]:
+    """ Creates an expanded list of tracers representing an output values of a Jaxpr program
+    based on the ``out_type`` of this program. The resulting tracers might be nested as required by
+    the Jax dynamic API and might contain ``in_tracers`` of the same Jaxpr program. """
+    # Notes:
+    # [1] - `get_referent` asks the `tracer -> constvar -> val -> tracer` chain of Jax references or
+    #       returns its argument tracer on failure.
+    out_tracers = []
+    for aval, _ in out_type:
+        if type(aval) is DShapedArray:
+            shape = [[*consts, *in_tracers][d.val] if type(d) is InDBIdx else
+                     out_tracers[d.val] if type(d) is OutDBIdx else
+                     d for d in aval.shape]
+            aval = aval.update(shape=tuple(get_referent(d) for d in shape)) # [1]
+        out_tracers.append(maker(aval))
+    return out_tracers
+
+
+class DynshapePrimitive(Primitive):
+    # TODO: Contribute this class to Jax, namely to the
+    # `jax.DynamicJaxprTrace.default_process_primitive`
+
+    def bind(primitive, *args, out_type, consts, **params):
+        trace = find_top_trace(args)
+        tracers = map(trace.full_raise, args)
+        avals = [get_aval2(t) for t in tracers]
+        source_info = jax_current()
+        out_tracers = _output_type_to_tracers(
+            out_type, tracers,
+            consts=consts,
+            maker=lambda a: DynamicJaxprTracer(trace, a, source_info))
+        invars = map(trace.getvar, tracers)
+        outvars = map(trace.makevar, out_tracers)
+        params.update({"out_type": out_type, "consts": consts})
+        eqn = new_jaxpr_eqn(invars, outvars, primitive, params, [], source_info)
+        trace.frame.add_eqn(eqn)
+        return out_tracers if primitive.multiple_results else out_tracers.pop()
+

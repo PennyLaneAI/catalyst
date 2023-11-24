@@ -273,10 +273,13 @@ class HybridOp(Operation):
     num_wires = AnyWires
     binder: Callable = _no_binder
 
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
+    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion],
+                 in_type = None, out_type = None):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
+        self.in_type = in_type
+        self.out_type = out_type
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):
@@ -297,7 +300,9 @@ class HybridOp(Operation):
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
         eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
+        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers), (
+            f"{eqn.outvars=}\n{self.out_classical_tracers=}"
+        )
         for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer

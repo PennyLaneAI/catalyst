@@ -61,6 +61,7 @@ from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.jax_extras import DynshapePrimitive
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -163,6 +164,7 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 # Primitives #
 ##############
 
+
 qdevice_p = core.Primitive("qdevice")
 qdevice_p.multiple_results = True
 qalloc_p = core.Primitive("qalloc")
@@ -190,7 +192,7 @@ probs_p = core.Primitive("probs")
 state_p = core.Primitive("state")
 cond_p = core.AxisPrimitive("cond")
 cond_p.multiple_results = True
-while_p = core.AxisPrimitive("while_loop")
+while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = core.AxisPrimitive("for_loop")
 for_p.multiple_results = True
@@ -1193,14 +1195,9 @@ def _cond_lowering(
 #
 # while loop
 #
-@while_p.def_abstract_eval
-def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
-    return body_jaxpr.out_avals
-
-
 @while_p.def_impl
 def _while_loop_def_impl(
-    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts
+    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, out_type
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1212,6 +1209,8 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
+    out_type,
+    consts,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
