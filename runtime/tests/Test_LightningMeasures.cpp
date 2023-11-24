@@ -1211,6 +1211,57 @@ TEMPLATE_LIST_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=
         CHECK((samples4[i] == 0. || samples4[i] == 1.));
 }
 
+TEMPLATE_LIST_TEST_CASE(
+    "Sample and PartialSample tests with numWires=0-4 shots=1000 mcmc=True num_burnin=200",
+    "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim =
+        std::make_unique<TestType>(false, "{mcmc : True, num_burnin : 200}");
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("RX", {0.5}, {Qs[0]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
+    sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
+
+    size_t shots = 100;
+
+    std::vector<double> samples1(shots * 1);
+    MemRefT<double, 2> buffer1{samples1.data(), samples1.data(), 0, {shots, 1}, {1, 1}};
+    DataView<double, 2> view1(buffer1.data_aligned, buffer1.offset, buffer1.sizes, buffer1.strides);
+    sim->PartialSample(view1, std::vector<QubitIdType>{Qs[2]}, shots);
+
+    std::vector<double> samples2(shots * 2);
+    MemRefT<double, 2> buffer2{samples2.data(), samples2.data(), 0, {shots, 2}, {1, 1}};
+    DataView<double, 2> view2(buffer2.data_aligned, buffer2.offset, buffer2.sizes, buffer2.strides);
+    sim->PartialSample(view2, std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
+
+    std::vector<double> samples3(shots * 4);
+    MemRefT<double, 2> buffer3{samples3.data(), samples3.data(), 0, {shots, 4}, {1, 1}};
+    DataView<double, 2> view3(buffer3.data_aligned, buffer3.offset, buffer3.sizes, buffer3.strides);
+    sim->PartialSample(view3, Qs, shots);
+
+    std::vector<double> samples4(shots * 4);
+    MemRefT<double, 2> buffer4{samples4.data(), samples4.data(), 0, {shots, 4}, {1, 1}};
+    DataView<double, 2> view4(buffer4.data_aligned, buffer4.offset, buffer4.sizes, buffer4.strides);
+    sim->Sample(view4, shots);
+
+    for (size_t i = 0; i < shots * 1; i++)
+        CHECK((samples1[i] == 0. || samples1[i] == 1.));
+    for (size_t i = 0; i < shots * 2; i++)
+        CHECK((samples2[i] == 0. || samples2[i] == 1.));
+    for (size_t i = 0; i < shots * 4; i++)
+        CHECK((samples3[i] == 0. || samples3[i] == 1.));
+    for (size_t i = 0; i < shots * 4; i++)
+        CHECK((samples4[i] == 0. || samples4[i] == 1.));
+}
+
 TEMPLATE_LIST_TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[Measures]",
                         SimTypes)
 {
