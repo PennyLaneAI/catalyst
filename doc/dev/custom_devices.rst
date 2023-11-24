@@ -134,9 +134,13 @@ One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` `as an 
 Integration with Python devices
 ===============================
 
+There are two things that are needed in order to integrate with PennyLane devices:
+
+* Adding a ``get_c_interface`` method to your ``qml.QubitDevice`` class.
+* Adding a ``config`` class variable pointing to your configuration file.
+
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
-After doing so, Catalyst should be able to interface with your custom device.
 
 .. note::
 
@@ -153,6 +157,8 @@ After doing so, Catalyst should be able to interface with your custom device.
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
+        author = "Erick Ochoa"
+        config = pathlib.Path("path/to/configuration/file.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -172,3 +178,84 @@ After doing so, Catalyst should be able to interface with your custom device.
     @qml.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
+
+
+Below is an example configuration file
+
+.. code-block:: toml
+
+        schema = 1
+
+        [device]
+        name = "dummy.device"
+        version = "v0.32.0"
+        precision = ['float32', 'float64']
+
+        [operations]
+        observables = [
+                "NamedObs",
+                "HermitianObs",
+                "TensorObs",
+                "HamiltonianObs",
+        ]
+
+        [[operations.gates]]
+        full = [
+                "Identity",
+                "PauliX",
+                "PauliY",
+                "PauliZ",
+                "Hadamard",
+                "S",
+                "T",
+                "PhaseShift",
+                "RX",
+                "RY",
+                "RZ",
+                "Rot",
+                "CNOT",
+                "CY",
+                "CZ",
+                "SWAP",
+                "IsingXX",
+                "IsingXY",
+                "IsingYY",
+                "IsingZZ",
+                "ControlledPhaseShift",
+                "CRX",
+                "CRY",
+                "CRZ",
+                "CRot",
+                "Toffoli",
+                "CSWAP",
+                "MultiRZ",
+        ]
+
+        # Gates which should be decomposed to qml.QubitUnitary.
+        matrix = [
+                "OrbitalRotation",
+                "MultiControlledX",
+                "DoubleExcitation",
+                "DoubleExcitationMinus",
+                "DoubleExcitationPlus",
+                "SingleExcitation",
+                "SingleExcitationMinus",
+                "SingleExcitationPlus",
+        ]
+
+        [measurements]
+        exactshots = [
+                "Expval",
+                "Var",
+        ]
+        finiteshots = [
+                "Probs",
+                "Sample",
+                "Measure",
+        ]
+
+        [compilation]
+        qjit_compatible = true
+        control_flow = true
+        dynamic_qubit_management = false
+
