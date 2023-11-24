@@ -40,6 +40,9 @@
    [1. 1. 1.]]
   ```
 
+* Support for `mcmc` sampling in `lightning.qubit`.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+
 <h3>Improvements</h3>
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
@@ -56,6 +59,9 @@
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
 <h3>Breaking changes</h3>
+
+* Third party device must now specify a configuration toml file.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 <h3>Bug fixes</h3>
 
