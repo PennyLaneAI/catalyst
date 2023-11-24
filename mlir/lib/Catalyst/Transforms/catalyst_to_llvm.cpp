@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include <unordered_map>
+#include <iostream>
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -457,29 +459,34 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Create function
         Type ptr = LLVM::LLVMPointerType::get(ctx);
 
-        FunctionType type = FunctionType::get(ctx, {/*args=*/ptr, /*rets=*/ptr}, {});
-        auto customCallFnOp = rewriter.create<func::FuncOp>(loc, op.getCallTargetName(), type);
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        auto type = LLVM::LLVMFunctionType::get(voidType, {/*args=*/ptr, /*rets=*/ptr});
+        auto point = rewriter.saveInsertionPoint();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+        LLVM::LLVMFuncOp customCallFnOp =
+            rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type);
         customCallFnOp.setPrivate();
-
+        rewriter.restoreInsertionPoint(point);
         // Setup args and res
         int32_t numberArg = op.getNumberOriginalArgAttr()[0];
         SmallVector<Value> operands = op.getOperands();
-        SmallVector<Value> args = {operands.begin(), operands.end() - numberArg};
-        SmallVector<Value> res = {operands.begin() + numberArg, operands.end()};
+        SmallVector<Value> args = {operands.begin(), operands.begin() + numberArg};
+        SmallVector<Value> res = {operands.begin() + (numberArg+1), operands.end()};
 
         SmallVector<Value> operandsConverted = adaptor.getOperands();
         SmallVector<Value> argsConverted = {operandsConverted.begin(),
-                                            operandsConverted.end() - numberArg};
-        SmallVector<Value> resConverted = {operandsConverted.begin() + numberArg,
+                                            operandsConverted.begin() + numberArg};
+        SmallVector<Value> resConverted = {operandsConverted.begin() + (numberArg+1),
                                            operandsConverted.end()};
 
         // Encode args
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        SmallVector<mlir::LLVM::AllocaOp> encoded;
+        SmallVector<LLVM::AllocaOp> encoded;
         for (auto tuple : llvm::drop_begin(llvm::zip(args, argsConverted))) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             auto encoded_arg = EncodeMemRef(loc, rewriter, memref_type, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, type, c1, 0);
+            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_arg.getType(), c1, 0);
             // Start the lifetime of encoded value.
             rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
             // Use volatile store to suppress expensive LLVM optimizations.
@@ -490,6 +497,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         // We store encoded arguments as `!llvm.array<ptr x len>`.
         size_t len = encoded.size();
+        std::cout << len << std::endl;
         Type typeArgs = LLVM::LLVMArrayType::get(ptr, len);
 
         // Prepare an array for encoded arguments.
@@ -503,7 +511,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             insertValueArgs(pair.value(), offset);
         }
         // Get allocation for packed arguments pointers.
-        LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, type, c1, 0);
+        LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, arrArgs.getType(), c1, 0);
 
         // Start the lifetime of the encoded arguments pointers.
         rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
@@ -518,11 +526,11 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Results: ########
 
         // Encode all returns as a set of pointers
-        SmallVector<mlir::LLVM::AllocaOp> encodedRes;
+        SmallVector<LLVM::AllocaOp> encodedRes;
         for (auto tuple : llvm::zip(res, resConverted)) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             auto encoded_res = EncodeMemRef(loc, rewriter, memref_type, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, type, c1, 0);
+            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_res.getType(), c1, 0);
             // Start the lifetime of encoded value.
             rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
             // Use volatile store to suppress expensive LLVM optimizations.
@@ -548,20 +556,24 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         }
 
         // Get allocation for packed results pointers.
-        LLVM::AllocaOp allocaRes = rewriter.create<LLVM::AllocaOp>(loc, ptr, type, c1, 0);
+        LLVM::AllocaOp allocaRes = rewriter.create<LLVM::AllocaOp>(loc, ptr, arrRes.getType(), c1, 0);
 
         // Start the lifetime of the encoded results pointers allocation.
         rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), allocaRes);
 
         // Store constructed results pointers array on the stack. Use volatile
         // store to suppress expensive LLVM optimizations.
-        rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes, /*alignment=*/0, /*isVolatile=*/true);
+        rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes, /*alignment=*/0,
+                                       /*isVolatile=*/true);
 
         // Alloca that encodes the custom call returns.
         auto encodedResults = allocaRes;
         // Call op
-        func::CallOp call = rewriter.create<func::CallOp>(
-            loc, customCallFnOp, ValueRange{encodedArguments, encodedResults});
+        customCallFnOp.dump();
+        encodedArguments.dump();
+        encodedResults.dump();
+        SmallVector<Value> callArgs{encodedArguments, encodedResults};
+        auto call = rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
 
         // Decode res
         SmallVector<Value> decodedResults;
@@ -587,7 +599,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // for (LLVM::AllocaOp alloca : rets->allocas)
         //     b.create<LLVM::LifetimeEndOp>(size, alloca);
 
-        rewriter.replaceOp(op, ValueRange(decodedResults));
+        // rewriter.replaceOp(op, ValueRange(decodedResults));
+        rewriter.eraseOp(op);
         return success();
     }
 };
