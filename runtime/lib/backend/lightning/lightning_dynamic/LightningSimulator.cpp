@@ -276,7 +276,6 @@ std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
 
 void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
 {
-
     auto li_samples = this->GenerateSamples(shots);
 
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
