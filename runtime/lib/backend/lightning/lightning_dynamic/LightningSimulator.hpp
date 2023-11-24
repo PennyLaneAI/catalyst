@@ -146,5 +146,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     auto Measure(QubitIdType wire) -> Result override;
     void Gradient(std::vector<DataView<double, 1>> &gradients,
                   const std::vector<size_t> &trainParams) override;
+    auto GenerateSamples(size_t shots) -> std::vector<size_t>;
 };
 } // namespace Catalyst::Runtime::Simulator

@@ -241,7 +241,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
+std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
 {
     // generate_samples is a member function of the Measures class.
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
@@ -251,7 +251,15 @@ void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
     // Given the number of samples, returns 1-D vector of samples
     // in binary, each sample is separated by a stride equal to
     // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    //
+    // Return Value Optimization (RVO)
+    return m.generate_samples(shots);
+}
+
+void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
+{
+
+    auto li_samples = this->GenerateSamples(shots);
 
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
 
