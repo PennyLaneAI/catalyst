@@ -241,8 +241,26 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
+std::vector<size_t> LightningSimulator::GenerateSamplesMetropolis(size_t shots)
+{
+    // generate_samples_metropolis is a member function of the Measures class.
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
+
+    // PL-Lightning generates samples using the alias method.
+    // Reference: https://en.wikipedia.org/wiki/Alias_method
+    // Given the number of samples, returns 1-D vector of samples
+    // in binary, each sample is separated by a stride equal to
+    // the number of qubits.
+    //
+    // Return Value Optimization (RVO)
+    return m.generate_samples_metropolis(this->kernel_name, this->num_burnin, shots);
+}
+
 std::vector<size_t> LightningSimulator::GenerateSamples(size_t shots)
 {
+    if (this->mcmc) {
+        return this->GenerateSamplesMetropolis(shots);
+    }
     // generate_samples is a member function of the Measures class.
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
@@ -291,15 +309,7 @@ void LightningSimulator::PartialSample(DataView<double, 2> &samples,
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    // generate_samples is a member function of the Measures class.
-    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-
-    // PL-Lightning generates samples using the alias method.
-    // Reference: https://en.wikipedia.org/wiki/Alias_method
-    // Given the number of samples, returns 1-D vector of samples
-    // in binary, each sample is separated by a stride equal to
-    // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto li_samples = this->GenerateSamples(shots);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -322,15 +332,7 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
     RT_FAIL_IF(eigvals.size() != numElements || counts.size() != numElements,
                "Invalid size for the pre-allocated counts");
 
-    // generate_samples is a member function of the Measures class.
-    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-
-    // PL-Lightning generates samples using the alias method.
-    // Reference: https://en.wikipedia.org/wiki/Alias_method
-    // Given the number of samples, returns 1-D vector of samples
-    // in binary, each sample is separated by a stride equal to
-    // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto li_samples = this->GenerateSamples(shots);
 
     // Fill the eigenvalues with the integer representation of the corresponding
     // computational basis bitstring. In the future, eigenvalues can also be
@@ -368,15 +370,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    // generate_samples is a member function of the Measures class.
-    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-
-    // PL-Lightning generates samples using the alias method.
-    // Reference: https://en.wikipedia.org/wiki/Alias_method
-    // Given the number of samples, returns 1-D vector of samples
-    // in binary, each sample is separated by a stride equal to
-    // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto li_samples = this->GenerateSamples(shots);
 
     // Fill the eigenvalues with the integer representation of the corresponding
     // computational basis bitstring. In the future, eigenvalues can also be

@@ -44,7 +44,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
     static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
-    static constexpr size_t default_num_burning{100};   // tidy: readability-magic-numbers
+    static constexpr size_t default_num_burnin{100};    // tidy: readability-magic-numbers
     static constexpr std::string_view default_kernel_name{
         "Local"}; // tidy: readability-magic-numbers
 
@@ -54,7 +54,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     size_t device_shots;
 
     bool mcmc{false};
-    size_t num_burning{0};
+    size_t num_burnin{0};
     std::string kernel_name;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
@@ -92,10 +92,10 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
-        mcmc = args.contains("mcmc") ? args["mcmc"].compare("True") : false;
-        num_burning = args.contains("num_burning")
-                          ? static_cast<size_t>(std::stoll(args["num_burning"]))
-                          : default_num_burning;
+        mcmc = args.contains("mcmc") ? args["mcmc"] == "True" : false;
+        num_burnin = args.contains("num_burnin")
+                         ? static_cast<size_t>(std::stoll(args["num_burnin"]))
+                         : default_num_burnin;
         kernel_name = args.contains("kernel_name") ? args["kernel_name"] : default_kernel_name;
     }
     ~LightningSimulator() override = default;
@@ -146,6 +146,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     auto Measure(QubitIdType wire) -> Result override;
     void Gradient(std::vector<DataView<double, 1>> &gradients,
                   const std::vector<size_t> &trainParams) override;
+    auto GenerateSamplesMetropolis(size_t shots) -> std::vector<size_t>;
     auto GenerateSamples(size_t shots) -> std::vector<size_t>;
 };
 } // namespace Catalyst::Runtime::Simulator
