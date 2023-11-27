@@ -340,21 +340,19 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
                         explicintess flags).
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
-    # Notes:
-    # [1] - The compilation cache must be clear for each translation unit.
-    #       Otherwise, MLIR functions which do not exist in the current translation unit will be
-    #       assumed to exist if an equivalent python function is seen in the cache. This happens
-    #       during testing or if we wanted to compile a single python function multiple times with
-    #       different options.
-    # [2] - We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
 
-    mlir_fn_cache.clear()  # [1]
+    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
+    # which do not exist in the current translation unit will be assumed to exist if an equivalent
+    # python function is seen in the cache. This happens during testing or if we wanted to compile a
+    # single python function multiple times with different options.
+    mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
         make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes}
         jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)  # [2]
+    # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
+    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
     return module, context, jaxpr, out_type2, out_tree
 
