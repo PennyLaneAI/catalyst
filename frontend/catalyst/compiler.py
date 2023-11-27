@@ -25,7 +25,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 

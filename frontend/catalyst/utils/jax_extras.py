@@ -74,6 +74,8 @@ from jax.tree_util import (
 )
 from jaxlib.xla_extension import PyTreeRegistry
 
+from catalyst.utils.patching import Patcher
+
 # pylint: disable=protected-access
 
 __all__ = (
@@ -294,6 +296,17 @@ def deduce_avals(f: Callable, args, kwargs):
     return wffa, in_avals, keep_inputs, out_tree_promise
 
 
+def get_aval2(x):
+    """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
+    # TODO: remove this patch when https://github.com/google/jax/pull/18579 is merged
+    if isinstance(x, AbstractValue):
+        return x
+    elif isinstance(x, Tracer):
+        return x.aval
+    else:
+        return concrete_aval(x)
+
+
 def jaxpr_to_mlir(func_name, jaxpr):
     """Lower a Jaxpr into an MLIR module.
 
@@ -307,19 +320,20 @@ def jaxpr_to_mlir(func_name, jaxpr):
         jaxpr: the jaxpr corresponding to ``func``
     """
 
-    nrep = jaxpr_replicas(jaxpr)
-    effects = jax_ordered_effects.filter_in(jaxpr.effects)
-    axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = new_name_stack(wrap_name("ok", "jit"))
-    module, context = custom_lower_jaxpr_to_module(
-        func_name="jit_" + func_name,
-        module_name=func_name,
-        jaxpr=jaxpr,
-        effects=effects,
-        platform="cpu",
-        axis_context=axis_context,
-        name_stack=name_stack,
-    )
+    with Patcher((jax._src.interpreters.partial_eval, "get_aval", get_aval2)):
+        nrep = jaxpr_replicas(jaxpr)
+        effects = jax_ordered_effects.filter_in(jaxpr.effects)
+        axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+        name_stack = new_name_stack(wrap_name("ok", "jit"))
+        module, context = custom_lower_jaxpr_to_module(
+            func_name="jit_" + func_name,
+            module_name=func_name,
+            jaxpr=jaxpr,
+            effects=effects,
+            platform="cpu",
+            axis_context=axis_context,
+            name_stack=name_stack,
+        )
 
     return module, context
 
@@ -429,23 +443,6 @@ def jaxpr_remove_implicit(
     return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
 
 
-# fmt:off
-# TODO: remove this patch when https://github.com/google/jax/pull/18579 is merged
-def get_aval2(x):
-    """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
-    if isinstance(x, AbstractValue):
-        return x
-    elif isinstance(x, Tracer):
-        return x.aval
-    else:
-        return concrete_aval(x)
-
-import jax._src.interpreters.partial_eval  # pylint: disable=wrong-import-position, ungrouped-imports
-
-jax._src.interpreters.partial_eval.get_aval = get_aval2
-# fmt:on
-
-
 def make_jaxpr2(
     fun: Callable,
     abstracted_axes: Any | None = None,
@@ -467,11 +464,11 @@ def make_jaxpr2(
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
         # TODO: re-use `deduce_avals` here.
-        f = wrap_init(fun)
-        in_type, in_tree = abstractify(args, kwargs)
-        f, out_tree_promise = flatten_fun(f, in_tree)
-        f = annotate(f, in_type)
-        with ExitStack():
+        with Patcher((jax._src.interpreters.partial_eval, "get_aval", get_aval2)), ExitStack():
+            f = wrap_init(fun)
+            in_type, in_tree = abstractify(args, kwargs)
+            f, out_tree_promise = flatten_fun(f, in_tree)
+            f = annotate(f, in_type)
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
         return closed_jaxpr, out_type, out_tree_promise()  # [2]
