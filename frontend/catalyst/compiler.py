@@ -65,7 +65,7 @@ class CompileOptions:
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
-    abstracted_axes: Optional[Any] = None
+    abstracted_axes: Optional[Iterable[Iterable[str]] | Dict[int, str]] = None
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
