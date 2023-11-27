@@ -18,16 +18,19 @@
 
 import jax.numpy as jnp
 import pennylane as qml
+from jax.core import ShapedArray
 
 from catalyst import qjit
 
 
-def print_attr(f, attr, *args, **kwargs):
+def print_attr(f, attr, *args, aot: bool = False, **kwargs):
     """Print function attribute"""
     name = f"TEST {f.__name__}"
     print("\n" + "-" * len(name))
     print(f"{name}\n")
-    res = f(*args, **kwargs)
+    res = None
+    if not aot:
+        res = f(*args, **kwargs)
     print(getattr(f, attr))
     return res
 
@@ -103,3 +106,14 @@ def test_qnode_dynamic_result(a):
 
 
 print_jaxpr(test_qnode_dynamic_result, 3)
+
+
+# CHECK-LABEL: test_qjit_aot
+@qjit(abstracted_axes={0: "n", 2: "m"})
+def test_qjit_aot(a: ShapedArray([1, 3, 1], dtype=float)):
+    """Test running aor compilation"""
+    # CHECK:        tensor<?x3x?xf64>
+    return a
+
+
+print_mlir(test_qjit_aot, aot=True)
