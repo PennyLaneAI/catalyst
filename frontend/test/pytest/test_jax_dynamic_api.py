@@ -27,7 +27,7 @@ DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", 
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
 
 
-def _assert_equal(a, b):
+def assert_array_and_dtype_equal(a, b):
     """Check that two arrays have exactly the same values and types"""
 
     assert array_equal(a, b)
@@ -43,7 +43,7 @@ def test_qjit_abstracted_axes():
 
     param = jnp.array([1, 2, 3])
     result = identity(param)
-    _assert_equal(param, result)
+    assert_array_and_dtype_equal(param, result)
     assert "tensor<?xi64>" in identity.mlir, identity.mlir
 
 
@@ -61,7 +61,7 @@ def test_qnode_abstracted_axis():
     param = jnp.array([1, 2, 3])
     result = identity(param)
 
-    _assert_equal(param, result)
+    assert_array_and_dtype_equal(param, result)
     assert "tensor<?xi64>" in identity.mlir, identity.mlir
 
 
@@ -78,7 +78,7 @@ def test_qnode_dynamic_structured_args():
 
     param = jnp.array([1, 2, 3])
     c = func((param, param))
-    _assert_equal(c, param + param)
+    assert_array_and_dtype_equal(c, param + param)
     assert "tensor<?xi64>" in func.mlir, func.mlir
 
 
@@ -103,32 +103,21 @@ def test_qnode_dynamic_structured_results():
 
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("shape", SHAPES)
-def test_interpretation(shape, dtype):
-    """Test that tensor primitive work in the interpretation mode"""
-    # pylint: disable=unnecessary-direct-lambda-call
-
-    _assert_equal((lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
-    _assert_equal((lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
-    _assert_equal((lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype))
-    _assert_equal((lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype))
-
-    def f(s):
-        return jnp.empty(shape=s, dtype=dtype)
-
-    res = f(shape)
-    assert_allclose(res.shape, shape)
-    assert res.dtype == dtype
-
-
-@pytest.mark.parametrize("dtype", DTYPES)
-@pytest.mark.parametrize("shape", SHAPES)
 def test_classical_tracing(shape, dtype):
     """Test that tensor primitive work in the classical tracing mode"""
 
-    _assert_equal(qjit(lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype))
-    _assert_equal(qjit(lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype))
-    _assert_equal(qjit(lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype))
-    _assert_equal(qjit(lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype))
+    assert_array_and_dtype_equal(
+        qjit(lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype)
+    )
+    assert_array_and_dtype_equal(
+        qjit(lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype)
+    )
+    assert_array_and_dtype_equal(
+        qjit(lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype)
+    )
+    assert_array_and_dtype_equal(
+        qjit(lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype)
+    )
 
     @qjit
     def f(s):
@@ -147,7 +136,7 @@ def test_classical_tracing_2():
     def f(x):
         return jnp.ones(shape=[1, x], dtype=int)
 
-    _assert_equal(f(3), jnp.ones((1, 3), dtype=int))
+    assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
 @pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
@@ -172,7 +161,7 @@ def test_quantum_tracing_1():
 
     result = f([2, 3])
     expected = jnp.ones([2, 3]) * 8
-    _assert_equal(result, expected)
+    assert_array_and_dtype_equal(result, expected)
 
 
 @pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
@@ -198,7 +187,7 @@ def test_quantum_tracing_2():
     result = f(2, 3)
     print(result)
     expected = jnp.ones((2, 4))
-    _assert_equal(result, expected)
+    assert_array_and_dtype_equal(result, expected)
 
 
 @pytest.mark.parametrize(

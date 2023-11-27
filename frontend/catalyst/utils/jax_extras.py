@@ -449,7 +449,6 @@ def make_jaxpr2(
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
     # Notes:
-    # delete when https://github.com/google/jax/pull/18505 is merged
     # [1] - We always infer implicit arguments, regardless of the presence of the
     #       ``abstracted_axes`` parameter.
     # [2] - Unlike the upstream version, ``return_shape`` argument is not supported, output type is
