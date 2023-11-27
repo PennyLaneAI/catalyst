@@ -174,6 +174,22 @@ def test_classical_tracing_binary_ops(op):
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
+@pytest.mark.skip("Failing operation on 3D-arrays possibly due to a bug in Jax")
+def test_classical_tracing_binary_ops_3D():
+    """Test that tensor primitives work with basic binary operations on 3D arrays"""
+    # TODO: Unify with the previous test after fixing
+
+    shape = (1, 2, 3)
+    dtype = complex
+    op = lambda a, b: a + b
+
+    @qjit
+    def f(s):
+        return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
+
+    assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
+
+
 def test_classical_tracing_2():
     """Test that tensor primitive work in the classical tracing mode, the traced dimention case"""
 
