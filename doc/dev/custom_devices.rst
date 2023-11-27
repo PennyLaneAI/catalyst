@@ -101,7 +101,7 @@ with `status` representing the initial state of the tape recording system, and `
 representing a dictionary of device specifications in string format. The destructor of
 ``CustomDevice`` will be automatically called by the runtime.
 
-.. note::
+.. warning::
 
     This interface might change quickly in the near future.
     Please check back regularly for updates and to ensure your device is compatible with
@@ -153,11 +153,11 @@ After doing so, Catalyst should be able to interface with your custom device.
 
         @staticmethod
         def get_c_interface():
-            """ The tuple of davice name and the location
-                to shared object with C/C++ implementation.
+            """ Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
             """
 
-            return "CustomDevice", "full/path/to/libdummy_device.so"
+            return "CustomDevice", "absolute/path/to/libdummy_device.so"
 
     @qjit
     @qml.qnode(CustomDevice(wires=1))

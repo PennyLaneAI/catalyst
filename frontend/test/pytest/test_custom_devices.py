@@ -52,7 +52,9 @@ def test_custom_device():
 
         @staticmethod
         def get_c_interface():
-            """A tuple of device name and location to shared object with C/C++ implementation"""
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
 
             return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
@@ -92,7 +94,9 @@ def test_custom_device_bad_directory():
 
         @staticmethod
         def get_c_interface():
-            """A tuple of device name and location to shared object with C/C++ implementation"""
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
 
             return "DummyDevice", "this-file-does-not-exist.so"
 

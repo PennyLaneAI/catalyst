@@ -413,7 +413,6 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        # export ASAN_OPTIONS=detect_odr_violation=0
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
         make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
@@ -583,8 +582,6 @@ jobs:
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-          # Disabling leak detection is usually required when running Python.
-          ASAN_OPTIONS=detect_leaks=0 \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \

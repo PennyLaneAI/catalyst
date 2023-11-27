@@ -100,7 +100,7 @@ dummy_device:
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "test the Catalyst runtime test suite"
-	$(RT_BUILD_DIR)/tests/runner_tests_lightning
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(RT_BUILD_DIR)/tests/runner_tests_openqasm

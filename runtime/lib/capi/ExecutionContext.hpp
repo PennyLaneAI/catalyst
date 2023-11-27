@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <dlfcn.h>
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -27,14 +29,12 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
-#include <dlfcn.h>
-
 namespace Catalyst::Runtime {
 
 /**
  * A (RAII) class for `pybind11::initialize_interpreter` and `pybind11::finalize_interpreter`.
  *
- * @note This is not copiable or movable and used in C++ tests and the ExecutionContext manager
+ * @note This is not copyable or movable and used in C++ tests and the ExecutionContext manager
  * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
  * tests which also enables the runtime to reuse the same interpreter in the scope of the global
  * quantum device unique pointer.
@@ -108,15 +108,15 @@ class SharedLibraryManager final {
         // Please re-compile without sanitizers.
 
 #ifdef __APPLE__
-        // macOS doesn't support RTLD_DEEPBIND
-        _handler = dlopen(filename.c_str(), RTLD_LAZY);
+        auto rtld_flags = RTLD_LAZY;
 #else
-        // Closing the dynamic library of Lightning simulators with dlclose() where
-        // OpenMP directives are in use would raise memory segfaults
-        // Ali: Adding RTLD_NODELETE fixed the issue.
-
-        _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_NODELETE);
+        // Closing the dynamic library of Lightning simulators with dlclose() where OpenMP
+        // directives (in Lightning simulators) are in use would raise memory segfaults.
+        // Note that we use RTLD_NODELETE as a workaround to fix the issue.
+        auto rtld_flags = RTLD_LAZY | RTLD_NODELETE;
 #endif
+
+        _handler = dlopen(filename.c_str(), rtld_flags);
         RT_FAIL_IF(!_handler, dlerror());
     }
 
@@ -176,6 +176,16 @@ class ExecutionContext final {
     std::unique_ptr<SharedLibraryManager> _driver_so_ptr{nullptr};
     std::unique_ptr<PythonInterpreterGuard> _py_guard{nullptr};
 
+    // Helper methods
+    void update_device_pl2runtime(std::string &pl_name, const std::string &rtd_name)
+    {
+#ifdef __linux__
+        pl_name = "librtd_" + rtd_name + ".so";
+#elif defined(__APPLE__)
+        pl_name = "libsmo_" + rtd_name + ".dylib";
+#endif
+    }
+
   public:
     explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
         : _device_name(default_device), _tape_recording(false)
@@ -221,46 +231,22 @@ class ExecutionContext final {
         // Reset the driver pointer
         _driver_ptr.reset(nullptr);
 
+        // Convert to a mutable string
+        std::string rtd_lib_str{rtd_lib};
+
         // LCOV_EXCL_START
-        // TODO: This can be added to a dictionary or function
-        {
-            // The following is required for C++ tests where these
-            // backend devices are linked in the interface library
-            // of the runtime.
-            // Besides, it provides support for libraries added to
-            // the system path.
-            if (rtd_lib == "lightning.qubit") {
-                _device_name = "LightningSimulator";
-#ifdef __linux__
-                rtd_lib = "librtd_lightning.so";
-#elif defined(__APPLE__)
-                rtd_lib = "librtd_lightning.dylib";
-#endif
-            }
-            else if (rtd_lib == "lightning.kokkos") {
-                _device_name = "LightningKokkosSimulator";
-#ifdef __linux__
-                rtd_lib = "librtd_lightning.so";
-#elif defined(__APPLE__)
-                rtd_lib = "librtd_lightning.dylib";
-#endif
-            }
-            else if (rtd_lib == "braket.aws.qubit") {
-                _device_name = "OpenQasmDevice";
-#ifdef __linux__
-                rtd_lib = "librtd_openqasm.so";
-#elif defined(__APPLE__)
-                rtd_lib = "librtd_openqasm.dylib";
-#endif
-            }
-            else if (rtd_lib == "braket.local.qubit") {
-                _device_name = "OpenQasmDevice";
-#ifdef __linux__
-                rtd_lib = "librtd_openqasm.so";
-#elif defined(__APPLE__)
-                rtd_lib = "librtd_openqasm.dylib";
-#endif
-            }
+        // The following is required for C++ tests where these backend devices
+        // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
+        // Besides, this provides support for runtime device (RTD) libraries added to the system
+        // path.
+        if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
+            _device_name =
+                (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
+            update_device_pl2runtime(rtd_lib_str, "lightning");
+        }
+        else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
+            _device_name = "OpenQasmDevice";
+            update_device_pl2runtime(rtd_lib_str, "openqasm");
         }
         // LCOV_EXCL_STOP
 
@@ -270,7 +256,7 @@ class ExecutionContext final {
         }
 #endif
 
-        QuantumDevice *impl = loadDevice(std::string(rtd_lib));
+        QuantumDevice *impl = loadDevice(rtd_lib_str);
         _driver_ptr.reset(impl);
         return true;
     }

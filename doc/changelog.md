@@ -18,6 +18,19 @@
 
 <h3>Improvements</h3>
 
+* ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last 
+  quantum register is deallocated instead of the first one. This allows to return the quantum
+  register in functions and can be given to another function (useful for quantum transformation).
+  [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
+
+* The quantum adjoint compiler routine has been extended to support function calls that affect the
+  quantum state within an adjoint region. Note that the function may only provide a single result
+  consisting of the quantum register.
+  By itself this provides no user-facing changes, but compiler pass developers may now generate
+  quantum adjoint operations around a block of code containing function calls as well as quantum
+  operations and control flow operations.
+  [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -27,6 +40,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Romain Moyard,
 Erick Ochoa Lopez.
 
 # Release 0.3.2
