@@ -69,9 +69,9 @@ def extract_backend_info(device):
 
         if sys_platform == "Linux":
             device_lpath = os.path.join(device_lpath, SUPPORTED_RT_DEVICES[dname][1] + ".so")
-        elif sys_platform == "Darwin":
+        elif sys_platform == "Darwin":  # pragma: no cover
             device_lpath = os.path.join(device_lpath, SUPPORTED_RT_DEVICES[dname][1] + ".dylib")
-        else:
+        else:  # pragma: no cover
             raise NotImplementedError(f"Platform not supported: {sys_platform}")
     elif hasattr(device, "get_c_interface"):
         # Support for third party devices
