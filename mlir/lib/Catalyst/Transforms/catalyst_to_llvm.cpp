@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <unordered_map>
 #include <iostream>
+#include <unordered_map>
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
@@ -404,49 +404,6 @@ Value EncodeMemRef(Location loc, PatternRewriter &rewriter, MemRefType memref_ty
     return memref;
 }
 
-// Convert EncodedMemRef back to llvm MemRef descriptor, e.g.,
-//   !llvm.struct<(i8, i8, ptr, array<2 x i64>)>
-//     --->>> (note that memref descriptor still uses typed LLVM pointers)
-//   !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
-Value DecodeMemref(Location loc, PatternRewriter &rewriter, Type type, Type converted,
-                   LLVM::AllocaOp alloca)
-{
-    auto ctx = rewriter.getContext();
-    auto memref_type = cast<MemRefType>(type);
-    auto memref_desc = MemRefDescriptor::undef(rewriter, loc, converted);
-    Type ptr = LLVM::LLVMPointerType::get(ctx);
-    // Encode sizes together with strides as a single array.
-    int64_t sizes_and_strides_size = 2 * memref_type.getRank();
-
-    // Encoded memref type: !llvm.struct<(i8, i8, ptr<i8>, array<... x i64>)>.
-    Type i8 = rewriter.getI8Type();
-    Type arr = LLVM::LLVMArrayType::get(rewriter.getI64Type(), sizes_and_strides_size);
-    auto encoded = LLVM::LLVMStructType::getLiteral(ctx, {i8, i8, ptr, arr});
-
-    Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
-    Value c2 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(2));
-
-    // Fill memref descriptor pointers and offset.
-    Value gep = rewriter.create<LLVM::GEPOp>(loc, ptr, encoded, alloca, ValueRange({c0, c2}));
-    Value data_ptr = rewriter.create<LLVM::LoadOp>(loc, ptr, gep);
-    memref_desc.setAllocatedPtr(rewriter, loc, data_ptr);
-    memref_desc.setAlignedPtr(rewriter, loc, data_ptr);
-
-    // Get the statically known strides and offset from the memref type.
-    SmallVector<int64_t> strides;
-    int64_t memref_offset;
-    getStridesAndOffset(memref_type, strides, memref_offset);
-    memref_desc.setConstantOffset(rewriter, loc, memref_offset);
-
-    // Fill memref descriptor dimensions and strides.
-    for (unsigned i = 0; i < memref_type.getRank(); ++i) {
-        memref_desc.setConstantSize(rewriter, loc, i, memref_type.getDimSize(i));
-        memref_desc.setConstantStride(rewriter, loc, i, strides[i]);
-    }
-
-    auto casted = rewriter.create<UnrealizedConversionCastOp>(loc, memref_type, Value(memref_desc));
-    return casted.getResult(0);
-}
 
 struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
@@ -472,12 +429,12 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         int32_t numberArg = op.getNumberOriginalArgAttr()[0];
         SmallVector<Value> operands = op.getOperands();
         SmallVector<Value> args = {operands.begin(), operands.begin() + numberArg};
-        SmallVector<Value> res = {operands.begin() + (numberArg+1), operands.end()};
+        SmallVector<Value> res = {operands.begin() + (numberArg + 1), operands.end()};
 
         SmallVector<Value> operandsConverted = adaptor.getOperands();
         SmallVector<Value> argsConverted = {operandsConverted.begin(),
                                             operandsConverted.begin() + numberArg};
-        SmallVector<Value> resConverted = {operandsConverted.begin() + (numberArg+1),
+        SmallVector<Value> resConverted = {operandsConverted.begin() + (numberArg + 1),
                                            operandsConverted.end()};
 
         // Encode args
@@ -486,9 +443,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         for (auto tuple : llvm::drop_begin(llvm::zip(args, argsConverted))) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             auto encoded_arg = EncodeMemRef(loc, rewriter, memref_type, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_arg.getType(), c1, 0);
-            // Start the lifetime of encoded value.
-            rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
+            LLVM::AllocaOp alloca =
+                rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_arg.getType(), c1, 0);
             // Use volatile store to suppress expensive LLVM optimizations.
             rewriter.create<LLVM::StoreOp>(loc, encoded_arg, alloca, /*alignment=*/0,
                                            /*isVolatile=*/true);
@@ -530,9 +486,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         for (auto tuple : llvm::zip(res, resConverted)) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             auto encoded_res = EncodeMemRef(loc, rewriter, memref_type, std::get<1>(tuple));
-            LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_res.getType(), c1, 0);
-            // Start the lifetime of encoded value.
-            rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), alloca);
+            LLVM::AllocaOp alloca =
+                rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_res.getType(), c1, 0);
             // Use volatile store to suppress expensive LLVM optimizations.
             rewriter.create<LLVM::StoreOp>(loc, encoded_res, alloca, /*alignment=*/0,
                                            /*isVolatile=*/true);
@@ -556,10 +511,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         }
 
         // Get allocation for packed results pointers.
-        LLVM::AllocaOp allocaRes = rewriter.create<LLVM::AllocaOp>(loc, ptr, arrRes.getType(), c1, 0);
-
-        // Start the lifetime of the encoded results pointers allocation.
-        rewriter.create<LLVM::LifetimeStartOp>(loc, rewriter.getI64IntegerAttr(-1), allocaRes);
+        LLVM::AllocaOp allocaRes =
+            rewriter.create<LLVM::AllocaOp>(loc, ptr, arrRes.getType(), c1, 0);
 
         // Store constructed results pointers array on the stack. Use volatile
         // store to suppress expensive LLVM optimizations.
@@ -569,37 +522,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Alloca that encodes the custom call returns.
         auto encodedResults = allocaRes;
         // Call op
-        customCallFnOp.dump();
-        encodedArguments.dump();
-        encodedResults.dump();
         SmallVector<Value> callArgs{encodedArguments, encodedResults};
         auto call = rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
-
-        // Decode res
-        SmallVector<Value> decodedResults;
-        for (auto tuple : llvm::zip(res, resConverted, encodedRes)) {
-            auto decodedReturn = DecodeMemref(loc, rewriter, std::get<0>(tuple).getType(),
-                                              std::get<1>(tuple).getType(), std::get<2>(tuple));
-            decodedResults.push_back(decodedReturn);
-        }
-        auto size = rewriter.getI64IntegerAttr(-1);
-
-        // // End the lifetime of encoded arguments and results pointers.
-        // if (auto *alloca = std::get_if<LLVM::AllocaOp>(&args->encoded))
-        //     b.create<LLVM::LifetimeEndOp>(size, *alloca);
-        // if (auto *alloca = std::get_if<LLVM::AllocaOp>(&rets->encoded))
-        //     b.create<LLVM::LifetimeEndOp>(size, *alloca);
-
-        // // End the lifetime of arguments encoded on a stack.
-        // for (auto &arg : args->values)
-        //     if (auto *alloca = std::get_if<LLVM::AllocaOp>(&arg))
-        //         b.create<LLVM::LifetimeEndOp>(size, *alloca);
-
-        // // End the lifetime of results encoded on a stack.
-        // for (LLVM::AllocaOp alloca : rets->allocas)
-        //     b.create<LLVM::LifetimeEndOp>(size, alloca);
-
-        // rewriter.replaceOp(op, ValueRange(decodedResults));
         rewriter.eraseOp(op);
         return success();
     }

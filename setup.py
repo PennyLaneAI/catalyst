@@ -13,12 +13,14 @@
 # limitations under the License.
 
 from os import path
+import importlib.util
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
 from setuptools import (  # pylint: disable=wrong-import-order
     find_namespace_packages,
     setup,
+    Extension,
 )
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
@@ -59,6 +61,23 @@ description = {
 }
 
 
+# Find the Jax lib
+package_name = 'jaxlib'
+file_path_within_package = 'cpu/_lapack.so'
+
+jaxlib_package = importlib.util.find_spec(package_name)
+if jaxlib_package is not None:
+    package_directory = path.dirname(jaxlib_package.origin)
+    jaxlib_so_path = path.join(package_directory, file_path_within_package)
+
+lapack_extension = Extension('lapack_wrapper',
+    sources=['frontend/catalyst/utils/lapack_wrapper.c'], 
+    libraries=['lapack'],
+    library_dirs=[jaxlib_so_path],
+    runtime_library_dirs=[jaxlib_so_path])
+
+ext_modules = [lapack_extension]
+
 lib_path_npymath = path.join(np.get_include(), "..", "lib")
 intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
 for ext in intree_extension_list:
@@ -66,7 +85,7 @@ for ext in intree_extension_list:
     ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
     ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
     ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
-ext_modules = intree_extension_list
+ext_modules.extend(intree_extension_list)
 
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
