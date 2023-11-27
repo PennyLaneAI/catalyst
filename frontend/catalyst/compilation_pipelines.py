@@ -849,22 +849,55 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        abstracted_axes (Optional(Any)): Experimental, a way to specify dynamic tensor shapes.
-            There are two ways to use abstracted_axes, one is passing a sequence of tuples and the
-            other is passing a dictionary. When passing a sequence of tuples
+        abstracted_axes (Optional(Union[
+                Sequence[Sequence[str]],
+                Dict[int, str],
+                Sequence[Dict[int, str]],
+            ])): This is an experimental feature.
+            A way to specify dynamic tensor shapes.
+            This option affects the parameters and the compilation of the annotated function.
+            Parameters with abstracted_axes will be compiled to ranked tensors with dynamic shapes.
 
-                abstracted_axes=(('n',), ('m', 'n'))
+            There are three ways to use abstracted_axes. Passing a sequence of tuples:
 
-            The intended meaning is that the first argument will have the 0th axis be the symbolic
-            variable "n" and the second argument will have the 0th axis be the symbolic variable
-            "n" and the 1st axist will be the symbolic vairable "m".
+            .. code-block:: python
 
-            When passing a dictionary:
+                abstracted_axes=((), ('n',), ('m', 'n'))
+
+            Each tuple in the sequence corresponds to one of the parameters in the annotated
+            function. Each tuple corresponds to a parameter. The first tuple corresponds to the
+            first parameter, the second tuple to the second parameter, and so on. Empty tuples can
+            be used and correspond to parameters with statically known shapes.
+            Non-empty tuples correspond to parameters with dynamically known shapes.
+            The intended meaning is that the first argument will have a statically known shape,
+            the second argument will have the 0th axis be the symbolic
+            variable "n" and the third argument will have the 0th axis be the symbolic variable
+            "n" and the 1st axist will be the symbolic variable "m".
+
+            Passing a dictionary:
+
+            .. code-block:: python
 
                 abstracted_axes={0: 'n'}
 
             it specifies that for all parameters, the 0th axis will be the symbolic variable "n".
-            This allows the user to express relationships between axes in different parameters.
+            This allows the user to concisely express relationships between axes in different
+            parameters.
+
+            Passing a sequence of dictionaries:
+
+            .. code-block:: python
+
+                abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
+
+            The example here is a more verbose version of the tuple example. This convention
+            allows the user to omit axes from abstracted axes.
+
+            Users may want to use abstracted_axes to avoid the cost of recompilation.
+            By using abstracted_axes, a more general version of the compiled function will be
+            generated. This more general version is parametrized over the abstracted axes and
+            allows the user to compute results over tensors independently of their axes lengths.
+
 
     Returns:
         QJIT object.
