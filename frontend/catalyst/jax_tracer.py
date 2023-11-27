@@ -333,12 +333,12 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
         kwargs: keyword arguments to ``func``
 
     Returns:
-        module: the MLIR module corresponding to ``func``
-        context: the MLIR context corresponding
-        jaxpr(ClosedJaxpr): the jaxpr corresponding to ``func``
-        out_type(jax.OutputType): Jaxpr output type (a list of abstract values paired with
-                                  explicintess flags).
-        out_tree(PyTreeDef): PyTree shape of the return values in ``PyTreeDef``
+        MLIR module: the MLIR module corresponding to ``func``
+        MLIR context: the MLIR context
+        ClosedJaxpr: the Jaxpr program corresponding to ``func``
+        jax.OutputType: Jaxpr output type (a list of abstract values paired with
+                        explicintess flags).
+        PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
     # Notes:
     # [1] - The compilation cache must be clear for each translation unit.
