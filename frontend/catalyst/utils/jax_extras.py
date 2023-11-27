@@ -448,17 +448,11 @@ def make_jaxpr2(
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
-    # Notes:
-    # [1] - We always infer implicit arguments, regardless of the presence of the
-    #       ``abstracted_axes`` parameter.
-    # [2] - Unlike the upstream version, ``return_shape`` argument is not supported, output type is
-    #       the PyTree-shape are returned as-is. The overal output format is consistent with the one
-    #       of ``frame.to_jaxpr2``.
 
     def abstractify(args, kwargs):
         flat_args, in_tree = tree_flatten((args, kwargs))
         axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
-        in_type = infer_lambda_input_type(axes_specs, flat_args)  # [1]
+        in_type = infer_lambda_input_type(axes_specs, flat_args)
         return in_type, in_tree
 
     @wraps(fun)
@@ -471,7 +465,7 @@ def make_jaxpr2(
             f = annotate(f, in_type)
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        return closed_jaxpr, out_type, out_tree_promise()  # [2]
+        return closed_jaxpr, out_type, out_tree_promise()
 
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
     return make_jaxpr_f
