@@ -103,7 +103,7 @@ test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
 
 ifeq ($(ENABLE_OPENQASM), ON)
-	$(RT_BUILD_DIR)/tests/runner_tests_openqasm
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
 
 .PHONY: coverage

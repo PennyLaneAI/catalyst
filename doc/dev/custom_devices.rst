@@ -87,19 +87,40 @@ Additionally, all measurements will always return ``true``.
             void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
         };
 
-In addition to implementing the ``QuantumDevice`` class, one must implement the following method:
+In addition to implementing the ``QuantumDevice`` class, one must implement the following method
+with the name ``CustomDevice`` + ``Factory``:
 
 .. code-block:: c++
 
     extern "C" Catalyst::Runtime::QuantumDevice*
     CustomDeviceFactory(bool status, const std::string &kwargs)
-    { 
+    {
         return new CustomDevice(status, kwargs); }
 
-where ``CustomDevice(status, kwargs)`` serves as a constructor for your custom device,
-with `status` representing the initial state of the tape recording system, and `kwargs`
-representing a dictionary of device specifications in string format. The destructor of
-``CustomDevice`` will be automatically called by the runtime.
+The use of the term ``Factory`` in ``CustomDeviceFactory`` is a runtime convention that combines the name
+of the device class, in this case, ``CustomDevice``, with the suffix ``Factory``. This signifies that the
+primary purpose of the method is to act as a factory for creating instances of the ``CustomDevice`` class.
+
+.. warning::
+
+    The runtime exclusively supports factory methods with the name of the device class followed by ``Factory``.
+    Please ensure that your method adheres to this naming convention.
+
+``CustomDevice(status, kwargs)`` serves as a constructor for your custom device, with
+
+- ``status``: A boolean to control the initial value of the tape recording system in the runtime.
+  If ``true``, this will cache the entire operations and observables in a program.
+  This may be used to compute gradient of a quantum circuit with taking advantage of gradient
+  methods provided by backend devices if supported.
+
+- ``kwargs``: A string that represents a Python dictionary of device specifications in string format.
+  This may contain information about the device type and a number of shots:
+  ``{'device_type': 'lightning.qubit', 'shots': 0}``.
+
+These parameters are automatically initialized in the frontend using the device specifications specified
+by users via :func:`qml.device() <pennylane.device>`.
+
+The destructor of ``CustomDevice`` will be automatically called by the runtime.
 
 .. warning::
 
