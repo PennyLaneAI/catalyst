@@ -87,8 +87,11 @@ def test_qnode_dynamic_structured_results():
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit(a):
-        return jnp.ones((a + 1,)), jnp.ones(
-            (a + 2),
+        return (
+            jnp.ones((a + 1,)),
+            jnp.ones(
+                (a + 2),
+            ),
         )
 
     @qjit
@@ -103,7 +106,7 @@ def test_qnode_dynamic_structured_results():
 
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("shape", SHAPES)
-def test_classical_tracing(shape, dtype):
+def test_classical_tracing_init(shape, dtype):
     """Test that tensor primitive work in the classical tracing mode"""
 
     assert_array_and_dtype_equal(
@@ -127,6 +130,48 @@ def test_classical_tracing(shape, dtype):
     res = f(shape)
     assert_allclose(res.shape, shape)
     assert res.dtype == dtype
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        jnp.sin,
+        jnp.abs,
+    ],
+)
+def test_classical_tracing_unary_ops(op):
+    """Test that tensor primitives work with basic unary operations"""
+
+    shape = (3, 4)
+    dtype = complex
+
+    @qjit
+    def f(s):
+        return op(jnp.ones(s, dtype))
+
+    assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype)))
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        (lambda x, y: x + y),
+        (lambda x, y: x - y),
+        (lambda x, y: x * y),
+        (lambda x, y: x / y),
+    ],
+)
+def test_classical_tracing_binary_ops(op):
+    """Test that tensor primitives work with basic binary operations"""
+
+    shape = (3, 4)
+    dtype = complex
+
+    @qjit
+    def f(s):
+        return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
+
+    assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
 def test_classical_tracing_2():
