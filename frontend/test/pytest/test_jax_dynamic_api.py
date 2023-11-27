@@ -277,5 +277,17 @@ def test_shapes_type_conversion():
     assert qjit(f)(4.9).shape == (2, 4)
 
 
+def test_accessing_shapes():
+    """Test that dynamic tensor shapes are available for calculations"""
+
+    @qjit
+    def f(sz):
+        a = jnp.ones((sz, sz))
+        sa = jnp.array(a.shape)
+        return jnp.sum(sa)
+
+    assert f(3) == 6
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
