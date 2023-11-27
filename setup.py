@@ -70,11 +70,11 @@ if jaxlib_package is not None:
     package_directory = path.dirname(jaxlib_package.origin)
     jaxlib_so_path = path.join(package_directory, file_path_within_package)
 
-lapack_extension = Extension('lapack_wrapper',
+lapack_extension = Extension('catalyst/utils/lapack_wrapper',
     sources=['frontend/catalyst/utils/lapack_wrapper.c'], 
-    libraries=['lapack'],
+    libraries=['catalyst/utils/lapack_wrapper'],
     library_dirs=[jaxlib_so_path],
-    runtime_library_dirs=[jaxlib_so_path])
+    )
 
 ext_modules = [lapack_extension]
 
@@ -86,7 +86,6 @@ for ext in intree_extension_list:
     ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
     ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
 ext_modules.extend(intree_extension_list)
-
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
 # expose the entry_points metadata under the designated group name `pennylane.compilers`, with
 # the following entry points:

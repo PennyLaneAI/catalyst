@@ -12,32 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// #include<lapack>
+extern "C" {
 
-// extern "C" {
+void jax_RealGees_Kernel(void*, void**, XlaCustomCallStatus_*);
 
-// enum NumericType : int8_t {
-//     idx = 0,
-//     i1,
-//     i8,
-//     i16,
-//     i32,
-//     i64,
-//     f32,
-//     f64,
-//     c64,
-//     c128,
-// };
+void *lapack_dgesdd(OpaqueMemRef args, OpaqueMemRef res) {
+    jax_RealGees_Kernel(res, args);
+}
 
-// struct OpaqueMemRef {
-//     int64_t rank;
-//     void *data;
-//     NumericType datatype;
-// };
+enum NumericType : int {
+    idx = 0,
+    i1,
+    i8,
+    i16,
+    i32,
+    i64,
+    f32,
+    f64,
+    c64,
+    c128,
+};
 
-// void *lapack_dgesdd(OpaqueMemRef args, OpaqueMemRef res) {
-//     void** args = get_bufffer(args);
-//     void* results = get_buffer(res);
+struct OpaqueMemRef {
+    int rank;
+    void *data;
+    NumericType datatype;
+};
 
-// }
-// }
+}
