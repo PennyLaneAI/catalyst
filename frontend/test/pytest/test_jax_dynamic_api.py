@@ -178,6 +178,7 @@ def test_classical_tracing_binary_ops(op):
 def test_classical_tracing_binary_ops_3D():
     """Test that tensor primitives work with basic binary operations on 3D arrays"""
     # TODO: Merge with the binary operations test after fixing
+    # pylint: disable=unnecessary-lambda-assignment
 
     shape = (1, 2, 3)
     dtype = complex
@@ -237,8 +238,7 @@ def test_modify_dynamic_array_dynamic_index(shape, idx, val):
 
 
 @pytest.mark.xfail(reason="Slicing is not supported by JAX?")
-@pytest.mark.parametrize("shape,idx,val", [((1, 2, 3), (0, 1, 2), 1j), ((3,), (2,), 0)])
-def test_slice_dynamic_array_dynamic_index(shape, idx, val):
+def test_slice_dynamic_array_dynamic_index():
     """Test dynamic array modification using dynamic indices"""
 
     shape = (1, 2, 3)
