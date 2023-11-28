@@ -307,6 +307,12 @@ def get_aval2(x):
         return concrete_aval(x)
 
 
+def _no_clean_up_dead_vars(eqn, env, last_used):
+    """A stub to workaround the Jax ``KeyError 'a'`` bug during the lowering of Jaxpr programs to
+    MLIR with the dynamic API enabled."""
+    pass
+
+
 def jaxpr_to_mlir(func_name, jaxpr):
     """Lower a Jaxpr into an MLIR module.
 
@@ -317,10 +323,12 @@ def jaxpr_to_mlir(func_name, jaxpr):
     Returns:
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
-        jaxpr: the jaxpr corresponding to ``func``
     """
 
-    with Patcher((jax._src.interpreters.partial_eval, "get_aval", get_aval2)):
+    with Patcher(
+        (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+        (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
+    ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)
         axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
