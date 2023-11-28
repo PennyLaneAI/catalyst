@@ -12,15 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <optional>
+#include <string>
+#include <cmath>
+#include <cstdint>
+
+extern "C"{
+
+struct XlaCustomCallStatus_ {
+    std::optional<std::string> message;
+};
+typedef struct XlaCustomCallStatus_ XlaCustomCallStatus;
+
+}
+namespace jax {
+
+typedef int lapack_int;
+template <typename T> struct RealGesdd {
+    using FnType = void(char *jobz, lapack_int *m, lapack_int *n, T *a, lapack_int *lda, T *s, T *u,
+                        lapack_int *ldu, T *vt, lapack_int *ldvt, T *work, lapack_int *lwork,
+                        lapack_int *iwork, lapack_int *info);
+    static FnType *fn;
+    static void Kernel(void *out, void **data, XlaCustomCallStatus *);
+
+    static int64_t Workspace(lapack_int m, lapack_int n, bool job_opt_compute_uv,
+                             bool job_opt_full_matrices);
+};
+
+
+} // namespace jax
 extern "C" {
 
-void jax_RealGees_Kernel(void*, void**, XlaCustomCallStatus_*);
-
-void *lapack_dgesdd(OpaqueMemRef args, OpaqueMemRef res) {
-    jax_RealGees_Kernel(res, args);
-}
-
-enum NumericType : int {
+enum NumericType : int8_t {
     idx = 0,
     i1,
     i8,
@@ -33,10 +56,22 @@ enum NumericType : int {
     c128,
 };
 
-struct OpaqueMemRef {
-    int rank;
-    void *data;
-    NumericType datatype;
+//   MemRef encoded as:
+//   { i8: dtype, i8: rank, ptr<i8>: data,
+//     array<2*rank x i64>: sizes_and_strides }
+struct EncodedMemref {
+  uint8_t dtype;
+  uint8_t rank;
+  void* data;
+  int64_t dims[];
 };
 
+void lapack_dgesdd(EncodedMemref args, EncodedMemref results)
+{
+    void **data;
+    void *res;
+    XlaCustomCallStatus status = XlaCustomCallStatus();
+    XlaCustomCallStatus *statusPointer = &status;
+    jax::RealGesdd<float>::Kernel(res, data, statusPointer);
+}
 }
