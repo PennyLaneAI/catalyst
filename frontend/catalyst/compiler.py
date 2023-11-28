@@ -22,6 +22,8 @@ import shutil
 import subprocess
 import sys
 import warnings
+import importlib
+from os import path
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
@@ -206,11 +208,28 @@ class LinkerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        py_rt_lib_path = get_lib_path("pyruntime", "PYRUNTIME_LIB_DIR")
+        package_name = 'jaxlib'
+
+        jaxlib_package = importlib.util.find_spec(package_name)
+
+        if jaxlib_package is not None:
+            lapack_directory = path.dirname(jaxlib_package.origin)
+            jaxlib_so_path = lapack_directory + "/cpu"
 
         lib_path_flags = [
             f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",
         ]
+        lib_path_flags += [
+                f"-Wl,-rpath,{jaxlib_so_path}",
+                f"-L{jaxlib_so_path}",
+            ]
+        
+        lib_path_flags += [
+                f"-Wl,-rpath,{py_rt_lib_path}",
+                f"-L{py_rt_lib_path}",
+            ]
 
         if rt_lib_path != mlir_lib_path:
             lib_path_flags += [
@@ -225,7 +244,6 @@ class LinkerDriver:
             system_flags += ["-Wl,-no-as-needed"]
         elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
-
         default_flags = [
             "-shared",
             "-rdynamic",
@@ -233,7 +251,7 @@ class LinkerDriver:
             *lib_path_flags,
             "-lrt_capi",
             "-lpthread",
-            "-lmlir_c_runner_utils",  # required for memref.copy
+            "-lmlir_c_runner_utils",
         ]
 
         return default_flags

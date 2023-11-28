@@ -61,7 +61,7 @@ description = {
 }
 
 
-# Find the Jax lib
+# Find the Jax lib amd add extemsion for lapack custom calls
 package_name = 'jaxlib'
 file_path_within_package = 'cpu/_lapack.so'
 
@@ -70,10 +70,10 @@ if jaxlib_package is not None:
     package_directory = path.dirname(jaxlib_package.origin)
     jaxlib_so_path = path.join(package_directory, file_path_within_package)
 
-lapack_extension = Extension('catalyst/utils/lapack_wrapper',
-    sources=['frontend/catalyst/utils/lapack_wrapper.c'], 
-    libraries=['catalyst/utils/lapack_wrapper'],
-    library_dirs=[jaxlib_so_path],
+lapack_extension = Extension('catalyst.utils.custom_calls',
+    sources=['frontend/catalyst/utils/custom_calls.cpp'],
+    libraries=[package_directory],
+    library_dirs=[jaxlib_so_path]
     )
 
 ext_modules = [lapack_extension]

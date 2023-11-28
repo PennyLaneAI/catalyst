@@ -32,6 +32,7 @@ DEFAULT_LIB_PATHS = {
     "llvm": os.path.join(package_root, "../../../mlir/llvm-project/build/lib"),
     "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
     "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
+    "pyruntime": os.path.join(package_root, "../../frontend/catalyst/utils"),
 }
 
 
