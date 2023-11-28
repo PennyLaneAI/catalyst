@@ -174,10 +174,10 @@ def test_classical_tracing_binary_ops(op):
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
-@pytest.mark.skip("Failing operation on 3D-arrays possibly due to a bug in Jax")
+@pytest.mark.xfail(reason="Bug in the Jax/dynamic API")
 def test_classical_tracing_binary_ops_3D():
     """Test that tensor primitives work with basic binary operations on 3D arrays"""
-    # TODO: Unify with the previous test after fixing
+    # TODO: Merge with the binary operations test after fixing
 
     shape = (1, 2, 3)
     dtype = complex
@@ -188,6 +188,68 @@ def test_classical_tracing_binary_ops_3D():
         return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
 
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
+
+
+@pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, 2)), ((3,), (2,))])
+def test_access_dynamic_array_static_index(shape, idx):
+    """Test accessing dynamic array elements using static indices"""
+
+    dtype = complex
+
+    @qjit
+    def f(s):
+        return jnp.ones(s, dtype)[idx]
+
+    assert f(shape) == jnp.ones(shape, dtype)[idx]
+    assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
+    assert "gather" in f.mlir
+
+
+@pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, -2)), ((3,), (2,))])
+def test_access_dynamic_array_dynamic_index(shape, idx):
+    """Test accessing dynamic array elements using dynamic indices"""
+
+    dtype = complex
+
+    @qjit
+    def f(s, i):
+        return jnp.ones(s, dtype)[i]
+
+    assert f(shape, idx) == jnp.ones(shape, dtype)[idx]
+    assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
+    assert "gather" in f.mlir
+
+
+@pytest.mark.xfail(reason="MLIR is incompatible with our pipeline")
+@pytest.mark.parametrize("shape,idx,val", [((1, 2, 3), (0, 1, 2), 1j), ((3,), (2,), 0)])
+def test_modify_dynamic_array_dynamic_index(shape, idx, val):
+    """Test dynamic array modification using dynamic indices"""
+
+    dtype = complex
+
+    @qjit
+    def f(s, i):
+        return jnp.ones(s, dtype).at[i].set(val)
+
+    assert_array_and_dtype_equal(f(shape, idx), jnp.ones(shape, dtype).at[idx].set(val))
+    assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
+    assert "gather" in f.mlir
+
+
+@pytest.mark.xfail(reason="Slicing is not supported by JAX?")
+@pytest.mark.parametrize("shape,idx,val", [((1, 2, 3), (0, 1, 2), 1j), ((3,), (2,), 0)])
+def test_slice_dynamic_array_dynamic_index(shape, idx, val):
+    """Test dynamic array modification using dynamic indices"""
+
+    shape = (1, 2, 3)
+    dtype = complex
+
+    @qjit
+    def f(s):
+        return jnp.ones(s, dtype)[0, 1, 0:1]
+
+    assert f(shape) == jnp.ones(shape, dtype)[0, 1, 0:1]
+    assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
 
 
 def test_classical_tracing_2():
