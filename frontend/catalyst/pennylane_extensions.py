@@ -125,9 +125,8 @@ class QFunc:
             raise CompileError(msg)
 
         name = qnode.device.short_name
-        is_known_device = name in QFunc.RUNTIME_DEVICES
         implements_c_interface = hasattr(qnode.device, "get_c_interface")
-        is_valid_device = is_known_device or implements_c_interface
+        is_valid_device = implements_c_interface
         if not is_valid_device:
             msg = f"The {name} device is not supported for compilation at the moment."
             raise CompileError(msg)
