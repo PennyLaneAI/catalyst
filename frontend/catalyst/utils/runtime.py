@@ -35,7 +35,8 @@ DEFAULT_LIB_PATHS = {
 }
 
 
-# The set of supported devices at runtime
+# TODO: This should be removed after implementing `get_c_interface`
+# for the following backend devices:
 SUPPORTED_RT_DEVICES = {
     "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
     "lightning.kokkos": ("LightningKokkosSimulator", "librtd_lightning"),
@@ -63,6 +64,7 @@ def extract_backend_info(device):
     device_kwargs = {"device_type": dname}
 
     if dname in SUPPORTED_RT_DEVICES:
+        # Support backend devices without `get_c_interface`
         device_name = SUPPORTED_RT_DEVICES[dname][0]
         device_lpath = get_lib_path("runtime", "RUNTIME_LIB_DIR")
         sys_platform = platform.system()
@@ -74,12 +76,13 @@ def extract_backend_info(device):
         else:  # pragma: no cover
             raise NotImplementedError(f"Platform not supported: {sys_platform}")
     elif hasattr(device, "get_c_interface"):
-        # Support for third party devices
+        # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
-        if not pathlib.Path(device_lpath).is_file():
-            raise CompileError(f"Device at {device_lpath} cannot be found!")
     else:
         raise CompileError(f"The {dname} device is not supported for compilation at the moment.")
+
+    if not pathlib.Path(device_lpath).is_file():
+        raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
         device_kwargs["shots"] = device.shots if device.shots else 0

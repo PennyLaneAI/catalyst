@@ -235,10 +235,11 @@ class ExecutionContext final {
         std::string rtd_lib_str{rtd_lib};
 
         // LCOV_EXCL_START
-        // The following is required for C++ tests where these backend devices
+        // The following if-elif is required for C++ tests where these backend devices
         // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
         // Besides, this provides support for runtime device (RTD) libraries added to the system
-        // path.
+        // path. This maintains backwards compatibility for specifying a device using its name.
+        // TODO: This support may need to be removed after updating the C++ unit tests.
         if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
             _device_name =
                 (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
