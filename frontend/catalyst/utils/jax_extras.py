@@ -22,7 +22,7 @@ from copy import copy
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import (_update_thread_local_jit_state, DBIdx)
+from jax._src.core import (_update_thread_local_jit_state, DBIdx, same_referent)
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -100,7 +100,10 @@ __all__ = (
     "convert_element_type",
     "deduce_avals",
     "deduce_avals2",
-    "deduce_output_type",
+    "infer_output_type",
+    "infer_lambda_input_type",
+    "expand_args",
+    "expand_results",
     "eval_jaxpr",
     "initial_style_jaxprs_with_common_consts1",
     "initial_style_jaxprs_with_common_consts2",
@@ -109,7 +112,7 @@ __all__ = (
     "_input_type_to_tracers",
     "_input_type_to_tracers2",
     "_extract_implicit_args",
-    "_output_type_to_tracers",
+    "output_type_to_tracers",
     "jaxpr_to_mlir",
     "jaxpr_remove_implicit",
     "jaxpr_force_outvars",
@@ -572,10 +575,10 @@ def get_referent_frame(self, frame):
     return self if val is None else get_referent_frame(val)
 
 
-def _output_type_to_tracers(out_type: OutputType,
-                            in_tracers: List[DynamicJaxprTracer],
-                            maker: Callable[[AbstractValue],DynamicJaxprTracer]
-                            ) -> List[DynamicJaxprTracer]:
+def output_type_to_tracers(out_type: OutputType,
+                           in_tracers: List[DynamicJaxprTracer],
+                           maker: Callable[[AbstractValue],DynamicJaxprTracer]
+                           ) -> List[DynamicJaxprTracer]:
     """ Creates an expanded list of tracers representing an output values of a Jaxpr program
     based on the ``out_type`` of this program. The resulting tracers might be nested as required by
     the Jax dynamic API and might contain ``in_tracers`` of the same Jaxpr program. """
@@ -590,23 +593,23 @@ def _output_type_to_tracers(out_type: OutputType,
     return out_tracers
 
 
-T = TypeVar("T")
+TracerLike = TypeVar("TracerLike")
 
-def deduce_output_type(inputs:List[T],
-                       outputs:List[T],
-                       eq_fun:Callable[[T,T],bool],
-                       allow_indbidx:bool = True,
-                       ) -> OutputType:
+def infer_output_type(inputs:List[TracerLike],
+                      outputs:List[TracerLike],
+                      # eq_fun:Callable[[TracerLike,TracerLike],bool],
+                      allow_indbidx:bool = True,
+                      ) -> OutputType:
     """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
     we mean either Jax tracers or Jaxpr variables. """
 
     def _is_tracer_like(x):
         return hasattr(x, "aval")
 
-    def _safe_index(l:List[T], x:T) -> Optional[int]:
+    def _safe_index(l:List[TracerLike], x:TracerLike) -> Optional[int]:
         assert isinstance(l, list)
         for i, t in enumerate(l):
-            if eq_fun(t, x):
+            if t is x:
                 return i
         return None
 
@@ -624,7 +627,7 @@ def deduce_output_type(inputs:List[T],
                     if i is not None:
                         d2 = InDBIdx(i)
                     else:
-                        i2 = _safe_index(acc, d)
+                        i2 = _safe_index(outputs, d)
                         if i2 is not None:
                             d2 = OutDBIdx(i2)
                         else:
@@ -635,30 +638,77 @@ def deduce_output_type(inputs:List[T],
                     d2 = d
                 shape2.append(d2)
             aval = aval.update(shape = tuple(shape2))
-        else:
-            assert False, aval
+        # else:
+        #     assert False, aval
         acc.append(aval)
         expl.append(True)
 
     return tuple(zip(acc, expl))
 
 
+def extract_implicit_results(out_type, explicit_results):
+    explicit_results_ = iter(explicit_results)
+    results = [next(explicit_results_) if expl else None for _, expl in out_type]
+    assert next(explicit_results_, None) is None
+    del explicit_results, explicit_results_
+
+    for i, (aval, explicit) in enumerate(out_type):
+        if not explicit or not isinstance(aval, DShapedArray):
+            continue
+        res = results[i]
+        assert res is not None
+        for d1, d2 in zip(aval.shape, res.aval.shape):
+            if isinstance(d1, OutDBIdx):
+                if results[d1.val] is None:
+                    results[d1.val] = d2
+                assert same_referent(results[d1.val], d2)
+    assert all(x is not None for x in results)
+    return [x for x, (_, e) in zip(results, out_type) if not e]
+
+
+def expand_args(args:List[TracerLike]) -> List[TracerLike]:
+    in_type = infer_lambda_input_type(None, args)
+    return list(_extract_implicit_args(in_type, args)) + list(args)
+
+
+def expand_results(args:List[TracerLike], results:List[TracerLike],
+                   allow_indbidx:bool=True) -> List[TracerLike]:
+    out_type = infer_output_type(args, results,
+                                 # eq_fun=lambda a, b: a is b,
+                                 allow_indbidx=allow_indbidx)
+    return list(extract_implicit_results(out_type, results)) + list(results)
+
+
 class DynshapePrimitive(Primitive):
     # TODO: Contribute this class to Jax, namely to the
     # `jax.DynamicJaxprTrace.default_process_primitive`
 
-    def bind(primitive, *args, out_type, consts, **params):
+    def bind(primitive, *args, **params):
         trace = find_top_trace(args)
         tracers = map(trace.full_raise, args)
-        avals = [get_aval2(t) for t in tracers]
+        # avals = [get_aval2(t) for t in tracers]
         source_info = jax_current()
-        out_tracers = _output_type_to_tracers(
+
+        in_type = infer_lambda_input_type(None, tracers)
+        print("BIND_IN_TYPE")
+        for t in in_type: print("I", t)
+
+        out_type, effects = primitive.abstract_eval(*in_type, **params)
+        print("BIND_OUT_TYPE")
+        for t in out_type: print("O", t)
+        assert len(effects) == 0, f"Effects are not supported, got ({effects})"
+
+        out_tracers = output_type_to_tracers(
             out_type, tracers,
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info))
+
         invars = map(trace.getvar, tracers)
         outvars = map(trace.makevar, out_tracers)
-        params.update({"out_type": out_type, "consts": consts})
+        # print(outvars)
+        # print("OUT_TRACERS_VARS")
+        # for t in out_tracers: print("OT", t.trace.frame.)
         eqn = new_jaxpr_eqn(invars, outvars, primitive, params, [], source_info)
         trace.frame.add_eqn(eqn)
+        # out_tracers = [t for t,(_,k) in zip(out_tracers, out_type) if k]
         return out_tracers if primitive.multiple_results else out_tracers.pop()
 

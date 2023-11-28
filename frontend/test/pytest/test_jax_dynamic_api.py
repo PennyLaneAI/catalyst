@@ -264,9 +264,8 @@ def test_classical_tracing_2():
     assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
-# @pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
-def test_quantum_tracing_1():
-    """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+def test_qnode_while():
+    """Test that catalyst tensor primitive is compatible with quantum while"""
 
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -285,6 +284,27 @@ def test_quantum_tracing_1():
     result = f(3)
     expected = jnp.ones(4)
     assert_array_and_dtype_equal(result, expected)
+
+
+# def test_qjit_while():
+#     """Test that catalyst tensor primitive is compatible with quantum while"""
+
+#     @qjit()
+#     def f(sz):
+#         a = jnp.ones([sz+1], dtype=float)
+
+#         @while_loop(lambda _, i: i < 3)
+#         def loop(_, i):
+#             b = jnp.ones([sz+1], dtype=float)
+#             i += 1
+#             return (b, i)
+
+#         a2, _ = loop(a, 0)
+#         return a2
+
+#     result = f(3)
+#     expected = jnp.ones(4)
+#     assert_array_and_dtype_equal(result, expected)
 
 
 @pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")

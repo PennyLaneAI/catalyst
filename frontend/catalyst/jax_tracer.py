@@ -307,6 +307,24 @@ class HybridOp(Operation):
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 
+
+    def bind_overwrite_classical_tracers2(
+        self, ctx: JaxTracingContext, trace: DynamicJaxprTrace,
+        in_expanded_tracers, out_expanded_tracers, **kwargs
+    ) -> DynamicJaxprTracer:
+        """Binds the JAX primitive but override the returned classical tracers with the already
+        existing output tracers, stored in the operations."""
+        assert self.binder is not None, "HybridOp should set a binder"
+        out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
+        eqn = ctx.frames[trace].eqns[-1]
+        assert len(eqn.outvars[:-1])  == len(out_expanded_tracers), (
+            f"{eqn.outvars=}\n{out_expanded_tracers=}"
+        )
+        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
+            eqn.outvars[i] = trace.getvar(t)
+        return out_quantum_tracer
+
+
     def trace_quantum(
         self,
         ctx: JaxTracingContext,

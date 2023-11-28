@@ -61,7 +61,7 @@ from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.jax_extras import DynshapePrimitive
+from catalyst.utils.jax_extras import DynshapePrimitive, infer_output_type
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -1202,6 +1202,14 @@ def _while_loop_def_impl(
     raise NotImplementedError()
 
 
+@while_p.def_abstract_eval
+def _while_loop_abstract_eval(*in_type, body_jaxpr, **kwargs):
+    out_type = infer_output_type(body_jaxpr.jaxpr.invars,
+                                 body_jaxpr.jaxpr.outvars,
+                                 allow_indbidx=False)
+    return out_type
+
+
 def _while_loop_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *iter_args_plus_consts: tuple,
@@ -1209,8 +1217,6 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
-    out_type,
-    consts,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
