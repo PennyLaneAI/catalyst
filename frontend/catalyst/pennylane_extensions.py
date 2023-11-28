@@ -150,37 +150,6 @@ class QFunc:
 
         return device.short_name
 
-    @staticmethod
-    def _get_device_kwargs(qnode):
-        QFunc._validate_qnode(qnode)
-        name = qnode.device.short_name
-
-        # TODO:
-        # Once all devices get converted to shared libraries this name should just be the path.
-        device = qnode.device
-        backend_path = QFunc.get_library_path(device)
-
-        backend_kwargs = {}
-        if hasattr(device, "shots"):
-            backend_kwargs["shots"] = device.shots if device.shots else 0
-        if device.short_name == "braket.local.qubit":  # pragma: no cover
-            backend_kwargs["backend"] = device._device._delegate.DEVICE_ID
-        elif device.short_name == "braket.aws.qubit":  # pragma: no cover
-            backend_kwargs["device_arn"] = device._device._arn
-            if device._s3_folder:
-                backend_kwargs["s3_destination_folder"] = str(device._s3_folder)
-
-        # TODO: Maybe we should have a **device_kwargs stored in device.
-        # that way we avoid hand coding these and looking into the spec file
-        backend_kwargs["mcmc"] = getattr(device, "_mcmc", False)
-        backend_kwargs["num_burnin"] = getattr(device, "_num_burnin", 0)
-        backend_kwargs["kernel_name"] = getattr(device, "_kernel_name", None)
-        return {
-            "backend_name": name,
-            "backend_path": backend_path,
-            "backend_kwargs": backend_kwargs,
-        }
-
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
