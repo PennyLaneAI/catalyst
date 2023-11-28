@@ -74,6 +74,7 @@ from catalyst.utils.jax_extras import (
     _input_type_to_tracers2,
     _output_type_to_tracers,
     convert_constvars_jaxpr,
+    deduce_output_type,
     _extract_implicit_args,
     jaxpr_force_outvars,
     deduce_avals,
@@ -1642,14 +1643,20 @@ def while_loop(cond_fn):
                         body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
                     )
 
-                    j, out_type, consts = ctx.frames[body_trace].to_jaxpr2(res_classical_tracers)
-                    j, out_type = jaxpr_force_outvars(ClosedJaxpr(j, consts), out_type)
+                    out_type = deduce_output_type(arg_classical_tracers,
+                                                  res_classical_tracers,
+                                                  eq_fun=lambda t1, t2: t1 is t2,
+                                                  allow_indbidx=False)
+                    print("OUT_TYPE")
+                    for o in out_type: print("O", o)
+                    # j, out_type, consts = ctx.frames[body_trace].to_jaxpr2(res_classical_tracers)
+                    # j, out_type = jaxpr_force_outvars(ClosedJaxpr(j, consts), out_type)
 
                 in_expanded_classical_tracers = _extract_implicit_args(
                     in_type, in_classical_tracers
                 ) + in_classical_tracers
                 out_expanded_classical_tracers = _output_type_to_tracers(
-                    out_type, in_expanded_classical_tracers, consts,
+                    out_type, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
                 out_classical_tracers = [

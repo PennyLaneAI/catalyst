@@ -16,7 +16,8 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type, TypeVar
+from copy import copy
 
 import jax
 from jax import ShapeDtypeStruct
@@ -99,6 +100,7 @@ __all__ = (
     "convert_element_type",
     "deduce_avals",
     "deduce_avals2",
+    "deduce_output_type",
     "eval_jaxpr",
     "initial_style_jaxprs_with_common_consts1",
     "initial_style_jaxprs_with_common_consts2",
@@ -500,7 +502,7 @@ def jaxpr_remove_implicit(
 def jaxpr_force_outvars(
     closed_jaxpr: ClosedJaxpr, out_type: OutputType
 ) -> tuple[ClosedJaxpr, OutputType]:
-    """Turn all the InDBIdx references into OutDBIdx ones."""
+    """Turn all the InDBIdx references in a Jaxpr program into OutDBIdx."""
     jaxpr = closed_jaxpr.jaxpr
     out_aval, out_keep = unzip2(out_type)
     num_inrefs = max(sum(([d.val for d in a.shape if isinstance(d, InDBIdx)] for a in out_aval
@@ -572,24 +574,73 @@ def get_referent_frame(self, frame):
 
 def _output_type_to_tracers(out_type: OutputType,
                             in_tracers: List[DynamicJaxprTracer],
-                            consts,
                             maker: Callable[[AbstractValue],DynamicJaxprTracer]
                             ) -> List[DynamicJaxprTracer]:
     """ Creates an expanded list of tracers representing an output values of a Jaxpr program
     based on the ``out_type`` of this program. The resulting tracers might be nested as required by
     the Jax dynamic API and might contain ``in_tracers`` of the same Jaxpr program. """
-    # Notes:
-    # [1] - `get_referent` asks the `tracer -> constvar -> val -> tracer` chain of Jax references or
-    #       returns its argument tracer on failure.
     out_tracers = []
     for aval, _ in out_type:
         if type(aval) is DShapedArray:
-            shape = [[*consts, *in_tracers][d.val] if type(d) is InDBIdx else
+            shape = [[*in_tracers][d.val] if type(d) is InDBIdx else
                      out_tracers[d.val] if type(d) is OutDBIdx else
                      d for d in aval.shape]
-            aval = aval.update(shape=tuple(get_referent(d) for d in shape)) # [1]
+            aval = aval.update(shape=tuple(get_referent(d) for d in shape))
         out_tracers.append(maker(aval))
     return out_tracers
+
+
+T = TypeVar("T")
+
+def deduce_output_type(inputs:List[T],
+                       outputs:List[T],
+                       eq_fun:Callable[[T,T],bool],
+                       allow_indbidx:bool = True,
+                       ) -> OutputType:
+    """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
+    we mean either Jax tracers or Jaxpr variables. """
+
+    def _is_tracer_like(x):
+        return hasattr(x, "aval")
+
+    def _safe_index(l:List[T], x:T) -> Optional[int]:
+        assert isinstance(l, list)
+        for i, t in enumerate(l):
+            if eq_fun(t, x):
+                return i
+        return None
+
+    acc:List[T] = []
+    expl:List[bool] = []
+
+    for o in outputs:
+        assert _is_tracer_like(o)
+        aval = copy(o.aval)
+        if hasattr(aval, "shape"):
+            shape2 = []
+            for d in aval.shape:
+                if _is_tracer_like(d):
+                    i = _safe_index(inputs, d) if allow_indbidx else None
+                    if i is not None:
+                        d2 = InDBIdx(i)
+                    else:
+                        i2 = _safe_index(acc, d)
+                        if i2 is not None:
+                            d2 = OutDBIdx(i2)
+                        else:
+                            d2 = OutDBIdx(len(acc))
+                            acc.append(d.aval)
+                            expl.append(False)
+                else:
+                    d2 = d
+                shape2.append(d2)
+            aval = aval.update(shape = tuple(shape2))
+        else:
+            assert False, aval
+        acc.append(aval)
+        expl.append(True)
+
+    return tuple(zip(acc, expl))
 
 
 class DynshapePrimitive(Primitive):
@@ -603,7 +654,6 @@ class DynshapePrimitive(Primitive):
         source_info = jax_current()
         out_tracers = _output_type_to_tracers(
             out_type, tracers,
-            consts=consts,
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info))
         invars = map(trace.getvar, tracers)
         outvars = map(trace.makevar, out_tracers)

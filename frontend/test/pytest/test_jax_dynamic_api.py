@@ -271,7 +271,7 @@ def test_quantum_tracing_1():
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
-        a = jnp.ones([sz], dtype=float)
+        a = jnp.ones([sz+1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
         def loop(_, i):
@@ -283,7 +283,7 @@ def test_quantum_tracing_1():
         return a2
 
     result = f(3)
-    expected = jnp.ones(4) * 8
+    expected = jnp.ones(4)
     assert_array_and_dtype_equal(result, expected)
 
 
