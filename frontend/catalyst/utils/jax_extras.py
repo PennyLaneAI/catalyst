@@ -307,10 +307,10 @@ def get_aval2(x):
         return concrete_aval(x)
 
 
-def _no_clean_up_dead_vars(eqn, env, last_used):
+def _no_clean_up_dead_vars(_eqn, _env, _last_used):
     """A stub to workaround the Jax ``KeyError 'a'`` bug during the lowering of Jaxpr programs to
     MLIR with the dynamic API enabled."""
-    pass
+    return None
 
 
 def jaxpr_to_mlir(func_name, jaxpr):
