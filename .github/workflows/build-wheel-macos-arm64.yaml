@@ -255,8 +255,9 @@ jobs:
     - name: Test Catalyst-Runtime
       run: |
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
-        cmake --build runtime-build --target runner_tests
-        ./runtime-build/tests/runner_tests
+        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
+        ./runtime-build/tests/runner_tests_lightning
+        ./runtime-build/tests/runner_tests_openqasm
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
