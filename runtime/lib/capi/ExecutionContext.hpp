@@ -182,7 +182,7 @@ class ExecutionContext final {
 #ifdef __linux__
         pl_name = "librtd_" + rtd_name + ".so";
 #elif defined(__APPLE__)
-        pl_name = "libsmo_" + rtd_name + ".dylib";
+        pl_name = "librtd_" + rtd_name + ".dylib";
 #endif
     }
 
