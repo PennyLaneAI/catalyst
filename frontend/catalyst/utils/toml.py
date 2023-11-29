@@ -10,7 +10,7 @@ tomllib = importlib.util.find_spec("tomllib")
 tomlkit = importlib.util.find_spec("tomlkit")
 # We need at least one of these to make sure we can read toml files.
 if tomllib is None and tomlkit is None:
-    msg = "Either tomllib or tomli need to be installed."
+    msg = "Either tomllib or tomlkit need to be installed."
     raise ImportError(msg)
 
 # Give preference to tomllib
