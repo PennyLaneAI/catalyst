@@ -977,17 +977,20 @@ class WhileLoop(HybridOp):
 
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
+        arg_classical_tracers = self.regions[1].arg_classical_tracers
         res_classical_tracers = self.regions[1].res_classical_tracers
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
-            body_jaxpr, out_type, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_classical_tracers + [qreg_out]
-            )
-            j, out_type = jaxpr_force_outvars(ClosedJaxpr(body_jaxpr, body_consts), out_type)
-            body_jaxpr = j.jaxpr
 
+
+            res_tracers = expand_results(arg_classical_tracers + [qreg_in],
+                                         res_classical_tracers + [qreg_out],
+                                         force_implicit_indbidx=True)
+            body_jaxpr, out_type, body_consts = ctx.frames[body_trace].to_jaxpr2(
+                res_tracers
+            )
 
         qreg = qrp.actualize()
 
@@ -1001,7 +1004,7 @@ class WhileLoop(HybridOp):
             expand_results(
                 in_expanded_tracers,
                 self.out_classical_tracers,
-                allow_indbidx=False
+                force_implicit_indbidx=True
             )
         )
 
@@ -1664,7 +1667,7 @@ def while_loop(cond_fn):
 
                     out_type = infer_output_type(arg_classical_tracers,
                                                  res_classical_tracers,
-                                                 allow_indbidx=False)
+                                                 force_implicit_indbidx=True)
 
                 in_expanded_classical_tracers = _extract_implicit_args(
                     in_type, in_classical_tracers
@@ -1681,22 +1684,28 @@ def while_loop(cond_fn):
                 return tree_unflatten(body_tree(), out_classical_tracers)
 
             def _call_with_classical_ctx():
-                init_vals, in_tree = tree_flatten(init_state)
-                init_avals = tuple(_abstractify(val) for val in init_vals)
-                cond_jaxpr, cond_consts, cond_tree = _initial_style_jaxpr(
-                    cond_fn, in_tree, init_avals, "while_cond"
-                )
-                body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-                    body_fn, in_tree, init_avals, "while_loop"
-                )
+                # init_vals, in_tree = tree_flatten(init_state)
+                # init_avals = tuple(_abstractify(val) for val in init_vals)
+                # in_type = infer_lambda_input_type(None, init_vals)
+                # in_aval,_ = unzip2(in_type)
+                cond_jaxpr, cond_out_type, cond_tree = make_jaxpr2(cond_fn)(*init_state)
+                body_jaxpr, body_out_type, body_tree = make_jaxpr2(body_fn)(*init_state)
+
+
                 _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
+
+                in_expanded_tracers = (
+                    [trace.full_raise(c) for c in (cond_consts + body_consts)] +
+                    expand_args(in_classical_tracers) +
+                    [qreg]
+                )
+
                 out_classical_tracers = while_p.bind(
                     *(cond_consts + body_consts + init_vals),
                     cond_jaxpr=cond_jaxpr,
                     body_jaxpr=body_jaxpr,
                     cond_nconsts=len(cond_consts),
                     body_nconsts=len(body_consts),
-                    out_type=body_jaxpr.out_avals # FIXME: dynamic API
                 )
                 return tree_unflatten(body_tree, out_classical_tracers)
 

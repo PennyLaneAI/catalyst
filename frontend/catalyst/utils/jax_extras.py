@@ -598,7 +598,7 @@ TracerLike = TypeVar("TracerLike")
 def infer_output_type(inputs:List[TracerLike],
                       outputs:List[TracerLike],
                       # eq_fun:Callable[[TracerLike,TracerLike],bool],
-                      allow_indbidx:bool = True,
+                      force_implicit_indbidx:bool = True,
                       ) -> OutputType:
     """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
     we mean either Jax tracers or Jaxpr variables. """
@@ -624,9 +624,14 @@ def infer_output_type(inputs:List[TracerLike],
             shape2 = []
             for d in aval.shape:
                 if _is_tracer_like(d):
-                    i = _safe_index(inputs, d) if allow_indbidx else None
+                    i = _safe_index(inputs, d)
                     if i is not None:
                         d2 = InDBIdx(i)
+                        if force_implicit_indbidx:
+                            # FIXME: only add once per InDBIdx?
+                            acc.append(d.aval)
+                            outputs2.append(d)
+                            expl.append(False)
                     else:
                         i2 = _safe_index(outputs2, d)
                         if i2 is not None:
@@ -649,7 +654,7 @@ def infer_output_type(inputs:List[TracerLike],
     return tuple(zip(acc, expl))
 
 
-def extract_implicit_results(out_type, explicit_results):
+def extract_implicit_results(out_type, explicit_results, force_implicit_indbidx=False):
     explicit_results_ = iter(explicit_results)
     results = [next(explicit_results_) if expl else None for _, expl in out_type]
     assert next(explicit_results_, None) is None
@@ -665,6 +670,11 @@ def extract_implicit_results(out_type, explicit_results):
                 if results[d1.val] is None:
                     results[d1.val] = d2
                 assert same_referent(results[d1.val], d2)
+            elif isinstance(d1, InDBIdx) and force_implicit_indbidx:
+                if results[d1.val] is None:
+                    results[d1.val] = d2
+                assert same_referent(results[d1.val], d2)
+
     assert all(x is not None for x in results)
     return [x for x, (_, e) in zip(results, out_type) if not e]
 
@@ -674,12 +684,20 @@ def expand_args(args:List[TracerLike]) -> List[TracerLike]:
     return list(_extract_implicit_args(in_type, args)) + list(args)
 
 
-def expand_results(args:List[TracerLike], results:List[TracerLike],
-                   allow_indbidx:bool=True) -> List[TracerLike]:
+def expand_results(
+    args:List[TracerLike],
+    results:List[TracerLike],
+    force_implicit_indbidx:bool=False
+) -> List[TracerLike]:
     out_type = infer_output_type(args, results,
                                  # eq_fun=lambda a, b: a is b,
-                                 allow_indbidx=allow_indbidx)
-    return list(extract_implicit_results(out_type, results)) + list(results)
+                                 force_implicit_indbidx=force_implicit_indbidx)
+    return (
+        list(extract_implicit_results(
+            out_type, results, force_implicit_indbidx=force_implicit_indbidx
+        )) +
+        list(results)
+    )
 
 
 class DynshapePrimitive(Primitive):
@@ -707,9 +725,7 @@ class DynshapePrimitive(Primitive):
 
         invars = map(trace.getvar, tracers)
         outvars = map(trace.makevar, out_tracers)
-        # print(outvars)
-        # print("OUT_TRACERS_VARS")
-        # for t in out_tracers: print("OT", t.trace.frame.)
+
         eqn = new_jaxpr_eqn(invars, outvars, primitive, params, [], source_info)
         trace.frame.add_eqn(eqn)
         # out_tracers = [t for t,(_,k) in zip(out_tracers, out_type) if k]

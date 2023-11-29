@@ -321,6 +321,13 @@ class HybridOp(Operation):
             f"{eqn.outvars=}\n{out_expanded_tracers=}"
         )
         for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
+            if trace.getvar(t) in set([
+                *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
+                *ctx.frames[trace].invars,
+                *ctx.frames[trace].constvar_to_val.keys()
+            ]):
+                # Do not re-assign vars from other equations
+                continue
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 

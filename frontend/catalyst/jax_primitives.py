@@ -1206,7 +1206,7 @@ def _while_loop_def_impl(
 def _while_loop_abstract_eval(*in_type, body_jaxpr, **kwargs):
     out_type = infer_output_type(body_jaxpr.jaxpr.invars,
                                  body_jaxpr.jaxpr.outvars,
-                                 allow_indbidx=False)
+                                 force_implicit_indbidx=False)
     return out_type
 
 
