@@ -20,8 +20,8 @@ while using :func:`~.qjit`.
 # pylint: disable=protected-access
 
 import numbers
-from functools import update_wrapper
 import pathlib
+from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
