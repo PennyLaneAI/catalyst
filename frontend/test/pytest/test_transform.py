@@ -35,9 +35,10 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
+
 try:
     from pennylane import qcut
-except:  #pylint: disable=bare-except
+except:  # pylint: disable=bare-except
     from pennylane.transforms import qcut
 from pennylane.transforms import hamiltonian_expand, merge_rotations, sum_expand
 
