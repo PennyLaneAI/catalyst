@@ -634,7 +634,7 @@ def output_type_to_tracers(out_type: OutputType,
 
 TracerLike = TypeVar("TracerLike")
 
-def infer_output_type(inputs:List[TracerLike],
+def infer_output_type2(inputs:List[TracerLike],
                       outputs:List[TracerLike],
                       # eq_fun:Callable[[TracerLike,TracerLike],bool],
                       force_implicit_indbidx:bool = True,
@@ -645,77 +645,40 @@ def infer_output_type(inputs:List[TracerLike],
     def _is_tracer_like(x):
         return hasattr(x, "aval")
 
-    def _safe_index(l:List[TracerLike], x:TracerLike) -> Optional[int]:
-        assert isinstance(l, (list,tuple)), f"{type(l)=} {l=}"
-        for i, t in enumerate(l):
-            if t is x:
-                return i
-        return None
+    expl_outs = outputs
+    impl_outs = []
+    seen = set() if force_implicit_indbidx else set(inputs)
 
-    acc:List[AbstractValue] = []
-    outputs2:List[TracerLike] = []
-    expl:List[bool] = []
-
-    for o in outputs:
+    for o in expl_outs:
         assert _is_tracer_like(o)
-        aval = copy(o.aval)
-        if hasattr(aval, "shape"):
-            shape2 = []
-            for d in aval.shape:
-                if _is_tracer_like(d):
-                    i = _safe_index(inputs, d)
-                    if i is not None:
-                        d2 = InDBIdx(i)
-                        if force_implicit_indbidx:
-                            if _safe_index(outputs2, d) is None:
-                                acc.append(d.aval)
-                                outputs2.append(d)
-                                expl.append(False)
-                    else:
-                        i2 = _safe_index(outputs2, d)
-                        if i2 is not None:
-                            d2 = OutDBIdx(i2)
-                        else:
-                            d2 = OutDBIdx(len(acc))
-                            acc.append(d.aval)
-                            outputs2.append(d)
-                            expl.append(False)
-                else:
-                    d2 = d
-                shape2.append(d2)
-            aval = aval.update(shape = tuple(shape2))
-        # else:
-        #     assert False, aval
-        acc.append(aval)
-        outputs2.append(o)
-        expl.append(True)
+        if isinstance(o.aval, DShapedArray):
+            for d in o.aval.shape:
+                if _is_tracer_like(d) and (d not in seen):
+                    impl_outs.append(d)
+                    seen.add(d)
+        seen.add(o)
 
-    return tuple(zip(acc, expl))
+    all_ins = [*inputs]
+    all_outs = [*impl_outs, *expl_outs]
+    in_map : dict[TracerLike,  InDBIdx] = {v:  InDBIdx(i) for i, v in enumerate(all_ins)}
+    out_map: dict[TracerLike, OutDBIdx] = {x: OutDBIdx(i) for i, x in enumerate(all_outs)}
+
+    out_avals_ = (x.aval for x in all_outs)
+    out_avals = [a.update(shape=tuple(in_map.get(d, out_map.get(d))
+                                      if _is_tracer_like(d) else d for d in a.shape))
+                 if isinstance(a, DShapedArray) else a for a in out_avals_]
+
+    kept_outs = [False] * len(impl_outs) + [True] * len(expl_outs)
+    out_type = tuple(zip(out_avals, kept_outs))
+    return all_outs, out_type
 
 
-def extract_implicit_results(out_type, explicit_results, force_implicit_indbidx=False):
-    explicit_results_ = iter(explicit_results)
-    results = [next(explicit_results_) if expl else None for _, expl in out_type]
-    assert next(explicit_results_, None) is None
-    del explicit_results, explicit_results_
+def infer_output_type(inputs:List[TracerLike],
+                      outputs:List[TracerLike],
+                      force_implicit_indbidx:bool = True,
+                      ) -> OutputType:
 
-    for i, (aval, explicit) in enumerate(out_type):
-        if not explicit or not isinstance(aval, DShapedArray):
-            continue
-        res = results[i]
-        assert res is not None
-        for d1, d2 in zip(aval.shape, res.aval.shape):
-            if isinstance(d1, OutDBIdx):
-                if results[d1.val] is None:
-                    results[d1.val] = d2
-                assert same_referent(results[d1.val], d2)
-            elif isinstance(d1, InDBIdx) and force_implicit_indbidx:
-                if results[d1.val] is None:
-                    results[d1.val] = d2
-                assert same_referent(results[d1.val], d2)
-
-    assert all(x is not None for x in results)
-    return [x for x, (_, e) in zip(results, out_type) if not e]
+    return infer_output_type2(inputs, outputs, force_implicit_indbidx=force_implicit_indbidx)[1]
 
 
 def expand_args(args:List[TracerLike], in_type=None) -> List[TracerLike]:
@@ -726,17 +689,9 @@ def expand_args(args:List[TracerLike], in_type=None) -> List[TracerLike]:
 def expand_results(
     args:List[TracerLike],
     results:List[TracerLike],
-    force_implicit_indbidx:bool=False
+    force_implicit_indbidx:bool=False,
 ) -> Tuple[List[TracerLike], OutputType]:
-    out_type = infer_output_type(args, results,
-                                 # eq_fun=lambda a, b: a is b,
-                                 force_implicit_indbidx=force_implicit_indbidx)
-    return (
-        list(extract_implicit_results(
-            out_type, results, force_implicit_indbidx=force_implicit_indbidx
-        )) +
-        list(results)
-    ), out_type
+    return infer_output_type2(args, results, force_implicit_indbidx=force_implicit_indbidx)
 
 
 def collapse(typ:InputType|OutputType, params:List[TracerLike]) -> List[TracerLike]:
@@ -754,12 +709,12 @@ class DynshapePrimitive(Primitive):
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
-        print("BIND_IN_TYPE")
-        for t in in_type: print("I", t)
+        # print("BIND_IN_TYPE")
+        # for t in in_type: print("I", t)
 
         out_type, effects = primitive.abstract_eval(*in_type, **params)
-        print("BIND_OUT_TYPE")
-        for t in out_type: print("O", t)
+        # print("BIND_OUT_TYPE")
+        # for t in out_type: print("O", t)
         assert len(effects) == 0, f"Effects are not supported, got ({effects})"
 
         out_tracers = output_type_to_tracers(

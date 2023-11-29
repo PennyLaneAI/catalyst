@@ -75,8 +75,6 @@ from catalyst.utils.jax_extras import (
     input_type_to_tracers,
     output_type_to_tracers,
     convert_constvars_jaxpr,
-    infer_output_type,
-    infer_lambda_input_type,
     _extract_implicit_args,
     jaxpr_force_outvars,
     deduce_avals,
@@ -1004,15 +1002,7 @@ class WhileLoop(HybridOp):
             body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_expanded_tracers
             )
-            assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
-            print("QBIND_RES_TRACERS")
-            for t in self.regions[1].res_classical_tracers + [qreg_out]: print("-", t)
-            print("QBIND_RES_EXP_TRACERS")
-            for t in res_expanded_tracers: print("-", t)
-            print("BBBBBBBBBBBBBB")
-            print(cond_jaxpr)
-            print(body_jaxpr)
-            print("BBBBBBBBBBBBBB")
+            # assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
 
         qreg = qrp.actualize()
 
@@ -1026,7 +1016,7 @@ class WhileLoop(HybridOp):
             expand_results(
                 in_expanded_tracers,
                 self.out_classical_tracers,
-                force_implicit_indbidx=True
+                force_implicit_indbidx=True,
             )[0]
         )
 
@@ -1692,12 +1682,6 @@ def while_loop(cond_fn):
                     out_type = out_sig.out_type()
                     out_tree = out_sig.out_tree()
 
-                    print("API_RES_CLASSICAL_TRACERS")
-                    for t in res_classical_tracers: print("-", t)
-                    print("API_OUT_TYPE")
-                    for t in out_type: print("-", t)
-
-
                     body_region = HybridOpRegion(
                         body_trace, quantum_tape,
                         collapse(in_type, arg_classical_tracers),
@@ -1720,8 +1704,7 @@ def while_loop(cond_fn):
             def _call_with_classical_ctx():
                 # init_vals, in_tree = tree_flatten(init_state)
                 # init_avals = tuple(_abstractify(val) for val in init_vals)
-                # in_type = infer_lambda_input_type(None, init_vals)
-                # in_aval,_ = unzip2(in_type)
+                # FIXME: modify
                 cond_jaxpr, cond_out_type, cond_tree = make_jaxpr2(cond_fn)(*init_state)
                 body_jaxpr, body_out_type, body_tree = make_jaxpr2(body_fn)(*init_state)
 
