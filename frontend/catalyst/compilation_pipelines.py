@@ -851,11 +851,14 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]): An experimental option to specify dynamic tensor shapes.
+        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
+            An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
-            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors with dynamic shapes.
+            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
+            with dynamic shapes.
 
-            There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
+            There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
+            dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
 
             .. code-block:: python
 
