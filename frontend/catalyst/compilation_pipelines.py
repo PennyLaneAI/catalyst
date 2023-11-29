@@ -865,14 +865,14 @@ def qjit(
             function. Empty tuples can
             be used and correspond to parameters with statically known shapes.
             Non-empty tuples correspond to parameters with dynamically known shapes.
-            
+
             In this example above,
-            
+
             - the first argument will have a statically known shape,
-            
+
             - the second argument has its zeroth axis have dynamic
               shape ``n``, and
-            
+
             - the third argument will have its zeroth axis with dynamic shape
               ``m`` and first axis with dynamic shape ``n``.
 
