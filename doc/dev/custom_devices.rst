@@ -19,7 +19,7 @@ Additionally, all measurements will always return ``true``.
 
         struct CustomDevice final : public Catalyst::Runtime::QuantumDevice {
             CustomDevice([[maybe_unused]] const std::string &kwargs = "{}") {}
-            ~CustomDevice() = default; // LCOV_EXCL_LINE
+            ~CustomDevice() = default;
 
             CustomDevice &operator=(const QuantumDevice &) = delete;
             CustomDevice(const CustomDevice &) = delete;
@@ -77,7 +77,7 @@ Additionally, all measurements will always return ``true``.
 
 In addition to implementing the ``QuantumDevice`` class, one must implement an entry point for the
 device library with the name ``<DeviceIdentifier>Factory``, where ``DeviceIdentifier`` is used to
-unique the entry point symbol. As an example, we use the identifier ``CustomDevice``:
+uniquely identify the entry point symbol. As an example, we use the identifier ``CustomDevice``:
 
 .. code-block:: c++
 
@@ -87,7 +87,6 @@ unique the entry point symbol. As an example, we use the identifier ``CustomDevi
     }
 
 The entry point function acts as a factory method for the device class.
-
 Note that a plugin library may also provide several factory methods in case it packages
 multiple devices into the same library. However, it is important that the device identifier
 be unique, as best as possible, to avoid clashes with other plugins.
@@ -100,7 +99,8 @@ Python devices" section further down for details.
 
 ``CustomDevice(kwargs)`` serves as a constructor for your custom device, with ``kwargs``
 as a string of device specifications and options, represented in Python dictionary format.
-An example could be the number of shots, encoded as the following string: ``"{'shots': 1000}"``.
+An example could be the default number of device shots, encoded as the following string:
+``"{'shots': 1000}"``.
 
 Note that these parameters are automatically initialized in the frontend if the library is
 provided as a PennyLane plugin device (see :func:`qml.device() <pennylane.device>`).
