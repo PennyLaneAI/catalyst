@@ -613,7 +613,8 @@ def infer_output_type(inputs:List[TracerLike],
                 return i
         return None
 
-    acc:List[T] = []
+    acc:List[AbstractValue] = []
+    outputs2:List[TracerLike] = []
     expl:List[bool] = []
 
     for o in outputs:
@@ -627,12 +628,13 @@ def infer_output_type(inputs:List[TracerLike],
                     if i is not None:
                         d2 = InDBIdx(i)
                     else:
-                        i2 = _safe_index(outputs, d)
+                        i2 = _safe_index(outputs2, d)
                         if i2 is not None:
                             d2 = OutDBIdx(i2)
                         else:
                             d2 = OutDBIdx(len(acc))
                             acc.append(d.aval)
+                            outputs2.append(d)
                             expl.append(False)
                 else:
                     d2 = d
@@ -641,6 +643,7 @@ def infer_output_type(inputs:List[TracerLike],
         # else:
         #     assert False, aval
         acc.append(aval)
+        outputs2.append(o)
         expl.append(True)
 
     return tuple(zip(acc, expl))

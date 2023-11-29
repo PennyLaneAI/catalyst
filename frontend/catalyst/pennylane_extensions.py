@@ -87,7 +87,8 @@ from catalyst.utils.jax_extras import (
     new_inner_tracer2,
     unzip2,
     expand_args,
-    expand_results
+    expand_results,
+    make_jaxpr2
 )
 from catalyst.utils.patching import Patcher
 
