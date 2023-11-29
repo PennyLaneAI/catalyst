@@ -196,13 +196,14 @@ class CompiledFunction:
         """
         compiled_data, compiled_shape = tree_flatten(compiled_signature)
         runtime_data, runtime_shape = tree_flatten(runtime_signature)
-        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
-        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
-        in_type_compiled = infer_lambda_input_type(axes_specs_compile, compiled_data)
-        in_type_runtime = infer_lambda_input_type(axes_specs_runtime, runtime_data)
+        if abstracted_axes is not None:
+            axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
+            axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
+            in_type_compiled = infer_lambda_input_type(axes_specs_compile, compiled_data)
+            in_type_runtime = infer_lambda_input_type(axes_specs_runtime, runtime_data)
 
-        if in_type_compiled == in_type_runtime:
-            return TypeCompatibility.CAN_SKIP_PROMOTION
+            if in_type_compiled == in_type_runtime:
+                return TypeCompatibility.CAN_SKIP_PROMOTION
 
         if compiled_shape != runtime_shape:
             return TypeCompatibility.NEEDS_COMPILATION
