@@ -61,6 +61,7 @@ from catalyst.jax_tracer import (
     trace_quantum_function,
     trace_quantum_tape,
     unify_result_types,
+    trace_function
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -88,7 +89,8 @@ from catalyst.utils.jax_extras import (
     unzip2,
     expand_args,
     expand_results,
-    make_jaxpr2
+    make_jaxpr2,
+    find_top_trace
 )
 from catalyst.utils.patching import Patcher
 
@@ -1701,30 +1703,31 @@ def while_loop(cond_fn):
                           [cond_region, body_region])
                 return tree_unflatten(out_tree, out_classical_tracers)
 
-            def _call_with_classical_ctx():
-                # init_vals, in_tree = tree_flatten(init_state)
-                # init_avals = tuple(_abstractify(val) for val in init_vals)
-                # FIXME: modify
-                cond_jaxpr, cond_out_type, cond_tree = make_jaxpr2(cond_fn)(*init_state)
-                body_jaxpr, body_out_type, body_tree = make_jaxpr2(body_fn)(*init_state)
-
+            def _call_with_classical_ctx(ctx):
+                cond_jaxpr, cond_out_type, cond_tree, cond_consts = trace_function(
+                    ctx, cond_fn, *init_state, force_implicit_indbidx=True
+                )
+                body_jaxpr, body_out_type, body_tree, body_consts = trace_function(
+                    ctx, body_fn, *init_state, force_implicit_indbidx=True
+                )
 
                 _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
 
+                in_classical_tracers, _ = tree_flatten(init_state)
+                trace = find_top_trace(in_classical_tracers)
                 in_expanded_tracers = (
                     [trace.full_raise(c) for c in (cond_consts + body_consts)] +
-                    expand_args(in_classical_tracers) +
-                    [qreg]
+                    expand_args(in_classical_tracers)
                 )
 
-                out_classical_tracers = while_p.bind(
-                    *(cond_consts + body_consts + init_vals),
+                out_expanded_tracers = while_p.bind(
+                    *in_expanded_tracers,
                     cond_jaxpr=cond_jaxpr,
                     body_jaxpr=body_jaxpr,
                     cond_nconsts=len(cond_consts),
                     body_nconsts=len(body_consts),
                 )
-                return tree_unflatten(body_tree, out_classical_tracers)
+                return tree_unflatten(body_tree, collapse(body_out_type, out_expanded_tracers))
 
             def _call_during_interpretation():
                 args = init_state
@@ -1738,7 +1741,7 @@ def while_loop(cond_fn):
             if mode == EvaluationMode.QUANTUM_COMPILATION:
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-                return _call_with_classical_ctx()
+                return _call_with_classical_ctx(ctx)
             else:
                 assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
                 return _call_during_interpretation()

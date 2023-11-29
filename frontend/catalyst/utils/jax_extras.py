@@ -104,6 +104,7 @@ __all__ = (
     "deduce_avals2",
     "deduce_avals3",
     "infer_output_type",
+    "infer_output_type2",
     "infer_lambda_input_type",
     "expand_args",
     "expand_results",
@@ -333,7 +334,7 @@ def deduce_avals3(f: Callable, args, kwargs, force_implicit_indbidx=False):
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
-    axes_specs = _flat_axes_specs(None, *args, **kwargs)
+    axes_specs = _flat_axes_specs(None, *args, {})
     in_type = infer_lambda_input_type(axes_specs, flat_args)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
@@ -598,6 +599,7 @@ def make_jaxpr2(
 
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
     return make_jaxpr_f
+
 
 def input_type_to_tracers(in_type: InputType,
                           maker: Callable[[AbstractValue],DynamicJaxprTracer]
