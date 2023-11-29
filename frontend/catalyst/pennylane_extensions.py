@@ -118,38 +118,6 @@ class QFunc:
         self.device = device
         update_wrapper(self, fn)
 
-    @staticmethod
-    def _validate_qnode(qnode):
-        if not isinstance(qnode.device, qml.Device):
-            msg = "Device is not supported for compilation at the moment."
-            raise CompileError(msg)
-
-        name = qnode.device.short_name
-        implements_c_interface = hasattr(qnode.device, "get_c_interface")
-        is_valid_device = implements_c_interface
-        if not is_valid_device:
-            msg = f"The {name} device is not supported for compilation at the moment."
-            raise CompileError(msg)
-
-    @staticmethod
-    def _validate_library_path(lib_path):
-        if not pathlib.Path(lib_path).is_file():
-            msg = f"Device's library cannot be found at {lib_path}."
-            raise CompileError(msg)
-
-    @staticmethod
-    def get_library_path(device):
-        """Return C library for interfacing with the device.
-
-        For legacy purposes, returns the short name if no C library path is
-        implemented."""
-        if hasattr(device, "get_c_interface"):
-            lib_path = device.get_c_interface()
-            QFunc._validate_library_path(lib_path)
-            return lib_path
-
-        return device.short_name
-
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
@@ -286,14 +254,8 @@ class QJITDevice(qml.QubitDevice):
         # The assumption is that it has to live in the same directory as the C library.
         def get_spec_path(name, name_or_path_str):
             name_or_path = pathlib.Path(name_or_path_str)
-            if name_or_path.exists():
-                path = name_or_path.parent
-                path = path / "backend" / (name + ".toml")
-                return path
-
-            path_to_spec_str = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-            path = pathlib.Path(path_to_spec_str) / "backend" / (name + ".toml")
-            assert path.exists(), path
+            path = name_or_path.parent
+            path = path / "backend" / (name + ".toml")
             return path
 
         spec_path = get_spec_path(self.backend_name_canonical, self.backend_lib)

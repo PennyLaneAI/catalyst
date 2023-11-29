@@ -360,32 +360,5 @@ module @workflow {
         assert "Trace" in e.value.args[0]
 
 
-class TestQFunc:
-    """Test that a QFunc is properly validated"""
-
-    def test_qnode_has_no_c_interface(self):
-        class CustomDevice(qml.QubitDevice):
-            """Custom Device without c interface."""
-
-            name = "Custom Device"
-            short_name = "custom.device"
-            pennylane_requires = "0.32.0"
-            version = "0.0.1"
-            author = "Anonymous"
-
-            operations = []
-            observables = []
-
-            def apply(self, _operations, **_kwargs):
-                ...
-
-        qnode = qml.QNode(lambda x: x, CustomDevice(wires=1))
-
-        regex = "The .* device is not supported for compilation at the moment."
-        with pytest.raises(CompileError, match=regex):
-            # pylint: disable=protected-access
-            QFunc._validate_qnode(qnode)
-
-
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
