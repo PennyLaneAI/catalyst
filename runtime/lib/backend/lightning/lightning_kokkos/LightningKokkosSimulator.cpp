@@ -193,7 +193,7 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 
     // update tape caching
     if (this->tape_recording) {
-        cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
+        cache_manager.addObservable(obsKey, MeasurementsT::Expval);
     }
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
@@ -210,7 +210,7 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 
     // update tape caching
     if (this->tape_recording) {
-        this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
+        this->cache_manager.addObservable(obsKey, MeasurementsT::Var);
     }
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
@@ -484,7 +484,7 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
     auto &&obs_callees = this->cache_manager.getObservablesCallees();
     bool is_valid_measurements =
         std::all_of(obs_callees.begin(), obs_callees.end(),
-                    [](const auto &m) { return m == Lightning::Measurements::Expval; });
+                    [](const auto &m) { return m == MeasurementsT::Expval; });
     RT_FAIL_IF(!is_valid_measurements,
                "Unsupported measurements to compute gradient; "
                "Adjoint differentiation method only supports expectation return type");
@@ -538,3 +538,9 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
 }
 
 } // namespace Catalyst::Runtime::Simulator
+
+extern "C" Catalyst::Runtime::QuantumDevice *
+LightningKokkosSimulatorFactory(const std::string &kwargs)
+{
+    return new Catalyst::Runtime::Simulator::LightningKokkosSimulator(kwargs);
+}

@@ -9,6 +9,13 @@
   `MeasurementProcess`es.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
 
+* The plugin system of Catalyst for backend devices. This system in runtime
+  is backed by `dlopen` and enables the devices to be packaged separately from
+  the runtime CAPI and loaded at run time instead of being linked at compile time.
+  This provides flexibility and extensibility to Catalyst allowing users to
+  load quantum devices dynamically.
+  [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+
 <h3>Improvements</h3>
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last 
@@ -32,6 +39,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Romain Moyard,
 Erick Ochoa Lopez.
 

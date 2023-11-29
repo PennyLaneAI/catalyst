@@ -265,7 +265,7 @@ jobs:
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=ON
 
-        cmake --build runtime-build --target rt_capi
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects

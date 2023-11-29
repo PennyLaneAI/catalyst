@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <dlfcn.h>
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -20,26 +21,59 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#if __has_include("pybind11/embed.h")
+#include <pybind11/embed.h>
+#define __build_with_pybind11
+#endif
+
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
-#if __has_include("LightningSimulator.hpp")
-// device: lightning.qubit
-#include "LightningSimulator.hpp"
-#endif
-
-#if __has_include("LightningKokkosSimulator.hpp")
-// device: lightning.kokkos
-#include "LightningKokkosSimulator.hpp"
-#endif
-
-#if __has_include("OpenQasmDevice.hpp")
-// device: openqasm
-#include "OpenQasmDevice.hpp"
-#include <pybind11/embed.h>
-#endif
-
 namespace Catalyst::Runtime {
+
+/**
+ * A (RAII) class for `pybind11::initialize_interpreter` and `pybind11::finalize_interpreter`.
+ *
+ * @note This is not copyable or movable and used in C++ tests and the ExecutionContext manager
+ * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
+ * tests which also enables the runtime to reuse the same interpreter in the scope of the global
+ * quantum device unique pointer.
+ *
+ * @note This is only required for OpenQasmDevice and when CAPI is built with pybind11.
+ */
+#ifdef __build_with_pybind11
+// LCOV_EXCL_START
+struct PythonInterpreterGuard {
+    // This ensures the guard scope to avoid Interpreter
+    // conflicts with runtime calls from the frontend.
+    bool _init_by_guard = false;
+
+    PythonInterpreterGuard()
+    {
+        if (!Py_IsInitialized()) {
+            pybind11::initialize_interpreter();
+            _init_by_guard = true;
+        }
+    }
+    ~PythonInterpreterGuard()
+    {
+        if (_init_by_guard) {
+            pybind11::finalize_interpreter();
+        }
+    }
+
+    PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
+    PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
+    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
+    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
+};
+// LCOV_EXCL_STOP
+#else
+struct PythonInterpreterGuard {
+    PythonInterpreterGuard() {}
+    ~PythonInterpreterGuard() {}
+};
+#endif
 
 class MemoryManager final {
   private:
@@ -62,7 +96,7 @@ class MemoryManager final {
 
 class SharedLibraryManager final {
   private:
-    void *_handler{NULL};
+    void *_handler{nullptr};
 
   public:
     SharedLibraryManager() = delete;
@@ -72,12 +106,17 @@ class SharedLibraryManager final {
         // If you have compiled this file with sanitizers and you reach this line
         // you will get an error.
         // Please re-compile without sanitizers.
+
 #ifdef __APPLE__
-        // macOS doesn't support RTLD_DEEPBIND
-        _handler = dlopen(filename.c_str(), RTLD_LAZY);
+        auto rtld_flags = RTLD_LAZY;
 #else
-        _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
+        // Closing the dynamic library of Lightning simulators with dlclose() where OpenMP
+        // directives (in Lightning simulators) are in use would raise memory segfaults.
+        // Note that we use RTLD_NODELETE as a workaround to fix the issue.
+        auto rtld_flags = RTLD_LAZY | RTLD_NODELETE;
 #endif
+
+        _handler = dlopen(filename.c_str(), rtld_flags);
         RT_FAIL_IF(!_handler, dlerror());
     }
 
@@ -118,23 +157,15 @@ class SharedLibraryManager final {
     }
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice();
+extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::string &kwargs);
 
 class ExecutionContext final {
   private:
     using DeviceInitializer =
         std::function<std::unique_ptr<QuantumDevice>(bool, const std::string &)>;
-    std::unordered_map<std::string_view, DeviceInitializer> _device_map{
-        {"lightning.qubit",
-         [](bool tape_recording, const std::string &device_kwargs) {
-             return std::make_unique<Simulator::LightningSimulator>(tape_recording, device_kwargs);
-         }},
-    };
 
     // Device specifications
     std::string _device_kwargs{};
-    size_t _device_shots{1000};
-
     std::string _device_name;
     bool _tape_recording;
 
@@ -142,27 +173,22 @@ class ExecutionContext final {
     std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
     std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
     std::unique_ptr<SharedLibraryManager> _driver_so_ptr{nullptr};
+    std::unique_ptr<PythonInterpreterGuard> _py_guard{nullptr};
 
-#ifdef __device_openqasm
-    std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{nullptr};
+    // Helper methods
+    void update_device_pl2runtime(std::string &pl_name, const std::string &rtd_name)
+    {
+#ifdef __linux__
+        pl_name = "librtd_" + rtd_name + ".so";
+#elif defined(__APPLE__)
+        pl_name = "librtd_" + rtd_name + ".dylib";
 #endif
+    }
 
   public:
     explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
         : _device_name(default_device), _tape_recording(false)
     {
-#ifdef __device_lightning_kokkos
-        _device_map.emplace("lightning.kokkos",
-                            [](bool tape_recording, const std::string &device_kwargs) {
-                                return std::make_unique<Simulator::LightningKokkosSimulator>(
-                                    tape_recording, device_kwargs);
-                            });
-#endif
-#ifdef __device_openqasm
-        _device_map.emplace("openqasm", [](bool tape_recording, const std::string &device_kwargs) {
-            return std::make_unique<Device::OpenQasmDevice>(tape_recording, device_kwargs);
-        });
-#endif
         _driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 
@@ -171,10 +197,7 @@ class ExecutionContext final {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
         _driver_so_ptr.reset(nullptr);
-
-#ifdef __device_openqasm
         _py_guard.reset(nullptr);
-#endif
 
         RT_ASSERT(getDevice() == nullptr);
         RT_ASSERT(getMemoryManager() == nullptr);
@@ -182,7 +205,9 @@ class ExecutionContext final {
 
     void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
 
-    void setDeviceKwArgs(std::string_view info) noexcept { _device_kwargs = info; }
+    void setDeviceKwArgs(std::string_view kwargs) noexcept { _device_kwargs = kwargs; }
+
+    void setDeviceName(std::string_view name) noexcept { _device_name = name; }
 
     [[nodiscard]] auto getDeviceName() const -> std::string_view { return _device_name; }
 
@@ -193,55 +218,46 @@ class ExecutionContext final {
     [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
     {
         _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
-        void *f_ptr = _driver_so_ptr->getSymbol("getCustomDevice");
-        return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : nullptr;
+        std::string factory_name{_device_name + "Factory"};
+        void *f_ptr = _driver_so_ptr->getSymbol(factory_name);
+        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_device_kwargs)
+                     : nullptr;
     }
 
-    [[nodiscard]] bool initDevice(std::string_view name)
+    [[nodiscard]] bool initDevice(std::string_view rtd_lib)
     {
-        if (name != "default") {
-            _device_name = name;
-        }
-
-        if (_device_name == "braket.aws.qubit" || _device_name == "braket.local.qubit") {
-            _device_kwargs = "device_type : " + _device_name + "," + _device_kwargs;
-            _device_name = "openqasm";
-        }
-
+        // Reset the driver pointer
         _driver_ptr.reset(nullptr);
 
-        auto iter = _device_map.find(_device_name);
-        if (iter != _device_map.end()) {
-            _driver_ptr = iter->second(_tape_recording, _device_kwargs);
+        // Convert to a mutable string
+        std::string rtd_lib_str{rtd_lib};
 
-#ifdef __device_openqasm
-            if (_device_name == "openqasm" && !Py_IsInitialized()) {
-                _py_guard =
-                    std::make_unique<Device::OpenQasm::PythonInterpreterGuard>(); // LCOV_EXCL_LINE
-            }
+        // LCOV_EXCL_START
+        // The following if-elif is required for C++ tests where these backend devices
+        // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
+        // Besides, this provides support for runtime device (RTD) libraries added to the system
+        // path. This maintains backward compatibility for specifying a device using its name.
+        // TODO: This support may need to be removed after updating the C++ unit tests.
+        if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
+            _device_name =
+                (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
+            update_device_pl2runtime(rtd_lib_str, "lightning");
+        }
+        else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
+            _device_name = "OpenQasmDevice";
+            update_device_pl2runtime(rtd_lib_str, "openqasm");
+        }
+        // LCOV_EXCL_STOP
+
+#ifdef __build_with_pybind11
+        if (_device_name == "OpenQasmDevice" && !Py_IsInitialized()) {
+            _py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
+        }
 #endif
 
-            return true;
-        }
-
-        // TODO: Once all devices are shared libraries, they all need to be loaded.
-        // During this transition period, there are several ways in which we can do this.
-        // This try catch is just for allowing the previous mechanism to still succeed
-        // while keeping the implementation of SharedLibraryManager as a minimal as possible.
-        // Once all devices are shared libraries, we can replace initDevice with loadDevice.
-        //
-        // Yes, I know there is a performance impact. But this try-catch will be removed once
-        // all devices are shared libraries.
-        try {
-            QuantumDevice *impl = loadDevice(std::string(name));
-            _driver_ptr.reset(impl);
-            return true;
-        }
-        catch (RuntimeException &e) {
-            // fall-through
-        }
-
-        return false;
+        QuantumDevice *impl = loadDevice(rtd_lib_str);
+        _driver_ptr.reset(impl);
+        return true;
     }
 
     [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &

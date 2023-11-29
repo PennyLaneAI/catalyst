@@ -148,7 +148,7 @@ wheel:
 
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib
-	cp $(RT_BUILD_DIR)/lib/librt_backend.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib

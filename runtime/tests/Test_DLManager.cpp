@@ -21,10 +21,12 @@
 
 using namespace Catalyst::Runtime;
 
+#ifdef __linux__
 TEST_CASE("Test dummy", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("this-file-does-not-exist.so");
+    driver->setDeviceName("DummyDevice");
     REQUIRE_THROWS_WITH(driver->loadDevice(file), Catch::Contains("No such file or directory"));
 }
 
@@ -32,30 +34,34 @@ TEST_CASE("Test error message function not found", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libm.so.6");
+    driver->setDeviceName("DummyDevice");
     REQUIRE_THROWS_WITH(driver->loadDevice(file),
-                        Catch::Contains("undefined symbol: getCustomDevice"));
+                        Catch::Contains("undefined symbol: DummyDeviceFactory"));
 }
 
-TEST_CASE("Test return false if cannot init device", "[Third Party]")
+TEST_CASE("Test error message if init device fails", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libm.so.6");
-    CHECK(!driver->initDevice(file));
+    REQUIRE_THROWS_WITH(driver->initDevice(file),
+                        Catch::Contains("undefined symbol: defaultFactory"));
 }
 
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libdummy_device.so");
+    driver->setDeviceName("DummyDevice");
     CHECK(driver->initDevice(file));
 }
+#endif
 
-TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning",
+TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning.qubit",
           "[CoreQIS]")
 {
     __quantum__rt__initialize();
 
-    char dev[8] = "backend";
+    char dev[8] = "rtd_lib";
     char dev_value[17] = "lightning.qubit";
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 
@@ -66,7 +72,7 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
                                         "Runtime: Invalid device specification"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev2_value),
-                        Catch::Contains("Failed initialization of the backend device"));
+                        Catch::Contains("cannot open shared object file"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device(nullptr, nullptr),
                         Catch::Contains("Invalid device specification"));
@@ -77,49 +83,15 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
                         Catch::Contains("Invalid use of the global driver before initialization"));
 }
 
-TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
+#ifdef __device_lightning_kokkos
+TEST_CASE("Test __rt__device registering device=lightning.kokkos", "[CoreQIS]")
 {
     __quantum__rt__initialize();
 
-    char dev[8] = "backend";
-    char dev_value[30] = "braket.aws.qubit";
-
-#if __has_include("OpenQasmDevice.hpp")
+    char dev[8] = "rtd_lib";
+    char dev_value[18] = "lightning.kokkos";
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
-#else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
-                        Catch::Contains("Failed initialization of the backend device"));
-#endif
-
-    __quantum__rt__finalize();
-
-    __quantum__rt__initialize();
-
-    char dev_kwargs[20] = "kwargs";
-    char dev_value_kwargs[70] = "device_arn : arn:aws:braket:::device/quantum-simulator/amazon/sv1";
-
-    __quantum__rt__device((int8_t *)dev_kwargs, (int8_t *)dev_value_kwargs);
-
-#if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
-#else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
-                        Catch::Contains("Failed initialization of the backend device"));
-#endif
-
-    __quantum__rt__finalize();
-
-    __quantum__rt__initialize();
-
-    char dev_lcl[8] = "backend";
-    char dev_value_lcl[30] = "braket.local.qubit";
-
-#if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl);
-#else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl),
-                        Catch::Contains("Failed initialization of the backend device"));
-#endif
 
     __quantum__rt__finalize();
 }
+#endif

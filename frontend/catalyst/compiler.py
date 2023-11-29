@@ -29,11 +29,9 @@ from typing import Any, List, Optional, Tuple
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
-from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-
-package_root = os.path.dirname(__file__)
+from catalyst.utils.runtime import get_lib_path
 
 
 @dataclass
@@ -91,20 +89,6 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     if compile_options.verbose:
         print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
-
-
-default_lib_paths = {
-    "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
-    "runtime": os.path.join(package_root, "../../runtime/build/lib"),
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
-}
-
-
-def get_lib_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "lib")  # pragma: no cover
-    return os.getenv(env_var, default_lib_paths.get(project, ""))
 
 
 DEFAULT_PIPELINES = [
@@ -246,7 +230,6 @@ class LinkerDriver:
             "-rdynamic",
             *system_flags,
             *lib_path_flags,
-            "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy

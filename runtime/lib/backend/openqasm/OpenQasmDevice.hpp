@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <bitset>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -30,9 +31,11 @@
 #include "QubitManager.hpp"
 #include "Utils.hpp"
 
+#include <pybind11/embed.h>
+
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
-#include "OpenQasmRunner.hpp"
+#include "OpenQasmRunner.hpp" // <pybind11/embed.h>
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
@@ -41,16 +44,16 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
     static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
 
-    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+    static constexpr size_t default_device_shots{0}; // tidy: readability-magic-numbers
 
-    Simulator::QubitManager<QubitIdType, size_t> qubit_manager{};
+    Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
     std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
 
-    Simulator::CacheManager cache_manager{};
+    Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
-
     size_t device_shots;
+
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
     std::unordered_map<std::string, std::string> device_kwargs;
@@ -72,11 +75,9 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     explicit OpenQasmDevice(
-        [[maybe_unused]] bool status = false,
         const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
-        : tape_recording(status)
     {
-        device_kwargs = Simulator::parse_kwargs(kwargs);
+        device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : default_device_shots;
