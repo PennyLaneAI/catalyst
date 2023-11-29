@@ -86,10 +86,11 @@ unique the entry point symbol. As an example, we use the identifier ``CustomDevi
         return new CustomDevice(kwargs);
     }
 
-The entry point function acts as a factory method for the device class. Note that a plugin library
-may also provide several factory methods in case it packages multiple devices into the same
-library. However, it is important that the device identifier be unique, as best as possible, to
-avoid clashes with other plugins.
+The entry point function acts as a factory method for the device class.
+
+Note that a plugin library may also provide several factory methods in case it packages
+multiple devices into the same library. However, it is important that the device identifier
+be unique, as best as possible, to avoid clashes with other plugins.
 
 Importantly, the ``<DeviceIdentifier>`` string in the entry point function needs to match
 exactly what is supplied to the ``__quantum__rt__device("rtd_name", "<DeviceIdentifier>")``
@@ -99,7 +100,7 @@ Python devices" section further down for details.
 
 ``CustomDevice(kwargs)`` serves as a constructor for your custom device, with ``kwargs``
 as a string of device specifications and options, represented in Python dictionary format.
-This may contain information such as device type and a number of shots: ``{'shots': 1000}``.
+An example could be the number of shots, encoded as the following string: ``"{'shots': 1000}"``.
 
 Note that these parameters are automatically initialized in the frontend if the library is
 provided as a PennyLane plugin device (see :func:`qml.device() <pennylane.device>`).
