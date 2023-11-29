@@ -61,7 +61,7 @@ def extract_backend_info(device):
 
     device_name = ""
     device_lpath = ""
-    device_kwargs = {"device_type": dname}
+    device_kwargs = {}
 
     if dname in SUPPORTED_RT_DEVICES:
         # Support backend devices without `get_c_interface`
@@ -88,10 +88,12 @@ def extract_backend_info(device):
         device_kwargs["shots"] = device.shots if device.shots else 0
 
     if dname == "braket.local.qubit":  # pragma: no cover
+        device_kwargs["device_type"] = dname
         device_kwargs[
             "backend"
         ] = device._device._delegate.DEVICE_ID  # pylint: disable=protected-access
     elif dname == "braket.aws.qubit":  # pragma: no cover
+        device_kwargs["device_type"] = dname
         device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
         if device._s3_folder:  # pylint: disable=protected-access
             device_kwargs["s3_destination_folder"] = str(

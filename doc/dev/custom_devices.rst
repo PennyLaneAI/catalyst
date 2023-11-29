@@ -18,8 +18,7 @@ Additionally, all measurements will always return ``true``.
         #include <QuantumDevice.hpp>
 
         struct CustomDevice final : public Catalyst::Runtime::QuantumDevice {
-            CustomDevice([[maybe_unused]] bool status = false,
-                [[maybe_unused]] const std::string &kwargs = "{}") {}
+            CustomDevice([[maybe_unused]] const std::string &kwargs = "{}") {}
             ~CustomDevice() = default; // LCOV_EXCL_LINE
 
             CustomDevice &operator=(const QuantumDevice &) = delete;
@@ -28,25 +27,21 @@ Additionally, all measurements will always return ``true``.
             CustomDevice &operator=(QuantumDevice &&) = delete;
 
             auto AllocateQubit() -> QubitIdType override { return 0; }
-            auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override
-            {
+            auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override {
                 return std::vector<QubitIdType>(num_qubits);
             }
             [[nodiscard]] auto Zero() const -> Result override { return NULL; }
             [[nodiscard]] auto One() const -> Result override { return NULL; }
             auto Observable(ObsId, const std::vector<std::complex<double>> &,
-                                    const std::vector<QubitIdType> &) -> ObsIdType override
-            {
+                                    const std::vector<QubitIdType> &) -> ObsIdType override {
                 return 0;
             }
             auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType override { return 0; }
             auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
-                -> ObsIdType override
-            {
+                -> ObsIdType override {
                 return 0;
             }
-            auto Measure(QubitIdType) -> Result override
-            {
+            auto Measure(QubitIdType) -> Result override {
                 bool *ret = (bool *)malloc(sizeof(bool));
                 *ret = true;
                 return ret;
@@ -61,14 +56,9 @@ Additionally, all measurements will always return ``true``.
             void StopTapeRecording() override {}
             void PrintState() override {}
             void NamedOperation(const std::string &, const std::vector<double> &,
-                                        const std::vector<QubitIdType> &, bool) override
-            {
-            }
-
+                                        const std::vector<QubitIdType> &, bool) override {}
             void MatrixOperation(const std::vector<std::complex<double>> &,
-                                        const std::vector<QubitIdType> &, bool) override
-            {
-            }
+                                        const std::vector<QubitIdType> &, bool) override{}
 
             auto Expval(ObsIdType) -> double override { return 0.0; }
             auto Var(ObsIdType) -> double override { return 0.0; }
@@ -80,45 +70,39 @@ Additionally, all measurements will always return ``true``.
             void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) override {}
 
             void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
-                                    const std::vector<QubitIdType> &, size_t) override
-            {
-            }
+                                    const std::vector<QubitIdType> &, size_t) override {}
 
             void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
         };
 
-In addition to implementing the ``QuantumDevice`` class, one must implement the following method
-with the name ``CustomDevice`` + ``Factory``:
+In addition to implementing the ``QuantumDevice`` class, one must implement an entry point for the
+device library with the name ``<DeviceIdentifier>Factory``, where ``DeviceIdentifier`` is used to
+unique the entry point symbol. As an example, we use the identifier ``CustomDevice``:
 
 .. code-block:: c++
 
     extern "C" Catalyst::Runtime::QuantumDevice*
-    CustomDeviceFactory(bool status, const std::string &kwargs)
-    {
-        return new CustomDevice(status, kwargs); }
+    CustomDeviceFactory(const std::string &kwargs) {
+        return new CustomDevice(kwargs);
+    }
 
-The use of the term ``Factory`` in ``CustomDeviceFactory`` is a runtime convention that combines the name
-of the device class, in this case, ``CustomDevice``, with the suffix ``Factory``. This signifies that the
-primary purpose of the method is to act as a factory for creating instances of the ``CustomDevice`` class.
+The entry point function acts as a factory method for the device class. Note that a plugin library
+may also provide several factory methods in case it packages multiple devices into the same
+library. However, it is important that the device identifier be unique, as best as possible, to
+avoid clashes with other plugins.
 
-.. warning::
+Importantly, the ``<DeviceIdentifier>`` string in the entry point function needs to match
+exactly what is supplied to the ``__quantum__rt__device("rtd_name", "<DeviceIdentifier>")``
+runtime instruction in compiled user programs, or what is returned from the ``get_c_interface``
+function when integrating the device into a PennyLane plugin. Please see the "Integration with
+Python devices" section further down for details.
 
-    The runtime exclusively supports factory methods with the name of the device class followed by ``Factory``.
-    Please ensure that your method adheres to this naming convention.
+``CustomDevice(kwargs)`` serves as a constructor for your custom device, with ``kwargs``
+as a string of device specifications and options, represented in Python dictionary format.
+This may contain information such as device type and a number of shots: ``{'shots': 1000}``.
 
-``CustomDevice(status, kwargs)`` serves as a constructor for your custom device, with
-
-- ``status``: A boolean to control the initial value of the tape recording system in the runtime.
-  If ``true``, this will cache the entire operations and observables in a program.
-  This may be used to compute gradient of a quantum circuit with taking advantage of gradient
-  methods provided by backend devices if supported.
-
-- ``kwargs``: A string that represents a Python dictionary of device specifications in string format.
-  This may contain information about the device type and a number of shots:
-  ``{'device_type': 'lightning.qubit', 'shots': 0}``.
-
-These parameters are automatically initialized in the frontend using the device specifications specified
-by users via :func:`qml.device() <pennylane.device>`.
+Note that these parameters are automatically initialized in the frontend if the library is
+provided as a PennyLane plugin device (see :func:`qml.device() <pennylane.device>`).
 
 The destructor of ``CustomDevice`` will be automatically called by the runtime.
 
@@ -146,14 +130,17 @@ One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` `as an 
         target_include_directories(dummy_device PUBLIC ${runtime_includes})
         set_property(TARGET dummy_device PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-
-
 Integration with Python devices
 ===============================
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
 After doing so, Catalyst should be able to interface with your custom device.
+
+.. note::
+
+    The first result of ``get_c_interface`` needs to match the ``<DeviceIdentifier>``
+    as described in the first section.
 
 .. code-block:: python
 
@@ -184,4 +171,3 @@ After doing so, Catalyst should be able to interface with your custom device.
     @qml.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
-

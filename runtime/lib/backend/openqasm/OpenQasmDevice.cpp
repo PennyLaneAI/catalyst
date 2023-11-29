@@ -184,8 +184,7 @@ auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
 
     // update tape caching
     if (tape_recording) {
-        cache_manager.addObservable(obsKey,
-                                    Catalyst::Runtime::Simulator::Lightning::Measurements::Expval);
+        cache_manager.addObservable(obsKey, Catalyst::Runtime::MeasurementsT::Expval);
     }
 
     std::string s3_folder_str{};
@@ -218,8 +217,7 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
 
     // update tape caching
     if (tape_recording) {
-        cache_manager.addObservable(obsKey,
-                                    Catalyst::Runtime::Simulator::Lightning::Measurements::Var);
+        cache_manager.addObservable(obsKey, Catalyst::Runtime::MeasurementsT::Var);
     }
 
     std::string s3_folder_str{};
@@ -496,8 +494,7 @@ void OpenQasmDevice::Gradient([[maybe_unused]] std::vector<DataView<double, 1>> 
 
 } // namespace Catalyst::Runtime::Device
 
-extern "C" Catalyst::Runtime::QuantumDevice *OpenQasmDeviceFactory(bool status,
-                                                                   const std::string &kwargs)
+extern "C" Catalyst::Runtime::QuantumDevice *OpenQasmDeviceFactory(const std::string &kwargs)
 {
-    return new Catalyst::Runtime::Device::OpenQasmDevice(status, kwargs);
+    return new Catalyst::Runtime::Device::OpenQasmDevice(kwargs);
 }

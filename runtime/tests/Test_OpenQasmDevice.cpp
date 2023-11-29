@@ -80,7 +80,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 {
     SECTION("Common")
     {
-        auto device = OpenQasmDevice(false, "{shots : 100}");
+        auto device = OpenQasmDevice("{shots : 100}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -90,8 +90,8 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 
     SECTION("Braket SV1")
     {
-        auto device = OpenQasmDevice(
-            false, "{shots: 100, device_type : braket.local.qubit, backend : default}");
+        auto device =
+            OpenQasmDevice("{shots: 100, device_type : braket.local.qubit, backend : default}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -102,8 +102,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device =
-        std::make_unique<OpenQasmDevice>(false, "{shots : 100}");
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
 
     constexpr size_t n = 3;
     device->AllocateQubits(1);
@@ -118,8 +117,7 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device =
-        std::make_unique<OpenQasmDevice>(false, "{shots : 100}");
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
 
     constexpr size_t n = 2;
     auto wires = device->AllocateQubits(n);
@@ -144,9 +142,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
           "[openqasm]")
 {
     constexpr size_t shots{1000};
-    constexpr bool status{false};
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        status, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{2};
     constexpr size_t size{1UL << n};
@@ -280,10 +277,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
     constexpr size_t shots{1000};
-    constexpr bool status{false};
-
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        status, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{5};
     constexpr size_t size{1UL << n};
@@ -460,7 +455,7 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        false, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{5};
     constexpr size_t size{1UL << n};
@@ -505,7 +500,7 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
 {
-    auto device = OpenQasmDevice(false, "{shots : 100}");
+    auto device = OpenQasmDevice("{shots : 100}");
     auto wires = device.AllocateQubits(2);
     std::vector<std::complex<double>> matrix{
         {0, 0},

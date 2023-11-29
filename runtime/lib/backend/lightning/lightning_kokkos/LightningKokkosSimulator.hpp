@@ -47,8 +47,8 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
 
-    QubitManager<QubitIdType, size_t> qubit_manager{};
-    CacheManager cache_manager{};
+    Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
+    Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
 
     size_t device_shots;
@@ -83,10 +83,9 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit LightningKokkosSimulator(bool status = false, const std::string &kwargs = "{}")
-        : tape_recording(status)
+    explicit LightningKokkosSimulator(const std::string &kwargs = "{}")
     {
-        auto &&args = parse_kwargs(kwargs);
+        auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
     }

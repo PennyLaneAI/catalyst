@@ -157,8 +157,7 @@ class SharedLibraryManager final {
     }
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(bool status,
-                                                                  const std::string &kwargs);
+extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::string &kwargs);
 
 class ExecutionContext final {
   private:
@@ -221,8 +220,7 @@ class ExecutionContext final {
         _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
         std::string factory_name{_device_name + "Factory"};
         void *f_ptr = _driver_so_ptr->getSymbol(factory_name);
-        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_tape_recording,
-                                                                                 _device_kwargs)
+        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_device_kwargs)
                      : nullptr;
     }
 
@@ -238,7 +236,7 @@ class ExecutionContext final {
         // The following if-elif is required for C++ tests where these backend devices
         // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
         // Besides, this provides support for runtime device (RTD) libraries added to the system
-        // path. This maintains backwards compatibility for specifying a device using its name.
+        // path. This maintains backward compatibility for specifying a device using its name.
         // TODO: This support may need to be removed after updating the C++ unit tests.
         if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
             _device_name =

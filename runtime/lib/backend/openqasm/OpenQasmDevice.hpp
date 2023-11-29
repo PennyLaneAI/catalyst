@@ -46,11 +46,11 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     static constexpr size_t default_device_shots{0}; // tidy: readability-magic-numbers
 
-    Simulator::QubitManager<QubitIdType, size_t> qubit_manager{};
+    Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
     std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
 
-    Simulator::CacheManager cache_manager{};
+    Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
 
@@ -75,11 +75,9 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     explicit OpenQasmDevice(
-        bool status = false,
         const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
-        : tape_recording(status)
     {
-        device_kwargs = Simulator::parse_kwargs(kwargs);
+        device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : default_device_shots;

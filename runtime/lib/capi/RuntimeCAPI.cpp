@@ -148,6 +148,9 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
     else if (args[0] == "rtd_lib") {
         RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(args[1]),
                    "Failed initialization of the backend device");
+        if (Catalyst::Runtime::CTX->getDeviceRecorderStatus()) {
+            Catalyst::Runtime::CTX->getDevice()->StartTapeRecording();
+        }
         return;
     }
 
