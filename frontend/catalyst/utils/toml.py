@@ -26,14 +26,14 @@ import importlib.util
 tomllib = importlib.util.find_spec("tomllib")
 tomlkit = importlib.util.find_spec("tomlkit")
 # We need at least one of these to make sure we can read toml files.
-if tomllib is None and tomlkit is None:
+if tomllib is None and tomlkit is None:  # pragma: nocover
     msg = "Either tomllib or tomlkit need to be installed."
     raise ImportError(msg)
 
 # Give preference to tomllib
 if tomllib:
-    from tomllib import load as toml_load
+    from tomllib import load as toml_load  # pragma: nocover
 else:
-    from tomlkit import load as toml_load
+    from tomlkit import load as toml_load  # pragma: nocover
 
 __all__ = ["toml_load"]
