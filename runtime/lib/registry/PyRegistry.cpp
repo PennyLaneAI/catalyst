@@ -2,11 +2,11 @@
 
 namespace py = pybind11;
 
-int add(int i, int j) {
-	return i + j;
+auto registerImpl(py::function f, py::args args, py::kwargs kwargs) {
+	return f(args, kwargs);
 }
 
 PYBIND11_MODULE(pyregistry, m) {
 	m.doc() = "pybind11 example plugin"; // optional module docstring.
-	m.def("add", &add, "A function that adds two numbers");
+	m.def("register", &registerImpl, "Call a function...");
 }
