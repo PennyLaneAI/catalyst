@@ -369,5 +369,17 @@ def test_accessing_shapes():
     assert f(3) == 6
 
 
+def test_no_recompilation():
+    @qjit(abstracted_axes={0: "n"})
+    def i(x):
+        return x
+
+    i(jnp.array([1]))
+    _id0 = id(i.compiled_function)
+    i(jnp.array([1, 1]))
+    _id1 = id(i.compiled_function)
+    assert _id0 == _id1
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

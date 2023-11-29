@@ -30,6 +30,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+from jax._src.interpreters.partial_eval import infer_lambda_input_type
+from jax._src.pjit import _flat_axes_specs
 from jax.interpreters.mlir import ir
 from jax.tree_util import tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
@@ -181,7 +183,7 @@ class CompiledFunction:
         self.compile_options = compile_options
 
     @staticmethod
-    def typecheck(compiled_signature, runtime_signature):
+    def typecheck(abstracted_axes, compiled_signature, runtime_signature):
         """Whether arguments can be promoted.
 
         Args:
@@ -194,6 +196,14 @@ class CompiledFunction:
         """
         compiled_data, compiled_shape = tree_flatten(compiled_signature)
         runtime_data, runtime_shape = tree_flatten(runtime_signature)
+        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
+        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
+        in_type_compiled = infer_lambda_input_type(axes_specs_compile, compiled_data)
+        in_type_runtime = infer_lambda_input_type(axes_specs_runtime, runtime_data)
+
+        if in_type_compiled == in_type_runtime:
+            return TypeCompatibility.CAN_SKIP_PROMOTION
+
         if compiled_shape != runtime_shape:
             return TypeCompatibility.NEEDS_COMPILATION
 
@@ -641,7 +651,8 @@ class QJIT:
         if not has_been_compiled:
             next_action = TypeCompatibility.NEEDS_COMPILATION
         else:
-            next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
+            abstracted_axes = self.compile_options.abstracted_axes
+            next_action = CompiledFunction.typecheck(abstracted_axes, self.c_sig, r_sig)
 
         if next_action == TypeCompatibility.NEEDS_PROMOTION:
             args = CompiledFunction.promote_arguments(self.c_sig, *args)
