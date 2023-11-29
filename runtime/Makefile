@@ -105,6 +105,8 @@ lq_configure:
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
+		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
@@ -124,6 +126,10 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 .PHONY: dummy_device
 dummy_device:
 	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
+
+.PHONE: pyregistry
+pyregistry:
+	cmake --build $(RT_BUILD_DIR) --target pyregistry -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
