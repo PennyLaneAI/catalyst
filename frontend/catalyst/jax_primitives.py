@@ -213,6 +213,22 @@ adjoint_p = jax.core.Primitive("adjoint")
 adjoint_p.multiple_results = True
 print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
+python_callback_p = core.Primitive("python_callback")
+python_callback_p.multiple_results = True
+
+
+@python_callback_p.def_abstract_eval
+def _python_callback_abstract_eval(*avals, callback, results_aval):
+    return results_aval
+
+
+@python_callback_p.def_impl
+def _python_callback_def_impl(*avals, callback, results_aval):
+    raise NotImplementedError()
+
+
+def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
+    raise NotImplementedError("TODO")
 
 
 #
@@ -1677,6 +1693,7 @@ mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
+mlir.register_lowering(python_callback_p, _python_callback_lowering)
 
 
 def _scalar_abstractify(t):

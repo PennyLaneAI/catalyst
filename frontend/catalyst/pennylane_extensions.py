@@ -39,6 +39,7 @@ from jax._src.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
+from jax._src import tree_util
 from jax.core import AbstractValue, eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
@@ -2446,3 +2447,25 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
         )
 
     return batch_size
+
+def callback(callback: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any):
+    """TODO: Attribution. I looked into
+    https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
+    flat_args, in_tree = tree_flatten((args, kwargs))
+
+    def _flat_callback(*flat_args):
+        # Why is in_tree here, shouldn't it be after?
+        args, kwargs = tree_unflatten(in_tree, flat_args)
+        return tree_util.tree_leaves(callback(*args, **kwargs))
+
+    import jax
+    from catalyst.jax_primitives import python_callback_p
+
+    results_aval = tree_util.tree_map(
+        lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes
+    )
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+    out_flat = python_callback_p.bind(
+        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
+    )
+    return tree_util.tree_unflatten(out_tree, out_flat)
