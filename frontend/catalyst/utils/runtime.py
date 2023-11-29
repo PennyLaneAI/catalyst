@@ -15,6 +15,8 @@
 Runtime utility methods.
 """
 
+# pylint: disable=protected-access,too-many-branches
+
 import os
 import pathlib
 import platform

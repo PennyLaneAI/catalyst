@@ -17,7 +17,6 @@ while using :func:`~.qjit`.
 """
 
 # pylint: disable=too-many-lines
-# pylint: disable=protected-access
 
 import numbers
 import pathlib
@@ -38,7 +37,6 @@ from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 import catalyst
-from catalyst.compiler import get_lib_path
 from catalyst.jax_primitives import (
     AbstractQreg,
     GradParams,
