@@ -197,6 +197,7 @@ class CompiledFunction:
         compiled_data, compiled_shape = tree_flatten(compiled_signature)
         runtime_data, runtime_shape = tree_flatten(runtime_signature)
         with Patcher(
+            # pylint: disable=protected-access
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
         ):
             axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
