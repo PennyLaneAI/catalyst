@@ -18,6 +18,7 @@ from __future__ import annotations
 from contextlib import ExitStack, contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type, TypeVar
 from copy import copy
+from dataclasses import dataclass
 
 import jax
 from jax import ShapeDtypeStruct
@@ -71,7 +72,7 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.linear_util import wrap_init, transformation
+from jax.linear_util import wrap_init, transformation, transformation_with_aux
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -98,8 +99,10 @@ __all__ = (
     "DynshapePrimitive",
     "convert_constvars_jaxpr",
     "convert_element_type",
+    "collapse",
     "deduce_avals",
     "deduce_avals2",
+    "deduce_avals3",
     "infer_output_type",
     "infer_lambda_input_type",
     "expand_args",
@@ -110,7 +113,7 @@ __all__ = (
     "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
-    "_input_type_to_tracers2",
+    "input_type_to_tracers",
     "_extract_implicit_args",
     "output_type_to_tracers",
     "jaxpr_to_mlir",
@@ -305,6 +308,42 @@ def expanded_fun(in_type, *args_expanded):
     args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
     ans = yield args_collapsed, {}
     yield ans
+
+@transformation_with_aux
+def expanded_fun2(static_args, *args_expanded):
+    (in_type, force_implicit_indbidx) = static_args
+    args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
+    res_flat = yield args_collapsed, {}
+    yield expand_results(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
+
+@dataclass
+class InputSignature:
+    in_type: InputType
+    in_tree: PyTreeDef
+
+
+@dataclass
+class OutputSignature:
+    out_type: Callable[[],OutputType]
+    out_tree: Callable[[],PyTreeDef]
+
+
+def deduce_avals3(f: Callable, args, kwargs, force_implicit_indbidx=False):
+    """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
+    and returning expanded flatten results. Calculate input abstract values and output_tree promise.
+    The promise must be called after the resulting wrapped function is evaluated."""
+    flat_args, in_tree = tree_flatten((args, kwargs))
+    axes_specs = _flat_axes_specs(None, *args, **kwargs)
+    in_type = infer_lambda_input_type(axes_specs, flat_args)
+    wf = wrap_init(f)
+    wf, out_tree_promise = flatten_fun(wf, in_tree)
+    wf, out_type_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
+    wf = annotate(wf, in_type)
+    return (
+        wf,
+        InputSignature(in_type, in_tree),
+        OutputSignature(out_type_promise, out_tree_promise)
+    )
 
 
 def deduce_avals2(f: Callable, args, kwargs):
@@ -560,9 +599,9 @@ def make_jaxpr2(
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
     return make_jaxpr_f
 
-def _input_type_to_tracers2(in_type: InputType,
-                            maker: Callable[[AbstractValue],DynamicJaxprTracer]
-                            ) -> List[DynamicJaxprTracer]:
+def input_type_to_tracers(in_type: InputType,
+                          maker: Callable[[AbstractValue],DynamicJaxprTracer]
+                          ) -> List[DynamicJaxprTracer]:
     """ Creates an expanded list of tracers representing an input values of a Jaxpr program """
     in_aval, in_keep = unzip2(in_type)
     return _input_type_to_tracers(maker, in_aval)
@@ -607,7 +646,7 @@ def infer_output_type(inputs:List[TracerLike],
         return hasattr(x, "aval")
 
     def _safe_index(l:List[TracerLike], x:TracerLike) -> Optional[int]:
-        assert isinstance(l, list)
+        assert isinstance(l, (list,tuple)), f"{type(l)=} {l=}"
         for i, t in enumerate(l):
             if t is x:
                 return i
@@ -628,10 +667,10 @@ def infer_output_type(inputs:List[TracerLike],
                     if i is not None:
                         d2 = InDBIdx(i)
                         if force_implicit_indbidx:
-                            # FIXME: only add once per InDBIdx?
-                            acc.append(d.aval)
-                            outputs2.append(d)
-                            expl.append(False)
+                            if _safe_index(outputs2, d) is None:
+                                acc.append(d.aval)
+                                outputs2.append(d)
+                                expl.append(False)
                     else:
                         i2 = _safe_index(outputs2, d)
                         if i2 is not None:
@@ -679,8 +718,8 @@ def extract_implicit_results(out_type, explicit_results, force_implicit_indbidx=
     return [x for x, (_, e) in zip(results, out_type) if not e]
 
 
-def expand_args(args:List[TracerLike]) -> List[TracerLike]:
-    in_type = infer_lambda_input_type(None, args)
+def expand_args(args:List[TracerLike], in_type=None) -> List[TracerLike]:
+    in_type = in_type if in_type is not None else infer_lambda_input_type(None, args)
     return list(_extract_implicit_args(in_type, args)) + list(args)
 
 
@@ -688,7 +727,7 @@ def expand_results(
     args:List[TracerLike],
     results:List[TracerLike],
     force_implicit_indbidx:bool=False
-) -> List[TracerLike]:
+) -> Tuple[List[TracerLike], OutputType]:
     out_type = infer_output_type(args, results,
                                  # eq_fun=lambda a, b: a is b,
                                  force_implicit_indbidx=force_implicit_indbidx)
@@ -697,7 +736,11 @@ def expand_results(
             out_type, results, force_implicit_indbidx=force_implicit_indbidx
         )) +
         list(results)
-    )
+    ), out_type
+
+
+def collapse(typ:InputType|OutputType, params:List[TracerLike]) -> List[TracerLike]:
+    return [t for t,(_,k) in zip(params, typ) if k]
 
 
 class DynshapePrimitive(Primitive):

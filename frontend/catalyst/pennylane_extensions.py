@@ -71,7 +71,8 @@ from catalyst.utils.jax_extras import (
     ShapedArray,
     _initial_style_jaxpr,
     _input_type_to_tracers,
-    _input_type_to_tracers2,
+    collapse,
+    input_type_to_tracers,
     output_type_to_tracers,
     convert_constvars_jaxpr,
     infer_output_type,
@@ -80,6 +81,7 @@ from catalyst.utils.jax_extras import (
     jaxpr_force_outvars,
     deduce_avals,
     deduce_avals2,
+    deduce_avals3,
     get_implicit_and_explicit_flat_args,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
@@ -970,27 +972,47 @@ class WhileLoop(HybridOp):
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
-        res_classical_tracers = self.regions[0].res_classical_tracers
         with EvaluationContext.frame_tracing_context(ctx, cond_trace):
+            arg_expanded_classical_tracers = expand_args(
+                self.regions[0].arg_classical_tracers
+            )
+            res_expanded_classical_tracers, out_type = expand_results(
+                arg_expanded_classical_tracers,
+                self.regions[0].res_classical_tracers,
+                force_implicit_indbidx=True
+            )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
-            cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(res_classical_tracers)
+            cond_jaxpr, out_type2, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
+                res_expanded_classical_tracers
+            )
+            assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
 
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
-        arg_classical_tracers = self.regions[1].arg_classical_tracers
-        res_classical_tracers = self.regions[1].res_classical_tracers
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
-
-
-            res_tracers = expand_results(arg_classical_tracers + [qreg_in],
-                                         res_classical_tracers + [qreg_out],
-                                         force_implicit_indbidx=True)
-            body_jaxpr, out_type, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_tracers
+            arg_expanded_tracers = expand_args(
+                self.regions[1].arg_classical_tracers + [qreg_in]
             )
+            res_expanded_tracers, out_type = expand_results(
+                arg_expanded_tracers,
+                self.regions[1].res_classical_tracers + [qreg_out],
+                force_implicit_indbidx=True
+            )
+            body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
+                res_expanded_tracers
+            )
+            assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
+            print("QBIND_RES_TRACERS")
+            for t in self.regions[1].res_classical_tracers + [qreg_out]: print("-", t)
+            print("QBIND_RES_EXP_TRACERS")
+            for t in res_expanded_tracers: print("-", t)
+            print("BBBBBBBBBBBBBB")
+            print(cond_jaxpr)
+            print(body_jaxpr)
+            print("BBBBBBBBBBBBBB")
 
         qreg = qrp.actualize()
 
@@ -1005,7 +1027,7 @@ class WhileLoop(HybridOp):
                 in_expanded_tracers,
                 self.out_classical_tracers,
                 force_implicit_indbidx=True
-            )
+            )[0]
         )
 
         qrp2 = QRegPromise(
@@ -1632,56 +1654,68 @@ def while_loop(cond_fn):
         def _call_handler(*init_state):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
-                in_classical_tracers, _ = tree_flatten(init_state)
 
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, cond_in_keep, cond_tree = deduce_avals2(cond_fn, init_state, {})
-                    in_type = list(zip(cond_in_avals, cond_in_keep))
-                    arg_classical_tracers = _input_type_to_tracers(
-                        cond_trace.new_arg, cond_in_avals
-                    )
+                    cond_wffa, in_sig, out_sig = deduce_avals3(cond_fn, init_state, {},
+                                                               force_implicit_indbidx=True)
+                    in_type = in_sig.in_type
+                    arg_classical_tracers = input_type_to_tracers(in_type, cond_trace.new_arg)
                     res_classical_tracers = [
                         cond_trace.full_raise(t)
                         for t in cond_wffa.call_wrapped(*arg_classical_tracers)
                     ]
+
+                    out_type = out_sig.out_type()
+                    out_tree = out_sig.out_tree()
+
                     cond_region = HybridOpRegion(
-                        cond_trace, None, arg_classical_tracers, res_classical_tracers
+                        cond_trace, None,
+                        collapse(in_type, arg_classical_tracers),
+                        collapse(out_type, res_classical_tracers)
                     )
 
-                _check_single_bool_value(cond_tree(), res_classical_tracers)
+                _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, in_keep, body_tree = deduce_avals2(body_fn, init_state, {})
-                    in_type = list(zip(in_avals, in_keep))
-                    arg_classical_tracers = _input_type_to_tracers2(in_type, body_trace.new_arg)
+                    body_wffa, in_sig, out_sig = deduce_avals3(body_fn, init_state, {},
+                                                               force_implicit_indbidx=True)
+                    in_type = in_sig.in_type
+                    arg_classical_tracers = input_type_to_tracers(in_type, body_trace.new_arg)
 
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:
                         res_classical_tracers = [
                             body_trace.full_raise(t)
-                            for t in wffa.call_wrapped(*arg_classical_tracers)
+                            for t in body_wffa.call_wrapped(*arg_classical_tracers)
                         ]
+
+                    out_type = out_sig.out_type()
+                    out_tree = out_sig.out_tree()
+
+                    print("API_RES_CLASSICAL_TRACERS")
+                    for t in res_classical_tracers: print("-", t)
+                    print("API_OUT_TYPE")
+                    for t in out_type: print("-", t)
+
+
                     body_region = HybridOpRegion(
-                        body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
+                        body_trace, quantum_tape,
+                        collapse(in_type, arg_classical_tracers),
+                        collapse(out_type, res_classical_tracers)
                     )
 
-                    out_type = infer_output_type(arg_classical_tracers,
-                                                 res_classical_tracers,
-                                                 force_implicit_indbidx=True)
+                in_classical_tracers, _ = tree_flatten(init_state)
+                in_expanded_classical_tracers = expand_args(in_classical_tracers, in_type)
 
-                in_expanded_classical_tracers = _extract_implicit_args(
-                    in_type, in_classical_tracers
-                ) + in_classical_tracers
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
-                out_classical_tracers = [
-                    t for t,(_,k) in zip(out_expanded_classical_tracers, out_type) if k
-                ]
-
-                WhileLoop(in_classical_tracers, out_classical_tracers, [cond_region, body_region])
-                return tree_unflatten(body_tree(), out_classical_tracers)
+                out_classical_tracers = collapse(out_type, out_expanded_classical_tracers)
+                WhileLoop(collapse(in_type, in_expanded_classical_tracers),
+                          out_classical_tracers,
+                          [cond_region, body_region])
+                return tree_unflatten(out_tree, out_classical_tracers)
 
             def _call_with_classical_ctx():
                 # init_vals, in_tree = tree_flatten(init_state)

@@ -273,10 +273,9 @@ def test_qnode_while_1():
         a = jnp.ones([sz+1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
-        def loop(_, i):
-            b = jnp.ones([sz+1], dtype=float)
+        def loop(a, i):
             i += 1
-            return (b, i)
+            return (a, i)
 
         a2, _ = loop(a, 0)
         return a2
@@ -295,9 +294,10 @@ def test_qnode_while_2():
         a = jnp.ones([sz+1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
-        def loop(a, i):
+        def loop(_, i):
+            b = jnp.ones([sz+1], dtype=float)
             i += 1
-            return (a, i)
+            return (b, i)
 
         a2, _ = loop(a, 0)
         return a2
@@ -305,6 +305,51 @@ def test_qnode_while_2():
     result = f(3)
     expected = jnp.ones(4)
     assert_array_and_dtype_equal(result, expected)
+
+
+def test_qnode_while_shared_indbidx():
+    """Test that catalyst tensor primitive is compatible with quantum while"""
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.ones([sz], dtype=float)
+
+        @while_loop(lambda _a, _b, i: i < 3)
+        def loop(a, b, i):
+            i += 1
+            return (a, b, i)
+
+        a2, b2, _ = loop(a, b, 0)
+        return a2 + b2
+
+    result = f(3)
+    expected = 2*jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qnode_while_indbidx_outdbidx():
+    """Test that catalyst tensor primitive is compatible with quantum while"""
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.ones([sz+1], dtype=float)
+
+        @while_loop(lambda _a, _b, i: i < 3)
+        def loop(a, _, i):
+            b = jnp.ones([sz+1], dtype=float)
+            i += 1
+            return (a, b, i)
+
+        a2, b2, _ = loop(a, b, 0)
+        return a2, b2
+
+    res_a, res_b = f(3)
+    assert_array_and_dtype_equal(res_a, jnp.ones(3))
+    assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
 
