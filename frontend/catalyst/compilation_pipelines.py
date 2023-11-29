@@ -51,7 +51,7 @@ from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args
+from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args, get_aval2
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -196,7 +196,9 @@ class CompiledFunction:
         """
         compiled_data, compiled_shape = tree_flatten(compiled_signature)
         runtime_data, runtime_shape = tree_flatten(runtime_signature)
-        if abstracted_axes is not None:
+        with Patcher(
+            (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+        ):
             axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
             axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
             in_type_compiled = infer_lambda_input_type(axes_specs_compile, compiled_data)
