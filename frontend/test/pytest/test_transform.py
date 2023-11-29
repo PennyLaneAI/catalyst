@@ -35,7 +35,8 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
-from pennylane.transforms import hamiltonian_expand, merge_rotations, qcut, sum_expand
+from pennylane import qcut
+from pennylane.transforms import hamiltonian_expand, merge_rotations, sum_expand
 
 from catalyst import measure, qjit
 from catalyst.utils.exceptions import CompileError
