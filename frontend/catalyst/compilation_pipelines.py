@@ -915,6 +915,31 @@ def qjit(
             generated. This more general version is parametrized over the abstracted axes and
             allows results to be computed over tensors independently of their axes lengths.
 
+            For example:
+
+            .. code-block:: python
+
+                @qjit
+                def sum(arr):
+                    return jnp.sum(arr)
+
+                sum(jnp.array([1]))     # Compilation happens here.
+                sum(jnp.array([1, 1]))  # And here!
+
+            The ``sum`` function would recompile each time an array of different size is passed
+            as an argument.
+
+            .. code-block:: python
+
+                @qjit(abstracted_axes={0: "n"})
+                def sum_abstracted(arr):
+                    return jnp.sum(arr)
+
+                sum(jnp.array([1]))     # Compilation happens here.
+                sum(jnp.array([1, 1]))  # No need to recompile.
+
+            the ``sum_abstracted`` function would only compile once and its definition would be
+            reused for subsequent function calls.
 
     Returns:
         QJIT object.
