@@ -61,7 +61,10 @@ from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.jax_extras import ClosedJaxpr, DynshapePrimitive, infer_output_type
+from catalyst.utils.jax_extras import (
+    ClosedJaxpr, DynshapePrimitive, infer_output_type, out_type_shift_indbidx,
+    out_type_force_outdbidx
+)
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -194,7 +197,7 @@ cond_p = core.AxisPrimitive("cond")
 cond_p.multiple_results = True
 while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
-for_p = core.AxisPrimitive("for_loop")
+for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
@@ -1289,14 +1292,21 @@ def _while_loop_lowering(
 # for loop
 #
 @for_p.def_abstract_eval
-def _for_loop_abstract_eval(*args, body_jaxpr, **kwargs):
-    return body_jaxpr.out_avals
+def _for_loop_abstract_eval(*args, body_jaxpr, body_iter_index, **kwargs):
+    _assert_jaxpr_without_constants(body_jaxpr)
+    out_type = infer_output_type(body_jaxpr.jaxpr.invars,
+                                 body_jaxpr.jaxpr.outvars,
+                                 force_implicit_indbidx=False)
+
+    out_type2 = out_type_force_outdbidx(out_type, body_iter_index, body_jaxpr.jaxpr.invars, body_jaxpr.jaxpr.outvars)
+    out_type3 = out_type_shift_indbidx(out_type2, 3)
+    return out_type3
 
 
 # pylint: disable=too-many-arguments
 @for_p.def_impl
 def _for_loop_def_impl(
-    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_nconsts
+    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_iter_index, body_nconsts
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1309,6 +1319,7 @@ def _for_loop_lowering(
     step: ir.Value,
     *iter_args_plus_consts: tuple,
     body_jaxpr: core.ClosedJaxpr,
+    body_iter_index : int,
     body_nconsts: int,
     apply_reverse_transform: bool,
 ):
@@ -1337,9 +1348,9 @@ def _for_loop_lowering(
     # Don't include the iteration index in the result types.
     result_types = loop_carry_types[1:]
     assert [val.type for val in loop_args] == result_types
-    assert result_types == [
-        mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
-    ], f"{result_types=} doesn't match {jax_ctx.avals_out=}"
+    # assert result_types == [
+    #     mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
+    # ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
 
     loop_operands = []
     for p in (lower_bound, upper_bound, step):

@@ -21,7 +21,7 @@ from jax import numpy as jnp
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import qjit, while_loop
+from catalyst import qjit, while_loop, for_loop
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -262,6 +262,25 @@ def test_classical_tracing_2():
         return jnp.ones(shape=[1, x], dtype=int)
 
     assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
+
+
+def test_qnode_for_1():
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 2)
+        def loop(i, a):
+            return a
+
+        a2 = loop(a)
+        return a2
+
+    result = f(3)
+    expected = jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
 
 
 def test_qnode_while_1():

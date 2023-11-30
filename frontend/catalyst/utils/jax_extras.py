@@ -339,8 +339,7 @@ def deduce_avals3(f: Callable, args, kwargs, abstracted_axes=None, force_implici
     The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
     axes_specs = _flat_axes_specs(abstracted_axes, *args, {})
-    in_type = infer_lambda_input_type(axes_specs, flat_args)
-    in_expanded_args = expand_args(flat_args, in_type)
+    in_expanded_args, in_type = expand_args(flat_args, axes_specs=axes_specs)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
@@ -638,7 +637,7 @@ def output_type_to_tracers(out_type: OutputType,
             shape = [[*out_consts, *in_tracers][d.val] if type(d) is InDBIdx else
                      out_tracers[d.val] if type(d) is OutDBIdx else
                      d for d in aval.shape]
-            aval = aval.update(shape=tuple(get_referent(d) for d in shape))
+            aval = aval.update(shape=tuple(shape))
         out_tracers.append(maker(aval))
     return out_tracers
 
@@ -647,9 +646,8 @@ TracerLike = TypeVar("TracerLike")
 
 def infer_output_type2(inputs:List[TracerLike],
                       outputs:List[TracerLike],
-                      # eq_fun:Callable[[TracerLike,TracerLike],bool],
                       force_implicit_indbidx:bool = True,
-                      ) -> OutputType:
+                      ) -> Tuple[List[TracerLike], OutputType]:
     """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
     we mean either Jax tracers or Jaxpr variables. """
 
@@ -707,9 +705,12 @@ def infer_output_type3(inputs:List[TracerLike],
     out_type = tuple(zip(out_aval2, out_keep1))
     return all_outs, (ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()), out_type, consts)
 
-def expand_args(args:List[TracerLike], in_type=None) -> List[TracerLike]:
-    in_type = in_type if in_type is not None else infer_lambda_input_type(None, args)
-    return list(_extract_implicit_args(in_type, args)) + list(args)
+def expand_args(args:List[TracerLike],
+                in_type=None,
+                axes_specs=None,
+                ) -> Tuple[List[TracerLike], InputType]:
+    in_type = in_type if in_type is not None else infer_lambda_input_type(axes_specs, args)
+    return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
 
 def expand_results(
@@ -722,6 +723,63 @@ def expand_results(
 
 def collapse(typ:InputType|OutputType, params:List[TracerLike]) -> List[TracerLike]:
     return [t for t,(_,k) in zip(params, typ) if k]
+
+
+def tracer_index(x:TracerLike, ls:List[TracerLike]) -> Optional[int]:
+    for i, t in enumerate(ls):
+        if x is t:
+            return i
+    return None
+
+
+def out_type_force_outdbidx(out_type:OutputType,
+                            input_idx:int,
+                            inputs:List[TracerLike],
+                            outputs:List[TracerLike]
+                            ) -> OutputType:
+
+    assert len(out_type) == len(outputs), "Outputs must be expanded"
+    x_in_idx = input_idx
+    x_out_idx = tracer_index(inputs[x_in_idx], outputs)
+
+    out_type2 = []
+    for i, ((aval, k), t) in enumerate(zip(out_type, outputs)):
+        if isinstance(t, DynamicJaxprTracer):
+            if isinstance(aval, DShapedArray):
+                shape2 = []
+                for d in aval.shape:
+                    if isinstance(d, InDBIdx) and d.val == x_in_idx:
+                        assert x_out_idx is not None, (
+                            "Target tracer does not exist in the outputs "
+                            "(see force_implicit_indbidx=True)"
+                        )
+                        assert x_out_idx < i, (
+                            "Target tracer is not available for OutDBIdx"
+                        )
+                        shape2.append(OutDBIdx(x_out_idx))
+                    else:
+                        shape2.append(d)
+                aval2 = aval.update(shape = tuple(shape2))
+            else:
+                aval2 = copy(aval)
+        else:
+            aval2 = aval
+        out_type2.append((aval2, k))
+    return out_type2
+
+
+def out_type_shift_indbidx(out_type:OutputType, delta:int) -> OutputType:
+    out_type2 = []
+    for (aval, k) in out_type:
+        if isinstance(aval, DShapedArray):
+            shape2 = []
+            for d in aval.shape:
+                shape2.append(InDBIdx(d.val+delta) if isinstance(d, InDBIdx) else d)
+            aval2 = aval.update(shape = tuple(shape2))
+        else:
+            aval2 = copy(aval)
+        out_type2.append((aval2, k))
+    return tuple(out_type2)
 
 
 class DynshapePrimitive(Primitive):
