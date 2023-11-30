@@ -352,6 +352,25 @@ def test_qnode_while_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
+def test_qnode_while_outer():
+    """Test that catalyst tensor primitive is compatible with quantum while"""
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        a0 = jnp.ones([sz], dtype=float)
+
+        @while_loop(lambda _a, i: i < 3)
+        def loop(a, i):
+            i += 1
+            return (a0, i)
+
+        a2, _ = loop(a0, 0)
+        return a0+a2
+
+    res_a = f(3)
+    assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
+
 
 def test_qjit_while_1():
     """Test that catalyst tensor primitive is compatible with quantum while"""
@@ -454,7 +473,6 @@ def test_qjit_while_outer():
         return a0+a2
 
     res_a = f(3)
-    print(f.jaxpr)
     assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
 
 

@@ -315,7 +315,9 @@ def expanded_fun2(static_args, *args_expanded):
     (in_type, force_implicit_indbidx) = static_args
     args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
-    yield expand_results(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
+    # yield expand_results(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
+    all_outs, out_type, out_consts = infer_output_type3(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
+    yield all_outs, (out_type, out_consts)
 
 @dataclass
 class InputSignature:
@@ -326,6 +328,7 @@ class InputSignature:
 @dataclass
 class OutputSignature:
     out_type: Callable[[],OutputType]
+    out_consts: Callable[[],list]
     out_tree: Callable[[],PyTreeDef]
 
 
@@ -338,12 +341,14 @@ def deduce_avals3(f: Callable, args, kwargs, force_implicit_indbidx=False):
     in_type = infer_lambda_input_type(axes_specs, flat_args)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
-    wf, out_type_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
+    wf, out_type_consts_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
     wf = annotate(wf, in_type)
     return (
         wf,
         InputSignature(in_type, in_tree),
-        OutputSignature(out_type_promise, out_tree_promise)
+        OutputSignature(lambda: out_type_consts_promise()[0],
+                        lambda: out_type_consts_promise()[1],
+                        out_tree_promise)
     )
 
 
@@ -617,6 +622,7 @@ def get_referent_frame(self, frame):
 
 
 def output_type_to_tracers(out_type: OutputType,
+                           out_consts: list,
                            in_tracers: List[DynamicJaxprTracer],
                            maker: Callable[[AbstractValue],DynamicJaxprTracer]
                            ) -> List[DynamicJaxprTracer]:
@@ -626,7 +632,7 @@ def output_type_to_tracers(out_type: OutputType,
     out_tracers = []
     for aval, _ in out_type:
         if type(aval) is DShapedArray:
-            shape = [[*in_tracers][d.val] if type(d) is InDBIdx else
+            shape = [[*out_consts, *in_tracers][d.val] if type(d) is InDBIdx else
                      out_tracers[d.val] if type(d) is OutDBIdx else
                      d for d in aval.shape]
             aval = aval.update(shape=tuple(get_referent(d) for d in shape))
@@ -683,6 +689,21 @@ def infer_output_type(inputs:List[TracerLike],
     return infer_output_type2(inputs, outputs, force_implicit_indbidx=force_implicit_indbidx)[1]
 
 
+def infer_output_type3(inputs:List[TracerLike],
+                       outputs:List[TracerLike],
+                       force_implicit_indbidx:bool = True,
+                       ) -> OutputType:
+
+    trace:DynamicJaxprTrace = find_top_trace(inputs)
+    outputs = [trace.full_raise(t) for t in outputs]
+    all_outs, out_type1 = infer_output_type2(inputs, outputs, force_implicit_indbidx=force_implicit_indbidx)
+    jaxpr, out_type2, consts = trace.frame.to_jaxpr2(all_outs)
+    assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
+    out_aval1, out_keep1 = unzip2(out_type1)
+    out_aval2, out_keep2 = unzip2(out_type2)
+    out_type = tuple(zip(out_aval2, out_keep1))
+    return all_outs, out_type, consts
+
 def expand_args(args:List[TracerLike], in_type=None) -> List[TracerLike]:
     in_type = in_type if in_type is not None else infer_lambda_input_type(None, args)
     return list(_extract_implicit_args(in_type, args)) + list(args)
@@ -711,16 +732,11 @@ class DynshapePrimitive(Primitive):
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
-        # print("BIND_IN_TYPE")
-        # for t in in_type: print("I", t)
-
         out_type, effects = primitive.abstract_eval(*in_type, **params)
-        # print("BIND_OUT_TYPE")
-        # for t in out_type: print("O", t)
         assert len(effects) == 0, f"Effects are not supported, got ({effects})"
 
         out_tracers = output_type_to_tracers(
-            out_type, tracers,
+            out_type, [], tracers, # FIXME: what to do with constants here???
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info))
 
         invars = map(trace.getvar, tracers)

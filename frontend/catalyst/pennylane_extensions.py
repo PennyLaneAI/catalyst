@@ -90,7 +90,8 @@ from catalyst.utils.jax_extras import (
     expand_args,
     expand_results,
     make_jaxpr2,
-    find_top_trace
+    find_top_trace,
+    infer_output_type3,
 )
 from catalyst.utils.patching import Patcher
 
@@ -1005,6 +1006,7 @@ class WhileLoop(HybridOp):
                 res_expanded_tracers
             )
             # assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
+            #
 
         qreg = qrp.actualize()
 
@@ -1683,6 +1685,7 @@ def while_loop(cond_fn):
 
                     out_type = out_sig.out_type()
                     out_tree = out_sig.out_tree()
+                    out_consts = out_sig.out_consts()
 
                     body_region = HybridOpRegion(
                         body_trace, quantum_tape,
@@ -1690,13 +1693,16 @@ def while_loop(cond_fn):
                         collapse(out_type, res_classical_tracers)
                     )
 
+                    # infer_output_type3(arg_classical_tracers, res_classical_tracers, True)
+
                 in_classical_tracers, _ = tree_flatten(init_state)
                 in_expanded_classical_tracers = expand_args(in_classical_tracers, in_type)
 
                 out_expanded_classical_tracers = output_type_to_tracers(
-                    out_type, in_expanded_classical_tracers,
+                    out_type, out_consts, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
+
                 out_classical_tracers = collapse(out_type, out_expanded_classical_tracers)
                 WhileLoop(collapse(in_type, in_expanded_classical_tracers),
                           out_classical_tracers,
