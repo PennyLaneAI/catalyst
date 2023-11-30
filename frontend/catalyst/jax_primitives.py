@@ -228,6 +228,12 @@ def _python_callback_def_impl(*avals, callback, results_aval):
 
 
 def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
+    import sys
+    from catalyst.compiler import get_lib_path
+    sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    import pyregistry
+    import pdb
+    pdb.set_trace()
     raise NotImplementedError("TODO")
 
 
