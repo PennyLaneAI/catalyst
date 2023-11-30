@@ -64,6 +64,7 @@ def extract_backend_info(device):
     device_name = ""
     device_lpath = ""
     device_kwargs = {}
+    device_kwargs["device_type"] = dname
 
     if dname in SUPPORTED_RT_DEVICES:
         # Support backend devices without `get_c_interface`
