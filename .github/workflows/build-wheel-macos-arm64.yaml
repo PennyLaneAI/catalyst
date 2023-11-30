@@ -248,7 +248,7 @@ jobs:
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -ENABLE_OPENMP=OFF
+              -DENABLE_OPENMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
@@ -297,7 +297,7 @@ jobs:
         retention-days: 14
 
   test-wheels:
-    needs: [constants, catalyst-macos-wheels-x86-64]
+    needs: [constants, catalyst-macos-wheels-arm64]
     strategy:
       fail-fast: false
       matrix:
