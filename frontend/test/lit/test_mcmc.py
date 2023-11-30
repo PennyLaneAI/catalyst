@@ -33,9 +33,9 @@ from catalyst import qjit
         shots=1000,
     )
 )
-def foo():
+def circuit():
     return qml.state()
 
 
 # CHECK: 'mcmc': True, 'num_burnin': 200, 'kernel_name': 'NonZeroRandom'
-print(foo.mlir)
+print(circuit.mlir)
