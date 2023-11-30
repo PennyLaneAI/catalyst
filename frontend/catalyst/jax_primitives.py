@@ -234,6 +234,12 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     import pyregistry
     import pdb
     pdb.set_trace()
+    # So, let's think about what kind of instruction we need.
+    # We need to generate a callback instruction that takes (preferrably) a static
+    # parameter which is a function symbol...
+    # And the parameters
+    # %res = catalyst.callback @function (arg0, arg1, ..., argN) : (types) -> (out_types)
+    # So this is what is needed.
     raise NotImplementedError("TODO")
 
 
