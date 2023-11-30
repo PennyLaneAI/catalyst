@@ -61,7 +61,7 @@ from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.jax_extras import DynshapePrimitive, infer_output_type
+from catalyst.utils.jax_extras import ClosedJaxpr, DynshapePrimitive, infer_output_type
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -209,6 +209,13 @@ adjoint_p.multiple_results = True
 print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
 
+
+
+def _assert_jaxpr_without_constants(jaxpr:ClosedJaxpr):
+    assert len(jaxpr.consts) == 0, (
+        "Abstract evaluation is not defined for Jaxprs with non-empty constants because these are "
+        "not available at the time of the creation of output tracers."
+    )
 
 #
 # print
@@ -1204,6 +1211,7 @@ def _while_loop_def_impl(
 
 @while_p.def_abstract_eval
 def _while_loop_abstract_eval(*in_type, body_jaxpr, **kwargs):
+    _assert_jaxpr_without_constants(body_jaxpr)
     out_type = infer_output_type(body_jaxpr.jaxpr.invars,
                                  body_jaxpr.jaxpr.outvars,
                                  force_implicit_indbidx=False)

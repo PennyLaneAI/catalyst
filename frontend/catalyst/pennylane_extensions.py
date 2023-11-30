@@ -1649,18 +1649,22 @@ def while_loop(cond_fn):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
 
+                cond_wffa, _, cond_out_sig = deduce_avals3(cond_fn, init_state, {},
+                                                           force_implicit_indbidx=True)
+                body_wffa, in_sig, out_sig = deduce_avals3(body_fn, init_state, {},
+                                                           force_implicit_indbidx=True)
+                in_type = in_sig.in_type
+                in_expanded_classical_tracers = in_sig.in_expanded_args
+
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, in_sig, out_sig = deduce_avals3(cond_fn, init_state, {},
-                                                               force_implicit_indbidx=True)
-                    in_type = in_sig.in_type
                     arg_classical_tracers = input_type_to_tracers(in_type, cond_trace.new_arg)
                     res_classical_tracers = [
                         cond_trace.full_raise(t)
                         for t in cond_wffa.call_wrapped(*arg_classical_tracers)
                     ]
 
-                    out_type = out_sig.out_type()
-                    out_tree = out_sig.out_tree()
+                    out_type = cond_out_sig.out_type()
+                    out_tree = cond_out_sig.out_tree()
 
                     cond_region = HybridOpRegion(
                         cond_trace, None,
@@ -1668,12 +1672,9 @@ def while_loop(cond_fn):
                         collapse(out_type, res_classical_tracers)
                     )
 
-                _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
+                    _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    body_wffa, in_sig, out_sig = deduce_avals3(body_fn, init_state, {},
-                                                               force_implicit_indbidx=True)
-                    in_type = in_sig.in_type
                     arg_classical_tracers = input_type_to_tracers(in_type, body_trace.new_arg)
 
                     quantum_tape = QuantumTape()
@@ -1693,21 +1694,16 @@ def while_loop(cond_fn):
                         collapse(out_type, res_classical_tracers)
                     )
 
-                    # infer_output_type3(arg_classical_tracers, res_classical_tracers, True)
-
-                in_classical_tracers, _ = tree_flatten(init_state)
-                in_expanded_classical_tracers = expand_args(in_classical_tracers, in_type)
 
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type, out_consts, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
 
-                out_classical_tracers = collapse(out_type, out_expanded_classical_tracers)
                 WhileLoop(collapse(in_type, in_expanded_classical_tracers),
-                          out_classical_tracers,
+                          collapse(out_type, out_expanded_classical_tracers),
                           [cond_region, body_region])
-                return tree_unflatten(out_tree, out_classical_tracers)
+                return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
             def _call_with_classical_ctx(ctx):
                 cond_jaxpr, cond_out_type, cond_tree, cond_consts = trace_function(

@@ -315,39 +315,42 @@ def expanded_fun2(static_args, *args_expanded):
     (in_type, force_implicit_indbidx) = static_args
     args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
-    # yield expand_results(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
-    all_outs, out_type, out_consts = infer_output_type3(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
-    yield all_outs, (out_type, out_consts)
+    all_outs, out_sig = infer_output_type3(args_expanded, res_flat, force_implicit_indbidx=force_implicit_indbidx)
+    yield all_outs, out_sig
 
 @dataclass
 class InputSignature:
     in_type: InputType
     in_tree: PyTreeDef
+    in_expanded_args: List[DynamicJaxprTracer]
 
 
 @dataclass
 class OutputSignature:
-    out_type: Callable[[],OutputType]
-    out_consts: Callable[[],list]
-    out_tree: Callable[[],PyTreeDef]
+    out_jaxpr: Callable[[], ClosedJaxpr]
+    out_type: Callable[[], OutputType]
+    out_consts: Callable[[], list]
+    out_tree: Callable[[], PyTreeDef]
 
 
-def deduce_avals3(f: Callable, args, kwargs, force_implicit_indbidx=False):
+def deduce_avals3(f: Callable, args, kwargs, abstracted_axes=None, force_implicit_indbidx=False):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
-    axes_specs = _flat_axes_specs(None, *args, {})
+    axes_specs = _flat_axes_specs(abstracted_axes, *args, {})
     in_type = infer_lambda_input_type(axes_specs, flat_args)
+    in_expanded_args = expand_args(flat_args, in_type)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
-    wf, out_type_consts_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
+    wf, out_sig_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
     wf = annotate(wf, in_type)
     return (
         wf,
-        InputSignature(in_type, in_tree),
-        OutputSignature(lambda: out_type_consts_promise()[0],
-                        lambda: out_type_consts_promise()[1],
+        InputSignature(in_type, in_tree, in_expanded_args),
+        OutputSignature(lambda: out_sig_promise()[0],
+                        lambda: out_sig_promise()[1],
+                        lambda: out_sig_promise()[2],
                         out_tree_promise)
     )
 
@@ -622,7 +625,7 @@ def get_referent_frame(self, frame):
 
 
 def output_type_to_tracers(out_type: OutputType,
-                           out_consts: list,
+                           out_consts: List[DynamicJaxprTracer],
                            in_tracers: List[DynamicJaxprTracer],
                            maker: Callable[[AbstractValue],DynamicJaxprTracer]
                            ) -> List[DynamicJaxprTracer]:
@@ -702,7 +705,7 @@ def infer_output_type3(inputs:List[TracerLike],
     out_aval1, out_keep1 = unzip2(out_type1)
     out_aval2, out_keep2 = unzip2(out_type2)
     out_type = tuple(zip(out_aval2, out_keep1))
-    return all_outs, out_type, consts
+    return all_outs, (ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()), out_type, consts)
 
 def expand_args(args:List[TracerLike], in_type=None) -> List[TracerLike]:
     in_type = in_type if in_type is not None else infer_lambda_input_type(None, args)
@@ -746,4 +749,3 @@ class DynshapePrimitive(Primitive):
         trace.frame.add_eqn(eqn)
         # out_tracers = [t for t,(_,k) in zip(out_tracers, out_type) if k]
         return out_tracers if primitive.multiple_results else out_tracers.pop()
-

@@ -358,25 +358,18 @@ def has_nested_tapes(op: Operation) -> bool:
 
 def trace_function(ctx, fun, *args, force_implicit_indbidx=False, **kwargs):
 
+    wfun, in_sig, out_sig = deduce_avals3(
+        fun, args, kwargs, force_implicit_indbidx=force_implicit_indbidx
+    )
     with EvaluationContext.frame_tracing_context(ctx) as trace:
-        wfun, in_sig, out_sig = deduce_avals3(
-            fun, args, kwargs, force_implicit_indbidx=force_implicit_indbidx
-        )
         arg_classical_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
-        res_classical_tracers = [
-            trace.full_raise(t)
-            for t in wfun.call_wrapped(*arg_classical_tracers)
-        ]
-        out_aval, out_keep = unzip2(out_sig.out_type())
-        jaxpr, out_type2, consts = ctx.frames[trace].to_jaxpr2(res_classical_tracers)
-        assert len(out_type2) == len(out_sig.out_type())
-        out_aval2, _ = unzip2(out_type2)
+        _ = wfun.call_wrapped(*arg_classical_tracers)
 
         return (
-            ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-            tuple(zip(out_aval2, out_keep)),
+            out_sig.out_jaxpr(),
+            out_sig.out_type(),
             out_sig.out_tree(),
-            consts
+            out_sig.out_consts()
         )
 
 
