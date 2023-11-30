@@ -27,11 +27,18 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
-from jaxlib.mlir.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects.arith import (
+    AddIOp,
+    CeilDivSIOp,
+    IndexCastOp,
+    MulIOp,
+    SubIOp,
+    ConstantOp as ArithConstant,
+)
 from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
-from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
+from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp, CustomCallOp
 from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
@@ -230,17 +237,21 @@ def _python_callback_def_impl(*avals, callback, results_aval):
 def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
     import sys
     from catalyst.compiler import get_lib_path
+
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import pyregistry
-    import pdb
-    pdb.set_trace()
+
+    callback_id = pyregistry.register(callback)
+
+    value_id = ConstantOp(ir.DenseElementsAttr.get(np.asarray(callback_id))).results
+    return CustomCallOp([], [value_id], "pyregistry").results
     # So, let's think about what kind of instruction we need.
     # We need to generate a callback instruction that takes (preferrably) a static
     # parameter which is a function symbol...
     # And the parameters
     # %res = catalyst.callback @function (arg0, arg1, ..., argN) : (types) -> (out_types)
     # So this is what is needed.
-    raise NotImplementedError("TODO")
+    # raise NotImplementedError("TODO")
 
 
 #
