@@ -1216,7 +1216,7 @@ TEMPLATE_LIST_TEST_CASE(
     "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim =
-        std::make_unique<TestType>(false, "{mcmc : True, num_burnin : 200}");
+        std::make_unique<TestType>("{mcmc : True, num_burnin : 200}");
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
