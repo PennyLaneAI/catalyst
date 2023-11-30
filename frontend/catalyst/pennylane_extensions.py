@@ -1912,7 +1912,7 @@ def ctrl(
 
 def callback(callback: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any):
     """TODO: Attribution. I looked into
-    https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"
+    https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
     flat_args, in_tree = tree_flatten((args, kwargs))
 
     def _flat_callback(*flat_args):
