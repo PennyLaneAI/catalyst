@@ -36,33 +36,34 @@ struct FuncOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::FuncO
             auto inputTypes = opType.getInputs();
             auto resultTypes = opType.getResults();
 
-            // Convert inputs to async values
-            SmallVector<Type> asyncInputTypes;
-            for (Type inputType : inputTypes) {
-                asyncInputTypes.push_back(async::ValueType::get(inputType));
-            }
-
             // Convert results to async values
             SmallVector<Type> asyncResultTypes;
             for (Type resultType : resultTypes) {
                 asyncResultTypes.push_back(async::ValueType::get(resultType));
             }
             FunctionType asyncFunctionType = FunctionType::get(op.getContext(), /*inputs=*/
-                                                               asyncInputTypes,
+                                                               inputTypes,
                                                                /*outputs=*/asyncResultTypes);
             StringRef nameOp = op.getName();
             auto asyncFunc = rewriter.create<async::FuncOp>(op.getLoc(), nameOp, asyncFunctionType);
             asyncFunc.setPrivate();
             // Create the block of the function
-            Block *funcBody = asyncFunc.addEntryBlock();
+            Block *asyncFuncBody = asyncFunc.addEntryBlock();
 
-            auto funcBlockArgs = funcBody->getArguments();
-            rewriter.setInsertionPointToEnd(funcBody);
-            
+            auto asyncFuncBlockArgs = asyncFuncBody->getArguments();
+            rewriter.setInsertionPointToEnd(asyncFuncBody);
+
             // Merge the two blocks and delete the first one
-            Region* body = &op.getFunctionBody();
-            Block* firstBlock = &body->front();
-            rewriter.mergeBlocks(firstBlock, funcBody, funcBlockArgs);
+            Region *body = &op.getFunctionBody();
+            Block *originalBlock = &body->front();
+            Operation *originalTerminator = originalBlock->getTerminator();
+            rewriter.mergeBlocks(originalBlock, asyncFuncBody, asyncFuncBlockArgs);
+            // Replace the terminator with async return
+            rewriter.create<async::ReturnOp>(op.getLoc(), originalTerminator->getResultTypes(),
+                                             originalTerminator->getOperands());
+            rewriter.eraseOp(originalTerminator);
+            // TODO: Copy all attr
+            // asyncFunc.setAttr("qnode", rewriter.getUnitAttr());
             rewriter.replaceOp(op, asyncFunc);
             return success();
         }
@@ -76,9 +77,16 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
     mlir::LogicalResult matchAndRewrite(func::CallOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        // Call op that have
-        // Convert the args
-        return success();
+        SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(op.getCallableForCallee());
+        async::FuncOp funcOp =
+            dyn_cast_or_null<async::FuncOp>(SymbolTable::lookupNearestSymbolFrom(op, symbol));
+        // Check for Call ops that have QNode func ops
+        if (funcOp->hasAttrOfType<UnitAttr>("qnode")) {
+            rewriter.create<async::CallOp>(op.getLoc(), funcOp, op.getArgOperands());
+            // TODO: Add the awaits
+            return success();
+        }
+        return failure();
     }
 };
 
