@@ -351,7 +351,7 @@ def test_shapes_type_conversion():
     """We allow floats to be passed as dynamic shapes. This test fixes the current behavior of this
     mechanism.
     Note: Jax seems to call `canonicalize_shape` function on every input. Probably we should follow
-    this approach in future. """
+    this approach in future."""
 
     def f(x):
         return jnp.empty(shape=[2, x], dtype=int)
