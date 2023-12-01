@@ -39,7 +39,7 @@ struct QnodeToAsyncLoweringPass : impl::QnodeToAsyncLoweringPassBase<QnodeToAsyn
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "qnod to async lowering pass"
+        LLVM_DEBUG(dbgs() << "qnode to async lowering pass"
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
