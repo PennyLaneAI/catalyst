@@ -14,6 +14,7 @@
 
 #include <dlfcn.h>
 
+#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -30,6 +31,9 @@
 
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
+#include "Types.h"
+
+extern void callbackCall(uintptr_t);
 
 namespace Catalyst::Runtime {
 
@@ -76,6 +80,12 @@ struct PythonInterpreterGuard {
     ~PythonInterpreterGuard() {}
 };
 #endif
+
+extern "C" void pyregistry(void *p, uintptr_t *aligned, int64_t i)
+{
+    fprintf(stderr, "%ld\n", *aligned);
+    callbackCall(aligned[0]);
+}
 
 class MemoryManager final {
   private:

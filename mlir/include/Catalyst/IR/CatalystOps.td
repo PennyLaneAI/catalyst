@@ -17,6 +17,7 @@
 #define CATALYST_OPS
 
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
 
@@ -77,7 +78,8 @@ def PrintOp : Catalyst_Op<"print"> {
     );
 }
 
-def CustomCallOp: Catalyst_Op<"custom_call"> {
+def CustomCallOp: Catalyst_Op<"custom_call",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let summary = "CustomCall operation";
   let description = [{
     Encapsulates an implementation-defined operation `call_target_name` that

@@ -2456,6 +2456,8 @@ def callback(callback: Callable[..., Any], result_shape_dtypes: Any, *args: Any,
     def _flat_callback(*flat_args):
         # Why is in_tree here, shouldn't it be after?
         args, kwargs = tree_unflatten(in_tree, flat_args)
+        if len(*args) == 0:
+            return tree_util.tree_leaves(callback())
         return tree_util.tree_leaves(callback(*args, **kwargs))
 
     import jax

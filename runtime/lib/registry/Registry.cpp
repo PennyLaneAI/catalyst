@@ -1,20 +1,24 @@
 #include <cstdint>
+#include <cstdio>
+#include <pybind11/pybind11.h>
 #include <unordered_map>
 
-class Environment
-{
-private:
-	std::unordered_map<uintptr_t, void*> _function_map;
-public:
-	uintptr_t insert(void*);
-	void erase(void*);
-};
+#include "Types.h"
 
-uintptr_t
-Environment::insert(void *fptr)
+namespace py = pybind11;
+
+std::unordered_map<uintptr_t, py::function> references;
+
+__attribute__((visibility("default"))) void _registerImpl(uintptr_t id, py::function f)
 {
-	uintptr_t retval = (uintptr_t)fptr;
-	_function_map.insert({retval, fptr});
-	return retval;
+    fprintf(stderr, "%ld\n", id);
+    references.insert({id, f});
 }
 
+__attribute__((visibility("default"))) void callbackCall(uintptr_t identifier)
+{
+    fprintf(stderr, "%ld\n", identifier);
+    auto it = references.find(identifier);
+    auto lambda = it->second();
+    // lambda();
+}

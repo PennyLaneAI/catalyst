@@ -243,7 +243,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     callback_id = pyregistry.register(callback)
 
-    value_id = ConstantOp(ir.DenseElementsAttr.get(np.asarray(callback_id))).results
+    value_id = StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(callback_id))).results
     return CustomCallOp([], [value_id], "pyregistry").results
     # So, let's think about what kind of instruction we need.
     # We need to generate a callback instruction that takes (preferrably) a static
