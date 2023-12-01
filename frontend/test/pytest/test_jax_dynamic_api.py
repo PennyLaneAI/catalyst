@@ -373,7 +373,8 @@ def test_accessing_shapes():
 
 
 def test_no_recompilation():
-    """Test that the function is not recompiled when changing the argument shape across invocations."""
+    """Test that the function is not recompiled when changing the argument shape across
+    invocations."""
 
     @qjit(abstracted_axes={0: "n"})
     def i(x):

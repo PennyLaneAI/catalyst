@@ -267,6 +267,7 @@ class TestCompilerState:
         """Test the textual IR compilation."""
         full_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
+        # pylint: disable=line-too-long
         ir = (
             r"""
 module @workflow {
