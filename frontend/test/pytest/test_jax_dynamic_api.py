@@ -255,7 +255,7 @@ def test_slice_dynamic_array_dynamic_index():
 
 
 def test_classical_tracing_2():
-    """Test that tensor primitive work in the classical tracing mode, the traced dimention case"""
+    """Test that tensor primitive work in the classical tracing mode, the traced dimension case"""
 
     @qjit
     def f(x):
@@ -268,7 +268,7 @@ def test_classical_tracing_2():
 def test_quantum_tracing_1():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(shape):
         i = 0
@@ -293,7 +293,7 @@ def test_quantum_tracing_1():
 def test_quantum_tracing_2():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(x, y):
         i = 0
@@ -370,6 +370,7 @@ def test_accessing_shapes():
 
 
 def test_no_recompilation():
+    """Test that the function is not recompiled when changing the argument shape across invocations."""
     @qjit(abstracted_axes={0: "n"})
     def i(x):
         return x
