@@ -9,6 +9,13 @@
   `MeasurementProcess`es.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
 
+* The plugin system of Catalyst for backend devices. This system in runtime
+  is backed by `dlopen` and enables the devices to be packaged separately from
+  the runtime CAPI and loaded at run time instead of being linked at compile time.
+  This provides flexibility and extensibility to Catalyst allowing users to
+  load quantum devices dynamically.
+  [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+
 * Jax dynamic API is enabled and the intial support for dynamically-shaped arrays is added.
   Catalyst now accepts tensors whose dimensions are not known at the compile time in the top-level
   programs. Standard tensor initialisation functions `jax.numpy.ones/zeros/empty` now accept
@@ -51,9 +58,10 @@
 
 This release contains contributions from (in alphabetical order):
 
-Erick Ochoa Lopez,
+Ali Asadi,
 Romain Moyard,
-Sergei Mironov.
+Sergei Mironov,
+Erick Ochoa Lopez.
 
 # Release 0.3.2
 

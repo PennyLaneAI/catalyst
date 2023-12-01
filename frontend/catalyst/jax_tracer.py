@@ -778,8 +778,9 @@ def trace_quantum_function(
                 trees = return_values_tree
 
             with EvaluationContext.frame_tracing_context(ctx, trace):
-                qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
-                qdevice_p.bind(spec="backend", val=device.backend_name)
+                qdevice_p.bind(spec="rtd_kwargs", val=str(device.backend_kwargs))
+                qdevice_p.bind(spec="rtd_name", val=device.backend_name)
+                qdevice_p.bind(spec="rtd_lib", val=device.backend_lib)
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)

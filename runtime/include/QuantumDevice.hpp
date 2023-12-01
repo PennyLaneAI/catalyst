@@ -47,7 +47,7 @@ struct QuantumDevice {
     /**
      * @brief Allocate a qubit.
      *
-     * @return QubitIdType
+     * @return `QubitIdType`
      */
     virtual auto AllocateQubit() -> QubitIdType = 0;
 
@@ -95,11 +95,17 @@ struct QuantumDevice {
 
     /**
      * @brief Start recording a quantum tape if provided.
+     *
+     * @note This is backed by the `Catalyst::Runtime::CacheManager` property in
+     * the device implementation.
      */
     virtual void StartTapeRecording() = 0;
 
     /**
      * @brief Stop recording a quantum tape if provided.
+     *
+     * @note This is backed by the `Catalyst::Runtime::CacheManager` property in
+     * the device implementation.
      */
     virtual void StopTapeRecording() = 0;
 

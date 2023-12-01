@@ -8,8 +8,9 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
-BUILD_TYPE?=Release
+BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
+ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 ENABLE_ASAN?=OFF
@@ -22,6 +23,22 @@ else
 	DEFAULT_ENABLE_OPENMP := ON
 endif
 
+BUILD_TARGETS := rt_capi
+TEST_TARGETS := ""
+
+ifeq ($(ENABLE_LIGHTNING), ON)
+	BUILD_TARGETS += rtd_lightning
+	TEST_TARGETS += runner_tests_lightning
+else ifeq ($(ENABLE_LIGHTNING_KOKKOS), ON)
+	BUILD_TARGETS += rtd_lightning
+	TEST_TARGETS += runner_tests_lightning
+endif
+
+ifeq ($(ENABLE_OPENQASM), ON)
+	BUILD_TARGETS += rtd_openqasm
+	TEST_TARGETS += runner_tests_openqasm
+endif
+
 ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
 
 coverage: CODE_COVERAGE=ON
@@ -29,7 +46,7 @@ coverage: BUILD_TYPE=Debug
 coverage: C_COMPILER=$(shell which gcc)
 coverage: CXX_COMPILER=$(shell which g++)
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=Release
+test: BUILD_TYPE?=RelWithDebInfo
 
 .PHONY: help
 help:
@@ -56,6 +73,7 @@ configure:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DENABLE_LIGHTNING=$(ENABLE_LIGHTNING) \
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OPENMP=$(ENABLE_OPENMP) \
@@ -66,29 +84,33 @@ configure:
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
 
-$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
+$(RT_BUILD_DIR)/lib/librt_capi.so: configure
+	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
 .PHONY: runtime
-runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
+runtime: $(RT_BUILD_DIR)/lib/librt_capi.so
 
-$(RT_BUILD_DIR)/tests/runner_tests: configure
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
+$(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
+	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: dummy_device
 dummy_device:
 	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
 
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests
+test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "test the Catalyst runtime test suite"
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
+
+ifeq ($(ENABLE_OPENQASM), ON)
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
+endif
 
 .PHONY: coverage
-coverage: $(RT_BUILD_DIR)/tests/runner_tests
+coverage: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "check C++ code coverage"
 
-	$(RT_BUILD_DIR)/tests/runner_tests
+	$(RT_BUILD_DIR)/tests/runner_tests_lightning
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4

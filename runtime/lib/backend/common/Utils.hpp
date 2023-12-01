@@ -26,11 +26,7 @@
 #include "Exception.hpp"
 #include "Types.h"
 
-#if __has_include("StateVectorLQubitDynamic.hpp")
-#include "Util.hpp"
-#endif
-
-namespace Catalyst::Runtime::Simulator {
+namespace Catalyst::Runtime {
 static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::string, std::string>
 {
     // cleaning kwargs
@@ -77,7 +73,16 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
 
     return map;
 }
-} // namespace Catalyst::Runtime::Simulator
+
+enum class MeasurementsT : uint8_t {
+    None, // = 0
+    Expval,
+    Var,
+    Probs,
+    State,
+};
+
+} // namespace Catalyst::Runtime
 
 namespace Catalyst::Runtime::Simulator::Lightning {
 enum class SimulatorGate : uint8_t {
@@ -113,14 +118,6 @@ enum class SimulatorGate : uint8_t {
     Toffoli,
     // n-qubit
     MultiRZ,
-};
-
-enum class Measurements : uint8_t {
-    None, // = 0
-    Expval,
-    Var,
-    Probs,
-    State,
 };
 
 constexpr std::array simulator_observable_support = {

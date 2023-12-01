@@ -14,10 +14,6 @@
 
 #pragma once
 
-#if !__has_include("StateVectorLQubitDynamic.hpp")
-throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
-#endif
-
 #define __device_lightning
 
 #include <bitset>
@@ -29,10 +25,6 @@ throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
 #include <random>
 #include <span>
 
-#include "AdjointJacobianLQubit.hpp"
-#include "JacobianData.hpp"
-#include "LinearAlgebra.hpp"
-#include "MeasurementsLQubit.hpp"
 #include "StateVectorLQubitDynamic.hpp"
 
 #include "CacheManager.hpp"
@@ -53,10 +45,9 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
 
-    QubitManager<QubitIdType, size_t> qubit_manager{};
-    CacheManager cache_manager{};
+    Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
+    Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
-
     size_t device_shots;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
@@ -89,10 +80,9 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit LightningSimulator(bool status = false, const std::string &kwargs = "{}")
-        : tape_recording(status)
+    explicit LightningSimulator(const std::string &kwargs = "{}")
     {
-        auto &&args = parse_kwargs(kwargs);
+        auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
     }

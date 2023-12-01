@@ -137,17 +137,24 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
 
     const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
                                              reinterpret_cast<char *>(value)};
-    if (args[0] == "kwargs") {
+    if (args[0] == "rtd_kwargs") {
         Catalyst::Runtime::CTX->setDeviceKwArgs(args[1]);
         return;
     }
-    else if (args[0] == "backend") {
+    else if (args[0] == "rtd_name") {
+        Catalyst::Runtime::CTX->setDeviceName(args[1]);
+        return;
+    }
+    else if (args[0] == "rtd_lib") {
         RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(args[1]),
                    "Failed initialization of the backend device");
+        if (Catalyst::Runtime::CTX->getDeviceRecorderStatus()) {
+            Catalyst::Runtime::CTX->getDevice()->StartTapeRecording();
+        }
         return;
     }
 
-    RT_FAIL("Invalid device specification; Supported keys: ['kwargs', 'backend']");
+    RT_FAIL("Invalid device specification; Supported keys: ['kwargs', 'rtd_name', 'rtd_lib']");
 }
 
 void __quantum__rt__print_state() { Catalyst::Runtime::CTX->getDevice()->PrintState(); }

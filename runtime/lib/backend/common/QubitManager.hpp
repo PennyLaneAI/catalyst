@@ -21,7 +21,7 @@
 #include "Types.h"
 #include "Utils.hpp"
 
-namespace Catalyst::Runtime::Simulator {
+namespace Catalyst::Runtime {
 
 /**
  * Qubit Manager
@@ -143,4 +143,4 @@ class QubitManager {
         this->qubits_map.clear();
     }
 };
-} // namespace Catalyst::Runtime::Simulator
+} // namespace Catalyst::Runtime

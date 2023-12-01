@@ -19,7 +19,6 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
-import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -80,6 +79,7 @@ from catalyst.utils.jax_extras import (
     unzip2,
 )
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime import extract_backend_info
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -109,14 +109,6 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    # The set of supported devices at runtime
-    RUNTIME_DEVICES = (
-        "lightning.qubit",
-        "lightning.kokkos",
-        "braket.aws.qubit",
-        "braket.local.qubit",
-    )
-
     def __init__(self, fn, device):
         self.func = fn
         self.device = device
@@ -126,41 +118,8 @@ class QFunc:
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
-            if isinstance(self.device, qml.Device):
-                name = self.device.short_name
-            else:
-                name = self.device.name
-
-            is_known_device = name in QFunc.RUNTIME_DEVICES
-            implements_c_interface = hasattr(self.device, "get_c_interface")
-            is_valid_device = is_known_device or implements_c_interface
-            if not is_valid_device:
-                raise CompileError(
-                    f"The {name} device is not supported for compilation at the moment."
-                )
-
-            # TODO:
-            # Once all devices get converted to shared libraries this name should just be the path.
-            backend_path_or_name = name
-            if implements_c_interface:
-                impl = self.device.get_c_interface()
-                if not pathlib.Path(impl).is_file():
-                    raise CompileError(f"Device at {impl} cannot be found!")
-
-                backend_path_or_name = self.device.get_c_interface()
-
-            backend_kwargs = {}
-            if hasattr(self.device, "shots"):
-                backend_kwargs["shots"] = self.device.shots if self.device.shots else 0
-            if self.device.short_name == "braket.local.qubit":  # pragma: no cover
-                backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
-            elif self.device.short_name == "braket.aws.qubit":  # pragma: no cover
-                backend_kwargs["device_arn"] = self.device._device._arn
-                if self.device._s3_folder:
-                    backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
-
             device = QJITDevice(
-                self.device.shots, self.device.wires, backend_path_or_name, backend_kwargs
+                self.device.shots, self.device.wires, *extract_backend_info(self.device)
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
@@ -247,8 +206,12 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+    ):
         self.backend_name = backend_name if backend_name else "default"
+        self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
         super().__init__(wires=wires, shots=shots)
 
