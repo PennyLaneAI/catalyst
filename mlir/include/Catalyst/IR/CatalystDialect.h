@@ -15,6 +15,7 @@
 #pragma once
 
 #include "mlir/IR/Dialect.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 //===----------------------------------------------------------------------===//
 // Catalyst dialect declarations.

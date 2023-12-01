@@ -404,16 +404,15 @@ Value EncodeMemRef(Location loc, PatternRewriter &rewriter, MemRefType memref_ty
     return memref;
 }
 
-
 struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        MLIRContext *ctx = op.getContext();
         Location loc = op.getLoc();
         // Create function
+        MLIRContext *ctx = op.getContext();
         Type ptr = LLVM::LLVMPointerType::get(ctx);
 
         Type voidType = LLVM::LLVMVoidType::get(ctx);
@@ -421,6 +420,16 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         auto point = rewriter.saveInsertionPoint();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
+        if (op.getCallTargetName().equals("pyregistry")) {
+            SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
+                                       adaptor.getOperands().getTypes().end());
+            auto type2 = LLVM::LLVMFunctionType::get(voidType, argTypes);
+            LLVM::LLVMFuncOp customCallFnOp =
+                rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type2);
+            rewriter.restoreInsertionPoint(point);
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, customCallFnOp, adaptor.getOperands());
+            return success();
+        }
         LLVM::LLVMFuncOp customCallFnOp =
             rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type);
         customCallFnOp.setPrivate();
@@ -428,14 +437,23 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Setup args and res
         int32_t numberArg = op.getNumberOriginalArgAttr()[0];
         SmallVector<Value> operands = op.getOperands();
+        // What if it h as no arguments and no results?
+        size_t how_many_args_and_results = operands.size();
+        bool has_results = (how_many_args_and_results - numberArg) > 0;
         SmallVector<Value> args = {operands.begin(), operands.begin() + numberArg};
-        SmallVector<Value> res = {operands.begin() + (numberArg + 1), operands.end()};
+        SmallVector<Value> res;
+        if (has_results) {
+            res = SmallVector<Value>({operands.begin() + (numberArg + 1), operands.end()});
+        }
 
         SmallVector<Value> operandsConverted = adaptor.getOperands();
         SmallVector<Value> argsConverted = {operandsConverted.begin(),
                                             operandsConverted.begin() + numberArg};
-        SmallVector<Value> resConverted = {operandsConverted.begin() + (numberArg + 1),
-                                           operandsConverted.end()};
+        SmallVector<Value> resConverted;
+        if (has_results) {
+            resConverted = SmallVector<Value>(
+                {operandsConverted.begin() + (numberArg + 1), operandsConverted.end()});
+        }
 
         // Encode args
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
@@ -453,7 +471,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         // We store encoded arguments as `!llvm.array<ptr x len>`.
         size_t len = encoded.size();
-        std::cout << len << std::endl;
         Type typeArgs = LLVM::LLVMArrayType::get(ptr, len);
 
         // Prepare an array for encoded arguments.
