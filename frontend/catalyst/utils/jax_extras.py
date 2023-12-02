@@ -339,7 +339,6 @@ def deduce_avals3(f: Callable, args, kwargs, abstracted_axes=None, force_implici
     The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
     flat_axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
-    print("FFFFFFFFF", flat_args)
     in_expanded_args, in_type = expand_args(flat_args, axes_specs=flat_axes_specs,
                                             force_implicit_indbidx=force_implicit_indbidx)
     wf = wrap_init(f)
@@ -748,7 +747,6 @@ def expand_args(args:List[TracerLike],
     else:
         assert axes_specs is None
         assert force_implicit_indbidx is False
-    print("IIIIIIIII", in_type)
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
 

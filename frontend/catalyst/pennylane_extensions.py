@@ -916,11 +916,6 @@ class ForLoop(HybridOp):
             )
             jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
 
-        print("JJJJJJJJJJJJ")
-        print(jaxpr)
-        print(consts)
-        print("JJJJJJJJJJJJ")
-
         in_expanded_tracers = expand_args(op.in_classical_tracers,
                                           force_implicit_indbidx=True)[0]
 
@@ -932,12 +927,6 @@ class ForLoop(HybridOp):
             [qrp.actualize()]
         )
 
-        print("IN_C_EXPANDED_TRACERS")
-        for t in in_c_expanded_tracers: print("I", t)
-
-        print("BIND_OUT_CLASSICAL_RESULTS")
-        for t in self.out_classical_tracers: print("O", t)
-
         out_c_expanded_classical_tracers = (
             expand_results(
                 in_c_expanded_tracers,
@@ -945,9 +934,6 @@ class ForLoop(HybridOp):
                 force_implicit_indbidx=True,
             )[0]
         )
-
-        print("OUT_C_EXPANDED_CLASSICAL_TRACERS")
-        for t in out_c_expanded_classical_tracers: print("O", t)
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers2(
@@ -1575,18 +1561,11 @@ def for_loop(lower_bound, upper_bound, step):
                     out_tree = out_sig.out_tree()
                     out_consts = out_sig.out_consts()
 
-                print("IN_SIG.IN_EXPANDED_ARGS")
-                for t in in_sig.in_expanded_args: print("I", t)
-
                 in_expanded_classical_tracers, in_type2 = expand_args(
                     aux_classical_tracers +
                     collapse(in_type, in_sig.in_expanded_args),
                     force_implicit_indbidx=True
                 )
-                print(f"{in_type=}")
-                print(f"{in_type2=}")
-                print(f"{out_type=}")
-                print(f"{out_consts=}")
                 nimplicit = len([() for _,k in in_type2 if not k])
                 out_type = out_type_force_outdbidx(
                     out_type, nimplicit, out_consts, arg_classical_tracers, res_classical_tracers

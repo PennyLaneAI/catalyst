@@ -1229,7 +1229,6 @@ def _while_loop_lowering(
     cond_nconsts: int,
     body_nconsts: int,
 ):
-    from pdb import set_trace; set_trace()
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
     assert [val.type for val in flat_args_plus_consts] == loop_carry_types_plus_consts
@@ -1328,7 +1327,6 @@ def _for_loop_lowering(
     apply_reverse_transform: bool,
     nimplicit : int = 0
 ):
-    # print("IIIIIIIIIII", [v.type for v in [lower_bound, upper_bound, step, *iter_args_plus_consts]])
     # Separate constants from iteration arguments.
     # The MLIR value provided by JAX for the iteration index is not needed
     # (as it's identical to the lower bound value).
@@ -1343,10 +1341,6 @@ def _for_loop_lowering(
                       *body_implicits,
                       *iter_args_plus_consts[body_nconsts + nimplicit + 4:]
                      ]
-
-    print("body_consts=",[x.type for x in body_consts])
-    print("body_implicits=",[x.type for x in body_implicits])
-    print("loop_args=",[x.type for x in loop_args])
 
     loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
@@ -1428,7 +1422,6 @@ def _for_loop_lowering(
                                    body_args[0],
                                    *body_args[nimplicit+1:])]
 
-        # from pdb import set_trace; set_trace()
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
             body_ctx,
@@ -1439,11 +1432,8 @@ def _for_loop_lowering(
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        print(f"{[o[0].type for o in out]}")
         YieldOp([o[0] for o in out])
 
-    print('MMMMMMMMMM')
-    print(f"{[o.type for o in for_op_scf.results]}")
     return for_op_scf.results
 
 
