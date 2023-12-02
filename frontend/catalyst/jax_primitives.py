@@ -1229,6 +1229,7 @@ def _while_loop_lowering(
     cond_nconsts: int,
     body_nconsts: int,
 ):
+    from pdb import set_trace; set_trace()
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
     assert [val.type for val in flat_args_plus_consts] == loop_carry_types_plus_consts
@@ -1292,21 +1293,25 @@ def _while_loop_lowering(
 # for loop
 #
 @for_p.def_abstract_eval
-def _for_loop_abstract_eval(*args, body_jaxpr, body_iter_index, **kwargs):
+def _for_loop_abstract_eval(*args, body_jaxpr,
+                            nimplicit = 0,
+                            **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
     out_type = infer_output_type(body_jaxpr.jaxpr.invars,
                                  body_jaxpr.jaxpr.outvars,
                                  force_implicit_indbidx=False)
 
-    out_type2 = out_type_force_outdbidx(out_type, body_iter_index, body_jaxpr.jaxpr.invars, body_jaxpr.jaxpr.outvars)
-    out_type3 = out_type_shift_indbidx(out_type2, 3)
-    return out_type3
+    body_loop_arg_idx = nimplicit
+    out_type = out_type_force_outdbidx(out_type, body_loop_arg_idx, [], body_jaxpr.jaxpr.invars, body_jaxpr.jaxpr.outvars)
+    return out_type
 
 
 # pylint: disable=too-many-arguments
 @for_p.def_impl
 def _for_loop_def_impl(
-    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_iter_index, body_nconsts
+    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr,
+    nimplicit = 0,
+    body_nconsts
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1314,51 +1319,67 @@ def _for_loop_def_impl(
 # pylint: disable=too-many-statements, too-many-arguments
 def _for_loop_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    lower_bound: ir.Value,
-    upper_bound: ir.Value,
-    step: ir.Value,
+    # lower_bound: ir.Value,
+    # upper_bound: ir.Value,
+    # step: ir.Value,
     *iter_args_plus_consts: tuple,
     body_jaxpr: core.ClosedJaxpr,
-    body_iter_index : int,
     body_nconsts: int,
     apply_reverse_transform: bool,
+    nimplicit : int = 0
 ):
+    # print("IIIIIIIIIII", [v.type for v in [lower_bound, upper_bound, step, *iter_args_plus_consts]])
     # Separate constants from iteration arguments.
     # The MLIR value provided by JAX for the iteration index is not needed
     # (as it's identical to the lower bound value).
-    body_consts = iter_args_plus_consts[:body_nconsts]
-    loop_index = iter_args_plus_consts[body_nconsts]
-    loop_args = iter_args_plus_consts[body_nconsts + 1 :]
 
-    all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    body_consts    = iter_args_plus_consts[:body_nconsts]
+    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + nimplicit]
+    lower_bound    = iter_args_plus_consts[body_nconsts + nimplicit + 0]
+    upper_bound    = iter_args_plus_consts[body_nconsts + nimplicit + 1]
+    step           = iter_args_plus_consts[body_nconsts + nimplicit + 2]
+    loop_index     = iter_args_plus_consts[body_nconsts + nimplicit + 3]
+    loop_args      = [
+                      *body_implicits,
+                      *iter_args_plus_consts[body_nconsts + nimplicit + 4:]
+                     ]
 
+    print("body_consts=",[x.type for x in body_consts])
+    print("body_implicits=",[x.type for x in body_implicits])
+    print("loop_args=",[x.type for x in loop_args])
+
+    loop_index_type = ir.RankedTensorType(loop_index.type).element_type
+
+    # all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     # Remove header values: lower_bound, upper_bound, step
-    assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[:3]
-    loop_carry_types_plus_consts = all_param_types_plus_consts[3:]
+    # assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[:3]
+    # loop_carry_types_plus_consts = all_param_types_plus_consts[3:]
 
     # Remove loop body constants.
-    assert [val.type for val in body_consts] == loop_carry_types_plus_consts[:body_nconsts]
-    loop_carry_types = loop_carry_types_plus_consts[body_nconsts:]
+    # assert [val.type for val in body_consts] == loop_carry_types_plus_consts[:body_nconsts]
+    # loop_carry_types = loop_carry_types_plus_consts[body_nconsts:]
 
     # Overwrite the type of the iteration index determined by JAX (= type of lower bound)
     # in favor of the 'index' type expected by MLIR.
-    loop_index_type = ir.RankedTensorType(loop_index.type).element_type
-    loop_carry_types[0] = ir.IndexType.get()
+    # loop_carry_types[0] = ir.IndexType.get()
 
     # Don't include the iteration index in the result types.
-    result_types = loop_carry_types[1:]
-    assert [val.type for val in loop_args] == result_types
+    # result_types = loop_carry_types[1:]
+    # assert [val.type for val in loop_args] == result_types
     # assert result_types == [
     #     mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
     # ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
 
-    loop_operands = []
-    for p in (lower_bound, upper_bound, step):
+    # loop_operands = [*body_implicit]
+
+    def _cast_to_index(p):
         p = TensorExtractOp(
             ir.RankedTensorType(p.type).element_type, p, []
         ).result  # tensor<i64> -> i64
         p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
-        loop_operands.append(p)
+        return p
+
+    lower_bound, upper_bound, step = map(_cast_to_index, (lower_bound, upper_bound, step))
 
     if apply_reverse_transform:
         zero_np = np.array(0)
@@ -1374,21 +1395,18 @@ def _for_loop_lowering(
         zero = IndexCastOp(ir.IndexType.get(), zero_i64).result
         one = IndexCastOp(ir.IndexType.get(), one_i64).result
 
-        start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
+        start_val, stop_val, step_val = lower_bound, upper_bound, step
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
         num_iterations = CeilDivSIOp(distance, step_val)
-        loop_operands[0] = zero
-        loop_operands[1] = num_iterations
-        loop_operands[2] = one
+        lower_bound, upper_bound, step = zero, num_iterations, one
 
-    loop_operands.extend(loop_args)
-
-    for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
+    for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
 
     name_stack = jax_ctx.module_context.name_stack.extend("for")
     body_block = for_op_scf.body
+    # body_block = for_op_scf.regions[0].blocks.append(*loop_args)
     body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
 
     with ir.InsertionPoint(body_block):
@@ -1398,24 +1416,34 @@ def _for_loop_lowering(
         if apply_reverse_transform:
             # iv = start + normalized_iv * step
             body_args[0] = AddIOp(start_val, MulIOp(body_args[0], step_val))
+
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
         result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
         from_elements_op = FromElementsOp(result_from_elements_op, body_args[0])
         body_args[0] = from_elements_op.result
 
-        # recursively generate the mlir for the loop body
+        # Re-order arguments in accordance with jax dynamic API convensions
+        body_args = [[a] for a in (*body_consts,
+                                   *body_args[1:nimplicit+1],
+                                   body_args[0],
+                                   *body_args[nimplicit+1:])]
+
+        # from pdb import set_trace; set_trace()
+        # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
             body_ctx,
             body_jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
-            # [],
-            *([a] for a in (*body_consts, *body_args)),
+            *body_args,
             dim_var_values=jax_ctx.dim_var_values,
         )
 
+        print(f"{[o[0].type for o in out]}")
         YieldOp([o[0] for o in out])
 
+    print('MMMMMMMMMM')
+    print(f"{[o.type for o in for_op_scf.results]}")
     return for_op_scf.results
 
 

@@ -890,10 +890,9 @@ class ForLoop(HybridOp):
 
     binder = for_p.bind
 
-    def __init__(self, *args, apply_reverse_transform:bool, body_iter_index:int, **kwargs):
+    def __init__(self, *args, apply_reverse_transform:bool, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_reverse_transform = apply_reverse_transform
-        self.body_iter_index = body_iter_index
 
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
@@ -907,7 +906,8 @@ class ForLoop(HybridOp):
             qreg_out = qrp_out.actualize()
 
             arg_expanded_tracers = expand_args(
-                self.regions[0].arg_classical_tracers + [qreg_in]
+                self.regions[0].arg_classical_tracers + [qreg_in],
+                force_implicit_indbidx=True
             )[0]
             res_expanded_tracers, _ = expand_results(
                 arg_expanded_tracers,
@@ -921,40 +921,44 @@ class ForLoop(HybridOp):
         print(consts)
         print("JJJJJJJJJJJJ")
 
-        in_expanded_tracers = (
+        in_expanded_tracers = expand_args(op.in_classical_tracers,
+                                          force_implicit_indbidx=True)[0]
+
+        nimplicit = len(in_expanded_tracers) - len(op.in_classical_tracers)
+
+        in_c_expanded_tracers = (
             [trace.full_raise(c) for c in consts] +
-            op.in_classical_tracers[0:3] +
-            expand_args(op.in_classical_tracers[3:])[0] +
+            in_expanded_tracers +
             [qrp.actualize()]
         )
 
-        print("BIND_IN_EXPANDED_TRACERS")
-        for t in in_expanded_tracers: print("I", t)
+        print("IN_C_EXPANDED_TRACERS")
+        for t in in_c_expanded_tracers: print("I", t)
 
         print("BIND_OUT_CLASSICAL_RESULTS")
         for t in self.out_classical_tracers: print("O", t)
 
-        out_expanded_classical_tracers = (
+        out_c_expanded_classical_tracers = (
             expand_results(
-                in_expanded_tracers,
+                in_c_expanded_tracers,
                 self.out_classical_tracers,
                 force_implicit_indbidx=True,
             )[0]
         )
 
-        print("BIND_OUT_EXPANDED_CLASSICAL_TRACERS")
-        for t in out_expanded_classical_tracers: print("O", t)
+        print("OUT_C_EXPANDED_CLASSICAL_TRACERS")
+        for t in out_c_expanded_classical_tracers: print("O", t)
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                in_expanded_tracers=in_expanded_tracers,
-                out_expanded_tracers=out_expanded_classical_tracers,
+                in_expanded_tracers=in_c_expanded_tracers,
+                out_expanded_tracers=out_c_expanded_classical_tracers,
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                 body_nconsts=len(consts),
                 apply_reverse_transform=self.apply_reverse_transform,
-                body_iter_index=self.body_iter_index,
+                nimplicit=nimplicit,
             )
         )
         return qrp2
@@ -1558,11 +1562,6 @@ def for_loop(lower_bound, upper_bound, step):
                     force_implicit_indbidx=True
                 )
                 in_type = in_sig.in_type
-                in_expanded_classical_tracers = (
-                    aux_classical_tracers +
-                    expand_args(collapse(in_type, in_sig.in_expanded_args)[1:])[0]
-                )
-                in_body_iter_index = len(in_sig.in_expanded_args) - len(collapse(in_type, in_sig.in_expanded_args))
 
                 with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
                     arg_classical_tracers = input_type_to_tracers(in_type, inner_trace.new_arg)
@@ -1576,31 +1575,28 @@ def for_loop(lower_bound, upper_bound, step):
                     out_tree = out_sig.out_tree()
                     out_consts = out_sig.out_consts()
 
-                print("OOOOOOOO")
-                print(out_sig.out_jaxpr())
-                print(out_type)
-                out_type = out_type_force_outdbidx(
-                    out_type, in_body_iter_index, arg_classical_tracers, res_classical_tracers
+                print("IN_SIG.IN_EXPANDED_ARGS")
+                for t in in_sig.in_expanded_args: print("I", t)
+
+                in_expanded_classical_tracers, in_type2 = expand_args(
+                    aux_classical_tracers +
+                    collapse(in_type, in_sig.in_expanded_args),
+                    force_implicit_indbidx=True
                 )
-                print(out_type)
-                out_type = out_type_shift_indbidx(out_type, 3)
-                print(out_type)
-                print("OOOOOOOO")
-
-                print("API_IN_EXPANDED_CLASSICAL_TRACERS")
-                for c in out_consts: print("C", c)
-                for t in in_expanded_classical_tracers: print("I", t)
-
+                print(f"{in_type=}")
+                print(f"{in_type2=}")
+                print(f"{out_type=}")
+                print(f"{out_consts=}")
+                nimplicit = len([() for _,k in in_type2 if not k])
+                out_type = out_type_force_outdbidx(
+                    out_type, nimplicit, out_consts, arg_classical_tracers, res_classical_tracers
+                )
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type, out_consts, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
-
-                print("API_OUT_EXPANDED_CLASSICAL_TRACERS")
-                for t in out_expanded_classical_tracers: print("O", t)
-
                 ForLoop(
-                    aux_classical_tracers + collapse(in_type, in_sig.in_expanded_args)[1:],
+                    collapse(in_type2, in_expanded_classical_tracers),
                     collapse(out_type, out_expanded_classical_tracers),
                     [
                         HybridOpRegion(
@@ -1610,7 +1606,6 @@ def for_loop(lower_bound, upper_bound, step):
                         )
                     ],
                     apply_reverse_transform=apply_reverse_transform,
-                    body_iter_index=in_body_iter_index
                 )
 
                 return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))

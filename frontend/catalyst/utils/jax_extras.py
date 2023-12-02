@@ -338,8 +338,10 @@ def deduce_avals3(f: Callable, args, kwargs, abstracted_axes=None, force_implici
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
-    axes_specs = _flat_axes_specs(abstracted_axes, *args, {})
-    in_expanded_args, in_type = expand_args(flat_args, axes_specs=axes_specs)
+    flat_axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+    print("FFFFFFFFF", flat_args)
+    in_expanded_args, in_type = expand_args(flat_args, axes_specs=flat_axes_specs,
+                                            force_implicit_indbidx=force_implicit_indbidx)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun2(wf, (in_type, force_implicit_indbidx))
@@ -644,10 +646,35 @@ def output_type_to_tracers(out_type: OutputType,
 
 TracerLike = TypeVar("TracerLike")
 
+def infer_input_type_unshared(inputs:List[TracerLike],
+                             ) -> Tuple[List[TracerLike], InputType]:
+
+    def _is_tracer_like(x):
+        return hasattr(x, "aval")
+
+    expl_ins = inputs
+    impl_avals = []
+    expl_avals = []
+    for o in expl_ins:
+        assert _is_tracer_like(o)
+        if isinstance(o.aval, DShapedArray):
+            shape2 = []
+            for d in o.aval.shape:
+                if _is_tracer_like(d):
+                    shape2.append(DBIdx(len(impl_avals)))
+                    impl_avals.append(d.aval)
+                else:
+                    shape2.append(d)
+            expl_avals.append(o.aval.update(shape=tuple(shape2)))
+        else:
+            expl_avals.append(o.aval)
+    return (*[(i,False) for i in impl_avals], *[(i,True) for i in expl_avals])
+
+
 def infer_output_type2(inputs:List[TracerLike],
-                      outputs:List[TracerLike],
-                      force_implicit_indbidx:bool = True,
-                      ) -> Tuple[List[TracerLike], OutputType]:
+                       outputs:List[TracerLike],
+                       force_implicit_indbidx:bool = False,
+                       ) -> Tuple[List[TracerLike], OutputType]:
     """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
     we mean either Jax tracers or Jaxpr variables. """
 
@@ -664,8 +691,10 @@ def infer_output_type2(inputs:List[TracerLike],
             for d in o.aval.shape:
                 if _is_tracer_like(d) and (d not in seen):
                     impl_outs.append(d)
-                    seen.add(d)
-        seen.add(o)
+                    if not force_implicit_indbidx:
+                        seen.add(d)
+        if not force_implicit_indbidx:
+            seen.add(o)
 
     all_ins = [*inputs]
     all_outs = [*impl_outs, *expl_outs]
@@ -684,7 +713,7 @@ def infer_output_type2(inputs:List[TracerLike],
 
 def infer_output_type(inputs:List[TracerLike],
                       outputs:List[TracerLike],
-                      force_implicit_indbidx:bool = True,
+                      force_implicit_indbidx:bool = False,
                       ) -> OutputType:
 
     return infer_output_type2(inputs, outputs, force_implicit_indbidx=force_implicit_indbidx)[1]
@@ -692,7 +721,7 @@ def infer_output_type(inputs:List[TracerLike],
 
 def infer_output_type3(inputs:List[TracerLike],
                        outputs:List[TracerLike],
-                       force_implicit_indbidx:bool = True,
+                       force_implicit_indbidx:bool = False,
                        ) -> OutputType:
 
     trace:DynamicJaxprTrace = find_top_trace(inputs)
@@ -708,8 +737,18 @@ def infer_output_type3(inputs:List[TracerLike],
 def expand_args(args:List[TracerLike],
                 in_type=None,
                 axes_specs=None,
+                force_implicit_indbidx:bool=False,
                 ) -> Tuple[List[TracerLike], InputType]:
-    in_type = in_type if in_type is not None else infer_lambda_input_type(axes_specs, args)
+    if in_type is None:
+        if force_implicit_indbidx is True:
+            assert axes_specs is None
+            in_type = infer_input_type_unshared(args)
+        else:
+            in_type = infer_lambda_input_type(axes_specs, args)
+    else:
+        assert axes_specs is None
+        assert force_implicit_indbidx is False
+    print("IIIIIIIII", in_type)
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
 
@@ -734,13 +773,14 @@ def tracer_index(x:TracerLike, ls:List[TracerLike]) -> Optional[int]:
 
 def out_type_force_outdbidx(out_type:OutputType,
                             input_idx:int,
+                            consts:List[TracerLike],
                             inputs:List[TracerLike],
                             outputs:List[TracerLike]
                             ) -> OutputType:
 
     assert len(out_type) == len(outputs), "Outputs must be expanded"
     x_in_idx = input_idx
-    x_out_idx = tracer_index(inputs[x_in_idx], outputs)
+    x_out_idx = tracer_index([*consts, *inputs][x_in_idx], outputs)
 
     out_type2 = []
     for i, ((aval, k), t) in enumerate(zip(out_type, outputs)):

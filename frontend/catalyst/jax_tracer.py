@@ -402,6 +402,11 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
         make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes}
         jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
+
+        print("CCCCCCCCCCCCC")
+        print(jaxpr)
+        print("CCCCCCCCCCCCC")
+
     # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
     jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
@@ -838,6 +843,10 @@ def trace_quantum_function(
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
+
+                # print("jjjjjjjjjjjjjj")
+                # print(ctx.frames[trace].to_jaxpr2(meas_tracers + [qrp_out.actualize()]))
+                # print("jjjjjjjjjjjjjj")
 
                 # TODO: Allow the user to return whatever types they specify.
                 if is_program_transformed:

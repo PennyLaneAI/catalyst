@@ -21,7 +21,13 @@ from jax import numpy as jnp
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
+from jax._src.core import dim_value_aval
 from catalyst import qjit, while_loop, for_loop
+from catalyst.utils.contexts import EvaluationContext, EvaluationMode
+from catalyst.utils.jax_extras import (
+    deduce_avals3, input_type_to_tracers, collapse, expand_args, infer_lambda_input_type,
+    ShapedArray, DShapedArray, DBIdx
+)
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -32,6 +38,49 @@ def assert_array_and_dtype_equal(a, b):
 
     assert array_equal(a, b)
     assert a.dtype == b.dtype
+
+
+
+def test_jax_typing():
+
+    # def fun(a,b):
+    #     b2 = jnp.zeros(a.shape[0]+1)
+    #     return a,b2
+    # a = jnp.zeros([1,1])
+    # b = jnp.zeros([1,1])
+    # wfun, in_sig, out_sig = deduce_avals3(fun, (a,b), {},
+    #                                       abstracted_axes=({0:'0'},{1:'1'}))
+    # in_type = in_sig.in_type
+
+    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx, \
+         EvaluationContext.frame_tracing_context(ctx) as trace:
+
+        sz = trace.new_arg(dim_value_aval())
+        args = jnp.zeros([0,sz]), jnp.zeros([sz,1])
+
+        _, in_type = expand_args(args)
+        assert [(t.shape,k) for t,k in in_type] == [
+            ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=0),1), True)
+        ]
+
+        _, in_type = expand_args(args, force_implicit_indbidx=True)
+        assert [(t.shape,k) for t,k in in_type] == [
+            ((), False), ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=1),1), True)
+        ]
+
+
+        # argkcollapse(in_sig.in_type, arg_tracers)
+        # res_expanded_tracers = [ trace.full_raise(t) for t in wfun.call_wrapped(*arg_expanded_tracers) ]
+
+    # assert in_type == in_type2
+    # print(in_type)
+    # print(in_type2)
+    # print(in_type2)
+    # print(out_sig.out_type())
+    # print(out_sig.out_jaxpr())
+    assert False
+
+
 
 
 def test_qjit_abstracted_axes():
@@ -264,7 +313,7 @@ def test_classical_tracing_2():
     assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
-def test_qnode_for_1():
+def test_qnode_forloop_identity():
 
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -281,6 +330,49 @@ def test_qnode_for_1():
     result = f(3)
     expected = jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
+
+
+
+def test_qnode_forloop_shared_indbidx():
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 2)
+        def loop(i, a, b):
+            return (a, b)
+
+        a2, b2 = loop(a, b)
+        return a2 + b2
+
+    result = f(3)
+    expected = 2*jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qnode_forloop_indbidx_outdbidx():
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 2)
+        def loop(i, a, _):
+            b = jnp.ones([sz+1], dtype=float)
+            return (a, b)
+
+        a2, b2 = loop(a, b)
+        return a2, b2
+
+    res_a, res_b = f(3)
+    assert_array_and_dtype_equal(res_a, jnp.ones(3))
+    assert_array_and_dtype_equal(res_b, jnp.ones(4))
+
 
 
 def test_qnode_while_1():
