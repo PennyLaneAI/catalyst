@@ -255,8 +255,8 @@ class RTDeviceInfoT {
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
         QuantumDevice *impl =
             f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs) : nullptr;
-        rtd_qdevice.reset(impl);
 
+        rtd_qdevice.reset(impl);
         return rtd_qdevice;
     }
 
@@ -268,6 +268,8 @@ class RTDeviceInfoT {
     {
         return {rtd_lib, rtd_name, rtd_kwargs};
     }
+
+    [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
 
     friend std::ostream &operator<<(std::ostream &os, const RTDeviceInfoT &device)
     {
@@ -285,26 +287,16 @@ class ExecutionContext final {
     size_t pool_counter{0}; // Counter for generating unique keys for devices
     std::mutex pool_mutex;  // Mutex to guard the device pool
 
-    // Device specifications
+    // Device info before initialization to support the current frontend-backend pipeline
+    // TODO: remove this after the end-to-end adaptation of the async support in Catalyst
     std::string zero_rtd_kwargs{};
     std::string zero_rtd_name{};
     bool zero_rtd_tape_recorder_status;
 
     // ExecutionContext pointers
-    std::unique_ptr<QuantumDevice> active_rtd_ptr{nullptr};
+    std::shared_ptr<QuantumDevice> active_rtd_ptr{nullptr};
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
-    std::unique_ptr<SharedLibraryManager> init_rtd_dylib{nullptr};
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
-
-    // Helper methods
-    void update_device_pl2runtime(std::string &pl_name, const std::string &rtd_name)
-    {
-#ifdef __linux__
-        pl_name = "librtd_" + rtd_name + ".so";
-#elif defined(__APPLE__)
-        pl_name = "librtd_" + rtd_name + ".dylib";
-#endif
-    }
 
   public:
     explicit ExecutionContext() : zero_rtd_tape_recorder_status(false)
@@ -314,12 +306,9 @@ class ExecutionContext final {
 
     ~ExecutionContext()
     {
-        active_rtd_ptr.reset(nullptr);
         memory_man_ptr.reset(nullptr);
-        init_rtd_dylib.reset(nullptr);
         py_guard.reset(nullptr);
 
-        RT_ASSERT(getDevice() == nullptr);
         RT_ASSERT(getMemoryManager() == nullptr);
     };
 
@@ -329,17 +318,8 @@ class ExecutionContext final {
 
     void setDeviceName(std::string_view name) noexcept { zero_rtd_name = name; }
 
-    [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
-    {
-        init_rtd_dylib = std::make_unique<SharedLibraryManager>(filename);
-        std::string factory_name{zero_rtd_name + "Factory"};
-        void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
-        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(zero_rtd_kwargs)
-                     : nullptr;
-    }
-
-    [[nodiscard]] auto addDevice(std::string rtd_lib, std::string rtd_name = {},
-                                 std::string rtd_kwargs = {})
+    [[nodiscard]] auto addDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
+                                 const std::string &rtd_kwargs = {})
         -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
     {
         // Lock the mutex to protect device_pool updates
@@ -352,6 +332,8 @@ class ExecutionContext final {
 
     [[nodiscard]] auto getDevice(size_t device_key) -> std::shared_ptr<QuantumDevice>
     {
+        // Lock the mutex to protect device_pool info
+        std::lock_guard<std::mutex> lock(pool_mutex);
         auto it = device_pool.find(device_key);
         return (it != device_pool.end()) ? it->second.second->getQuantumDevicePtr() : nullptr;
     }
@@ -370,10 +352,6 @@ class ExecutionContext final {
         return device_pool.size();
     }
 
-    [[nodiscard]] auto getDeviceName() const -> std::string_view { return zero_rtd_name; }
-
-    [[nodiscard]] auto getDeviceKwArgs() const -> std::string { return zero_rtd_kwargs; }
-
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
     {
         return zero_rtd_tape_recorder_status;
@@ -381,44 +359,20 @@ class ExecutionContext final {
 
     [[nodiscard]] bool initDevice(std::string_view rtd_lib)
     {
-        // Reset the driver pointer
-        active_rtd_ptr.reset(nullptr);
-
-        // Convert to a mutable string
-        std::string rtd_lib_str{rtd_lib};
-
-        // LCOV_EXCL_START
-        // The following if-elif is required for C++ tests where these backend devices
-        // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
-        // Besides, this provides support for runtime device (RTD) libraries added to the system
-        // path. This maintains backward compatibility for specifying a device using its name.
-        // TODO: This support may need to be removed after updating the C++ unit tests.
-        if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
-            zero_rtd_name =
-                (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
-            update_device_pl2runtime(rtd_lib_str, "lightning");
-        }
-        else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
-            zero_rtd_name = "OpenQasmDevice";
-            update_device_pl2runtime(rtd_lib_str, "openqasm");
-        }
-        // LCOV_EXCL_STOP
+        auto &&[key, rtd_ptr] =
+            this->addDevice(std::string(rtd_lib), zero_rtd_name, zero_rtd_kwargs);
+        this->active_rtd_ptr = rtd_ptr;
 
 #ifdef __build_with_pybind11
-        if (zero_rtd_name == "OpenQasmDevice" && !Py_IsInitialized()) {
+        if (device_pool[key].second->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
             py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
         }
 #endif
 
-        QuantumDevice *impl = loadDevice(rtd_lib_str);
-        active_rtd_ptr.reset(impl);
         return true;
     }
 
-    [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
-    {
-        return active_rtd_ptr;
-    }
+    [[nodiscard]] auto getDevice() -> std::shared_ptr<QuantumDevice> { return active_rtd_ptr; }
 
     [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
     {

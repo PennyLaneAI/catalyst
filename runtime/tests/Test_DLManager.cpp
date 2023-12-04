@@ -21,21 +21,27 @@
 
 using namespace Catalyst::Runtime;
 
-#ifdef __linux__
-TEST_CASE("Test dummy", "[Third Party]")
+QuantumDevice *loadDevice(std::string device_name, std::string filename)
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    std::string file("this-file-does-not-exist.so");
-    driver->setDeviceName("DummyDevice");
-    REQUIRE_THROWS_WITH(driver->loadDevice(file), Catch::Contains("No such file or directory"));
+    std::unique_ptr<SharedLibraryManager> init_rtd_dylib =
+        std::make_unique<SharedLibraryManager>(filename);
+    std::string factory_name{device_name + "Factory"};
+    void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
+    return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("") : nullptr;
 }
 
+TEST_CASE("Test dummy", "[Third Party]")
+{
+    std::string file("this-file-does-not-exist" + get_dylib_ext());
+    REQUIRE_THROWS_WITH(loadDevice("DummyDevice", file),
+                        Catch::Contains("No such file or directory"));
+}
+
+#ifdef __linux__
 TEST_CASE("Test error message function not found", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::string file("libm.so.6");
-    driver->setDeviceName("DummyDevice");
-    REQUIRE_THROWS_WITH(driver->loadDevice(file),
+    REQUIRE_THROWS_WITH(loadDevice("DummyDevice", file),
                         Catch::Contains("undefined symbol: DummyDeviceFactory"));
 }
 
@@ -45,15 +51,15 @@ TEST_CASE("Test error message if init device fails", "[Third Party]")
     std::string file("libm.so.6");
     REQUIRE_THROWS_WITH(driver->initDevice(file), Catch::Contains("undefined symbol: Factory"));
 }
+#endif
 
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    std::string file("libdummy_device.so");
+    std::string file("libdummy_device" + get_dylib_ext());
     driver->setDeviceName("DummyDevice");
     CHECK(driver->initDevice(file));
 }
-#endif
 
 TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning.qubit",
           "[CoreQIS]")

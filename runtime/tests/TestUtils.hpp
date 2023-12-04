@@ -52,3 +52,12 @@ static inline auto getDevices() -> std::vector<std::pair<std::string, std::strin
 #endif
     return devices;
 }
+
+inline auto get_dylib_ext() -> std::string
+{
+#ifdef __linux__
+    return ".so";
+#elif defined(__APPLE__)
+    return ".dylib";
+#endif
+}

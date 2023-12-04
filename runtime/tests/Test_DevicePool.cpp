@@ -25,15 +25,6 @@
 
 using namespace Catalyst::Runtime;
 
-inline auto get_dylib_ext() -> std::string
-{
-#ifdef __linux__
-    return ".so";
-#elif defined(__APPLE__)
-    return ".dylib";
-#endif
-}
-
 TEST_CASE("Test getter/setter methods in RTDeviceInfoT", "[device_pool]")
 {
     std::unique_ptr<RTDeviceInfoT> device = std::make_unique<RTDeviceInfoT>(
