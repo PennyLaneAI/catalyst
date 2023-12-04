@@ -2,7 +2,6 @@ schema = 1
 
 [device]
 name = "braket.local.qubit"
-version = "v0.31.0"
 precision = ['float32', 'float64']
 
 [operations]
@@ -22,33 +21,18 @@ full = [
 	"Hadamard",
 	"S",
 	"T",
-	"PhaseShift",
-	"RX",
-	"RY",
-	"RZ",
-	"Rot",
 	"CNOT",
 	"CY",
 	"CZ",
 	"SWAP",
-	"IsingXX",
-	"IsingXY",
-	"IsingYY",
-	"IsingZZ",
-	"ControlledPhaseShift",
-	"CRX",
-	"CRY",
-	"CRZ",
-	"CRot",
-	"SingleExcitation",
-	"SingleExcitationMinus",
-	"SingleExcitationPlus",
-	"Toffoli",
+	"PhaseShift",
+	"RX",
+	"RY",
+	"RZ",
 	"CSWAP",
-	"DoubleExcitation",
-	"DoubleExcitationMinus",
-	"DoubleExcitationPlus",
-	"MultiRZ",
+	"PSWAP",
+	"ISWAP",
+	"Toffoli",
 ]
 matrix = [
 	# QubitUnitary should never be here.
