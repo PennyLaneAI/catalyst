@@ -18,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -157,23 +158,143 @@ class SharedLibraryManager final {
     }
 };
 
+/**
+ * This indicates the various stages a device can be in:
+ * - `Zero`     : The device is added to the device pool and it's partially created
+ *                but hasn't been initialized yet. At this stage, `_device_so_ptr == nullptr`.
+ * - `Init`     : The device gets all information including device name, lib, and kwargs
+ *                so that it can be initialized: `_device_so_ptr <> nullptr`.
+ * - `Active`   : The device is activated, this is the stage after initializing the device
+ *                showing that the `_device_ptr` points to this device. The CAPI routines
+ *                have only access to the active device via `_device_ptr`.
+ * - `Release`  : The device is released but not removed from the pool. The ECM can
+ *                reuse this device if requested. (TODO)
+ */
+enum class RTDeviceStatusT : uint8_t {
+    Zero = 0,
+    Init,
+    Active,
+    Release,
+};
+
 extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::string &kwargs);
+
+/**
+ * Runtime Device data-class.
+ *
+ * This class introduces an interface for initialized devices by the execution
+ * context manager of the runtime. This includes the device name, library, kwargs,
+ * and a shared pointer to the QuantumDevice entry point.
+ */
+class RTDeviceInfoT {
+  private:
+    std::string rtd_lib;
+    std::string rtd_name;
+    std::string rtd_kwargs;
+
+    std::shared_ptr<QuantumDevice> rtd_qdevice{nullptr};
+
+    size_t rtd_hash;
+    bool tape_recording{false};
+
+    void _complete_dylib_os_extension(std::string &rtd_lib, const std::string &name) noexcept
+    {
+#ifdef __linux__
+        rtd_lib = "librtd_" + name + ".so";
+#elif defined(__APPLE__)
+        rtd_lib = "librtd_" + name + ".dylib";
+#endif
+    }
+
+    void _pl2runtime_device_info(std::string &rtd_lib, std::string &rtd_name) noexcept
+    {
+        // The following if-elif is required for C++ tests where these backend devices
+        // are linked in the interface library of the runtime. (check runtime/CMakeLists.txt)
+        // Besides, this provides support for runtime device (RTD) libraries added to the system
+        // path. This maintains backward compatibility for specifying a device using its name.
+        // TODO: This support may need to be removed after updating the C++ unit tests.
+        if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
+            rtd_name =
+                (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
+            _complete_dylib_os_extension(rtd_lib, "lightning");
+        }
+        else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
+            rtd_name = "OpenQasmDevice";
+            _complete_dylib_os_extension(rtd_lib, "openqasm");
+        }
+    }
+
+  public:
+    explicit RTDeviceInfoT(std::string _rtd_lib, std::string _rtd_name = {},
+                           std::string _rtd_kwargs = {})
+        : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
+          rtd_kwargs(std::move(_rtd_kwargs))
+    {
+        _pl2runtime_device_info(rtd_lib, rtd_name);
+        rtd_hash = std::hash<std::string>{}(rtd_lib + rtd_name + rtd_kwargs);
+    }
+
+    ~RTDeviceInfoT() = default;
+
+    [[nodiscard]] auto getHash() const -> size_t { return rtd_hash; }
+
+    auto operator==(const RTDeviceInfoT &other) const -> bool
+    {
+        return this->getHash() == other.getHash();
+    }
+
+    [[nodiscard]] auto getQuantumDevicePtr() -> std::shared_ptr<QuantumDevice>
+    {
+        if (rtd_qdevice.get() != nullptr) {
+            return rtd_qdevice;
+        }
+
+        std::unique_ptr<SharedLibraryManager> rtd_dylib =
+            std::make_unique<SharedLibraryManager>(rtd_lib);
+        std::string factory_name{rtd_name + "Factory"};
+        void *f_ptr = rtd_dylib->getSymbol(factory_name);
+        QuantumDevice *impl =
+            f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs) : nullptr;
+        rtd_qdevice.reset(impl);
+
+        return rtd_qdevice;
+    }
+
+    void setTapeRecorderStatus(bool status) noexcept { tape_recording = status; }
+
+    [[nodiscard]] auto getTapeRecorderStatus() const -> bool { return tape_recording; }
+
+    [[nodiscard]] auto getDeviceInfo() const -> std::tuple<std::string, std::string, std::string>
+    {
+        return {rtd_lib, rtd_name, rtd_kwargs};
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const RTDeviceInfoT &device)
+    {
+        os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
+           << " kwargs: " << device.rtd_kwargs;
+        return os;
+    }
+};
 
 class ExecutionContext final {
   private:
-    using DeviceInitializer =
-        std::function<std::unique_ptr<QuantumDevice>(bool, const std::string &)>;
+    // Device pool
+    std::unordered_map<size_t, std::pair<RTDeviceStatusT, std::shared_ptr<RTDeviceInfoT>>>
+        device_pool;
+    size_t pool_counter{0}; // Counter for generating unique keys for devices
+    std::mutex pool_mutex;  // Mutex to guard the device pool
 
     // Device specifications
-    std::string _device_kwargs{};
-    std::string _device_name;
-    bool _tape_recording;
+    std::string zero_rtd_kwargs{};
+    std::string zero_rtd_name{};
+    bool zero_rtd_tape_recorder_status;
 
     // ExecutionContext pointers
-    std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
-    std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
-    std::unique_ptr<SharedLibraryManager> _driver_so_ptr{nullptr};
-    std::unique_ptr<PythonInterpreterGuard> _py_guard{nullptr};
+    std::unique_ptr<QuantumDevice> active_rtd_ptr{nullptr};
+    std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
+    std::unique_ptr<SharedLibraryManager> init_rtd_dylib{nullptr};
+    std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
     // Helper methods
     void update_device_pl2runtime(std::string &pl_name, const std::string &rtd_name)
@@ -186,48 +307,82 @@ class ExecutionContext final {
     }
 
   public:
-    explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
-        : _device_name(default_device), _tape_recording(false)
+    explicit ExecutionContext() : zero_rtd_tape_recorder_status(false)
     {
-        _driver_mm_ptr = std::make_unique<MemoryManager>();
+        memory_man_ptr = std::make_unique<MemoryManager>();
     };
 
     ~ExecutionContext()
     {
-        _driver_ptr.reset(nullptr);
-        _driver_mm_ptr.reset(nullptr);
-        _driver_so_ptr.reset(nullptr);
-        _py_guard.reset(nullptr);
+        active_rtd_ptr.reset(nullptr);
+        memory_man_ptr.reset(nullptr);
+        init_rtd_dylib.reset(nullptr);
+        py_guard.reset(nullptr);
 
         RT_ASSERT(getDevice() == nullptr);
         RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
+    void setDeviceRecorder(bool status) noexcept { zero_rtd_tape_recorder_status = status; }
 
-    void setDeviceKwArgs(std::string_view kwargs) noexcept { _device_kwargs = kwargs; }
+    void setDeviceKwArgs(std::string_view kwargs) noexcept { zero_rtd_kwargs = kwargs; }
 
-    void setDeviceName(std::string_view name) noexcept { _device_name = name; }
-
-    [[nodiscard]] auto getDeviceName() const -> std::string_view { return _device_name; }
-
-    [[nodiscard]] auto getDeviceKwArgs() const -> std::string { return _device_kwargs; }
-
-    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
+    void setDeviceName(std::string_view name) noexcept { zero_rtd_name = name; }
 
     [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
     {
-        _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
-        std::string factory_name{_device_name + "Factory"};
-        void *f_ptr = _driver_so_ptr->getSymbol(factory_name);
-        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_device_kwargs)
+        init_rtd_dylib = std::make_unique<SharedLibraryManager>(filename);
+        std::string factory_name{zero_rtd_name + "Factory"};
+        void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
+        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(zero_rtd_kwargs)
                      : nullptr;
+    }
+
+    [[nodiscard]] auto addDevice(std::string rtd_lib, std::string rtd_name = {},
+                                 std::string rtd_kwargs = {})
+        -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
+    {
+        // Lock the mutex to protect device_pool updates
+        std::lock_guard<std::mutex> lock(pool_mutex);
+        size_t key = pool_counter++;
+        auto device = std::make_shared<RTDeviceInfoT>(rtd_lib, rtd_name, rtd_kwargs);
+        device_pool[key] = std::make_pair(RTDeviceStatusT::Init, device);
+        return {key, device->getQuantumDevicePtr()};
+    }
+
+    [[nodiscard]] auto getDevice(size_t device_key) -> std::shared_ptr<QuantumDevice>
+    {
+        auto it = device_pool.find(device_key);
+        return (it != device_pool.end()) ? it->second.second->getQuantumDevicePtr() : nullptr;
+    }
+
+    void removeDevice(size_t device_key)
+    {
+        // Lock the mutex to protect device_pool updates
+        std::lock_guard<std::mutex> lock(pool_mutex);
+        device_pool.erase(device_key);
+    }
+
+    [[nodiscard]] auto getPoolSize() -> size_t
+    {
+        // Lock the mutex to protect device_pool info
+        std::lock_guard<std::mutex> lock(pool_mutex);
+        return device_pool.size();
+    }
+
+    [[nodiscard]] auto getDeviceName() const -> std::string_view { return zero_rtd_name; }
+
+    [[nodiscard]] auto getDeviceKwArgs() const -> std::string { return zero_rtd_kwargs; }
+
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
+    {
+        return zero_rtd_tape_recorder_status;
     }
 
     [[nodiscard]] bool initDevice(std::string_view rtd_lib)
     {
         // Reset the driver pointer
-        _driver_ptr.reset(nullptr);
+        active_rtd_ptr.reset(nullptr);
 
         // Convert to a mutable string
         std::string rtd_lib_str{rtd_lib};
@@ -239,35 +394,35 @@ class ExecutionContext final {
         // path. This maintains backward compatibility for specifying a device using its name.
         // TODO: This support may need to be removed after updating the C++ unit tests.
         if (rtd_lib == "lightning.qubit" || rtd_lib == "lightning.kokkos") {
-            _device_name =
+            zero_rtd_name =
                 (rtd_lib == "lightning.qubit") ? "LightningSimulator" : "LightningKokkosSimulator";
             update_device_pl2runtime(rtd_lib_str, "lightning");
         }
         else if (rtd_lib == "braket.aws.qubit" || rtd_lib == "braket.local.qubit") {
-            _device_name = "OpenQasmDevice";
+            zero_rtd_name = "OpenQasmDevice";
             update_device_pl2runtime(rtd_lib_str, "openqasm");
         }
         // LCOV_EXCL_STOP
 
 #ifdef __build_with_pybind11
-        if (_device_name == "OpenQasmDevice" && !Py_IsInitialized()) {
-            _py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
+        if (zero_rtd_name == "OpenQasmDevice" && !Py_IsInitialized()) {
+            py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
         }
 #endif
 
         QuantumDevice *impl = loadDevice(rtd_lib_str);
-        _driver_ptr.reset(impl);
+        active_rtd_ptr.reset(impl);
         return true;
     }
 
     [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
     {
-        return _driver_ptr;
+        return active_rtd_ptr;
     }
 
     [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
     {
-        return _driver_mm_ptr;
+        return memory_man_ptr;
     }
 };
 } // namespace Catalyst::Runtime

@@ -24,7 +24,7 @@ using namespace Catalyst::Runtime;
 #ifdef __linux__
 TEST_CASE("Test dummy", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::string file("this-file-does-not-exist.so");
     driver->setDeviceName("DummyDevice");
     REQUIRE_THROWS_WITH(driver->loadDevice(file), Catch::Contains("No such file or directory"));
@@ -32,7 +32,7 @@ TEST_CASE("Test dummy", "[Third Party]")
 
 TEST_CASE("Test error message function not found", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::string file("libm.so.6");
     driver->setDeviceName("DummyDevice");
     REQUIRE_THROWS_WITH(driver->loadDevice(file),
@@ -41,15 +41,14 @@ TEST_CASE("Test error message function not found", "[Third Party]")
 
 TEST_CASE("Test error message if init device fails", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::string file("libm.so.6");
-    REQUIRE_THROWS_WITH(driver->initDevice(file),
-                        Catch::Contains("undefined symbol: defaultFactory"));
+    REQUIRE_THROWS_WITH(driver->initDevice(file), Catch::Contains("undefined symbol: Factory"));
 }
 
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::string file("libdummy_device.so");
     driver->setDeviceName("DummyDevice");
     CHECK(driver->initDevice(file));

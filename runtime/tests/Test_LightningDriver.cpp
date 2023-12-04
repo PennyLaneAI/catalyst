@@ -57,7 +57,7 @@ TEST_CASE("Test parse_kwargs coverage", "[Utils]")
 
 TEST_CASE("Test Driver", "[Driver]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
 
     // check the scope of memory-manager
     CHECK(driver->getMemoryManager() != nullptr);
