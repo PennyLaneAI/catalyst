@@ -13,7 +13,7 @@ pre-built binaries are being distributed via the Python Package Index (PyPI) for
 .. warning::
 
     macOS does not ship with a system compiler by default, which Catalyst depends on. Please
-    ensure that `XCode <https://developer.apple.com/xcode/resources/`_ or the
+    ensure that `XCode <https://developer.apple.com/xcode/resources/>`_ or the
     ``XCode Command Line Tools`` are installed on your system before using Catalyst.
 
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
