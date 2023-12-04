@@ -157,7 +157,7 @@ The ``get_c_interface`` method should be a static method that takes no parameter
         pennylane_requires = "0.33.0"
         version = "0.0.1"
         author = "Dummy"
-        author = "Erick Ochoa"
+        author = "An Author"
         config = pathlib.Path("absolute/path/to/configuration/file.toml")
 
         def __init__(self, shots=None, wires=None):
