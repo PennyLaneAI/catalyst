@@ -16,6 +16,13 @@
   load quantum devices dynamically.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
 
+* The runtime now supports multiple active devices via using a pool of devices.
+  The new `RTDeviceInfoT` data-class and `QuantumDeviceInterface`collection of methods
+  enable the runtime to better scope the lifetime of device instances and split the
+  `QuantumDevice` API from device implementations. With these changes, one can create
+  multiple active devices and execute multiple programs cuncurrently at runtime.
+  [(#377)](https://github.com/PennyLaneAI/catalyst/pull/377)
+
 <h3>Improvements</h3>
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last 
