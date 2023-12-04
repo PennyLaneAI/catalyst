@@ -158,7 +158,7 @@ The ``get_c_interface`` method should be a static method that takes no parameter
         version = "0.0.1"
         author = "Dummy"
         author = "Erick Ochoa"
-        config = pathlib.Path("path/to/configuration/file.toml")
+        config = pathlib.Path("absolute/path/to/configuration/file.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)

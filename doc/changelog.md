@@ -60,7 +60,7 @@
 
 <h3>Breaking changes</h3>
 
-* Third party device must now specify a configuration toml file.
+* Third party devices must now specify a configuration toml file.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 <h3>Bug fixes</h3>

@@ -1,7 +1,7 @@
 schema = 1
 
 [device]
-name = "lightning.qubit"
+name = "braket.local.qubit"
 version = "v0.31.0"
 precision = ['float32', 'float64']
 
@@ -70,10 +70,9 @@ exactshots = [
 finiteshots = [
 	"Probs",
 	"Sample",
-	"Measure", # mid-circuit measurement
 ]
 
 [compilation]
 qjit_compatible = true
-control_flow = true
+control_flow = false
 dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo

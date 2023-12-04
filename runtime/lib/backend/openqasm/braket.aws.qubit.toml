@@ -1,7 +1,7 @@
 schema = 1
 
 [device]
-name = "lightning.qubit"
+name = "braket.aws.qubit"
 version = "v0.31.0"
 precision = ['float32', 'float64']
 
@@ -10,7 +10,6 @@ observables = [
 	"NamedObs",
 	"HermitianObs",
 	"TensorObs",
-	"HamiltonianObs",
 ]
 
 [[operations.gates]]
@@ -75,5 +74,5 @@ finiteshots = [
 
 [compilation]
 qjit_compatible = true
-control_flow = true
+control_flow = false
 dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo
