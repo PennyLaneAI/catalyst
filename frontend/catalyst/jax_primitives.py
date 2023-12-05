@@ -1210,18 +1210,20 @@ def _cond_lowering(
 #
 @while_p.def_impl
 def _while_loop_def_impl(
-    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, out_type
+    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, nimplicit
 ):  # pragma: no cover
     raise NotImplementedError()
 
 
 @while_p.def_abstract_eval
-def _while_loop_abstract_eval(*in_type, body_jaxpr, **kwargs):
+def _while_loop_abstract_eval(*in_type, body_jaxpr, nimplicit, **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
-    out_type = infer_output_type(body_jaxpr.jaxpr.invars,
-                                 body_jaxpr.jaxpr.outvars,
-                                 expansion_strategy=while_loop_expansion_strategy())
-    return out_type
+    return infer_output_type(
+        [],
+        body_jaxpr.jaxpr.invars,
+        body_jaxpr.jaxpr.outvars[nimplicit:],
+        expansion_strategy=while_loop_expansion_strategy(),
+    )
 
 
 def _while_loop_lowering(
@@ -1231,6 +1233,7 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
+    nimplicit:int,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
@@ -1300,15 +1303,13 @@ def _for_loop_abstract_eval(*args, body_jaxpr,
                             **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
 
-    out_type = infer_output_type(body_jaxpr.jaxpr.invars,
-                                 body_jaxpr.jaxpr.outvars,
-                                 expansion_strategy=default_expansion_strategy(None),
-                                 num_implicit_inputs=nimplicit)
-    print("BIND_OUT_TYPE")
-    for t in out_type: print("t", t)
-    # body_loop_arg_idx = nimplicit
-    # out_type = out_type_force_outdbidx(out_type, body_loop_arg_idx, [], body_jaxpr.jaxpr.invars, body_jaxpr.jaxpr.outvars)
-    return out_type
+    return infer_output_type(
+        [],
+        body_jaxpr.jaxpr.invars,
+        body_jaxpr.jaxpr.outvars[nimplicit:],
+        expansion_strategy=for_loop_expansion_strategy(),
+        num_implicit_inputs=nimplicit
+    )
 
 
 # pylint: disable=too-many-arguments
