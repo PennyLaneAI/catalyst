@@ -282,7 +282,7 @@ module @workflow {
     quantum.device ["rtd_lib", """
             + r'"'
             + full_path
-            + r"""/librtd_lightning."""
+            + r"""/librtd_lightning"""
             + extension
             + """"]
     %0 = stablehlo.constant dense<4> : tensor<i64>
