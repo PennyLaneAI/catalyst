@@ -19,6 +19,7 @@
 * Support for dynamically-shaped arrays has been added.
   [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
   [(#386)](https://github.com/PennyLaneAI/catalyst/pull/385)
+  [(#390)](https://github.com/PennyLaneAI/catalyst/pull/390)
 
   Catalyst now accepts tensors whose dimensions are not known at compile time.
   Standard tensor initialisation functions `jax.numpy.ones`, `jnp.zeros`, and
