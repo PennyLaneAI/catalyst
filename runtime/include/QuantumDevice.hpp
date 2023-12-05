@@ -193,6 +193,19 @@ struct QuantumDevice {
     virtual auto Expval(ObsIdType obsKey) -> double = 0;
 
     /**
+     * @brief Compute the expected value of an observable with shot-noise.
+     *
+     * @param obsKey The index of the constructed observable
+     * @param shots The number of shots
+     * @param shot_range The range of samples to use. All samples are used by
+     * default.
+     *
+     * @return `double` The expected value
+     */
+    virtual auto Expval(ObsIdType obsKey, const size_t shots, const std::vector<size_t> &shot_range)
+        -> double = 0;
+
+    /**
      * @brief Compute the variance of an observable.
      *
      * @param obsKey The index of the constructed observable
