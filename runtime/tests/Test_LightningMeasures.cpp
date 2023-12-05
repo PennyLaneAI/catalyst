@@ -176,6 +176,34 @@ TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) test", "[Measures]", SimTypes)
     CHECK(sim->Expval(pz) == Approx(-1.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+
+    size_t num_shots = 1000;
+
+    CHECK(sim->Expval(px, num_shots, {}) == Approx(1.0).margin(5e-2));
+    CHECK(sim->Expval(py, num_shots, {}) == Approx(.0).margin(5e-2));
+    CHECK(sim->Expval(pz, num_shots, {}) == Approx(-1.0).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
