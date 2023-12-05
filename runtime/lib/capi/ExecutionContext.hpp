@@ -16,6 +16,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -184,7 +185,7 @@ extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::str
  *
  * This class introduces an interface for initialized devices by the execution
  * context manager of the runtime. This includes the device name, library, kwargs,
- * and a shared pointer to the QuantumDevice entry point.
+ * and a shared pointer to the `QuantumDevice` entry point.
  */
 class RTDeviceInfoT {
   private:

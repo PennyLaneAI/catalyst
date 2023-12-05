@@ -20,7 +20,7 @@
   The new `RTDeviceInfoT` data-class and `QuantumDeviceInterface`collection of methods
   enable the runtime to better scope the lifetime of device instances and split the
   `QuantumDevice` API from device implementations. With these changes, one can create
-  multiple active devices and execute multiple programs cuncurrently at runtime.
+  multiple active devices and execute multiple programs concurrently at runtime.
   [(#377)](https://github.com/PennyLaneAI/catalyst/pull/377)
 
 <h3>Improvements</h3>

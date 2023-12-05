@@ -32,6 +32,8 @@
  */
 namespace Catalyst::Runtime::QuantumDeviceInterface {
 
+// TODO: Remove lcov skips after completing the end-to-end async execution support
+// LCOV_EXCL_START
 auto AllocateQubit(QuantumDevice *device) -> QubitIdType { return device->AllocateQubit(); }
 
 auto AllocateQubits(QuantumDevice *device, size_t num_qubits) -> std::vector<QubitIdType>
@@ -137,5 +139,6 @@ void Gradient(QuantumDevice *device, std::vector<DataView<double, 1>> &gradients
 {
     device->Gradient(gradients, trainParams);
 }
+// LCOV_EXCL_STOP
 
 } // namespace Catalyst::Runtime::QuantumDeviceInterface

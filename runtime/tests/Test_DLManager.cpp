@@ -27,7 +27,8 @@ QuantumDevice *loadDevice(std::string device_name, std::string filename)
         std::make_unique<SharedLibraryManager>(filename);
     std::string factory_name{device_name + "Factory"};
     void *f_ptr = init_rtd_dylib->getSymbol(factory_name);
-    return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("") : nullptr;
+    return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)("")
+                 : nullptr; // LCOV_EXCL_LINE
 }
 
 TEST_CASE("Test dummy", "[Third Party]")
