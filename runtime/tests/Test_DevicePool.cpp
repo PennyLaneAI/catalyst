@@ -138,19 +138,19 @@ TEST_CASE("Test QuantumDeviceInterface (single-thread)", "device_pool")
     auto circuit1 = [](QuantumDevice *device, double param) {
         std::vector<QubitIdType> Qs = QuantumDeviceInterface::AllocateQubits(device, 2);
         QuantumDeviceInterface::NamedOperation(device, "Hadamard", {}, {Qs[0]}, false);
-        QuantumDeviceInterface::NamedOperation(device, "CRX", {0.123}, {Qs[0], Qs[1]}, false);
+        QuantumDeviceInterface::NamedOperation(device, "CRX", {param}, {Qs[0], Qs[1]}, false);
         ObsIdType pz = QuantumDeviceInterface::Observable(device, ObsId::PauliZ, {}, {Qs[1]});
         auto result = QuantumDeviceInterface::Expval(device, pz);
-        CHECK(result == Approx(0.9962225161).margin(1e-5));
+        CHECK(result == Approx(0.9900332889).margin(1e-5));
     };
 
     auto circuit2 = [](QuantumDevice *device, double param) {
         std::vector<QubitIdType> Qs = QuantumDeviceInterface::AllocateQubits(device, 2);
         QuantumDeviceInterface::NamedOperation(device, "Hadamard", {}, {Qs[0]}, false);
-        QuantumDeviceInterface::NamedOperation(device, "CRX", {0.123}, {Qs[0], Qs[1]}, false);
+        QuantumDeviceInterface::NamedOperation(device, "CRX", {param}, {Qs[0], Qs[1]}, false);
         ObsIdType pz = QuantumDeviceInterface::Observable(device, ObsId::PauliZ, {}, {Qs[1]});
-        return std::make_pair<double, double>(QuantumDeviceInterface::Expval(device, pz),
-                                              QuantumDeviceInterface::Var(device, pz));
+        return std::make_pair(QuantumDeviceInterface::Expval(device, pz),
+                              QuantumDeviceInterface::Var(device, pz));
     };
 
     auto dev0_qdp = dev0.second;
@@ -178,10 +178,10 @@ TEST_CASE("Test QuantumDeviceInterface (multi-thread)", "device_pool")
     auto circuit1 = [](QuantumDevice *device, double param) {
         std::vector<QubitIdType> Qs = QuantumDeviceInterface::AllocateQubits(device, 2);
         QuantumDeviceInterface::NamedOperation(device, "Hadamard", {}, {Qs[0]}, false);
-        QuantumDeviceInterface::NamedOperation(device, "CRX", {0.123}, {Qs[0], Qs[1]}, false);
+        QuantumDeviceInterface::NamedOperation(device, "CRX", {param}, {Qs[0], Qs[1]}, false);
         ObsIdType pz = QuantumDeviceInterface::Observable(device, ObsId::PauliZ, {}, {Qs[1]});
         auto result = QuantumDeviceInterface::Expval(device, pz);
-        CHECK(result == Approx(0.9962225161).margin(1e-5));
+        CHECK(result == Approx(0.9900332889).margin(1e-5));
     };
 
     auto dev0_qdp = driver->getDevice(0);
@@ -203,10 +203,10 @@ TEST_CASE("Test QuantumDeviceInterface with std::async (multi-thread)", "device_
     auto circuit2 = [](QuantumDevice *device, double param) {
         std::vector<QubitIdType> Qs = QuantumDeviceInterface::AllocateQubits(device, 2);
         QuantumDeviceInterface::NamedOperation(device, "Hadamard", {}, {Qs[0]}, false);
-        QuantumDeviceInterface::NamedOperation(device, "CRX", {0.123}, {Qs[0], Qs[1]}, false);
+        QuantumDeviceInterface::NamedOperation(device, "CRX", {param}, {Qs[0], Qs[1]}, false);
         ObsIdType pz = QuantumDeviceInterface::Observable(device, ObsId::PauliZ, {}, {Qs[1]});
-        return std::make_pair<double, double>(QuantumDeviceInterface::Expval(device, pz),
-                                              QuantumDeviceInterface::Var(device, pz));
+        return std::make_pair(QuantumDeviceInterface::Expval(device, pz),
+                              QuantumDeviceInterface::Var(device, pz));
     };
 
     auto dev0_qdp = driver->getDevice(0);
