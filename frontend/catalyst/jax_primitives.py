@@ -63,7 +63,10 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.jax_extras import (
     ClosedJaxpr, DynshapePrimitive, infer_output_type, out_type_shift_indbidx,
-    out_type_force_outdbidx
+    out_type_force_outdbidx,
+    for_loop_expansion_strategy,
+    while_loop_expansion_strategy,
+    default_expansion_strategy
 )
 
 # pylint: disable=unused-argument,too-many-lines
@@ -1217,7 +1220,7 @@ def _while_loop_abstract_eval(*in_type, body_jaxpr, **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
     out_type = infer_output_type(body_jaxpr.jaxpr.invars,
                                  body_jaxpr.jaxpr.outvars,
-                                 force_implicit_indbidx=False)
+                                 expansion_strategy=while_loop_expansion_strategy())
     return out_type
 
 
@@ -1296,12 +1299,15 @@ def _for_loop_abstract_eval(*args, body_jaxpr,
                             nimplicit = 0,
                             **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
+
     out_type = infer_output_type(body_jaxpr.jaxpr.invars,
                                  body_jaxpr.jaxpr.outvars,
-                                 force_implicit_indbidx=False)
-
-    body_loop_arg_idx = nimplicit
-    out_type = out_type_force_outdbidx(out_type, body_loop_arg_idx, [], body_jaxpr.jaxpr.invars, body_jaxpr.jaxpr.outvars)
+                                 expansion_strategy=default_expansion_strategy(None),
+                                 num_implicit_inputs=nimplicit)
+    print("BIND_OUT_TYPE")
+    for t in out_type: print("t", t)
+    # body_loop_arg_idx = nimplicit
+    # out_type = out_type_force_outdbidx(out_type, body_loop_arg_idx, [], body_jaxpr.jaxpr.invars, body_jaxpr.jaxpr.outvars)
     return out_type
 
 

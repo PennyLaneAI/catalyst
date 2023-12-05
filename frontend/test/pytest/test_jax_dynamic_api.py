@@ -58,7 +58,7 @@ def test_jax_typing():
         sz = trace.new_arg(dim_value_aval())
         args = jnp.zeros([0,sz]), jnp.zeros([sz,1])
 
-        _, in_type = expand_args(args)
+        _, in_type = expand_args(args, force_implicit_indbidx=False)
         assert [(t.shape,k) for t,k in in_type] == [
             ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=0),1), True)
         ]

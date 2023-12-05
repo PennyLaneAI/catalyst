@@ -353,10 +353,10 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
-def trace_function(ctx, fun, *args, force_implicit_indbidx=False, **kwargs):
+def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
 
     wfun, in_sig, out_sig = deduce_avals3(
-        fun, args, kwargs, force_implicit_indbidx=force_implicit_indbidx
+        fun, args, kwargs, expansion_strategy=expansion_strategy
     )
     with EvaluationContext.frame_tracing_context(ctx) as trace:
         arg_classical_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)

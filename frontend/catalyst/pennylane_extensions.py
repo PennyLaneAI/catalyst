@@ -68,6 +68,10 @@ from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
+    ExpansionStrategy,
+    for_loop_expansion_strategy,
+    while_loop_expansion_strategy,
+    default_expansion_strategy,
     Jaxpr,
     ShapedArray,
     _initial_style_jaxpr,
@@ -91,7 +95,7 @@ from catalyst.utils.jax_extras import (
     expand_results,
     make_jaxpr2,
     find_top_trace,
-    infer_output_type3,
+    # infer_output_type3,
     out_type_force_outdbidx,
     out_type_shift_indbidx,
     tracer_index,
@@ -907,17 +911,17 @@ class ForLoop(HybridOp):
 
             arg_expanded_tracers = expand_args(
                 self.regions[0].arg_classical_tracers + [qreg_in],
-                force_implicit_indbidx=True
+                expansion_strategy=for_loop_expansion_strategy()
             )[0]
             res_expanded_tracers, _ = expand_results(
                 arg_expanded_tracers,
                 self.regions[0].res_classical_tracers + [qreg_out],
-                force_implicit_indbidx=True
+                expansion_strategy=for_loop_expansion_strategy()
             )
             jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
 
         in_expanded_tracers = expand_args(op.in_classical_tracers,
-                                          force_implicit_indbidx=True)[0]
+                                          expansion_strategy=for_loop_expansion_strategy())[0]
 
         nimplicit = len(in_expanded_tracers) - len(op.in_classical_tracers)
 
@@ -927,13 +931,20 @@ class ForLoop(HybridOp):
             [qrp.actualize()]
         )
 
+        print("BBBBBBBBBB")
+        print(jaxpr)
+        print("BBBBBBBBBB")
+
         out_c_expanded_classical_tracers = (
             expand_results(
                 in_c_expanded_tracers,
                 self.out_classical_tracers,
-                force_implicit_indbidx=True,
+                expansion_strategy=for_loop_expansion_strategy(),
             )[0]
         )
+
+        print("OUT_C_EXPANDED_CLASSICAL_TRACERS")
+        for t in out_c_expanded_classical_tracers: print(t)
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers2(
@@ -1012,7 +1023,7 @@ class WhileLoop(HybridOp):
             res_expanded_classical_tracers, out_type = expand_results(
                 arg_expanded_classical_tracers,
                 self.regions[0].res_classical_tracers,
-                force_implicit_indbidx=True
+                expansion_strategy=while_loop_expansion_strategy()
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
             cond_jaxpr, out_type2, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
@@ -1032,7 +1043,7 @@ class WhileLoop(HybridOp):
             res_expanded_tracers, out_type = expand_results(
                 arg_expanded_tracers,
                 self.regions[1].res_classical_tracers + [qreg_out],
-                force_implicit_indbidx=True
+                expansion_strategy=while_loop_expansion_strategy(),
             )
             body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_expanded_tracers
@@ -1052,7 +1063,7 @@ class WhileLoop(HybridOp):
             expand_results(
                 in_expanded_tracers,
                 self.out_classical_tracers,
-                force_implicit_indbidx=True,
+                expansion_strategy=while_loop_expansion_strategy(),
             )[0]
         )
 
@@ -1545,7 +1556,7 @@ def for_loop(lower_bound, upper_bound, step):
                 ]
                 wfun, in_sig, out_sig = deduce_avals3(
                     body_fn, (aux_classical_tracers[0], *init_state), {},
-                    force_implicit_indbidx=True
+                    for_loop_expansion_strategy()
                 )
                 in_type = in_sig.in_type
 
@@ -1564,16 +1575,22 @@ def for_loop(lower_bound, upper_bound, step):
                 in_expanded_classical_tracers, in_type2 = expand_args(
                     aux_classical_tracers +
                     collapse(in_type, in_sig.in_expanded_args),
-                    force_implicit_indbidx=True
+                    for_loop_expansion_strategy()
                 )
-                nimplicit = len([() for _,k in in_type2 if not k])
-                out_type = out_type_force_outdbidx(
-                    out_type, nimplicit, out_consts, arg_classical_tracers, res_classical_tracers
-                )
+                # nimplicit = len([() for _,k in in_type2 if not k])
+                # out_type = out_type_force_outdbidx(
+                #     out_type, nimplicit, out_consts, arg_classical_tracers, res_classical_tracers
+                # )
+                print("OUT_TYPE")
+                print(out_type)
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type, out_consts, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
+
+                print("OUT_EXPANDED_CLASSICAL_TRACERS")
+                for t in out_expanded_classical_tracers: print(t)
+
                 ForLoop(
                     collapse(in_type2, in_expanded_classical_tracers),
                     collapse(out_type, out_expanded_classical_tracers),
@@ -1701,9 +1718,9 @@ def while_loop(cond_fn):
                 outer_trace = ctx.trace
 
                 cond_wffa, _, cond_out_sig = deduce_avals3(cond_fn, init_state, {},
-                                                           force_implicit_indbidx=True)
+                                                           while_loop_expansion_strategy())
                 body_wffa, in_sig, out_sig = deduce_avals3(body_fn, init_state, {},
-                                                           force_implicit_indbidx=True)
+                                                           while_loop_expansion_strategy())
                 in_type = in_sig.in_type
                 in_expanded_classical_tracers = in_sig.in_expanded_args
 
@@ -1745,7 +1762,6 @@ def while_loop(cond_fn):
                         collapse(out_type, res_classical_tracers)
                     )
 
-
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type, out_consts, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
@@ -1758,10 +1774,10 @@ def while_loop(cond_fn):
 
             def _call_with_classical_ctx(ctx):
                 cond_jaxpr, cond_out_type, cond_tree, cond_consts = trace_function(
-                    ctx, cond_fn, *init_state, force_implicit_indbidx=True
+                    ctx, cond_fn, *init_state, while_loop_expansion_strategy()
                 )
                 body_jaxpr, body_out_type, body_tree, body_consts = trace_function(
-                    ctx, body_fn, *init_state, force_implicit_indbidx=True
+                    ctx, body_fn, *init_state, while_loop_expansion_strategy()
                 )
 
                 _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
