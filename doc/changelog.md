@@ -16,9 +16,31 @@
   load quantum devices dynamically.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
 
+* Support for dynamically-shaped arrays has been added.
+  [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
+
+  Catalyst now accepts tensors whose dimensions are not known at compile time.
+  Standard tensor initialisation functions `jax.numpy.ones`, `jnp.zeros`, and
+  `jnp.empty`, now accept dynamic variables (where the value is only known at
+  runtime). Note that support for dynamic arrays in control-flow primitives
+  is not yet supported and still a work-in-progress.
+
+  ``` python
+  @qjit
+  def func(size: int):
+      return jax.numpy.ones([size, size], dtype=float)
+  ```
+
+  ``` pycon
+  >>> func(3)
+  [[1. 1. 1.]
+   [1. 1. 1.]
+   [1. 1. 1.]]
+  ```
+
 <h3>Improvements</h3>
 
-* ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last 
+* ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
   register in functions and can be given to another function (useful for quantum transformation).
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
@@ -41,6 +63,7 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 Romain Moyard,
+Sergei Mironov,
 Erick Ochoa Lopez.
 
 # Release 0.3.2
