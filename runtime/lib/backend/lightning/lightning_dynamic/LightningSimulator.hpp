@@ -120,7 +120,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;
     auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
         -> ObsIdType override;
-    auto Expval(ObsIdType obsKey) -> double override;
+    auto Expval(ObsIdType obsKey, size_t shots=0, std::vector<size_t>& short_range) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
     void State(DataView<std::complex<double>, 1> &state) override;
     void Probs(DataView<double, 1> &probs) override;

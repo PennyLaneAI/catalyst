@@ -172,10 +172,12 @@ auto LightningSimulator::HamiltonianObservable(const std::vector<double> &coeffs
     return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
-auto LightningSimulator::Expval(ObsIdType obsKey) -> double
+auto LightningSimulator::Expval(ObsIdType obsKey, size_t shots=0, std::vector<size_t>& shots_range = {}) -> double
 {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
                "Invalid key for cached observables");
+    RT_FAIL_IF(short_range.size()>shots,
+               "Short range size is larger than number of shots");
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
@@ -185,7 +187,11 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return m.expval(*obs);
+    if(shots == 0){
+        return m.expval(*obs);
+    }
+    return m.expval(*obs, shots, shots_range);
+        
 }
 
 auto LightningSimulator::Var(ObsIdType obsKey) -> double
