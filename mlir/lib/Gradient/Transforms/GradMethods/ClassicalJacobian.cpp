@@ -86,6 +86,20 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 
                 rewriter.replaceOp(gate, cast<quantum::QuantumGate>(op).getQubitOperands());
             }
+            // Any other gates or quantum instructions can also be stripped.
+            // Measurements are handled separately.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+                rewriter.replaceOp(op, gate.getQubitOperands());
+            }
+            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
+                rewriter.replaceOp(op, region.getRegisterOperand());
+            }
+            else if (isa<quantum::DeallocOp>(op)) {
+                rewriter.eraseOp(op);
+            }
             // Replace any return statements from the original function with the parameter count.
             else if (isa<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -93,10 +107,6 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 
                 Value paramCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
                 op->setOperands(paramCount);
-            }
-            // Erase redundant device specifications.
-            else if (isa<quantum::DeviceOp>(op)) {
-                rewriter.eraseOp(op);
             }
         });
 
@@ -159,6 +169,20 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
 
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
+            // Any other gates or quantum instructions also need to be stripped.
+            // Measurements are handled separately.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+                rewriter.replaceOp(op, gate.getQubitOperands());
+            }
+            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
+                rewriter.replaceOp(op, region.getRegisterOperand());
+            }
+            else if (isa<quantum::DeallocOp>(op)) {
+                rewriter.eraseOp(op);
+            }
             // Return ops should be preceded with calls to the modified QNode
             else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
@@ -167,10 +191,6 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
                     rewriter.create<func::CallOp>(loc, qnodeQuantum, qnodeQuantumArgs);
 
                 returnOp.getOperandsMutable().assign(modifiedCall.getResults());
-            }
-            // Erase redundant device specifications.
-            else if (isa<quantum::DeviceOp>(op)) {
-                rewriter.eraseOp(op);
             }
         });
 
@@ -238,16 +258,26 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
 
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
+            // Any other gates or quantum instructions also need to be stripped.
+            // Measurements are handled separately.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+                rewriter.replaceOp(op, gate.getQubitOperands());
+            }
+            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
+                rewriter.replaceOp(op, region.getRegisterOperand());
+            }
+            else if (isa<quantum::DeallocOp>(op)) {
+                rewriter.eraseOp(op);
+            }
             else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(returnOp);
                 Value paramsVector =
                     rewriter.create<bufferization::ToTensorOp>(loc, paramsVectorType, paramsBuffer);
                 returnOp.getOperandsMutable().assign(paramsVector);
-            }
-            // Erase redundant device specifications.
-            else if (isa<quantum::DeviceOp>(op)) {
-                rewriter.eraseOp(op);
             }
         });
 
