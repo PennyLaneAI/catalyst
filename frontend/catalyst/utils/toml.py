@@ -18,7 +18,7 @@ Module for abstracting which toml_load to use.
 import importlib.util
 
 # TODO:
-# Once Python version 3.11 is the oldest supported Python version, we can remove tomli
+# Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
 # and rely exclusively on tomllib.
 
 # New in version 3.11
