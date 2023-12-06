@@ -27,6 +27,7 @@ native = [
         "RY",
         "RZ",
         "CSWAP",
+	"QubitUnitary",
 ]
 # decomp gates are those which are neither supported natively
 # and are not executed via the applyMatrix operation. Technically
@@ -38,7 +39,6 @@ decomp = [
         "PSWAP",
 
 	# These ones are fine here.
-        "QubitUnitary",
         "MultiRZ",
         "Hadamard",
         "Toffoli",

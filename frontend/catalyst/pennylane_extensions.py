@@ -208,13 +208,6 @@ class QJITDevice(qml.QubitDevice):
         return spec["compilation"]["mid_circuit_measurement"]
 
     @staticmethod
-    def _check_runtime_code_generation(config):
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        return spec["compilation"]["runtime_code_generation"]
-
-    @staticmethod
     def _check_adjoint(config):
         with open(config, "rb") as f:
             spec = toml_load(f)
