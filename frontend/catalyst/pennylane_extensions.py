@@ -1757,8 +1757,6 @@ def while_loop(cond_fn):
                         collapse(out_type, res_classical_tracers)
                     )
 
-                print(out_sig.out_jaxpr())
-                print(out_type)
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type, out_consts, in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
@@ -1770,39 +1768,30 @@ def while_loop(cond_fn):
                 return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
             def _call_with_classical_ctx(ctx):
-                cond_jaxpr, cond_out_type, cond_tree, cond_consts = trace_function(
+                _, _, out_cond_sig = trace_function(
                     ctx, cond_fn, *init_state,
                     expansion_strategy=while_loop_expansion_strategy()
                 )
-                body_jaxpr, body_out_type, body_tree, body_consts = trace_function(
+                _, in_body_sig, out_body_sig = trace_function(
                     ctx, body_fn, *init_state,
                     expansion_strategy=while_loop_expansion_strategy()
                 )
 
-                _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
+                _check_single_bool_value(out_cond_sig.out_tree(),
+                                         out_cond_sig.out_jaxpr().out_avals)
 
-                in_classical_tracers, _ = tree_flatten(init_state)
-                trace = find_top_trace(in_classical_tracers)
-                in_expanded_tracers = (
-                    expand_args([trace.full_raise(c) for c in in_classical_tracers],
-                                expansion_strategy=while_loop_expansion_strategy()
-                                )[0]
-                )
-                nimplicit=len(in_expanded_tracers) - len(in_classical_tracers)
-                in_expanded_tracers = (
-                    [trace.full_raise(c) for c in (cond_consts + body_consts)] +
-                    in_expanded_tracers
-                )
+                in_expanded_tracers = [*out_body_sig.out_consts(), *in_body_sig.in_expanded_args]
 
                 out_expanded_tracers = while_p.bind(
                     *in_expanded_tracers,
-                    cond_jaxpr=cond_jaxpr,
-                    body_jaxpr=body_jaxpr,
-                    cond_nconsts=len(cond_consts),
-                    body_nconsts=len(body_consts),
-                    nimplicit=nimplicit
+                    cond_jaxpr=out_cond_sig.out_jaxpr(),
+                    body_jaxpr=out_body_sig.out_jaxpr(),
+                    cond_nconsts=len(out_cond_sig.out_consts()),
+                    body_nconsts=len(out_body_sig.out_consts()),
+                    nimplicit=in_body_sig.num_implicit_inputs()
                 )
-                return tree_unflatten(body_tree, collapse(body_out_type, out_expanded_tracers))
+                return tree_unflatten(out_body_sig.out_tree(),
+                                      collapse(out_body_sig.out_type(), out_expanded_tracers))
 
             def _call_during_interpretation():
                 args = init_state

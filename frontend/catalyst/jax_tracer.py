@@ -359,15 +359,10 @@ def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
     with EvaluationContext.frame_tracing_context(ctx) as trace:
-        arg_classical_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
-        _ = wfun.call_wrapped(*arg_classical_tracers)
+        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
-        return (
-            out_sig.out_jaxpr(),
-            out_sig.out_type(),
-            out_sig.out_tree(),
-            out_sig.out_consts()
-        )
+        return res_expanded_tracers, in_sig, out_sig
 
 
 

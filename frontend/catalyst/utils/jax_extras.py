@@ -332,6 +332,9 @@ class InputSignature:
     in_tree: PyTreeDef
     in_expanded_args: List[DynamicJaxprTracer]
 
+    def num_implicit_inputs(self):
+        return len([() for _,k in self.in_type if not k])
+
 
 @dataclass
 class OutputSignature:
