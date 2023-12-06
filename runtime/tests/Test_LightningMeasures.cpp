@@ -258,6 +258,37 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTy
     CHECK(sim->Expval(tpz) == Approx(-1.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tpx = sim->TensorObservable({px});
+    ObsIdType tpy = sim->TensorObservable({py});
+    ObsIdType tpz = sim->TensorObservable({pz});
+
+    size_t num_shots = 1000;
+
+    CHECK(sim->Expval(tpx, num_shots, {}) == Approx(1.0).margin(5e-2));
+    CHECK(sim->Expval(tpy, num_shots, {}) == Approx(.0).margin(5e-2));
+    CHECK(sim->Expval(tpz, num_shots, {}) == Approx(-1.0).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -441,6 +472,32 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", Si
     ObsIdType hxyz = sim->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz});
 
     CHECK(sim->Expval(hxyz) == Approx(0.2).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hxyz = sim->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz});
+
+    size_t num_shots = 1000;
+    CHECK(sim->Expval(hxyz, num_shots, {}) == Approx(0.2).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
