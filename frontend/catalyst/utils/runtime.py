@@ -64,7 +64,6 @@ def extract_backend_info(device):
     device_name = ""
     device_lpath = ""
     device_kwargs = {}
-    device_kwargs["device_type"] = dname
 
     if dname in SUPPORTED_RT_DEVICES:
         # Support backend devices without `get_c_interface`
@@ -110,4 +109,4 @@ def extract_backend_info(device):
     if hasattr(device, "_kernel_name"):
         device_kwargs["kernel_name"] = device._kernel_name
 
-    return device_name, device_lpath, device_kwargs
+    return device_name, device_lpath, device_kwargs, device.config

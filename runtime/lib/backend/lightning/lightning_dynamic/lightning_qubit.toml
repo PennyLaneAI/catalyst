@@ -39,15 +39,11 @@ native = [
         "CRY",
         "CRZ",
         "CRot",
+        "Identity",
         "IsingXX",
         "IsingYY",
         "IsingZZ",
         "IsingXY",
-        # Adjoint'ed gates
-        # which just need the inverse flag set
-        # are considered natively supported gates.
-        "Adjoint(S)",
-        "Adjoint(T)",
 ]
 # decomp gates are those which are neither supported natively
 # and are not executed via the applyMatrix operation. Technically
@@ -65,7 +61,6 @@ decomp = [
         "Adjoint(SX)",
         "Adjoint(ISWAP)",
         "Adjoint(SISWAP)",
-        "Identity",
         "BasisState",
         "QubitStateVector",
         "StatePrep",
@@ -82,6 +77,8 @@ decomp = [
         "OrbitalRotation",
         "QFT",
         "ECR",
+        "Adjoint(S)",
+        "Adjoint(T)",
 ]
 # QubitUnitary should never be here.
 # Gates in "matrix" are decomposed to QubitUnitary.
@@ -116,6 +113,8 @@ finiteshots = [
 [compilation]
 qjit_compatible = true
 control_flow = true
+adjoint = true
+quantum_control = false
 mid_circuit_measurement = true
 dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo
 

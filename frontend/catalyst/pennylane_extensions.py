@@ -80,7 +80,7 @@ from catalyst.utils.jax_extras import (
     unzip2,
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.runtime import extract_backend_info, get_lib_path
 from catalyst.utils.toml import toml_load
 
 
@@ -116,10 +116,29 @@ class QFunc:
         self.device = device
         update_wrapper(self, fn)
 
+    @staticmethod
+    def _add_toml_file(device):
+        """Temporary function. This function adds the config field to devices.
+        TODO: Remove this function when `qml.Device`s are guaranteed to have their own
+        config file field."""
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        # We need this replace because the toml file uses
+        # lightning_kokkos.toml and lightning_qubit.toml
+        # instead of lightning.qubit.toml and lightning.kokkos.toml
+        # We should just make all of them similar.
+        name = device.name
+        if isinstance(device, qml.Device):
+            name = device.short_name
+
+        toml_file_name = name.replace(".", "_") + ".toml"
+        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+        device.config = toml_file
+
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
+            QFunc._add_toml_file(self.device)
             device = QJITDevice(
                 self.device.shots, self.device.wires, *extract_backend_info(self.device)
             )
@@ -164,54 +183,101 @@ class QJITDevice(qml.QubitDevice):
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
-    operations = [
-        "MidCircuitMeasure",
-        "Cond",
-        "WhileLoop",
-        "ForLoop",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "Hadamard",
-        "Identity",
-        "S",
-        "T",
-        "PhaseShift",
-        "RX",
-        "RY",
-        "RZ",
-        "CNOT",
-        "CY",
-        "CZ",
-        "SWAP",
-        "IsingXX",
-        "IsingYY",
-        "IsingXY",
-        "IsingZZ",
-        "ControlledPhaseShift",
-        "CRX",
-        "CRY",
-        "CRZ",
-        "CRot",
-        "CSWAP",
-        "MultiRZ",
-        "QubitUnitary",
-        "Adjoint",
-    ]
-    observables = [
-        "Identity",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "Hadamard",
-        "Hermitian",
-        "Hamiltonian",
-    ]
+    # Even though these are empty, these are needed.
+    # Otherwise, the following error is raised:
+    #
+    #   TypeError: Can't instantiate abstract class QJITDevice with abstract method operations
+    operations = []
+    observables = []
+
+    @staticmethod
+    def _check_qjit_compatible(config):
+        """Check the qjit_compatible record in the configuration file."""
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        if not spec["compilation"]["qjit_compatible"]:
+            msg = "Attempting to compile to device without qjit support."
+            raise CompileError(msg)
+
+    @staticmethod
+    def _check_mid_circuit_measurement(config):
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        return spec["compilation"]["mid_circuit_measurement"]
+
+    @staticmethod
+    def _check_control_flow(config):
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        return spec["compilation"]["control_flow"]
+
+    @staticmethod
+    def _check_adjoint(config):
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        return spec["compilation"]["adjoint"]
+
+    @staticmethod
+    def _check_quantum_control(config):
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        return spec["compilation"]["quantum_control"]
+
+    @staticmethod
+    def _set_supported_operations(config):
+        """Override the set of supported operations."""
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        QJITDevice.operations = spec["operations"]["gates"][0]["native"]
+        if QJITDevice._check_mid_circuit_measurement(config):
+            QJITDevice.operations += ["MidCircuitMeasure"]
+
+        if QJITDevice._check_control_flow(config):
+            QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
+
+        if QJITDevice._check_adjoint(config):
+            QJITDevice.operations += ["Adjoint"]
+
+        if QJITDevice._check_quantum_control(config):
+            QJITDevice.operations += ["QCtrl"]
+
+    @staticmethod
+    def _set_supported_observables(config):
+        """Override the set of supported observables."""
+        with open(config, "rb") as f:
+            spec = toml_load(f)
+
+        QJITDevice.observables = spec["operations"]["observables"]
+
+    @staticmethod
+    def _check_config_exists(config, name):
+        if config.exists():
+            return
+        msg = f"{name} is not supported for compilation at the moment"
+        raise CompileError(msg)
 
     # pylint: disable=too-many-arguments
     def __init__(
-        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+        self,
+        shots=None,
+        wires=None,
+        backend_name=None,
+        backend_lib=None,
+        backend_kwargs=None,
+        config=None,
     ):
+        QJITDevice._check_config_exists(config, backend_name)
+        QJITDevice._check_qjit_compatible(config)
+        QJITDevice._set_supported_operations(config)
+        QJITDevice._set_supported_observables(config)
+
+        self.config = config
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
@@ -245,19 +311,7 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
-        # TODO: At the moment, lightning.qubit and other lightning devices are special because
-        # backend_name is indeed a name. However, for non-lightning devices, backend_name is
-        # actually a path to a shared library.
-        # So, let's try to find the path to this configuration file based on the name.
-        # The assumption is that it has to live in the same directory as the C library.
-        def get_spec_path(name, name_or_path_str):
-            name_or_path = pathlib.Path(name_or_path_str)
-            path = name_or_path.parent
-            path = path / "backend" / (name + ".toml")
-            return path
-
-        spec_path = get_spec_path(self.backend_name_canonical, self.backend_lib)
-        with open(spec_path, "rb") as f:
+        with open(self.config, "rb") as f:
             spec = toml_load(f)
 
         # At the moment assume QJIT Device's decomposition logic is guided by the specification of
