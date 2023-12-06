@@ -312,6 +312,80 @@ def test_classical_tracing_2():
 
     assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
 
+def test_qjit_forloop_identity():
+
+    @qjit()
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 2)
+        def loop(i, a):
+            return a
+
+        a2 = loop(a)
+        return a2
+
+    result = f(3)
+    expected = jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qjit_forloop_shared_indbidx():
+
+    @qjit()
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 2)
+        def loop(i, a, b):
+            return (a, b)
+
+        a2, b2 = loop(a, b)
+        return a2 + b2
+
+    result = f(3)
+    expected = 2*jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qjit_forloop_indbidx_outdbidx():
+
+    @qjit()
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 2)
+        def loop(i, a, _):
+            b = jnp.ones([sz+1], dtype=float)
+            return (a, b)
+
+        a2, b2 = loop(a, b)
+        return a2, b2
+
+    res_a, res_b = f(3)
+    assert_array_and_dtype_equal(res_a, jnp.ones(3))
+    assert_array_and_dtype_equal(res_b, jnp.ones(4))
+
+
+def test_qjit_forloop_index_indbidx():
+
+    @qjit()
+    def f(sz):
+        a = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 10, 1)
+        def loop(i, _):
+            b = jnp.ones([i], dtype=float)
+            return b
+
+        a2 = loop(a)
+        return a2
+
+    res_a = f(3)
+    assert_array_and_dtype_equal(res_a, jnp.ones(9))
+
 
 def test_qnode_forloop_identity():
 

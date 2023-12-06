@@ -929,7 +929,7 @@ class ForLoop(HybridOp):
         in_expanded_tracers = [
             *[trace.full_raise(c) for c in consts],
             *expand_args(op.in_classical_tracers,
-                        expansion_strategy=for_loop_expansion_strategy())[0],
+                         expansion_strategy=for_loop_expansion_strategy())[0],
             qrp.actualize()
         ]
 
@@ -1550,11 +1550,12 @@ def for_loop(lower_bound, upper_bound, step):
     """
 
     def _body_query(body_fn):
+        apply_reverse_transform = isinstance(step, int) and step < 0
+
         def _call_handler(*init_state):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 quantum_tape = QuantumTape()
                 outer_trace = ctx.trace
-                apply_reverse_transform = isinstance(step, int) and step < 0
                 aux_classical_tracers = [
                     outer_trace.full_raise(t) for t in [lower_bound, upper_bound, step]
                 ]
@@ -1601,26 +1602,35 @@ def for_loop(lower_bound, upper_bound, step):
 
                 return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-            def _call_with_classical_ctx():
-                iter_arg = lower_bound
-                init_vals, in_tree = tree_flatten((iter_arg, *init_state))
-                init_avals = tuple(_abstractify(val) for val in init_vals)
-                body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-                    body_fn, in_tree, init_avals, "for_loop"
+            def _call_with_classical_ctx(ctx):
+                outer_trace = find_top_trace([lower_bound, upper_bound, step])
+                aux_tracers = [
+                    outer_trace.full_raise(t) for t in [lower_bound, upper_bound, step]
+                ]
+
+                _, in_sig, out_sig = trace_function(
+                    ctx, body_fn, *(aux_tracers[0], *init_state),
+                    expansion_strategy=for_loop_expansion_strategy()
                 )
 
-                apply_reverse_transform = isinstance(step, int) and step < 0
-                out_classical_tracers = for_p.bind(
-                    lower_bound,
-                    upper_bound,
-                    step,
-                    *(body_consts + init_vals),
-                    body_jaxpr=body_jaxpr,
-                    body_nconsts=len(body_consts),
+                in_expanded_tracers = [
+                    *out_sig.out_consts(),
+                    *expand_args(
+                        aux_tracers + collapse(in_sig.in_type, in_sig.in_expanded_args),
+                        expansion_strategy=for_loop_expansion_strategy()
+                    )[0]
+                ]
+
+                out_expanded_tracers = for_p.bind(
+                    *in_expanded_tracers,
+                    body_jaxpr=out_sig.out_jaxpr(),
+                    body_nconsts=len(out_sig.out_consts()),
                     apply_reverse_transform=apply_reverse_transform,
+                    nimplicit=in_sig.num_implicit_inputs()
                 )
 
-                return tree_unflatten(body_tree, out_classical_tracers)
+                return tree_unflatten(out_sig.out_tree(),
+                                      collapse(out_sig.out_type(), out_expanded_tracers))
 
             def _call_during_interpretation():
                 args = init_state
@@ -1634,7 +1644,7 @@ def for_loop(lower_bound, upper_bound, step):
             if mode == EvaluationMode.QUANTUM_COMPILATION:
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-                return _call_with_classical_ctx()
+                return _call_with_classical_ctx(ctx)
             else:
                 assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
                 return _call_during_interpretation()
