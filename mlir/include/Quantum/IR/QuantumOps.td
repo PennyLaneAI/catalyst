@@ -295,6 +295,47 @@ def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
 
 // -----
 
+class Region_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [NoMemoryEffect]>;
+
+def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "Calculate the adjoint of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        QuregType:$qreg
+    );
+
+    let results = (outs
+        QuregType:$out_qreg
+    );
+
+    let assemblyFormat = [{
+        `(` $qreg `)` attr-dict `:` type(operands) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+    let summary = "Return results from quantum program regions";
+
+    let arguments = (ins
+        Variadic<AnyTypeOf<[QuregType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        attr-dict ($results^ `:` type($results))?
+    }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
+}
+
+// -----
+
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
@@ -764,43 +805,6 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let hasVerifier = 1;
-}
-
-def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
-    let summary = "Calculate the adjoint of the enclosed operations";
-
-    let regions = (region SizedRegion<1>:$region);
-
-    let arguments = (ins
-        QuregType:$qreg
-    );
-
-    let results = (outs
-        QuregType:$out_qreg
-    );
-
-    let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
-    }];
-
-    let hasVerifier = 1;
-}
-
-def YieldOp : Op<QuantumDialect, "yield",
-                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
-    let summary = "Return results from quantum program regions";
-
-    let arguments = (ins
-        Variadic<AnyTypeOf<[QuregType]>>:$results
-    );
-
-    let assemblyFormat = [{
-        attr-dict ($results^ `:` type($results))?
-    }];
-
-    let builders = [
-        OpBuilder<(ins), [{ /* nothing to do */ }]>
-    ];
 }
 
 #endif // QUANTUM_OPS
