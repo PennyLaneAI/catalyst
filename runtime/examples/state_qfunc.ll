@@ -29,7 +29,7 @@ target triple = "x86_64-pc-linux-gnu"
 @rtd_name_LightningSimulator = internal constant [19 x i8] c"LightningSimulator\00"
 @rtd_name = internal constant [9 x i8] c"rtd_name\00"
 
-declare void @__quantum__rt__device(i8*, i8*)
+declare void @__quantum__rt__device_init(i8*, i8*)
 
 declare void @__quantum__rt__initialize()
 
@@ -57,8 +57,8 @@ declare void @free(i8*)
 define i32 @main() {
   ; Initialize quantum runtime
   call void @__quantum__rt__initialize()
-  call void @__quantum__rt__device(i8* getelementptr ([9 x i8], [9 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name_LightningSimulator, i64 0, i64 0))
-  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([33 x i8], [33 x i8]*  @"rtd_lib_runtime/build/lib/librtd_lightning.so", i64 0, i64 0))
+  call void @__quantum__rt__device_init(i8* getelementptr ([9 x i8], [9 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name_LightningSimulator, i64 0, i64 0))
+  call void @__quantum__rt__device_init(i8* getelementptr ([8 x i8], [8 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([33 x i8], [33 x i8]*  @"rtd_lib_runtime/build/lib/librtd_lightning.so", i64 0, i64 0))
 
   ; Allocate 2 qubits
   %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)

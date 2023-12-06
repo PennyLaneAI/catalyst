@@ -513,7 +513,7 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
                         Catch::Contains("Unsupported functionality"));
 }
 
-TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
+TEST_CASE("Test __quantum__rt__device_init registering the OpenQasm device", "[CoreQIS]")
 {
     __quantum__rt__initialize();
 
@@ -521,9 +521,9 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
     char dev_value[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    __quantum__rt__device_init((int8_t *)dev, (int8_t *)dev_value);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
+    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)dev, (int8_t *)dev_value),
                         Catch::Contains("cannot open shared object file"));
 #endif
 
@@ -534,12 +534,12 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
     char dev_kwargs[20] = "rtd_kwargs";
     char dev_value_kwargs[70] = "device_arn : arn:aws:braket:::device/quantum-simulator/amazon/sv1";
 
-    __quantum__rt__device((int8_t *)dev_kwargs, (int8_t *)dev_value_kwargs);
+    __quantum__rt__device_init((int8_t *)dev_kwargs, (int8_t *)dev_value_kwargs);
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    __quantum__rt__device_init((int8_t *)dev, (int8_t *)dev_value);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
+    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)dev, (int8_t *)dev_value),
                         Catch::Contains("cannot open shared object file:"));
 #endif
 
@@ -551,9 +551,9 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
     char dev_value_lcl[30] = "braket.local.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl);
+    __quantum__rt__device_init((int8_t *)dev_lcl, (int8_t *)dev_value_lcl);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl),
+    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)dev_lcl, (int8_t *)dev_value_lcl),
                         Catch::Contains("cannot open shared object file"));
 #endif
 
