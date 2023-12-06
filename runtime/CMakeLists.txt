@@ -71,11 +71,12 @@ if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
     )
 
     if(NOT cargo_found_status EQUAL "0")
-        message(STATUS "-- To build runtime from source, you also need \"cargo\"")
-        message(STATUS "-- and the \"llvm-tools-preview\" rustup component.")
-        message(STATUS "-- Run the following command to install these dependencies:")
-        message(STATUS "-- $ curl https://sh.rustup.rs -sSf | sh && source \"$HOME/.cargo/env\" && rustup component add llvm-tools-preview")
-        message(FATAL_ERROR "Not found cargo")
+        message(FATAL_ERROR
+            "Missing cargo installation\n"
+            "Please install \"Rust\" and the \"llvm-tools-preview\" rustup component "
+            "for building qir-stdlib from source. See the installation guideline for details: "
+            "https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html"
+            )
     endif()
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
