@@ -112,7 +112,7 @@ finiteshots = [
 
 [compilation]
 qjit_compatible = true
-control_flow = true
+runtime_code_generation = false
 adjoint = true
 quantum_control = false
 mid_circuit_measurement = true

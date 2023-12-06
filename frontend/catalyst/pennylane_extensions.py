@@ -208,11 +208,11 @@ class QJITDevice(qml.QubitDevice):
         return spec["compilation"]["mid_circuit_measurement"]
 
     @staticmethod
-    def _check_control_flow(config):
+    def _check_runtime_code_generation(config):
         with open(config, "rb") as f:
             spec = toml_load(f)
 
-        return spec["compilation"]["control_flow"]
+        return spec["compilation"]["runtime_code_generation"]
 
     @staticmethod
     def _check_adjoint(config):
@@ -235,11 +235,12 @@ class QJITDevice(qml.QubitDevice):
             spec = toml_load(f)
 
         QJITDevice.operations = spec["operations"]["gates"][0]["native"]
+
+        # These are added unconditionally.
+        QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
+
         if QJITDevice._check_mid_circuit_measurement(config):
             QJITDevice.operations += ["MidCircuitMeasure"]
-
-        if QJITDevice._check_control_flow(config):
-            QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
 
         if QJITDevice._check_adjoint(config):
             QJITDevice.operations += ["Adjoint"]
