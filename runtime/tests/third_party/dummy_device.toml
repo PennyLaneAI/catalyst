@@ -1,0 +1,119 @@
+schema = 1
+
+[device]
+name = "dummy.device.qubit"
+precision = ['float32', 'float64']
+
+[operations]
+observables = [
+	"NamedObs",
+	"HermitianObs",
+	"TensorObs",
+	"HamiltonianObs",
+]
+
+# These are gates which are defined in Quantum Instruction Set.
+[[operations.gates]]
+native = [
+        "QubitUnitary",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "MultiRZ",
+        "Hadamard",
+        "S",
+        "T",
+        "CNOT",
+        "SWAP",
+        "CSWAP",
+        "Toffoli",
+        "CY",
+        "CZ",
+        "PhaseShift",
+        "ControlledPhaseShift",
+        "RX",
+        "RY",
+        "RZ",
+        "Rot",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "Identity",
+        "IsingXX",
+        "IsingYY",
+        "IsingZZ",
+        "IsingXY",
+]
+# decomp gates are those which are neither supported natively
+# and are not executed via the applyMatrix operation. Technically
+# they could also be decomposed via applyMatrix.
+decomp = [
+        "SX",
+        "ISWAP",
+        "PSWAP",
+        "SISWAP",
+        "SQISW",
+        "CPhase",
+        # Adjoint'ed gates
+        # which are not in native set must either be decomposed
+        # or applied via matrix.
+        "Adjoint(SX)",
+        "Adjoint(ISWAP)",
+        "Adjoint(SISWAP)",
+        "BasisState",
+        "QubitStateVector",
+        "StatePrep",
+        "ControlledQubitUnitary",
+        "DiagonalQubitUnitary",
+        "SingleExcitation",
+        "SingleExcitationPlus",
+        "SingleExcitationMinus",
+        "DoubleExcitation",
+        "DoubleExcitationPlus",
+        "DoubleExcitationMinus",
+        "QubitCarry",
+        "QubitSum",
+        "OrbitalRotation",
+        "QFT",
+        "ECR",
+        "Adjoint(S)",
+        "Adjoint(T)",
+]
+# QubitUnitary should never be here.
+# Gates in "matrix" are decomposed to QubitUnitary.
+# Having a QubitUnitary here would mean an infinite loop.
+
+# These are gates that appear on the list of supported gates
+# but are not in the list of Quantum Gate Set Instructions in
+# the Catalyst repository.
+# One disadvantage of matrix gates is that they will be lowered to
+# QubitUnitary and QubitUnitary is not differentiable.
+# TODO: Move some of these to native once we add support for them
+# in Catalyst runtime.
+matrix = [
+        "MultiControlledX",
+]
+
+[measurements]
+exactshots = [
+	"Expval",
+	"Var",
+	"Probs",
+	"State",
+]
+finiteshots = [
+	"Expval",
+	"Var",
+	"Probs",
+	"Sample",
+	"Counts",
+]
+
+[compilation]
+qjit_compatible = true
+runtime_code_generation = false
+adjoint = true
+quantum_control = false
+mid_circuit_measurement = true
+dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo
