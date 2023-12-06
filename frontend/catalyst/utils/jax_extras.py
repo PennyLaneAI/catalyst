@@ -695,8 +695,8 @@ class ExpansionStrategy:
     output_force_arg0_outdbidx: bool
 
 
-def while_loop_expansion_strategy():
-    return ExpansionStrategy(None, True, True, False)
+def while_loop_expansion_strategy(preserve_dimensions=False):
+    return ExpansionStrategy(None, not preserve_dimensions, True, False)
 
 def for_loop_expansion_strategy():
     return ExpansionStrategy(None, True, True, True)
@@ -728,9 +728,9 @@ def infer_output_type2(constants:List[TracerLike],
             for d in o.aval.shape:
                 if _is_tracer_like(d) and (d not in seen):
                     impl_outs.append(d)
-                    if not s.output_include_indbidx_vars:
+                    if not s.input_unshare_variables:
                         seen.add(d)
-        if not s.output_include_indbidx_vars:
+        if not s.input_unshare_variables:
             seen.add(o)
 
     all_ins = [*constants, *expanded_inputs]

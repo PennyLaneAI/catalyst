@@ -1210,19 +1210,19 @@ def _cond_lowering(
 #
 @while_p.def_impl
 def _while_loop_def_impl(
-    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, nimplicit
+    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, nimplicit, preserve_dimensions
 ):  # pragma: no cover
     raise NotImplementedError()
 
 
 @while_p.def_abstract_eval
-def _while_loop_abstract_eval(*in_type, body_jaxpr, nimplicit, **kwargs):
+def _while_loop_abstract_eval(*in_type, body_jaxpr, nimplicit, preserve_dimensions, **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
     return infer_output_type(
         [],
         body_jaxpr.jaxpr.invars,
         body_jaxpr.jaxpr.outvars[nimplicit:],
-        expansion_strategy=while_loop_expansion_strategy(),
+        expansion_strategy=while_loop_expansion_strategy(preserve_dimensions),
     )
 
 
@@ -1234,6 +1234,7 @@ def _while_loop_lowering(
     cond_nconsts: int,
     body_nconsts: int,
     nimplicit:int,
+    preserve_dimensions:bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)

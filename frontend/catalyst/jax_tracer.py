@@ -277,10 +277,12 @@ class HybridOp(Operation):
     num_wires = AnyWires
     binder: Callable = _no_binder
 
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
+    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion],
+                 expansion_strategy=None):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
+        self.expansion_strategy = expansion_strategy
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):

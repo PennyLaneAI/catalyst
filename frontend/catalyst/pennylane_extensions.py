@@ -1013,16 +1013,17 @@ class WhileLoop(HybridOp):
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
+        expansion_strategy = self.expansion_strategy
         with EvaluationContext.frame_tracing_context(ctx, cond_trace):
             arg_expanded_classical_tracers = expand_args(
                 self.regions[0].arg_classical_tracers,
-                expansion_strategy=while_loop_expansion_strategy()
+                expansion_strategy=expansion_strategy
             )[0]
             res_expanded_classical_tracers, out_type = expand_results(
                 [],
                 arg_expanded_classical_tracers,
                 self.regions[0].res_classical_tracers,
-                expansion_strategy=while_loop_expansion_strategy()
+                expansion_strategy=expansion_strategy
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
             cond_jaxpr, out_type2, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
@@ -1039,13 +1040,13 @@ class WhileLoop(HybridOp):
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
                 self.regions[1].arg_classical_tracers + [qreg_in],
-                expansion_strategy=while_loop_expansion_strategy()
+                expansion_strategy=expansion_strategy
             )[0]
             res_expanded_tracers, out_type = expand_results(
                 [],
                 arg_expanded_tracers,
                 self.regions[1].res_classical_tracers + [qreg_out],
-                expansion_strategy=while_loop_expansion_strategy(),
+                expansion_strategy=expansion_strategy,
             )
             body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_expanded_tracers
@@ -1056,7 +1057,7 @@ class WhileLoop(HybridOp):
         in_expanded_tracers = [
             *[trace.full_raise(c) for c in (cond_consts + body_consts)],
             *expand_args(self.in_classical_tracers,
-                         expansion_strategy=while_loop_expansion_strategy())[0],
+                         expansion_strategy=expansion_strategy)[0],
             qrp.actualize()
         ]
 
@@ -1066,7 +1067,7 @@ class WhileLoop(HybridOp):
                 [],
                 in_expanded_tracers,
                 self.out_classical_tracers,
-                expansion_strategy=while_loop_expansion_strategy(),
+                expansion_strategy=expansion_strategy,
             )[0]
         )
 
@@ -1081,6 +1082,7 @@ class WhileLoop(HybridOp):
                 cond_nconsts=len(cond_consts),
                 body_nconsts=len(body_consts),
                 nimplicit=nimplicit,
+                preserve_dimensions=not expansion_strategy.input_unshare_variables
             )
         )
         return qrp2
@@ -1654,7 +1656,7 @@ def for_loop(lower_bound, upper_bound, step):
     return _body_query
 
 
-def while_loop(cond_fn):
+def while_loop(cond_fn, preserve_dimensions:bool=False):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
     This decorator provides a functional version of the traditional while
@@ -1717,15 +1719,17 @@ def while_loop(cond_fn):
     [array(-0.02919952), array(2.56)]
     """
 
+    expansion_strategy = while_loop_expansion_strategy(preserve_dimensions)
+
     def _body_query(body_fn):
         def _call_handler(*init_state):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
 
                 cond_wffa, _, cond_out_sig = deduce_avals3(cond_fn, init_state, {},
-                                                           while_loop_expansion_strategy())
+                                                           expansion_strategy)
                 body_wffa, in_sig, out_sig = deduce_avals3(body_fn, init_state, {},
-                                                           while_loop_expansion_strategy())
+                                                           expansion_strategy)
                 in_type = in_sig.in_type
                 in_expanded_classical_tracers = in_sig.in_expanded_args
 
@@ -1774,17 +1778,18 @@ def while_loop(cond_fn):
 
                 WhileLoop(collapse(in_type, in_expanded_classical_tracers),
                           collapse(out_type, out_expanded_classical_tracers),
-                          [cond_region, body_region])
+                          [cond_region, body_region],
+                          expansion_strategy=expansion_strategy)
                 return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
             def _call_with_classical_ctx(ctx):
                 _, _, out_cond_sig = trace_function(
                     ctx, cond_fn, *init_state,
-                    expansion_strategy=while_loop_expansion_strategy()
+                    expansion_strategy=expansion_strategy
                 )
                 _, in_body_sig, out_body_sig = trace_function(
                     ctx, body_fn, *init_state,
-                    expansion_strategy=while_loop_expansion_strategy()
+                    expansion_strategy=expansion_strategy
                 )
 
                 _check_single_bool_value(out_cond_sig.out_tree(),
@@ -1798,7 +1803,8 @@ def while_loop(cond_fn):
                     body_jaxpr=out_body_sig.out_jaxpr(),
                     cond_nconsts=len(out_cond_sig.out_consts()),
                     body_nconsts=len(out_body_sig.out_consts()),
-                    nimplicit=in_body_sig.num_implicit_inputs()
+                    nimplicit=in_body_sig.num_implicit_inputs(),
+                    preserve_dimensions=preserve_dimensions
                 )
                 return tree_unflatten(out_body_sig.out_tree(),
                                       collapse(out_body_sig.out_type(), out_expanded_tracers))
