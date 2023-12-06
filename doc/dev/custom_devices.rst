@@ -187,11 +187,11 @@ Below is an example configuration file
         schema = 1
 
         [device]
-        name = "dummy.device"
-        version = "v0.32.0"
+        name = "dummy.device.qubit"
         precision = ['float32', 'float64']
 
         [operations]
+        # Observables supported by the device
         observables = [
                 "NamedObs",
                 "HermitianObs",
@@ -199,63 +199,98 @@ Below is an example configuration file
                 "HamiltonianObs",
         ]
 
+        # Operations supported by the device in the C interface.
         [[operations.gates]]
-        full = [
-                "Identity",
+        native = [
+                "QubitUnitary",
                 "PauliX",
                 "PauliY",
                 "PauliZ",
+                "MultiRZ",
                 "Hadamard",
                 "S",
                 "T",
+                "CNOT",
+                "SWAP",
+                "CSWAP",
+                "Toffoli",
+                "CY",
+                "CZ",
                 "PhaseShift",
+                "ControlledPhaseShift",
                 "RX",
                 "RY",
                 "RZ",
                 "Rot",
-                "CNOT",
-                "CY",
-                "CZ",
-                "SWAP",
-                "IsingXX",
-                "IsingXY",
-                "IsingYY",
-                "IsingZZ",
-                "ControlledPhaseShift",
                 "CRX",
                 "CRY",
                 "CRZ",
                 "CRot",
-                "Toffoli",
-                "CSWAP",
-                "MultiRZ",
+                "Identity",
+                "IsingXX",
+                "IsingYY",
+                "IsingZZ",
+                "IsingXY",
         ]
 
-        # Gates which should be decomposed to qml.QubitUnitary.
-        matrix = [
-                "OrbitalRotation",
-                "MultiControlledX",
-                "DoubleExcitation",
-                "DoubleExcitationMinus",
-                "DoubleExcitationPlus",
+        # Gates that should be decomposed
+        decomp = [
+                "SX",
+                "ISWAP",
+                "PSWAP",
+                "SISWAP",
+                "SQISW",
+                "CPhase",
+                "BasisState",
+                "QubitStateVector",
+                "StatePrep",
+                "ControlledQubitUnitary",
+                "DiagonalQubitUnitary",
                 "SingleExcitation",
-                "SingleExcitationMinus",
                 "SingleExcitationPlus",
+                "SingleExcitationMinus",
+                "DoubleExcitation",
+                "DoubleExcitationPlus",
+                "DoubleExcitationMinus",
+                "QubitCarry",
+                "QubitSum",
+                "OrbitalRotation",
+                "QFT",
+                "ECR",
+        ]
+        # QubitUnitary should never be here.
+        # Gates in "matrix" are decomposed to QubitUnitary.
+        # Having a QubitUnitary here would mean an infinite loop.
+        matrix = [
+                # Gates which should be translated to QubitUnitary
+                "MultiControlledX",
         ]
 
         [measurements]
         exactshots = [
                 "Expval",
                 "Var",
+                "Probs",
+                "State",
         ]
         finiteshots = [
+                "Expval",
+                "Var",
                 "Probs",
                 "Sample",
-                "Measure",
+                "Counts",
         ]
 
         [compilation]
+        # If the device is compatible with qjit
         qjit_compatible = true
-        control_flow = true
-        dynamic_qubit_management = false
-
+        # If the device supports run time code generation
+        runtime_code_generation = false
+        # If the device supports adjoint
+        adjoint = true
+        # If the device supports quantum control instructions natively
+        quantum_control = false
+        # If the device supports mid circuit measurements natively
+        mid_circuit_measurement = true
+        # If the device supports dynamic qubits
+        dynamic_qubit_management = false 
