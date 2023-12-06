@@ -489,24 +489,24 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 # qdevice
 #
 @qdevice_p.def_impl
-def _qdevice_def_impl(ctx, spec, val):  # pragma: no cover
+def _qdevice_def_impl(ctx, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(spec, val):
+def _qdevice_abstract_eval(rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, spec, val):
+def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    backend_attr = ir.StringAttr.get(spec)
-    backend_val = "default" if val == "qjit.device" else val
-    val_attr = ir.StringAttr.get(backend_val)
-
-    DeviceOp(specs=ir.ArrayAttr.get([backend_attr, val_attr]))
+    DeviceOp(
+        specs=ir.ArrayAttr.get(
+            [ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs)]
+        )
+    )
 
     return ()
 

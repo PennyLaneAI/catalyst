@@ -109,26 +109,32 @@ struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
         auto specs = op.getSpecs(); // maybe {} for using the default backend device
         if (specs && !specs->empty()) {
             const auto args = specs.value();
-            StringRef qirName = "__quantum__rt__device"; // (int8_t *, int8_t *) -> void
+            StringRef qirName =
+                "__quantum__rt__device_init"; // (int8_t *, int8_t *, int8_t *) -> void
 
             Type intPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
-            Type qirSignature =
-                LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {intPtrType, intPtrType});
+            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                            {/* rtd_lib = */ intPtrType,
+                                                             /* rtd_name = */ intPtrType,
+                                                             /* rtd_kwargs = */ intPtrType});
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-            for (size_t i = 0; i < args.size() - 1; i += 2) {
-                auto spec = args[i].cast<StringAttr>().getValue().str();
-                auto value = args[i + 1].cast<StringAttr>().getValue().str();
+            auto rtd_lib = args[0].cast<StringAttr>().getValue().str();
+            auto rtd_name = args[1].cast<StringAttr>().getValue().str();
+            auto rtd_kwargs = args[2].cast<StringAttr>().getValue().str();
 
-                SmallVector<Value> operands = {
-                    getGlobalString(loc, rewriter, spec, StringRef(spec.c_str(), spec.length() + 1),
-                                    mod),
-                    getGlobalString(loc, rewriter, spec + "_" + value,
-                                    StringRef(value.c_str(), value.length() + 1), mod)};
+            auto rtd_lib_gs = getGlobalString(
+                loc, rewriter, rtd_lib, StringRef(rtd_lib.c_str(), rtd_lib.length() + 1), mod);
+            auto rtd_name_gs = getGlobalString(
+                loc, rewriter, rtd_name, StringRef(rtd_name.c_str(), rtd_name.length() + 1), mod);
+            auto rtd_kwargs_gs =
+                getGlobalString(loc, rewriter, rtd_kwargs,
+                                StringRef(rtd_kwargs.c_str(), rtd_kwargs.length() + 1), mod);
 
-                rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
-            }
+            SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
+
+            rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
         }
 
         rewriter.eraseOp(op);
