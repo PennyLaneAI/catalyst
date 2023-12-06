@@ -111,6 +111,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         });
 
         quantum::removeQuantumMeasurements(paramCountFn);
+        paramCountFn->setAttr("QuantumFree", rewriter.getUnitAttr());
     }
 
     return paramCountFn;
@@ -195,6 +196,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         });
 
         quantum::removeQuantumMeasurements(splitFn);
+        splitFn->setAttr("QuantumFree", rewriter.getUnitAttr());
     }
 
     return splitFn;
@@ -282,6 +284,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         });
 
         quantum::removeQuantumMeasurements(argMapFn);
+        argMapFn->setAttr("QuantumFree", rewriter.getUnitAttr());
     }
 
     return argMapFn;
