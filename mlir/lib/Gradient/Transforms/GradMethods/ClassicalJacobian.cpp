@@ -25,7 +25,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 namespace catalyst {
 namespace gradient {

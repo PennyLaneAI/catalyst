@@ -39,7 +39,7 @@
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
