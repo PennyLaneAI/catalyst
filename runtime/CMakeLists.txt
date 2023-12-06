@@ -65,10 +65,18 @@ if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
     FetchContent_MakeAvailable(qir_runner)
 
     execute_process(
-        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR}
+        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR} RESULT_VARIABLE cargo_found_status
         COMMAND ${CMAKE_COMMAND} -E copy ./stdlib/include/qir_stdlib.h ${qir_runner_BINARY_DIR}/release/qir_stdlib.h
         WORKING_DIRECTORY ${qir_runner_SOURCE_DIR}
     )
+
+    if(NOT cargo_found_status EQUAL "0")
+        message(STATUS "-- To build runtime from source, you also need \"cargo\"")
+        message(STATUS "-- and the \"llvm-tools-preview\" rustup component.")
+        message(STATUS "-- Run the following command to install these dependencies:")
+        message(STATUS "-- $ curl https://sh.rustup.rs -sSf | sh && source \"$HOME/.cargo/env\" && rustup component add llvm-tools-preview")
+        message(FATAL_ERROR "Not found cargo")
+    endif()
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
 elseif(NOT DEFINED QIR_STDLIB_PATH)
