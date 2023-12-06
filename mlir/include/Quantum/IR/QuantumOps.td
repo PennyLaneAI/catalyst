@@ -183,7 +183,7 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
+        Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
         mlir::ValueRange getQubitOperands() {
@@ -205,7 +205,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
+def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -232,7 +232,7 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
+def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -260,7 +260,7 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -295,9 +295,10 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
 
 // -----
 
-class Observable_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
+class Observable_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [Pure]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis", [Pure]> {
+def ComputationalBasisOp : Observable_Op<"compbasis"> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
@@ -329,7 +330,7 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [Pure]> {
     }];
 }
 
-def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
+def NamedObsOp : Observable_Op<"namedobs"> {
     let summary = "Define a Named observable for use in measurements";
     let description = [{
         The `quantum.namedobs` operation defines a quantum observable to be used by measurement
@@ -362,7 +363,7 @@ def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
     }];
 }
 
-def HermitianOp : Observable_Op<"hermitian", [Pure]> {
+def HermitianOp : Observable_Op<"hermitian"> {
     let summary = "Define a Hermitian observable for use in measurements";
     let description = [{
         The `quantum.hermitian` operation defines a quantum observable to be used by measurement
@@ -388,7 +389,7 @@ def HermitianOp : Observable_Op<"hermitian", [Pure]> {
     let hasVerifier = 1;
 }
 
-def TensorOp : Observable_Op<"tensor", [Pure]> {
+def TensorOp : Observable_Op<"tensor"> {
     let summary = "Define a tensor product of observables for use in measurements";
     let description = [{
         The `quantum.tensor` operation defines a quantum observable to be used by other
@@ -422,7 +423,7 @@ def TensorOp : Observable_Op<"tensor", [Pure]> {
     }];
 }
 
-def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
+def HamiltonianOp : Observable_Op<"hamiltonian"> {
     let summary = "Define a Hamiltonian observable for use in measurements";
     let description = [{
         The `quantum.hamiltonian` operation defines a quantum observable to be used by other
