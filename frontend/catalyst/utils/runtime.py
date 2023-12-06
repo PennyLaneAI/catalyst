@@ -25,6 +25,7 @@ import pennylane as qml
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.toml import toml_load
 
 package_root = os.path.dirname(__file__)
 
@@ -102,11 +103,11 @@ def extract_backend_info(device):
                 device._s3_folder  # pylint: disable=protected-access
             )
 
-    if hasattr(device, "_mcmc"):
-        device_kwargs["mcmc"] = device._mcmc
-    if hasattr(device, "_num_burnin"):
-        device_kwargs["num_burnin"] = device._num_burnin
-    if hasattr(device, "_kernel_name"):
-        device_kwargs["kernel_name"] = device._kernel_name
+    with open(device.config, "rb") as f:
+        spec = toml_load(f)
+
+    for k, v in spec["options"].items():
+        if hasattr(device, v):
+            device_kwargs[k] = getattr(device, v)
 
     return device_name, device_lpath, device_kwargs, device.config
