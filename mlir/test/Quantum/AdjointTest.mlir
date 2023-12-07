@@ -105,13 +105,14 @@ func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
 
 func.func @workflow_unhandled() {
   %0 = quantum.alloc(1) : !quantum.reg
-  quantum.adjoint (%0) : !quantum.reg {
+  %1 = quantum.adjoint (%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %qb = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
     // expected-error@+1 {{Unhandled operation in adjoint region}}
     quantum.measure %qb : i1, !quantum.bit
     quantum.yield %arg0 : !quantum.reg
   }
+  quantum.dealloc %1 : !quantum.reg
   return
 }
 

@@ -32,6 +32,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -60,6 +61,19 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(gradientPatterns)))) {
             return signalPassFailure();
+        }
+
+        // Guarantee that functions intended to be free of quantum ops are indeed so after folding.
+        for (Region &region : getOperation()->getRegions()) {
+            for (Operation &op : region.getOps()) {
+                if (isa<func::FuncOp>(op) && op.hasAttr("QuantumFree"))
+                    if (failed(quantum::verifyQuantumFree(cast<func::FuncOp>(op)))) {
+                        op.emitOpError() << "cloned during the gradient pass is not free of "
+                                            "quantum ops:\n"
+                                         << op;
+                        return signalPassFailure();
+                    }
+            }
         }
     }
 };
