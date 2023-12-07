@@ -110,7 +110,6 @@ __all__ = (
     "deduce_avals3",
     "infer_output_type_python",
     "infer_output_type_jaxpr",
-    "infer_output_type2",
     "infer_lambda_input_type",
     "expand_args",
     "expand_results",
@@ -702,12 +701,12 @@ def default_expansion_strategy(axes_spec):
     return ExpansionStrategy(axes_spec, False, False, False)
 
 
-def infer_output_type2(constants:List[TracerLike],
-                       expanded_inputs:List[TracerLike],
-                       outputs:List[TracerLike],
-                       expansion_strategy:ExpansionStrategy,
-                       num_implicit_inputs:int|None = None
-                       ) -> Tuple[List[TracerLike], OutputType]:
+def infer_output_type(constants:List[TracerLike],
+                      expanded_inputs:List[TracerLike],
+                      outputs:List[TracerLike],
+                      expansion_strategy:ExpansionStrategy,
+                      num_implicit_inputs:int|None = None
+                      ) -> Tuple[List[TracerLike], OutputType]:
     """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
     we mean either Jax tracers or Jaxpr variables. """
     s = expansion_strategy
@@ -763,7 +762,7 @@ def infer_output_type_jaxpr(constants:List[TracerLike],
                             num_implicit_inputs:int|None = None
                             ) -> OutputType:
 
-    _, out_type = infer_output_type2(constants,
+    _, out_type = infer_output_type(constants,
                                      expanded_inputs,
                                      outputs,
                                      expansion_strategy,
@@ -780,13 +779,13 @@ def infer_output_type_python(expanded_inputs:List[TracerLike],
     trace:DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
-    expanded_outputs, out_type1 = infer_output_type2(
+    expanded_outputs, out_type1 = infer_output_type(
         [], expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
     )
 
     jaxpr, out_type_, consts = trace.frame.to_jaxpr2(expanded_outputs)
 
-    expanded_outputs2, out_type2 = infer_output_type2(
+    expanded_outputs2, out_type2 = infer_output_type(
         [trace.full_raise(t) for t in consts],
         expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
     )
@@ -822,7 +821,7 @@ def expand_results(
     expansion_strategy:ExpansionStrategy,
     num_implicit_inputs:int|None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
-    return infer_output_type2(constants, expanded_inputs, results, expansion_strategy,
+    return infer_output_type(constants, expanded_inputs, results, expansion_strategy,
                               num_implicit_inputs)
 
 
