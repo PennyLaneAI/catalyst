@@ -319,6 +319,45 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", Sim
     CHECK(sim->Expval(tpxz) == Approx(-1.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    std::unique_ptr<TestType> sim0 = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+        Qs.push_back(sim0->AllocateQubit());
+    }
+
+    sim->SetDeviceShots(1000);
+    
+    
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+    //sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+
+    sim0->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim0->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim0->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+    //sim0->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType tpxy = sim->TensorObservable({px, py});
+
+    ObsIdType px0 = sim0->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py0 = sim0->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType tpxy0 = sim0->TensorObservable({px0, py0});
+
+    CHECK(sim->Expval(tpxy, sim->GetDeviceShots(), {}) == Approx(sim0->Expval(tpxy0)).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
