@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from catalyst.pennylane_extensions import QJITDevice
 from catalyst.utils.exceptions import CompileError
 
