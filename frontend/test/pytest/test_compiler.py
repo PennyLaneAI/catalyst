@@ -35,6 +35,7 @@ from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
+from catalyst.utils.runtime import get_lib_path
 
 # pylint: disable=missing-function-docstring
 
@@ -262,11 +263,14 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
-    @pytest.mark.skip(reason="skip this test with the plugin system on CI")
     def test_compiler_from_textual_ir(self):
         """Test the textual IR compilation."""
+        full_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        extension = ".so" if platform.system() == "Linux" else ".dylib"
 
-        ir = r"""
+        # pylint: disable=line-too-long
+        ir = (
+            r"""
 module @workflow {
   func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
     %0 = call @workflow(%arg0) : (tensor<f64>) -> tensor<f64>
@@ -275,7 +279,12 @@ module @workflow {
   func.func private @workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "finite-diff", llvm.linkage = #llvm.linkage<internal>, qnode} {
     quantum.device ["rtd_kwargs", "{'shots': 0}"]
     quantum.device ["rtd_name", "LightningSimulator"]
-    quantum.device ["rtd_lib", "./runtime/build/lib/librtd_lightning.so"]
+    quantum.device ["rtd_lib", """
+            + r'"'
+            + full_path
+            + r"""/librtd_lightning"""
+            + extension
+            + """"]
     %0 = stablehlo.constant dense<4> : tensor<i64>
     %1 = quantum.alloc( 4) : !quantum.reg
     %2 = stablehlo.constant dense<0> : tensor<i64>
@@ -303,6 +312,7 @@ module @workflow {
   }
 }
 """
+        )
         compiled_function = qjit(ir)
         assert compiled_function(0.1) == -1
 

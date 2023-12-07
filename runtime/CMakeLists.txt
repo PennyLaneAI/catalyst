@@ -65,10 +65,19 @@ if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
     FetchContent_MakeAvailable(qir_runner)
 
     execute_process(
-        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR}
+        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR} RESULT_VARIABLE cargo_found_status
         COMMAND ${CMAKE_COMMAND} -E copy ./stdlib/include/qir_stdlib.h ${qir_runner_BINARY_DIR}/release/qir_stdlib.h
         WORKING_DIRECTORY ${qir_runner_SOURCE_DIR}
     )
+
+    if(NOT cargo_found_status EQUAL "0")
+        message(FATAL_ERROR
+            "Missing cargo installation\n"
+            "Please install \"Rust\" and the \"llvm-tools-preview\" rustup component "
+            "for building qir-stdlib from source. See the installation guideline for details: "
+            "https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html"
+            )
+    endif()
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
 elseif(NOT DEFINED QIR_STDLIB_PATH)
