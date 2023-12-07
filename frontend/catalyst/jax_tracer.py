@@ -101,6 +101,7 @@ class Function:
         retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(out_tree, retval)
 
+
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p, qinst_p}
