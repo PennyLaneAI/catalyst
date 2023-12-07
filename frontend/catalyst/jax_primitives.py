@@ -62,7 +62,7 @@ from pennylane import QNode as pennylane_QNode
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.jax_extras import (
-    ClosedJaxpr, DynshapePrimitive, infer_output_type, out_type_shift_indbidx,
+    ClosedJaxpr, DynshapePrimitive, infer_output_type_jaxpr, out_type_shift_indbidx,
     out_type_force_outdbidx,
     for_loop_expansion_strategy,
     while_loop_expansion_strategy,
@@ -1218,7 +1218,7 @@ def _while_loop_def_impl(
 @while_p.def_abstract_eval
 def _while_loop_abstract_eval(*in_type, body_jaxpr, nimplicit, preserve_dimensions, **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
-    return infer_output_type(
+    return infer_output_type_jaxpr(
         [],
         body_jaxpr.jaxpr.invars,
         body_jaxpr.jaxpr.outvars[nimplicit:],
@@ -1304,7 +1304,7 @@ def _for_loop_abstract_eval(*args, body_jaxpr,
                             **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
 
-    return infer_output_type(
+    return infer_output_type_jaxpr(
         [],
         body_jaxpr.jaxpr.invars,
         body_jaxpr.jaxpr.outvars[nimplicit:],

@@ -544,7 +544,6 @@ class TestInterpretationControlFlow:
             return res
 
         assert fun(0) == 0
-        assert False
 
 
     def test_for_loop_acc(self):

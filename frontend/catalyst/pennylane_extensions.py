@@ -1742,6 +1742,7 @@ def while_loop(cond_fn, preserve_dimensions:bool=False):
 
                     out_type = cond_out_sig.out_type()
                     out_tree = cond_out_sig.out_tree()
+                    out_cond_consts = cond_out_sig.out_consts()
 
                     cond_region = HybridOpRegion(
                         cond_trace, None,
@@ -1763,7 +1764,7 @@ def while_loop(cond_fn, preserve_dimensions:bool=False):
 
                     out_type = out_sig.out_type()
                     out_tree = out_sig.out_tree()
-                    out_consts = out_sig.out_consts()
+                    out_body_consts = out_sig.out_consts()
 
                     body_region = HybridOpRegion(
                         body_trace, quantum_tape,
@@ -1772,7 +1773,9 @@ def while_loop(cond_fn, preserve_dimensions:bool=False):
                     )
 
                 out_expanded_classical_tracers = output_type_to_tracers(
-                    out_type, out_consts, in_expanded_classical_tracers,
+                    out_type,
+                    [*out_cond_consts, *out_body_consts],
+                    in_expanded_classical_tracers,
                     maker=lambda aval: new_inner_tracer(outer_trace, aval)
                 )
 
@@ -1795,7 +1798,9 @@ def while_loop(cond_fn, preserve_dimensions:bool=False):
                 _check_single_bool_value(out_cond_sig.out_tree(),
                                          out_cond_sig.out_jaxpr().out_avals)
 
-                in_expanded_tracers = [*out_body_sig.out_consts(), *in_body_sig.in_expanded_args]
+                in_expanded_tracers = [*out_cond_sig.out_consts(),
+                                       *out_body_sig.out_consts(),
+                                       *in_body_sig.in_expanded_args]
 
                 out_expanded_tracers = while_p.bind(
                     *in_expanded_tracers,

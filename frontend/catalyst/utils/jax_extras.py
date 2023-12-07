@@ -108,7 +108,8 @@ __all__ = (
     "deduce_avals",
     "deduce_avals2",
     "deduce_avals3",
-    "infer_output_type",
+    "infer_output_type_python",
+    "infer_output_type_jaxpr",
     "infer_output_type2",
     "infer_lambda_input_type",
     "expand_args",
@@ -321,7 +322,7 @@ def expanded_fun2(static_args, *args_expanded):
     args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
     num_implicit_inputs = len([() for _,k in in_type if not k])
-    all_outs, out_sig = infer_output_type3(
+    all_outs, out_sig = infer_output_type_python(
         args_expanded, res_flat, expansion_strategy, num_implicit_inputs
     )
     yield all_outs, out_sig
@@ -427,10 +428,6 @@ def jaxpr_to_mlir(func_name, jaxpr):
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
     """
-
-    print("JJJJJJJJJJ")
-    print(jaxpr)
-    print("JJJJJJJJJJ")
 
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
@@ -759,12 +756,12 @@ def infer_output_type2(constants:List[TracerLike],
     return all_outs, out_type
 
 
-def infer_output_type(constants:List[TracerLike],
-                      expanded_inputs:List[TracerLike],
-                      outputs:List[TracerLike],
-                      expansion_strategy,
-                      num_implicit_inputs:int|None = None
-                      ) -> OutputType:
+def infer_output_type_jaxpr(constants:List[TracerLike],
+                            expanded_inputs:List[TracerLike],
+                            outputs:List[TracerLike],
+                            expansion_strategy,
+                            num_implicit_inputs:int|None = None
+                            ) -> OutputType:
 
     _, out_type = infer_output_type2(constants,
                                      expanded_inputs,
@@ -774,11 +771,11 @@ def infer_output_type(constants:List[TracerLike],
     return out_type
 
 
-def infer_output_type3(expanded_inputs:List[TracerLike],
-                       outputs:List[TracerLike],
-                       expansion_strategy:ExpansionStrategy,
-                       num_implicit_inputs:int
-                       ) -> OutputType:
+def infer_output_type_python(expanded_inputs:List[TracerLike],
+                             outputs:List[TracerLike],
+                             expansion_strategy:ExpansionStrategy,
+                             num_implicit_inputs:int
+                             ) -> OutputType:
 
     trace:DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
@@ -825,7 +822,8 @@ def expand_results(
     expansion_strategy:ExpansionStrategy,
     num_implicit_inputs:int|None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
-    return infer_output_type2(constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs)
+    return infer_output_type2(constants, expanded_inputs, results, expansion_strategy,
+                              num_implicit_inputs)
 
 
 def collapse(typ:InputType|OutputType, params:List[TracerLike]) -> List[TracerLike]:
