@@ -98,7 +98,7 @@ class Function:
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(shape_tree, retval)
 
 

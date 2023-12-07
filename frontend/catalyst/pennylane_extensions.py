@@ -116,7 +116,7 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         qnode = None
-        if isinstance(self, qml.QNode):
+        if isinstance(self, QNode):
             qnode = self
             device = QJITDevice(
                 self.device.shots, self.device.wires, *extract_backend_info(self.device)
@@ -343,32 +343,40 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
-            # The Python function is stored in the "fn" parameter of func_p JAXPR primitives.
-            fn = eqn.params.get("fn")
-            if fn and fn not in visited:
-                child = eqn.params.get("call_jaxpr", None)
-                if isinstance(fn, (qml.QNode, Grad)):
-                    _check_created_jaxpr_gradient_methods(fn, method, child)
-                if child and child not in visited:
-                    traverse_children(child)
-            visited.add(fn)
+            primitive = eqn.primitive
+            if primitive is func_p:
+                child_jaxpr = eqn.params.get("call_jaxpr")
+            elif primitive is grad_p:
+                child_jaxpr = eqn.params.get("jaxpr")
+            else:
+                continue
+
+            _check_primitive_is_differentiable(primitive, method)
+
+            py_callable = eqn.params.get("fn")
+            if py_callable not in visited:
+                if isinstance(py_callable, QNode):
+                    _check_qnode_against_grad_method(py_callable, method, child_jaxpr)
+                traverse_children(child_jaxpr)
+                visited.add(py_callable)
 
     traverse_children(jaxpr)
 
 
-def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
+def _check_primitive_is_differentiable(primitive, method):
+    """Verify restriction on primitives in the call graph of a Grad operation."""
+
+    if primitive is grad_p and method != "fd":
+        raise DifferentiableCompileError(
+            "Only finite difference can compute higher order derivatives."
+        )
+
+
+def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
     """Additional checks for the given jaxpr of a differentiable function."""
     if method == "fd":
         return
 
-    if isinstance(f, Grad):
-        raise DifferentiableCompileError(
-            "Only finite difference can compute higher order derivatives"
-        )
-
-    assert isinstance(
-        f, qml.QNode
-    ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
     return_ops = []
     for res in jaxpr.outvars:
         for eq in reversed(jaxpr.eqns):  # pragma: no branch
@@ -378,8 +386,8 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
 
     if f.diff_method is None:
         raise DifferentiableCompileError(
-            "Cannot differentiate a QNode explicitly marked non-differentiable (with"
-            " diff_method=None)"
+            "Cannot differentiate a QNode explicitly marked non-differentiable (with "
+            "diff_method=None)."
         )
 
     if f.diff_method == "parameter-shift" and any(
@@ -389,6 +397,7 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
             "The parameter-shift method can only be used for QNodes "
             "which return either qml.expval or qml.probs."
         )
+
     if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
         raise DifferentiableCompileError(
             "The adjoint method can only be used for QNodes which return qml.expval."
@@ -457,7 +466,7 @@ class Grad:
         args_data, _ = tree_flatten(args)
 
         # It always returns list as required by catalyst control-flows
-        return grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
+        return grad_p.bind(*args_data, jaxpr=jaxpr, fn=self.fn, grad_params=self.grad_params)
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
