@@ -21,6 +21,7 @@ from typing import Dict, Iterable, List
 
 import jax
 import numpy as np
+import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
@@ -57,7 +58,6 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -244,7 +244,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
     func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
 
-    if isinstance(fn, pennylane_QNode):
+    if isinstance(fn, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
         # "best", the default option in PennyLane, chooses backprop on the device
         # if supported and parameter-shift otherwise. Emulating the same behaviour
@@ -350,8 +350,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnum)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
 
-    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn.fn, call=False)
-    symbol_name = mlir_fn_cache[fn.fn]
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
