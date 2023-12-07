@@ -112,11 +112,11 @@ struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
             StringRef qirName =
                 "__quantum__rt__device_init"; // (int8_t *, int8_t *, int8_t *) -> void
 
-            Type intPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
+            Type charPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                                            {/* rtd_lib = */ intPtrType,
-                                                             /* rtd_name = */ intPtrType,
-                                                             /* rtd_kwargs = */ intPtrType});
+                                                            {/* rtd_lib = */ charPtrType,
+                                                             /* rtd_name = */ charPtrType,
+                                                             /* rtd_kwargs = */ charPtrType});
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
