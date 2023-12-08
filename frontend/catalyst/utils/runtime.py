@@ -96,11 +96,24 @@ def check_no_overlap(*args):
     raise CompileError(msg)
 
 
+def check_full_overlap(device, *args):
+    gates_in_device = set(device.operations)
+    set_of_sets = [set(arg) for arg in args]
+    union = set.union(*set_of_sets)
+    intersection = union.intersection(gates_in_device)
+    if union == intersection:
+        return
+
+    msg = "Gates in qml.device.operations and specification file do not match"
+    raise CompileError(msg)
+
+
 def check_gates_are_compatible_with_device(device, config):
     native = get_native_gates(config)
     decomposable = get_decomposable_gates(config)
     matrix = get_matrix_decomposable_gates(config)
     check_no_overlap(native, decomposable, matrix)
+    check_full_overlap(device, native, decomposable, matrix)
 
 
 def validate_config_with_device(device):
