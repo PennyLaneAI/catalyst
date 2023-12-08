@@ -18,7 +18,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 using namespace mlir;
 
@@ -55,6 +55,24 @@ void removeQuantumMeasurements(func::FuncOp &function)
             opsToDelete.push_back(currentOp);
         }
     }
+}
+
+LogicalResult verifyQuantumFree(func::FuncOp function)
+{
+    assert(function->hasAttr("QuantumFree") &&
+           "verifying function that doesn't have QuantumFree attribute");
+
+    WalkResult result = function.walk([&](Operation *op) {
+        if (isa<QuantumDialect>(op->getDialect()))
+            return WalkResult::interrupt();
+        return WalkResult::advance();
+    });
+
+    if (result.wasInterrupted())
+        return failure();
+
+    function->removeAttr("QuantumFree");
+    return success();
 }
 
 } // namespace quantum

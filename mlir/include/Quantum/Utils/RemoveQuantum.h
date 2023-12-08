@@ -20,6 +20,7 @@ namespace catalyst {
 namespace quantum {
 
 void removeQuantumMeasurements(mlir::func::FuncOp &function);
+mlir::LogicalResult verifyQuantumFree(mlir::func::FuncOp function);
 
 } // namespace quantum
 } // namespace catalyst
