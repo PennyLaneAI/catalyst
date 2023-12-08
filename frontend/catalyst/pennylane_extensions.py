@@ -129,6 +129,7 @@ class QFunc:
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
         toml_file_name = name.replace(".", "_") + ".toml"
+        # And they are currently saved in the following directory.
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
         device.config = toml_file
 
