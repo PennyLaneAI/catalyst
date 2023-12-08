@@ -42,8 +42,8 @@
 
 <h3>Improvements</h3>
 
-* Catalyst gradient functions ``grad``, ``jacobian``, ``jvp``, and ``vjp`` can now be invoked from
-  outside a ``@qjit`` context. This simplifies the process of writing functions where compilation
+* Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
+  outside a `@qjit` context. This simplifies the process of writing functions where compilation
   can be turned on and off easily by adding or removing the decorator. The functions dispatch to
   their JAX equivalents when the compilation is turned off.
   [(#375)](https://github.com/PennyLaneAI/catalyst/pull/375)
