@@ -15,20 +15,19 @@
 import tempfile
 from pathlib import Path
 
-from pennylane_lightning.lightning_qubit.lightning_qubit import LightningQubit
 import pytest
-
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
+    check_device_config,
     check_no_overlap,
     check_qjit_compatibility,
-    check_device_config,
-    get_native_gates,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_native_gates,
 )
 from catalyst.utils.toml import toml_load
+from pennylane_lightning.lightning_qubit.lightning_qubit import LightningQubit
 
 
 def test_toml_file():
