@@ -156,7 +156,6 @@ The ``get_c_interface`` method should be a static method that takes no parameter
         short_name = "dummy.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
-        author = "Dummy"
         author = "An Author"
         config = pathlib.Path("absolute/path/to/configuration/file.toml")
 
@@ -199,7 +198,7 @@ Below is an example configuration file
                 "HamiltonianObs",
         ]
 
-        # Operations supported by the device in the C interface.
+        # Operations that shouldn't be decomposed.
         [[operations.gates]]
         native = [
                 "QubitUnitary",
@@ -233,7 +232,8 @@ Below is an example configuration file
                 "IsingXY",
         ]
 
-        # Gates that should be decomposed
+        # Operations that should be decomposed according to
+        # whatever algorithm PL specifies.
         decomp = [
                 "SX",
                 "ISWAP",
@@ -258,11 +258,8 @@ Below is an example configuration file
                 "QFT",
                 "ECR",
         ]
-        # QubitUnitary should never be here.
-        # Gates in "matrix" are decomposed to QubitUnitary.
-        # Having a QubitUnitary here would mean an infinite loop.
+        # Gates which should be translated to QubitUnitary
         matrix = [
-                # Gates which should be translated to QubitUnitary
                 "MultiControlledX",
         ]
 
