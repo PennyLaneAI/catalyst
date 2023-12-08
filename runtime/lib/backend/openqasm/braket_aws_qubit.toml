@@ -6,9 +6,12 @@ precision = ['float64']
 
 [operations]
 observables = [
-	"NamedObs",
-	"HermitianObs",
-	"TensorObs",
+	"PauliX",
+	"PauliY",
+	"PauliZ",
+	"Hadamard",
+	"Hermitian",
+	"Tensor",
 ]
 
 # These are gates that are natively supported by the device.
@@ -35,6 +38,9 @@ native = [
         "RZ",
         "CSWAP",
 ]
+
+decomp = []
+
 # QubitUnitary should never be here.
 # Gates in "matrix" are decomposed to QubitUnitary.
 # Having a QubitUnitary here would mean an infinite loop.

@@ -6,10 +6,14 @@ precision = ['float64']
 
 [operations]
 observables = [
-	"NamedObs",
-	"HermitianObs",
-	"TensorObs",
+	"PauliX",
+	"PauliY",
+	"PauliZ",
+	"Hadamard",
+	"Hermitian",
+	"Tensor",
 ]
+
 
 # These are gates that are natively supported by the device.
 [[operations.gates]]
@@ -17,7 +21,8 @@ native = [
 	# These two are native but are not supported by the QIR runtime yet.
 	# This is not a problem because we intersect the native gate set
 	# with the gate set supported by the QIR runtime.
-	# But it means that the compiler cannot use all native gates.
+	# But it means that the compiler cannot use all native gates yet.
+	# See https://github.com/PennyLaneAI/catalyst/issues/395
         "ISWAP",
         "PSWAP",
 
@@ -38,6 +43,8 @@ native = [
 	# The "braket.local.qubit" device does support QubitUnitary
 	"QubitUnitary",
 ]
+
+decomp = []
 
 # QubitUnitary should never be here.
 # Gates in "matrix" are decomposed to QubitUnitary.
