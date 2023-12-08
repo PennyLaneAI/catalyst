@@ -15,7 +15,7 @@
 Runtime utility methods.
 """
 
-# pylint: disable=protected-access,too-many-branches
+# pylint: disable=too-many-branches
 
 import os
 import pathlib
@@ -56,6 +56,15 @@ def get_lib_path(project, env_var):
 
 
 def check_qjit_compatibility(device, config):
+    """Check that the device is qjit compatible.
+
+    Args:
+        device (qml.Device): An instance of a quantum device.
+        config (Dict[Str, Any]): Configuration dictionary.
+
+    Raises:
+        CompileError
+    """
     if config["compilation"]["qjit_compatible"]:
         return
 
@@ -65,6 +74,14 @@ def check_qjit_compatibility(device, config):
 
 
 def check_device_config(device):
+    """Check that the device configuration exists.
+
+    Args:
+        device (qml.Device): An instance of a quantum device.
+
+    Raises:
+        CompileError
+    """
     if hasattr(device, "config") and device.config.exists():
         return
 
@@ -74,18 +91,42 @@ def check_device_config(device):
 
 
 def get_native_gates(config):
+    """Get gates that are natively supported by the device and therefore do not need to be
+    decomposed.
+
+    Args:
+        config (Dict[Str, Any]): Configuration dictionary
+    """
     return config["operations"]["gates"][0]["native"]
 
 
 def get_decomposable_gates(config):
+    """Get gates that will be decomposed according to PL's decomposition rules.
+
+    Args:
+        config (Dict[Str, Any]): Configuration dictionary
+    """
     return config["operations"]["gates"][0]["decomp"]
 
 
 def get_matrix_decomposable_gates(config):
+    """Get gates that will be decomposed to QubitUnitary.
+
+    Args:
+        config (Dict[Str, Any]): Configuration dictionary
+    """
     return config["operations"]["gates"][0]["matrix"]
 
 
 def check_no_overlap(*args):
+    """Check items in *args are mutually exclusive.
+
+    Args:
+        *args (List[Str]): List of strings.
+
+    Raises:
+        CompileError
+    """
     set_of_sets = [set(arg) for arg in args]
     union = set.union(*set_of_sets)
     len_of_sets = [len(arg) for arg in args]
@@ -97,6 +138,14 @@ def check_no_overlap(*args):
 
 
 def check_full_overlap(device, *args):
+    """Check that device.operations is equivalent to the union of *args
+
+    Args:
+        device (qml.Device): An instance of a quantum device.
+        *args (List[Str]): List of strings.
+
+    Raises: CompileError
+    """
     gates_in_device = set(device.operations)
     set_of_sets = [set(arg) for arg in args]
     union = set.union(*set_of_sets)
@@ -109,6 +158,14 @@ def check_full_overlap(device, *args):
 
 
 def check_gates_are_compatible_with_device(device, config):
+    """Validate configuration dictionary against device.
+
+    Args:
+        device (qml.Device): An instance of a quantum device.
+        config (Dict[Str, Any]): Configuration dictionary
+
+    Raises: CompileError
+    """
     native = get_native_gates(config)
     decomposable = get_decomposable_gates(config)
     matrix = get_matrix_decomposable_gates(config)
@@ -117,6 +174,18 @@ def check_gates_are_compatible_with_device(device, config):
 
 
 def validate_config_with_device(device):
+    """Validate configuration file against device.
+    Will raise a CompileError
+    * if device does not contain ``config`` attribute
+    * if configuration file does not exists
+    * if decomposable, matrix, and native gates have some overlap
+    * if decomposable, matrix, and native gates do not match gates in ``device.operations``
+
+    Args:
+        device (qml.Device): An instance of a quantum device.
+
+    Raises: CompileError
+    """
     check_device_config(device)
 
     with open(device.config, "rb") as f:

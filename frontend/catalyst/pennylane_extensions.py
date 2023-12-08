@@ -81,7 +81,6 @@ from catalyst.utils.jax_extras import (
 )
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import extract_backend_info, get_lib_path
-from catalyst.utils.toml import toml_load
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
