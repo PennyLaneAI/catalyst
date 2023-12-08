@@ -286,7 +286,6 @@ class QJITDevice(qml.QubitDevice):
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
-        self.backend_name_canonical = self.backend_kwargs.get("device_type")
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
