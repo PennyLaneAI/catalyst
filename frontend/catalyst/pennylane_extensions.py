@@ -235,18 +235,6 @@ class QJITDevice(qml.QubitDevice):
         return {"MultiControlledX"}
 
     @staticmethod
-    def _check_qjit_compatible(config):
-        """Check the qjit_compatible record in the configuration file."""
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        if spec["compilation"]["qjit_compatible"]:
-            return
-
-        msg = "Attempting to compile to device without qjit support."
-        raise CompileError(msg)
-
-    @staticmethod
     def _check_mid_circuit_measurement(config):
         with open(config, "rb") as f:
             spec = toml_load(f)
@@ -315,7 +303,6 @@ class QJITDevice(qml.QubitDevice):
         config=None,
     ):
         QJITDevice._check_config_exists(config, backend_name)
-        QJITDevice._check_qjit_compatible(config)
         QJITDevice._set_supported_operations(config)
         QJITDevice._set_supported_observables(config)
 

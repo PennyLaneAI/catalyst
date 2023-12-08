@@ -55,6 +55,22 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
+def check_qjit_compatibility(device, config):
+    if config["compilation"]["qjit_compatible"]:
+        return
+
+    name = device.name
+    msg = f"Attempting to compile program for incompatible device {name}."
+    raise CompileError(msg)
+
+
+def validate_config_with_device(device):
+    with open(device.config, "rb") as f:
+        config = toml_load(f)
+
+    check_qjit_compatibility(device, config)
+
+
 def extract_backend_info(device):
     """Extract the backend info as a tuple of (name, lib, kwargs)."""
 

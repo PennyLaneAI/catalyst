@@ -15,27 +15,33 @@
 import tempfile
 from pathlib import Path
 
+from pennylane_lightning.lightning_qubit.lightning_qubit import LightningQubit
 import pytest
 
 from catalyst.pennylane_extensions import QJITDevice
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime import check_qjit_compatibility
+from catalyst.utils.toml import toml_load
 
 
 def test_toml_file():
-    with tempfile.NamedTemporaryFile(delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w+b") as f:
         f.write(
             b"""
 [compilation]
 qjit_compatible = false
         """
         )
+        f.flush()
+        f.seek(0)
+        config = toml_load(f)
         f.close()
 
-        p = Path(f.name)
+        name = LightningQubit.name
         with pytest.raises(
-            CompileError, match="Attempting to compile to device without qjit support"
+            CompileError, match=f"Attempting to compile program for incompatible device {name}"
         ):
-            QJITDevice._check_qjit_compatible(p)
+            check_qjit_compatibility(LightningQubit, config)
 
 
 def test_toml_file_exists():
