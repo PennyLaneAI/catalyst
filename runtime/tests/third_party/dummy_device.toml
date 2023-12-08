@@ -44,23 +44,18 @@ native = [
         "IsingYY",
         "IsingZZ",
         "IsingXY",
+        "MultiControlledX",
 ]
-# decomp gates are those which are neither supported natively
-# and are not executed via the applyMatrix operation. Technically
-# they could also be decomposed via applyMatrix.
-decomp = [
+# QubitUnitary should never be here.
+# Gates in "matrix" are decomposed to QubitUnitary.
+# Having a QubitUnitary here would mean an infinite loop.
+matrix = [
         "SX",
         "ISWAP",
         "PSWAP",
         "SISWAP",
         "SQISW",
         "CPhase",
-        # Adjoint'ed gates
-        # which are not in native set must either be decomposed
-        # or applied via matrix.
-        "Adjoint(SX)",
-        "Adjoint(ISWAP)",
-        "Adjoint(SISWAP)",
         "BasisState",
         "QubitStateVector",
         "StatePrep",
@@ -79,20 +74,9 @@ decomp = [
         "ECR",
         "Adjoint(S)",
         "Adjoint(T)",
-]
-# QubitUnitary should never be here.
-# Gates in "matrix" are decomposed to QubitUnitary.
-# Having a QubitUnitary here would mean an infinite loop.
-
-# These are gates that appear on the list of supported gates
-# but are not in the list of Quantum Gate Set Instructions in
-# the Catalyst repository.
-# One disadvantage of matrix gates is that they will be lowered to
-# QubitUnitary and QubitUnitary is not differentiable.
-# TODO: Move some of these to native once we add support for them
-# in Catalyst runtime.
-matrix = [
-        "MultiControlledX",
+        "Adjoint(SX)",
+        "Adjoint(ISWAP)",
+        "Adjoint(SISWAP)",
 ]
 
 [measurements]

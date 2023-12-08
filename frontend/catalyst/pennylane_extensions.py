@@ -183,12 +183,56 @@ class QJITDevice(qml.QubitDevice):
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
-    # Even though these are empty, these are needed.
-    # Otherwise, the following error is raised:
-    #
-    #   TypeError: Can't instantiate abstract class QJITDevice with abstract method operations
+
     operations = []
     observables = []
+
+    @staticmethod
+    def _get_operations_available_in_QIR_abstract_machine():
+        # These are the methods implemented in the runtime.
+        # A device might have gates which are native to the device
+        # but are not exposed. This is a limitation of the current runtime
+        # because it does not contain implementation of gates for every possible
+        # gate from the infinite set.
+        return {
+            "Identity",
+            "PauliX",
+            "PauliY",
+            "PauliZ",
+            "Hadamard",
+            "S",
+            "T",
+            "PhaseShift",
+            "RX",
+            "RY",
+            "RZ",
+            "Rot",
+            "CNOT",
+            "CY",
+            "CZ",
+            "SWAP",
+            "IsingXX",
+            "IsingYY",
+            "IsingXY",
+            "ControlledPhaseShift",
+            "CRX",
+            "CRY",
+            "CRZ",
+            "CRot",
+            "CSWAP",
+            "Toffoli",
+            "MultiRZ",
+            "QubitUnitary",
+        }
+
+    @staticmethod
+    def _get_operations_to_convert_to_matrix(_config):
+        # We currently override and only set MultiControlledX to preserve current behaviour.
+        # We could choose to read from config and use the "matrix" gates.
+        # However, that affects differentiability.
+        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
+        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
+        return {"MultiControlledX"}
 
     @staticmethod
     def _check_qjit_compatible(config):
@@ -196,9 +240,11 @@ class QJITDevice(qml.QubitDevice):
         with open(config, "rb") as f:
             spec = toml_load(f)
 
-        if not spec["compilation"]["qjit_compatible"]:
-            msg = "Attempting to compile to device without qjit support."
-            raise CompileError(msg)
+        if spec["compilation"]["qjit_compatible"]:
+            return
+
+        msg = "Attempting to compile to device without qjit support."
+        raise CompileError(msg)
 
     @staticmethod
     def _check_mid_circuit_measurement(config):
@@ -227,7 +273,9 @@ class QJITDevice(qml.QubitDevice):
         with open(config, "rb") as f:
             spec = toml_load(f)
 
-        QJITDevice.operations = spec["operations"]["gates"][0]["native"]
+        native_gates = set(spec["operations"]["gates"][0]["native"])
+        qir_gates = QJITDevice._get_operations_available_in_QIR_abstract_machine()
+        QJITDevice.operations = list(native_gates.intersection(qir_gates))
 
         # These are added unconditionally.
         QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
@@ -311,7 +359,8 @@ class QJITDevice(qml.QubitDevice):
         # At the moment assume QJIT Device's decomposition logic is guided by the specification of
         # lightning.qubit. All "full" gates are allowed. All "matrix" gates are decomposed to
         # to qml.QubitUnitary
-        decompose_to_qubit_unitary = spec["operations"]["gates"][0]["matrix"]
+        # decompose_to_qubit_unitary = spec["operations"]["gates"][0]["matrix"]
+        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
