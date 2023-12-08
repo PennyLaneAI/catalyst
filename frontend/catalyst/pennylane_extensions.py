@@ -122,14 +122,12 @@ class QFunc:
         TODO: Remove this function when `qml.Device`s are guaranteed to have their own
         config file field."""
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        # We need this replace because the toml file uses
-        # lightning_kokkos.toml and lightning_qubit.toml
-        # instead of lightning.qubit.toml and lightning.kokkos.toml
-        # We should just make all of them similar.
         name = device.name
         if isinstance(device, qml.Device):
             name = device.short_name
 
+        # The toml files name convention we follow is to replace
+        # the dots with underscores in the device short name.
         toml_file_name = name.replace(".", "_") + ".toml"
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
         device.config = toml_file
