@@ -285,13 +285,6 @@ class QJITDevice(qml.QubitDevice):
 
         QJITDevice.observables = spec["operations"]["observables"]
 
-    @staticmethod
-    def _check_config_exists(config, name):
-        if config.exists():
-            return
-        msg = f"{name} is not supported for compilation at the moment"
-        raise CompileError(msg)
-
     # pylint: disable=too-many-arguments
     def __init__(
         self,
@@ -302,7 +295,6 @@ class QJITDevice(qml.QubitDevice):
         backend_kwargs=None,
         config=None,
     ):
-        QJITDevice._check_config_exists(config, backend_name)
         QJITDevice._set_supported_operations(config)
         QJITDevice._set_supported_observables(config)
 

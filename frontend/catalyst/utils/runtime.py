@@ -64,7 +64,18 @@ def check_qjit_compatibility(device, config):
     raise CompileError(msg)
 
 
+def check_device_config(device):
+    if hasattr(device, "config") and device.config.exists():
+        return
+
+    name = device.name
+    msg = f"Attempting to compile program for incompatible device {name}."
+    raise CompileError(msg)
+
+
 def validate_config_with_device(device):
+    check_device_config(device)
+
     with open(device.config, "rb") as f:
         config = toml_load(f)
 
@@ -73,6 +84,8 @@ def validate_config_with_device(device):
 
 def extract_backend_info(device):
     """Extract the backend info as a tuple of (name, lib, kwargs)."""
+
+    validate_config_with_device(device)
 
     dname = device.name
     if isinstance(device, qml.Device):
