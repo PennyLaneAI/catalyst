@@ -12,7 +12,6 @@ observables = [
 	"HamiltonianObs",
 ]
 
-# These are gates which are defined in Quantum Instruction Set.
 [[operations.gates]]
 native = [
         "QubitUnitary",
@@ -44,12 +43,9 @@ native = [
         "IsingYY",
         "IsingZZ",
         "IsingXY",
-        "MultiControlledX",
 ]
-# QubitUnitary should never be here.
-# Gates in "matrix" are decomposed to QubitUnitary.
-# Having a QubitUnitary here would mean an infinite loop.
-matrix = [
+
+decomp = [
         "SX",
         "ISWAP",
         "PSWAP",
@@ -77,6 +73,10 @@ matrix = [
         "Adjoint(SX)",
         "Adjoint(ISWAP)",
         "Adjoint(SISWAP)",
+]
+
+matrix = [
+        "MultiControlledX",
 ]
 
 [measurements]

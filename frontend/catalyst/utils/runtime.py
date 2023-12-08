@@ -88,8 +88,8 @@ def get_matrix_decomposable_gates(config):
 def check_no_overlap(*args):
     set_of_sets = [set(arg) for arg in args]
     union = set.union(*set_of_sets)
-    len_of_sets = {len(arg) for arg in args}
-    if len_of_sets == len(union):
+    len_of_sets = [len(arg) for arg in args]
+    if sum(len_of_sets) == len(union):
         return
 
     msg = "Device has overlapping gates in native and decomposable sets."
