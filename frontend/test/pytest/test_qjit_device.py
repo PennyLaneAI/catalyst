@@ -16,6 +16,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from pennylane_lightning.lightning_qubit.lightning_qubit import LightningQubit
+
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
@@ -27,7 +29,6 @@ from catalyst.utils.runtime import (
     get_native_gates,
 )
 from catalyst.utils.toml import toml_load
-from pennylane_lightning.lightning_qubit.lightning_qubit import LightningQubit
 
 
 def test_toml_file():
