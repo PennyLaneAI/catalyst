@@ -6,21 +6,12 @@ precision = ['float32', 'float64']
 
 [operations]
 observables = [
-	"NamedObs",
-	"HermitianObs",
-	"TensorObs",
-	"HamiltonianObs",
-]
-
-[operations]
-observables = [
         "PauliX",
         "PauliY",
         "PauliZ",
         "Hadamard",
         "Hermitian",
         "Identity",
-        "Projector",
         "SparseHamiltonian",
         "Hamiltonian",
         "Sum",
@@ -67,6 +58,7 @@ native = [
         "DoubleExcitationPlus",
         "DoubleExcitationMinus",
         "MultiRZ",
+
 	# QubitUnitary is technically
 	# "applyMatrix", but it doesn't
 	# belong in matrix gates.
@@ -81,15 +73,16 @@ native = [
         "Adjoint(SISWAP)",
 ]
 
-# These are gates which need to be decomposed to QubitUnitary.
-matrix = [
-	# The rest.
+# Gates listed in qml.device.ops
+# which the authors of this file would like to be decomposed
+# according to rules outlined in the decomposition strategy for each
+# operation.
+decomp = [
         "BasisState",
         "ECR",
         "QubitStateVector",
         "StatePrep",
         "ControlledQubitUnitary",
-        "MultiControlledX",
         "DiagonalQubitUnitary",
         "SX",
         "ISWAP",
@@ -101,6 +94,12 @@ matrix = [
         "QubitSum",
         "OrbitalRotation",
         "QFT",
+]
+
+# Gates listed in qml.device.ops
+# which the authors of this file would like to be decomposed into QubitUnitary.
+matrix = [
+        "MultiControlledX",
 ]
 
 [measurements]
@@ -124,9 +123,4 @@ runtime_code_generation = false
 adjoint = true
 quantum_control = false
 mid_circuit_measurement = true
-dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo
-
-[options]
-mcmc = "_mcmc"
-num_burnin = "_num_burnin"
-kernel_name = "_kernel_name"
+dynamic_qubit_management = false 
