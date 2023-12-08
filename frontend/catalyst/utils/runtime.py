@@ -177,11 +177,11 @@ def extract_backend_info(device):
             )
 
     with open(device.config, "rb") as f:
-        spec = toml_load(f)
+        config = toml_load(f)
 
-    if "options" in spec.keys():
-        for k, v in spec["options"].items():
+    if "options" in config.keys():
+        for k, v in config["options"].items():
             if hasattr(device, v):
                 device_kwargs[k] = getattr(device, v)
 
-    return device_name, device_lpath, device_kwargs, device.config
+    return device_name, device_lpath, device_kwargs, config

@@ -184,6 +184,7 @@ class QJITDevice(qml.QubitDevice):
     version = "0.0.1"
     author = ""
 
+    # These must be present even if empty.
     operations = []
     observables = []
 
@@ -236,32 +237,20 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _check_mid_circuit_measurement(config):
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        return spec["compilation"]["mid_circuit_measurement"]
+        return config["compilation"]["mid_circuit_measurement"]
 
     @staticmethod
     def _check_adjoint(config):
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        return spec["compilation"]["adjoint"]
+        return config["compilation"]["adjoint"]
 
     @staticmethod
     def _check_quantum_control(config):
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        return spec["compilation"]["quantum_control"]
+        return config["compilation"]["quantum_control"]
 
     @staticmethod
     def _set_supported_operations(config):
         """Override the set of supported operations."""
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        native_gates = set(spec["operations"]["gates"][0]["native"])
+        native_gates = set(config["operations"]["gates"][0]["native"])
         qir_gates = QJITDevice._get_operations_available_in_QIR_abstract_machine()
         QJITDevice.operations = list(native_gates.intersection(qir_gates))
 
@@ -280,10 +269,7 @@ class QJITDevice(qml.QubitDevice):
     @staticmethod
     def _set_supported_observables(config):
         """Override the set of supported observables."""
-        with open(config, "rb") as f:
-            spec = toml_load(f)
-
-        QJITDevice.observables = spec["operations"]["observables"]
+        QJITDevice.observables = config["operations"]["observables"]
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -331,9 +317,6 @@ class QJITDevice(qml.QubitDevice):
         # Ensure catalyst.measure is used instead of qml.measure.
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-
-        with open(self.config, "rb") as f:
-            spec = toml_load(f)
 
         # At the moment assume QJIT Device's decomposition logic is guided by the specification of
         # lightning.qubit. All "full" gates are allowed. All "matrix" gates are decomposed to
