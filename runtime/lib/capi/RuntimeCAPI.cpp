@@ -130,39 +130,34 @@ void __quantum__rt__initialize()
 
 void __quantum__rt__finalize() { Catalyst::Runtime::CTX.reset(nullptr); }
 
-void __quantum__rt__device(int8_t *spec, int8_t *value)
+void __quantum__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
 {
-    RT_FAIL_IF((!spec || !value), "Invalid device specification");
+    // Device library cannot be a nullptr
+    RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!Catalyst::Runtime::CTX, "Invalid use of the global driver before initialization");
 
-    const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
-                                             reinterpret_cast<char *>(value)};
-    if (args[0] == "rtd_kwargs") {
-        Catalyst::Runtime::CTX->setDeviceKwArgs(args[1]);
-        return;
+    const std::vector<std::string_view> args{
+        reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
+        (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
+    RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(args[0], args[1], args[2]),
+               "Failed initialization of the backend device");
+    if (Catalyst::Runtime::CTX->getDeviceRecorderStatus()) {
+        Catalyst::Runtime::CTX->getDevice()->StartTapeRecording();
     }
-    else if (args[0] == "rtd_name") {
-        Catalyst::Runtime::CTX->setDeviceName(args[1]);
-        return;
-    }
-    else if (args[0] == "rtd_lib") {
-        RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(args[1]),
-                   "Failed initialization of the backend device");
-        if (Catalyst::Runtime::CTX->getDeviceRecorderStatus()) {
-            Catalyst::Runtime::CTX->getDevice()->StartTapeRecording();
-        }
-        return;
-    }
+}
 
-    RT_FAIL("Invalid device specification; Supported keys: ['kwargs', 'rtd_name', 'rtd_lib']");
+void __quantum__rt__device_release()
+{
+    // TODO: This will be used for the async support
+    Catalyst::Runtime::CTX->releaseDevice();
 }
 
 void __quantum__rt__print_state() { Catalyst::Runtime::CTX->getDevice()->PrintState(); }
 
 void __quantum__rt__toggle_recorder(bool status)
 {
-    Catalyst::Runtime::CTX->setDeviceRecorder(status);
-    if (!Catalyst::Runtime::CTX->getDevice()) {
+    Catalyst::Runtime::CTX->setDeviceRecorderStatus(status);
+    if (!Catalyst::Runtime::CTX->isInitialized()) {
         return;
     }
 

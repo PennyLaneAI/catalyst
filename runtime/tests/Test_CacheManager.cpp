@@ -170,8 +170,9 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and
 TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 {
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -210,6 +211,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
         __quantum__rt__qubit_release(target);
         __quantum__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
+        __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
 }
@@ -219,8 +221,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 {
 
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -263,6 +266,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
         __quantum__rt__qubit_release(target);
         __quantum__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
+        __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
 }

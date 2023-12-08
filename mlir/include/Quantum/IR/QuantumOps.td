@@ -83,11 +83,13 @@ def DeviceOp : Quantum_Op<"device"> {
     let summary = "Initialize a quantum device or set some device configuration options.";
 
     let arguments = (ins
-        OptionalAttr<StrArrayAttr>:$specs
+        StrAttr:$lib,
+        StrAttr:$name,
+        StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      $specs attr-dict
+      `[` $lib `,` $name `,` $kwargs `]` attr-dict
     }];
 }
 
