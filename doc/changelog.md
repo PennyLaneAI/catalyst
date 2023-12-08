@@ -62,11 +62,20 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve a bug in the compiler's differentiation engine that results in a crash with the Enzyme
+  error message "attempting to differentiate function without definition" (see issue
+  [#384](https://github.com/PennyLaneAI/catalyst/issues/384)).
+  The fix ensures that all current quantum operation types are removed during gradient passes that
+  extract classical from a QNode function. It also adds a verification step that will raise an error
+  if a gradient pass cannot successfully eliminate all quantum operations for such functions.
+  [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez.
@@ -263,7 +272,7 @@ Erick Ochoa Lopez.
 
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
     the signature `qjit(fn, *args, **kwargs)`, where `fn` is the function to be compiled.
-  
+
 * The compiler driver diagnostic output has been improved, and now includes failing IR as well as
   the names of failing passes.
   [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
