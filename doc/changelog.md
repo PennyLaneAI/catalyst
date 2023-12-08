@@ -55,6 +55,9 @@
   operations and control flow operations.
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
+* Add the `GENERATE_DEVICE_ENTRYPOINT` template macro for generating a device entry-point in the runtime plugin system.
+  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>

@@ -84,7 +84,7 @@ in the C++ format. As an example, we use the identifier ``CustomDevice``:
 
 .. code-block:: c++
 
-    GENERATE_DEVICE_FACTORY(CustomDevice, /* NAMESPACE */)
+    GENERATE_DEVICE_ENTRYPOINT(CustomDevice, /* NAMESPACE */)
 
 The entry point function acts as a factory method for the device class.
 Note that a plugin library may also provide several factory methods in case it packages
