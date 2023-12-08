@@ -73,6 +73,18 @@ def check_device_config(device):
     raise CompileError(msg)
 
 
+def get_native_gates(config):
+    return config["operations"]["gates"][0]["native"]
+
+
+def get_decomposable_gates(config):
+    return config["operations"]["gates"][0]["decomp"]
+
+
+def get_matrix_decomposable_gates(config):
+    return config["operations"]["gates"][0]["matrix"]
+
+
 def validate_config_with_device(device):
     check_device_config(device)
 

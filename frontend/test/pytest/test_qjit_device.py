@@ -20,7 +20,13 @@ import pytest
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import check_qjit_compatibility, check_device_config
+from catalyst.utils.runtime import (
+    check_qjit_compatibility,
+    check_device_config,
+    get_native_gates,
+    get_decomposable_gates,
+    get_matrix_decomposable_gates,
+)
 from catalyst.utils.toml import toml_load
 
 
@@ -60,3 +66,48 @@ def test_device_with_invalid_config_attr():
         with pytest.raises(CompileError, match=msg):
             check_device_config(LightningQubit)
         delattr(LightningQubit, "config")
+
+
+def test_get_native_gates():
+    with tempfile.NamedTemporaryFile(mode="w+") as f:
+        test_gates = ["TestNativeGate"]
+        payload = f"""
+[[operations.gates]]
+native = {str(test_gates)}
+        """
+        f.write(payload)
+        f.flush()
+        f.seek(0)
+        config = toml_load(f)
+        f.close()
+    assert test_gates == get_native_gates(config)
+
+
+def test_get_decomp_gates():
+    with tempfile.NamedTemporaryFile(mode="w+") as f:
+        test_gates = ["TestDecompGate"]
+        payload = f"""
+[[operations.gates]]
+decomp = {str(test_gates)}
+        """
+        f.write(payload)
+        f.flush()
+        f.seek(0)
+        config = toml_load(f)
+        f.close()
+    assert test_gates == get_decomposable_gates(config)
+
+
+def test_get_matrix_decomposable_gates():
+    with tempfile.NamedTemporaryFile(mode="w+") as f:
+        test_gates = ["TestMatrixGate"]
+        payload = f"""
+[[operations.gates]]
+matrix = {str(test_gates)}
+        """
+        f.write(payload)
+        f.flush()
+        f.seek(0)
+        config = toml_load(f)
+        f.close()
+    assert test_gates == get_matrix_decomposable_gates(config)
