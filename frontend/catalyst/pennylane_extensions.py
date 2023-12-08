@@ -318,11 +318,10 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
-        # At the moment assume QJIT Device's decomposition logic is guided by the specification of
-        # lightning.qubit. All "full" gates are allowed. All "matrix" gates are decomposed to
-        # to qml.QubitUnitary
-        # decompose_to_qubit_unitary = spec["operations"]["gates"][0]["matrix"]
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
+
+        def _decomp_to_unitary(self, *_args, **_kwargs):
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
@@ -330,10 +329,6 @@ class QJITDevice(qml.QubitDevice):
         # decomposition is generally faster.
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-
-        def _decomp_to_unitary(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
-
         overriden_methods = [  # pragma: no cover
             (qml.ops.Controlled, "has_decomposition", lambda self: True),  # pragma: no cover
             (qml.ops.Controlled, "decomposition", _decomp_to_unitary),  # pragma: no cover
