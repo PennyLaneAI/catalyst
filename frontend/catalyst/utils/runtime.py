@@ -85,6 +85,24 @@ def get_matrix_decomposable_gates(config):
     return config["operations"]["gates"][0]["matrix"]
 
 
+def check_no_overlap(*args):
+    set_of_sets = [set(arg) for arg in args]
+    union = set.union(*set_of_sets)
+    len_of_sets = {len(arg) for arg in args}
+    if len_of_sets == len(union):
+        return
+
+    msg = "Device has overlapping gates in native and decomposable sets."
+    raise CompileError(msg)
+
+
+def check_gates_are_compatible_with_device(device, config):
+    native = get_native_gates(config)
+    decomposable = get_decomposable_gates(config)
+    matrix = get_matrix_decomposable_gates(config)
+    check_no_overlap(native, decomposable, matrix)
+
+
 def validate_config_with_device(device):
     check_device_config(device)
 
@@ -92,6 +110,7 @@ def validate_config_with_device(device):
         config = toml_load(f)
 
     check_qjit_compatibility(device, config)
+    check_gates_are_compatible_with_device(device, config)
 
 
 def extract_backend_info(device):

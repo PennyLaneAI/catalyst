@@ -21,6 +21,7 @@ import pytest
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
+    check_no_overlap,
     check_qjit_compatibility,
     check_device_config,
     get_native_gates,
@@ -111,3 +112,9 @@ matrix = {str(test_gates)}
         config = toml_load(f)
         f.close()
     assert test_gates == get_matrix_decomposable_gates(config)
+
+
+def test_check_overlap_msg():
+    msg = "Device has overlapping gates in native and decomposable sets."
+    with pytest.raises(CompileError, match=msg):
+        check_no_overlap(["A"], ["A"], ["A"])
