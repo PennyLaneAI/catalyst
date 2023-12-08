@@ -157,7 +157,7 @@ class SharedLibraryManager final {
     }
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::string &kwargs);
+extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const char *kwargs);
 
 class ExecutionContext final {
   private:
@@ -220,7 +220,8 @@ class ExecutionContext final {
         _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
         std::string factory_name{_device_name + "Factory"};
         void *f_ptr = _driver_so_ptr->getSymbol(factory_name);
-        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_device_kwargs)
+        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(
+                           _device_kwargs.c_str())
                      : nullptr;
     }
 
