@@ -6,10 +6,19 @@ precision = ['float32', 'float64']
 
 [operations]
 observables = [
-	"NamedObs",
-	"HermitianObs",
-	"TensorObs",
-	"HamiltonianObs",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "Hermitian",
+        "Identity",
+        "Projector",
+        "SparseHamiltonian",
+        "Hamiltonian",
+        "Sum",
+        "SProd",
+        "Prod",
+        "Exp",
 ]
 
 [[operations.gates]]
