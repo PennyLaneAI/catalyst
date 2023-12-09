@@ -150,7 +150,7 @@ def check_full_overlap(device, *args):
     set_of_sets = [set(arg) for arg in args]
     union = set.union(*set_of_sets)
     intersection = union.intersection(gates_in_device)
-    if union == intersection:
+    if gates_in_device == intersection:
         return
 
     msg = "Gates in qml.device.operations and specification file do not match"

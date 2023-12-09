@@ -24,6 +24,7 @@ native = [
         "ISWAP",
         "PSWAP",
 
+	"Hadamard",
         "PauliX",
         "PauliY",
         "PauliZ",
@@ -37,6 +38,27 @@ native = [
         "RY",
         "RZ",
         "CSWAP",
+
+	"MS",
+	"CY",
+	"SX",
+	"AAMS",
+	"ECR",
+	"GPi",
+	"GPi2",
+	"Adjoint(S)",
+	"Adjoint(T)",
+	"Adjoint(SX)",
+	"CPhaseShift00",
+	"CPhaseShift01",
+	"CPhaseShift10",
+	"Identity",
+	"IsingXX",
+	"IsingXY",
+	"IsingYY",
+	"IsingZZ",
+	"Toffoli",
+	"ControlledPhaseShift",
 ]
 
 decomp = []

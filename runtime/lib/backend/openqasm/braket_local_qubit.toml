@@ -26,6 +26,7 @@ native = [
         "ISWAP",
         "PSWAP",
 
+	"Hadamard",
         "PauliX",
         "PauliY",
         "PauliZ",
@@ -42,6 +43,27 @@ native = [
 	# Unlike "braket.aws.qubit"
 	# The "braket.local.qubit" device does support QubitUnitary
 	"QubitUnitary",
+
+	"MS",
+	"CY",
+	"SX",
+	"AAMS",
+	"ECR",
+	"GPi",
+	"GPi2",
+	"Adjoint(S)",
+	"Adjoint(T)",
+	"Adjoint(SX)",
+	"CPhaseShift00",
+	"CPhaseShift01",
+	"CPhaseShift10",
+	"Identity",
+	"IsingXX",
+	"IsingXY",
+	"IsingYY",
+	"IsingZZ",
+	"Toffoli",
+	"ControlledPhaseShift",
 ]
 
 decomp = []
