@@ -111,9 +111,9 @@ class QFunc:
     """
 
     def __init__(self, fn, device):
-        self.func = fn
-        self.device = device
-        update_wrapper(self, fn)
+        self.func = fn  # pragma: nocover
+        self.device = device  # pragma: nocover
+        update_wrapper(self, fn)  # pragma: nocover
 
     @staticmethod
     def _add_toml_file(device):
@@ -134,15 +134,15 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         qnode = None
-        if isinstance(self, qml.QNode):
+        if isinstance(self, qml.QNode):  # pragma: nocover
             qnode = self
             QFunc._add_toml_file(self.device)
             device = QJITDevice(
                 self.device.shots, self.device.wires, *extract_backend_info(self.device)
             )
-        else:
+        else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
-            device = self.device
+            device = self.device  # pragma: nocover
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
