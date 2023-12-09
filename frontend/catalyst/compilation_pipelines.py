@@ -42,7 +42,7 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
-from catalyst.ag_utils import run_autograph
+from catalyst.autograph import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc

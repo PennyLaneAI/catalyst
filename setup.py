@@ -31,6 +31,7 @@ requirements = [
     "pennylane>=0.32",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
+    "pennylane_autograph==2.15.0",
 ]
 
 classifiers = [

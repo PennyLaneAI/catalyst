@@ -21,41 +21,21 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-
-# Use tensorflow implementations for handling function scopes and calls,
-# as well as various utility objects.
 import pennylane as qml
-import tensorflow.python.autograph.impl.api as tf_autograph_api
+from autograph.core import config
+from autograph.impl import api as autograph_api
+from autograph.impl.api import converted_call as ag_converted_call
+from autograph.operators.variables import Undefined
+from autograph.pyct.origin_info import LineLocation
 from pennylane.queuing import AnnotatedQueue
-from tensorflow.python.autograph.core import config
-from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
-from tensorflow.python.autograph.core.converter import ConversionOptions
-from tensorflow.python.autograph.core.function_wrappers import (
-    FunctionScope,
-    with_function_scope,
-)
-from tensorflow.python.autograph.impl.api import autograph_artifact
-from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
-from tensorflow.python.autograph.operators.variables import (
-    Undefined,
-    UndefinedReturnValue,
-)
-from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
-from catalyst.ag_utils import AutoGraphError
 from catalyst.utils.contexts import EvaluationContext
+from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
 __all__ = [
-    "STD",
-    "ConversionOptions",
-    "Undefined",
-    "UndefinedReturnValue",
-    "autograph_artifact",
-    "FunctionScope",
-    "with_function_scope",
     "if_stmt",
     "for_stmt",
     "while_stmt",
@@ -533,7 +513,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
     transforming functions, but otherwise duplicate the same behaviour."""
 
     with Patcher(
-        (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
+        (autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
         (config, "CONVERSION_RULES", module_allowlist),
     ):
         # HOTFIX: pass through calls of known Catalyst wrapper functions
@@ -580,12 +560,12 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
             @functools.wraps(fn.func)
             def qnode_call_wrapper():
-                return tf_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
+                return ag_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
 
             new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
             return new_qnode()
 
-        return tf_converted_call(fn, args, kwargs, caller_fn_scope, options)
+        return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
 
 class CRange:
