@@ -494,4 +494,7 @@ void OpenQasmDevice::Gradient([[maybe_unused]] std::vector<DataView<double, 1>> 
 
 } // namespace Catalyst::Runtime::Device
 
-GENERATE_DEVICE_ENTRYPOINT(OpenQasmDevice, Catalyst::Runtime::Device)
+extern "C" Catalyst::Runtime::QuantumDevice *OpenQasmDeviceFactory(const char *kwargs)
+{
+    return new Catalyst::Runtime::Device::OpenQasmDevice(std::string(kwargs));
+}

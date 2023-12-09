@@ -77,14 +77,14 @@ Additionally, all measurements will always return ``true``.
 
 In addition to implementing the ``QuantumDevice`` class, one must implement an entry point for the
 device library with the name ``<DeviceIdentifier>Factory``, where ``DeviceIdentifier`` is used to
-uniquely identify the entry point symbol.
-You can use the `GENERATE_DEVICE_ENTRYPOINT(DEVICE_NAME, NAMESPACE)` template macro to define this entry
-point where `DEVICE_NAME` is the name of the device identifier and `NAMESPACE` is the device class namespace
-in the C++ format. As an example, we use the identifier ``CustomDevice``:
+uniquely identify the entry point symbol. As an example, we use the identifier ``CustomDevice``:
 
 .. code-block:: c++
 
-    GENERATE_DEVICE_ENTRYPOINT(CustomDevice, /* NAMESPACE */)
+    extern "C" Catalyst::Runtime::QuantumDevice*
+    CustomDeviceFactory(const char *kwargs) {
+        return new CustomDevice(std::string(kwargs));
+    }
 
 The entry point function acts as a factory method for the device class.
 Note that a plugin library may also provide several factory methods in case it packages

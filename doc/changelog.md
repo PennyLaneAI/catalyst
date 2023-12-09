@@ -55,8 +55,11 @@
   operations and control flow operations.
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
-* Add the `GENERATE_DEVICE_ENTRYPOINT` template macro for generating a device entry-point in the runtime plugin system.
-  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+* Update the `DeviceOp` definition in the Quantum MLIR dialect.
+  `DeviceOp` gets the tuple of device info: ('lib', 'name', 'kwargs')
+  and lowers the operation to one single device initialization call:
+  `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
+  [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
 
 <h3>Breaking changes</h3>
 

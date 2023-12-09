@@ -69,4 +69,7 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
 };
 
-GENERATE_DEVICE_ENTRYPOINT(DummyDevice, )
+extern "C" Catalyst::Runtime::QuantumDevice *DummyDeviceFactory(const char *kwargs)
+{
+    return new DummyDevice(std::string(kwargs));
+}

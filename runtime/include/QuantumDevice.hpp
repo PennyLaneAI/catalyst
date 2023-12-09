@@ -21,12 +21,6 @@
 #include "DataView.hpp"
 #include "Types.h"
 
-#define GENERATE_DEVICE_ENTRYPOINT(DEVICE_NAME, NAMESPACE)                                         \
-    extern "C" Catalyst::Runtime::QuantumDevice *DEVICE_NAME##Factory(const char *kwargs)          \
-    {                                                                                              \
-        return new NAMESPACE::DEVICE_NAME(std::string(kwargs));                                    \
-    }
-
 namespace Catalyst::Runtime {
 
 /**
