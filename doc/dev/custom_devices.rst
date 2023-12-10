@@ -86,6 +86,15 @@ uniquely identify the entry point symbol. As an example, we use the identifier `
         return new CustomDevice(std::string(kwargs));
     }
 
+For simplicity, you can use the ``GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)`` macro to
+define this function, where ``IDENTIFIER`` is the device identifier, and ``CONSTRUCTOR`` is the
+C++ device constructor including the namespace. For this example, both the device identifier and
+constructor are the same:
+
+.. code-block:: c++
+
+    GENERATE_DEVICE_FACTORY(CustomDevice, CustomDevice);
+
 The entry point function acts as a factory method for the device class.
 Note that a plugin library may also provide several factory methods in case it packages
 multiple devices into the same library. However, it is important that the device identifier

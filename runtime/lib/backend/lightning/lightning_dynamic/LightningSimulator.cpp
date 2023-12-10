@@ -520,7 +520,4 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
 
 } // namespace Catalyst::Runtime::Simulator
 
-extern "C" Catalyst::Runtime::QuantumDevice *LightningSimulatorFactory(const char *kwargs)
-{
-    return new Catalyst::Runtime::Simulator::LightningSimulator(std::string(kwargs));
-}
+GENERATE_DEVICE_FACTORY(LightningSimulator, Catalyst::Runtime::Simulator::LightningSimulator);
