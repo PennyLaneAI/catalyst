@@ -21,6 +21,7 @@ from catalyst.autograph import AutoGraphError, autograph_source, run_autograph
 
 
 def print_code(fn):
+    """Print autograph generated code for a function."""
     print(autograph_source(fn))
 
 

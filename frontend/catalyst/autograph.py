@@ -33,6 +33,11 @@ class CatalystTransformer(PyToPy):
     """A source-to-source transformer to convert imperative style control flow into a function style
     suitable for tracing."""
 
+    def __init__(self):
+        super().__init__()
+
+        self._extra_locals = None
+
     def transform(self, obj, user_context):
         """Launch the transformation process. Typically this only works on function objects.
         Here we also allow QNodes to be transformed."""
