@@ -280,7 +280,7 @@ Below is an example configuration file
                 "MultiControlledX",
         ]
 
-        [measurements]
+        [measurement_processes]
         exactshots = [
                 "Expval",
                 "Var",

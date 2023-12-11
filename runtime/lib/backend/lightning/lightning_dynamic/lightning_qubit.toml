@@ -103,7 +103,7 @@ matrix = [
         "MultiControlledX",
 ]
 
-[measurements]
+[measurement_processes]
 exactshots = [
 	"Expval",
 	"Var",
