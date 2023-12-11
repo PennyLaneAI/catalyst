@@ -40,10 +40,10 @@
    [1. 1. 1.]]
   ```
 
+<h3>Improvements</h3>
+
 * Support for `mcmc` sampling in `lightning.qubit`.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
-
-<h3>Improvements</h3>
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
