@@ -239,7 +239,7 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _check_adjoint(config):
-        return config["compilation"]["adjoint"]
+        return config["compilation"]["quantum_adjoint"]
 
     @staticmethod
     def _check_quantum_control(config):

@@ -297,7 +297,7 @@ Below is an example configuration file
         # If the device supports run time code generation
         runtime_code_generation = false
         # If the device supports adjoint
-        adjoint = true
+        quantum_adjoint = true
         # If the device supports quantum control instructions natively
         quantum_control = false
         # If the device supports mid circuit measurements natively

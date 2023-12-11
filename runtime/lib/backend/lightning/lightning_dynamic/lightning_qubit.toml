@@ -120,7 +120,7 @@ finiteshots = [
 [compilation]
 qjit_compatible = true
 runtime_code_generation = false
-adjoint = true
+quantum_adjoint = true
 quantum_control = false
 mid_circuit_measurement = true
 dynamic_qubit_management = false # true after merging `StateVectorLQubitDynamic` to the monorepo
