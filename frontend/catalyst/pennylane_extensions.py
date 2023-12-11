@@ -110,10 +110,10 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device):
-        self.func = fn  # pragma: nocover
-        self.device = device  # pragma: nocover
-        update_wrapper(self, fn)  # pragma: nocover
+    def __init__(self, fn, device): # pragma: nocover
+        self.func = fn
+        self.device = device
+        update_wrapper(self, fn)
 
     @staticmethod
     def _add_toml_file(device):
