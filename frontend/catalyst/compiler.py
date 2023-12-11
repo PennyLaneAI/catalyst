@@ -25,7 +25,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
@@ -34,6 +34,7 @@ from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
     """Generic compilation options, for which reasonable default values exist.
@@ -52,6 +53,7 @@ class CompileOptions:
             be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
+        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
     """
 
     verbose: Optional[bool] = False
@@ -61,6 +63,7 @@ class CompileOptions:
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
+    abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is

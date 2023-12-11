@@ -27,7 +27,8 @@ extern "C" {
 // Quantum Runtime Instructions
 void __quantum__rt__fail_cstr(const char *);
 void __quantum__rt__initialize();
-void __quantum__rt__device(int8_t *, int8_t *);
+void __quantum__rt__device_init(int8_t *, int8_t *, int8_t *);
+void __quantum__rt__device_release();
 void __quantum__rt__finalize();
 void __quantum__rt__toggle_recorder(bool);
 void __quantum__rt__print_state();

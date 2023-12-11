@@ -80,20 +80,38 @@ struct PythonInterpreterGuard {
 class MemoryManager final {
   private:
     std::unordered_set<void *> _impl;
+    std::mutex mu; // To guard the memory manager
 
   public:
     explicit MemoryManager() { _impl.reserve(1024); };
 
     ~MemoryManager()
     {
+        // Lock the mutex to protect _impl free
+        std::lock_guard<std::mutex> lock(mu);
         for (auto allocation : _impl) {
             free(allocation);
         }
     }
 
-    void insert(void *ptr) { _impl.insert(ptr); }
-    void erase(void *ptr) { _impl.erase(ptr); }
-    bool contains(void *ptr) { return _impl.contains(ptr); }
+    void insert(void *ptr)
+    {
+        // Lock the mutex to protect _impl update
+        std::lock_guard<std::mutex> lock(mu);
+        _impl.insert(ptr);
+    }
+    void erase(void *ptr)
+    {
+        // Lock the mutex to protect _impl update
+        std::lock_guard<std::mutex> lock(mu);
+        _impl.erase(ptr);
+    }
+    bool contains(void *ptr)
+    {
+        // Lock the mutex to protect _impl update
+        std::lock_guard<std::mutex> lock(mu);
+        return _impl.contains(ptr);
+    }
 };
 
 class SharedLibraryManager final {
@@ -161,19 +179,17 @@ class SharedLibraryManager final {
 
 /**
  * This indicates the various stages a device can be in:
- * - `Zero`     : The device is added to the device pool and it's partially created
- *                but hasn't been initialized yet. At this stage, `_device_so_ptr == nullptr`.
- * - `Init`     : The device gets all information including device name, lib, and kwargs
- *                so that it can be initialized: `_device_so_ptr <> nullptr`.
- * - `Active`   : The device is activated, this is the stage after initializing the device
- *                showing that the `_device_ptr` points to this device. The CAPI routines
- *                have only access to the active device via `_device_ptr`.
- * - `Release`  : The device is released but not removed from the pool. The ECM can
- *                reuse this device if requested. (TODO)
+ * - `Init`     : The device is added to the device pool and initialized ()`rtd_qdevice != nullptr`)
+ *                using the device factory method.
+ * - `Active`   : The device is activated. This is the stage after the device initialization,
+ *                so that the `ExecutionContext` active device pointer (`active_rtd_ptr`) points to
+ * this device. The CAPI routines have only access to one single active device per thread via
+ * `active_rtd_ptr`.
+ * - `Release`  : The device is released but not removed from the pool. The `ExecutionContext`
+ * manager will be able to reuse this device later.
  */
-enum class RTDeviceStatusT : uint8_t {
-    Zero = 0,
-    Init,
+enum class RTDeviceStatusType : uint8_t {
+    Init = 0,
     Active,
     Release,
 };
@@ -183,9 +199,9 @@ extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::str
 /**
  * Runtime Device data-class.
  *
- * This class introduces an interface for initialized devices by the execution
- * context manager of the runtime. This includes the device name, library, kwargs,
- * and a shared pointer to the `QuantumDevice` entry point.
+ * This class introduces an interface for constructed devices by the `ExecutionContext`
+ * manager. This includes the device name, library, kwargs, and a shared pointer to the
+ * `QuantumDevice` entry point.
  */
 class RTDeviceInfoT {
   private:
@@ -235,6 +251,14 @@ class RTDeviceInfoT {
         rtd_hash = std::hash<std::string>{}(rtd_lib + rtd_name + rtd_kwargs);
     }
 
+    explicit RTDeviceInfoT(std::string_view _rtd_lib, std::string_view _rtd_name,
+                           std::string_view _rtd_kwargs)
+        : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs)
+    {
+        _pl2runtime_device_info(rtd_lib, rtd_name);
+        rtd_hash = std::hash<std::string>{}(rtd_lib + rtd_name + rtd_kwargs);
+    }
+
     ~RTDeviceInfoT() = default;
 
     [[nodiscard]] auto getHash() const -> size_t { return rtd_hash; }
@@ -261,6 +285,8 @@ class RTDeviceInfoT {
         return rtd_qdevice;
     }
 
+    void releaseDevice() noexcept { rtd_qdevice->ReleaseAllQubits(); }
+
     void setTapeRecorderStatus(bool status) noexcept { tape_recording = status; }
 
     [[nodiscard]] auto getTapeRecorderStatus() const -> bool { return tape_recording; }
@@ -283,15 +309,10 @@ class RTDeviceInfoT {
 class ExecutionContext final {
   private:
     // Device pool
-    std::unordered_map<size_t, std::pair<RTDeviceStatusT, std::shared_ptr<RTDeviceInfoT>>>
+    std::unordered_map<size_t, std::pair<RTDeviceStatusType, std::shared_ptr<RTDeviceInfoT>>>
         device_pool;
     size_t pool_counter{0}; // Counter for generating unique keys for devices
-    std::mutex pool_mutex;  // Mutex to guard the device pool
 
-    // Device info before initialization to support the current frontend-backend pipeline
-    // TODO: remove this after the end-to-end adaptation of the async support in Catalyst
-    std::string zero_rtd_kwargs{};
-    std::string zero_rtd_name{};
     bool zero_rtd_tape_recorder_status;
 
     // ExecutionContext pointers
@@ -309,75 +330,54 @@ class ExecutionContext final {
     {
         memory_man_ptr.reset(nullptr);
         py_guard.reset(nullptr);
-
-        RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void setDeviceRecorder(bool status) noexcept { zero_rtd_tape_recorder_status = status; }
-
-    void setDeviceKwArgs(std::string_view kwargs) noexcept { zero_rtd_kwargs = kwargs; }
-
-    void setDeviceName(std::string_view name) noexcept { zero_rtd_name = name; }
-
-    [[nodiscard]] auto addDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
-                                 const std::string &rtd_kwargs = {})
-        -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
-    {
-        // Lock the mutex to protect device_pool updates
-        std::lock_guard<std::mutex> lock(pool_mutex);
-        size_t key = pool_counter++;
-        auto device = std::make_shared<RTDeviceInfoT>(rtd_lib, rtd_name, rtd_kwargs);
-        device_pool[key] = std::make_pair(RTDeviceStatusT::Init, device);
-        return {key, device->getQuantumDevicePtr()};
-    }
-
-    [[nodiscard]] auto getDevice(size_t device_key) -> std::shared_ptr<QuantumDevice>
-    {
-        // Lock the mutex to protect device_pool info
-        std::lock_guard<std::mutex> lock(pool_mutex);
-        auto it = device_pool.find(device_key);
-        return (it != device_pool.end()) ? it->second.second->getQuantumDevicePtr() : nullptr;
-    }
-
-    void removeDevice(size_t device_key)
-    {
-        // Lock the mutex to protect device_pool updates
-        std::lock_guard<std::mutex> lock(pool_mutex);
-        device_pool.erase(device_key);
-    }
-
-    [[nodiscard]] auto getPoolSize() -> size_t
-    {
-        // Lock the mutex to protect device_pool info
-        std::lock_guard<std::mutex> lock(pool_mutex);
-        return device_pool.size();
-    }
+    void setDeviceRecorderStatus(bool status) noexcept { zero_rtd_tape_recorder_status = status; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool
     {
         return zero_rtd_tape_recorder_status;
     }
 
-    [[nodiscard]] bool initDevice(std::string_view rtd_lib)
+    [[nodiscard]] auto addDevice(const std::string &rtd_lib, const std::string &rtd_name = {},
+                                 const std::string &rtd_kwargs = {})
+        -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
     {
-        auto &&[key, rtd_ptr] =
-            this->addDevice(std::string(rtd_lib), zero_rtd_name, zero_rtd_kwargs);
-        this->active_rtd_ptr = rtd_ptr;
-
-#ifdef __build_with_pybind11
-        if (device_pool[key].second->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
-            py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
-        }
-#endif
-
-        return true;
+        size_t key = pool_counter++;
+        auto device = std::make_shared<RTDeviceInfoT>(rtd_lib, rtd_name, rtd_kwargs);
+        device_pool[key] = std::make_pair(RTDeviceStatusType::Init, device);
+        return {key, device->getQuantumDevicePtr()};
     }
 
-    [[nodiscard]] auto getDevice() -> std::shared_ptr<QuantumDevice> { return active_rtd_ptr; }
+    [[nodiscard]] auto addDevice(std::string_view rtd_lib, std::string_view rtd_name,
+                                 std::string_view rtd_kwargs)
+        -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
+    {
+        size_t key = pool_counter++;
+        auto device = std::make_shared<RTDeviceInfoT>(rtd_lib, rtd_name, rtd_kwargs);
+        device_pool[key] = std::make_pair(RTDeviceStatusType::Init, device);
+        return {key, device->getQuantumDevicePtr()};
+    }
+
+    [[nodiscard]] auto getDevice(size_t device_key) -> std::shared_ptr<QuantumDevice>
+    {
+        auto it = device_pool.find(device_key);
+        return (it != device_pool.end()) ? it->second.second->getQuantumDevicePtr() : nullptr;
+    }
+
+    void removeDevice(size_t device_key) { device_pool.erase(device_key); }
+
+    [[nodiscard]] auto getPoolSize() -> size_t { return device_pool.size(); }
 
     [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
     {
         return memory_man_ptr;
     }
+
+    friend bool initDevice(ExecutionContext *ec, std::string_view rtd_lib,
+                           std::string_view rtd_name, std::string_view rtd_kwargs);
+    friend void releaseDevice(ExecutionContext *ec);
+    friend auto getDevice() -> QuantumDevice *;
+    friend auto isInitialized() -> bool;
 };
 } // namespace Catalyst::Runtime

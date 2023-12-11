@@ -66,9 +66,7 @@ TEST_CASE("Test Driver", "[Driver]")
     CHECK(driver->getDeviceRecorderStatus() == false);
 
     // check device specs update
-    driver->setDeviceRecorder(true);
-    driver->setDeviceKwArgs("execute=openmp;");
-    CHECK(driver->getDevice() == nullptr);
+    driver->setDeviceRecorderStatus(true);
     CHECK(driver->getDeviceRecorderStatus() == true);
 }
 

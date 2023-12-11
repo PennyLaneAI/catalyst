@@ -22,7 +22,6 @@ func.func private @foo(%arg0: f64) -> f64
 
 gradient.grad "fd" @foo(%0) : (f64) -> f64
 gradient.grad "auto" @foo(%0) : (f64) -> f64
-gradient.grad "auto" @foo(%0) : (f64) -> f64
 
 // expected-error@+1 {{got invalid differentiation method: none}}
 gradient.grad "none" @foo(%0) : (f64) -> f64
