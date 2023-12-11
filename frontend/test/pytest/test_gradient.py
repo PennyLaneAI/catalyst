@@ -52,11 +52,65 @@ class TestGradShape:
 
 
 def test_grad_outside_qjit():
-    def f(x: float):
-        return x
+    """Test that grad can be used outside of a jitting context."""
 
-    with pytest.raises(CompileError, match="can only be used from within @qjit"):
-        grad(f)(1.0)
+    def f(x):
+        return x**2
+
+    x = 4.0
+
+    expected = jax.grad(f)(x)
+    result = grad(f)(x)
+
+    assert np.allclose(expected, result)
+
+
+@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
+def test_grad_outside_qjit_argnum(argnum):
+    """Test that argnums work correctly outside of a jitting context."""
+
+    def f(x, y):
+        return x**2 + y**2
+
+    x, y = 4.0, 4.0
+
+    expected = jax.grad(f, argnums=argnum if argnum is not None else 0)(x, y)
+    result = grad(f, argnum=argnum)(x, y)
+
+    assert np.allclose(expected, result)
+
+
+def test_jacobian_outside_qjit():
+    """Test that jacobian can be used outside of a jitting context."""
+
+    def f(x):
+        return x**2, 2 * x
+
+    x = jnp.array([4.0, 5.0])
+
+    expected = jax.jacobian(f)(x)
+    result = jacobian(f)(x)
+
+    assert len(expected) == len(result) == 2
+    assert np.allclose(expected[0], result[0])
+    assert np.allclose(expected[1], result[1])
+
+
+@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
+def test_jacobian_outside_qjit_argnum(argnum):
+    """Test that argnums work correctly outside of a jitting context."""
+
+    def f(x, y):
+        return x**2 + y**2, 2 * x + 2 * y
+
+    x, y = jnp.array([4.0, 5.0]), jnp.array([4.0, 5.0])
+
+    expected = jax.jacobian(f, argnums=argnum if argnum is not None else 0)(x, y)
+    result = jacobian(f, argnum=argnum)(x, y)
+
+    assert len(expected) == len(result) == 2
+    assert np.allclose(expected[0], result[0])
+    assert np.allclose(expected[1], result[1])
 
 
 def test_non_differentiable_qnode():
