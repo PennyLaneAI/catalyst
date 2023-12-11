@@ -261,8 +261,8 @@ class QJITDevice(qml.QubitDevice):
         if QJITDevice._check_adjoint(config):
             QJITDevice.operations += ["Adjoint"]
 
-        if QJITDevice._check_quantum_control(config):  # pragma: nocover
-            QJITDevice.operations += ["QCtrl"]  # pragma: nocover
+        if QJITDevice._check_quantum_control(config):  # pragma: nobranch
+            QJITDevice.operations += ["QCtrl"]
 
     @staticmethod
     def _set_supported_observables(config):
