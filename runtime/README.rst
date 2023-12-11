@@ -6,7 +6,7 @@ Catalyst Quantum Runtime
 The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
 quantum programs, and is currently backed by `PennyLane-Lightning <https://docs.pennylane.ai/projects/lightning/en/stable>`_
 state-vector simulators, and `Amazon Braket <https://amazon-braket-pennylane-plugin-python.readthedocs.io>`_
-devices. Additional hardware support, including QPUs to come.
+devices. Additional hardware support, including QPUs, to come.
 
 The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
 public interface to support an extensible list of backend devices. This interface comprises two collections of abstract methods:
@@ -109,7 +109,7 @@ You can use ``ENABLE_LIGHTNING_KOKKOS=ON`` to build the runtime with `lightning.
 
 .. code-block:: console
 
-    ENABLE_LIGHTNING_KOKKOS=ON make runtime
+    make runtime ENABLE_LIGHTNING_KOKKOS=ON
 
 Lightning-Kokkos provides support for other Kokkos backends including OpenMP, HIP and CUDA.
 Please refer to `the installation guideline <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/installation.html>`_ for the requirements.
@@ -118,13 +118,13 @@ To build the runtime with Lightning-Kokkos and the ``Kokkos::OpenMP`` backend ex
 
 .. code-block:: console
 
-    ENABLE_LIGHTNING_KOKKOS=ON CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" make runtime
+    make runtime ENABLE_LIGHTNING_KOKKOS=ON CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON"
 
 You can also use ``ENABLE_OPENQASM=ON`` to build the runtime with `Amazon-Braket-OpenQasm <https://aws.amazon.com/braket/>`_:
 
 .. code-block:: console
 
-    ENABLE_OPENQASM=ON make runtime
+    make runtime ENABLE_OPENQASM=ON
 
 This device currently offers generators for the `OpenQasm3 <https://openqasm.com/versions/3.0/index.html>`_ specification and
 `Amazon Braket <https://docs.aws.amazon.com/braket/latest/developerguide/braket-openqasm-supported-features.html>`_ assembly extension.
@@ -136,8 +136,8 @@ is required. You can build the runtime with ``BUILD_QIR_STDLIB_FROM_SRC=ON`` aft
 
 .. code-block:: console
 
-  rustup component add llvm-tools-preview
-  BUILD_QIR_STDLIB_FROM_SRC=ON make runtime
+    rustup component add llvm-tools-preview
+    make runtime BUILD_QIR_STDLIB_FROM_SRC=ON
 
 To check the runtime test suite:
 

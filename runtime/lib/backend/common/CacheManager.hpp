@@ -20,7 +20,7 @@
 #include "Types.h"
 #include "Utils.hpp"
 
-namespace Catalyst::Runtime::Simulator {
+namespace Catalyst::Runtime {
 /**
  * @brief The CacheManager caches the entire operations and observables of
  * a program at runtime.
@@ -39,7 +39,7 @@ class CacheManager {
 
     // Observables Data
     std::vector<ObsIdType> obs_keys_{};
-    std::vector<Lightning::Measurements> obs_callees_{};
+    std::vector<MeasurementsT> obs_callees_{};
 
     // Number of parameters
     size_t num_params_{0};
@@ -100,8 +100,7 @@ class CacheManager {
      * @param id The observable key created by LObsManager()
      * @param callee The measurement operation
      */
-    void addObservable(const ObsIdType id,
-                       const Lightning::Measurements &callee = Lightning::Measurements::None)
+    void addObservable(const ObsIdType id, const MeasurementsT &callee = MeasurementsT::None)
     {
         this->obs_keys_.push_back(id);
         this->obs_callees_.push_back(callee);
@@ -115,7 +114,7 @@ class CacheManager {
     /**
      * @brief Get a reference to observables callees.
      */
-    auto getObservablesCallees() -> const std::vector<Lightning::Measurements> &
+    auto getObservablesCallees() -> const std::vector<MeasurementsT> &
     {
         return this->obs_callees_;
     }
@@ -169,4 +168,4 @@ class CacheManager {
      */
     [[nodiscard]] auto getNumParams() const -> size_t { return this->num_params_; }
 };
-} // namespace Catalyst::Runtime::Simulator
+} // namespace Catalyst::Runtime

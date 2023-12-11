@@ -499,31 +499,31 @@ class TestPromotionRules:
     def test_incompatible_compiled_vs_runtime_different_lengths(self):
         """Test incompatible compiled vs runtime."""
 
-        retval = CompiledFunction.typecheck([], [1])
+        retval = CompiledFunction.typecheck(None, [], [1])
         assert TypeCompatibility.NEEDS_COMPILATION == retval
 
     def test_incompatible_compiled_vs_runtime_different_types(self):
         """Test incompatible compiled vs runtime with different types."""
 
-        retval = CompiledFunction.typecheck(jnp.array([1]), jnp.array([complex(1, 2)]))
+        retval = CompiledFunction.typecheck(None, jnp.array([1]), jnp.array([complex(1, 2)]))
         assert TypeCompatibility.NEEDS_COMPILATION == retval
 
     def test_incompatible_compiled_vs_runtime_different_shapes(self):
         """Test incompatible compiled vs runtime with different shapes."""
 
-        retval = CompiledFunction.typecheck(jnp.array([1, 2]), jnp.array([1]))
+        retval = CompiledFunction.typecheck(None, jnp.array([1, 2]), jnp.array([1]))
         assert TypeCompatibility.NEEDS_COMPILATION == retval
 
     def test_can_skip_promotion(self):
         """Test skipping promotion"""
 
-        retval = CompiledFunction.typecheck(jnp.array([1]), jnp.array([1]))
+        retval = CompiledFunction.typecheck(None, jnp.array([1]), jnp.array([1]))
         assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
 
     def test_needs_promotion(self):
         """Test promotion"""
 
-        retval = CompiledFunction.typecheck(jnp.array([1.0]), jnp.array([1]))
+        retval = CompiledFunction.typecheck(None, jnp.array([1.0]), jnp.array([1]))
         assert TypeCompatibility.NEEDS_PROMOTION == retval
 
 
@@ -533,33 +533,33 @@ class TestPromotionRulesDictionary:
     def test_trivial_no_promotion(self):
         """Test trivial for the same dictionary as input."""
         one = jnp.array(1.0)
-        retval = CompiledFunction.typecheck({"key1": one}, {"key1": one})
+        retval = CompiledFunction.typecheck(None, {"key1": one}, {"key1": one})
         assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
 
     def test_trivial_no_promotion_different_values(self):
         """Test trivial for the same dictionary with different values."""
         one = jnp.array(1.0)
         two = jnp.array(2.0)
-        retval = CompiledFunction.typecheck({"key1": one}, {"key1": two})
+        retval = CompiledFunction.typecheck(None, {"key1": one}, {"key1": two})
         assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
 
     def test_trivial_promotion_different_values(self):
         """Test promotion where keys have different values."""
         one = jnp.array(1.0)
         one_int = jnp.array(1)
-        retval = CompiledFunction.typecheck({"key1": one}, {"key1": one_int})
+        retval = CompiledFunction.typecheck(None, {"key1": one}, {"key1": one_int})
         assert TypeCompatibility.NEEDS_PROMOTION == retval
 
     def test_recompilation_superset_keys(self):
         """Recompile if the structure is different superset case."""
         one = jnp.array(1.0)
-        retval = CompiledFunction.typecheck({"key1": one}, {"key2": one, "key1": one})
+        retval = CompiledFunction.typecheck(None, {"key1": one}, {"key2": one, "key1": one})
         assert TypeCompatibility.NEEDS_COMPILATION == retval
 
     def test_recompilation_subset_keys(self):
         """Recompile if the structure is different subset case."""
         one = jnp.array(1.0)
-        retval = CompiledFunction.typecheck({"key2": one, "key1": one}, {"key1": one})
+        retval = CompiledFunction.typecheck(None, {"key2": one, "key1": one}, {"key1": one})
         assert TypeCompatibility.NEEDS_COMPILATION == retval
 
 

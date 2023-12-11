@@ -23,8 +23,9 @@ using namespace Catalyst::Runtime;
 TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 {
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient(0, nullptr));
     }
@@ -34,8 +35,9 @@ TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 {
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(nullptr, 0, nullptr),
                             Catch::Contains("Invalid number of trainable parameters"));
@@ -53,8 +55,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -83,13 +86,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
 
         // To check toggle_recorder before device initialization
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -127,9 +131,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -171,9 +176,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -214,6 +220,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     delete[] buffer_tp;
 }
 
+#ifndef __device_lightning_kokkos
 TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
           "Op=RY, Obs=X [lightning.qubit]",
           "[Gradient]")
@@ -229,12 +236,11 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    const std::string dev("backend");
-    const std::string dev_value("lightning.qubit");
+    const std::string device("lightning.qubit");
 
     for (const auto &p : param) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)dev.c_str(), (int8_t *)dev_value.c_str());
+        __quantum__rt__device_init((int8_t *)device.c_str(), nullptr, nullptr);
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -262,6 +268,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     delete[] buffer;
     delete[] buffer_tp;
 }
+#endif
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
           "Obs=[X]",
@@ -284,8 +291,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
@@ -336,9 +344,10 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     double *buffer1 = new double[J];
     MemRefT_double_1d result1 = {buffer1, buffer1, 0, {J}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __quantum__rt__qubit_allocate_array(2);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -386,9 +395,10 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __quantum__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -444,9 +454,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __quantum__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -516,9 +527,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __quantum__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -590,9 +602,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __quantum__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -662,9 +675,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
 
-    for (const auto &[key, val] : getDevices()) {
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                   (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qubit_arr = __quantum__rt__qubit_allocate_array(2);
 

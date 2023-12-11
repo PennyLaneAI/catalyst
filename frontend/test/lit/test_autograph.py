@@ -364,7 +364,7 @@ print_code(if_assign_existing_partial_no_type_mismatch)
 def if_assign_multiple(x: float):
     """Test a conditional that assigns to multiple existing variables."""
 
-    # CHECK:   (y, z) = (0, False)
+    # CHECK:   {{\(?}}y, z{{\)?}} = (0, False)
     y, z = 0, False
 
     # CHECK:       def if_body():

@@ -44,11 +44,12 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
  *
  * @return `std::vector<std::pair<std::string, std::string>>`
  */
-static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>>
+static inline auto getDevices() -> std::vector<std::tuple<std::string, std::string, std::string>>
 {
-    std::vector<std::pair<std::string, std::string>> devices{{"backend", "lightning.qubit"}};
+    std::vector<std::tuple<std::string, std::string, std::string>> devices{
+        {"lightning.qubit", "lightning.qubit", "{shots: 0}"}};
 #ifdef __device_lightning_kokkos
-    devices.emplace_back("backend", "lightning.kokkos");
+    devices.emplace_back("lightning.kokkos", "lightning.kokkos", "{shots: 0}");
 #endif
     return devices;
 }

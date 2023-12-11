@@ -64,7 +64,7 @@ def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_obser
 class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, mnemonic, traits>;
 
 def InitializeOp : Quantum_Op<"init"> {
-    let summary = "Initialize the quantum device in the runtime.";
+    let summary = "Initialize the quantum runtime.";
 
     let assemblyFormat = [{
         attr-dict
@@ -72,7 +72,7 @@ def InitializeOp : Quantum_Op<"init"> {
 }
 
 def FinalizeOp : Quantum_Op<"finalize"> {
-    let summary = "Teardown the quantum device in the runtime.";
+    let summary = "Teardown the quantum runtime.";
 
     let assemblyFormat = [{
         attr-dict
@@ -80,14 +80,16 @@ def FinalizeOp : Quantum_Op<"finalize"> {
 }
 
 def DeviceOp : Quantum_Op<"device"> {
-    let summary = "Set device specifications in the runtime.";
+    let summary = "Initialize a quantum device or set some device configuration options.";
 
     let arguments = (ins
-        OptionalAttr<StrArrayAttr>:$specs
+        StrAttr:$lib,
+        StrAttr:$name,
+        StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      $specs attr-dict
+      `[` $lib `,` $name `,` $kwargs `]` attr-dict
     }];
 }
 
@@ -95,7 +97,9 @@ def DeviceOp : Quantum_Op<"device"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterface, ["buildDealloc"]>]> {
+// The operation has no memory effect and is pure, therefore two similar alloc would be removed
+// by a CSE pass. This needs to be changed in the future.
+def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -106,7 +110,7 @@ def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterfac
     );
 
     let results = (outs
-        Res<QuregType, "", [MemAlloc<QuantumMemory>]>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
@@ -120,7 +124,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        Arg<QuregType, "", [MemFree<QuantumMemory>]>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
@@ -181,7 +185,7 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
+        Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
         mlir::ValueRange getQubitOperands() {
@@ -203,7 +207,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
+def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -230,7 +234,7 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
+def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -258,7 +262,7 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -293,9 +297,51 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
 
 // -----
 
-class Observable_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
+class Region_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [NoMemoryEffect]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis", [Pure]> {
+def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "Calculate the adjoint of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        QuregType:$qreg
+    );
+
+    let results = (outs
+        QuregType:$out_qreg
+    );
+
+    let assemblyFormat = [{
+        `(` $qreg `)` attr-dict `:` type(operands) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+    let summary = "Return results from quantum program regions";
+
+    let arguments = (ins
+        Variadic<AnyTypeOf<[QuregType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        attr-dict ($results^ `:` type($results))?
+    }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
+}
+
+// -----
+
+class Observable_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [Pure]>;
+
+def ComputationalBasisOp : Observable_Op<"compbasis"> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
@@ -327,7 +373,7 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [Pure]> {
     }];
 }
 
-def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
+def NamedObsOp : Observable_Op<"namedobs"> {
     let summary = "Define a Named observable for use in measurements";
     let description = [{
         The `quantum.namedobs` operation defines a quantum observable to be used by measurement
@@ -360,7 +406,7 @@ def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
     }];
 }
 
-def HermitianOp : Observable_Op<"hermitian", [Pure]> {
+def HermitianOp : Observable_Op<"hermitian"> {
     let summary = "Define a Hermitian observable for use in measurements";
     let description = [{
         The `quantum.hermitian` operation defines a quantum observable to be used by measurement
@@ -386,7 +432,7 @@ def HermitianOp : Observable_Op<"hermitian", [Pure]> {
     let hasVerifier = 1;
 }
 
-def TensorOp : Observable_Op<"tensor", [Pure]> {
+def TensorOp : Observable_Op<"tensor"> {
     let summary = "Define a tensor product of observables for use in measurements";
     let description = [{
         The `quantum.tensor` operation defines a quantum observable to be used by other
@@ -420,7 +466,7 @@ def TensorOp : Observable_Op<"tensor", [Pure]> {
     }];
 }
 
-def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
+def HamiltonianOp : Observable_Op<"hamiltonian"> {
     let summary = "Define a Hamiltonian observable for use in measurements";
     let description = [{
         The `quantum.hamiltonian` operation defines a quantum observable to be used by other
@@ -761,43 +807,6 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let hasVerifier = 1;
-}
-
-def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
-    let summary = "Calculate the adjoint of the enclosed operations";
-
-    let regions = (region SizedRegion<1>:$region);
-
-    let arguments = (ins
-        QuregType:$qreg
-    );
-
-    let results = (outs
-        QuregType:$out_qreg
-    );
-
-    let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
-    }];
-
-    let hasVerifier = 1;
-}
-
-def YieldOp : Op<QuantumDialect, "yield",
-                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
-    let summary = "Return results from quantum program regions";
-
-    let arguments = (ins
-        Variadic<AnyTypeOf<[QuregType]>>:$results
-    );
-
-    let assemblyFormat = [{
-        attr-dict ($results^ `:` type($results))?
-    }];
-
-    let builders = [
-        OpBuilder<(ins), [{ /* nothing to do */ }]>
-    ];
 }
 
 #endif // QUANTUM_OPS

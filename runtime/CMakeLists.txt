@@ -21,7 +21,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
-set(extensions_includes "${PROJECT_SOURCE_DIR}/extensions")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
 
 set(QIRSTDLIB_VERSION "0.4.0")
@@ -66,10 +65,19 @@ if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
     FetchContent_MakeAvailable(qir_runner)
 
     execute_process(
-        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR}
+        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR} RESULT_VARIABLE cargo_found_status
         COMMAND ${CMAKE_COMMAND} -E copy ./stdlib/include/qir_stdlib.h ${qir_runner_BINARY_DIR}/release/qir_stdlib.h
         WORKING_DIRECTORY ${qir_runner_SOURCE_DIR}
     )
+
+    if(NOT cargo_found_status EQUAL "0")
+        message(FATAL_ERROR
+            "Missing cargo installation\n"
+            "Please install \"Rust\" and the \"llvm-tools-preview\" rustup component "
+            "for building qir-stdlib from source. See the installation guideline for details: "
+            "https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html"
+            )
+    endif()
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
 elseif(NOT DEFINED QIR_STDLIB_PATH)
@@ -95,26 +103,36 @@ endif()
 
 message(STATUS "QIR_STDLIB: ${QIR_STDLIB_PATH}")
 
-if(ENABLE_LIGHTNING)
-    message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning")
-endif()
+message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
+message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
+message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
-if(ENABLE_LIGHTNING_KOKKOS)
-    message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
-    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning-kokkos")
+set(devices_list)
+
+if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
+    list(APPEND devices_list pennylane_lightning rtd_lightning)
+    if(ENABLE_LIGHTNING)
+        list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_dynamic")
+    endif()
+    if(ENABLE_LIGHTNING_KOKKOS)
+        list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning/lightning_kokkos")
+    endif()
 endif()
 
 if(ENABLE_OPENQASM)
-    message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
+    list(APPEND devices_list rtd_openqasm)
 endif()
 
 add_library(catalyst_qir_runtime INTERFACE)
 
-target_link_libraries(catalyst_qir_runtime INTERFACE rt_backend rt_capi)
+target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 
-target_include_directories(catalyst_qir_runtime INTERFACE runtime_includes ${QIR_STDLIB_PATH})
+target_include_directories(catalyst_qir_runtime INTERFACE
+    ${runtime_includes}
+    ${backend_includes}
+    ${QIR_STDLIB_PATH}
+    )
 
 if(ENABLE_CODE_COVERAGE)
 	message(STATUS "ENABLE_CODE_COVERAGE is ON.")
@@ -130,7 +148,5 @@ if(ENABLE_ADDRESS_SANITIZER)
     add_link_options(-fsanitize=address)
 endif()
 
-add_subdirectory(extensions)
 add_subdirectory(lib)
-
 add_subdirectory(tests)

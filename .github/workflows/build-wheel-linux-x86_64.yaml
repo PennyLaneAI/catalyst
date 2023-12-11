@@ -254,7 +254,7 @@ jobs:
       run: |
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$PWD/runtime-build/lib \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
@@ -262,9 +262,10 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
-              -DENABLE_OPENQASM=ON
+              -DENABLE_OPENQASM=ON \
+              -DENABLE_OPENMP=ON
 
-        cmake --build runtime-build --target rt_capi
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects

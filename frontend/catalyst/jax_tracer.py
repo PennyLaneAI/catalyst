@@ -57,19 +57,20 @@ from catalyst.utils.jax_extras import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     PyTreeDef,
+    PyTreeRegistry,
     ShapedArray,
-    ShapeDtypeStruct,
     _abstractify,
     _input_type_to_tracers,
     convert_element_type,
     deduce_avals,
     eval_jaxpr,
+    jaxpr_remove_implicit,
     jaxpr_to_mlir,
-    pytree,
+    make_jaxpr2,
     sort_eqns,
+    tree_flatten,
     tree_structure,
     tree_unflatten,
-    unzip2,
     wrap_init,
 )
 
@@ -92,14 +93,13 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
-        shape_tree = tree_structure(shape)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
-        return tree_unflatten(shape_tree, retval)
+        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
+        return tree_unflatten(out_tree, retval)
 
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
@@ -322,31 +322,39 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
-def trace_to_mlir(func, *args, **kwargs):
+def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
         func: python function to be lowered
+        abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
+            sizes.
         args: arguments to ``func``
         kwargs: keyword arguments to ``func``
 
     Returns:
-        module: the MLIR module corresponding to ``func``
-        context: the MLIR context corresponding
-        jaxpr: the jaxpr corresponding to ``func``
-        shape: the shape of the return values in ``PyTreeDef``
+        MLIR module: the MLIR module corresponding to ``func``
+        MLIR context: the MLIR context
+        ClosedJaxpr: the Jaxpr program corresponding to ``func``
+        jax.OutputType: Jaxpr output type (a list of abstract values paired with
+                        explicintess flags).
+        PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    # The compilation cache must be clear for each translation unit.
-    # Otherwise, MLIR functions which do not exist in the current translation unit will be assumed
-    # to exist if an equivalent python function is seen in the cache. This happens during testing or
-    # if we wanted to compile a single python function multiple times with different options.
+    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
+    # which do not exist in the current translation unit will be assumed to exist if an equivalent
+    # python function is seen in the cache. This happens during testing or if we wanted to compile a
+    # single python function multiple times with different options.
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
+        make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes}
+        jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    return jaxpr_to_mlir(func.__name__, jaxpr, shape)
+    # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
+    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+    module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
+    return module, context, jaxpr, out_type2, out_tree
 
 
 def trace_quantum_tape(
@@ -555,7 +563,7 @@ def trace_quantum_measurements(
                 if len(meas_return_trees_children):
                     meas_return_trees_children[i] = counts_tree
                     out_tree = out_tree.make_from_node_data_and_children(
-                        pytree.PyTreeRegistry(),
+                        PyTreeRegistry(),
                         out_tree.node_data(),
                         meas_return_trees_children,
                     )
@@ -664,45 +672,37 @@ def split_tracers_and_measurements(flat_values):
     return classical, measurements
 
 
-def trace_post_processing(ctx, trace, post_processing, args_types, args):
+def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
     """Trace post processing function.
 
     Args:
         ctx (EvaluationContext): context
         trace (DynamicJaxprTrace): trace
-        post_processing: post_processing function
-        args_types: unflattened args
-        args: input tracers
+        post_processing(Callable): PennyLane transform post_processing function
+        pp_args(structured Jax tracers): List of results returned from the PennyLane quantum
+                                         transform function
 
     Returns:
-        closed_jaxpr: JAXPR expression for the whole frame
-        post_processing_results: Output
+        closed_jaxpr(ClosedJaxpr): JAXPR expression for the whole frame
+        out_type(jax.OutputType) : List of abstract values with explicitness flag
+        out_tree(PyTreeDef): PyTree shape of the qnode result
     """
 
     with EvaluationContext.frame_tracing_context(ctx, trace):
         # What is the input to the post_processing function?
-        # The input to the post_processing function is going to be a list of values
-        # One for each tape.
-
-        # The tracers are all flat in args.
-        # The shape is in a list of args_types.
+        # The input to the post_processing function is going to be a list of values One for each
+        # tape. The tracers are all flat in pp_args.
 
         # We need to deduce the type/shape/tree of the post_processing.
-        wffa, _, out_tree_promise = deduce_avals(post_processing, (args_types,), {})
+        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
 
         # wffa will take as an input a flatten tracers.
-        post_processing_retval_flat = wffa.call_wrapped(*args)
-
         # After wffa is called, then the shape becomes available in out_tree_promise.
-        post_processing_tracers = [trace.full_raise(t) for t in post_processing_retval_flat]
-        jaxpr, _, consts = ctx.frames[trace].to_jaxpr2(post_processing_tracers)
+        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
+        out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
+        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        post_processing_results = tree_unflatten(
-            out_tree_promise(),
-            [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in post_processing_tracers],
-        )
-
-        return closed_jaxpr, post_processing_results
+        return closed_jaxpr, out_type, out_tree_promise()
 
 
 def trace_quantum_function(
@@ -724,17 +724,19 @@ def trace_quantum_function(
 
     Returns:
         closed_jaxpr: JAXPR expression of the function ``f``.
-        abstract_results: Output structure filled with abstract return values of ``f``.
+        out_type: JAXPR output type (list of abstract values with explicitness flags).
+        out_tree: PyTree shapen of the result
     """
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape()
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
+            wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
+                in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
                 return_values_flat = wffa.call_wrapped(*in_classical_tracers)
 
             # Ans contains the leaves of the pytree (empty for measurement without
@@ -761,7 +763,7 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(qnode, quantum_tape, return_values_flat)
 
         # (2) - Quantum tracing
-        results_tracers, results_abstract = [], []
+        transformed_results = []
         is_program_transformed = qnode and qnode.transform_program
         for tape in tapes:
             # If the program is batched, that means that it was transformed.
@@ -776,40 +778,32 @@ def trace_quantum_function(
                 trees = return_values_tree
 
             with EvaluationContext.frame_tracing_context(ctx, trace):
-                qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
-                qdevice_p.bind(spec="backend", val=device.backend_name)
+                qdevice_p.bind(
+                    rtd_lib=device.backend_lib,
+                    rtd_name=device.backend_name,
+                    rtd_kwargs=str(device.backend_kwargs),
+                )
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
-                out_quantum_tracers = [qrp_out.actualize()]
-                qdealloc_p.bind(qreg_in)
+                qdealloc_p.bind(qrp_out.actualize())
 
-                tracers = [trace.full_raise(m) for m in meas]
-                results_tracers += tracers
+                meas_tracers = [trace.full_raise(m) for m in meas]
+                meas_results = tree_unflatten(meas_trees, meas_tracers)
 
-                jaxpr, out_type, _ = ctx.frames[trace].to_jaxpr2(tracers + out_quantum_tracers)
-                jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
-                out_type = out_type[:-1]
-
-                out_avals, _ = unzip2(out_type)
-                abstract_results = tree_unflatten(
-                    meas_trees,
-                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
-                )
-                # This mimics the return type from qnodes.
-                # I would prefer if qnodes didn't have special rules about whether they return a
-                # tuple, list, or value.
                 # TODO: Allow the user to return whatever types they specify.
-                if is_program_transformed and len(abstract_results) == 1:
-                    results_abstract.append(abstract_results[0])
-                elif is_program_transformed:
-                    results_abstract.append(tuple(abstract_results))
+                if is_program_transformed:
+                    assert isinstance(meas_results, list)
+                    if len(meas_results) == 1:
+                        transformed_results.append(meas_results[0])
+                    else:
+                        transformed_results.append(tuple(meas_results))
                 else:
-                    results_abstract.append(abstract_results)
-                # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
-                # check_jaxpr(jaxpr)
+                    transformed_results.append(meas_results)
 
-        closed_jaxpr, unflattened_callback_results = trace_post_processing(
-            ctx, trace, post_processing, results_abstract, results_tracers
+        closed_jaxpr, out_type, out_tree = trace_post_processing(
+            ctx, trace, post_processing, transformed_results
         )
-    return closed_jaxpr, unflattened_callback_results
+        # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+        # check_jaxpr(jaxpr)
+    return closed_jaxpr, out_type, out_tree

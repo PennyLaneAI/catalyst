@@ -39,7 +39,7 @@
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -591,7 +591,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         SmallVector<Value> unwrappedInputs;
         SmallVector<Value> unwrappedShadows;
-        unsigned idx = 0;
 
         auto unwrapMemRef = [&](Value wrapped, Type unwrappedType) {
             auto structType = getTypeConverter()->convertType(unwrappedType);
@@ -611,7 +610,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 assert(false && "non memref inputs not yet supported");
                 unwrappedInputs.push_back(arg);
             }
-            idx++;
         }
 
         SmallVector<Value> primalInputs{
