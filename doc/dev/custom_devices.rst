@@ -187,9 +187,12 @@ Below is an example configuration file
 
         [device]
         name = "dummy.device.qubit"
+
+        # The number of bits and encoding for floating point numbers.
+        # This relates to the underlying precision of the quantum state.
         precision = ['float32', 'float64']
 
-        [operations]
+        [operators]
         # Observables supported by the device
         observables = [
                 "PauliX",
@@ -207,8 +210,8 @@ Below is an example configuration file
                 "Exp",
         ]
 
-        # Operations that shouldn't be decomposed.
-        [[operations.gates]]
+        # Operators that shouldn't be decomposed.
+        [[operators.gates]]
         native = [
                 "QubitUnitary",
                 "PauliX",
@@ -241,7 +244,7 @@ Below is an example configuration file
                 "IsingXY",
         ]
 
-        # Operations that should be decomposed according to
+        # Operators that should be decomposed according to
         # whatever algorithm PL specifies.
         decomp = [
                 "SX",

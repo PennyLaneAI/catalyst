@@ -97,7 +97,7 @@ def get_native_gates(config):
     Args:
         config (Dict[Str, Any]): Configuration dictionary
     """
-    return config["operations"]["gates"][0]["native"]
+    return config["operators"]["gates"][0]["native"]
 
 
 def get_decomposable_gates(config):
@@ -106,7 +106,7 @@ def get_decomposable_gates(config):
     Args:
         config (Dict[Str, Any]): Configuration dictionary
     """
-    return config["operations"]["gates"][0]["decomp"]
+    return config["operators"]["gates"][0]["decomp"]
 
 
 def get_matrix_decomposable_gates(config):
@@ -115,7 +115,7 @@ def get_matrix_decomposable_gates(config):
     Args:
         config (Dict[Str, Any]): Configuration dictionary
     """
-    return config["operations"]["gates"][0]["matrix"]
+    return config["operators"]["gates"][0]["matrix"]
 
 
 def check_no_overlap(*args):

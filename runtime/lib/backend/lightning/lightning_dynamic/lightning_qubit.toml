@@ -4,7 +4,7 @@ schema = 1
 name = "lightning.qubit"
 precision = ['float32', 'float64']
 
-[operations]
+[operators]
 observables = [
         "PauliX",
         "PauliY",
@@ -23,7 +23,7 @@ observables = [
 
 # These are gates that do not need decomposition.
 # Also gates which are natively supported by the device.
-[[operations.gates]]
+[[operators.gates]]
 native = [
         "Identity",
         "PauliX",
@@ -70,7 +70,7 @@ native = [
 # according to rules outlined in the decomposition strategy for each
 # operation.
 decomp = [
-	# All adjoint operations in lightning_qubit
+	# All adjoint operators in lightning_qubit
 	# are applied via applyMatrix.
         "Adjoint(S)",
         "Adjoint(T)",

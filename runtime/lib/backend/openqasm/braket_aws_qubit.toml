@@ -4,7 +4,7 @@ schema = 1
 name = "braket.aws.qubit"
 precision = ['float64']
 
-[operations]
+[operators]
 observables = [
 	"PauliX",
 	"PauliY",
@@ -15,7 +15,7 @@ observables = [
 ]
 
 # These are gates that are natively supported by the device.
-[[operations.gates]]
+[[operators.gates]]
 native = [
 	# These two are native but are not supported by the QIR runtime yet.
 	# This is not a problem because we intersect the native gate set

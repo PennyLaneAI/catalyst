@@ -4,7 +4,7 @@ schema = 1
 name = "lightning.kokkos"
 precision = ['float32', 'float64']
 
-[operations]
+[operators]
 observables = [
         "PauliX",
         "PauliY",
@@ -22,7 +22,7 @@ observables = [
 
 # These are gates that do not need decomposition.
 # Also gates which are natively supported by the device.
-[[operations.gates]]
+[[operators.gates]]
 native = [
         "Identity",
         "PauliX",
@@ -64,7 +64,7 @@ native = [
 	# belong in matrix gates.
         "QubitUnitary",
 
-	# All adjoint operations in lightning_kokkos
+	# All adjoint operators in lightning_kokkos
 	# are applied via the inverse flag.
         "Adjoint(S)",
         "Adjoint(T)",

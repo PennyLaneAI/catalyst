@@ -79,7 +79,7 @@ def test_get_native_gates():
     with tempfile.NamedTemporaryFile(mode="w+") as f:
         test_gates = ["TestNativeGate"]
         payload = f"""
-[[operations.gates]]
+[[operators.gates]]
 native = {str(test_gates)}
         """
         f.write(payload)
@@ -95,7 +95,7 @@ def test_get_decomp_gates():
     with tempfile.NamedTemporaryFile(mode="w+") as f:
         test_gates = ["TestDecompGate"]
         payload = f"""
-[[operations.gates]]
+[[operators.gates]]
 decomp = {str(test_gates)}
         """
         f.write(payload)
@@ -111,7 +111,7 @@ def test_get_matrix_decomposable_gates():
     with tempfile.NamedTemporaryFile(mode="w+") as f:
         test_gates = ["TestMatrixGate"]
         payload = f"""
-[[operations.gates]]
+[[operators.gates]]
 matrix = {str(test_gates)}
         """
         f.write(payload)

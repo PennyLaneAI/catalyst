@@ -248,7 +248,7 @@ class QJITDevice(qml.QubitDevice):
     @staticmethod
     def _set_supported_operations(config):
         """Override the set of supported operations."""
-        native_gates = set(config["operations"]["gates"][0]["native"])
+        native_gates = set(config["operators"]["gates"][0]["native"])
         qir_gates = QJITDevice._get_operations_available_in_QIR_abstract_machine()
         QJITDevice.operations = list(native_gates.intersection(qir_gates))
 
@@ -267,7 +267,7 @@ class QJITDevice(qml.QubitDevice):
     @staticmethod
     def _set_supported_observables(config):
         """Override the set of supported observables."""
-        QJITDevice.observables = config["operations"]["observables"]
+        QJITDevice.observables = config["operators"]["observables"]
 
     # pylint: disable=too-many-arguments
     def __init__(

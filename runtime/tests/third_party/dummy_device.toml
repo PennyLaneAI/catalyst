@@ -4,7 +4,7 @@ schema = 1
 name = "dummy.device.qubit"
 precision = ['float32', 'float64']
 
-[operations]
+[operators]
 observables = [
         "PauliX",
         "PauliY",
@@ -21,7 +21,7 @@ observables = [
         "Exp",
 ]
 
-[[operations.gates]]
+[[operators.gates]]
 native = [
         "QubitUnitary",
         "PauliX",
