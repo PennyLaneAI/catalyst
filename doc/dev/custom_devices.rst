@@ -302,5 +302,5 @@ Below is an example configuration file
         quantum_control = false
         # If the device supports mid circuit measurements natively
         mid_circuit_measurement = true
-        # If the device supports dynamic qubits
+        # If the device supports dynamic qubit allocation/deallocation
         dynamic_qubit_management = false 
