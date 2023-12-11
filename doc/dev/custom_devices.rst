@@ -210,9 +210,11 @@ Below is an example configuration file
                 "Exp",
         ]
 
-        # Operators that shouldn't be decomposed.
+        # The union of all gate types listed in this section must match what
+        # the device considers "supported" through PennyLane's device API.
         [[operators.gates]]
         native = [
+                # Operators that shouldn't be decomposed.
                 "QubitUnitary",
                 "PauliX",
                 "PauliY",
