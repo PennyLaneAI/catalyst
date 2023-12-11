@@ -188,10 +188,6 @@ Below is an example configuration file
         [device]
         name = "dummy.device.qubit"
 
-        # The number of bits and encoding for floating point numbers.
-        # This relates to the underlying precision of the quantum state.
-        precision = ['float32', 'float64']
-
         [operators]
         # Observables supported by the device
         observables = [

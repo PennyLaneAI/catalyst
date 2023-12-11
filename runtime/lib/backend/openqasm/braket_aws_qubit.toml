@@ -2,7 +2,6 @@ schema = 1
 
 [device]
 name = "braket.aws.qubit"
-precision = ['float64']
 
 [operators]
 observables = [

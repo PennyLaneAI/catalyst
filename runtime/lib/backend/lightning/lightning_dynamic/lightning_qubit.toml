@@ -2,7 +2,6 @@ schema = 1
 
 [device]
 name = "lightning.qubit"
-precision = ['float32', 'float64']
 
 [operators]
 observables = [
