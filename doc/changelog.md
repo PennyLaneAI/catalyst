@@ -15,6 +15,8 @@
   This provides flexibility and extensibility to Catalyst allowing users to
   load quantum devices dynamically.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+
 
 * Support for dynamically-shaped arrays has been added.
   [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
@@ -44,6 +46,12 @@
 
 * Support for `mcmc` sampling in `lightning.qubit`.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+
+* Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
+  outside a `@qjit` context. This simplifies the process of writing functions where compilation
+  can be turned on and off easily by adding or removing the decorator. The functions dispatch to
+  their JAX equivalents when the compilation is turned off.
+  [(#375)](https://github.com/PennyLaneAI/catalyst/pull/375)
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum

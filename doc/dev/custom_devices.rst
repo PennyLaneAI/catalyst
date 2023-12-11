@@ -82,9 +82,18 @@ uniquely identify the entry point symbol. As an example, we use the identifier `
 .. code-block:: c++
 
     extern "C" Catalyst::Runtime::QuantumDevice*
-    CustomDeviceFactory(const std::string &kwargs) {
-        return new CustomDevice(kwargs);
+    CustomDeviceFactory(const char *kwargs) {
+        return new CustomDevice(std::string(kwargs));
     }
+
+For simplicity, you can use the ``GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)`` macro to
+define this function, where ``IDENTIFIER`` is the device identifier, and ``CONSTRUCTOR`` is the
+C++ device constructor including the namespace. For this example, both the device identifier and
+constructor are the same:
+
+.. code-block:: c++
+
+    GENERATE_DEVICE_FACTORY(CustomDevice, CustomDevice);
 
 The entry point function acts as a factory method for the device class.
 Note that a plugin library may also provide several factory methods in case it packages
