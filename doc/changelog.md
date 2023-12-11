@@ -67,6 +67,7 @@
 <h3>Breaking changes</h3>
 
 * Third party devices must now specify a configuration toml file.
+  For more information please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 <h3>Bug fixes</h3>
