@@ -116,7 +116,7 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device): # pragma: nocover
+    def __init__(self, fn, device):  # pragma: nocover
         self.func = fn
         self.device = device
         update_wrapper(self, fn)
