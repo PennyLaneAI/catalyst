@@ -83,10 +83,18 @@ OPERATIONS = [
     "MultiControlledX",
 ]
 OBSERVABLES = [
-    "NamedObs",
-    "HermitianObs",
-    "TensorObs",
-    "HamiltonianObs",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "Hadamard",
+    "Hermitian",
+    "Identity",
+    "Projector",
+    "Hamiltonian",
+    "Sum",
+    "SProd",
+    "Prod",
+    "Exp",
 ]
 
 
