@@ -315,3 +315,16 @@ Below is an example configuration file
         # This field is currently unchecked but it is reserved for the purpose of
         # determining if the device supports dynamic qubit allocation/deallocation.
         dynamic_qubit_management = false 
+
+        [options]
+        # Options is an optional field.
+        # These options represent runtime parameters that can be passed to the device
+        # upon the device initialization.
+        # The option key will be the key in a dictionary.
+        # The string corresponds to a field queried in the `qml.Device` instance.
+        option = "option"
+        # The concrete meaning is as follows:
+        # if "options" in config.keys():
+        #    for k, v in config["options"].items():
+        #         if hasattr(device, v):
+        #             runtime_options[k] = getattr(device, v)
