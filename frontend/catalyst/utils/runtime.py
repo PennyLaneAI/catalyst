@@ -171,7 +171,7 @@ def check_gates_are_compatible_with_device(device, config):
     decomposable = get_decomposable_gates(config)
     matrix = get_matrix_decomposable_gates(config)
     check_no_overlap(native, decomposable, matrix)
-    if not hasattr(device, "operations"):  # pragma: nobranch
+    if not hasattr(device, "operations"):  # pragma: nocover
         # The new device API has no "operations" field
         # so we cannot check that there's an overlap or not.
         return
