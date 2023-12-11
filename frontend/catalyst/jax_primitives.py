@@ -15,7 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from itertools import chain
 from typing import Dict, Iterable, List
 
@@ -310,6 +310,9 @@ class GradParams:
     scalar_out: bool
     h: float
     argnum: List[int]
+
+    def __iter__(self):
+        return iter(astuple(self))
 
 
 @grad_p.def_impl
