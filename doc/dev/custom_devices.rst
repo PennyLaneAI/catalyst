@@ -303,7 +303,7 @@ Below is an example configuration file
         [compilation]
         # If the device is compatible with qjit
         qjit_compatible = true
-        # If the device supports run time code generation
+        # If the device requires run time generation of the quantum circuit.
         runtime_code_generation = false
         # If the device supports adjoint
         quantum_adjoint = true
