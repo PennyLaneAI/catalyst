@@ -182,9 +182,9 @@ class SharedLibraryManager final {
  * - `Init`     : The device is added to the device pool and initialized ()`rtd_qdevice != nullptr`)
  *                using the device factory method.
  * - `Active`   : The device is activated. This is the stage after the device initialization,
- *                so that the `ExecutionContext` active device pointer (`active_rtd_ptr`) points to
- * this device. The CAPI routines have only access to one single active device per thread via
- * `active_rtd_ptr`.
+ *                so that the `ExecutionContext` active device pointer (`RTD_PTR`) points to
+ *                this device. The CAPI routines have only access to one single active device
+ *                per thread via `RTD_PTR`.
  * - `Release`  : The device is released but not removed from the pool. The `ExecutionContext`
  * manager will be able to reuse this device later.
  */
@@ -316,7 +316,6 @@ class ExecutionContext final {
     bool zero_rtd_tape_recorder_status;
 
     // ExecutionContext pointers
-    std::shared_ptr<QuantumDevice> active_rtd_ptr{nullptr};
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 

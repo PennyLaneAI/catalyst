@@ -37,16 +37,20 @@
 namespace Catalyst::Runtime {
 
 /**
- * @brief Global quantum device unique pointer.
+ * @brief Global quantum device unique pointer with internal linkage.
  */
 thread_local static std::unique_ptr<ExecutionContext> CTX = nullptr;
 
 /**
- * @brief Thread local device pointer and unique ID.
+ * @brief Thread local device pointer and unique ID with internal linkage.
  */
-thread_local QuantumDevice *RTD_PTR = nullptr;
-thread_local size_t RTD_ID = 0;
+thread_local static QuantumDevice *RTD_PTR = nullptr;
+thread_local static size_t RTD_ID = 0;
 
+/**
+ * @brief Initialize the device instance and update the value of RTD_PTR and RTD_ID
+ * to the new initialized device pointer and unique id.
+ */
 [[nodiscard]] bool initDevice(ExecutionContext *ec, std::string_view rtd_lib,
                               std::string_view rtd_name, std::string_view rtd_kwargs)
 {
@@ -63,6 +67,9 @@ thread_local size_t RTD_ID = 0;
     return true;
 }
 
+/**
+ * @brief Release the active device instance.
+ */
 void releaseDevice(ExecutionContext *ec)
 {
     if (RTD_PTR == nullptr) {
@@ -79,8 +86,14 @@ void releaseDevice(ExecutionContext *ec)
     RTD_ID = 0;
 }
 
+/**
+ * @brief get `RTD_PTR`.
+ */
 auto getDevice() -> QuantumDevice * { return RTD_PTR; }
 
+/**
+ * @brief check `RTD_PTR ?= nullptr`.
+ */
 auto isInitialized() -> bool { return RTD_PTR ? true : false; }
 
 } // namespace Catalyst::Runtime
