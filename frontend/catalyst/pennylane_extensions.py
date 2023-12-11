@@ -261,7 +261,7 @@ class QJITDevice(qml.QubitDevice):
         # These are added unconditionally.
         QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
 
-        if QJITDevice._check_mid_circuit_measurement(config):
+        if QJITDevice._check_mid_circuit_measurement(config):  # pragma: no branch
             QJITDevice.operations += ["MidCircuitMeasure"]
 
         if QJITDevice._check_adjoint(config):
