@@ -246,8 +246,11 @@ Below is an example configuration file
                 "IsingXY",
         ]
 
-        # Operators that should be decomposed according to
-        # whatever algorithm PL specifies.
+        # Operators that should be decomposed according to the algorithm used
+        # by PennyLane's device API.
+        # Optional, since gates not listed in this list will typically be decomposed by
+        # default, but can be useful to express a deviation from this device's regular
+        # strategy in PennyLane.
         decomp = [
                 "SX",
                 "ISWAP",
