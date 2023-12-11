@@ -15,6 +15,8 @@
   This provides flexibility and extensibility to Catalyst allowing users to
   load quantum devices dynamically.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+
 
 * Support for dynamically-shaped arrays has been added.
   [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
@@ -60,9 +62,6 @@
   and lowers the operation to one single device initialization call:
   `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
   [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
-
-* Add C++ macros for generating the device entry-point and declarations.
-  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
 
 <h3>Breaking changes</h3>
 
