@@ -54,15 +54,9 @@ thread_local static size_t RTD_ID = 0;
 [[nodiscard]] bool initDevice(ExecutionContext *ec, std::string_view rtd_lib,
                               std::string_view rtd_name, std::string_view rtd_kwargs)
 {
-    auto &&[key, rtd_ptr] = ec->addDevice(rtd_lib, rtd_name, rtd_kwargs);
+    auto &&[key, rtd_ptr] = ec->getDevice(rtd_lib, rtd_name, rtd_kwargs);
     RTD_PTR = rtd_ptr.get();
     RTD_ID = key;
-
-#ifdef __build_with_pybind11
-    if (ec->device_pool[key].second->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
-        ec->py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
-    }
-#endif
 
     return true;
 }
@@ -77,12 +71,8 @@ void releaseDevice(ExecutionContext *ec)
         return;
     }
 
+    ec->releaseDevice(RTD_ID);
     RTD_PTR = nullptr;
-    auto it = ec->device_pool.find(RTD_ID);
-    if (it != ec->device_pool.end()) {
-        it->second.first = RTDeviceStatusType::Release;
-        it->second.second->releaseDevice();
-    }
     RTD_ID = 0;
 }
 

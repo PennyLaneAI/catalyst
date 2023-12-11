@@ -74,7 +74,7 @@ if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
 
     target_sources(runner_tests_lightning PRIVATE ${cov_helper_src}
         ${dl_manager_tests}
-        # Test_DevicePool.cpp
+        Test_DevicePool.cpp
         Test_QubitManager.cpp
         Test_CacheManager.cpp
         Test_LightningDriver.cpp
