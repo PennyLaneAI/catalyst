@@ -15,6 +15,8 @@
   This provides flexibility and extensibility to Catalyst allowing users to
   load quantum devices dynamically.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+
 
 * Support for dynamically-shaped arrays has been added.
   [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)

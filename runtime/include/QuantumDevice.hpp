@@ -21,6 +21,15 @@
 #include "DataView.hpp"
 #include "Types.h"
 
+// A helper template macro to generate the <IDENTIFIER>Factory method by
+// calling <CONSTRUCTOR>(kwargs). Check the Custom Devices guideline for details:
+// https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html
+#define GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)                                           \
+    extern "C" Catalyst::Runtime::QuantumDevice *IDENTIFIER##Factory(const char *kwargs)           \
+    {                                                                                              \
+        return new CONSTRUCTOR(std::string(kwargs));                                               \
+    }
+
 namespace Catalyst::Runtime {
 
 /**
