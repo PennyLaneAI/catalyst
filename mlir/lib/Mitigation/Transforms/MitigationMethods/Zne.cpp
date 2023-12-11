@@ -29,7 +29,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 namespace catalyst {
 namespace mitigation {
