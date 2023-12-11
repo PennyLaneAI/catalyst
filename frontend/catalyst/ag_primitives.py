@@ -22,9 +22,10 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from autograph.core import config
-from autograph.impl import api as autograph_api
+from autograph.core import config as ag_config
+from autograph.impl import api as ag_api
 from autograph.impl.api import converted_call as ag_converted_call
+from autograph.operators import py_builtins as ag_py_builtins
 from autograph.operators.variables import Undefined
 from autograph.pyct.origin_info import LineLocation
 from pennylane.queuing import AnnotatedQueue
@@ -502,19 +503,22 @@ def get_source_code_info(tb_frame):
 # issues such as always tracing through code that should only be executed conditionally. We might
 # have to be even more restrictive in the future to prevent issues if necessary.
 module_allowlist = (
-    config.DoNotConvert("pennylane"),
-    config.DoNotConvert("catalyst"),
-    config.DoNotConvert("jax"),
-) + config.CONVERSION_RULES
+    ag_config.DoNotConvert("pennylane"),
+    ag_config.DoNotConvert("catalyst"),
+    ag_config.DoNotConvert("jax"),
+    *ag_config.CONVERSION_RULES,
+)
 
 
 def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
     """We want AutoGraph to use our own instance of the AST transformer when recursively
     transforming functions, but otherwise duplicate the same behaviour."""
 
+    # TODO: eliminate the need for patching by improving the autograph interface
     with Patcher(
-        (autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
-        (config, "CONVERSION_RULES", module_allowlist),
+        (ag_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
+        (ag_config, "CONVERSION_RULES", module_allowlist),
+        (ag_py_builtins, "BUILTIN_FUNCTIONS_MAP", py_builtins_map),
     ):
         # HOTFIX: pass through calls of known Catalyst wrapper functions
         if fn in (
@@ -537,14 +541,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 **(kwargs if kwargs is not None else {}),
             )
 
-        # Dispatch range calls to a custom range class that enables constructs like
-        # `for .. in range(..)` to be converted natively to `for_loop` calls. This is beneficial
-        # since the Python range function does not allow tracers as arguments.
-        if fn is range:
-            return CRange(*args, **(kwargs if kwargs is not None else {}))
-        elif fn is enumerate:
-            return CEnumerate(*args, **(kwargs if kwargs is not None else {}))
-
+        # TODO: find a way to handle custom decorators more effectively with autograph
         # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
         # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
         # than the QNode or QJIT call method.
@@ -654,3 +651,10 @@ class CEnumerate(enumerate):
     def __init__(self, iterable, start=0):
         self.iteration_target = iterable
         self.start_idx = start
+
+
+py_builtins_map = {
+    **ag_py_builtins.BUILTIN_FUNCTIONS_MAP,
+    "range": CRange,
+    "enumerate": CEnumerate,
+}

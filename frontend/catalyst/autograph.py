@@ -72,7 +72,11 @@ class CatalystTransformer(PyToPy):
         """Check for the presence of the given function in the cache. Functions to be converted are
         cached by the function object itself as well as the conversion options."""
 
-        return self._cache.has(fn, STANDARD_OPTIONS) or self._cache.has(fn, TOPLEVEL_OPTIONS)
+        return (
+            self._cache.has(fn, TOPLEVEL_OPTIONS)
+            or self._cache.has(fn, NESTED_OPTIONS)
+            or self._cache.has(fn, STANDARD_OPTIONS)
+        )
 
     def get_cached_function(self, fn):
         """Retrieve a Python function object for a previously converted function.
@@ -81,10 +85,12 @@ class CatalystTransformer(PyToPy):
         exception of auto-generated names."""
 
         # Converted functions are cached as a _PythonFnFactory object.
-        if self._cache.has(fn, STANDARD_OPTIONS):
-            cached_factory = self._cached_factory(fn, STANDARD_OPTIONS)
-        else:
+        if self._cache.has(fn, TOPLEVEL_OPTIONS):
             cached_factory = self._cached_factory(fn, TOPLEVEL_OPTIONS)
+        elif self._cache.has(fn, NESTED_OPTIONS):
+            cached_factory = self._cached_factory(fn, NESTED_OPTIONS)
+        else:
+            cached_factory = self._cached_factory(fn, STANDARD_OPTIONS)
 
         # Convert to a Python function object before returning (e.g. to obtain its source code).
         new_fn = cached_factory.instantiate(
@@ -190,7 +196,14 @@ TOPLEVEL_OPTIONS = converter.ConversionOptions(
     recursive=True,
     user_requested=True,
     internal_convert_user_code=True,
-    optional_features=None,
+    optional_features=[converter.Feature.BUILTIN_FUNCTIONS],
+)
+
+NESTED_OPTIONS = converter.ConversionOptions(
+    recursive=True,
+    user_requested=False,
+    internal_convert_user_code=True,
+    optional_features=[converter.Feature.BUILTIN_FUNCTIONS],
 )
 
 STANDARD_OPTIONS = converter.STANDARD_OPTIONS
