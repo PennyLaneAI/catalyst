@@ -488,8 +488,9 @@ class Grad:
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
-    This function allows the gradient of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the gradient of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.grad``.
 
     .. warning::
 
@@ -617,8 +618,9 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
-    This function allows the Jacobian of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the Jacobian of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.jacobian``.
 
     Args:
         f (Callable): a function or a function object to differentiate
@@ -683,7 +685,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.jvp``.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -772,7 +775,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.vjp``.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
