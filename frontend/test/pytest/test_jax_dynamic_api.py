@@ -22,7 +22,7 @@ from numpy import array_equal
 from numpy.testing import assert_allclose
 
 from jax._src.core import dim_value_aval
-from catalyst import qjit, while_loop, for_loop
+from catalyst import qjit, while_loop, for_loop, cond
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.jax_extras import (
     deduce_avals3, input_type_to_tracers, collapse, expand_args, infer_lambda_input_type,
@@ -618,6 +618,28 @@ def test_qjit_while_2():
     assert_array_and_dtype_equal(result, expected)
 
 
+def test_qjit_while_3():
+    """Test that catalyst tensor primitive is compatible with quantum while"""
+
+    @qjit
+    def f(sz:int):
+        input_a = jnp.ones([sz+1], dtype=float)
+        input_b = jnp.ones([sz+2], dtype=float)
+
+        @while_loop(lambda a, b: False, preserve_dimensions=False)
+        def loop(a, b):
+            return (input_a, input_b)
+
+        outputs = loop(input_a, input_a)
+        return outputs
+
+    result = f(3)
+    print(f.jaxpr)
+    print(result)
+    # assert False
+    # TODO: fix
+
+
 def test_qjit_while_shared_indbidx():
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
@@ -678,6 +700,53 @@ def test_qjit_while_outer():
 
     res_a = f(3)
     assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
+
+
+def test_qjit_cond_identity():
+    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+    @qjit
+    def f(c, sz):
+
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.zeros([sz], dtype=float)
+
+        @cond(c)
+        def case():
+            return a
+
+        @case.otherwise
+        def case():
+            return b
+
+        c = case()
+        return c
+
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
+    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
+
+
+def test_qjit_cond_identity():
+    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+    @qjit
+    def f(c, sz):
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.zeros([sz], dtype=float)
+
+        @cond(c)
+        def case():
+            return a
+
+        @case.otherwise
+        def case():
+            return b
+
+        c = case()
+        return c
+
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
+    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
 
 
 @pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")

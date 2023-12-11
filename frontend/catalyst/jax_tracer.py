@@ -53,12 +53,14 @@ from catalyst.jax_primitives import (
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
+    Jaxpr,
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
+    DShapedArray,
     _abstractify,
     _input_type_to_tracers,
     convert_element_type,
@@ -75,7 +77,9 @@ from catalyst.utils.jax_extras import (
     deduce_avals3,
     input_type_to_tracers,
     unzip2,
-    convert_constvars_jaxpr
+    convert_constvars_jaxpr,
+    cond_expansion_strategy,
+    expand_args
 )
 
 
@@ -163,7 +167,29 @@ def _apply_result_type_conversion(
     return ClosedJaxpr(jaxpr2, consts)
 
 
-def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
+def _apply_result_type_conversion2(
+    ctx, jaxpr: ClosedJaxpr, args, target_types: List[ShapedArray]
+):
+    with_qreg = isinstance(target_types[-1], AbstractQreg)
+    # with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
+    def _fun(in_tracers):
+        out_tracers = eval_jaxpr(jaxpr, in_tracers)
+        out_tracers_, target_types_ = (
+            (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
+        )
+        out_promoted_tracers = [
+            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            for tr, ty in zip(out_tracers_, target_types_)
+        ]
+        return out_promoted_tracers
+
+    _, in_sig, out_sig = trace_function(ctx, _fun, args,
+                                        expansion_strategy=cond_expansion_strategy())
+
+    return out_sig.out_initial_jaxpr()
+
+
+def unify_result_types(ctx, jaxprs: List[Jaxpr], args) -> List[ClosedJaxpr]:
     """Unify result types of the jaxpr equations given.
     Args:
         jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
@@ -177,8 +203,8 @@ def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
         TypePromotionError: Unification is not possible.
 
     """
-    promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs])
-    return [_apply_result_type_conversion(j, promoted_types) for j in jaxprs]
+    promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
+    return [_apply_result_type_conversion2(ctx, j, a, promoted_types) for j,a in zip(jaxprs, args)]
 
 
 class QRegPromise:

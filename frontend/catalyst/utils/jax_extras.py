@@ -93,6 +93,7 @@ __all__ = (
     "DynamicJaxprTracer",
     "ExpansionStrategy",
     "for_loop_expansion_strategy",
+    "cond_expansion_strategy",
     "while_loop_expansion_strategy",
     "default_expansion_strategy",
     "Jaxpr",
@@ -309,6 +310,95 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     return closed_jaxprs, consts
 
 
+def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
+    newvar = gensym(jaxprs, suffix="_")
+
+    all_consts = []
+    all_padded_consvars = []
+    for jaxpr in jaxprs:
+        padded_consvars = []
+        for jaxpr2 in jaxprs:
+            if jaxpr2 is jaxpr:
+                padded_consvars.extend(jaxpr2.constvars)
+                all_consts.extend(jaxpr2.constvars)
+            else:
+                cmap = {}
+                for cv in jaxpr2.constvars:
+                    aval = cv.aval
+                    if isinstance(aval, DShapedArray):
+                        shape2 = []
+                        for d in aval.shape:
+                            if hasattr(d, "aval"):
+                                shape2.append(cmap[d])
+                            else:
+                                shape2.append(d)
+                        aval = aval.update(shape=tuple(shape2))
+                    nv = newvar(aval)
+                    cmap[cv] = nv
+                    padded_consvars.append(nv)
+        all_padded_consvars.append(padded_consvars)
+
+    print("APAPPAAPAPAP")
+    print(all_padded_consvars)
+
+    acc = []
+    for jaxpr, padded_consvars in zip(jaxprs, all_padded_consvars):
+        acc.append(ClosedJaxpr(
+            convert_constvars_jaxpr(jaxpr.replace(constvars=padded_consvars)), ()
+        ))
+    return acc
+
+    # all_const_avals = [map(_abstractify, consts) for consts in all_consts]
+
+    # canonical_ref_indices = []
+    # canonical_refs: List[Any] = []
+    # all_nonref_consts = []
+    # canonical_ref_avals = []
+    # all_nonref_const_avals = []
+    # for consts, consts_avals in zip(all_consts, all_const_avals):
+    #     ref_indices = []
+    #     nonref_consts = []
+    #     nonref_const_avals = []
+    #     for c, aval in zip(consts, consts_avals):
+    #         assert not isinstance(
+    #             aval, state.AbstractRef
+    #         ), "AbstractRefs are not supported in this Catalyst version of this function"
+    #         nonref_consts.append(c)
+    #         nonref_const_avals.append(aval)
+    #     all_nonref_consts.append(nonref_consts)
+    #     all_nonref_const_avals.append(nonref_const_avals)
+    #     canonical_ref_indices.append(ref_indices)
+
+    # newvar = gensym(jaxprs, suffix="_")
+    # unused_ref_const_vars = map(newvar, canonical_ref_avals)
+    # unused_const_vars = [map(newvar, const_avals) for const_avals in all_nonref_const_avals]
+
+    # def pad_jaxpr_constvars(i, jaxpr):
+    #     is_ref = [isinstance(v.aval, state.AbstractRef) for v in jaxpr.constvars]
+    #     nonref_constvars, ref_constvars = partition_list(is_ref, jaxpr.constvars)
+    #     padded_ref_constvars = unused_ref_const_vars[:]
+
+    #     for canonical_id, ref_var in zip(canonical_ref_indices[i], ref_constvars):
+    #         padded_ref_constvars[canonical_id] = ref_var  # pragma: no cover
+
+    #     const_prefix = util.concatenate(unused_const_vars[:i])
+    #     const_suffix = util.concatenate(unused_const_vars[i + 1 :])
+    #     constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
+    #     jaxpr = jaxpr.replace(constvars=constvars)
+    #     effects = make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
+    #     jaxpr = jaxpr.replace(effects=effects)
+    #     return jaxpr
+
+    # consts = [*canonical_refs, *util.concatenate(all_nonref_consts)]
+    # jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
+    # closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
+    # return closed_jaxprs, consts
+
+
+
+
+
+
 @transformation
 def expanded_fun(in_type, *args_expanded):
     args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
@@ -342,6 +432,7 @@ class OutputSignature:
     out_type: Callable[[], OutputType]
     out_consts: Callable[[], list]
     out_tree: Callable[[], PyTreeDef]
+    out_initial_jaxpr: Callable[[], Jaxpr]
 
 
 def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
@@ -361,10 +452,11 @@ def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
     return (
         wf,
         InputSignature(in_type, in_tree, in_expanded_args),
-        OutputSignature(lambda: out_sig_promise()[0],
+        OutputSignature(lambda: ClosedJaxpr(convert_constvars_jaxpr(out_sig_promise()[0]), ()),
                         lambda: out_sig_promise()[1],
                         lambda: out_sig_promise()[2],
-                        out_tree_promise)
+                        out_tree_promise,
+                        lambda: out_sig_promise()[0])
     )
 
 
@@ -427,6 +519,10 @@ def jaxpr_to_mlir(func_name, jaxpr):
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
     """
+
+    print("JJJJJJJJ")
+    print(jaxpr)
+    print("JJJJJJJJ")
 
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
@@ -697,6 +793,9 @@ def while_loop_expansion_strategy(preserve_dimensions=False):
 def for_loop_expansion_strategy():
     return ExpansionStrategy(None, True, True, True)
 
+def cond_expansion_strategy():
+    return ExpansionStrategy(None, False, True, False)
+
 def default_expansion_strategy(axes_spec):
     return ExpansionStrategy(axes_spec, False, False, False)
 
@@ -716,26 +815,26 @@ def infer_output_type(constants:List[TracerLike],
 
     expl_outs = outputs
     impl_outs = []
-    seen = set() if s.output_include_indbidx_vars else set([*constants, *expanded_inputs])
+    seen = set() if s.output_include_indbidx_vars else set(map(id,[*constants, *expanded_inputs]))
 
     for o in expl_outs:
         assert _is_tracer_like(o)
         if isinstance(o.aval, DShapedArray):
             for d in o.aval.shape:
-                if _is_tracer_like(d) and (d not in seen):
+                if _is_tracer_like(d) and (id(d) not in seen):
                     impl_outs.append(d)
                     if not s.input_unshare_variables:
-                        seen.add(d)
+                        seen.add(id(d))
         if not s.input_unshare_variables:
-            seen.add(o)
+            seen.add(id(o))
 
     all_ins = [*constants, *expanded_inputs]
     all_outs = [*impl_outs, *expl_outs]
-    in_map : dict[TracerLike,  InDBIdx] = {v:  InDBIdx(i) for i, v in enumerate(all_ins)}
-    out_map: dict[TracerLike, OutDBIdx] = {x: OutDBIdx(i) for i, x in enumerate(all_outs)}
+    in_map : dict[TracerLike,  InDBIdx] = {id(v):  InDBIdx(i) for i, v in enumerate(all_ins)}
+    out_map: dict[TracerLike, OutDBIdx] = {id(x): OutDBIdx(i) for i, x in enumerate(all_outs)}
 
     out_avals_ = (x.aval for x in all_outs)
-    out_avals = [a.update(shape=tuple(in_map.get(d, out_map.get(d))
+    out_avals = [a.update(shape=tuple(in_map.get(id(d), out_map.get(id(d)))
                                       if _is_tracer_like(d) else d for d in a.shape))
                  if isinstance(a, DShapedArray) else a for a in out_avals_]
 
@@ -763,10 +862,10 @@ def infer_output_type_jaxpr(constants:List[TracerLike],
                             ) -> OutputType:
 
     _, out_type = infer_output_type(constants,
-                                     expanded_inputs,
-                                     outputs,
-                                     expansion_strategy,
-                                     num_implicit_inputs)
+                                    expanded_inputs,
+                                    outputs,
+                                    expansion_strategy,
+                                    num_implicit_inputs)
     return out_type
 
 
@@ -795,7 +894,7 @@ def infer_output_type_python(expanded_inputs:List[TracerLike],
     out_aval2, out_keep2 = unzip2(out_type2)
     out_type3 = tuple(zip(out_aval2, out_keep1))
 
-    return expanded_outputs2, (ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()), out_type3, consts)
+    return expanded_outputs2, (jaxpr, out_type3, consts)
 
 def expand_args(args:List[TracerLike],
                 expansion_strategy: ExpansionStrategy,

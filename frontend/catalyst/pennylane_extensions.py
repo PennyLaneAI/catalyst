@@ -69,6 +69,7 @@ from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
     ExpansionStrategy,
+    cond_expansion_strategy,
     for_loop_expansion_strategy,
     while_loop_expansion_strategy,
     default_expansion_strategy,
@@ -82,6 +83,7 @@ from catalyst.utils.jax_extras import (
     convert_constvars_jaxpr,
     _extract_implicit_args,
     jaxpr_force_outvars,
+    jaxpr_pad_consts,
     deduce_avals,
     deduce_avals2,
     deduce_avals3,
@@ -1270,16 +1272,36 @@ class CondCallable:
         Cond(in_classical_tracers, out_classical_tracers, regions)
         return tree_unflatten(out_tree(), out_classical_tracers)
 
-    def _call_with_classical_ctx(self):
-        args, args_tree = tree_flatten([])
-        args_avals = tuple(map(_abstractify, args))
-        branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
-            (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
+    def _call_with_classical_ctx(self, ctx):
+
+        def _trace(branch_fn):
+            _, in_sig, out_sig = trace_function(
+                ctx, branch_fn, *(),
+                expansion_strategy=cond_expansion_strategy()
+            )
+            return in_sig, out_sig
+
+
+        in_sigs, out_sigs = unzip2(
+            _trace(fun) for fun in (*self.branch_fns, self.otherwise_fn)
         )
-        _check_cond_same_shapes(out_trees, [j.out_avals for j in branch_jaxprs])
-        branch_jaxprs = unify_result_types(branch_jaxprs)
-        out_classical_tracers = cond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
-        return tree_unflatten(out_trees[0], out_classical_tracers)
+        all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
+        all_consts = [s.out_consts() for s in out_sigs]
+
+        all_jaxprs = unify_result_types(ctx, all_jaxprs, all_consts)
+        print("AAAAAAAAAAA")
+        print(all_jaxprs)
+        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+        print("BBBBBBBBBB")
+        print(branch_jaxprs)
+
+        out_tracers = cond_p.bind(*(self.preds + sum(all_consts, [])),
+                                  branch_jaxprs=branch_jaxprs,
+                                  nimplicit_inputs=in_sigs[0].num_implicit_inputs(),
+                                  nimplicit_outputs=len([() for _,k in out_sigs[0].out_type() if not k]))
+        return tree_unflatten(out_sigs[0].out_tree(),
+                              collapse(out_sigs[0].out_type(), out_tracers))
+
 
     def _call_during_interpretation(self):
         for pred, branch_fn in zip(self.preds, self.branch_fns):
@@ -1292,7 +1314,7 @@ class CondCallable:
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(ctx)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx()
+            return self._call_with_classical_ctx(ctx)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()

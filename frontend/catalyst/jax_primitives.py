@@ -66,7 +66,8 @@ from catalyst.utils.jax_extras import (
     out_type_force_outdbidx,
     for_loop_expansion_strategy,
     while_loop_expansion_strategy,
-    default_expansion_strategy
+    default_expansion_strategy,
+    cond_expansion_strategy
 )
 
 # pylint: disable=unused-argument,too-many-lines
@@ -196,7 +197,7 @@ expval_p = core.Primitive("expval")
 var_p = core.Primitive("var")
 probs_p = core.Primitive("probs")
 state_p = core.Primitive("state")
-cond_p = core.AxisPrimitive("cond")
+cond_p = DynshapePrimitive("cond")
 cond_p.multiple_results = True
 while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
@@ -1127,8 +1128,20 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 # cond
 #
 @cond_p.def_abstract_eval
-def _cond_abstract_eval(*args, branch_jaxprs, **kwargs):
-    return branch_jaxprs[0].out_avals
+def _cond_abstract_eval(*args,
+                        branch_jaxprs,
+                        nimplicit_inputs:int,
+                        nimplicit_outputs:int,
+                        **kwargs):
+    # for j in branch_jaxprs:
+    #     _assert_jaxpr_without_constants(j)
+    return infer_output_type_jaxpr(
+        [()] + branch_jaxprs[0].jaxpr.constvars,
+        [],
+        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        expansion_strategy=cond_expansion_strategy(),
+        num_implicit_inputs=nimplicit_inputs
+    )
 
 
 @cond_p.def_impl
@@ -1140,6 +1153,8 @@ def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
+    nimplicit_inputs:int,
+    nimplicit_outputs:int
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
