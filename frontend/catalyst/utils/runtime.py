@@ -166,10 +166,16 @@ def check_gates_are_compatible_with_device(device, config):
 
     Raises: CompileError
     """
+
     native = get_native_gates(config)
     decomposable = get_decomposable_gates(config)
     matrix = get_matrix_decomposable_gates(config)
     check_no_overlap(native, decomposable, matrix)
+    if not hasattr(device, "operations"): # pragma: nobranch
+        # The new device API has no "operations" field
+        # so we cannot check that there's an overlap or not.
+        return
+
     check_full_overlap(device, native, decomposable, matrix)
 
 
