@@ -143,9 +143,9 @@ class QFunc:
         if isinstance(self, qml.QNode):
             qnode = self
             QFunc._add_toml_file(self.device)
-            device = QJITDevice(
-                self.device.shots, self.device.wires, *extract_backend_info(self.device)
-            )
+            dev_args = extract_backend_info(self.device)
+            config, rest = dev_args[0], dev_args[1:]
+            device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
         else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -278,12 +278,12 @@ class QJITDevice(qml.QubitDevice):
     # pylint: disable=too-many-arguments
     def __init__(
         self,
+        config,
         shots=None,
         wires=None,
         backend_name=None,
         backend_lib=None,
         backend_kwargs=None,
-        config=None,
     ):
         QJITDevice._set_supported_operations(config)
         QJITDevice._set_supported_observables(config)

@@ -259,4 +259,4 @@ def extract_backend_info(device):
             if hasattr(device, v):
                 device_kwargs[k] = getattr(device, v)
 
-    return device_name, device_lpath, device_kwargs, config
+    return config, device_name, device_lpath, device_kwargs
