@@ -192,10 +192,19 @@ Below is an example configuration file
         [operations]
         # Observables supported by the device
         observables = [
-                "NamedObs",
-                "HermitianObs",
-                "TensorObs",
-                "HamiltonianObs",
+                "PauliX",
+                "PauliY",
+                "PauliZ",
+                "Hadamard",
+                "Hermitian",
+                "Identity",
+                "Projector",
+                "SparseHamiltonian",
+                "Hamiltonian",
+                "Sum",
+                "SProd",
+                "Prod",
+                "Exp",
         ]
 
         # Operations that shouldn't be decomposed.
