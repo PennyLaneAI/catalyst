@@ -97,6 +97,12 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.eraseOp(localDealloc);
     }
 
+    unallocFn.walk([&](Operation *op) {
+        if (isa<quantum::DeviceReleaseOp>(op)) {
+            rewriter.eraseOp(op);
+        }
+    });
+
     return unallocFn;
 }
 

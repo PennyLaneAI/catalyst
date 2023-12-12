@@ -557,9 +557,7 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
-
-    # End of QNode
-    DeviceReleaseOp()
+    DeviceReleaseOp()  # end of qnode
     return ()
 
 
