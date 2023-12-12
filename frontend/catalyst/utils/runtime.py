@@ -20,6 +20,7 @@ Runtime utility methods.
 import os
 import pathlib
 import platform
+import re
 
 import pennylane as qml
 
@@ -136,6 +137,28 @@ def check_no_overlap(*args):
     msg = "Device has overlapping gates in native and decomposable sets."
     raise CompileError(msg)
 
+def filter_out_adjoint_and_control(operations):
+    """Remove Adjoint and C strings from operations.
+
+    Args:
+        operations (List[Str]): List of strings with names of supported operations
+
+    Returns:
+        List: A list of strings with names of supported operations with Adjoint and C gates
+        removed.
+    """
+    adjoint = re.compile("^Adjoint\(.*\)$")
+    control = re.compile("^C\(.*\)$")
+
+    def is_not_adj(op):
+        return not re.match(adjoint, op)
+
+    def is_not_ctrl(op):
+        return not re.match(control, op)
+
+    operations_no_adj = filter(is_not_adj, operations)
+    operations_no_adj_no_ctrl = filter(is_not_ctrl, operations_no_adj)
+    return list(operations_no_adj_no_ctrl)
 
 def check_full_overlap(device, *args):
     """Check that device.operations is equivalent to the union of *args
@@ -146,7 +169,8 @@ def check_full_overlap(device, *args):
 
     Raises: CompileError
     """
-    gates_in_device = set(device.operations)
+    operations = filter_out_adjoint_and_control(device.operations)
+    gates_in_device = set(operations)
     set_of_sets = [set(arg) for arg in args]
     union = set.union(*set_of_sets)
     if gates_in_device == union:

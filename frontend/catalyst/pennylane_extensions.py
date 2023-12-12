@@ -22,7 +22,6 @@ import numbers
 import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
-import re
 
 import jax
 import jax.numpy as jnp
@@ -123,30 +122,6 @@ class QFunc:
         update_wrapper(self, fn)
 
     @staticmethod
-    def _filter_out_adjoint_and_control(operations):
-        """Remove Adjoint and C strings from operations.
-
-        Args:
-            operations (List[Str]): List of strings with names of supported operations
-
-        Returns:
-            List: A list of strings with names of supported operations with Adjoint and C gates
-            removed.
-        """
-        adjoint = re.compile("^Adjoint\(.*\)$")
-        control = re.compile("^C\(.*\)$")
-
-        def is_not_adj(op):
-            return not re.match(adjoint, op)
-
-        def is_not_ctrl(op):
-            return not re.match(control, op)
-
-        operations_no_adj = filter(is_not_adj, operations)
-        operations_no_adj_no_ctrl = filter(is_not_ctrl, operations_no_adj)
-        return list(operations_no_adj_no_ctrl)
-
-    @staticmethod
     def _add_toml_file(device):
         """Temporary function. This function adds the config field to devices.
         TODO: Remove this function when `qml.Device`s are guaranteed to have their own
@@ -166,15 +141,11 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
-            old_operations = getattr(self.device, "operations", [])
-            new_operations = QFunc._filter_out_adjoint_and_control(old_operations)
-            self.device.operations = new_operations
             qnode = self
             QFunc._add_toml_file(self.device)
             dev_args = extract_backend_info(self.device)
             config, rest = dev_args[0], dev_args[1:]
             device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
-            self.device.operations = old_operations
         else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
