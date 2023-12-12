@@ -332,10 +332,10 @@ class QJITDevice(qml.QubitDevice):
         # decomposition is generally faster.
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-        overriden_methods = [  # pragma: no cover
-            (qml.ops.Controlled, "has_decomposition", lambda self: True),  # pragma: no cover
-            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),  # pragma: no cover
-        ]  # pragma: no cover
+        overriden_methods = [
+            (qml.ops.Controlled, "has_decomposition", lambda self: True),
+            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
+        ]
         for gate in decompose_to_qubit_unitary:
             overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
 
