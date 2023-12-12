@@ -43,11 +43,11 @@
   ```
 
 * The runtime now supports multiple active devices via using a pool of devices.
-  The new `RTDeviceInfoT` data-class and `QuantumDeviceInterface`collection of methods
-  enable the runtime to better scope the lifetime of device instances and split the
-  `QuantumDevice` API from device implementations. With these changes, one can create
-  multiple active devices and execute multiple programs concurrently at runtime.
-  [(#377)](https://github.com/PennyLaneAI/catalyst/pull/377)
+  The new `RTDeviceType` data-class and `RTDeviceStatus` along with the `thread_local`
+  device instance pointer enable the runtime to better scope the lifetime of device
+  instances cuncurrently. With these changes, one can create multiple active devices
+  and execute multiple programs in a multithreaded environment.
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 <h3>Improvements</h3>
 
@@ -75,6 +75,14 @@
   and lowers the operation to one single device initialization call:
   `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
   [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
+
+* Add `DeviceReleaseOp` to the Quantum MLIR dialect. This will be lowered to
+  the `__quantum__rt__device_init()` runtime instruction and releases the device
+  memory and update the status of the device instance from `ACTIVE` to `RELEASE`.
+  The runtime will re-use this released instance instead of creating a new one
+  automatically at runtime in a multi-qnode workflow when multiple devices have
+  identical specifications.
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 <h3>Breaking changes</h3>
 
