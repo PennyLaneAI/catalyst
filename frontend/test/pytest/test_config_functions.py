@@ -35,7 +35,7 @@ from catalyst.utils.toml import toml_load
 
 def test_toml_file():
     """Test error is raised if checking for qjit compatibility and field is false in toml file."""
-    with tempfile.NamedTemporaryFile() as f:
+    with tempfile.NamedTemporaryFile(mode="w+b") as f:
         f.write(
             b"""
 [compilation]
@@ -65,7 +65,7 @@ def test_device_has_config_attr():
 def test_device_with_invalid_config_attr():
     """Test error is raised when device has invalid config attr."""
     name = LightningQubit.name
-    with tempfile.NamedTemporaryFile() as f:
+    with tempfile.NamedTemporaryFile(mode="w+b") as f:
         f.close()
         setattr(LightningQubit, "config", Path(f.name))
         msg = f"Attempting to compile program for incompatible device {name}."
@@ -76,13 +76,13 @@ def test_device_with_invalid_config_attr():
 
 def test_get_native_gates():
     """Test native gates are properly obtained from the toml."""
-    with tempfile.NamedTemporaryFile(mode="w+") as f:
+    with tempfile.NamedTemporaryFile(mode="w+b") as f:
         test_gates = ["TestNativeGate"]
         payload = f"""
 [[operators.gates]]
 native = {str(test_gates)}
         """
-        f.write(payload)
+        f.write(str.encode(payload))
         f.flush()
         f.seek(0)
         config = toml_load(f)
@@ -92,13 +92,13 @@ native = {str(test_gates)}
 
 def test_get_decomp_gates():
     """Test native decomposition gates are properly obtained from the toml."""
-    with tempfile.NamedTemporaryFile(mode="w+") as f:
+    with tempfile.NamedTemporaryFile(mode="w+b") as f:
         test_gates = ["TestDecompGate"]
         payload = f"""
 [[operators.gates]]
 decomp = {str(test_gates)}
         """
-        f.write(payload)
+        f.write(str.encode(payload))
         f.flush()
         f.seek(0)
         config = toml_load(f)
@@ -108,13 +108,13 @@ decomp = {str(test_gates)}
 
 def test_get_matrix_decomposable_gates():
     """Test native matrix gates are properly obtained from the toml."""
-    with tempfile.NamedTemporaryFile(mode="w+") as f:
+    with tempfile.NamedTemporaryFile(mode="w+b") as f:
         test_gates = ["TestMatrixGate"]
         payload = f"""
 [[operators.gates]]
 matrix = {str(test_gates)}
         """
-        f.write(payload)
+        f.write(str.encode(payload))
         f.flush()
         f.seek(0)
         config = toml_load(f)
