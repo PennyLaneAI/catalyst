@@ -42,10 +42,10 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Mitigation/IR/MitigationDialect.h"
 #include "Mitigation/Transforms/Passes.h"
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/Passes.h"
 
 #include "Enzyme.h"
 

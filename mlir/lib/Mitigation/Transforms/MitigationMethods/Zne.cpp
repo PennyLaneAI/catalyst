@@ -24,12 +24,12 @@
 
 #include "Mitigation/IR/MitigationOps.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
-#include "Quantum/Utils/RemoveQuantum.h"
 
 namespace catalyst {
 namespace mitigation {
@@ -89,90 +89,45 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
 
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    rewriter.setInsertionPointToStart(moduleOp.getBody());
+    std::string fnFoldedName = op.getCallee().str() + ".folded";
+
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnFoldedName)) {
+        return SymbolRefAttr::get(ctx, fnFoldedName);
+    }
+
     // Original function
     func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     TypeRange originalTypes = op.getArgs().getTypes();
-
     Type qregType = quantum::QuregType::get(rewriter.getContext());
 
-    // Quantum Alloc function
-    std::string fnAllocName = op.getCallee().str() + ".quantumAlloc";
-    Type i64Type = rewriter.getI64Type();
-    FunctionType fnAllocType = FunctionType::get(ctx, /*inputs=*/
-                                                 i64Type,
-                                                 /*outputs=*/qregType);
-
-    func::FuncOp fnAlloc = rewriter.create<func::FuncOp>(loc, fnAllocName, fnAllocType);
-    fnAlloc.setPrivate();
-    Block *allocBloc = fnAlloc.addEntryBlock();
-    rewriter.setInsertionPointToStart(allocBloc);
-    Value nQubits = allocBloc->getArgument(0);
-    IntegerAttr intAttr;
-    auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, nQubits, intAttr);
-    rewriter.create<func::ReturnOp>(loc, qreg.getResult());
-
-    // Function without measurements: Create function without measurements and with qreg as last argument
-    std::string fnWithoutMeasurementsName = op.getCallee().str() + ".withoutMeasurements";
-    SmallVector<Type> typesWithoutMeasurements = {originalTypes.begin(), originalTypes.end()};
-    typesWithoutMeasurements.push_back(qregType);
-
-    FunctionType fnWithoutMeasurementsType = FunctionType::get(ctx, /*inputs=*/
-                                                               typesWithoutMeasurements,
-                                                               /*outputs=*/qregType);
+    // Set insertion in the module
     rewriter.setInsertionPointToStart(moduleOp.getBody());
-    func::FuncOp fnWithoutMeasurementsOp =
-        rewriter.create<func::FuncOp>(loc, fnWithoutMeasurementsName, fnWithoutMeasurementsType);
-    fnWithoutMeasurementsOp.setPrivate();
-    rewriter.cloneRegionBefore(fnOp.getBody(), fnWithoutMeasurementsOp.getBody(),
-                               fnWithoutMeasurementsOp.end());
-    Block *fnWithoutMeasurementsBlock = &fnWithoutMeasurementsOp.front();
-    fnWithoutMeasurementsBlock->addArgument(qregType, loc);
-    quantum::AllocOp allocOp = *fnWithoutMeasurementsOp.getOps<quantum::AllocOp>().begin();
+    // Quantum Alloc function
+    FlatSymbolRefAttr quantumAllocRefAttr = getOrInsertQuantumAlloc(loc, rewriter, op);
+    func::FuncOp fnAllocOp =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
 
-    auto lastArgIndex = fnWithoutMeasurementsBlock->getArguments().size();
-    allocOp.replaceAllUsesWith(fnWithoutMeasurementsBlock->getArgument(lastArgIndex - 1));
-
+    // Get the number of qubits
+    quantum::AllocOp allocOp = *fnAllocOp.getOps<quantum::AllocOp>().begin();
     std::optional<int64_t> numberQubitsOptional = allocOp.getNqubitsAttr();
     int64_t numberQubits = numberQubitsOptional.value_or(0);
 
-    rewriter.eraseOp(allocOp);
-    rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
+    // Function without measurements: Create function without measurements and with qreg as last
+    // argument
+    FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
+        getOrInsertFnWithoutMeasurements(loc, rewriter, op);
+    func::FuncOp fnWithoutMeasurementsOp =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
 
-    std::vector<Operation *> insertOps;
-    fnWithoutMeasurementsOp.walk(
-        [&](quantum::InsertOp insertOp) { insertOps.push_back(insertOp); });
-    fnWithoutMeasurementsOp.walk(
-        [&](func::ReturnOp returnOp) { returnOp->setOperands(insertOps.back()->getResult(0)); });
-
-    quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
-    rewriter.eraseOp(localDealloc);
-    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp);
-
-    // Function with measurements: Modify the original function to take a quantum register as last arg and keep measurements
-    std::string fnWithMeasurementsName = op.getCallee().str() + ".withMeasurements";
-    SmallVector<Type> typesWithQreg = {originalTypes.begin(), originalTypes.end()};
-    typesWithQreg.push_back(qregType);
-
-    FunctionType fnWithMeasurementsType = FunctionType::get(ctx, /*inputs=*/
-                                                    typesWithQreg,
-                                                    /*outputs=*/fnOp.getResultTypes());
-    rewriter.setInsertionPointToStart(moduleOp.getBody());
+    // Function with measurements: Modify the original function to take a quantum register as last
+    // arg and keep measurements
+    FlatSymbolRefAttr fnWithMeasurementsRefAttr = getOrInsertFnWithMeasurements(loc, rewriter, op);
     func::FuncOp fnWithMeasurementsOp =
-        rewriter.create<func::FuncOp>(loc, fnWithMeasurementsName, fnWithMeasurementsType);
-    fnWithMeasurementsOp.setPrivate();
-    rewriter.cloneRegionBefore(fnOp.getBody(), fnWithMeasurementsOp.getBody(), fnWithMeasurementsOp.end());
-    Block *fnWithMeasurementsBlock = &fnWithMeasurementsOp.front();
-    fnWithMeasurementsBlock->addArgument(qregType, loc);
-    quantum::AllocOp allocOpWithMeasurements = *fnWithMeasurementsOp.getOps<quantum::AllocOp>().begin();
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
 
-    auto lastArgQregIndex = fnWithMeasurementsBlock->getArguments().size();
-    allocOpWithMeasurements.replaceAllUsesWith(fnWithMeasurementsBlock->getArgument(lastArgQregIndex - 1));
-    rewriter.eraseOp(allocOpWithMeasurements);
-
-    // Function folded: Create the folded circuit (withoutMeasurement * Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
+    // Function folded: Create the folded circuit (withoutMeasurement *
+    // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
     rewriter.setInsertionPointToStart(moduleOp.getBody());
-    std::string fnFoldedName = op.getCallee().str() + ".folded";
     SmallVector<Type> typesFolded = {originalTypes.begin(), originalTypes.end()};
     Type indexType = rewriter.getIndexType();
     typesFolded.push_back(indexType);
@@ -187,7 +142,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     rewriter.setInsertionPointToStart(foldedBloc);
     TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
     Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
-    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAlloc, numberQubitsValue).getResult(0);
+    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
     Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
@@ -201,7 +156,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                     Value qreg = iterArgs.front();
                     std::vector<Value> argsAndQreg = {fnFoldedOp.getArguments().begin(),
-                                                     fnFoldedOp.getArguments().end()};
+                                                      fnFoldedOp.getArguments().end()};
                     argsAndQreg.pop_back();
                     argsAndQreg.push_back(qreg);
 
@@ -209,14 +164,15 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                     Value fnWithoutMeasurementsQreg =
                         builder.create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndQreg)
                             .getResult(0);
-                    
+
                     // Call the function without measurements in an adjoint region
-                    auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, fnWithoutMeasurementsQreg);
+                    auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType,
+                                                                        fnWithoutMeasurementsQreg);
                     Region *adjointRegion = &adjointOp.getRegion();
-                    Block* adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
+                    Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
 
                     std::vector<Value> argsAndQregAdjoint = {fnFoldedOp.getArguments().begin(),
-                                                            fnFoldedOp.getArguments().end()};
+                                                             fnFoldedOp.getArguments().end()};
                     argsAndQregAdjoint.pop_back();
                     argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));
                     Value fnWithoutMeasurementsAdjointQreg =
@@ -233,10 +189,122 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     argsAndRegMeasurement.pop_back();
     argsAndRegMeasurement.push_back(loopedQreg);
     ValueRange funcFolded =
-        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndRegMeasurement).getResults();
+        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndRegMeasurement)
+            .getResults();
     rewriter.create<func::ReturnOp>(loc, funcFolded);
     return SymbolRefAttr::get(ctx, fnFoldedName);
 }
+FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
+                                                       mitigation::ZneOp op)
+{
+    // Quantum Alloc function
+    MLIRContext *ctx = rewriter.getContext();
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
 
+    std::string fnAllocName = op.getCallee().str() + ".quantumAlloc";
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnAllocName)) {
+        return SymbolRefAttr::get(ctx, fnAllocName);
+    }
+    Type i64Type = rewriter.getI64Type();
+    FunctionType fnAllocType = FunctionType::get(ctx, /*inputs=*/
+                                                 i64Type,
+                                                 /*outputs=*/qregType);
+    func::FuncOp fnAlloc = rewriter.create<func::FuncOp>(loc, fnAllocName, fnAllocType);
+    fnAlloc.setPrivate();
+    Block *allocBloc = fnAlloc.addEntryBlock();
+    rewriter.setInsertionPointToStart(allocBloc);
+    Value nQubits = allocBloc->getArgument(0);
+    IntegerAttr intAttr;
+    auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, nQubits, intAttr);
+    rewriter.create<func::ReturnOp>(loc, qreg.getResult());
+    return SymbolRefAttr::get(ctx, fnAllocName);
+}
+FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
+                                                                PatternRewriter &rewriter,
+                                                                mitigation::ZneOp op)
+{
+    MLIRContext *ctx = rewriter.getContext();
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    TypeRange originalTypes = op.getArgs().getTypes();
+
+    std::string fnWithoutMeasurementsName = op.getCallee().str() + ".withoutMeasurements";
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
+        return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
+    }
+
+    SmallVector<Type> typesWithoutMeasurements = {originalTypes.begin(), originalTypes.end()};
+    typesWithoutMeasurements.push_back(qregType);
+
+    FunctionType fnWithoutMeasurementsType = FunctionType::get(ctx, /*inputs=*/
+                                                               typesWithoutMeasurements,
+                                                               /*outputs=*/qregType);
+    func::FuncOp fnWithoutMeasurementsOp =
+        rewriter.create<func::FuncOp>(loc, fnWithoutMeasurementsName, fnWithoutMeasurementsType);
+    fnWithoutMeasurementsOp.setPrivate();
+    rewriter.cloneRegionBefore(fnOp.getBody(), fnWithoutMeasurementsOp.getBody(),
+                               fnWithoutMeasurementsOp.end());
+    Block *fnWithoutMeasurementsBlock = &fnWithoutMeasurementsOp.front();
+    fnWithoutMeasurementsBlock->addArgument(qregType, loc);
+    quantum::AllocOp allocOp = *fnWithoutMeasurementsOp.getOps<quantum::AllocOp>().begin();
+
+    auto lastArgIndex = fnWithoutMeasurementsBlock->getArguments().size();
+    allocOp.replaceAllUsesWith(fnWithoutMeasurementsBlock->getArgument(lastArgIndex - 1));
+
+    rewriter.eraseOp(allocOp);
+    rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
+
+    std::vector<Operation *> insertOps;
+    fnWithoutMeasurementsOp.walk(
+        [&](quantum::InsertOp insertOp) { insertOps.push_back(insertOp); });
+    fnWithoutMeasurementsOp.walk(
+        [&](func::ReturnOp returnOp) { returnOp->setOperands(insertOps.back()->getResult(0)); });
+
+    quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
+    rewriter.eraseOp(localDealloc);
+    quantum::removeQuantumMeasurements(fnWithoutMeasurementsOp);
+    return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
+}
+FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
+                                                             PatternRewriter &rewriter,
+                                                             mitigation::ZneOp op)
+{
+    MLIRContext *ctx = rewriter.getContext();
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    TypeRange originalTypes = op.getArgs().getTypes();
+
+    std::string fnWithMeasurementsName = op.getCallee().str() + ".withMeasurements";
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
+        return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
+    }
+    SmallVector<Type> typesWithQreg = {originalTypes.begin(), originalTypes.end()};
+    typesWithQreg.push_back(qregType);
+
+    FunctionType fnWithMeasurementsType = FunctionType::get(ctx, /*inputs=*/
+                                                            typesWithQreg,
+                                                            /*outputs=*/fnOp.getResultTypes());
+    func::FuncOp fnWithMeasurementsOp =
+        rewriter.create<func::FuncOp>(loc, fnWithMeasurementsName, fnWithMeasurementsType);
+    fnWithMeasurementsOp.setPrivate();
+    rewriter.cloneRegionBefore(fnOp.getBody(), fnWithMeasurementsOp.getBody(),
+                               fnWithMeasurementsOp.end());
+    Block *fnWithMeasurementsBlock = &fnWithMeasurementsOp.front();
+    fnWithMeasurementsBlock->addArgument(qregType, loc);
+    quantum::AllocOp allocOpWithMeasurements =
+        *fnWithMeasurementsOp.getOps<quantum::AllocOp>().begin();
+
+    auto lastArgQregIndex = fnWithMeasurementsBlock->getArguments().size();
+    allocOpWithMeasurements.replaceAllUsesWith(
+        fnWithMeasurementsBlock->getArgument(lastArgQregIndex - 1));
+    rewriter.eraseOp(allocOpWithMeasurements);
+    return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
+}
 } // namespace mitigation
 } // namespace catalyst
