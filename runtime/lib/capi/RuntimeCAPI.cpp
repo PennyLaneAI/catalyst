@@ -66,7 +66,7 @@ thread_local static size_t RTD_ID = 0;
  */
 void releaseDevice(ExecutionContext *ec)
 {
-    if (RTD_PTR == nullptr) {
+    if (!RTD_PTR) {
         RT_FAIL_IF(RTD_ID, "Invalid device id");
         return;
     }
@@ -80,11 +80,6 @@ void releaseDevice(ExecutionContext *ec)
  * @brief get `RTD_PTR`.
  */
 auto getDevice() -> QuantumDevice * { return RTD_PTR; }
-
-/**
- * @brief check `RTD_PTR ?= nullptr`.
- */
-auto isInitialized() -> bool { return RTD_PTR ? true : false; }
 
 } // namespace Catalyst::Runtime
 
@@ -171,6 +166,8 @@ void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()
 {
+    Catalyst::Runtime::RTD_ID = 0;
+    Catalyst::Runtime::RTD_PTR = nullptr;
     Catalyst::Runtime::CTX = std::make_unique<Catalyst::Runtime::ExecutionContext>();
 }
 
@@ -186,6 +183,9 @@ void __quantum__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_k
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!Catalyst::Runtime::CTX, "Invalid use of the global driver before initialization");
+    RT_FAIL_IF(Catalyst::Runtime::RTD_PTR,
+               "Cannot re-initialize an ACTIVE device: Consider using "
+               "__quantum__rt__device_release before __quantum__rt__device_init");
 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
@@ -209,7 +209,7 @@ void __quantum__rt__print_state() { Catalyst::Runtime::getDevice()->PrintState()
 void __quantum__rt__toggle_recorder(bool status)
 {
     Catalyst::Runtime::CTX->setDeviceRecorderStatus(status);
-    if (!Catalyst::Runtime::isInitialized()) {
+    if (!Catalyst::Runtime::RTD_PTR) {
         return;
     }
 

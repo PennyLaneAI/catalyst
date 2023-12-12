@@ -448,7 +448,7 @@ class TestJAXVectorize:
     def test_simple_circuit(self, backend):
         """Test a basic use case of jax.vmap on top of qjit."""
 
-        @qjit
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)

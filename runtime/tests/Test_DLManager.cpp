@@ -70,6 +70,7 @@ TEST_CASE("Test __quantum__rt__device_init registering a custom device with shot
 
     char dev1[17] = "lightning.qubit";
     __quantum__rt__device_init((int8_t *)dev1, nullptr, nullptr);
+    __quantum__rt__device_release();
 
     char dev2[15] = "backend.other";
     REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)dev2, nullptr, nullptr),

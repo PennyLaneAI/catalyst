@@ -186,6 +186,36 @@ TEST_CASE("Test __quantum__rt__fail_cstr", "[qir_lightning_core]")
         Catch::Contains("[Function:__quantum__rt__fail_cstr] Error in Catalyst Runtime: Test!"));
 }
 
+TEST_CASE("Test device release after driver release", "[CoreQIS]")
+{
+    auto devices = getDevices();
+    auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
+
+    __quantum__rt__initialize();
+    __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                               (int8_t *)rtd_kwargs.c_str());
+    QUBIT *q = __quantum__rt__qubit_allocate();
+    __quantum__rt__qubit_release(q);
+    __quantum__rt__finalize();
+    __quantum__rt__device_release();
+    CHECK(true);
+}
+
+TEST_CASE("Test device init before device release", "[CoreQIS]")
+{
+    auto devices = getDevices();
+    auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
+
+    __quantum__rt__initialize();
+    __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                               (int8_t *)rtd_kwargs.c_str());
+    QUBIT *q = __quantum__rt__qubit_allocate();
+    __quantum__rt__qubit_release(q);
+    __quantum__rt__finalize();
+    __quantum__rt__device_release();
+    CHECK(true);
+}
+
 TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 {
     __quantum__rt__initialize();
