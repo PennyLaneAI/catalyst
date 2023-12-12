@@ -70,6 +70,7 @@ struct FuncOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::FuncO
             asyncFunc->setAttrs(oldAttrs);
 
             rewriter.replaceOp(op, asyncFunc);
+
             return success();
         }
         return failure();
@@ -83,13 +84,17 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
                                         mlir::PatternRewriter &rewriter) const override
     {
         SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(op.getCallableForCallee());
-        async::FuncOp funcOp =
+        async::FuncOp asyncFuncOp =
             dyn_cast_or_null<async::FuncOp>(SymbolTable::lookupNearestSymbolFrom(op, symbol));
+        if (!asyncFuncOp) {
+            // Nothing to change.
+            return success();
+        }
+
         // Check for Call ops that have QNode func ops
         if (funcOp->hasAttrOfType<UnitAttr>("qnode")) {
             rewriter.create<async::CallOp>(op.getLoc(), funcOp, op.getArgOperands());
-            // TODO: Add the awaits
-            return success();
+            return failure();
         }
         return failure();
     }
@@ -98,7 +103,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 void populateQnodeToAsyncPatterns(RewritePatternSet &patterns)
 {
     patterns.add<catalyst::FuncOpToAsyncOPRewritePattern>(patterns.getContext(), 1);
-    // patterns.add<catalyst::CallOpToAsyncOPRewritePattern>(patterns.getContext(), 1);
+    patterns.add<catalyst::CallOpToAsyncOPRewritePattern>(patterns.getContext(), 1);
 }
 
 } // namespace catalyst
