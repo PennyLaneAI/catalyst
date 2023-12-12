@@ -160,6 +160,48 @@ class TestExpval:
         observed = expval3(np.pi)
         assert np.isclose(observed, expected)
 
+    def test_hermitian_shots_expval(self, backend):
+        """Test expval Hermitian observables with shots."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3, shots=1000))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+
+        with pytest.raises(
+            RuntimeError,
+            match="For Hermitian Observables, expval calculation is not supported by shots",
+        ):
+            circuit(np.pi / 4, np.pi / 4)
+
+        qml.operation.disable_new_opmath()
+
+    def test_hermitian_shots_var(self, backend):
+        """Test var Hermitian observables with shots."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3, shots=1000))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.var(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+
+        with pytest.raises(
+            RuntimeError,
+            match="Hermitian observables do not support applyInPlaceShots method",
+        ):
+            circuit(np.pi / 4, np.pi / 4)
+
     def test_tensor_1(self, backend):
         """Test expval for Tensor observable."""
 

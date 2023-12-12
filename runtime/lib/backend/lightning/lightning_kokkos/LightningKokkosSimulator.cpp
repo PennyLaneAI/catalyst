@@ -244,7 +244,7 @@ void LightningKokkosSimulator::State(DataView<std::complex<double>, 1> &state)
 void LightningKokkosSimulator::Probs(DataView<double, 1> &probs)
 {
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = m.probs();
+    auto &&dv_probs = device_shots ? m.probs(device_shots) : m.probs();
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
@@ -262,7 +262,7 @@ void LightningKokkosSimulator::PartialProbs(DataView<double, 1> &probs,
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = m.probs(dev_wires);
+    auto &&dv_probs = device_shots ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
                "Invalid size for the pre-allocated partial-probabilities");

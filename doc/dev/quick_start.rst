@@ -249,9 +249,9 @@ are supported in Catalyst, although not all features are supported for all measu
    :header-rows: 0
 
    * - :func:`qml.expval() <pennylane.expval>`
-     - The expectation value of all observables is supported.
+     - The expectation value of all observables and finite-shots are supported.
    * - :func:`qml.var() <pennylane.var>`
-     - The variance of all observables is supported.
+     - The variance of all observables and finite-shots are supported.
    * - :func:`qml.sample() <pennylane.sample>`
      - Samples in the computational basis only are supported.
    * - :func:`qml.counts() <pennylane.counts>`
