@@ -42,6 +42,10 @@
    [1. 1. 1.]]
   ```
 
+* Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
+  for `lightning.qubit` and `lightning.kokkos` devices.
+  [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
+
 <h3>Improvements</h3>
 
 * Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
@@ -89,6 +93,7 @@ Ali Asadi,
 David Ittah,
 Romain Moyard,
 Sergei Mironov,
+Shuli Shu,
 Erick Ochoa Lopez.
 
 # Release 0.3.2
