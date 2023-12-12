@@ -18,7 +18,6 @@
 
 #include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
-#include "QuantumDeviceInterface.hpp"
 #include "RuntimeCAPI.h"
 
 #include "TestUtils.hpp"

@@ -382,7 +382,7 @@ class ExecutionContext final {
         -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
     {
         return getDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
-                         std::string_view{rtd_lib});
+                         std::string_view{rtd_kwargs});
     }
 
     [[nodiscard]] auto getDevice(size_t device_key) -> std::shared_ptr<QuantumDevice>

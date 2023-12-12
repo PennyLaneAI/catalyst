@@ -41,7 +41,13 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
 
 void OpenQasmDevice::ReleaseAllQubits()
 {
-    // do nothing
+    // refresh the builder for device re-use.
+    if (builder_type != OpenQasm::BuilderType::Common) {
+        builder = std::make_unique<OpenQasm::BraketBuilder>();
+    }
+    else {
+        builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
+    }
 }
 
 void OpenQasmDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
