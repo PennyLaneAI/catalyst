@@ -98,7 +98,15 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         }
 
         auto callOp = rewriter.create<async::CallOp>(op.getLoc(), asyncFuncOp, op.getArgOperands());
-        return failure();
+        auto newResults = callOp.getResults();
+        auto oldResults = op.getResults();
+        for (auto [newResult, oldResult] : llvm::zip(newResults, oldResults)) {
+            auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newResult);
+            oldResult.replaceAllUsesWith(awaitOp.getResult());
+        }
+
+        rewriter.replaceOp(op, callOp);
+        return success();
     }
 };
 
