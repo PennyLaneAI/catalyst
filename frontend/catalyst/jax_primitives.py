@@ -1133,10 +1133,8 @@ def _cond_abstract_eval(*args,
                         nimplicit_inputs:int,
                         nimplicit_outputs:int,
                         **kwargs):
-    # for j in branch_jaxprs:
-    #     _assert_jaxpr_without_constants(j)
     return infer_output_type_jaxpr(
-        [()] + branch_jaxprs[0].jaxpr.constvars,
+        [()] + branch_jaxprs[0].jaxpr.invars,
         [],
         branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
         expansion_strategy=cond_expansion_strategy(),

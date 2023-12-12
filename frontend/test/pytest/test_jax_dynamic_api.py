@@ -696,22 +696,23 @@ def test_qjit_while_outer():
             return (a0, i)
 
         a2, _ = loop(a0, 0)
-        return a0+a2
+        assert a2.shape[0] is a0.shape[0]
+        return a2
 
     res_a = f(3)
-    assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
+    assert_array_and_dtype_equal(res_a, jnp.ones(3))
 
 
 def test_qjit_cond_identity():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     @qjit
-    def f(c, sz):
+    def f(flag, sz):
 
         a = jnp.ones([sz], dtype=float)
         b = jnp.zeros([sz], dtype=float)
 
-        @cond(c)
+        @cond(flag)
         def case():
             return a
 
@@ -720,32 +721,55 @@ def test_qjit_cond_identity():
             return b
 
         c = case()
+        assert c.shape[0] is a.shape[0]
+        assert c.shape[0] is b.shape[0]
         return c
 
     assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
 
 
-def test_qjit_cond_identity():
+def test_qjit_cond_outdbidx():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     @qjit
-    def f(c, sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.zeros([sz], dtype=float)
-
-        @cond(c)
+    def f(flag, sz):
+        @cond(flag)
         def case():
-            return a
+            return jnp.ones([sz+1], dtype=float)
 
         @case.otherwise
         def case():
-            return b
+            return jnp.zeros([sz+1], dtype=float)
+
+        return case()
+
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones(4))
+    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(4))
+
+
+def test_qjit_cond_const_outdbidx():
+    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+    @qjit
+    def f(flag, sz):
+
+        a = jnp.zeros([sz], dtype=float)
+
+        @cond(flag)
+        def case():
+            return jnp.ones([sz+1], dtype=float)
+
+        @case.otherwise
+        def case():
+            return a
 
         c = case()
+        if flag is False:
+            assert c.shape[0] is a.shape[0]
         return c
 
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones(4))
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
 
 
