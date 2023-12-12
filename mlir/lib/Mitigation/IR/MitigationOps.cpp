@@ -30,7 +30,6 @@ using namespace catalyst::mitigation;
 // SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-
 //===----------------------------------------------------------------------===//
 // ZneOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -48,16 +47,10 @@ Operation::operand_range ZneOp::getArgOperands() { return getOperands(); }
 // ZneOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
-    return success();
-}
+LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // ZneOp Extra methods
 //===----------------------------------------------------------------------===//
 
-LogicalResult ZneOp::verify()
-{
-    return success();
-}
+LogicalResult ZneOp::verify() { return success(); }

@@ -14,7 +14,6 @@
 
 #include "MitigationMethods/Zne.hpp"
 
-
 #include "mlir/IR/PatternMatch.h"
 
 #include "Mitigation/Transforms/Patterns.h"

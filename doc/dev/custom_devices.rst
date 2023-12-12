@@ -17,91 +17,110 @@ Additionally, all measurements will always return ``true``.
 
         #include <QuantumDevice.hpp>
 
-        struct DummyDevice : public Catalyst::Runtime::QuantumDevice {
-            DummyDevice() = default;          // LCOV_EXCL_LINE
-            virtual ~DummyDevice() = default; // LCOV_EXCL_LINE
+        struct CustomDevice final : public Catalyst::Runtime::QuantumDevice {
+            CustomDevice([[maybe_unused]] const std::string &kwargs = "{}") {}
+            ~CustomDevice() = default;
 
-            DummyDevice &operator=(const QuantumDevice &) = delete;
-            DummyDevice(const DummyDevice &) = delete;
-            DummyDevice(DummyDevice &&) = delete;
-            DummyDevice &operator=(QuantumDevice &&) = delete;
+            CustomDevice &operator=(const QuantumDevice &) = delete;
+            CustomDevice(const CustomDevice &) = delete;
+            CustomDevice(CustomDevice &&) = delete;
+            CustomDevice &operator=(QuantumDevice &&) = delete;
 
-            virtual std::string getName(void) { return "DummyDevice"; }
-
-            auto AllocateQubit() -> QubitIdType { return 0; }
-            virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
-            {
+            auto AllocateQubit() -> QubitIdType override { return 0; }
+            auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override {
                 return std::vector<QubitIdType>(num_qubits);
             }
-            [[nodiscard]] virtual auto Zero() const -> Result { return NULL; }
-            [[nodiscard]] virtual auto One() const -> Result { return NULL; }
-            virtual auto Observable(ObsId, const std::vector<std::complex<double>> &,
-                                    const std::vector<QubitIdType> &) -> ObsIdType
-            {
+            [[nodiscard]] auto Zero() const -> Result override { return NULL; }
+            [[nodiscard]] auto One() const -> Result override { return NULL; }
+            auto Observable(ObsId, const std::vector<std::complex<double>> &,
+                                    const std::vector<QubitIdType> &) -> ObsIdType override {
                 return 0;
             }
-            virtual auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0; }
-            virtual auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
-                -> ObsIdType
-            {
+            auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType override { return 0; }
+            auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
+                -> ObsIdType override {
                 return 0;
             }
-            virtual auto Measure(QubitIdType) -> Result
-            {
+            auto Measure(QubitIdType) -> Result override {
                 bool *ret = (bool *)malloc(sizeof(bool));
                 *ret = true;
                 return ret;
             }
 
-            virtual void ReleaseQubit(QubitIdType) {}
-            virtual void ReleaseAllQubits() {}
-            [[nodiscard]] virtual auto GetNumQubits() const -> size_t { return 0; }
-            virtual void SetDeviceShots(size_t shots) {}
-            [[nodiscard]] virtual auto GetDeviceShots() const -> size_t { return 0; }
-            virtual void StartTapeRecording() {}
-            virtual void StopTapeRecording() {}
-            virtual void PrintState() {}
-            virtual void NamedOperation(const std::string &, const std::vector<double> &,
-                                        const std::vector<QubitIdType> &, bool)
-            {
-            }
+            void ReleaseQubit(QubitIdType) override {}
+            void ReleaseAllQubits() override {}
+            [[nodiscard]] auto GetNumQubits() const -> size_t override { return 0; }
+            void SetDeviceShots(size_t shots) override {}
+            [[nodiscard]] auto GetDeviceShots() const -> size_t override { return 0; }
+            void StartTapeRecording() override {}
+            void StopTapeRecording() override {}
+            void PrintState() override {}
+            void NamedOperation(const std::string &, const std::vector<double> &,
+                                        const std::vector<QubitIdType> &, bool) override {}
+            void MatrixOperation(const std::vector<std::complex<double>> &,
+                                        const std::vector<QubitIdType> &, bool) override{}
 
-            virtual void MatrixOperation(const std::vector<std::complex<double>> &,
-                                         const std::vector<QubitIdType> &, bool)
-            {
-            }
+            auto Expval(ObsIdType) -> double override { return 0.0; }
+            auto Var(ObsIdType) -> double override { return 0.0; }
+            void State(DataView<std::complex<double>, 1> &) override {}
+            void Probs(DataView<double, 1> &) override {}
+            void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) override {}
+            void Sample(DataView<double, 2> &, size_t) override {}
+            void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) override {}
+            void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) override {}
 
-            virtual auto Expval(ObsIdType) -> double { return 0.0; }
-            virtual auto Var(ObsIdType) -> double { return 0.0; }
-            virtual void State(DataView<std::complex<double>, 1> &) {}
-            virtual void Probs(DataView<double, 1> &) {}
-            virtual void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) {}
-            virtual void Sample(DataView<double, 2> &, size_t) {}
-            virtual void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) {}
-            virtual void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) {}
+            void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                                    const std::vector<QubitIdType> &, size_t) override {}
 
-            virtual void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
-                                       const std::vector<QubitIdType> &, size_t)
-            {
-            }
-
-            virtual void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) {}
+            void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
         };
 
-In addition to implementing the ``QuantumDevice`` class, one must implement the following method:
+In addition to implementing the ``QuantumDevice`` class, one must implement an entry point for the
+device library with the name ``<DeviceIdentifier>Factory``, where ``DeviceIdentifier`` is used to
+uniquely identify the entry point symbol. As an example, we use the identifier ``CustomDevice``:
 
 .. code-block:: c++
 
     extern "C" Catalyst::Runtime::QuantumDevice*
-    getCustomDevice() { return new CustomDevice(); }
+    CustomDeviceFactory(const char *kwargs) {
+        return new CustomDevice(std::string(kwargs));
+    }
 
-where ``CustomDevice()`` is a constructor for your custom device.
-``CustomDevice``'s destructor will be called by the runtime.
+For simplicity, you can use the ``GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)`` macro to
+define this function, where ``IDENTIFIER`` is the device identifier, and ``CONSTRUCTOR`` is the
+C++ device constructor including the namespace. For this example, both the device identifier and
+constructor are the same:
 
-.. note::
+.. code-block:: c++
+
+    GENERATE_DEVICE_FACTORY(CustomDevice, CustomDevice);
+
+The entry point function acts as a factory method for the device class.
+Note that a plugin library may also provide several factory methods in case it packages
+multiple devices into the same library. However, it is important that the device identifier
+be unique, as best as possible, to avoid clashes with other plugins.
+
+Importantly, the ``<DeviceIdentifier>`` string in the entry point function needs to match
+exactly what is supplied to the ``__quantum__rt__device("rtd_name", "<DeviceIdentifier>")``
+runtime instruction in compiled user programs, or what is returned from the ``get_c_interface``
+function when integrating the device into a PennyLane plugin. Please see the "Integration with
+Python devices" section further down for details.
+
+``CustomDevice(kwargs)`` serves as a constructor for your custom device, with ``kwargs``
+as a string of device specifications and options, represented in Python dictionary format.
+An example could be the default number of device shots, encoded as the following string:
+``"{'shots': 1000}"``.
+
+Note that these parameters are automatically initialized in the frontend if the library is
+provided as a PennyLane plugin device (see :func:`qml.device() <pennylane.device>`).
+
+The destructor of ``CustomDevice`` will be automatically called by the runtime.
+
+.. warning::
 
     This interface might change quickly in the near future.
-    Please check back regularly for updates and to ensure your device is compatible with a specific version of Catalyst.
+    Please check back regularly for updates and to ensure your device is compatible with
+    a specific version of Catalyst.
 
 How to compile custom devices
 =============================
@@ -121,8 +140,6 @@ One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` `as an 
         target_include_directories(dummy_device PUBLIC ${runtime_includes})
         set_property(TARGET dummy_device PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-
-
 Integration with Python devices
 ===============================
 
@@ -130,16 +147,21 @@ If you already have a custom PennyLane device defined in Python and have added a
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
 After doing so, Catalyst should be able to interface with your custom device.
 
+.. note::
+
+    The first result of ``get_c_interface`` needs to match the ``<DeviceIdentifier>``
+    as described in the first section.
+
 .. code-block:: python
 
-    class DummyDevice(qml.QubitDevice):
+    class CustomDevice(qml.QubitDevice):
         """Dummy Device"""
 
         name = "Dummy Device"
         short_name = "dummy.device"
-        pennylane_requires = "0.32.0"
+        pennylane_requires = "0.33.0"
         version = "0.0.1"
-        author = "Erick Ochoa"
+        author = "Dummy"
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -149,11 +171,13 @@ After doing so, Catalyst should be able to interface with your custom device.
 
         @staticmethod
         def get_c_interface():
-            """Location to shared object with C/C++ implementation"""
-            return "full/path/to/libdummy_device.so"
+            """ Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            return "CustomDevice", "absolute/path/to/libdummy_device.so"
 
     @qjit
-    @qml.qnode(DummyDevice(wires=1))
+    @qml.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
-

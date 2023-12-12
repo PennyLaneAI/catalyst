@@ -10,6 +10,14 @@ pre-built binaries are being distributed via the Python Package Index (PyPI) for
 
     pip install pennylane-catalyst
 
+.. warning::
+
+    macOS does not ship with a system compiler by default, which Catalyst depends on. Please
+    ensure that `XCode <https://developer.apple.com/xcode/resources/>`_ or the
+    ``XCode Command Line Tools`` are installed on your system before using Catalyst.
+
+    The easiest method of installation is to run ``xcode-select --install`` from the Terminal
+    app.
 
 Pre-built packages for Windows are not yet available, and comptability with other platforms is
 untested and cannot be guaranteed. If you are using one of these platforms, please
@@ -144,27 +152,36 @@ directory:
 
   make all
 
-To build each component one by one starting from the runtime, you can follow the instructions below.
+To build each component one by one starting from the runtime, or to build additional backend devices
+beyond ``lightning.qubit``, please follow the instructions below.
 
 Runtime
 """""""
 
-By default, the runtime is backed by `PennyLane-Lightning
-<https://github.com/PennyLaneAI/pennylane-lightning>`_
-requiring the use of C++20 standard library headers, and leverages the `QIR
-standard library <https://github.com/qir-alliance/qir-runner>`_. Assuming
-``libomp-dev`` is available, you can build the runtime from the top level
-directory:
+By default, the runtime builds and installs the `PennyLane-Lightning
+<https://github.com/PennyLaneAI/pennylane-lightning>`_ simulator device, which requires C++20
+standard library features. Older C++ compilers may not support this, so it is recommended to use a
+modern compiler with these features. An additional dependency, the `QIR
+standard library <https://github.com/qir-alliance/qir-runner>`_, is automatically fetched and
+built on supported platforms.
+
+From the root project directory, the runtime can then be built as follows:
 
 .. code-block:: console
 
   make runtime
 
-The runtime supports multiple backend devices, enabling the execution of quantum
-circuits locally on CPUs and GPUs, and remotely on Amazon Braket NISQ hardware.
-A list of supported backends, along with Make arguments for each device, is available in the
+Additional devices are constantly added, enabling the execution of quantum circuits on CPUs, GPUs,
+and remote services, such as Amazon Braket. The full list of supported backends, and additional
+configuration options, are available in the
 `Catalyst Runtime <https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html>`_
 page.
+
+To install Catalyst with all available backends, simply run:
+
+.. code-block:: console
+
+  make runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
 MLIR Dialects
 """""""""""""
@@ -234,11 +251,69 @@ To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
 Tests
 ^^^^^
 
-The following target runs all available test suites in Catalyst:
+The following target runs all available test suites with the default execution device in Catalyst:
 
 .. code-block:: console
 
   make test
 
 You can also test each module separately by using running the ``test-frontend``,
-``test-dialects``, and ``test-runtime`` targets instead.
+``test-dialects``, and ``test-runtime`` targets instead. Jupyter Notebook demos are also testable
+via ``test-demos``.
+
+Additional Device Backends
+""""""""""""""""""""""""""
+
+The **runtime tests** can be run on additional devices via the same flags that were used to build
+them, but using the ``test-runtime`` target instead:
+
+.. code-block:: console
+
+  make test-runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
+
+.. Note::
+
+  The ``test-runtime`` targets rebuilds the runtime with the specified flags. Therefore,
+  running ``make runtime OPENQASM=ON`` and ``make test-runtime`` in succession will leave you
+  without the OpenQASM device installed.
+  In case of errors it can also help to delete the build directory.
+
+The **Python test suite** is also set up to run with different device backends. Assuming the
+respective device is available & compatible, they can be tested individually by specifying the
+PennyLane plugin device name in the test command:
+
+.. code-block:: console
+
+  make pytest TEST_BACKEND="lightning.kokkos"
+
+AWS Braket devices have their own set of tests, which can be run either locally (``LOCAL``) or on
+the AWS Braket service (``REMOTE``) as follows:
+
+.. code-block:: console
+
+  make pytest TEST_BRAKET=LOCAL
+
+Documentation
+^^^^^^^^^^^^^
+
+To build and test documentation for Catalyst, you will need to install
+`sphinx <https://www.sphinx-doc.org>`_ and other packages listed in ``doc/requirements.txt``:
+
+.. code-block:: console
+
+  pip install -r doc/requirements.txt
+
+Additionally, `doxygen <https://www.doxygen.nl>`_ is required to build C++ documentation, and
+`pandoc <https://pandoc.org>`_ to render Jupyter Notebooks.
+
+On **Debian/Ubuntu**, they can be installed via:
+
+.. code-block:: console
+
+  sudo apt install doxygen pandoc
+
+On **macOS**, `homebrew <https://brew.sh>`_ is the easiest way to install these packages:
+
+.. code-block:: console
+
+  brew install doxygen pandoc

@@ -18,8 +18,8 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
-#include "Quantum/IR/QuantumDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
 
 #include "mhlo/IR/register.h"
 #include "stablehlo/dialect/Register.h"

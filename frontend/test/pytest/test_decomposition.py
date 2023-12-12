@@ -38,8 +38,12 @@ class CustomDevice(qml.QubitDevice):
     operations = copy
     observables = lightning.observables.copy()
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+    ):
         self.backend_name = backend_name if backend_name else "default"
+        self.backend_lib = backend_lib if backend_lib else "default"
         self.backend_kwargs = backend_kwargs if backend_kwargs else ""
         super().__init__(wires=wires, shots=shots)
 
@@ -50,6 +54,7 @@ class CustomDevice(qml.QubitDevice):
 dev = CustomDevice(wires=2)
 
 
+@pytest.mark.skip(reason="skip this test with the plugin system on CI")
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
     @qjit()

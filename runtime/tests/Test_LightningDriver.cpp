@@ -57,7 +57,7 @@ TEST_CASE("Test parse_kwargs coverage", "[Utils]")
 
 TEST_CASE("Test Driver", "[Driver]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
 
     // check the scope of memory-manager
     CHECK(driver->getMemoryManager() != nullptr);
@@ -66,11 +66,12 @@ TEST_CASE("Test Driver", "[Driver]")
     CHECK(driver->getDeviceRecorderStatus() == false);
 
     // check device specs update
-    driver->setDeviceRecorder(true);
-    driver->setDeviceKwArgs("execute=openmp;");
-    CHECK(driver->getDevice() == nullptr);
-    CHECK(driver->getDeviceKwArgs() == "execute=openmp;");
+    driver->setDeviceRecorderStatus(true);
     CHECK(driver->getDeviceRecorderStatus() == true);
+
+    // try accessing the device pointer before init
+    REQUIRE_THROWS_WITH(driver->getDevice(),
+                        Catch::Contains("Invalid use of the device pointer before initialization"));
 }
 
 TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes)

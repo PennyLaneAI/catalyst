@@ -15,27 +15,41 @@
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
 
+import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import _update_thread_local_jit_state, eval_jaxpr
+from jax._src.core import _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
-from jax._src.interpreters.partial_eval import _input_type_to_tracers
+from jax._src.interpreters.partial_eval import (
+    _input_type_to_tracers,
+    infer_lambda_input_type,
+    trace_to_jaxpr_dynamic2,
+)
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
 from jax._src.linear_util import annotate
+from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
-from jax.api_util import flatten_fun, shaped_abstractify
-from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
+from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
+from jax.api_util import flatten_fun
+from jax.core import AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import ShapedArray, Trace, gensym, thread_local_state
+from jax.core import (
+    ShapedArray,
+    Trace,
+    Tracer,
+    concrete_aval,
+    eval_jaxpr,
+    gensym,
+    thread_local_state,
+)
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -58,7 +72,11 @@ from jax.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jaxlib.xla_extension import pytree
+from jaxlib.xla_extension import PyTreeRegistry
+
+from catalyst.utils.patching import Patcher
+
+# pylint: disable=protected-access
 
 __all__ = (
     "ClosedJaxpr",
@@ -66,6 +84,7 @@ __all__ = (
     "DynamicJaxprTracer",
     "Jaxpr",
     "PyTreeDef",
+    "PyTreeRegistry",
     "ShapedArray",
     "ShapeDtypeStruct",
     "convert_constvars_jaxpr",
@@ -77,10 +96,11 @@ __all__ = (
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "jaxpr_to_mlir",
+    "jaxpr_remove_implicit",
     "make_jaxpr_effects",
+    "make_jaxpr2",
     "new_dynamic_main2",
     "new_inner_tracer",
-    "pytree",
     "sort_eqns",
     "treedef_is_leaf",
     "tree_flatten",
@@ -262,48 +282,68 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 
 
 def deduce_avals(f: Callable, args, kwargs):
-    """Wraps the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
-    and output_tree promise. The promise must be called after the resulting wrapped function is
-    evaluated."""
+    """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
+    and returning expanded flatten results. Calculate input abstract values and output_tree promise.
+    The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
+    abstracted_axes = None
+    axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+    in_type = infer_lambda_input_type(axes_specs, flat_args)
+    in_avals, keep_inputs = unzip2(in_type)
     wf = wrap_init(f)
-    in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
-    in_type = tuple(zip(in_avals, keep_inputs))
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
-    return wffa, in_avals, out_tree_promise
+    return wffa, in_avals, keep_inputs, out_tree_promise
 
 
-def jaxpr_to_mlir(func_name, jaxpr, shape):
-    """Lower a Python function into an MLIR module.
+def get_aval2(x):
+    """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
+    # TODO: remove this patch when https://github.com/google/jax/pull/18579 is merged
+    if isinstance(x, AbstractValue):
+        return x
+    elif isinstance(x, Tracer):
+        return x.aval
+    else:
+        return concrete_aval(x)
+
+
+def _no_clean_up_dead_vars(_eqn, _env, _last_used):
+    """A stub to workaround the Jax ``KeyError 'a'`` bug during the lowering of Jaxpr programs to
+    MLIR with the dynamic API enabled."""
+    return None
+
+
+def jaxpr_to_mlir(func_name, jaxpr):
+    """Lower a Jaxpr into an MLIR module.
 
     Args:
-        func: python function to be lowered
-        args: arguments to ``func``
-        kwargs: keyword arguments to ``func``
+        func_name(str): function name
+        jaxpr(Jaxpr): Jaxpr code to lower
 
     Returns:
         module: the MLIR module corresponding to ``func``
         context: the MLIR context corresponding
-        jaxpr: the jaxpr corresponding to ``func``
-        shape: the shape of the return values in ``PyTreeDef``
     """
 
-    nrep = jaxpr_replicas(jaxpr)
-    effects = jax_ordered_effects.filter_in(jaxpr.effects)
-    axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = new_name_stack(wrap_name("ok", "jit"))
-    module, context = custom_lower_jaxpr_to_module(
-        func_name="jit_" + func_name,
-        module_name=func_name,
-        jaxpr=jaxpr,
-        effects=effects,
-        platform="cpu",
-        axis_context=axis_context,
-        name_stack=name_stack,
-    )
+    with Patcher(
+        (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+        (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
+    ):
+        nrep = jaxpr_replicas(jaxpr)
+        effects = jax_ordered_effects.filter_in(jaxpr.effects)
+        axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+        name_stack = new_name_stack(wrap_name("ok", "jit"))
+        module, context = custom_lower_jaxpr_to_module(
+            func_name="jit_" + func_name,
+            module_name=func_name,
+            jaxpr=jaxpr,
+            effects=effects,
+            platform="cpu",
+            axis_context=axis_context,
+            name_stack=name_stack,
+        )
 
-    return module, context, jaxpr, tree_structure(shape)
+    return module, context
 
 
 # pylint: disable=too-many-arguments
@@ -383,3 +423,57 @@ def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
+
+
+def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
+    """Get implicit arguments from explicit arguments and abstracted_axes."""
+    axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+    explicit_args, _ = tree_flatten(args)
+    in_type = infer_lambda_input_type(axes_specs, explicit_args)
+    implicit_args = _extract_implicit_args(in_type, explicit_args)
+    args_flat = [*implicit_args, *explicit_args]
+    return args_flat
+
+
+def jaxpr_remove_implicit(
+    closed_jaxpr: ClosedJaxpr, out_type: OutputType
+) -> tuple[ClosedJaxpr, OutputType]:
+    """Remove all the implicit result values of the ``closed_jaxpr``."""
+    # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the unneeded
+    # tracers.
+    jaxpr = closed_jaxpr.jaxpr
+    out_keep = list(tuple(zip(*out_type))[1]) if len(out_type) > 0 else []
+    outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
+    out_type2 = [o for o, keep in zip(out_type, out_keep) if keep]
+    jaxpr2 = Jaxpr(
+        jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
+    )
+    return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
+
+
+def make_jaxpr2(
+    fun: Callable,
+    abstracted_axes: Any | None = None,
+) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
+    """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
+
+    def abstractify(args, kwargs):
+        flat_args, in_tree = tree_flatten((args, kwargs))
+        axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
+        in_type = infer_lambda_input_type(axes_specs, flat_args)
+        return in_type, in_tree
+
+    @wraps(fun)
+    def make_jaxpr_f(*args, **kwargs):
+        # TODO: re-use `deduce_avals` here.
+        with Patcher((jax._src.interpreters.partial_eval, "get_aval", get_aval2)), ExitStack():
+            f = wrap_init(fun)
+            in_type, in_tree = abstractify(args, kwargs)
+            f, out_tree_promise = flatten_fun(f, in_tree)
+            f = annotate(f, in_type)
+            jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
+        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        return closed_jaxpr, out_type, out_tree_promise()
+
+    make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
+    return make_jaxpr_f

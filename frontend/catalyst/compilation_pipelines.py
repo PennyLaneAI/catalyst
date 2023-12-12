@@ -15,6 +15,8 @@
 compiling of hybrid quantum-classical functions using Catalyst.
 """
 
+# pylint: disable=too-many-lines
+
 import ctypes
 import functools
 import inspect
@@ -28,6 +30,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+from jax._src.interpreters.partial_eval import infer_lambda_input_type
+from jax._src.pjit import _flat_axes_specs
 from jax.interpreters.mlir import ir
 from jax.tree_util import tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
@@ -47,6 +51,7 @@ from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
+from catalyst.utils.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -55,6 +60,7 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_dynamic_shapes", True)
 
 
 def are_params_annotated(f: typing.Callable):
@@ -169,14 +175,16 @@ class CompiledFunction:
         shared_object_file,
         func_name,
         restype,
+        compile_options,
     ):
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
+        self.compile_options = compile_options
 
     @staticmethod
-    def typecheck(compiled_signature, runtime_signature):
+    def typecheck(abstracted_axes, compiled_signature, runtime_signature):
         """Whether arguments can be promoted.
 
         Args:
@@ -189,6 +197,18 @@ class CompiledFunction:
         """
         compiled_data, compiled_shape = tree_flatten(compiled_signature)
         runtime_data, runtime_shape = tree_flatten(runtime_signature)
+        with Patcher(
+            # pylint: disable=protected-access
+            (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+        ):
+            axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
+            axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
+            in_type_compiled = infer_lambda_input_type(axes_specs_compile, compiled_data)
+            in_type_runtime = infer_lambda_input_type(axes_specs_runtime, runtime_data)
+
+            if in_type_compiled == in_type_runtime:
+                return TypeCompatibility.CAN_SKIP_PROMOTION
+
         if compiled_shape != runtime_shape:
             return TypeCompatibility.NEEDS_COMPILATION
 
@@ -434,6 +454,10 @@ class CompiledFunction:
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
+        if self.compile_options.abstracted_axes is not None:
+            abstracted_axes = self.compile_options.abstracted_axes
+            args = get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs)
+
         abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
@@ -473,7 +497,7 @@ class QJIT:
         self.mlir_module = None
         self.user_typed = False
         self.c_sig = None
-        self.shape = None
+        self.out_tree = None
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -551,11 +575,13 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, *self.c_sig)
+            func = self.user_function
+            sig = self.c_sig
+            abstracted_axes = self.compile_options.abstracted_axes
+            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(func, abstracted_axes, *sig)
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
-
         canonicalizer_options = deepcopy(self.compile_options)
         canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
         canonicalizer_options.lower_to_llvm = False
@@ -603,7 +629,8 @@ class QJIT:
             )
 
         self._llvmir = llvm_ir
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
+        options = self.compile_options
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
         return compiled_function
 
     def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
@@ -629,7 +656,8 @@ class QJIT:
         if not has_been_compiled:
             next_action = TypeCompatibility.NEEDS_COMPILATION
         else:
-            next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
+            abstracted_axes = self.compile_options.abstracted_axes
+            next_action = CompiledFunction.typecheck(abstracted_axes, self.c_sig, r_sig)
 
         if next_action == TypeCompatibility.NEEDS_PROMOTION:
             args = CompiledFunction.promote_arguments(self.c_sig, *args)
@@ -681,8 +709,8 @@ class QJIT:
         data = self.compiled_function(*args, **kwargs)
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        if self.shape is not None:
-            data = tree_unflatten(self.shape, data)
+        if self.out_tree is not None:
+            data = tree_unflatten(self.out_tree, data)
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:
@@ -722,8 +750,8 @@ class JAX_QJIT:
         )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        assert qjit_function.shape is not None, "Shape must not be none."
-        return tree_unflatten(qjit_function.shape, data)
+        assert qjit_function.out_tree is not None, "PyTree shape must not be none."
+        return tree_unflatten(qjit_function.out_tree, data)
 
     def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
@@ -806,6 +834,7 @@ def qjit(
     verbose=False,
     logfile=None,
     pipelines=None,
+    abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -838,6 +867,84 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
+        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
+            An experimental option to specify dynamic tensor shapes.
+            This option affects the compilation of the annotated function.
+            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
+            with dynamic shapes.
+
+            There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
+            dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
+
+            .. code-block:: python
+
+                abstracted_axes=((), ('n',), ('m', 'n'))
+
+            Each tuple in the sequence corresponds to one of the arguments in the annotated
+            function. Empty tuples can
+            be used and correspond to parameters with statically known shapes.
+            Non-empty tuples correspond to parameters with dynamically known shapes.
+
+            In this example above,
+
+            - the first argument will have a statically known shape,
+
+            - the second argument has its zeroth axis have dynamic
+              shape ``n``, and
+
+            - the third argument will have its zeroth axis with dynamic shape
+              ``m`` and first axis with dynamic shape ``n``.
+
+            Passing a dictionary:
+
+            .. code-block:: python
+
+                abstracted_axes={0: 'n'}
+
+            This approach allows a concise expression of the relationships
+            between axes for different function arguments. In this example,
+            it specifies that for all function arguments, the zeroth axis will
+            have dynamic shape ``n``.
+
+            Passing a sequence of dictionaries:
+
+            .. code-block:: python
+
+                abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
+
+            The example here is a more verbose version of the tuple example. This convention
+            allows axes to be omitted from the list of abstracted axes.
+
+            Using ``abstracted_axes`` can help avoid the cost of recompilation.
+            By using ``abstracted_axes``, a more general version of the compiled function will be
+            generated. This more general version is parametrized over the abstracted axes and
+            allows results to be computed over tensors independently of their axes lengths.
+
+            For example:
+
+            .. code-block:: python
+
+                @qjit
+                def sum(arr):
+                    return jnp.sum(arr)
+
+                sum(jnp.array([1]))     # Compilation happens here.
+                sum(jnp.array([1, 1]))  # And here!
+
+            The ``sum`` function would recompile each time an array of different size is passed
+            as an argument.
+
+            .. code-block:: python
+
+                @qjit(abstracted_axes={0: "n"})
+                def sum_abstracted(arr):
+                    return jnp.sum(arr)
+
+                sum(jnp.array([1]))     # Compilation happens here.
+                sum(jnp.array([1, 1]))  # No need to recompile.
+
+            the ``sum_abstracted`` function would only compile once and its definition would be
+            reused for subsequent function calls.
 
     Returns:
         QJIT object.
@@ -938,14 +1045,33 @@ def qjit(
             :class:`~.pennylane_extensions.QJITDevice`.
     """
 
+    axes = abstracted_axes
     if fn is not None:
         return QJIT(
-            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                abstracted_axes=axes,
+            ),
         )
 
     def wrap_fn(fn):
         return QJIT(
-            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                abstracted_axes=axes,
+            ),
         )
 
     return wrap_fn

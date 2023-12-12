@@ -19,7 +19,6 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
-import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -28,7 +27,13 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
-from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax._src.tree_util import (
+    PyTreeDef,
+    flatten_one_level,
+    tree_flatten,
+    tree_unflatten,
+    treedef_is_leaf,
+)
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
@@ -73,13 +78,14 @@ from catalyst.utils.jax_extras import (
     _initial_style_jaxpr,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
+    get_implicit_and_explicit_flat_args,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
-    tree_structure,
-    wrap_init,
+    unzip2,
 )
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime import extract_backend_info
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -109,14 +115,6 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    # The set of supported devices at runtime
-    RUNTIME_DEVICES = (
-        "lightning.qubit",
-        "lightning.kokkos",
-        "braket.aws.qubit",
-        "braket.local.qubit",
-    )
-
     def __init__(self, fn, device):
         self.func = fn
         self.device = device
@@ -124,62 +122,29 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         qnode = None
-        if isinstance(self, qml.QNode):
+        if isinstance(self, QNode):
             qnode = self
-            if isinstance(self.device, qml.Device):
-                name = self.device.short_name
-            else:
-                name = self.device.name
-
-            is_known_device = name in QFunc.RUNTIME_DEVICES
-            implements_c_interface = hasattr(self.device, "get_c_interface")
-            is_valid_device = is_known_device or implements_c_interface
-            if not is_valid_device:
-                raise CompileError(
-                    f"The {name} device is not supported for compilation at the moment."
-                )
-
-            # TODO:
-            # Once all devices get converted to shared libraries this name should just be the path.
-            backend_path_or_name = name
-            if implements_c_interface:
-                impl = self.device.get_c_interface()
-                if not pathlib.Path(impl).is_file():
-                    raise CompileError(f"Device at {impl} cannot be found!")
-
-                backend_path_or_name = self.device.get_c_interface()
-
-            backend_kwargs = {}
-            if hasattr(self.device, "shots"):
-                backend_kwargs["shots"] = self.device.shots if self.device.shots else 0
-            if self.device.short_name == "braket.local.qubit":  # pragma: no cover
-                backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
-            elif self.device.short_name == "braket.aws.qubit":  # pragma: no cover
-                backend_kwargs["device_arn"] = self.device._device._arn
-                if self.device._s3_folder:
-                    backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
-
             device = QJITDevice(
-                self.device.shots, self.device.wires, backend_path_or_name, backend_kwargs
+                self.device.shots, self.device.wires, *extract_backend_info(self.device)
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs, qnode)
+        def _eval_quantum(*args):
+            closed_jaxpr, out_type, out_tree = trace_quantum_function(
+                self.func, device, args, kwargs, qnode
+            )
+            args_expanded = get_implicit_and_explicit_flat_args(None, *args)
+            res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
+            _, out_keep = unzip2(out_type)
+            res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
+            return tree_unflatten(out_tree, res_flat)
 
-        retval_tree = tree_structure(shape)
-
-        def _eval_jaxpr(*args):
-            return eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
-
-        args_data, _ = tree_flatten(args)
-
-        wrapped = wrap_init(_eval_jaxpr)
-        retval = func_p.bind(wrapped, *args_data, fn=self)
-
-        return tree_unflatten(retval_tree, retval)
+        flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_quantum, args, {})
+        args_flat = tree_flatten(args)[0]
+        res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
+        return tree_unflatten(out_tree_promise(), res_flat)
 
 
 class QJITDevice(qml.QubitDevice):
@@ -247,8 +212,12 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+    ):
         self.backend_name = backend_name if backend_name else "default"
+        self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
         super().__init__(wires=wires, shots=shots)
 
@@ -380,32 +349,40 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
-            # The Python function is stored in the "fn" parameter of func_p JAXPR primitives.
-            fn = eqn.params.get("fn")
-            if fn and fn not in visited:
-                child = eqn.params.get("call_jaxpr", None)
-                if isinstance(fn, (qml.QNode, Grad)):
-                    _check_created_jaxpr_gradient_methods(fn, method, child)
-                if child and child not in visited:
-                    traverse_children(child)
-            visited.add(fn)
+            primitive = eqn.primitive
+            if primitive is func_p:
+                child_jaxpr = eqn.params.get("call_jaxpr")
+            elif primitive is grad_p:
+                child_jaxpr = eqn.params.get("jaxpr")
+            else:
+                continue
+
+            _check_primitive_is_differentiable(primitive, method)
+
+            py_callable = eqn.params.get("fn")
+            if py_callable not in visited:
+                if isinstance(py_callable, QNode):
+                    _check_qnode_against_grad_method(py_callable, method, child_jaxpr)
+                traverse_children(child_jaxpr)
+                visited.add(py_callable)
 
     traverse_children(jaxpr)
 
 
-def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
+def _check_primitive_is_differentiable(primitive, method):
+    """Verify restriction on primitives in the call graph of a Grad operation."""
+
+    if primitive is grad_p and method != "fd":
+        raise DifferentiableCompileError(
+            "Only finite difference can compute higher order derivatives."
+        )
+
+
+def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
     """Additional checks for the given jaxpr of a differentiable function."""
     if method == "fd":
         return
 
-    if isinstance(f, Grad):
-        raise DifferentiableCompileError(
-            "Only finite difference can compute higher order derivatives"
-        )
-
-    assert isinstance(
-        f, qml.QNode
-    ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
     return_ops = []
     for res in jaxpr.outvars:
         for eq in reversed(jaxpr.eqns):  # pragma: no branch
@@ -415,8 +392,8 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
 
     if f.diff_method is None:
         raise DifferentiableCompileError(
-            "Cannot differentiate a QNode explicitly marked non-differentiable (with"
-            " diff_method=None)"
+            "Cannot differentiate a QNode explicitly marked non-differentiable (with "
+            "diff_method=None)."
         )
 
     if f.diff_method == "parameter-shift" and any(
@@ -426,6 +403,7 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
             "The parameter-shift method can only be used for QNodes "
             "which return either qml.expval or qml.probs."
         )
+
     if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
         raise DifferentiableCompileError(
             "The adjoint method can only be used for QNodes which return qml.expval."
@@ -447,7 +425,7 @@ def _check_grad_params(
     if method == "fd" and h is None:
         h = 1e-7
     if not (h is None or isinstance(h, numbers.Number)):
-        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
+        raise ValueError(f"Invalid h value ({h}). None or number was expected.")
     if argnum is None:
         argnum = [0]
     elif isinstance(argnum, int):
@@ -476,9 +454,9 @@ class Grad:
         TypeError: Non-differentiable object was passed as `fn` argument.
     """
 
-    def __init__(self, fn: Differentiable, *, grad_params: GradParams):
+    def __init__(self, fn: Differentiable, grad_params: GradParams):
         self.fn = fn
-        self.__name__ = f"grad.{fn.__name__}"
+        self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
 
     def __call__(self, *args, **kwargs):
@@ -486,22 +464,33 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
-        EvaluationContext.check_is_tracing(
-            "catalyst.grad can only be used from within @qjit decorated code."
-        )
-        jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
+        if EvaluationContext.is_tracing():
+            fn = _ensure_differentiable(self.fn)
+            grad_params = _check_grad_params(*self.grad_params)
 
-        args_data, _ = tree_flatten(args)
+            jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
-        # It always returns list as required by catalyst control-flows
-        return grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
+            args_data, _ = tree_flatten(args)
+
+            # It always returns list as required by catalyst control-flows
+            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        else:
+            if argnums := self.grad_params.argnum is None:
+                argnums = 0
+            if self.grad_params.scalar_out:
+                results = jax.grad(self.fn, argnums=argnums)(*args)
+            else:
+                results = jax.jacobian(self.fn, argnums=argnums)(*args)
+
+        return results
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
-    This function allows the gradient of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the gradient of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.grad``.
 
     .. warning::
 
@@ -623,16 +612,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     array(4.6)
     """
     scalar_out = True
-    return Grad(
-        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
-    )
+    return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
-    This function allows the Jacobian of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the Jacobian of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.jacobian``.
 
     Args:
         f (Callable): a function or a function object to differentiate
@@ -689,9 +677,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
            [-4.20735506e-01,  4.20735506e-01]])
     """
     scalar_out = False
-    return Grad(
-        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
-    )
+    return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
 # pylint: disable=too-many-arguments
@@ -699,7 +685,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.jvp``.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -761,22 +748,26 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> workflow(params, dy)
     [array(0.78766064), array(-0.7011436)]
     """
-    EvaluationContext.check_is_tracing(
-        "catalyst.jvp can only be used from within @qjit decorated code."
-    )
 
-    def _check(x, hint):
+    def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-        return x
 
-    params = _check(params, "params")
-    tangents = _check(tangents, "tangents")
-    fn: Differentiable = _ensure_differentiable(f)
-    scalar_out = False
-    grad_params = _check_grad_params(method, scalar_out, h, argnum)
-    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    check_is_iterable(params, "params")
+    check_is_iterable(tangents, "tangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    else:
+        results = jax.jvp(f, params, tangents)
+
+    return results
 
 
 # pylint: disable=too-many-arguments
@@ -784,7 +775,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.vjp``.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
@@ -822,22 +814,37 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     [array([0.09983342, 0.04      , 0.02      ]),
     array([-0.43750208,  0.07000001])]
     """
-    EvaluationContext.check_is_tracing(
-        "catalyst.vjp can only be used from within @qjit decorated code."
-    )
 
-    def _check(x, hint):
+    def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-        return x
 
-    params = _check(params, "params")
-    cotangents = _check(cotangents, "cotangents")
-    fn: Differentiable = _ensure_differentiable(f)
-    scalar_out = False
-    grad_params = _check_grad_params(method, scalar_out, h, argnum)
-    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    check_is_iterable(params, "params")
+    check_is_iterable(cotangents, "cotangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    else:
+        primal_outputs, vjp_fn = jax.vjp(f, *params)
+
+        # JAX requires that the PyTree shape of cotangents matches that of the function results.
+        # Generally, the user is responsible for this, except when the function returns a "bare"
+        # array, since we do force users to provide cotangents as an iterable.
+        # TODO: Add support for PyTrees in the compiled branch, then we can remove this special
+        # handling here by relaxing the input type restriction.
+        if len(cotangents) == 1 and isinstance(primal_outputs, jax.Array):
+            children, _ = flatten_one_level(cotangents)
+            cotangents = children[0]
+
+        results = vjp_fn(cotangents)
+
+    return results
 
 
 def _aval_to_primitive_type(aval):
@@ -1160,7 +1167,7 @@ class CondCallable:
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-                wffa, _, out_tree = deduce_avals(branch, [], {})
+                wffa, _, _, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
@@ -1466,7 +1473,7 @@ def for_loop(lower_bound, upper_bound, step):
                         step,
                         lower_bound,
                     ] + tree_flatten(init_state)[0]
-                    wffa, in_avals, body_tree = deduce_avals(
+                    wffa, in_avals, _, body_tree = deduce_avals(
                         body_fn, [lower_bound] + list(init_state), {}
                     )
                     arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
@@ -1603,7 +1610,7 @@ def while_loop(cond_fn):
                 in_classical_tracers, _ = tree_flatten(init_state)
 
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
+                    cond_wffa, cond_in_avals, _, cond_tree = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(
                         cond_trace.new_arg, cond_in_avals
                     )
@@ -1618,7 +1625,7 @@ def while_loop(cond_fn):
                 _check_single_bool_value(cond_tree(), res_classical_tracers)
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
+                    wffa, in_avals, _, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:
@@ -1801,7 +1808,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _ = deduce_avals(_callee, args, kwargs)
+            wffa, in_avals, _, _ = deduce_avals(_callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:

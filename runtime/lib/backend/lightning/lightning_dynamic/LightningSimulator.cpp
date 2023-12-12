@@ -14,6 +14,11 @@
 
 #include "LightningSimulator.hpp"
 
+#include "AdjointJacobianLQubit.hpp"
+#include "JacobianData.hpp"
+#include "LinearAlgebra.hpp"
+#include "MeasurementsLQubit.hpp"
+
 namespace Catalyst::Runtime::Simulator {
 
 auto LightningSimulator::AllocateQubit() -> QubitIdType
@@ -175,7 +180,7 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 
     // update tape caching
     if (this->tape_recording) {
-        this->cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
+        this->cache_manager.addObservable(obsKey, MeasurementsT::Expval);
     }
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
@@ -191,7 +196,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 
     // update tape caching
     if (this->tape_recording) {
-        this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
+        this->cache_manager.addObservable(obsKey, MeasurementsT::Var);
     }
 
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
@@ -456,7 +461,7 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     auto &&obs_callees = this->cache_manager.getObservablesCallees();
     bool is_valid_measurements =
         std::all_of(obs_callees.begin(), obs_callees.end(),
-                    [](const auto &m) { return m == Lightning::Measurements::Expval; });
+                    [](const auto &m) { return m == MeasurementsT::Expval; });
     RT_FAIL_IF(!is_valid_measurements,
                "Unsupported measurements to compute gradient; "
                "Adjoint differentiation method only supports expectation return type");
@@ -514,3 +519,5 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
 }
 
 } // namespace Catalyst::Runtime::Simulator
+
+GENERATE_DEVICE_FACTORY(LightningSimulator, Catalyst::Runtime::Simulator::LightningSimulator);

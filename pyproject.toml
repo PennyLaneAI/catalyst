@@ -5,6 +5,7 @@ extend-exclude = '''
   frontend/catalyst/python_bindings
   | mlir/llvm-project
   | mlir/mlir-hlo
+  | mlir/Enzyme
   | build
   | env
 )
@@ -13,7 +14,15 @@ extend-exclude = '''
 [tool.isort]
 profile = "black"
 skip = ["frontend/test/pytest/conftest.py"]
-extend_skip_glob = ["mlir/llvm-project/*", "mlir/mlir-hlo/*", ".git/*", ".vscode/*"]
+extend_skip_glob = [
+  "mlir/llvm-project/*",
+  "mlir/mlir-hlo/*",
+  "mlir/Enzyme/*",
+  "mlir/build/*",
+  "runtime/build/*",
+  ".git/*",
+  ".vscode/*"
+]
 
 [build-system]
 requires = ["setuptools>=62", "wheel", "pybind11>=2.7.0", "numpy>=1.22", "jaxlib"]
