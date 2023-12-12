@@ -266,6 +266,7 @@ class TestCompilerState:
     def test_compiler_from_textual_ir(self):
         """Test the textual IR compilation."""
         full_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        extension = ".so" if platform.system() == "Linux" else ".dylib"
 
         # pylint: disable=line-too-long
         ir = (
@@ -276,12 +277,12 @@ module @workflow {
     return %0 : tensor<f64>
   }
   func.func private @workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "finite-diff", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    quantum.device ["rtd_kwargs", "{'shots': 0}"]
-    quantum.device ["rtd_name", "LightningSimulator"]
-    quantum.device ["rtd_lib", """
+    quantum.device ["""
             + r'"'
             + full_path
-            + r"""/librtd_lightning.so"]
+            + r"""/librtd_lightning"""
+            + extension
+            + """", "LightningSimulator", "{'shots': 0}"]
     %0 = stablehlo.constant dense<4> : tensor<i64>
     %1 = quantum.alloc( 4) : !quantum.reg
     %2 = stablehlo.constant dense<0> : tensor<i64>

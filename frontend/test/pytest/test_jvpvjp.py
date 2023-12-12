@@ -59,6 +59,96 @@ def assert_elements_allclose(a, b, **kwargs):
 diff_methods = ["auto", "fd"]
 
 
+def test_vjp_outside_qjit_scalar_scalar():
+    """Test that vjp can be used outside of a jitting context on a scalar-scalar function."""
+
+    def f(x):
+        return x**2
+
+    x = (4.0,)
+    ct = (1.0,)
+
+    expected = jax.vjp(f, *x)[1](*ct)
+    result = C_vjp(f, x, ct)
+
+    assert_allclose(expected, result)
+
+
+def test_vjp_outside_qjit_tuple_scalar():
+    """Test that vjp can be used outside of a jitting context on a tuple-scalar function."""
+
+    def f(x, y):
+        return x**2 + y**2
+
+    x = (4.0, 4.0)
+    ct = (1.0,)
+
+    expected = jax.vjp(f, *x)[1](*ct)
+    result = C_vjp(f, x, ct)
+
+    assert_allclose(expected, result)
+
+
+def test_vjp_outside_qjit_tuple_tuple():
+    """Test that vjp can be used outside of a jitting context on a tuple-tuple function."""
+
+    def f(x, y):
+        return x**2, y**2
+
+    x = (4.0, 4.0)
+    ct = (1.0, 1.0)
+
+    expected = jax.vjp(f, *x)[1](ct)
+    result = C_vjp(f, x, ct)
+
+    assert_allclose(expected, result)
+
+
+def test_jvp_outside_qjit_scalar_scalar():
+    """Test that jvp can be used outside of a jitting context on a scalar-scalar function."""
+
+    def f(x):
+        return x**2
+
+    x = (4.0,)
+    t = (1.0,)
+
+    expected = jax.jvp(f, x, t)
+    result = C_jvp(f, x, t)
+
+    assert_allclose(expected, result)
+
+
+def test_jvp_outside_qjit_tuple_scalar():
+    """Test that jvp can be used outside of a jitting context on a tuple-scalar function."""
+
+    def f(x, y):
+        return x**2 + y**2
+
+    x = (4.0, 4.0)
+    t = (1.0, 1.0)
+
+    expected = jax.jvp(f, x, t)
+    result = C_jvp(f, x, t)
+
+    assert_allclose(expected, result)
+
+
+def test_jvp_outside_qjit_tuple_tuple():
+    """Test that jvp can be used outside of a jitting context on a tuple-tuple function."""
+
+    def f(x, y):
+        return x**2, y**2
+
+    x = (4.0, 4.0)
+    t = (1.0, 1.0)
+
+    expected = jax.jvp(f, x, t)
+    result = C_jvp(f, x, t)
+
+    assert_allclose(expected, result)
+
+
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""

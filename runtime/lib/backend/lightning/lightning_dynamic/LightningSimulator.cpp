@@ -188,24 +188,6 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
     return m.expval(*obs);
 }
 
-auto LightningSimulator::Expval(ObsIdType obsKey, const size_t shots,
-                                const std::vector<size_t> &shot_range = {}) -> double
-{
-    RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
-               "Invalid key for cached observables");
-    RT_FAIL_IF(shot_range.size() > shots, "Shot range size is larger than number of shots");
-    auto &&obs = this->obs_manager.getObservable(obsKey);
-
-    // update tape caching
-    if (this->tape_recording) {
-        this->cache_manager.addObservable(obsKey, MeasurementsT::Expval);
-    }
-
-    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-
-    return m.expval(*obs, shots, shot_range);
-}
-
 auto LightningSimulator::Var(ObsIdType obsKey) -> double
 {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
@@ -538,7 +520,4 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
 
 } // namespace Catalyst::Runtime::Simulator
 
-extern "C" Catalyst::Runtime::QuantumDevice *LightningSimulatorFactory(const std::string &kwargs)
-{
-    return new Catalyst::Runtime::Simulator::LightningSimulator(kwargs);
-}
+GENERATE_DEVICE_FACTORY(LightningSimulator, Catalyst::Runtime::Simulator::LightningSimulator);

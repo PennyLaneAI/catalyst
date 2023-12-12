@@ -157,22 +157,19 @@ class SharedLibraryManager final {
     }
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::string &kwargs);
+extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const char *kwargs);
 
 class ExecutionContext final {
   private:
-    using DeviceInitializer =
-        std::function<std::unique_ptr<QuantumDevice>(bool, const std::string &)>;
-
     // Device specifications
     std::string _device_kwargs{};
-    std::string _device_name;
-    bool _tape_recording;
+    std::string _device_name{};
+    bool _tape_recording{false};
 
     // ExecutionContext pointers
-    std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
+    std::unique_ptr<QuantumDevice> _device_ptr{nullptr};
     std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
-    std::unique_ptr<SharedLibraryManager> _driver_so_ptr{nullptr};
+    std::unique_ptr<SharedLibraryManager> _device_so_ptr{nullptr};
     std::unique_ptr<PythonInterpreterGuard> _py_guard{nullptr};
 
     // Helper methods
@@ -186,48 +183,41 @@ class ExecutionContext final {
     }
 
   public:
-    explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
-        : _device_name(default_device), _tape_recording(false)
-    {
-        _driver_mm_ptr = std::make_unique<MemoryManager>();
-    };
+    explicit ExecutionContext() { _driver_mm_ptr = std::make_unique<MemoryManager>(); };
 
     ~ExecutionContext()
     {
-        _driver_ptr.reset(nullptr);
+        _device_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
-        _driver_so_ptr.reset(nullptr);
+        _device_so_ptr.reset(nullptr);
         _py_guard.reset(nullptr);
-
-        RT_ASSERT(getDevice() == nullptr);
-        RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
-
-    void setDeviceKwArgs(std::string_view kwargs) noexcept { _device_kwargs = kwargs; }
+    void setDeviceRecorderStatus(bool status) noexcept { _tape_recording = status; }
 
     void setDeviceName(std::string_view name) noexcept { _device_name = name; }
-
-    [[nodiscard]] auto getDeviceName() const -> std::string_view { return _device_name; }
-
-    [[nodiscard]] auto getDeviceKwArgs() const -> std::string { return _device_kwargs; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
     [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
     {
-        _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
+        _device_so_ptr = std::make_unique<SharedLibraryManager>(filename);
         std::string factory_name{_device_name + "Factory"};
-        void *f_ptr = _driver_so_ptr->getSymbol(factory_name);
-        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(_device_kwargs)
+        void *f_ptr = _device_so_ptr->getSymbol(factory_name);
+        return f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(
+                           _device_kwargs.c_str())
                      : nullptr;
     }
 
-    [[nodiscard]] bool initDevice(std::string_view rtd_lib)
+    [[nodiscard]] bool initDevice(std::string_view rtd_lib, std::string_view rtd_name,
+                                  std::string_view rtd_kwargs)
     {
-        // Reset the driver pointer
-        _driver_ptr.reset(nullptr);
+        // Reset the device pointer
+        _device_ptr.reset(nullptr);
+
+        // Set the device info.
+        _device_name = rtd_name;
+        _device_kwargs = rtd_kwargs;
 
         // Convert to a mutable string
         std::string rtd_lib_str{rtd_lib};
@@ -256,14 +246,19 @@ class ExecutionContext final {
 #endif
 
         QuantumDevice *impl = loadDevice(rtd_lib_str);
-        _driver_ptr.reset(impl);
+        _device_ptr.reset(impl);
         return true;
     }
 
+    void releaseDevice() noexcept { _device_ptr.reset(nullptr); }
+
     [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
     {
-        return _driver_ptr;
+        RT_FAIL_IF(!_device_ptr, "Invalid use of the device pointer before initialization")
+        return _device_ptr;
     }
+
+    [[nodiscard]] auto isInitialized() const -> bool { return _device_ptr ? true : false; }
 
     [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
     {

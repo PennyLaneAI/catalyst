@@ -21,6 +21,15 @@
 #include "DataView.hpp"
 #include "Types.h"
 
+// A helper template macro to generate the <IDENTIFIER>Factory method by
+// calling <CONSTRUCTOR>(kwargs). Check the Custom Devices guideline for details:
+// https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html
+#define GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)                                           \
+    extern "C" Catalyst::Runtime::QuantumDevice *IDENTIFIER##Factory(const char *kwargs)           \
+    {                                                                                              \
+        return new CONSTRUCTOR(std::string(kwargs));                                               \
+    }
+
 namespace Catalyst::Runtime {
 
 /**
@@ -191,19 +200,6 @@ struct QuantumDevice {
      * @return `double` The expected value
      */
     virtual auto Expval(ObsIdType obsKey) -> double = 0;
-
-    /**
-     * @brief Compute the expected value of an observable with shot-noise.
-     *
-     * @param obsKey The index of the constructed observable
-     * @param shots The number of shots
-     * @param shot_range The range of samples to use. All samples are used by
-     * default.
-     *
-     * @return `double` The expected value
-     */
-    virtual auto Expval(ObsIdType obsKey, const size_t shots, const std::vector<size_t> &shot_range)
-        -> double = 0;
 
     /**
      * @brief Compute the variance of an observable.

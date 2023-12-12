@@ -15,10 +15,13 @@
   This provides flexibility and extensibility to Catalyst allowing users to
   load quantum devices dynamically.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+
 
 * Support for dynamically-shaped arrays has been added.
   [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
   [(#386)](https://github.com/PennyLaneAI/catalyst/pull/385)
+  [(#390)](https://github.com/PennyLaneAI/catalyst/pull/390)
 
   Catalyst now accepts tensors whose dimensions are not known at compile time.
   Standard tensor initialisation functions `jax.numpy.ones`, `jnp.zeros`, and
@@ -41,6 +44,12 @@
 
 <h3>Improvements</h3>
 
+* Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
+  outside a `@qjit` context. This simplifies the process of writing functions where compilation
+  can be turned on and off easily by adding or removing the decorator. The functions dispatch to
+  their JAX equivalents when the compilation is turned off.
+  [(#375)](https://github.com/PennyLaneAI/catalyst/pull/375)
+
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
   register in functions and can be given to another function (useful for quantum transformation).
@@ -54,15 +63,30 @@
   operations and control flow operations.
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
+* Update the `DeviceOp` definition in the Quantum MLIR dialect.
+  `DeviceOp` gets the tuple of device info: ('lib', 'name', 'kwargs')
+  and lowers the operation to one single device initialization call:
+  `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
+  [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+
+* Resolve a bug in the compiler's differentiation engine that results in a crash with the Enzyme
+  error message "attempting to differentiate function without definition" (see issue
+  [#384](https://github.com/PennyLaneAI/catalyst/issues/384)).
+  The fix ensures that all current quantum operation types are removed during gradient passes that
+  extract classical from a QNode function. It also adds a verification step that will raise an error
+  if a gradient pass cannot successfully eliminate all quantum operations for such functions.
+  [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez.
@@ -259,7 +283,7 @@ Erick Ochoa Lopez.
 
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
     the signature `qjit(fn, *args, **kwargs)`, where `fn` is the function to be compiled.
-  
+
 * The compiler driver diagnostic output has been improved, and now includes failing IR as well as
   the names of failing passes.
   [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)

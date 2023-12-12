@@ -44,48 +44,39 @@ func.func @finalize() {
 
 // -----
 
-// CHECK: llvm.func @__quantum__rt__device(!llvm.ptr<i8>, !llvm.ptr<i8>)
+// CHECK: llvm.func @__quantum__rt__device_init(!llvm.ptr<i8>, !llvm.ptr<i8>, !llvm.ptr<i8>)
 
 // CHECK-LABEL: @device
 func.func @device() {
+    // CHECKL llvm.mlir.global internal constant @lightning.qubit("lightning.qubit\00") {addr_space = 0 : i32}
+    // CHECKL llvm.mlir.global internal constant @rtd_lightning.so("rtd_lightning.so\00") {addr_space = 0 : i32}
+    // CHECKL llvm.mlir.global internal constant @"{shots: 0}"("{shots: 0}\00") {addr_space = 0 : i32}
+    // CHECKL llvm.mlir.global internal constant @lightning.kokkos("lightning.kokkos\00") {addr_space = 0 : i32}
+    // CHECKL llvm.mlir.global internal constant @"{shots: 1000}"("{shots: 1000}\00") {addr_space = 0 : i32}
 
-    quantum.device
-
-    quantum.device {}
-
-    // CHECKL llvm.mlir.global internal constant @backend("backend\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @backend_lightning.qubit("lightning.qubit\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @backend_lightning.kokkos("lightning.kokkos\00") {addr_space = 0 : i32}
-
-    // CHECKL llvm.mlir.global internal constant @shots("shots\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @shots_2000("2000\00") {addr_space = 0 : i32}
-
-    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : index) : i64
-    // CHECK: [[bo:%.+]] = llvm.mlir.addressof @backend : !llvm.ptr<array<8 x i8>>
-    // CHECK: [[b1:%.+]] = llvm.getelementptr [[bo]][[[c0]], [[c0]]] : (!llvm.ptr<array<8 x i8>>, i64, i64) -> !llvm.ptr<i8>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(0 : index) : i64
-    // CHECK: [[d0:%.+]] = llvm.mlir.addressof @backend_lightning.qubit : !llvm.ptr<array<16 x i8>>
-    // CHECK: [[d1:%.+]] = llvm.getelementptr [[d0]][[[c1]], [[c1]]] : (!llvm.ptr<array<16 x i8>>, i64, i64) -> !llvm.ptr<i8>
-    // CHECK: llvm.call @__quantum__rt__device([[b1]], [[d1]]) : (!llvm.ptr<i8>, !llvm.ptr<i8>) -> ()
-    quantum.device {specs = ["backend", "lightning.qubit"]}
-
+    // CHECK: [[d0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr<array<17 x i8>>
+    // CHECK: [[d1:%.+]] = llvm.getelementptr [[d0]][[[c1]], [[c1]]] : (!llvm.ptr<array<17 x i8>>, i64, i64) -> !llvm.ptr<i8>
+    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : index) : i64
+    // CHECK: [[bo:%.+]] = llvm.mlir.addressof @lightning.qubit : !llvm.ptr<array<16 x i8>>
+    // CHECK: [[b1:%.+]] = llvm.getelementptr [[bo]][[[c0]], [[c0]]] : (!llvm.ptr<array<16 x i8>>, i64, i64) -> !llvm.ptr<i8>
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(0 : index) : i64
-    // CHECK: [[e0:%.+]] = llvm.mlir.addressof @backend : !llvm.ptr<array<8 x i8>>
-    // CHECK: [[e1:%.+]] = llvm.getelementptr [[e0]][[[c2]], [[c2]]] : (!llvm.ptr<array<8 x i8>>, i64, i64) -> !llvm.ptr<i8>
-    // CHECK: [[c3:%.+]] = llvm.mlir.constant(0 : index) : i64
-    // CHECK: [[f0:%.+]] = llvm.mlir.addressof @backend_lightning.kokkos : !llvm.ptr<array<17 x i8>>
-    // CHECK: [[f1:%.+]] = llvm.getelementptr [[f0]][[[c3]], [[c3]]] : (!llvm.ptr<array<17 x i8>>, i64, i64) -> !llvm.ptr<i8>
-    // CHECK: llvm.call @__quantum__rt__device([[e1]], [[f1]]) : (!llvm.ptr<i8>, !llvm.ptr<i8>) -> ()
-    quantum.device {specs = ["backend", "lightning.kokkos"]}
+    // CHECK: [[d3:%.+]] = llvm.mlir.addressof @"{shots: 0}" : !llvm.ptr<array<11 x i8>>
+    // CHECK: [[d4:%.+]] = llvm.getelementptr [[d3]][[[c2]], [[c2]]] : (!llvm.ptr<array<11 x i8>>, i64, i64) -> !llvm.ptr<i8>
+    // CHECK: llvm.call @__quantum__rt__device_init([[d1]], [[b1]], [[d4]]) : (!llvm.ptr<i8>, !llvm.ptr<i8>, !llvm.ptr<i8>) -> ()
+    quantum.device ["rtd_lightning.so", "lightning.qubit", "{shots: 0}"]
 
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(0 : index) : i64
+    // CHECK: [[e0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr<array<17 x i8>>
+    // CHECK: [[e1:%.+]] = llvm.getelementptr [[e0]][[[c3]], [[c3]]] : (!llvm.ptr<array<17 x i8>>, i64, i64) -> !llvm.ptr<i8>
     // CHECK: [[c4:%.+]] = llvm.mlir.constant(0 : index) : i64
-    // CHECK: [[g0:%.+]] = llvm.mlir.addressof @shots : !llvm.ptr<array<6 x i8>>
-    // CHECK: [[g1:%.+]] = llvm.getelementptr [[g0]][[[c4]], [[c4]]] : (!llvm.ptr<array<6 x i8>>, i64, i64) -> !llvm.ptr<i8>
+    // CHECK: [[e2:%.+]] = llvm.mlir.addressof @lightning.kokkos : !llvm.ptr<array<17 x i8>>
+    // CHECK: [[e3:%.+]] = llvm.getelementptr [[e2]][[[c4]], [[c4]]] : (!llvm.ptr<array<17 x i8>>, i64, i64) -> !llvm.ptr<i8>
     // CHECK: [[c5:%.+]] = llvm.mlir.constant(0 : index) : i64
-    // CHECK: [[h0:%.+]] = llvm.mlir.addressof @shots_2000 : !llvm.ptr<array<5 x i8>>
-    // CHECK: [[h1:%.+]] = llvm.getelementptr [[h0]][[[c5]], [[c5]]] : (!llvm.ptr<array<5 x i8>>, i64, i64) -> !llvm.ptr<i8>
-    // CHECK: llvm.call @__quantum__rt__device([[g1]], [[h1]]) : (!llvm.ptr<i8>, !llvm.ptr<i8>) -> ()
-    quantum.device {specs = ["shots", "2000"]}
+    // CHECK: [[e4:%.+]] = llvm.mlir.addressof @"{shots: 1000}" : !llvm.ptr<array<14 x i8>>
+    // CHECK: [[e5:%.+]] = llvm.getelementptr [[e4]][[[c5]], [[c5]]] : (!llvm.ptr<array<14 x i8>>, i64, i64) -> !llvm.ptr<i8>
+    // CHECK: llvm.call @__quantum__rt__device_init([[e1]], [[e3]], [[e5]]) : (!llvm.ptr<i8>, !llvm.ptr<i8>, !llvm.ptr<i8>) -> ()
+    quantum.device ["rtd_lightning.so", "lightning.kokkos", "{shots: 1000}"]
 
     return
 }

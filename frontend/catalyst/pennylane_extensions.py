@@ -27,7 +27,13 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
-from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax._src.tree_util import (
+    PyTreeDef,
+    flatten_one_level,
+    tree_flatten,
+    tree_unflatten,
+    treedef_is_leaf,
+)
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
@@ -116,7 +122,7 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         qnode = None
-        if isinstance(self, qml.QNode):
+        if isinstance(self, QNode):
             qnode = self
             device = QJITDevice(
                 self.device.shots, self.device.wires, *extract_backend_info(self.device)
@@ -343,32 +349,40 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
-            # The Python function is stored in the "fn" parameter of func_p JAXPR primitives.
-            fn = eqn.params.get("fn")
-            if fn and fn not in visited:
-                child = eqn.params.get("call_jaxpr", None)
-                if isinstance(fn, (qml.QNode, Grad)):
-                    _check_created_jaxpr_gradient_methods(fn, method, child)
-                if child and child not in visited:
-                    traverse_children(child)
-            visited.add(fn)
+            primitive = eqn.primitive
+            if primitive is func_p:
+                child_jaxpr = eqn.params.get("call_jaxpr")
+            elif primitive is grad_p:
+                child_jaxpr = eqn.params.get("jaxpr")
+            else:
+                continue
+
+            _check_primitive_is_differentiable(primitive, method)
+
+            py_callable = eqn.params.get("fn")
+            if py_callable not in visited:
+                if isinstance(py_callable, QNode):
+                    _check_qnode_against_grad_method(py_callable, method, child_jaxpr)
+                traverse_children(child_jaxpr)
+                visited.add(py_callable)
 
     traverse_children(jaxpr)
 
 
-def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
+def _check_primitive_is_differentiable(primitive, method):
+    """Verify restriction on primitives in the call graph of a Grad operation."""
+
+    if primitive is grad_p and method != "fd":
+        raise DifferentiableCompileError(
+            "Only finite difference can compute higher order derivatives."
+        )
+
+
+def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
     """Additional checks for the given jaxpr of a differentiable function."""
     if method == "fd":
         return
 
-    if isinstance(f, Grad):
-        raise DifferentiableCompileError(
-            "Only finite difference can compute higher order derivatives"
-        )
-
-    assert isinstance(
-        f, qml.QNode
-    ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
     return_ops = []
     for res in jaxpr.outvars:
         for eq in reversed(jaxpr.eqns):  # pragma: no branch
@@ -378,8 +392,8 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
 
     if f.diff_method is None:
         raise DifferentiableCompileError(
-            "Cannot differentiate a QNode explicitly marked non-differentiable (with"
-            " diff_method=None)"
+            "Cannot differentiate a QNode explicitly marked non-differentiable (with "
+            "diff_method=None)."
         )
 
     if f.diff_method == "parameter-shift" and any(
@@ -389,6 +403,7 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
             "The parameter-shift method can only be used for QNodes "
             "which return either qml.expval or qml.probs."
         )
+
     if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
         raise DifferentiableCompileError(
             "The adjoint method can only be used for QNodes which return qml.expval."
@@ -410,7 +425,7 @@ def _check_grad_params(
     if method == "fd" and h is None:
         h = 1e-7
     if not (h is None or isinstance(h, numbers.Number)):
-        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
+        raise ValueError(f"Invalid h value ({h}). None or number was expected.")
     if argnum is None:
         argnum = [0]
     elif isinstance(argnum, int):
@@ -439,9 +454,9 @@ class Grad:
         TypeError: Non-differentiable object was passed as `fn` argument.
     """
 
-    def __init__(self, fn: Differentiable, *, grad_params: GradParams):
+    def __init__(self, fn: Differentiable, grad_params: GradParams):
         self.fn = fn
-        self.__name__ = f"grad.{fn.__name__}"
+        self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
 
     def __call__(self, *args, **kwargs):
@@ -449,22 +464,33 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
-        EvaluationContext.check_is_tracing(
-            "catalyst.grad can only be used from within @qjit decorated code."
-        )
-        jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
+        if EvaluationContext.is_tracing():
+            fn = _ensure_differentiable(self.fn)
+            grad_params = _check_grad_params(*self.grad_params)
 
-        args_data, _ = tree_flatten(args)
+            jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
-        # It always returns list as required by catalyst control-flows
-        return grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
+            args_data, _ = tree_flatten(args)
+
+            # It always returns list as required by catalyst control-flows
+            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        else:
+            if argnums := self.grad_params.argnum is None:
+                argnums = 0
+            if self.grad_params.scalar_out:
+                results = jax.grad(self.fn, argnums=argnums)(*args)
+            else:
+                results = jax.jacobian(self.fn, argnums=argnums)(*args)
+
+        return results
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
-    This function allows the gradient of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the gradient of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.grad``.
 
     .. warning::
 
@@ -586,16 +612,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     array(4.6)
     """
     scalar_out = True
-    return Grad(
-        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
-    )
+    return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
-    This function allows the Jacobian of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the Jacobian of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.jacobian``.
 
     Args:
         f (Callable): a function or a function object to differentiate
@@ -652,9 +677,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
            [-4.20735506e-01,  4.20735506e-01]])
     """
     scalar_out = False
-    return Grad(
-        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
-    )
+    return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
 # pylint: disable=too-many-arguments
@@ -662,7 +685,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.jvp``.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -724,22 +748,26 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> workflow(params, dy)
     [array(0.78766064), array(-0.7011436)]
     """
-    EvaluationContext.check_is_tracing(
-        "catalyst.jvp can only be used from within @qjit decorated code."
-    )
 
-    def _check(x, hint):
+    def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-        return x
 
-    params = _check(params, "params")
-    tangents = _check(tangents, "tangents")
-    fn: Differentiable = _ensure_differentiable(f)
-    scalar_out = False
-    grad_params = _check_grad_params(method, scalar_out, h, argnum)
-    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    check_is_iterable(params, "params")
+    check_is_iterable(tangents, "tangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    else:
+        results = jax.jvp(f, params, tangents)
+
+    return results
 
 
 # pylint: disable=too-many-arguments
@@ -747,7 +775,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.vjp``.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
@@ -785,22 +814,37 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     [array([0.09983342, 0.04      , 0.02      ]),
     array([-0.43750208,  0.07000001])]
     """
-    EvaluationContext.check_is_tracing(
-        "catalyst.vjp can only be used from within @qjit decorated code."
-    )
 
-    def _check(x, hint):
+    def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-        return x
 
-    params = _check(params, "params")
-    cotangents = _check(cotangents, "cotangents")
-    fn: Differentiable = _ensure_differentiable(f)
-    scalar_out = False
-    grad_params = _check_grad_params(method, scalar_out, h, argnum)
-    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    check_is_iterable(params, "params")
+    check_is_iterable(cotangents, "cotangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    else:
+        primal_outputs, vjp_fn = jax.vjp(f, *params)
+
+        # JAX requires that the PyTree shape of cotangents matches that of the function results.
+        # Generally, the user is responsible for this, except when the function returns a "bare"
+        # array, since we do force users to provide cotangents as an iterable.
+        # TODO: Add support for PyTrees in the compiled branch, then we can remove this special
+        # handling here by relaxing the input type restriction.
+        if len(cotangents) == 1 and isinstance(primal_outputs, jax.Array):
+            children, _ = flatten_one_level(cotangents)
+            cotangents = children[0]
+
+        results = vjp_fn(cotangents)
+
+    return results
 
 
 def _aval_to_primitive_type(aval):
