@@ -47,10 +47,15 @@ Operation::operand_range ZneOp::getArgOperands() { return getOperands(); }
 // ZneOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable) { return success(); }
-
-//===----------------------------------------------------------------------===//
-// ZneOp Extra methods
-//===----------------------------------------------------------------------===//
-
-LogicalResult ZneOp::verify() { return success(); }
+LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    auto callee = this->getCalleeAttr();
+    func::FuncOp fn =
+        symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
+    if (!fn)
+        return this->emitOpError("invalid function name specified: ") << callee;
+    if (!fn->hasAttrOfType<UnitAttr>("qnode"))
+        return this->emitOpError("ZNE can only be applied on QNodes. ") << callee;
+    return success();
+}
