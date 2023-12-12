@@ -36,7 +36,8 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     quantum.dealloc %r : !quantum.reg
     func.return %expval : f64
 }
- 
+
+// CHECK: func.func @zneCallScalarScalar
 func.func @zneCallScalarScalar(%arg0: tensor<3xf64>) -> tensor<5xf64> {
     %scalarFactors = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xindex>
     %0 = mitigation.zne @simpleCircuit(%arg0) scalarFactors (%scalarFactors : tensor<5xindex>) : (tensor<3xf64>) -> tensor<5xf64>
