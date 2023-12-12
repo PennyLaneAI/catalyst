@@ -92,10 +92,12 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         }
 
         // Check for Call ops that have QNode func ops
-        if (funcOp->hasAttrOfType<UnitAttr>("qnode")) {
-            rewriter.create<async::CallOp>(op.getLoc(), funcOp, op.getArgOperands());
-            return failure();
+        if (!asyncFuncOp->hasAttrOfType<UnitAttr>("qnode")) {
+            // Nothing to change. (For functions which are not qnodes).
+            return success();
         }
+
+        auto callOp = rewriter.create<async::CallOp>(op.getLoc(), asyncFuncOp, op.getArgOperands());
         return failure();
     }
 };
