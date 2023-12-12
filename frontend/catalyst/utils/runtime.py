@@ -137,6 +137,7 @@ def check_no_overlap(*args):
     msg = "Device has overlapping gates in native and decomposable sets."
     raise CompileError(msg)
 
+
 def filter_out_adjoint_and_control(operations):
     """Remove Adjoint and C strings from operations.
 
@@ -159,6 +160,7 @@ def filter_out_adjoint_and_control(operations):
     operations_no_adj = filter(is_not_adj, operations)
     operations_no_adj_no_ctrl = filter(is_not_ctrl, operations_no_adj)
     return list(operations_no_adj_no_ctrl)
+
 
 def check_full_overlap(device, *args):
     """Check that device.operations is equivalent to the union of *args
