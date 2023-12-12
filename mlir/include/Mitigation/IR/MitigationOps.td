@@ -24,9 +24,9 @@ include "Mitigation/IR/MitigationDialect.td"
 
 def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-    let summary = "Compute a quantum function with ZNE error mitigation.";
+    let summary = "Compute a quantum function with ZNE (Zero Noise Extrapolation) error mitigation.";
     let description = [{
-        The `mitigation.zne` operation computes the quantum function with ZNE mitigation.
+        The `mitigation.zne` operation computes the results of the quantum function with ZNE mitigation.
     }];
 
     let arguments = (ins
@@ -35,8 +35,6 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
         RankedTensorOf<[Index]>:$scalarFactors
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
-
-    let hasVerifier = 1;
 
     let assemblyFormat = [{
         $callee `(` $args `)` `scalarFactors` `(` $scalarFactors `:` type($scalarFactors) `)` attr-dict `:` functional-type($args, results)
