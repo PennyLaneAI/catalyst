@@ -147,6 +147,7 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 def _apply_result_type_conversion(
     jaxpr: ClosedJaxpr, target_types: List[ShapedArray]
 ) -> ClosedJaxpr:
+    # TODO: Remove
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context(ctx) as trace:

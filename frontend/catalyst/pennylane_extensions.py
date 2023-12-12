@@ -1289,12 +1289,7 @@ class CondCallable:
         all_consts = [s.out_consts() for s in out_sigs]
 
         all_jaxprs = unify_result_types(ctx, all_jaxprs, all_consts)
-        print("AAAAAAAAAAA")
-        print(all_jaxprs)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
-        print("BBBBBBBBBB")
-        print(branch_jaxprs)
-
         out_tracers = cond_p.bind(*(self.preds + sum(all_consts, [])),
                                   branch_jaxprs=branch_jaxprs,
                                   nimplicit_inputs=in_sigs[0].num_implicit_inputs(),

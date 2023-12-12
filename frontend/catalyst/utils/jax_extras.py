@@ -313,17 +313,15 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
     newvar = gensym(jaxprs, suffix="_")
 
-    all_consts = []
-    all_padded_consvars = []
+    all_padded_invars = []
     for jaxpr in jaxprs:
-        padded_consvars = []
+        padded_invars = []
         for jaxpr2 in jaxprs:
             if jaxpr2 is jaxpr:
-                padded_consvars.extend(jaxpr2.constvars)
-                all_consts.extend(jaxpr2.constvars)
+                padded_invars.extend(jaxpr2.invars)
             else:
                 cmap = {}
-                for cv in jaxpr2.constvars:
+                for cv in jaxpr2.invars:
                     aval = cv.aval
                     if isinstance(aval, DShapedArray):
                         shape2 = []
@@ -335,16 +333,13 @@ def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
                         aval = aval.update(shape=tuple(shape2))
                     nv = newvar(aval)
                     cmap[cv] = nv
-                    padded_consvars.append(nv)
-        all_padded_consvars.append(padded_consvars)
-
-    print("APAPPAAPAPAP")
-    print(all_padded_consvars)
+                    padded_invars.append(nv)
+        all_padded_invars.append(padded_invars)
 
     acc = []
-    for jaxpr, padded_consvars in zip(jaxprs, all_padded_consvars):
+    for jaxpr, padded_invars in zip(jaxprs, all_padded_invars):
         acc.append(ClosedJaxpr(
-            convert_constvars_jaxpr(jaxpr.replace(constvars=padded_consvars)), ()
+            convert_constvars_jaxpr(jaxpr.replace(invars=padded_invars)), ()
         ))
     return acc
 
