@@ -182,8 +182,8 @@ class SharedLibraryManager final {
  * - `Init`     : The device is added to the device pool and initialized (`rtd_qdevice != nullptr`)
  *                using the device factory method.
  * - `Active`   : The device is activated. This is the stage after the device initialization,
- *                so that the `ExecutionContext` active device pointer (`RTD_PTR`) points to
- *                this device. The CAPI routines have only access to one single active device
+ *                so that the `ExecutionContext` device pointer (`RTD_PTR`) points to this
+ *                device instance. The CAPI routines have only access to one single active device
  *                per thread via `RTD_PTR`.
  * - `Release`  : The device is released but not removed from the pool. The `ExecutionContext`
  * manager will be able to reuse this device later.
@@ -194,7 +194,7 @@ enum class RTDeviceStatus : uint8_t {
     Release,
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const std::string &kwargs);
+extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const char *kwargs);
 
 /**
  * Runtime Device data-class.
@@ -275,7 +275,8 @@ class RTDeviceType {
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
         QuantumDevice *impl =
-            f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs) : nullptr;
+            f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
+                  : nullptr;
 
         rtd_qdevice.reset(impl);
         return rtd_qdevice;
