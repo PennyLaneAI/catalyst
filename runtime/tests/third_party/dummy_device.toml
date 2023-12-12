@@ -84,11 +84,6 @@ decomp = [
         "OrbitalRotation",
         "QFT",
         "ECR",
-        "Adjoint(S)",
-        "Adjoint(T)",
-        "Adjoint(SX)",
-        "Adjoint(ISWAP)",
-        "Adjoint(SISWAP)",
 ]
 
 # Gates which should be translated to QubitUnitary

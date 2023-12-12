@@ -69,32 +69,27 @@ native = [
 # default, but can be useful to express a deviation from this device's regular
 # strategy in PennyLane.
 decomp = [
-        "Adjoint(S)",
-        "Adjoint(T)",
-        "Adjoint(SX)",
-        "Adjoint(ISWAP)",
-        "Adjoint(SISWAP)",
         "BasisState",
-        "ECR",
         "QubitStateVector",
         "StatePrep",
+        "QFT",
         "ControlledQubitUnitary",
-        "DiagonalQubitUnitary",
+        "MultiControlledX",
+]
+
+# Gates which should be translated to QubitUnitary
+matrix = [
+        "ECR",
         "SX",
         "ISWAP",
         "PSWAP",
         "SISWAP",
         "SQISW",
         "CPhase",
+        "OrbitalRotation",
         "QubitCarry",
         "QubitSum",
-        "OrbitalRotation",
-        "QFT",
-]
-
-# Gates which should be translated to QubitUnitary
-matrix = [
-        "MultiControlledX",
+        "DiagonalQubitUnitary",
 ]
 
 [measurement_processes]
