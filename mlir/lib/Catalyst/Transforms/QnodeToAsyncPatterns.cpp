@@ -39,7 +39,8 @@ struct FuncOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::FuncO
             // Convert results to async values
             SmallVector<Type> asyncResultTypes;
             for (Type resultType : resultTypes) {
-                asyncResultTypes.push_back(async::ValueType::get(resultType));
+                Type asyncType = async::ValueType::get(resultType);
+                asyncResultTypes.push_back(asyncType);
             }
             FunctionType asyncFunctionType = FunctionType::get(op.getContext(), /*inputs=*/
                                                                inputTypes,
@@ -62,8 +63,12 @@ struct FuncOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::FuncO
             rewriter.create<async::ReturnOp>(op.getLoc(), originalTerminator->getResultTypes(),
                                              originalTerminator->getOperands());
             rewriter.eraseOp(originalTerminator);
-            // TODO: Copy all attr
-            // asyncFunc.setAttr("qnode", rewriter.getUnitAttr());
+
+            // Removing the function_type attribute as we don't want that overwritten.
+            op->removeAttr("function_type");
+            auto oldAttrs = op->getAttrs();
+            asyncFunc->setAttrs(oldAttrs);
+
             rewriter.replaceOp(op, asyncFunc);
             return success();
         }
