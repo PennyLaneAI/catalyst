@@ -148,8 +148,8 @@ def filter_out_adjoint_and_control(operations):
         List: A list of strings with names of supported operations with Adjoint and C gates
         removed.
     """
-    adjoint = re.compile("^Adjoint\(.*\)$")
-    control = re.compile("^C\(.*\)$")
+    adjoint = re.compile(r"^Adjoint\(.*\)$")
+    control = re.compile(r"^C\(.*\)$")
 
     def is_not_adj(op):
         return not re.match(adjoint, op)
