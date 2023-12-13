@@ -17,14 +17,13 @@
 module @workflow {
   // CHECK: async.func private @f() -> !async.value<tensor<2xcomplex<f64>>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
   func.func private @f() -> tensor<2xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    quantum.device ["rtd_kwargs", "{'shots': 0}"]
-    quantum.device ["rtd_name", "LightningSimulator"]
-    quantum.device ["rtd_lib", "/home/erick.ochoalopez/Code/cataliist/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so"]
+    quantum.device["/home/erick.ochoalopez/Code/cataliist/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 0}"]
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.compbasis %1 : !quantum.obs
     %3 = quantum.state %2 : tensor<2xcomplex<f64>>
     quantum.dealloc %0 : !quantum.reg
+    quantum.drelease
     return %3 : tensor<2xcomplex<f64>>
   }
   func.func public @jit_workflow() -> tensor<2xcomplex<f64>> attributes {llvm.emit_c_interface} {
