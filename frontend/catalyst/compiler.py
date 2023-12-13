@@ -121,7 +121,7 @@ DEFAULT_PIPELINES = [
         "BufferizationPass",
         [
             "one-shot-bufferize{dialect-filter=memref}",
-            "inline",
+            #"inline",
             "gradient-bufferize",
             "scf-bufferize",
             "convert-tensor-to-linalg",  # tensor.pad
@@ -135,10 +135,13 @@ DEFAULT_PIPELINES = [
             "catalyst-bufferize",
             "quantum-bufferize",
             "func-bufferize",
+            "qnode-to-async-lowering",
+            "async-func-to-async-runtime",
+            "async-to-async-runtime",
             "func.func(finalizing-bufferize)",
             "func.func(buffer-hoisting)",
             "func.func(buffer-loop-hoisting)",
-            "func.func(buffer-deallocation)",
+            # "func.func(buffer-deallocation)",
             "convert-arraylist-to-memref",
             "convert-bufferization-to-memref",
             "canonicalize",
@@ -149,6 +152,7 @@ DEFAULT_PIPELINES = [
     (
         "MLIRToLLVMDialect",
         [
+            "convert-async-to-llvm",
             "convert-gradient-to-llvm",
             "func.func(convert-linalg-to-loops)",
             "convert-scf-to-cf",
@@ -236,6 +240,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
+            "-lmlir_async_runtime",  # required for memref.copy
         ]
 
         return default_flags
