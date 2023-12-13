@@ -238,12 +238,13 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
+        # TODO: Update LIGHTNING_GIT_TAG to 'latest_version' after v0.34.0
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG="latest_release" \
+              -DLIGHTNING_GIT_TAG="8770a96" \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=OFF \
