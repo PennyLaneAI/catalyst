@@ -14,6 +14,7 @@
 
 from os import path
 import importlib.util
+import glob
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
@@ -60,23 +61,29 @@ description = {
     "license": "Apache License 2.0",
 }
 
+package_name = 'scipy'
+file_path_within_package = '../scipy.libs/'
 
-# Find the Jax lib amd add extemsion for lapack custom calls
-package_name = 'jaxlib'
-file_path_within_package = 'cpu/_lapack.so'
+scipy_package = importlib.util.find_spec(package_name)
 
-jaxlib_package = importlib.util.find_spec(package_name)
-if jaxlib_package is not None:
-    package_directory = path.dirname(jaxlib_package.origin)
-    jaxlib_so_path = path.join(package_directory, file_path_within_package)
+if scipy_package is not None:
+    package_directory = path.dirname(scipy_package.origin)
+    scipy_lib_path = path.join(package_directory, file_path_within_package)
+    file_prefix = "libopenblasp"
+    file_extension = ".so"
+    search_pattern = f"{file_prefix}*{file_extension}"
+    # Use glob to find matching files
+    openblas_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
 
-lapack_extension = Extension('catalyst.utils.custom_calls',
+openblas_so = scipy_lib_path + openblas_so_file
+
+custom_calls_extension = Extension('catalyst.utils.custom_calls',
     sources=['frontend/catalyst/utils/custom_calls.cpp'],
     libraries=[package_directory],
-    library_dirs=[jaxlib_so_path]
+    library_dirs=[openblas_so]
     )
 
-ext_modules = [lapack_extension]
+ext_modules = [custom_calls_extension]
 
 lib_path_npymath = path.join(np.get_include(), "..", "lib")
 intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])

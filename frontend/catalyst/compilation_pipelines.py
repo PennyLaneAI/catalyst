@@ -90,7 +90,6 @@ class SharedObjectManager:
     """
 
     def __init__(self, shared_object_file, func_name):
-        print(shared_object_file)
         self.shared_object = ctypes.CDLL(shared_object_file)
         self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
 
