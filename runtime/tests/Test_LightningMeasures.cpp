@@ -1014,7 +1014,6 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(NamedObs[])) shots test", "[Measures]", SimT
 
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
-    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
@@ -1022,7 +1021,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(NamedObs[])) shots test", "[Measures]", SimT
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
     ObsIdType thz = sim->TensorObservable({px, py, pz});
 
-    CHECK(sim->Var(thz) == Approx(0.0).margin(5e-2)); // Bug in Lightning
+    CHECK(sim->Var(thz) == Approx(0.99998976).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE(

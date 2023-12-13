@@ -24,10 +24,10 @@ from catalyst import qjit
 class TestExpval:
     "Test expval with shots > 0"
 
-    def test_identity_expectation(self, backend):
+    def test_identity(self, backend):
         """Test that identity expectation value (i.e. the trace) is 1."""
         n_wires = 2
-        n_shots = 1000
+        n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         theta = 0.432
@@ -44,10 +44,10 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_pauliz_expectation(self, backend):
+    def test_pauliz(self, backend):
         """Test that PauliZ expectation value is correct"""
         n_wires = 2
-        n_shots = 1000
+        n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         theta = 0.432
@@ -64,7 +64,7 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_paulix_expectation(self, backend):
+    def test_paulix(self, backend):
         """Test that PauliX expectation value is correct"""
         n_wires = 2
         n_shots = 5000
@@ -84,7 +84,7 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_pauliy_expectation(self, backend):
+    def test_pauliy(self, backend):
         """Test that PauliY expectation value is correct"""
         n_wires = 2
         n_shots = 5000
@@ -104,7 +104,7 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_hadamard_expectation(self, backend):
+    def test_hadamard(self, backend):
         """Test that Hadamard expectation value is correct"""
         n_wires = 2
         n_shots = 5000
@@ -128,7 +128,7 @@ class TestExpval:
         """Test expval Hermitian observables with shots."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3, shots=1000))
+        @qml.qnode(qml.device(backend, wires=3, shots=5000))
         def circuit(x, y):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -147,7 +147,7 @@ class TestExpval:
     def test_paulix_pauliy(self, backend):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
-        n_shots = 10000
+        n_shots = 50000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         theta = 0.432
@@ -167,8 +167,9 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    # def test_pauliz_hadamard_prod(self, backend):
-    #     """Test that a tensor product involving PauliZ and PauliY and hadamard works correctly"""
+    # TODO: This test should be uncommented after fixing the issue in Lightning
+    # def test_pauliz_pauliy_prod(self, backend):
+    #     """Test that a tensor product involving PauliZ and PauliY works correctly"""
     #     n_wires = 3
     #     n_shots = 5000
     #     dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -180,7 +181,7 @@ class TestExpval:
     #         qml.RX(varphi, wires=[2])
     #         qml.CNOT(wires=[0, 1])
     #         qml.CNOT(wires=[1, 2])
-    #         return qml.var(qml.PauliZ(wires=0) @ qml.Hadamard(wires=1) @ qml.PauliY(wires=2))
+    #         return qml.expval(qml.PauliZ(wires=1) @ qml.PauliY(wires=2))
 
     #     expected = circuit(0.432, 0.123, -0.543)
     #     result = qjit(circuit)(0.432, 0.123, -0.543)
@@ -211,10 +212,10 @@ class TestExpval:
 class TestVar:
     "Test var with shots > 0"
 
-    def test_identity_expectation(self, backend):
-        """Test that identity expectation value (i.e. the trace) is 1."""
+    def test_identity(self, backend):
+        """Test that identity variance value (i.e. the trace) is 1."""
         n_wires = 2
-        n_shots = 1000
+        n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         theta = 0.432
@@ -231,10 +232,10 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_pauliz_expectation(self, backend):
-        """Test that PauliZ expectation value is correct"""
+    def test_pauliz(self, backend):
+        """Test that PauliZ variance value is correct"""
         n_wires = 2
-        n_shots = 1000
+        n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         theta = 0.432
@@ -251,8 +252,8 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_paulix_expectation(self, backend):
-        """Test that PauliX expectation value is correct"""
+    def test_paulix(self, backend):
+        """Test that PauliX variance value is correct"""
         n_wires = 2
         n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -271,8 +272,8 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_pauliy_expectation(self, backend):
-        """Test that PauliY expectation value is correct"""
+    def test_pauliy(self, backend):
+        """Test that PauliY variance value is correct"""
         n_wires = 2
         n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -291,8 +292,8 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_hadamard_expectation(self, backend):
-        """Test that Hadamard expectation value is correct"""
+    def test_hadamard(self, backend):
+        """Test that Hadamard variance value is correct"""
         n_wires = 2
         n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -311,11 +312,11 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_hermitian_shots_var(self, backend):
+    def test_hermitian_shots(self, backend):
         """Test var Hermitian observables with shots."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=3, shots=1000))
+        @qml.qnode(qml.device(backend, wires=3, shots=5000))
         def circuit(x, y):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -354,24 +355,24 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    # def test_pauliz_hadamard_prod(self, backend):
-    #     """Test that a tensor product involving PauliZ and PauliY and hadamard works correctly"""
-    #     n_wires = 3
-    #     n_shots = 5000
-    #     dev = qml.device(backend, wires=n_wires, shots=n_shots)
+    def test_paulix_pauliy_prod(self, backend):
+        """Test that a tensor product involving PauliX and PauliY works correctly"""
+        n_wires = 3
+        n_shots = 5000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-    #     @qml.qnode(dev)
-    #     def circuit(theta, phi, varphi):
-    #         qml.RX(theta, wires=[0])
-    #         qml.RX(phi, wires=[1])
-    #         qml.RX(varphi, wires=[2])
-    #         qml.CNOT(wires=[0, 1])
-    #         qml.CNOT(wires=[1, 2])
-    #         return qml.var(qml.PauliZ(wires=0) @ qml.Hadamard(wires=1) @ qml.PauliY(wires=2))
+        @qml.qnode(dev)
+        def circuit(theta, phi, varphi):
+            qml.RX(theta, wires=[0])
+            qml.RX(phi, wires=[1])
+            qml.RX(varphi, wires=[2])
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[1, 2])
+            return qml.var(qml.PauliX(wires=1) @ qml.PauliY(wires=2))
 
-    #     expected = circuit(0.432, 0.123, -0.543)
-    #     result = qjit(circuit)(0.432, 0.123, -0.543)
-    #     assert np.allclose(result, expected, atol=0.05)
+        expected = circuit(0.432, 0.123, -0.543)
+        result = qjit(circuit)(0.432, 0.123, -0.543)
+        assert np.allclose(result, expected, atol=0.05)
 
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
@@ -402,7 +403,7 @@ class TestProbs:
         """Test probs on all wires"""
 
         n_wires = 2
-        n_shots = 1000
+        n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         @qml.qnode(dev)
@@ -419,7 +420,7 @@ class TestProbs:
         """Test probs on subset of wires"""
 
         n_wires = 2
-        n_shots = 1000
+        n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
         @qml.qnode(dev)

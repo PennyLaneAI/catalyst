@@ -257,7 +257,7 @@ are supported in Catalyst, although not all features are supported for all measu
    * - :func:`qml.counts() <pennylane.counts>`
      - Sample counts in the computational basis only are supported.
    * - :func:`qml.probs() <pennylane.probs>`
-     - Probabilities in the computational basis only are supported.
+     - Probabilities in the computational basis and finite-shots are supported.
    * - :func:`qml.state() <pennylane.state>`
      - The state in the computational basis only is supported.
    * - :func:`.measure`
