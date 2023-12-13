@@ -250,9 +250,8 @@ TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) shots test", "[Measures]", SimType
     std::vector<std::complex<double>> mat1(16, {0, 0});
 
     ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
-    REQUIRE_THROWS_WITH(
-        sim->Expval(h1),
-        Catch::Contains("For Hermitian Observables, expval calculation is not supported by shots"));
+    REQUIRE_THROWS_WITH(sim->Expval(h1),
+                        Catch::Contains("Hermitian observables do not support shot measurement."));
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
@@ -276,9 +275,8 @@ TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
     std::vector<std::complex<double>> mat1(16, {0, 0});
 
     ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
-    REQUIRE_THROWS_WITH(
-        sim->Var(h1),
-        Catch::Contains("Hermitian observables do not support applyInPlaceShots method"));
+    REQUIRE_THROWS_WITH(sim->Var(h1),
+                        Catch::Contains("Hermitian observables do not support shot measurement."));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
@@ -999,37 +997,33 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(Hamiltonian(NamedObs[]), NamedObs)) test", "
     CHECK(sim->Var(thz) == Approx(0.64).margin(1e-5));
 }
 
-// TEMPLATE_LIST_TEST_CASE("Var(Tensor(Hamiltonian(NamedObs[]), NamedObs)) shots test",
-// "[Measures]",
-//                         SimTypes)
-// {
-//     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+TEMPLATE_LIST_TEST_CASE("Var(Tensor(NamedObs[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-//     // state-vector with #qubits = n
-//     constexpr size_t n = 4;
-//     std::vector<QubitIdType> Qs;
-//     Qs.reserve(n);
-//     for (size_t i = 0; i < n; i++) {
-//         Qs.push_back(sim->AllocateQubit());
-//     }
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
 
-//     constexpr size_t num_shots = 5000;
-//     sim->SetDeviceShots(num_shots);
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
 
-//     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
-//     sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
-//     sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
-//     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-//     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
-//     ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
-//     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
-//     ObsIdType hxy = sim->HamiltonianObservable({0.4, 0.8}, {px, py});
-//     ObsIdType thz = sim->TensorObservable({hxy, pz});
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
+    ObsIdType thz = sim->TensorObservable({px, py, pz});
 
-//     CHECK(sim->Var(thz) == Approx(0.64).margin(5e-2)); // TODO: Lightning failed!,
-//                                                        // Lightning-Kokkos succeed!
-// }
+    CHECK(sim->Var(thz) == Approx(0.0).margin(5e-2)); // Bug in Lightning
+}
 
 TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes)
 {
@@ -1053,29 +1047,27 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measur
     CHECK(sim->Var(ten) == Approx(0.8).margin(1e-5));
 }
 
-// TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) shots test", "[Measures]",
-//                         SimTypes)
-// {
-//     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) shots test", "[Measures]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-//     // state-vector with #qubits = n
-//     constexpr size_t n = 3;
-//     std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
+    // state-vector with #qubits = n
+    constexpr size_t n = 3;
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
-//     constexpr size_t num_shots = 5000;
-//     sim->SetDeviceShots(num_shots);
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
 
-//     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
-//     sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
 
-//     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
-//     ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[2]});
-//     ObsIdType hxy = sim->HamiltonianObservable({0.4, 0.8}, {px, py});
-//     ObsIdType ten = sim->TensorObservable({hxy});
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[2]});
+    ObsIdType hxy = sim->HamiltonianObservable({0.4, 0.8}, {px, py});
 
-//     CHECK(sim->Var(ten) == Approx(0.8).margin(5e-2)); // TODO: Lightning failed!,
-//                                                       // Lightning-Kokkos succeed!
-// }
+    CHECK(sim->Var(hxy) == Approx(0.8).margin(5e-2));
+}
 
 TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
 {

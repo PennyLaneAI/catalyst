@@ -200,7 +200,7 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return m.expval(*obs);
+    return device_shots ? m.expval(*obs, device_shots, {}) : m.expval(*obs);
 }
 
 auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
@@ -217,7 +217,7 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return m.var(*obs);
+    return device_shots ? m.var(*obs, device_shots) : m.var(*obs);
 }
 
 void LightningKokkosSimulator::State(DataView<std::complex<double>, 1> &state)
