@@ -95,21 +95,6 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
         print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
 
-default_lib_paths = {
-    "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
-    "runtime": os.path.join(package_root, "../../runtime/build/lib"),
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
-    "pyruntime": os.path.join(package_root, "../../frontend/catalyst/utils"),
-}
-
-
-def get_lib_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "lib")  # pragma: no cover
-    return os.getenv(env_var, default_lib_paths.get(project, ""))
-
-
 
 DEFAULT_PIPELINES = [
     (
@@ -148,7 +133,7 @@ DEFAULT_PIPELINES = [
             "empty-tensor-to-alloc-tensor",
             "func.func(bufferization-bufferize)",
             "func.func(tensor-bufferize)",
-            "catalyst-bufferize", #figure out why before linalg.
+            "catalyst-bufferize",  # figure out why before linalg.
             "func.func(linalg-bufferize)",
             "func.func(tensor-bufferize)",
             "quantum-bufferize",
@@ -226,28 +211,11 @@ class LinkerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        py_rt_lib_path = get_lib_path("pyruntime", "PYRUNTIME_LIB_DIR")
-        package_name = 'jaxlib'
 
-        jaxlib_package = importlib.util.find_spec(package_name)
-
-        if jaxlib_package is not None:
-            lapack_directory = path.dirname(jaxlib_package.origin)
-            jaxlib_so_path = lapack_directory + "/cpu"
-
-        lib_path_flags = [
-            f"-Wl,-rpath,{mlir_lib_path}",
-            f"-L{mlir_lib_path}",
+        lib_path_flags += [
+            f"-Wl,-rpath,{py_rt_lib_path}",
+            f"-L{py_rt_lib_path}",
         ]
-        lib_path_flags += [
-                f"-Wl,-rpath,{jaxlib_so_path}",
-                f"-L{jaxlib_so_path}",
-            ]
-        
-        lib_path_flags += [
-                f"-Wl,-rpath,{py_rt_lib_path}",
-                f"-L{py_rt_lib_path}",
-            ]
 
         if rt_lib_path != mlir_lib_path:
             lib_path_flags += [
@@ -262,7 +230,7 @@ class LinkerDriver:
             system_flags += ["-Wl,-no-as-needed"]
         elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
-        print(lib_path_flags)
+
         default_flags = [
             "-shared",
             "-rdynamic",
@@ -270,9 +238,7 @@ class LinkerDriver:
             *lib_path_flags,
             "-lrt_capi",
             "-lpthread",
-            "-lmlir_c_runner_utils",
             "-l:custom_calls.cpython-310-x86_64-linux-gnu.so",
-            "-l:_lapack.so",
         ]
 
         return default_flags

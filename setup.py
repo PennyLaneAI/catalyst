@@ -61,8 +61,8 @@ description = {
     "license": "Apache License 2.0",
 }
 
-package_name = 'scipy'
-file_path_within_package = '../scipy.libs/'
+package_name = "scipy"
+file_path_within_package = "../scipy.libs/"
 
 scipy_package = importlib.util.find_spec(package_name)
 
@@ -72,16 +72,17 @@ if scipy_package is not None:
     file_prefix = "libopenblasp"
     file_extension = ".so"
     search_pattern = f"{file_prefix}*{file_extension}"
-    # Use glob to find matching files
     openblas_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
+    openblas_lib_name = openblas_so_file[3:-3]
 
 openblas_so = scipy_lib_path + openblas_so_file
 
-custom_calls_extension = Extension('catalyst.utils.custom_calls',
-    sources=['frontend/catalyst/utils/custom_calls.cpp'],
-    libraries=[package_directory],
-    library_dirs=[openblas_so]
-    )
+custom_calls_extension = Extension(
+    "catalyst.utils.custom_calls",
+    sources=["frontend/catalyst/utils/custom_calls.cpp"],
+    libraries=[openblas_lib_name],
+    library_dirs=[scipy_lib_path],
+)
 
 ext_modules = [custom_calls_extension]
 
