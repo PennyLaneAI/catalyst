@@ -109,26 +109,13 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         auto oldResults = op.getResults();
         for (auto [newResult, oldResult] : llvm::zip(newResults, oldResults)) {
             auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newResult);
-            // Maybe this would make more sense as a pass after bufferization then?
-            // We are making an assumption that QNode can only return tensors.
-            auto tensorAsync = awaitOp.getResult();
-            auto tensorType = tensorAsync.getType();
-            auto memrefType = conv.convertType(tensorType).cast<MemRefType>();
-            // Due to the AsyncExecutionEngine, it we need to insert a copy.
-            // And we need to do it in the memref level, because there is no tensorCopy
+            auto memrefAsync = awaitOp.getResult();
+            auto memrefType = oldResult.getType().cast<MemRefType>();
             auto memrefHeap = rewriter.create<memref::AllocOp>(op.getLoc(), memrefType);
-            auto memrefAsyncRT =
-                rewriter.create<bufferization::ToMemrefOp>(op.getLoc(), memrefType, tensorAsync);
-            rewriter.create<memref::CopyOp>(op.getLoc(), memrefAsyncRT, memrefHeap);
-            auto tensorHeap =
-                rewriter.create<bufferization::ToTensorOp>(op.getLoc(), tensorType, memrefHeap);
-
-            // Now that the value has been copied, we can drop the reference to the async value.
+            rewriter.create<memref::CopyOp>(op.getLoc(), memrefAsync, memrefHeap);
             rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), newResult,
                                                      rewriter.getI64IntegerAttr(1));
-
-            // Replace all uses with the new heap that is allocated in the tensor.
-            oldResult.replaceAllUsesWith(tensorHeap.getResult());
+            oldResult.replaceAllUsesWith(memrefHeap.getResult());
         }
 
         rewriter.replaceOp(op, callOp);
