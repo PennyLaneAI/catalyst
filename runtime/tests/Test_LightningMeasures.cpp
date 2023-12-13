@@ -1025,6 +1025,31 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(NamedObs[])) shots test", "[Measures]", SimT
     CHECK(sim->Var(thz) == Approx(0.0).margin(5e-2)); // Bug in Lightning
 }
 
+TEMPLATE_LIST_TEST_CASE(
+    "Var(Tensor(NamedObs[])) shots test without gates (influenced from a bug in Lightning)",
+    "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 3;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
+    ObsIdType thz = sim->TensorObservable({px, py, pz});
+
+    CHECK(sim->Var(thz) == Approx(0.99966144).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
