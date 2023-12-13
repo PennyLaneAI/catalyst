@@ -212,15 +212,15 @@ class LinkerDriver:
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
-        lib_path_flags += [
+        lib_path_flags = [
             f"-Wl,-rpath,{py_rt_lib_path}",
             f"-L{py_rt_lib_path}",
         ]
 
         if rt_lib_path != mlir_lib_path:
             lib_path_flags += [
-                f"-Wl,-rpath,{rt_lib_path}",
-                f"-L{rt_lib_path}",
+                f"-Wl,-rpath,{mlir_lib_path}",
+                f"-L{mlir_lib_path}",
             ]
         else:
             pass  # pragma: nocover
@@ -238,6 +238,7 @@ class LinkerDriver:
             *lib_path_flags,
             "-lrt_capi",
             "-lpthread",
+            "-lmlir_c_runner_utils", # required for memref.copy
             "-l:custom_calls.cpython-310-x86_64-linux-gnu.so",
         ]
 
