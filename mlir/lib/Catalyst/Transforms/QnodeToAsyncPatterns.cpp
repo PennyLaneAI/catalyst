@@ -18,7 +18,10 @@
 #include <vector>
 
 #include "mlir/Dialect/Async/IR/Async.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
 
@@ -97,12 +100,30 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             return success();
         }
 
+        TypeConverter conv;
+        conv.addConversion([](RankedTensorType type) -> Type {
+            return MemRefType::get(type.getShape(), type.getElementType());
+        });
         auto callOp = rewriter.create<async::CallOp>(op.getLoc(), asyncFuncOp, op.getArgOperands());
         auto newResults = callOp.getResults();
         auto oldResults = op.getResults();
         for (auto [newResult, oldResult] : llvm::zip(newResults, oldResults)) {
             auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newResult);
-            oldResult.replaceAllUsesWith(awaitOp.getResult());
+            // Maybe this would make more sense as a pass after bufferization then?
+            // We are making an assumption that QNode can only return tensors.
+            auto tensorAsync = awaitOp.getResult();
+            auto tensorType = tensorAsync.getType();
+            auto memrefType = conv.convertType(tensorType).cast<MemRefType>();
+            // Due to the AsyncExecutionEngine, it we need to insert a copy.
+            // And we need to do it in the memref level, because there is no tensorCopy
+            auto memrefHeap = rewriter.create<memref::AllocOp>(op.getLoc(), memrefType);
+            auto memrefAsyncRT =
+                rewriter.create<bufferization::ToMemrefOp>(op.getLoc(), memrefType, tensorAsync);
+            rewriter.create<memref::CopyOp>(op.getLoc(), memrefAsyncRT, memrefHeap);
+            auto tensorHeap =
+                rewriter.create<bufferization::ToTensorOp>(op.getLoc(), tensorType, memrefHeap);
+
+            oldResult.replaceAllUsesWith(tensorHeap.getResult());
         }
 
         rewriter.replaceOp(op, callOp);

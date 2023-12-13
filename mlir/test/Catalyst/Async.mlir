@@ -81,9 +81,17 @@ module @foo {
 module @foo {
   func.func public @jit_foo() -> (tensor<2xcomplex<f64>>, tensor<2xf64>) attributes {llvm.emit_c_interface} {
     // CHECK: [[promise:%.+]]:2 = async.call @foo()
-    // CHECK-NEXT: [[return_val0:%.+]] = async.await [[promise]]#0
-    // CHECK-NEXT: [[return_val1:%.+]] = async.await [[promise]]#1
-    // CHECK-NEXT return [[return_val0]], [[return_val1]]
+    // CHECK: [[return_val_0:%.+]] = async.await [[promise]]#0
+    // CHECK: [[memref_heap_0:%.+]] = memref.alloc
+    // CHECK: [[memref_async_0:%.+]] = bufferization.to_memref [[return_val_0]]
+    // CHECK: memref.copy [[memref_async_0]], [[memref_heap_0]]
+    // CHECK: [[tensor_heap_0:%.+]] = bufferization.to_tensor [[memref_heap_0]]
+    // CHECK: [[return_val_1:%.+]] = async.await [[promise]]#1
+    // CHECK: [[memref_heap_1:%.+]] = memref.alloc
+    // CHECK: [[memref_async_1:%.+]] = bufferization.to_memref [[return_val_1]]
+    // CHECK: memref.copy [[memref_async_1]], [[memref_heap_1]]
+    // CHECK: [[tensor_heap_1:%.+]] = bufferization.to_tensor [[memref_heap_1]]
+    // CHECK: return [[tensor_heap_0]], [[tensor_heap_1]]
     %0:2 = call @foo() : () -> (tensor<2xcomplex<f64>>, tensor<2xf64>)
     return %0#0, %0#1 : tensor<2xcomplex<f64>>, tensor<2xf64>
   }
