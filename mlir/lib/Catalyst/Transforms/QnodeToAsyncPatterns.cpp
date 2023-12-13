@@ -123,6 +123,11 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             auto tensorHeap =
                 rewriter.create<bufferization::ToTensorOp>(op.getLoc(), tensorType, memrefHeap);
 
+            // Now that the value has been copied, we can drop the reference to the async value.
+            rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), newResult,
+                                                     rewriter.getI64IntegerAttr(1));
+
+            // Replace all uses with the new heap that is allocated in the tensor.
             oldResult.replaceAllUsesWith(tensorHeap.getResult());
         }
 

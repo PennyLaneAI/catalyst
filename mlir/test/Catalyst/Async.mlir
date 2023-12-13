@@ -109,3 +109,29 @@ module @foo {
     return %3, %6 : tensor<2xcomplex<f64>>, tensor<2xf64>
   }
 }
+
+// -----
+
+// Test drop_ref
+
+module @foo {
+  func.func public @jit_foo() -> (tensor<2xcomplex<f64>>, tensor<2xf64>) attributes {llvm.emit_c_interface} {
+    %0:2 = call @foo() : () -> (tensor<2xcomplex<f64>>, tensor<2xf64>)
+    // CHECK: async.runtime.drop_ref
+    // CHECK: async.runtime.drop_ref
+    return %0#0, %0#1 : tensor<2xcomplex<f64>>, tensor<2xf64>
+  }
+  func.func private @foo() -> (tensor<2xcomplex<f64>>, tensor<2xf64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    quantum.device["/home/erick.ochoalopez/Code/cataliist/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so", "LightningSimulator", "{'shots': 0}"]
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.compbasis %1 : !quantum.obs
+    %3 = quantum.state %2 : tensor<2xcomplex<f64>>
+    %4 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %5 = quantum.compbasis %4 : !quantum.obs
+    %6 = quantum.probs %5 : tensor<2xf64>
+    quantum.dealloc %0 : !quantum.reg
+    quantum.drelease
+    return %3, %6 : tensor<2xcomplex<f64>>, tensor<2xf64>
+  }
+}
