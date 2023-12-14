@@ -126,6 +126,9 @@ class QFunc:
         """Temporary function. This function adds the config field to devices.
         TODO: Remove this function when `qml.Device`s are guaranteed to have their own
         config file field."""
+        if hasattr(device, "config"):  # pragma: no cover
+            """Devices that already have a config field do not need it to be overwritten."""
+            return
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
         name = device.name
         if isinstance(device, qml.Device):
