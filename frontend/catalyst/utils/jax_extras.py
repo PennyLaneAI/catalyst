@@ -16,14 +16,25 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
-from typing import (Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type, TypeVar)
 from copy import copy
 from dataclasses import dataclass
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    TypeVar,
+)
 
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import (_update_thread_local_jit_state, DBIdx, same_referent)
+from jax._src.core import DBIdx, _update_thread_local_jit_state, same_referent
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -43,22 +54,27 @@ from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
-    AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType,
+    AbstractValue,
+    ClosedJaxpr,
+    ConcreteArray,
+    DShapedArray,
+    InDBIdx,
+    Jaxpr,
+    JaxprEqn,
+    MainTrace,
+    OutDBIdx,
+    OutputType,
     Primitive,
     ShapedArray,
-    DShapedArray,
-    ConcreteArray,
-    InDBIdx,
-    OutDBIdx,
     Trace,
     Tracer,
     concrete_aval,
     eval_jaxpr,
+    find_top_trace,
     gensym,
-    thread_local_state,
     get_referent,
     new_jaxpr_eqn,
-    find_top_trace
+    thread_local_state,
 )
 from jax.interpreters.mlir import (
     AxisContext,
@@ -74,7 +90,7 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.linear_util import wrap_init, transformation, transformation_with_aux
+from jax.linear_util import transformation, transformation_with_aux, wrap_init
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -312,7 +328,7 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     return closed_jaxprs, consts
 
 
-def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
+def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     newvar = gensym(jaxprs, suffix="_")
 
     all_padded_constvars = []
@@ -340,9 +356,9 @@ def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
 
     acc = []
     for jaxpr, padded_constvars in zip(jaxprs, all_padded_constvars):
-        acc.append(ClosedJaxpr(
-            convert_constvars_jaxpr(jaxpr.replace(constvars=padded_constvars)), ()
-        ))
+        acc.append(
+            ClosedJaxpr(convert_constvars_jaxpr(jaxpr.replace(constvars=padded_constvars)), ())
+        )
     return acc
 
     # all_const_avals = [map(_abstractify, consts) for consts in all_consts]
@@ -392,26 +408,24 @@ def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
     # return closed_jaxprs, consts
 
 
-
-
-
-
 @transformation
 def expanded_fun(in_type, *args_expanded):
-    args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
+    args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     ans = yield args_collapsed, {}
     yield ans
+
 
 @transformation_with_aux
 def expanded_fun2(static_args, *args_expanded):
     (in_type, expansion_strategy) = static_args
-    args_collapsed = [a for a,(_,k) in zip(args_expanded, in_type) if k]
+    args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
-    num_implicit_inputs = len([() for _,k in in_type if not k])
+    num_implicit_inputs = len([() for _, k in in_type if not k])
     all_outs, out_sig = infer_output_type_python(
         args_expanded, res_flat, expansion_strategy, num_implicit_inputs
     )
     yield all_outs, out_sig
+
 
 @dataclass
 class InputSignature:
@@ -420,7 +434,7 @@ class InputSignature:
     in_expanded_args: List[DynamicJaxprTracer]
 
     def num_implicit_inputs(self):
-        return len([() for _,k in self.in_type if not k])
+        return len([() for _, k in self.in_type if not k])
 
 
 @dataclass
@@ -432,18 +446,20 @@ class OutputSignature:
     out_initial_jaxpr: Callable[[], Jaxpr]
 
     def num_implicit_outputs(self):
-        return len([() for _,k in self.out_type() if not k])
+        return len([() for _, k in self.out_type() if not k])
+
 
 def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
-    trace:DynamicJaxprTrace = find_top_trace(flat_args)
+    trace: DynamicJaxprTrace = find_top_trace(flat_args)
     flat_tracers = [trace.full_raise(a) for a in flat_args]
     # flat_axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
-    in_expanded_args, in_type = expand_args(flat_tracers, #axes_specs=flat_axes_specs,
-                                            expansion_strategy=expansion_strategy)
+    in_expanded_args, in_type = expand_args(
+        flat_tracers, expansion_strategy=expansion_strategy  # axes_specs=flat_axes_specs,
+    )
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun2(wf, (in_type, expansion_strategy))
@@ -451,11 +467,13 @@ def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
     return (
         wf,
         InputSignature(in_type, in_tree, in_expanded_args),
-        OutputSignature(lambda: ClosedJaxpr(convert_constvars_jaxpr(out_sig_promise()[0]), ()),
-                        lambda: out_sig_promise()[1],
-                        lambda: out_sig_promise()[2],
-                        out_tree_promise,
-                        lambda: out_sig_promise()[0])
+        OutputSignature(
+            lambda: ClosedJaxpr(convert_constvars_jaxpr(out_sig_promise()[0]), ()),
+            lambda: out_sig_promise()[1],
+            lambda: out_sig_promise()[2],
+            out_tree_promise,
+            lambda: out_sig_promise()[0],
+        ),
     )
 
 
@@ -660,8 +678,17 @@ def jaxpr_force_outvars(
     """Turn all the InDBIdx references in a Jaxpr program into OutDBIdx."""
     jaxpr = closed_jaxpr.jaxpr
     out_aval, out_keep = unzip2(out_type)
-    num_inrefs = max(sum(([d.val for d in a.shape if isinstance(d, InDBIdx)] for a in out_aval
-                              if hasattr(a, "shape")), [0]))
+    num_inrefs = max(
+        sum(
+            (
+                [d.val for d in a.shape if isinstance(d, InDBIdx)]
+                for a in out_aval
+                if hasattr(a, "shape")
+            ),
+            [0],
+        )
+    )
+
     def _new_shape(shape):
         shape2 = []
         for d in shape:
@@ -678,7 +705,9 @@ def jaxpr_force_outvars(
         if hasattr(v, "shape"):
             v.update(shape=_new_shape(v.shape))
     outvars2 = jaxpr.invars[:num_inrefs] + jaxpr.outvars
-    out_type2 = tuple((i.aval,False) for i in jaxpr.invars[:num_inrefs]) + tuple(zip(out_aval, out_keep))
+    out_type2 = tuple((i.aval, False) for i in jaxpr.invars[:num_inrefs]) + tuple(
+        zip(out_aval, out_keep)
+    )
     jaxpr2 = Jaxpr(
         jaxpr.constvars, jaxpr.invars, outvars2, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
     )
@@ -713,35 +742,41 @@ def make_jaxpr2(
     return make_jaxpr_f
 
 
-def input_type_to_tracers(in_type: InputType,
-                          maker: Callable[[AbstractValue],DynamicJaxprTracer]
-                          ) -> List[DynamicJaxprTracer]:
-    """ Creates an expanded list of tracers representing an input values of a Jaxpr program """
+def input_type_to_tracers(
+    in_type: InputType, maker: Callable[[AbstractValue], DynamicJaxprTracer]
+) -> List[DynamicJaxprTracer]:
+    """Creates an expanded list of tracers representing an input values of a Jaxpr program"""
     in_aval, in_keep = unzip2(in_type)
     return _input_type_to_tracers(maker, in_aval)
 
 
 def get_referent_frame(self, frame):
-    """ Find referents in the specific frame """
+    """Find referents in the specific frame"""
     # TODO: clarify the logic! Can we need other frames?
     val = frame.constvar_to_val.get(frame.tracer_to_var.get(id(self)))
     return self if val is None else get_referent_frame(val)
 
 
-def output_type_to_tracers(out_type: OutputType,
-                           out_consts: List[DynamicJaxprTracer],
-                           in_tracers: List[DynamicJaxprTracer],
-                           maker: Callable[[AbstractValue],DynamicJaxprTracer]
-                           ) -> List[DynamicJaxprTracer]:
-    """ Creates an expanded list of tracers representing an output values of a Jaxpr program
+def output_type_to_tracers(
+    out_type: OutputType,
+    out_consts: List[DynamicJaxprTracer],
+    in_tracers: List[DynamicJaxprTracer],
+    maker: Callable[[AbstractValue], DynamicJaxprTracer],
+) -> List[DynamicJaxprTracer]:
+    """Creates an expanded list of tracers representing an output values of a Jaxpr program
     based on the ``out_type`` of this program. The resulting tracers might be nested as required by
-    the Jax dynamic API and might contain ``in_tracers`` of the same Jaxpr program. """
+    the Jax dynamic API and might contain ``in_tracers`` of the same Jaxpr program."""
     out_tracers = []
     for aval, _ in out_type:
         if type(aval) is DShapedArray:
-            shape = [[*out_consts, *in_tracers][d.val] if type(d) is InDBIdx else
-                     out_tracers[d.val] if type(d) is OutDBIdx else
-                     d for d in aval.shape]
+            shape = [
+                [*out_consts, *in_tracers][d.val]
+                if type(d) is InDBIdx
+                else out_tracers[d.val]
+                if type(d) is OutDBIdx
+                else d
+                for d in aval.shape
+            ]
             aval = aval.update(shape=tuple(shape))
         out_tracers.append(maker(aval))
     return out_tracers
@@ -749,9 +784,10 @@ def output_type_to_tracers(out_type: OutputType,
 
 TracerLike = TypeVar("TracerLike")
 
-def infer_input_type_unshared(inputs:List[TracerLike],
-                             ) -> Tuple[List[TracerLike], InputType]:
 
+def infer_input_type_unshared(
+    inputs: List[TracerLike],
+) -> Tuple[List[TracerLike], InputType]:
     def _is_tracer_like(x):
         return hasattr(x, "aval")
 
@@ -771,12 +807,12 @@ def infer_input_type_unshared(inputs:List[TracerLike],
             expl_avals.append(o.aval.update(shape=tuple(shape2)))
         else:
             expl_avals.append(o.aval)
-    return (*[(i,False) for i in impl_avals], *[(i,True) for i in expl_avals])
+    return (*[(i, False) for i in impl_avals], *[(i, True) for i in expl_avals])
 
 
 @dataclass
 class ExpansionStrategy:
-    axes_specs: Sequence[AbstractedAxesSpec]|None
+    axes_specs: Sequence[AbstractedAxesSpec] | None
     input_unshare_variables: bool
     output_include_indbidx_vars: bool
     output_force_arg0_outdbidx: bool
@@ -785,24 +821,28 @@ class ExpansionStrategy:
 def while_loop_expansion_strategy(preserve_dimensions=False):
     return ExpansionStrategy(None, not preserve_dimensions, True, False)
 
+
 def for_loop_expansion_strategy():
     return ExpansionStrategy(None, True, True, True)
 
+
 def cond_expansion_strategy():
     return ExpansionStrategy(None, False, True, False)
+
 
 def default_expansion_strategy(axes_spec):
     return ExpansionStrategy(axes_spec, False, False, False)
 
 
-def infer_output_type(constants:List[TracerLike],
-                      expanded_inputs:List[TracerLike],
-                      outputs:List[TracerLike],
-                      expansion_strategy:ExpansionStrategy,
-                      num_implicit_inputs:int|None = None
-                      ) -> Tuple[List[TracerLike], OutputType]:
-    """ Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
-    we mean either Jax tracers or Jaxpr variables. """
+def infer_output_type(
+    constants: List[TracerLike],
+    expanded_inputs: List[TracerLike],
+    outputs: List[TracerLike],
+    expansion_strategy: ExpansionStrategy,
+    num_implicit_inputs: int | None = None,
+) -> Tuple[List[TracerLike], OutputType]:
+    """Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
+    we mean either Jax tracers or Jaxpr variables."""
     s = expansion_strategy
 
     def _is_tracer_like(x):
@@ -810,7 +850,7 @@ def infer_output_type(constants:List[TracerLike],
 
     expl_outs = outputs
     impl_outs = []
-    seen = set() if s.output_include_indbidx_vars else set(map(id,[*constants, *expanded_inputs]))
+    seen = set() if s.output_include_indbidx_vars else set(map(id, [*constants, *expanded_inputs]))
 
     for o in expl_outs:
         assert _is_tracer_like(o)
@@ -825,13 +865,20 @@ def infer_output_type(constants:List[TracerLike],
 
     all_ins = [*constants, *expanded_inputs]
     all_outs = [*impl_outs, *expl_outs]
-    in_map : dict[TracerLike,  InDBIdx] = {id(v):  InDBIdx(i) for i, v in enumerate(all_ins)}
+    in_map: dict[TracerLike, InDBIdx] = {id(v): InDBIdx(i) for i, v in enumerate(all_ins)}
     out_map: dict[TracerLike, OutDBIdx] = {id(x): OutDBIdx(i) for i, x in enumerate(all_outs)}
 
     out_avals_ = (x.aval for x in all_outs)
-    out_avals = [a.update(shape=tuple(in_map.get(id(d), out_map.get(id(d)))
-                                      if _is_tracer_like(d) else d for d in a.shape))
-                 if isinstance(a, DShapedArray) else a for a in out_avals_]
+    out_avals = [
+        a.update(
+            shape=tuple(
+                in_map.get(id(d), out_map.get(id(d))) if _is_tracer_like(d) else d for d in a.shape
+            )
+        )
+        if isinstance(a, DShapedArray)
+        else a
+        for a in out_avals_
+    ]
 
     kept_outs = [False] * len(impl_outs) + [True] * len(expl_outs)
     out_type = tuple(zip(out_avals, kept_outs))
@@ -841,36 +888,34 @@ def infer_output_type(constants:List[TracerLike],
         assert num_implicit_inputs is not None
         out_type = out_type_force_outdbidx(
             out_type,
-            len(constants) + num_implicit_inputs, # for-loop index argument
+            len(constants) + num_implicit_inputs,  # for-loop index argument
             constants,
             expanded_inputs,
-            all_outs
+            all_outs,
         )
     return all_outs, out_type
 
 
-def infer_output_type_jaxpr(constants:List[TracerLike],
-                            expanded_inputs:List[TracerLike],
-                            outputs:List[TracerLike],
-                            expansion_strategy,
-                            num_implicit_inputs:int|None = None
-                            ) -> OutputType:
-
-    _, out_type = infer_output_type(constants,
-                                    expanded_inputs,
-                                    outputs,
-                                    expansion_strategy,
-                                    num_implicit_inputs)
+def infer_output_type_jaxpr(
+    constants: List[TracerLike],
+    expanded_inputs: List[TracerLike],
+    outputs: List[TracerLike],
+    expansion_strategy,
+    num_implicit_inputs: int | None = None,
+) -> OutputType:
+    _, out_type = infer_output_type(
+        constants, expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
+    )
     return out_type
 
 
-def infer_output_type_python(expanded_inputs:List[TracerLike],
-                             outputs:List[TracerLike],
-                             expansion_strategy:ExpansionStrategy,
-                             num_implicit_inputs:int
-                             ) -> OutputType:
-
-    trace:DynamicJaxprTrace = find_top_trace(expanded_inputs)
+def infer_output_type_python(
+    expanded_inputs: List[TracerLike],
+    outputs: List[TracerLike],
+    expansion_strategy: ExpansionStrategy,
+    num_implicit_inputs: int,
+) -> OutputType:
+    trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
     expanded_outputs, out_type1 = infer_output_type(
@@ -881,7 +926,10 @@ def infer_output_type_python(expanded_inputs:List[TracerLike],
 
     expanded_outputs2, out_type2 = infer_output_type(
         [trace.full_raise(t) for t in consts],
-        expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
+        expanded_inputs,
+        outputs,
+        expansion_strategy,
+        num_implicit_inputs,
     )
 
     assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
@@ -891,10 +939,12 @@ def infer_output_type_python(expanded_inputs:List[TracerLike],
 
     return expanded_outputs2, (jaxpr, out_type3, consts)
 
-def expand_args(args:List[TracerLike],
-                expansion_strategy: ExpansionStrategy,
-                in_type=None,
-                ) -> Tuple[List[TracerLike], InputType]:
+
+def expand_args(
+    args: List[TracerLike],
+    expansion_strategy: ExpansionStrategy,
+    in_type=None,
+) -> Tuple[List[TracerLike], InputType]:
     s = expansion_strategy
     if in_type is None:
         if s.input_unshare_variables is True:
@@ -909,34 +959,35 @@ def expand_args(args:List[TracerLike],
 
 
 def expand_results(
-    constants:List[TracerLike],
-    expanded_inputs:List[TracerLike],
-    results:List[TracerLike],
-    expansion_strategy:ExpansionStrategy,
-    num_implicit_inputs:int|None = None,
+    constants: List[TracerLike],
+    expanded_inputs: List[TracerLike],
+    results: List[TracerLike],
+    expansion_strategy: ExpansionStrategy,
+    num_implicit_inputs: int | None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
-    return infer_output_type(constants, expanded_inputs, results, expansion_strategy,
-                              num_implicit_inputs)
+    return infer_output_type(
+        constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs
+    )
 
 
-def collapse(typ:InputType|OutputType, params:List[TracerLike]) -> List[TracerLike]:
-    return [t for t,(_,k) in zip(params, typ) if k]
+def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:
+    return [t for t, (_, k) in zip(params, typ) if k]
 
 
-def tracer_index(x:TracerLike, ls:List[TracerLike]) -> Optional[int]:
+def tracer_index(x: TracerLike, ls: List[TracerLike]) -> Optional[int]:
     for i, t in enumerate(ls):
         if x is t:
             return i
     return None
 
 
-def out_type_force_outdbidx(out_type:OutputType,
-                            input_idx:int,
-                            consts:List[TracerLike],
-                            inputs:List[TracerLike],
-                            outputs:List[TracerLike]
-                            ) -> OutputType:
-
+def out_type_force_outdbidx(
+    out_type: OutputType,
+    input_idx: int,
+    consts: List[TracerLike],
+    inputs: List[TracerLike],
+    outputs: List[TracerLike],
+) -> OutputType:
     assert len(out_type) == len(outputs), "Outputs must be expanded"
     x_in_idx = input_idx
     x_out_idx = tracer_index([*consts, *inputs][x_in_idx], outputs)
@@ -952,13 +1003,11 @@ def out_type_force_outdbidx(out_type:OutputType,
                             "Target tracer does not exist in the outputs "
                             "(see force_implicit_indbidx=True)"
                         )
-                        assert x_out_idx < i, (
-                            "Target tracer is not available for OutDBIdx"
-                        )
+                        assert x_out_idx < i, "Target tracer is not available for OutDBIdx"
                         shape2.append(OutDBIdx(x_out_idx))
                     else:
                         shape2.append(d)
-                aval2 = aval.update(shape = tuple(shape2))
+                aval2 = aval.update(shape=tuple(shape2))
             else:
                 aval2 = copy(aval)
         else:
@@ -967,14 +1016,14 @@ def out_type_force_outdbidx(out_type:OutputType,
     return out_type2
 
 
-def out_type_shift_indbidx(out_type:OutputType, delta:int) -> OutputType:
+def out_type_shift_indbidx(out_type: OutputType, delta: int) -> OutputType:
     out_type2 = []
-    for (aval, k) in out_type:
+    for aval, k in out_type:
         if isinstance(aval, DShapedArray):
             shape2 = []
             for d in aval.shape:
-                shape2.append(InDBIdx(d.val+delta) if isinstance(d, InDBIdx) else d)
-            aval2 = aval.update(shape = tuple(shape2))
+                shape2.append(InDBIdx(d.val + delta) if isinstance(d, InDBIdx) else d)
+            aval2 = aval.update(shape=tuple(shape2))
         else:
             aval2 = copy(aval)
         out_type2.append((aval2, k))
@@ -998,8 +1047,11 @@ class DynshapePrimitive(Primitive):
         assert len(effects) == 0, f"Effects are not supported, got ({effects})"
 
         out_tracers = output_type_to_tracers(
-            out_type, [], tracers, # FIXME: what to do with constants here???
-            maker=lambda a: DynamicJaxprTracer(trace, a, source_info))
+            out_type,
+            [],
+            tracers,  # FIXME: what to do with constants here???
+            maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
+        )
 
         invars = map(trace.getvar, tracers)
         outvars = map(trace.makevar, out_tracers)

@@ -53,21 +53,27 @@ from catalyst.jax_primitives import (
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
-    Jaxpr,
     ClosedJaxpr,
+    ConcreteArray,
+    DShapedArray,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
+    Jaxpr,
+    OutputType,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
-    DShapedArray,
-    ConcreteArray,
-    OutputType,
     _abstractify,
     _input_type_to_tracers,
+    cond_expansion_strategy,
+    convert_constvars_jaxpr,
     convert_element_type,
     deduce_avals,
+    deduce_avals3,
     eval_jaxpr,
+    expand_args,
+    gensym,
+    input_type_to_tracers,
     jaxpr_remove_implicit,
     jaxpr_to_mlir,
     make_jaxpr2,
@@ -75,14 +81,8 @@ from catalyst.utils.jax_extras import (
     tree_flatten,
     tree_structure,
     tree_unflatten,
-    wrap_init,
-    deduce_avals3,
-    input_type_to_tracers,
     unzip2,
-    convert_constvars_jaxpr,
-    cond_expansion_strategy,
-    expand_args,
-    gensym
+    wrap_init,
 )
 
 
@@ -136,8 +136,8 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         return [t.shape for t in ts if isinstance(t, ShapedArray)]
 
     assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
-    all_ends_with_qreg = all(len(t)>0 and isinstance(t[-1], AbstractQreg) for t in types)
-    all_not_ends_with_qreg = all(len(t)==0 or not isinstance(t[-1], AbstractQreg) for t in types)
+    all_ends_with_qreg = all(len(t) > 0 and isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(len(t) == 0 or not isinstance(t[-1], AbstractQreg) for t in types)
     assert (
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
@@ -174,9 +174,10 @@ def _apply_result_type_conversion(
 def _apply_result_type_conversion2(
     ctx, jaxpr: ClosedJaxpr, consts, target_types: List[ShapedArray], num_implicit_outputs
 ):
-    with_qreg = len(target_types)>0 and isinstance(target_types[-1], AbstractQreg)
+    with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
     newvar = gensym([jaxpr], suffix="_")
-    args = ([AbstractQreg()] if with_qreg else [])
+    args = [AbstractQreg()] if with_qreg else []
+
     # with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
     def _fun(*in_tracers):
         print(jaxpr)
@@ -191,10 +192,13 @@ def _apply_result_type_conversion2(
             (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
             for tr, ty in zip(out_tracers_, target_types_)
         ]
-        return out_promoted_tracers[num_implicit_outputs:] + ([out_tracers[-1]] if with_qreg else [])
+        return out_promoted_tracers[num_implicit_outputs:] + (
+            [out_tracers[-1]] if with_qreg else []
+        )
 
-    _, in_sig, out_sig = trace_function(ctx, _fun, *args,
-                                        expansion_strategy=cond_expansion_strategy())
+    _, in_sig, out_sig = trace_function(
+        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+    )
 
     return in_sig, out_sig
 
@@ -319,8 +323,13 @@ class HybridOp(Operation):
     num_wires = AnyWires
     binder: Callable = _no_binder
 
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion],
-                 expansion_strategy=None):
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        expansion_strategy=None,
+    ):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
@@ -345,37 +354,41 @@ class HybridOp(Operation):
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
         eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers), (
-            f"{eqn.outvars=}\n{self.out_classical_tracers=}"
-        )
+        assert (len(eqn.outvars) - 1) == len(
+            self.out_classical_tracers
+        ), f"{eqn.outvars=}\n{self.out_classical_tracers=}"
         for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 
-
     def bind_overwrite_classical_tracers2(
-        self, ctx: JaxTracingContext, trace: DynamicJaxprTrace,
-        in_expanded_tracers, out_expanded_tracers, **kwargs
+        self,
+        ctx: JaxTracingContext,
+        trace: DynamicJaxprTrace,
+        in_expanded_tracers,
+        out_expanded_tracers,
+        **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations."""
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
-        assert len(eqn.outvars[:-1])  == len(out_expanded_tracers), (
-            f"{eqn.outvars=}\n{out_expanded_tracers=}"
-        )
+        assert len(eqn.outvars[:-1]) == len(
+            out_expanded_tracers
+        ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
         for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
-            if trace.getvar(t) in set([
-                *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
-                *ctx.frames[trace].invars,
-                *ctx.frames[trace].constvar_to_val.keys()
-            ]):
+            if trace.getvar(t) in set(
+                [
+                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
+                    *ctx.frames[trace].invars,
+                    *ctx.frames[trace].constvar_to_val.keys(),
+                ]
+            ):
                 # Do not re-assign vars from other equations
                 continue
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
-
 
     def trace_quantum(
         self,
@@ -398,18 +411,12 @@ def has_nested_tapes(op: Operation) -> bool:
 
 
 def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
-
-    wfun, in_sig, out_sig = deduce_avals3(
-        fun, args, kwargs, expansion_strategy=expansion_strategy
-    )
+    wfun, in_sig, out_sig = deduce_avals3(fun, args, kwargs, expansion_strategy=expansion_strategy)
     with EvaluationContext.frame_tracing_context(ctx) as trace:
         arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
 
         return res_expanded_tracers, in_sig, out_sig
-
-
-
 
 
 def trace_to_mlir(func, abstracted_axes, *args, **kwargs):

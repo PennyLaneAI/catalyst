@@ -62,12 +62,15 @@ from pennylane import QNode as pennylane_QNode
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.jax_extras import (
-    ClosedJaxpr, DynshapePrimitive, infer_output_type_jaxpr, out_type_shift_indbidx,
-    out_type_force_outdbidx,
-    for_loop_expansion_strategy,
-    while_loop_expansion_strategy,
+    ClosedJaxpr,
+    DynshapePrimitive,
+    cond_expansion_strategy,
     default_expansion_strategy,
-    cond_expansion_strategy
+    for_loop_expansion_strategy,
+    infer_output_type_jaxpr,
+    out_type_force_outdbidx,
+    out_type_shift_indbidx,
+    while_loop_expansion_strategy,
 )
 
 # pylint: disable=unused-argument,too-many-lines
@@ -217,12 +220,12 @@ print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
 
 
-
-def _assert_jaxpr_without_constants(jaxpr:ClosedJaxpr):
+def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
     assert len(jaxpr.consts) == 0, (
         "Abstract evaluation is not defined for Jaxprs with non-empty constants because these are "
         "not available at the time of the creation of output tracers."
     )
+
 
 #
 # print
@@ -1128,17 +1131,15 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 # cond
 #
 @cond_p.def_abstract_eval
-def _cond_abstract_eval(*args,
-                        branch_jaxprs,
-                        nimplicit_inputs:int,
-                        nimplicit_outputs:int,
-                        **kwargs):
+def _cond_abstract_eval(
+    *args, branch_jaxprs, nimplicit_inputs: int, nimplicit_outputs: int, **kwargs
+):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
         branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
         expansion_strategy=cond_expansion_strategy(),
-        num_implicit_inputs=nimplicit_inputs
+        num_implicit_inputs=nimplicit_inputs,
     )
     return out_type
 
@@ -1152,8 +1153,8 @@ def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    nimplicit_inputs:int,
-    nimplicit_outputs:int
+    nimplicit_inputs: int,
+    nimplicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -1224,7 +1225,14 @@ def _cond_lowering(
 #
 @while_p.def_impl
 def _while_loop_def_impl(
-    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, nimplicit, preserve_dimensions
+    ctx,
+    *iter_args_plus_consts,
+    cond_jaxpr,
+    body_jaxpr,
+    cond_nconsts,
+    body_nconsts,
+    nimplicit,
+    preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1247,8 +1255,8 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
-    nimplicit:int,
-    preserve_dimensions:bool,
+    nimplicit: int,
+    preserve_dimensions: bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
@@ -1313,9 +1321,7 @@ def _while_loop_lowering(
 # for loop
 #
 @for_p.def_abstract_eval
-def _for_loop_abstract_eval(*args, body_jaxpr,
-                            nimplicit = 0,
-                            **kwargs):
+def _for_loop_abstract_eval(*args, body_jaxpr, nimplicit=0, **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
 
     return infer_output_type_jaxpr(
@@ -1323,16 +1329,21 @@ def _for_loop_abstract_eval(*args, body_jaxpr,
         body_jaxpr.jaxpr.invars,
         body_jaxpr.jaxpr.outvars[nimplicit:],
         expansion_strategy=for_loop_expansion_strategy(),
-        num_implicit_inputs=nimplicit
+        num_implicit_inputs=nimplicit,
     )
 
 
 # pylint: disable=too-many-arguments
 @for_p.def_impl
 def _for_loop_def_impl(
-    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr,
-    nimplicit = 0,
-    body_nconsts
+    ctx,
+    lower_bound,
+    upper_bound,
+    step,
+    *iter_args_plus_consts,
+    body_jaxpr,
+    nimplicit=0,
+    body_nconsts,
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1347,22 +1358,19 @@ def _for_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
-    nimplicit : int = 0
+    nimplicit: int = 0,
 ):
     # Separate constants from iteration arguments.
     # The MLIR value provided by JAX for the iteration index is not needed
     # (as it's identical to the lower bound value).
 
-    body_consts    = iter_args_plus_consts[:body_nconsts]
+    body_consts = iter_args_plus_consts[:body_nconsts]
     body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + nimplicit]
-    lower_bound    = iter_args_plus_consts[body_nconsts + nimplicit + 0]
-    upper_bound    = iter_args_plus_consts[body_nconsts + nimplicit + 1]
-    step           = iter_args_plus_consts[body_nconsts + nimplicit + 2]
-    loop_index     = iter_args_plus_consts[body_nconsts + nimplicit + 3]
-    loop_args      = [
-                      *body_implicits,
-                      *iter_args_plus_consts[body_nconsts + nimplicit + 4:]
-                     ]
+    lower_bound = iter_args_plus_consts[body_nconsts + nimplicit + 0]
+    upper_bound = iter_args_plus_consts[body_nconsts + nimplicit + 1]
+    step = iter_args_plus_consts[body_nconsts + nimplicit + 2]
+    loop_index = iter_args_plus_consts[body_nconsts + nimplicit + 3]
+    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + nimplicit + 4 :]]
 
     loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
@@ -1439,10 +1447,15 @@ def _for_loop_lowering(
         body_args[0] = from_elements_op.result
 
         # Re-order arguments in accordance with jax dynamic API convensions
-        body_args = [[a] for a in (*body_consts,
-                                   *body_args[1:nimplicit+1],
-                                   body_args[0],
-                                   *body_args[nimplicit+1:])]
+        body_args = [
+            [a]
+            for a in (
+                *body_consts,
+                *body_args[1 : nimplicit + 1],
+                body_args[0],
+                *body_args[nimplicit + 1 :],
+            )
+        ]
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
