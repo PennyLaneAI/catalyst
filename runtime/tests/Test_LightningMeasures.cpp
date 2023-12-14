@@ -176,6 +176,34 @@ TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) test", "[Measures]", SimTypes)
     CHECK(sim->Expval(pz) == Approx(-1.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    CHECK(sim->Expval(px) == Approx(0.0).margin(5e-2));
+    CHECK(sim->Expval(py) == Approx(0.0).margin(5e-2));
+    CHECK(sim->Expval(pz) == Approx(-1.0).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -199,6 +227,56 @@ TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test", "[Measures]", SimTypes)
 
     CHECK(sim->Expval(h1) == Approx(.0).margin(1e-5));
     CHECK(sim->Expval(h2) == Approx(.0).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat1(16, {0, 0});
+
+    ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
+    REQUIRE_THROWS_WITH(sim->Expval(h1),
+                        Catch::Contains("Hermitian observables do not support shot measurement."));
+}
+
+TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat1(16, {0, 0});
+
+    ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
+    REQUIRE_THROWS_WITH(sim->Var(h1),
+                        Catch::Contains("Hermitian observables do not support shot measurement."));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
@@ -230,6 +308,38 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTy
     CHECK(sim->Expval(tpz) == Approx(-1.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tpx = sim->TensorObservable({px});
+    ObsIdType tpy = sim->TensorObservable({py});
+    ObsIdType tpz = sim->TensorObservable({pz});
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    CHECK(sim->Expval(tpx) == Approx(1.0).margin(5e-2));
+    CHECK(sim->Expval(tpy) == Approx(.0).margin(5e-2));
+    CHECK(sim->Expval(tpz) == Approx(-1.0).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -258,6 +368,42 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", Sim
 
     CHECK(sim->Expval(tpxy) == Approx(0.0).margin(1e-5));
     CHECK(sim->Expval(tpxz) == Approx(-1.0).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    std::unique_ptr<TestType> sim0 = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+        Qs.push_back(sim0->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    sim0->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim0->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim0->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType tpxy = sim->TensorObservable({px, py});
+
+    ObsIdType px0 = sim0->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py0 = sim0->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType tpxy0 = sim0->TensorObservable({px0, py0});
+
+    CHECK(sim->Expval(tpxy) == Approx(sim0->Expval(tpxy0)).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", SimTypes)
@@ -413,6 +559,34 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", Si
     ObsIdType hxyz = sim->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz});
 
     CHECK(sim->Expval(hxyz) == Approx(0.2).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hxyz = sim->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz});
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    CHECK(sim->Expval(hxyz) == Approx(0.2).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
@@ -583,6 +757,29 @@ TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimT
     CHECK(sim->Var(pz) == Approx(.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Var(NamedObs) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[0]});
+
+    CHECK(sim->Var(py) == Approx(1.0).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -635,6 +832,35 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes
     CHECK(sim->Var(tpx) == Approx(.0).margin(1e-5));
     CHECK(sim->Var(tpy) == Approx(1.0).margin(1e-5));
     CHECK(sim->Var(tpz) == Approx(.0).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tpx = sim->TensorObservable({px});
+    ObsIdType tpz = sim->TensorObservable({pz});
+
+    CHECK(sim->Var(tpx) == Approx(.0).margin(5e-2));
+    CHECK(sim->Var(tpz) == Approx(.0).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
@@ -771,6 +997,62 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(Hamiltonian(NamedObs[]), NamedObs)) test", "
     CHECK(sim->Var(thz) == Approx(0.64).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Var(Tensor(NamedObs[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
+    ObsIdType thz = sim->TensorObservable({px, py, pz});
+
+    CHECK(sim->Var(thz) == Approx(0.99998976).margin(5e-2));
+}
+
+TEMPLATE_LIST_TEST_CASE(
+    "Var(Tensor(NamedObs[])) shots test without gates (influenced from a bug in Lightning)",
+    "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 3;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
+    ObsIdType thz = sim->TensorObservable({px, py, pz});
+
+    CHECK(sim->Var(thz) == Approx(0.99966144).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -791,6 +1073,28 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measur
     ObsIdType ten = sim->TensorObservable({her, hxy});
 
     CHECK(sim->Var(ten) == Approx(0.8).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) shots test", "[Measures]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 3;
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
+
+    constexpr size_t num_shots = 5000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[2]});
+    ObsIdType hxy = sim->HamiltonianObservable({0.4, 0.8}, {px, py});
+
+    CHECK(sim->Var(hxy) == Approx(0.8).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
@@ -1090,6 +1394,71 @@ TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Meas
         else {
             CHECK(probs3[i] == Approx(0.).margin(1e-5));
             CHECK(probs4[i] == Approx(0.).margin(1e-5));
+        }
+    }
+}
+
+TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs shots tests with numWires=0-4", "[Measures]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    std::vector<double> probs0(1);
+    DataView<double, 1> view0(probs0);
+    sim->PartialProbs(view0, std::vector<QubitIdType>{});
+
+    std::vector<double> probs1(2);
+    DataView<double, 1> view1(probs1);
+    sim->PartialProbs(view1, std::vector<QubitIdType>{Qs[2]});
+
+    std::vector<double> probs2(4);
+    DataView<double, 1> view2(probs2);
+    sim->PartialProbs(view2, std::vector<QubitIdType>{Qs[0], Qs[3]});
+
+    std::vector<double> probs3(16);
+    DataView<double, 1> view3(probs3);
+    sim->PartialProbs(view3, Qs);
+
+    std::vector<double> probs4(16);
+    DataView<double, 1> view4(probs4);
+    sim->Probs(view4);
+
+    CHECK(probs0.size() == 1);
+    CHECK(probs0[0] == Approx(1.0).margin(5e-2));
+    CHECK(probs1[0] == Approx(0.5).margin(5e-2));
+    CHECK(probs1[1] == Approx(0.5).margin(5e-2));
+    for (size_t i = 0; i < 4; i++) {
+        if (i == 0 || i == 2) {
+            CHECK(probs2[i] == Approx(0.5).margin(5e-2));
+        }
+        else {
+            CHECK(probs2[i] == Approx(0.).margin(5e-2));
+        }
+    }
+    for (size_t i = 0; i < 16; i++) {
+        if (i == 4 || i == 6 || i == 12 || i == 14) {
+            CHECK(probs3[i] == Approx(0.25).margin(5e-2));
+            CHECK(probs4[i] == Approx(0.25).margin(5e-2));
+        }
+        else {
+            CHECK(probs3[i] == Approx(0.).margin(5e-2));
+            CHECK(probs4[i] == Approx(0.).margin(5e-2));
         }
     }
 }

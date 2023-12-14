@@ -42,6 +42,10 @@
    [1. 1. 1.]]
   ```
 
+* Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
+  for `lightning.qubit` and `lightning.kokkos` devices.
+  [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
+
 <h3>Improvements</h3>
 
 * Support for `mcmc` sampling in `lightning.qubit`.
@@ -96,7 +100,8 @@ Ali Asadi,
 David Ittah,
 Romain Moyard,
 Sergei Mironov,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Shuli Shu.
 
 # Release 0.3.2
 
