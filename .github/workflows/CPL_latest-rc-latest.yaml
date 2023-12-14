@@ -1,4 +1,4 @@
-name: Check CPL latest/latest/latest
+name: Check CPL latest/rc/latest
 
 on:
   schedule:
