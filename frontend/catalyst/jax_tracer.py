@@ -199,25 +199,6 @@ def _apply_result_type_conversion2(
     return in_sig, out_sig
 
 
-def unify_result_types(out_types:List[OutputType]) -> OutputType:
-    assert len(out_types)>0
-    avals = [[a for a,_ in ot] for ot in out_types]
-    unified_dtypes = _promote_jaxpr_types(avals)
-    assert len(unified_dtypes) == len(avals[0])
-    print("DDDDDDDDDDDDDDD")
-    print(unified_dtypes)
-    print(out_types[0])
-    def _update(x, dtype):
-        if isinstance(x, ConcreteArray):
-            return x.update(val=dtype(x.val), dtype=dtype)
-        elif isinstance(x, (ShapedArray, DShapedArray)):
-            return x.update(dtype=dtype)
-        else:
-            return dtype(x)
-    out_type = [_update(a, d) for (d, (a, k)) in zip(unified_dtypes,out_types[0])]
-    return out_type
-
-
 def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs) -> List[ClosedJaxpr]:
     """Unify result types of the jaxpr equations given.
     Args:

@@ -519,10 +519,6 @@ def jaxpr_to_mlir(func_name, jaxpr):
         context: the MLIR context corresponding
     """
 
-    print("JJJJJJJJ")
-    print(jaxpr)
-    print("JJJJJJJJ")
-
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
         (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
@@ -1001,8 +997,6 @@ class DynshapePrimitive(Primitive):
         out_type, effects = primitive.abstract_eval(*in_type, **params)
         assert len(effects) == 0, f"Effects are not supported, got ({effects})"
 
-        print("TTTTTTTTT")
-        for t in tracers: print(t)
         out_tracers = output_type_to_tracers(
             out_type, [], tracers, # FIXME: what to do with constants here???
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info))
