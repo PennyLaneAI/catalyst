@@ -34,38 +34,24 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
                                         mlir::PatternRewriter &rewriter) const override
     {
         SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(op.getCallableForCallee());
-        async::FuncOp asyncFuncOp =
-            dyn_cast_or_null<async::FuncOp>(SymbolTable::lookupNearestSymbolFrom(op, symbol));
-        if (!asyncFuncOp) {
+        func::FuncOp func = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, symbol);
+        if (!func) {
             // Nothing to change.
             return failure();
         }
 
         // Check for Call ops that have QNode func ops
-        if (!asyncFuncOp->hasAttrOfType<UnitAttr>("qnode")) {
+        if (!func->hasAttrOfType<UnitAttr>("qnode")) {
             // Nothing to change. (For functions which are not qnodes).
             return failure();
         }
 
-        TypeConverter conv;
-        conv.addConversion([](RankedTensorType type) -> Type {
-            return MemRefType::get(type.getShape(), type.getElementType());
-        });
-        auto callOp = rewriter.create<async::CallOp>(op.getLoc(), asyncFuncOp, op.getArgOperands());
-        auto newResults = callOp.getResults();
-        auto oldResults = op.getResults();
-        for (auto [newResult, oldResult] : llvm::zip(newResults, oldResults)) {
-            auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newResult);
-            auto memrefAsync = awaitOp.getResult();
-            auto memrefType = oldResult.getType().cast<MemRefType>();
-            auto memrefHeap = rewriter.create<memref::AllocOp>(op.getLoc(), memrefType);
-            rewriter.create<memref::CopyOp>(op.getLoc(), memrefAsync, memrefHeap);
-            rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), newResult,
-                                                     rewriter.getI64IntegerAttr(1));
-            oldResult.replaceAllUsesWith(memrefHeap.getResult());
+        if (op->hasAttrOfType<UnitAttr>("transformed")) {
+            // Nothing to change. (For functions which are not qnodes).
+            return failure();
         }
 
-        rewriter.replaceOp(op, callOp);
+        rewriter.updateRootInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
         return success();
     }
 };
