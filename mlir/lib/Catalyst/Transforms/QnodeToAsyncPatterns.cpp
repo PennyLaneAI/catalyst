@@ -91,13 +91,13 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             dyn_cast_or_null<async::FuncOp>(SymbolTable::lookupNearestSymbolFrom(op, symbol));
         if (!asyncFuncOp) {
             // Nothing to change.
-            return success();
+            return failure();
         }
 
         // Check for Call ops that have QNode func ops
         if (!asyncFuncOp->hasAttrOfType<UnitAttr>("qnode")) {
             // Nothing to change. (For functions which are not qnodes).
-            return success();
+            return failure();
         }
 
         TypeConverter conv;
