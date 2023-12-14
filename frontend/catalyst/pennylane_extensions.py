@@ -60,6 +60,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
+    unify_convert_result_types,
     unify_result_types,
     trace_function
 )
@@ -980,30 +981,63 @@ class Cond(HybridOp):
     binder = cond_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts = [], []
+        jaxprs, consts, nouts = [], [], []
         op = self
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
-                qrp_out = trace_quantum_tape(
+                qreg_out = trace_quantum_tape(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
+                ).actualize()
+
+                arg_expanded_classical_tracers = []
+                res_expanded_tracers, out_type = expand_results(
+                    [],
+                    arg_expanded_classical_tracers,
+                    region.res_classical_tracers + [qreg_out],
+                    expansion_strategy=self.expansion_strategy
                 )
-                qreg_out = qrp_out.actualize()
-                jaxpr, _, const = ctx.frames[region.trace].to_jaxpr2(
-                    region.res_classical_tracers + [qreg_out]
+
+                jaxpr, out_type, const = ctx.frames[region.trace].to_jaxpr2(
+                    res_expanded_tracers
                 )
+
                 jaxprs.append(jaxpr)
                 consts.append(const)
-
-        jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
+                nouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
+        nouts_s = list(set(nouts))
+        assert len(nouts_s) == 1
+        num_implicit_outputs = nouts_s[0]
+        all_jaxprs, out_type2 = unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs)
+        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+
+        in_expanded_classical_tracers = [
+            *self.in_classical_tracers,
+            *sum(consts, []),
+            qreg
+        ]
+
+        out_expanded_classical_tracers = (
+            expand_results(
+                [],
+                in_expanded_classical_tracers,
+                self.out_classical_tracers,
+                expansion_strategy=self.expansion_strategy,
+                num_implicit_inputs=0
+            )[0]
+        )
+
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
+            op.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                *(op.in_classical_tracers + combined_consts + [qreg]),
-                branch_jaxprs=unify_result_types(jaxprs2),
+                in_expanded_tracers=in_expanded_classical_tracers,
+                out_expanded_tracers=out_expanded_classical_tracers,
+                branch_jaxprs=branch_jaxprs,
+                nimplicit_inputs=0,
+                nimplicit_outputs=num_implicit_outputs
             )
         )
         return qrp2
@@ -1053,8 +1087,6 @@ class WhileLoop(HybridOp):
             body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_expanded_tracers
             )
-            # assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
-            #
 
         in_expanded_tracers = [
             *[trace.full_raise(c) for c in (cond_consts + body_consts)],
@@ -1207,6 +1239,8 @@ class CondCallable:
     Copyright 2021 The JAX Authors.
     """
 
+    expansion_strategy=cond_expansion_strategy()
+
     def __init__(self, pred, true_fn):
         self.preds = [pred]
         self.branch_fns = [true_fn]
@@ -1250,29 +1284,50 @@ class CondCallable:
         self.otherwise_fn = otherwise_fn
         return self
 
+
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 
-        out_trees, out_avals = [], []
-        for branch in self.branch_fns + [self.otherwise_fn]:
+        in_sigs, out_sigs = [], []
+        for branch_fn in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
+            wfun, in_sig, out_sig = deduce_avals3(branch_fn, [], {},
+                                                  expansion_strategy=self.expansion_strategy)
+            assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-                wffa, _, _, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
-            regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
-            out_trees.append(out_tree())
-            out_avals.append(res_classical_tracers)
+                    res_classical_tracers = [inner_trace.full_raise(t)
+                                             for t in wfun.call_wrapped()]
 
-        _check_cond_same_shapes(out_trees, out_avals)
-        res_avals = list(map(shaped_abstractify, res_classical_tracers))
-        out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-        Cond(in_classical_tracers, out_classical_tracers, regions)
-        return tree_unflatten(out_tree(), out_classical_tracers)
+            regions.append(HybridOpRegion(inner_trace, quantum_tape, [],
+                                          collapse(out_sig.out_type(), res_classical_tracers)))
+            in_sigs.append(in_sig)
+            out_sigs.append(out_sig)
+
+        out_tree = out_sigs[-1].out_tree()
+        all_consts = [s.out_consts() for s in out_sigs]
+        out_types = [s.out_type() for s in out_sigs]
+        # FIXME: This is not quite correct. We need to calculate the unified type here and only then
+        # use it as the output type of this primitive.
+        out_type2 = out_types[-1]
+
+        out_expanded_classical_tracers = output_type_to_tracers(
+            out_type2,
+            sum(all_consts, []),
+            (),
+            maker=lambda aval: new_inner_tracer(outer_trace, aval)
+        )
+
+        out_classical_tracers = collapse(out_type2, out_expanded_classical_tracers)
+
+        Cond(in_classical_tracers, out_classical_tracers, regions,
+             expansion_strategy=self.expansion_strategy)
+        return tree_unflatten(out_tree, out_classical_tracers)
 
     def _call_with_classical_ctx(self, ctx):
+        in_classical_tracers = self.preds
 
         def _trace(branch_fn):
             _, in_sig, out_sig = trace_function(
@@ -1287,13 +1342,13 @@ class CondCallable:
         )
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
-
-        all_jaxprs = unify_result_types(ctx, all_jaxprs, all_consts)
+        num_implicit_outputs = out_sigs[-1].num_implicit_outputs()
+        all_jaxprs, _ = unify_convert_result_types(ctx, all_jaxprs, all_consts, num_implicit_outputs)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
-        out_tracers = cond_p.bind(*(self.preds + sum(all_consts, [])),
+        out_tracers = cond_p.bind(*(in_classical_tracers + sum(all_consts, [])),
                                   branch_jaxprs=branch_jaxprs,
                                   nimplicit_inputs=in_sigs[0].num_implicit_inputs(),
-                                  nimplicit_outputs=len([() for _,k in out_sigs[0].out_type() if not k]))
+                                  nimplicit_outputs=out_sigs[0].num_implicit_outputs())
         return tree_unflatten(out_sigs[0].out_tree(),
                               collapse(out_sigs[0].out_type(), out_tracers))
 

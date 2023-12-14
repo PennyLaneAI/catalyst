@@ -47,6 +47,7 @@ from jax.core import (
     Primitive,
     ShapedArray,
     DShapedArray,
+    ConcreteArray,
     InDBIdx,
     OutDBIdx,
     Trace,
@@ -101,6 +102,7 @@ __all__ = (
     "PyTreeRegistry",
     "ShapedArray",
     "DShapedArray",
+    "ConcreteArray",
     "ShapeDtypeStruct",
     "DynshapePrimitive",
     "convert_constvars_jaxpr",
@@ -313,15 +315,15 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
     newvar = gensym(jaxprs, suffix="_")
 
-    all_padded_invars = []
+    all_padded_constvars = []
     for jaxpr in jaxprs:
-        padded_invars = []
+        padded_constvars = []
         for jaxpr2 in jaxprs:
             if jaxpr2 is jaxpr:
-                padded_invars.extend(jaxpr2.invars)
+                padded_constvars.extend(jaxpr2.constvars)
             else:
                 cmap = {}
-                for cv in jaxpr2.invars:
+                for cv in jaxpr2.constvars:
                     aval = cv.aval
                     if isinstance(aval, DShapedArray):
                         shape2 = []
@@ -333,13 +335,13 @@ def jaxpr_pad_consts(jaxprs:List[Jaxpr]) -> List[ClosedJaxpr] :
                         aval = aval.update(shape=tuple(shape2))
                     nv = newvar(aval)
                     cmap[cv] = nv
-                    padded_invars.append(nv)
-        all_padded_invars.append(padded_invars)
+                    padded_constvars.append(nv)
+        all_padded_constvars.append(padded_constvars)
 
     acc = []
-    for jaxpr, padded_invars in zip(jaxprs, all_padded_invars):
+    for jaxpr, padded_constvars in zip(jaxprs, all_padded_constvars):
         acc.append(ClosedJaxpr(
-            convert_constvars_jaxpr(jaxpr.replace(invars=padded_invars)), ()
+            convert_constvars_jaxpr(jaxpr.replace(constvars=padded_constvars)), ()
         ))
     return acc
 
@@ -429,6 +431,8 @@ class OutputSignature:
     out_tree: Callable[[], PyTreeDef]
     out_initial_jaxpr: Callable[[], Jaxpr]
 
+    def num_implicit_outputs(self):
+        return len([() for _,k in self.out_type() if not k])
 
 def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
@@ -997,6 +1001,8 @@ class DynshapePrimitive(Primitive):
         out_type, effects = primitive.abstract_eval(*in_type, **params)
         assert len(effects) == 0, f"Effects are not supported, got ({effects})"
 
+        print("TTTTTTTTT")
+        for t in tracers: print(t)
         out_tracers = output_type_to_tracers(
             out_type, [], tracers, # FIXME: what to do with constants here???
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info))

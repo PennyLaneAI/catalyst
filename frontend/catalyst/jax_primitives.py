@@ -1133,13 +1133,14 @@ def _cond_abstract_eval(*args,
                         nimplicit_inputs:int,
                         nimplicit_outputs:int,
                         **kwargs):
-    return infer_output_type_jaxpr(
+    out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
         branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
         expansion_strategy=cond_expansion_strategy(),
         num_implicit_inputs=nimplicit_inputs
     )
+    return out_type
 
 
 @cond_p.def_impl

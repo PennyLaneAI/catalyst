@@ -26,7 +26,7 @@ from catalyst import qjit, while_loop, for_loop, cond
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.jax_extras import (
     deduce_avals3, input_type_to_tracers, collapse, expand_args, infer_lambda_input_type,
-    ShapedArray, DShapedArray, DBIdx
+    ShapedArray, DShapedArray, DBIdx, while_loop_expansion_strategy
 )
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
@@ -43,44 +43,21 @@ def assert_array_and_dtype_equal(a, b):
 
 def test_jax_typing():
 
-    # def fun(a,b):
-    #     b2 = jnp.zeros(a.shape[0]+1)
-    #     return a,b2
-    # a = jnp.zeros([1,1])
-    # b = jnp.zeros([1,1])
-    # wfun, in_sig, out_sig = deduce_avals3(fun, (a,b), {},
-    #                                       abstracted_axes=({0:'0'},{1:'1'}))
-    # in_type = in_sig.in_type
-
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx, \
          EvaluationContext.frame_tracing_context(ctx) as trace:
 
         sz = trace.new_arg(dim_value_aval())
         args = jnp.zeros([0,sz]), jnp.zeros([sz,1])
 
-        _, in_type = expand_args(args, force_implicit_indbidx=False)
+        _, in_type = expand_args(args, expansion_strategy=while_loop_expansion_strategy(True))
         assert [(t.shape,k) for t,k in in_type] == [
             ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=0),1), True)
         ]
 
-        _, in_type = expand_args(args, force_implicit_indbidx=True)
+        _, in_type = expand_args(args, expansion_strategy=while_loop_expansion_strategy(False))
         assert [(t.shape,k) for t,k in in_type] == [
             ((), False), ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=1),1), True)
         ]
-
-
-        # argkcollapse(in_sig.in_type, arg_tracers)
-        # res_expanded_tracers = [ trace.full_raise(t) for t in wfun.call_wrapped(*arg_expanded_tracers) ]
-
-    # assert in_type == in_type2
-    # print(in_type)
-    # print(in_type2)
-    # print(in_type2)
-    # print(out_sig.out_type())
-    # print(out_sig.out_jaxpr())
-    assert False
-
-
 
 
 def test_qjit_abstracted_axes():
@@ -701,6 +678,33 @@ def test_qjit_while_outer():
 
     res_a = f(3)
     assert_array_and_dtype_equal(res_a, jnp.ones(3))
+
+
+def test_qnode_cond_identity():
+    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(flag, sz):
+
+        a = jnp.ones([sz], dtype=float)
+        b = jnp.zeros([sz], dtype=float)
+
+        @cond(flag)
+        def case():
+            return a
+
+        @case.otherwise
+        def case():
+            return b
+
+        c = case()
+        assert c.shape[0] is a.shape[0]
+        assert c.shape[0] is b.shape[0]
+        return c
+
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
+    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
 
 
 def test_qjit_cond_identity():

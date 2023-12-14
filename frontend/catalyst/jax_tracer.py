@@ -61,6 +61,8 @@ from catalyst.utils.jax_extras import (
     PyTreeRegistry,
     ShapedArray,
     DShapedArray,
+    ConcreteArray,
+    OutputType,
     _abstractify,
     _input_type_to_tracers,
     convert_element_type,
@@ -79,7 +81,8 @@ from catalyst.utils.jax_extras import (
     unzip2,
     convert_constvars_jaxpr,
     cond_expansion_strategy,
-    expand_args
+    expand_args,
+    gensym
 )
 
 
@@ -133,8 +136,8 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         return [t.shape for t in ts if isinstance(t, ShapedArray)]
 
     assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
-    all_ends_with_qreg = all(isinstance(t[-1], AbstractQreg) for t in types)
-    all_not_ends_with_qreg = all(not isinstance(t[-1], AbstractQreg) for t in types)
+    all_ends_with_qreg = all(len(t)>0 and isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(len(t)==0 or not isinstance(t[-1], AbstractQreg) for t in types)
     assert (
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
@@ -169,12 +172,18 @@ def _apply_result_type_conversion(
 
 
 def _apply_result_type_conversion2(
-    ctx, jaxpr: ClosedJaxpr, args, target_types: List[ShapedArray]
+    ctx, jaxpr: ClosedJaxpr, consts, target_types: List[ShapedArray], num_implicit_outputs
 ):
-    with_qreg = isinstance(target_types[-1], AbstractQreg)
+    with_qreg = len(target_types)>0 and isinstance(target_types[-1], AbstractQreg)
+    newvar = gensym([jaxpr], suffix="_")
+    args = ([AbstractQreg()] if with_qreg else [])
     # with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
-    def _fun(in_tracers):
-        out_tracers = eval_jaxpr(jaxpr, in_tracers)
+    def _fun(*in_tracers):
+        print(jaxpr)
+        print(with_qreg)
+        print(len(in_tracers))
+
+        out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
         out_tracers_, target_types_ = (
             (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
         )
@@ -182,15 +191,34 @@ def _apply_result_type_conversion2(
             (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
             for tr, ty in zip(out_tracers_, target_types_)
         ]
-        return out_promoted_tracers
+        return out_promoted_tracers[num_implicit_outputs:] + ([out_tracers[-1]] if with_qreg else [])
 
-    _, in_sig, out_sig = trace_function(ctx, _fun, args,
+    _, in_sig, out_sig = trace_function(ctx, _fun, *args,
                                         expansion_strategy=cond_expansion_strategy())
 
-    return out_sig.out_initial_jaxpr()
+    return in_sig, out_sig
 
 
-def unify_result_types(ctx, jaxprs: List[Jaxpr], args) -> List[ClosedJaxpr]:
+def unify_result_types(out_types:List[OutputType]) -> OutputType:
+    assert len(out_types)>0
+    avals = [[a for a,_ in ot] for ot in out_types]
+    unified_dtypes = _promote_jaxpr_types(avals)
+    assert len(unified_dtypes) == len(avals[0])
+    print("DDDDDDDDDDDDDDD")
+    print(unified_dtypes)
+    print(out_types[0])
+    def _update(x, dtype):
+        if isinstance(x, ConcreteArray):
+            return x.update(val=dtype(x.val), dtype=dtype)
+        elif isinstance(x, (ShapedArray, DShapedArray)):
+            return x.update(dtype=dtype)
+        else:
+            return dtype(x)
+    out_type = [_update(a, d) for (d, (a, k)) in zip(unified_dtypes,out_types[0])]
+    return out_type
+
+
+def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs) -> List[ClosedJaxpr]:
     """Unify result types of the jaxpr equations given.
     Args:
         jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
@@ -205,7 +233,13 @@ def unify_result_types(ctx, jaxprs: List[Jaxpr], args) -> List[ClosedJaxpr]:
 
     """
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
-    return [_apply_result_type_conversion2(ctx, j, a, promoted_types) for j,a in zip(jaxprs, args)]
+    acc = []
+    for j, a in zip(jaxprs, consts):
+        in_sig, out_sig = _apply_result_type_conversion2(
+            ctx, j, a, promoted_types, num_implicit_outputs
+        )
+        acc.append(out_sig.out_initial_jaxpr())
+    return acc, out_sig.out_type()
 
 
 class QRegPromise:
