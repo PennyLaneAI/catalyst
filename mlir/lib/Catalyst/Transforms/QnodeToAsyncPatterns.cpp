@@ -79,7 +79,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             rewriter.replaceAllUsesWith(op.getResults(), awaitOp.getResults());
         }
 
-        // rewriter.eraseOp(op);
+        rewriter.eraseOp(op);
 
         return success();
     }

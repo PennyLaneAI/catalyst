@@ -78,7 +78,9 @@ module @workflow {
 
   func.func public @jit_foo() -> (memref<2xcomplex<f64>>) attributes {llvm.emit_c_interface} {
     // CHECK: call @f
-    // CHECK: call @f
+    // CHECK: async.yield
+    // CHECK-NOT: call @f
+    // CHECK: return
     %0 = call @f() : () -> (memref<2xcomplex<f64>>)
     return %0 : memref<2xcomplex<f64>>
   }
@@ -97,6 +99,25 @@ module @workflow {
   func.func public @jit_foo() -> (memref<2xcomplex<f64>>) attributes {llvm.emit_c_interface} {
     // CHECK: async.yield
     // CHECK-SAME: memref<2xcomplex<f64>>
+    %0 = call @f() : () -> (memref<2xcomplex<f64>>)
+    return %0 : memref<2xcomplex<f64>>
+  }
+}
+
+// -----
+
+// Check that the return type is the one from inside the async.execute
+
+module @workflow {
+  func.func private @f() -> memref<2xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %0 = memref.alloc() : memref<2xcomplex<f64>>
+    return %0 : memref<2xcomplex<f64>>
+  }
+
+  func.func public @jit_foo() -> (memref<2xcomplex<f64>>) attributes {llvm.emit_c_interface} {
+    // CHECK: [[token:%.+]], [[bodyResults:%.+]] = async.execute
+    // CHECK: [[value:%.+]] = async.await [[bodyResults]]
+    // CHECK: return [[value:%.+]]
     %0 = call @f() : () -> (memref<2xcomplex<f64>>)
     return %0 : memref<2xcomplex<f64>>
   }
