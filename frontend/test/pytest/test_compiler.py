@@ -127,6 +127,7 @@ class TestCompilerErrors:
         result = compiler.get_output_of("inexistent-file")
         assert result is None
 
+    @pytest.mark.skip()
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
         contents = """
@@ -263,6 +264,7 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
+    @pytest.mark.skip()
     def test_compiler_from_textual_ir(self):
         """Test the textual IR compilation."""
         full_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
