@@ -83,3 +83,21 @@ module @workflow {
     return %0 : memref<2xcomplex<f64>>
   }
 }
+
+// -----
+
+// Test the async.yield type
+
+module @workflow {
+  func.func private @f() -> memref<2xcomplex<f64>> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %0 = memref.alloc() : memref<2xcomplex<f64>>
+    return %0 : memref<2xcomplex<f64>>
+  }
+
+  func.func public @jit_foo() -> (memref<2xcomplex<f64>>) attributes {llvm.emit_c_interface} {
+    // CHECK: async.yield
+    // CHECK-SAME: memref<2xcomplex<f64>>
+    %0 = call @f() : () -> (memref<2xcomplex<f64>>)
+    return %0 : memref<2xcomplex<f64>>
+  }
+}

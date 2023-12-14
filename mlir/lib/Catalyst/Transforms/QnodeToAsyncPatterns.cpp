@@ -52,7 +52,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             return failure();
         }
 
-        TypeRange retTy;                 /* = empty */
+        TypeRange retTy = op.getResultTypes();
         SmallVector<Value> dependencies; /* = empty */
         SmallVector<Value> operands;     /* = empty */
         auto noopExec = [&](OpBuilder &executeBuilder, Location executeLoc,
@@ -67,7 +67,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());
             Operation *cloneOp = op->clone(map);
             rewriter.insert(cloneOp);
-            rewriter.create<async::YieldOp>(op.getLoc(), ValueRange{});
+            rewriter.create<async::YieldOp>(op.getLoc(), cloneOp->getResults());
         }
 
         auto asyncValues = executeOp.getResults();
