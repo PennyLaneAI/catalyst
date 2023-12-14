@@ -325,9 +325,12 @@ headers and fields are generally required, unless stated otherwise.
         # upon the device initialization.
         # The option key will be the key in a dictionary.
         # The string corresponds to a field queried in the `qml.Device` instance.
-        option = "option"
-        # The concrete meaning is as follows:
-        # if "options" in config.keys():
-        #    for k, v in config["options"].items():
-        #         if hasattr(device, v):
-        #             runtime_options[k] = getattr(device, v)
+        option_key = "option_field"
+        # In the above example, a dictionary will be constructed at run time.
+        # The dictionary will contain the string key "option_key" and its value
+        # will be the value in `qml.Device` `option_field`.
+        # The value can be any Python type, but will be converted to a string.
+        # During the initialization of your `class QuantumDevice`, the dictionary
+        # will be sent to the constructor of your implementation of `class QuantumDevice`.
+        # The dictionary will be a JSON string like the following:
+        # { 'option_key': option_field }
