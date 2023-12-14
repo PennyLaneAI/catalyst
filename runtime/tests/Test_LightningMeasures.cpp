@@ -1041,6 +1041,10 @@ TEMPLATE_LIST_TEST_CASE(
     constexpr size_t num_shots = 5000;
     sim->SetDeviceShots(num_shots);
 
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+
     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
     ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});

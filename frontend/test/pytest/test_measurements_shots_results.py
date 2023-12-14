@@ -167,25 +167,24 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    # TODO: This test should be uncommented after fixing the issue in Lightning
-    # def test_pauliz_pauliy_prod(self, backend):
-    #     """Test that a tensor product involving PauliZ and PauliY works correctly"""
-    #     n_wires = 3
-    #     n_shots = 5000
-    #     dev = qml.device(backend, wires=n_wires, shots=n_shots)
+    def test_pauliz_pauliy_prod(self, backend):
+        """Test that a tensor product involving PauliZ and PauliY works correctly"""
+        n_wires = 3
+        n_shots = 5000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
 
-    #     @qml.qnode(dev)
-    #     def circuit(theta, phi, varphi):
-    #         qml.RX(theta, wires=[0])
-    #         qml.RX(phi, wires=[1])
-    #         qml.RX(varphi, wires=[2])
-    #         qml.CNOT(wires=[0, 1])
-    #         qml.CNOT(wires=[1, 2])
-    #         return qml.expval(qml.PauliZ(wires=1) @ qml.PauliY(wires=2))
+        @qml.qnode(dev)
+        def circuit(theta, phi, varphi):
+            qml.RX(theta, wires=[0])
+            qml.RX(phi, wires=[1])
+            qml.RX(varphi, wires=[2])
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[1, 2])
+            return qml.expval(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
-    #     expected = circuit(0.432, 0.123, -0.543)
-    #     result = qjit(circuit)(0.432, 0.123, -0.543)
-    #     assert np.allclose(result, expected, atol=0.05)
+        expected = circuit(0.432, 0.123, -0.543)
+        result = qjit(circuit)(0.432, 0.123, -0.543)
+        assert np.allclose(result, expected, atol=0.05)
 
     def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
@@ -202,6 +201,27 @@ class TestExpval:
             qml.CNOT(wires=[1, 2])
             return qml.expval(
                 0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1) + qml.PauliY(wires=2)
+            )
+
+        expected = circuit(0.432, 0.123, -0.543)
+        result = qjit(circuit)(0.432, 0.123, -0.543)
+        assert np.allclose(result, expected, atol=0.05)
+
+    def test_prod_hamiltonian(self, backend):
+        """Test that a hamiltonian involving PauliZ and Hadamard @ PauliX works correctly"""
+        n_wires = 3
+        n_shots = 5000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+
+        @qml.qnode(dev)
+        def circuit(theta, phi, varphi):
+            qml.RX(theta, wires=[0])
+            qml.RX(phi, wires=[1])
+            qml.RX(varphi, wires=[2])
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[1, 2])
+            return qml.expval(
+                0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1) @ qml.PauliX(2)
             )
 
         expected = circuit(0.432, 0.123, -0.543)
@@ -355,8 +375,8 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=0.05)
 
-    def test_paulix_pauliy_prod(self, backend):
-        """Test that a tensor product involving PauliX and PauliY works correctly"""
+    def test_hadamard_pauliy_prod(self, backend):
+        """Test that a tensor product involving Hadamard and PauliY works correctly"""
         n_wires = 3
         n_shots = 5000
         dev = qml.device(backend, wires=n_wires, shots=n_shots)
@@ -368,7 +388,26 @@ class TestVar:
             qml.RX(varphi, wires=[2])
             qml.CNOT(wires=[0, 1])
             qml.CNOT(wires=[1, 2])
-            return qml.var(qml.PauliX(wires=1) @ qml.PauliY(wires=2))
+            return qml.var(qml.Hadamard(wires=1) @ qml.PauliY(wires=2))
+
+        expected = circuit(0.432, 0.123, -0.543)
+        result = qjit(circuit)(0.432, 0.123, -0.543)
+        assert np.allclose(result, expected, atol=0.05)
+
+    def test_pauliz_pauliy_prod(self, backend):
+        """Test that a tensor product involving PauliZ and PauliY works correctly"""
+        n_wires = 3
+        n_shots = 5000
+        dev = qml.device(backend, wires=n_wires, shots=n_shots)
+
+        @qml.qnode(dev)
+        def circuit(theta, phi, varphi):
+            qml.RX(theta, wires=[0])
+            qml.RX(phi, wires=[1])
+            qml.RX(varphi, wires=[2])
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[1, 2])
+            return qml.var(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
         expected = circuit(0.432, 0.123, -0.543)
         result = qjit(circuit)(0.432, 0.123, -0.543)
