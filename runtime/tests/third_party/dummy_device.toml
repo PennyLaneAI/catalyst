@@ -1,0 +1,123 @@
+schema = 1
+
+[device]
+name = "dummy.device.qubit"
+
+[operators]
+# Observables supported by the device
+observables = [
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "Hermitian",
+        "Identity",
+        "Projector",
+        "SparseHamiltonian",
+        "Hamiltonian",
+        "Sum",
+        "SProd",
+        "Prod",
+        "Exp",
+]
+
+# The union of all gate types listed in this section must match what
+# the device considers "supported" through PennyLane's device API.
+[[operators.gates]]
+native = [
+        "QubitUnitary",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "MultiRZ",
+        "Hadamard",
+        "S",
+        "T",
+        "CNOT",
+        "SWAP",
+        "CSWAP",
+        "Toffoli",
+        "CY",
+        "CZ",
+        "PhaseShift",
+        "ControlledPhaseShift",
+        "RX",
+        "RY",
+        "RZ",
+        "Rot",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "Identity",
+        "IsingXX",
+        "IsingYY",
+        "IsingZZ",
+        "IsingXY",
+]
+
+# Operators that should be decomposed according to the algorithm used
+# by PennyLane's device API.
+# Optional, since gates not listed in this list will typically be decomposed by
+# default, but can be useful to express a deviation from this device's regular
+# strategy in PennyLane.
+decomp = [
+        "SX",
+        "ISWAP",
+        "PSWAP",
+        "SISWAP",
+        "SQISW",
+        "CPhase",
+        "BasisState",
+        "QubitStateVector",
+        "StatePrep",
+        "ControlledQubitUnitary",
+        "DiagonalQubitUnitary",
+        "SingleExcitation",
+        "SingleExcitationPlus",
+        "SingleExcitationMinus",
+        "DoubleExcitation",
+        "DoubleExcitationPlus",
+        "DoubleExcitationMinus",
+        "QubitCarry",
+        "QubitSum",
+        "OrbitalRotation",
+        "QFT",
+        "ECR",
+]
+
+# Gates which should be translated to QubitUnitary
+matrix = [
+        "MultiControlledX",
+]
+
+[measurement_processes]
+exactshots = [
+	"Expval",
+	"Var",
+	"Probs",
+	"State",
+]
+finiteshots = [
+	"Expval",
+	"Var",
+	"Probs",
+	"Sample",
+	"Counts",
+]
+
+[compilation]
+# If the device is compatible with qjit
+qjit_compatible = true
+# If the device requires run time generation of the quantum circuit.
+runtime_code_generation = false
+# If the device supports adjoint
+quantum_adjoint = true
+# If the device supports quantum control instructions natively
+quantum_control = false
+# If the device supports mid circuit measurements natively
+mid_circuit_measurement = true
+
+# This field is currently unchecked but it is reserved for the purpose of
+# determining if the device supports dynamic qubit allocation/deallocation.
+dynamic_qubit_management = false
