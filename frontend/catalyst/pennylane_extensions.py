@@ -192,43 +192,36 @@ class QJITDevice(qml.QubitDevice):
     operations = []
     observables = []
 
-    @staticmethod
-    def _get_operations_available_in_QIR_abstract_machine():
-        # These are the methods implemented in the runtime.
-        # A device might have gates which are native to the device
-        # but are not exposed. This is a limitation of the current runtime
-        # because it does not contain implementation of gates for every possible
-        # gate from the infinite set.
-        return {
-            "Identity",
-            "PauliX",
-            "PauliY",
-            "PauliZ",
-            "Hadamard",
-            "S",
-            "T",
-            "PhaseShift",
-            "RX",
-            "RY",
-            "RZ",
-            "Rot",
-            "CNOT",
-            "CY",
-            "CZ",
-            "SWAP",
-            "IsingXX",
-            "IsingYY",
-            "IsingXY",
-            "ControlledPhaseShift",
-            "CRX",
-            "CRY",
-            "CRZ",
-            "CRot",
-            "CSWAP",
-            "Toffoli",
-            "MultiRZ",
-            "QubitUnitary",
-        }
+    operations_supported_by_QIR_runtime = {
+        "Identity",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "S",
+        "T",
+        "PhaseShift",
+        "RX",
+        "RY",
+        "RZ",
+        "Rot",
+        "CNOT",
+        "CY",
+        "CZ",
+        "SWAP",
+        "IsingXX",
+        "IsingYY",
+        "IsingXY",
+        "ControlledPhaseShift",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "CSWAP",
+        "Toffoli",
+        "MultiRZ",
+        "QubitUnitary",
+    }
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config):
@@ -255,7 +248,7 @@ class QJITDevice(qml.QubitDevice):
     def _set_supported_operations(config):
         """Override the set of supported operations."""
         native_gates = set(config["operators"]["gates"][0]["native"])
-        qir_gates = QJITDevice._get_operations_available_in_QIR_abstract_machine()
+        qir_gates = QJITDevice.operations_supported_by_QIR_runtime
         QJITDevice.operations = list(native_gates.intersection(qir_gates))
 
         # These are added unconditionally.
