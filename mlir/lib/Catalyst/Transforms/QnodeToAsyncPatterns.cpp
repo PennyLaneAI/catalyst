@@ -77,11 +77,14 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), asyncValues.front(),
                                                  rewriter.getI64IntegerAttr(1));
 
-        if (asyncValues.size() == 2) {
-            auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), asyncValues.back());
-            rewriter.replaceAllUsesWith(op.getResults(), awaitOp.getResults());
-            rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), asyncValues.back(),
-                                                     rewriter.getI64IntegerAttr(1));
+        std::vector<Value> bodyReturns(asyncValues.begin() + 1, asyncValues.end());
+        if (bodyReturns.size() > 0) {
+            for (auto [oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
+                auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
+                rewriter.replaceAllUsesWith(oldVal, awaitOp.getResults());
+                rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), newVal,
+                                                         rewriter.getI64IntegerAttr(1));
+            }
         }
 
         rewriter.eraseOp(op);

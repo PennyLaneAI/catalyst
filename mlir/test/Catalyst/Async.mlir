@@ -122,3 +122,21 @@ module @workflow {
     return %0 : memref<2xcomplex<f64>>
   }
 }
+
+// -----
+
+// Test for multiple returns
+module @workflow {
+  func.func private @f() -> (memref<2xcomplex<f64>>, memref<2xcomplex<f64>>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    %0 = memref.alloc() : memref<2xcomplex<f64>>
+    return %0, %0 : memref<2xcomplex<f64>>, memref<2xcomplex<f64>>
+  }
+
+  func.func public @jit_foo() -> (memref<2xcomplex<f64>>, memref<2xcomplex<f64>>) attributes {llvm.emit_c_interface} {
+    // CHECK: [[token:%.+]], [[bodyResults:%.+]]:2 = async.execute
+    // CHECK: [[value0:%.+]] = async.await [[bodyResults]]#0
+    // CHECK: [[value1:%.+]] = async.await [[bodyResults]]#1
+    %0:2 = call @f() : () -> (memref<2xcomplex<f64>>, memref<2xcomplex<f64>>)
+    return %0#0, %0#1 : memref<2xcomplex<f64>>, memref<2xcomplex<f64>>
+  }
+}
