@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import warnings
+import glob
 import importlib
 from os import path
 from copy import deepcopy
@@ -35,6 +36,9 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
 
+package_root = os.path.dirname(__file__)
+
+DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
 
 # pylint: disable=too-many-instance-attributes
 @dataclass
@@ -225,6 +229,28 @@ class LinkerDriver:
         else:
             pass  # pragma: nocover
 
+        ### rpath and -L: custom calls
+        lib_path_flags += [
+            f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+            f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+        ]
+        file_prefix = "custom_calls"
+        file_extension = ".so"
+        search_pattern = f"{file_prefix}*{file_extension}"
+        custom_calls_so_file = glob.glob(f"{search_pattern}", root_dir=DEFAULT_CUSTOM_CALLS_LIB_PATH)[0]
+        custom_calls_so_flag = f"-l:{custom_calls_so_file}"
+
+        ### rpath: scipy
+        package_name = "scipy"
+        file_path_within_package = "../scipy.libs/"
+        scipy_package = importlib.util.find_spec(package_name)
+        package_directory = path.dirname(scipy_package.origin)
+        scipy_lib_path = path.join(package_directory, file_path_within_package)
+
+        lib_path_flags += [
+            f"-Wl,-rpath,{scipy_lib_path}",
+        ]
+
         system_flags = []
         if platform.system() == "Linux":
             system_flags += ["-Wl,-no-as-needed"]
@@ -239,7 +265,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils", # required for memref.copy
-            "-l:custom_calls.cpython-310-x86_64-linux-gnu.so",
+            custom_calls_so_flag,
         ]
 
         return default_flags
