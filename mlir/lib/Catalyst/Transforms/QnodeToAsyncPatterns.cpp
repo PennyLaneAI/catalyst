@@ -51,6 +51,15 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             return failure();
         }
 
+        TypeRange retTy;                 /* = empty */
+        SmallVector<Value> dependencies; /* = empty */
+        SmallVector<Value> operands;     /* = empty */
+        auto noopExec = [&](OpBuilder &executeBuilder, Location executeLoc,
+                            ValueRange executeArgs) {};
+        auto executeOp =
+            rewriter.create<async::ExecuteOp>(op.getLoc(), retTy, dependencies, operands, noopExec);
+        rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());
+        rewriter.create<async::YieldOp>(op.getLoc(), ValueRange{});
         rewriter.updateRootInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
         return success();
     }
