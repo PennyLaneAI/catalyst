@@ -219,7 +219,7 @@ class TestPyTreesReturnValues:
     def test_return_value_dict(self, backend):
         """Test dictionaries."""
 
-        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit1(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -234,8 +234,8 @@ class TestPyTreesReturnValues:
         expected = {"w0": 0.98006658, "w1": 0.82533561}
         result = jitted_fn(params)
         assert isinstance(result, dict)
-        assert jnp.allclose(result["w0"], expected["w0"], atol=0.05)
-        assert jnp.allclose(result["w1"], expected["w1"], atol=0.05)
+        assert jnp.allclose(result["w0"], expected["w0"])
+        assert jnp.allclose(result["w1"], expected["w1"])
 
         @qml.qnode(qml.device(backend, wires=2, shots=1000))
         def circuit2(params):
