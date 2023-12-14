@@ -58,8 +58,16 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
                             ValueRange executeArgs) {};
         auto executeOp =
             rewriter.create<async::ExecuteOp>(op.getLoc(), retTy, dependencies, operands, noopExec);
-        rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());
-        rewriter.create<async::YieldOp>(op.getLoc(), ValueRange{});
+        {
+            PatternRewriter::InsertionGuard insertGuard(rewriter);
+            rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());
+            rewriter.create<async::YieldOp>(op.getLoc(), ValueRange{});
+        }
+
+        auto asyncValues = executeOp.getResults();
+        for (auto val : asyncValues) {
+            rewriter.create<async::AwaitOp>(op.getLoc(), val);
+        }
         rewriter.updateRootInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
         return success();
     }
