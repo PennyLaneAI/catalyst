@@ -100,8 +100,8 @@ Ali Asadi,
 David Ittah,
 Romain Moyard,
 Sergei Mironov,
-Shuli Shu,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Shuli Shu.
 
 # Release 0.3.2
 
