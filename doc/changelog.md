@@ -48,6 +48,9 @@
 
 <h3>Improvements</h3>
 
+* Support for `mcmc` sampling in `lightning.qubit`.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+
 * Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
   outside a `@qjit` context. This simplifies the process of writing functions where compilation
   can be turned on and off easily by adding or removing the decorator. The functions dispatch to
@@ -74,6 +77,10 @@
   [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
 
 <h3>Breaking changes</h3>
+
+* Third party devices must now specify a configuration toml file.
+  For more information please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 <h3>Bug fixes</h3>
 

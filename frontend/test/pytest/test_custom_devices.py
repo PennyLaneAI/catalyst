@@ -22,6 +22,81 @@ from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
 
+# These have to match the ones in the configuration file.
+OPERATIONS = [
+    "QubitUnitary",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "MultiRZ",
+    "Hadamard",
+    "S",
+    "T",
+    "CNOT",
+    "SWAP",
+    "CSWAP",
+    "Toffoli",
+    "CY",
+    "CZ",
+    "PhaseShift",
+    "ControlledPhaseShift",
+    "RX",
+    "RY",
+    "RZ",
+    "Rot",
+    "CRX",
+    "CRY",
+    "CRZ",
+    "CRot",
+    "Identity",
+    "IsingXX",
+    "IsingYY",
+    "IsingZZ",
+    "IsingXY",
+    "SX",
+    "ISWAP",
+    "PSWAP",
+    "SISWAP",
+    "SQISW",
+    "CPhase",
+    "BasisState",
+    "QubitStateVector",
+    "StatePrep",
+    "ControlledQubitUnitary",
+    "DiagonalQubitUnitary",
+    "SingleExcitation",
+    "SingleExcitationPlus",
+    "SingleExcitationMinus",
+    "DoubleExcitation",
+    "DoubleExcitationPlus",
+    "DoubleExcitationMinus",
+    "QubitCarry",
+    "QubitSum",
+    "OrbitalRotation",
+    "QFT",
+    "ECR",
+    "Adjoint(S)",
+    "Adjoint(T)",
+    "Adjoint(SX)",
+    "Adjoint(ISWAP)",
+    "Adjoint(SISWAP)",
+    "MultiControlledX",
+]
+OBSERVABLES = [
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "Hadamard",
+    "Hermitian",
+    "Identity",
+    "Projector",
+    "Hamiltonian",
+    "Sum",
+    "SProd",
+    "Prod",
+    "Exp",
+]
+
 
 @pytest.mark.skipif(
     not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
@@ -40,8 +115,8 @@ def test_custom_device():
         author = "Dummy"
 
         # Doesn't matter as at the moment it is dictated by QJITDevice
-        operations = []
-        observables = []
+        operations = OPERATIONS
+        observables = OBSERVABLES
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -81,9 +156,8 @@ def test_custom_device_bad_directory():
         version = "0.0.1"
         author = "Dummy"
 
-        # Doesn't matter as at the moment it is dictated by QJITDevice
-        operations = []
-        observables = []
+        operations = OPERATIONS
+        observables = OBSERVABLES
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -100,7 +174,9 @@ def test_custom_device_bad_directory():
 
             return "DummyDevice", "this-file-does-not-exist.so"
 
-    with pytest.raises(CompileError, match="Device .* cannot be found"):
+    with pytest.raises(
+        CompileError, match="Device at this-file-does-not-exist.so cannot be found!"
+    ):
 
         @qjit
         @qml.qnode(DummyDevice(wires=1))
