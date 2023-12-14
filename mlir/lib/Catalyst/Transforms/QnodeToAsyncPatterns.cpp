@@ -71,9 +71,15 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         }
 
         auto asyncValues = executeOp.getResults();
-        for (auto val : asyncValues) {
-            rewriter.create<async::AwaitOp>(op.getLoc(), val);
+
+        // We should move this as much as we can...
+        rewriter.create<async::AwaitOp>(op.getLoc(), asyncValues.front());
+        if (asyncValues.size() == 2) {
+            auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), asyncValues.back());
+            rewriter.replaceAllUsesWith(op.getResults(), awaitOp.getResults());
         }
+
+        // rewriter.eraseOp(op);
 
         return success();
     }
