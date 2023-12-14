@@ -146,7 +146,7 @@ Integration with Python devices
 There are two things that are needed in order to integrate with PennyLane devices:
 
 * Adding a ``get_c_interface`` method to your ``qml.QubitDevice`` class.
-* Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe the gates supported by your device and decomposition strategies.
+* Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
@@ -188,10 +188,12 @@ The ``get_c_interface`` method should be a static method that takes no parameter
         return measure(0)
 
 
-Below is an example configuration file
+Below is an example configuration file with inline descriptions of how to fill out the fields. All
+headers and fields are generally required, unless stated otherwise.
 
 .. code-block:: toml
 
+        # Which version of the specification format is being used.
         schema = 1
 
         [device]
@@ -280,6 +282,7 @@ Below is an example configuration file
                 "QFT",
                 "ECR",
         ]
+
         # Gates which should be translated to QubitUnitary
         matrix = [
                 "MultiControlledX",
