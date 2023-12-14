@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
@@ -56,11 +57,16 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         SmallVector<Value> operands;     /* = empty */
         auto noopExec = [&](OpBuilder &executeBuilder, Location executeLoc,
                             ValueRange executeArgs) {};
+
+        rewriter.updateRootInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
+        IRMapping map;
         auto executeOp =
             rewriter.create<async::ExecuteOp>(op.getLoc(), retTy, dependencies, operands, noopExec);
         {
             PatternRewriter::InsertionGuard insertGuard(rewriter);
             rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());
+            Operation *cloneOp = op->clone(map);
+            rewriter.insert(cloneOp);
             rewriter.create<async::YieldOp>(op.getLoc(), ValueRange{});
         }
 
@@ -68,7 +74,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         for (auto val : asyncValues) {
             rewriter.create<async::AwaitOp>(op.getLoc(), val);
         }
-        rewriter.updateRootInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
+
         return success();
     }
 };
