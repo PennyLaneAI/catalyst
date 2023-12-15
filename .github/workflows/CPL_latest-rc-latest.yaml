@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-config:
-    name: CPL latest/latest/latest
+    name: CPL latest/rc/latest
     uses: ./.github/workflows/check-pl-compat.yaml
     with:
       catalyst: latest
