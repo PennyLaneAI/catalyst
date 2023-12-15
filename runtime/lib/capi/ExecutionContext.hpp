@@ -307,6 +307,7 @@ class ExecutionContext final {
   private:
     // Device pool
     std::unordered_map<size_t, std::pair<RTDeviceStatus, std::shared_ptr<RTDevice>>> device_pool;
+    std::mutex mu; // To guard the device pool pool.
     size_t pool_counter{0}; // Counter for generating unique keys for devices
 
     bool initial_tape_recorder_status;
@@ -341,6 +342,7 @@ class ExecutionContext final {
 
     [[nodiscard]] auto addDeviceToPool(std::shared_ptr<RTDevice> device) -> size_t
     {
+        std::lock_guard<std::mutex> lock(mu);
         // Add a new device
         const size_t key = pool_counter++;
         device_pool[key] = std::make_pair(RTDeviceStatus::Init, device);
@@ -380,12 +382,14 @@ class ExecutionContext final {
                                  const std::string &rtd_kwargs = {})
         -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
     {
+        std::lock_guard<std::mutex> lock(mu);
         return getDevice(std::string_view{rtd_lib}, std::string_view{rtd_name},
                          std::string_view{rtd_kwargs});
     }
 
     [[nodiscard]] auto getDevice(size_t device_key) -> std::shared_ptr<QuantumDevice>
     {
+        std::lock_guard<std::mutex> lock(mu);
         auto it = device_pool.find(device_key);
         return (it != device_pool.end() && it->second.first == RTDeviceStatus::Active)
                    ? it->second.second->getQuantumDevicePtr()
@@ -394,6 +398,7 @@ class ExecutionContext final {
 
     void releaseDevice(size_t device_key)
     {
+        std::lock_guard<std::mutex> lock(mu);
         auto it = device_pool.find(device_key);
         if (it != device_pool.end()) {
             it->second.second->releaseDevice();
