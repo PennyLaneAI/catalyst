@@ -72,7 +72,25 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         auto asyncValues = executeOp.getResults();
 
-        // We should move this as much as we can...
+        // Only one use
+        // And in the same basic block
+        // If it is not in the same basic block
+        // It may be in a loop.
+        // And therefore we may execute the drop_ref multiple times
+        // which is a runtime error.
+        auto results = op.getResults();
+        if (results.size() == 1) {
+            for (auto result : results) {
+                if (result.hasOneUse()) {
+                    for (Operation *user : result.getUsers()) {
+                        if (op->getBlock() == user->getBlock()) {
+                            rewriter.setInsertionPoint(user);
+                        }
+                    }
+                }
+            }
+        }
+
         rewriter.create<async::AwaitOp>(op.getLoc(), asyncValues.front());
         rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), asyncValues.front(),
                                                  rewriter.getI64IntegerAttr(1));

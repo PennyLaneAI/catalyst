@@ -307,7 +307,7 @@ class ExecutionContext final {
   private:
     // Device pool
     std::unordered_map<size_t, std::pair<RTDeviceStatus, std::shared_ptr<RTDevice>>> device_pool;
-    std::mutex mu; // To guard the device pool pool.
+    std::mutex mu;          // To guard the device pool
     size_t pool_counter{0}; // Counter for generating unique keys for devices
 
     bool initial_tape_recorder_status;
