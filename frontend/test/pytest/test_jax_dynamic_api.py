@@ -18,15 +18,22 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from jax._src.core import dim_value_aval
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from jax._src.core import dim_value_aval
-from catalyst import qjit, while_loop, for_loop, cond
+from catalyst import cond, for_loop, qjit, while_loop
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.jax_extras import (
-    deduce_avals3, input_type_to_tracers, collapse, expand_args, infer_lambda_input_type,
-    ShapedArray, DShapedArray, DBIdx, while_loop_expansion_strategy
+    DBIdx,
+    DShapedArray,
+    ShapedArray,
+    collapse,
+    deduce_avals3,
+    expand_args,
+    infer_lambda_input_type,
+    input_type_to_tracers,
+    while_loop_expansion_strategy,
 )
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
@@ -40,23 +47,26 @@ def assert_array_and_dtype_equal(a, b):
     assert a.dtype == b.dtype
 
 
-
 def test_jax_typing():
-
-    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx, \
-         EvaluationContext.frame_tracing_context(ctx) as trace:
-
+    with EvaluationContext(
+        EvaluationMode.CLASSICAL_COMPILATION
+    ) as ctx, EvaluationContext.frame_tracing_context(ctx) as trace:
         sz = trace.new_arg(dim_value_aval())
-        args = jnp.zeros([0,sz]), jnp.zeros([sz,1])
+        args = jnp.zeros([0, sz]), jnp.zeros([sz, 1])
 
         _, in_type = expand_args(args, expansion_strategy=while_loop_expansion_strategy(True))
-        assert [(t.shape,k) for t,k in in_type] == [
-            ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=0),1), True)
+        assert [(t.shape, k) for t, k in in_type] == [
+            ((), False),
+            ((0, DBIdx(val=0)), True),
+            ((DBIdx(val=0), 1), True),
         ]
 
         _, in_type = expand_args(args, expansion_strategy=while_loop_expansion_strategy(False))
-        assert [(t.shape,k) for t,k in in_type] == [
-            ((), False), ((), False), ((0,DBIdx(val=0)), True), ((DBIdx(val=1),1), True)
+        assert [(t.shape, k) for t, k in in_type] == [
+            ((), False),
+            ((), False),
+            ((0, DBIdx(val=0)), True),
+            ((DBIdx(val=1), 1), True),
         ]
 
 
@@ -289,8 +299,8 @@ def test_classical_tracing_2():
 
     assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
 
-def test_qjit_forloop_identity():
 
+def test_qjit_forloop_identity():
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -308,7 +318,6 @@ def test_qjit_forloop_identity():
 
 
 def test_qjit_forloop_shared_indbidx():
-
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -322,12 +331,11 @@ def test_qjit_forloop_shared_indbidx():
         return a2 + b2
 
     result = f(3)
-    expected = 2*jnp.ones(3)
+    expected = 2 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 
 def test_qjit_forloop_indbidx_outdbidx():
-
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -335,7 +343,7 @@ def test_qjit_forloop_indbidx_outdbidx():
 
         @for_loop(0, 10, 2)
         def loop(i, a, _):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
 
         a2, b2 = loop(a, b)
@@ -347,7 +355,6 @@ def test_qjit_forloop_indbidx_outdbidx():
 
 
 def test_qjit_forloop_index_indbidx():
-
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -365,7 +372,6 @@ def test_qjit_forloop_index_indbidx():
 
 
 def test_qnode_forloop_identity():
-
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -383,9 +389,7 @@ def test_qnode_forloop_identity():
     assert_array_and_dtype_equal(result, expected)
 
 
-
 def test_qnode_forloop_shared_indbidx():
-
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -400,12 +404,11 @@ def test_qnode_forloop_shared_indbidx():
         return a2 + b2
 
     result = f(3)
-    expected = 2*jnp.ones(3)
+    expected = 2 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 
 def test_qnode_forloop_indbidx_outdbidx():
-
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -414,7 +417,7 @@ def test_qnode_forloop_indbidx_outdbidx():
 
         @for_loop(0, 10, 2)
         def loop(i, a, _):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
 
         a2, b2 = loop(a, b)
@@ -426,7 +429,6 @@ def test_qnode_forloop_indbidx_outdbidx():
 
 
 def test_qnode_forloop_index_indbidx():
-
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -444,14 +446,13 @@ def test_qnode_forloop_index_indbidx():
     assert_array_and_dtype_equal(res_a, jnp.ones(9))
 
 
-
 def test_qnode_while_1():
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
-        a = jnp.ones([sz+1], dtype=float)
+        a = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
         def loop(a, i):
@@ -472,11 +473,11 @@ def test_qnode_while_2():
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
-        a = jnp.ones([sz+1], dtype=float)
+        a = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
         def loop(_, i):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             i += 1
             return (b, i)
 
@@ -506,7 +507,7 @@ def test_qnode_while_shared_indbidx():
         return a2 + b2
 
     result = f(3)
-    expected = 2*jnp.ones(3)
+    expected = 2 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 
@@ -517,19 +518,19 @@ def test_qnode_while_indbidx_outdbidx():
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz+1], dtype=float)
+        b = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _a, _b, i: i < 3)
         def loop(a, _, i):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             i += 1
             return (a, b, i)
 
         a2, b2, _ = loop(a, b, 0)
-        return a+a2, b2
+        return a + a2, b2
 
     res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
+    assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
@@ -547,10 +548,10 @@ def test_qnode_while_outer():
             return (a0, i)
 
         a2, _ = loop(a0, 0)
-        return a0+a2
+        return a0 + a2
 
     res_a = f(3)
-    assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
+    assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
 
 
 def test_qjit_while_1():
@@ -558,11 +559,11 @@ def test_qjit_while_1():
 
     @qjit
     def f(sz):
-        a = jnp.ones([sz+1], dtype=float)
+        a = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
         def loop(_, i):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             i += 1
             return (b, i)
 
@@ -579,11 +580,11 @@ def test_qjit_while_2():
 
     @qjit()
     def f(sz):
-        a = jnp.ones([sz+1], dtype=float)
+        a = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
         def loop(_, i):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             i += 1
             return (b, i)
 
@@ -599,9 +600,9 @@ def test_qjit_while_3():
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     @qjit
-    def f(sz:int):
-        input_a = jnp.ones([sz+1], dtype=float)
-        input_b = jnp.ones([sz+2], dtype=float)
+    def f(sz: int):
+        input_a = jnp.ones([sz + 1], dtype=float)
+        input_b = jnp.ones([sz + 2], dtype=float)
 
         @while_loop(lambda a, b: False, preserve_dimensions=False)
         def loop(a, b):
@@ -634,7 +635,7 @@ def test_qjit_while_shared_indbidx():
         return a2 + b2
 
     result = f(3)
-    expected = 2*jnp.ones(3)
+    expected = 2 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 
@@ -644,19 +645,19 @@ def test_qjit_while_indbidx_outdbidx():
     @qjit()
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
-        b0 = jnp.ones([sz+1], dtype=float)
+        b0 = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _a, _b, i: i < 3)
         def loop(a, _, i):
-            b = jnp.ones([sz+1], dtype=float)
+            b = jnp.ones([sz + 1], dtype=float)
             i += 1
             return (a, b, i)
 
         a2, b2, _ = loop(a0, b0, 0)
-        return a0+a2, b2
+        return a0 + a2, b2
 
     res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, 2*jnp.ones(3))
+    assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
@@ -686,7 +687,6 @@ def test_qnode_cond_identity():
     @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(flag, sz):
-
         a = jnp.ones([sz], dtype=float)
         b = jnp.zeros([sz], dtype=float)
 
@@ -712,7 +712,6 @@ def test_qjit_cond_identity():
 
     @qjit
     def f(flag, sz):
-
         a = jnp.ones([sz], dtype=float)
         b = jnp.zeros([sz], dtype=float)
 
@@ -740,11 +739,11 @@ def test_qjit_cond_outdbidx():
     def f(flag, sz):
         @cond(flag)
         def case():
-            return jnp.ones([sz+1], dtype=float)
+            return jnp.ones([sz + 1], dtype=float)
 
         @case.otherwise
         def case():
-            return jnp.zeros([sz+1], dtype=float)
+            return jnp.zeros([sz + 1], dtype=float)
 
         return case()
 
@@ -757,12 +756,11 @@ def test_qjit_cond_const_outdbidx():
 
     @qjit
     def f(flag, sz):
-
         a = jnp.zeros([sz], dtype=float)
 
         @cond(flag)
         def case():
-            return jnp.ones([sz+1], dtype=float)
+            return jnp.ones([sz + 1], dtype=float)
 
         @case.otherwise
         def case():

@@ -131,5 +131,3 @@ def test_qnode_dynamic_indexing(a):
 
 
 print_mlir(test_qnode_dynamic_indexing, 3)
-
-

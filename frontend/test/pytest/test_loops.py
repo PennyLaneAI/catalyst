@@ -529,7 +529,6 @@ class TestInterpretationControlFlow:
         mulc = qjit(muli)
         assert mulc(1, 2) == muli(1, 2)
 
-
     def test_for_loop_identity(self, backend):
         """Test simple for loop."""
 
@@ -544,7 +543,6 @@ class TestInterpretationControlFlow:
             return res
 
         assert fun(0) == 0
-
 
     def test_for_loop_acc(self):
         """Test simple for loop."""

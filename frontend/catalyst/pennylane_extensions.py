@@ -62,7 +62,6 @@ from catalyst.jax_tracer import (
     trace_quantum_function,
     trace_quantum_tape,
     unify_convert_result_types,
-    unify_result_types,
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
