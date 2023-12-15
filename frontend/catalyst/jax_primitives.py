@@ -609,7 +609,8 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     ):
         baseType = ir.RankedTensorType(qubit_idx.type).element_type
         qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
-    assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for extract op!"
+    assert ir.IntegerType.isinstance(qubit_idx.type), \
+        f"Scalar integer required for extract op! Got {qubit_idx.type}\n{jax_ctx}"
 
     qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
     return ExtractOp(qubit_type, qreg, idx=qubit_idx).results

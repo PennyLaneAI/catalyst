@@ -178,12 +178,7 @@ def _apply_result_type_conversion2(
     newvar = gensym([jaxpr], suffix="_")
     args = [AbstractQreg()] if with_qreg else []
 
-    # with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
     def _fun(*in_tracers):
-        print(jaxpr)
-        print(with_qreg)
-        print(len(in_tracers))
-
         out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
         out_tracers_, target_types_ = (
             (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
@@ -203,7 +198,7 @@ def _apply_result_type_conversion2(
     return in_sig, out_sig
 
 
-def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs) -> List[ClosedJaxpr]:
+def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
     """Unify result types of the jaxpr equations given.
     Args:
         jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
@@ -218,13 +213,14 @@ def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs) -> Lis
 
     """
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
-    acc = []
+    acc, consts2 = [], []
     for j, a in zip(jaxprs, consts):
         in_sig, out_sig = _apply_result_type_conversion2(
             ctx, j, a, promoted_types, num_implicit_outputs
         )
         acc.append(out_sig.out_initial_jaxpr())
-    return acc, out_sig.out_type()
+        consts2.append(out_sig.out_consts())
+    return acc, out_sig.out_type(), consts2
 
 
 class QRegPromise:

@@ -997,18 +997,19 @@ class Cond(HybridOp):
 
                 jaxprs.append(jaxpr)
                 consts.append(const)
+
                 nouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
         nouts_s = list(set(nouts))
         assert len(nouts_s) == 1
         num_implicit_outputs = nouts_s[0]
-        all_jaxprs, out_type2 = unify_convert_result_types(
+        all_jaxprs, out_type2, all_consts = unify_convert_result_types(
             ctx, jaxprs, consts, num_implicit_outputs
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
-        in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(consts, []), qreg]
+        in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
 
         out_expanded_classical_tracers = expand_results(
             [],
@@ -1333,7 +1334,7 @@ class CondCallable:
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
         num_implicit_outputs = out_sigs[-1].num_implicit_outputs()
-        all_jaxprs, _ = unify_convert_result_types(
+        all_jaxprs, _, all_consts = unify_convert_result_types(
             ctx, all_jaxprs, all_consts, num_implicit_outputs
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
