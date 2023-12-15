@@ -282,6 +282,9 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
             }
+            else if (isa<quantum::DeviceReleaseOp>(op)) {
+                rewriter.eraseOp(op);
+            }
 
             else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);

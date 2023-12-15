@@ -37,9 +37,9 @@
 namespace Catalyst::Runtime {
 
 /**
- * @brief Global quantum device unique pointer with internal linkage.
+ * @brief Global quantum device unique pointer.
  */
-thread_local static std::unique_ptr<ExecutionContext> CTX = nullptr;
+static std::unique_ptr<ExecutionContext> CTX = nullptr;
 
 /**
  * @brief Thread local device pointer and unique ID with internal linkage.
