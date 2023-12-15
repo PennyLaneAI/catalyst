@@ -115,7 +115,7 @@ class TestPyTreesReturnValues:
         assert result[0][0][0] + result[0][0][1] == result[0][1]
         assert result[0][0][0] * result[0][0][1] == result[1]
 
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
         def circuit3(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -133,7 +133,7 @@ class TestPyTreesReturnValues:
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
         assert len(result[1]) == 4
-        assert jnp.allclose(result[2], expected_expval)
+        assert jnp.allclose(result[2], expected_expval, atol=0.05)
 
         @qjit
         def workflow(x):
@@ -237,7 +237,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result["w0"], expected["w0"])
         assert jnp.allclose(result["w1"], expected["w1"])
 
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
         def circuit2(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -257,7 +257,7 @@ class TestPyTreesReturnValues:
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
         assert len(result["state"]) == 4
-        assert jnp.allclose(result["expval"]["z0"], expected_expval)
+        assert jnp.allclose(result["expval"]["z0"], expected_expval, atol=0.05)
 
         @qjit
         def workflow1(param):

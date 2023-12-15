@@ -43,8 +43,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
-    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
-    static constexpr size_t default_num_burnin{100};    // tidy: readability-magic-numbers
+    static constexpr size_t default_num_burnin{100}; // tidy: readability-magic-numbers
     static constexpr std::string_view default_kernel_name{
         "Local"}; // tidy: readability-magic-numbers
 
@@ -90,8 +89,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     explicit LightningSimulator(const std::string &kwargs = "{}")
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
-        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
-                                              : default_device_shots;
+        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
         mcmc = args.contains("mcmc") ? args["mcmc"] == "True" : false;
         num_burnin = args.contains("num_burnin")
                          ? static_cast<size_t>(std::stoll(args["num_burnin"]))
