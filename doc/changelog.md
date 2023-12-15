@@ -42,14 +42,21 @@
    [1. 1. 1.]]
   ```
 
-* The runtime now supports multiple active devices via using a pool of devices.
+* Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
+  for `lightning.qubit` and `lightning.kokkos` devices.
+  [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
+
+* The runtime now supports multiple active devices managed via a device pool.
   The new `RTDeviceType` data-class and `RTDeviceStatus` along with the `thread_local`
   device instance pointer enable the runtime to better scope the lifetime of device
-  instances cuncurrently. With these changes, one can create multiple active devices
+  instances concurrently. With these changes, one can create multiple active devices
   and execute multiple programs in a multithreaded environment.
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 <h3>Improvements</h3>
+
+* Support for `mcmc` sampling in `lightning.qubit`.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 * Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
   outside a `@qjit` context. This simplifies the process of writing functions where compilation
@@ -77,14 +84,17 @@
   [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
 
 * Add `DeviceReleaseOp` to the Quantum MLIR dialect. This will be lowered to
-  the `__quantum__rt__device_release()` runtime instruction and releases the device
-  memory and update the status of the device instance from `ACTIVE` to `RELEASE`.
-  The runtime will re-use this released instance instead of creating a new one
-  automatically at runtime in a multi-qnode workflow when multiple devices have
-  identical specifications.
+  the `__quantum__rt__device_release()` runtime instruction releasing the device
+  qubits and updating the status of the device instance from `ACTIVE` to `RELEASE`.
+  The runtime will reuse this released instance instead of creating a new one automatically
+  at runtime in a multi-qnode workflow when multiple devices have identical specifications.
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 <h3>Breaking changes</h3>
+
+* Third party devices must now specify a configuration toml file.
+  For more information please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 <h3>Bug fixes</h3>
 
@@ -104,7 +114,8 @@ Ali Asadi,
 David Ittah,
 Romain Moyard,
 Sergei Mironov,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Shuli Shu.
 
 # Release 0.3.2
 

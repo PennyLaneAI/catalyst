@@ -156,7 +156,7 @@ TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-    CHECK(sim->GetDeviceShots() == 1000);
+    CHECK(sim->GetDeviceShots() == 0);
 
     sim->SetDeviceShots(500);
 

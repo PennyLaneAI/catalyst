@@ -93,7 +93,7 @@ def DeviceInitOp : Quantum_Op<"device"> {
     }];
 }
 
-def DeviceReleaseOp : Quantum_Op<"drelease"> {
+def DeviceReleaseOp : Quantum_Op<"device_release"> {
     let summary = "Release the active quantum device.";
 
     let assemblyFormat = [{

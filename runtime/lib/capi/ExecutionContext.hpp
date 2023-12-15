@@ -203,7 +203,7 @@ extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const char *kw
  * manager. This includes the device name, library, kwargs, and a shared pointer to the
  * `QuantumDevice` entry point.
  */
-class RTDeviceType {
+class RTDevice {
   private:
     std::string rtd_lib;
     std::string rtd_name;
@@ -241,24 +241,24 @@ class RTDeviceType {
     }
 
   public:
-    explicit RTDeviceType(std::string _rtd_lib, std::string _rtd_name = {},
-                          std::string _rtd_kwargs = {})
+    explicit RTDevice(std::string _rtd_lib, std::string _rtd_name = {},
+                      std::string _rtd_kwargs = {})
         : rtd_lib(std::move(_rtd_lib)), rtd_name(std::move(_rtd_name)),
           rtd_kwargs(std::move(_rtd_kwargs))
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
-    explicit RTDeviceType(std::string_view _rtd_lib, std::string_view _rtd_name,
-                          std::string_view _rtd_kwargs)
+    explicit RTDevice(std::string_view _rtd_lib, std::string_view _rtd_name,
+                      std::string_view _rtd_kwargs)
         : rtd_lib(_rtd_lib), rtd_name(_rtd_name), rtd_kwargs(_rtd_kwargs)
     {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
-    ~RTDeviceType() = default;
+    ~RTDevice() = default;
 
-    auto operator==(const RTDeviceType &other) const -> bool
+    auto operator==(const RTDevice &other) const -> bool
     {
         return (this->rtd_lib == other.rtd_lib && this->rtd_name == other.rtd_name) &&
                this->rtd_kwargs == other.rtd_kwargs;
@@ -295,7 +295,7 @@ class RTDeviceType {
 
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
 
-    friend std::ostream &operator<<(std::ostream &os, const RTDeviceType &device)
+    friend std::ostream &operator<<(std::ostream &os, const RTDevice &device)
     {
         os << "RTD, name: " << device.rtd_name << " lib: " << device.rtd_lib
            << " kwargs: " << device.rtd_kwargs;
@@ -306,8 +306,7 @@ class RTDeviceType {
 class ExecutionContext final {
   private:
     // Device pool
-    std::unordered_map<size_t, std::pair<RTDeviceStatus, std::shared_ptr<RTDeviceType>>>
-        device_pool;
+    std::unordered_map<size_t, std::pair<RTDeviceStatus, std::shared_ptr<RTDevice>>> device_pool;
     size_t pool_counter{0}; // Counter for generating unique keys for devices
 
     bool initial_tape_recorder_status;
@@ -340,7 +339,7 @@ class ExecutionContext final {
         return memory_man_ptr;
     }
 
-    [[nodiscard]] auto addDeviceToPool(std::shared_ptr<RTDeviceType> device) -> size_t
+    [[nodiscard]] auto addDeviceToPool(std::shared_ptr<RTDevice> device) -> size_t
     {
         // Add a new device
         const size_t key = pool_counter++;
@@ -359,7 +358,7 @@ class ExecutionContext final {
                                  std::string_view rtd_kwargs)
         -> std::pair<size_t, std::shared_ptr<QuantumDevice>>
     {
-        auto device = std::make_shared<RTDeviceType>(rtd_lib, rtd_name, rtd_kwargs);
+        auto device = std::make_shared<RTDevice>(rtd_lib, rtd_name, rtd_kwargs);
 
         // Check whether we can re-use any released device
         for (auto &dev_pair : device_pool) {

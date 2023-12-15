@@ -24,20 +24,20 @@
 
 using namespace Catalyst::Runtime;
 
-TEST_CASE("Test getter/setter methods in RTDeviceType", "[device_pool]")
+TEST_CASE("Test getter/setter methods in RTDevice", "[device_pool]")
 {
-    std::unique_ptr<RTDeviceType> device = std::make_unique<RTDeviceType>(
+    std::unique_ptr<RTDevice> device = std::make_unique<RTDevice>(
         "librtd_lightning" + get_dylib_ext(), "LightningSimulator", "{shots: 100}");
     std::cerr << *device << std::endl;
     auto &&[other_lib, other_name, other_kwargs] = device->getDeviceInfo();
-    CHECK(*device == RTDeviceType(other_lib, other_name, other_kwargs));
+    CHECK(*device == RTDevice(other_lib, other_name, other_kwargs));
     CHECK(device->getQuantumDevicePtr() != nullptr);
     CHECK(device->getQuantumDevicePtr() != nullptr);
     device->setTapeRecorderStatus(true);
     CHECK(device->getTapeRecorderStatus());
 
-    std::unique_ptr<RTDeviceType> dev_oq3 = std::make_unique<RTDeviceType>("braket.aws.qubit");
-    CHECK(*dev_oq3 == RTDeviceType("librtd_openqasm" + get_dylib_ext(), "OpenQasmDevice"));
+    std::unique_ptr<RTDevice> dev_oq3 = std::make_unique<RTDevice>("braket.aws.qubit");
+    CHECK(*dev_oq3 == RTDevice("librtd_openqasm" + get_dylib_ext(), "OpenQasmDevice"));
 }
 
 TEST_CASE("Test the device pool in ExecutionContext", "device_pool")

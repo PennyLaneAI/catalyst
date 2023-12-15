@@ -43,12 +43,18 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
-    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+    static constexpr size_t default_num_burnin{100}; // tidy: readability-magic-numbers
+    static constexpr std::string_view default_kernel_name{
+        "Local"}; // tidy: readability-magic-numbers
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
+
+    bool mcmc{false};
+    size_t num_burnin{0};
+    std::string kernel_name;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
     LightningObsManager<double> obs_manager{};
@@ -83,8 +89,12 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     explicit LightningSimulator(const std::string &kwargs = "{}")
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
-        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
-                                              : default_device_shots;
+        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
+        mcmc = args.contains("mcmc") ? args["mcmc"] == "True" : false;
+        num_burnin = args.contains("num_burnin")
+                         ? static_cast<size_t>(std::stoll(args["num_burnin"]))
+                         : default_num_burnin;
+        kernel_name = args.contains("kernel_name") ? args["kernel_name"] : default_kernel_name;
     }
     ~LightningSimulator() override = default;
 
@@ -95,5 +105,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
+    auto GenerateSamplesMetropolis(size_t shots) -> std::vector<size_t>;
+    auto GenerateSamples(size_t shots) -> std::vector<size_t>;
 };
 } // namespace Catalyst::Runtime::Simulator

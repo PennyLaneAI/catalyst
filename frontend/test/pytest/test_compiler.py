@@ -32,7 +32,6 @@ from catalyst import qjit
 from catalyst.compilation_pipelines import WorkspaceManager
 from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import trace_to_mlir
-from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path

@@ -62,6 +62,7 @@ jobs:
           name: runtime-build-${{ matrix.compiler }}
           path: |
             runtime-build/lib/*.so
+            runtime-build/lib/backend/*.toml
           retention-days: 1
 
   llvm:
