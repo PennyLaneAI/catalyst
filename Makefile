@@ -167,13 +167,19 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-all
+.PHONY: clean clean-mlir clean-runtime clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
+
+clean-runtime:
+	$(MAKE) -C runtime clean
+
+clean-mlir:
+	$(MAKE) -C mlir clean
 
 clean-all:
 	@echo "uninstall catalyst and delete all temporary, cache files"

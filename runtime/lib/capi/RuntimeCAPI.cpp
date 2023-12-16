@@ -67,7 +67,7 @@ thread_local static RTDevice *RTD_PTR = nullptr;
 auto getDevicePtr() -> std::shared_ptr<QuantumDevice> { return RTD_PTR->getQuantumDevicePtr(); }
 
 /**
- * @brief Release the active device instance.
+ * @brief Inactivate the active device instance.
  */
 void inactivateDevice(ExecutionContext *ec)
 {
