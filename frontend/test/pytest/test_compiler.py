@@ -297,6 +297,7 @@ module @workflow {
     %9 = quantum.expval %8 : f64
     %from_elements = tensor.from_elements %9 : tensor<f64>
     quantum.dealloc %1 : !quantum.reg
+    quantum.device_release
     return %from_elements : tensor<f64>
   }
   func.func @setup() {
