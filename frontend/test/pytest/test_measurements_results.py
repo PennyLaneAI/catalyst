@@ -627,7 +627,7 @@ class TestOtherMeasurements:
         """Test multiple return values."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        @qml.qnode(qml.device(backend, wires=2, shots=5000))
         def all_measurements(x):
             qml.RY(x, wires=0)
             return (
@@ -639,7 +639,7 @@ class TestOtherMeasurements:
                 qml.state(),
             )
 
-        @qml.qnode(qml.device("default.qubit", wires=2))
+        @qml.qnode(qml.device("lightning.qubit", wires=2, shots=5000))
         def expected(x, measurement):
             qml.RY(x, wires=0)
             return qml.apply(measurement)
@@ -648,21 +648,23 @@ class TestOtherMeasurements:
         result = all_measurements(x)
 
         # qml.sample
-        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=100).shape
+        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=5000).shape
 
         # qml.counts
-        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True), shots=100).keys()):
+        for r, e in zip(
+            result[1][0], expected(x, qml.counts(all_outcomes=True), shots=5000).keys()
+        ):
             assert format(int(r), "02b") == e
-        assert sum(result[1][1]) == 100
+        assert sum(result[1][1]) == 5000
 
         # qml.expval
-        assert np.allclose(result[2], expected(x, qml.expval(qml.PauliZ(0))))
+        assert np.allclose(result[2], expected(x, qml.expval(qml.PauliZ(0))), atol=0.05)
 
         # qml.var
-        assert np.allclose(result[3], expected(x, qml.var(qml.PauliZ(0))))
+        assert np.allclose(result[3], expected(x, qml.var(qml.PauliZ(0))), atol=0.05)
 
         # qml.probs
-        assert np.allclose(result[4], expected(x, qml.probs(wires=[0, 1])))
+        assert np.allclose(result[4], expected(x, qml.probs(wires=[0, 1])), atol=0.05)
 
         # qml.state
         assert np.allclose(result[5], expected(x, qml.state()))

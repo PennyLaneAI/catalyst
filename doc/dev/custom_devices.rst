@@ -143,9 +143,13 @@ One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt`` `as an 
 Integration with Python devices
 ===============================
 
+There are two things that are needed in order to integrate with PennyLane devices:
+
+* Adding a ``get_c_interface`` method to your ``qml.QubitDevice`` class.
+* Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
+
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
-After doing so, Catalyst should be able to interface with your custom device.
 
 .. note::
 
@@ -161,7 +165,8 @@ After doing so, Catalyst should be able to interface with your custom device.
         short_name = "dummy.device"
         pennylane_requires = "0.33.0"
         version = "0.0.1"
-        author = "Dummy"
+        author = "An Author"
+        config = pathlib.Path("absolute/path/to/configuration/file.toml")
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
@@ -181,3 +186,151 @@ After doing so, Catalyst should be able to interface with your custom device.
     @qml.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
+
+
+Below is an example configuration file with inline descriptions of how to fill out the fields. All
+headers and fields are generally required, unless stated otherwise.
+
+.. code-block:: toml
+
+        # Which version of the specification format is being used.
+        schema = 1
+
+        [device]
+        name = "dummy.device.qubit"
+
+        [operators]
+        # Observables supported by the device
+        observables = [
+                "PauliX",
+                "PauliY",
+                "PauliZ",
+                "Hadamard",
+                "Hermitian",
+                "Identity",
+                "Projector",
+                "SparseHamiltonian",
+                "Hamiltonian",
+                "Sum",
+                "SProd",
+                "Prod",
+                "Exp",
+        ]
+
+        # The union of all gate types listed in this section must match what
+        # the device considers "supported" through PennyLane's device API.
+        [[operators.gates]]
+        native = [
+                # Operators that shouldn't be decomposed.
+                "QubitUnitary",
+                "PauliX",
+                "PauliY",
+                "PauliZ",
+                "MultiRZ",
+                "Hadamard",
+                "S",
+                "T",
+                "CNOT",
+                "SWAP",
+                "CSWAP",
+                "Toffoli",
+                "CY",
+                "CZ",
+                "PhaseShift",
+                "ControlledPhaseShift",
+                "RX",
+                "RY",
+                "RZ",
+                "Rot",
+                "CRX",
+                "CRY",
+                "CRZ",
+                "CRot",
+                "Identity",
+                "IsingXX",
+                "IsingYY",
+                "IsingZZ",
+                "IsingXY",
+        ]
+
+        # Operators that should be decomposed according to the algorithm used
+        # by PennyLane's device API.
+        # Optional, since gates not listed in this list will typically be decomposed by
+        # default, but can be useful to express a deviation from this device's regular
+        # strategy in PennyLane.
+        decomp = [
+                "SX",
+                "ISWAP",
+                "PSWAP",
+                "SISWAP",
+                "SQISW",
+                "CPhase",
+                "BasisState",
+                "QubitStateVector",
+                "StatePrep",
+                "ControlledQubitUnitary",
+                "DiagonalQubitUnitary",
+                "SingleExcitation",
+                "SingleExcitationPlus",
+                "SingleExcitationMinus",
+                "DoubleExcitation",
+                "DoubleExcitationPlus",
+                "DoubleExcitationMinus",
+                "QubitCarry",
+                "QubitSum",
+                "OrbitalRotation",
+                "QFT",
+                "ECR",
+        ]
+
+        # Gates which should be translated to QubitUnitary
+        matrix = [
+                "MultiControlledX",
+        ]
+
+        [measurement_processes]
+        exactshots = [
+                "Expval",
+                "Var",
+                "Probs",
+                "State",
+        ]
+        finiteshots = [
+                "Expval",
+                "Var",
+                "Probs",
+                "Sample",
+                "Counts",
+        ]
+
+        [compilation]
+        # If the device is compatible with qjit
+        qjit_compatible = true
+        # If the device requires run time generation of the quantum circuit.
+        runtime_code_generation = false
+        # If the device supports adjoint
+        quantum_adjoint = true
+        # If the device supports quantum control instructions natively
+        quantum_control = false
+        # If the device supports mid circuit measurements natively
+        mid_circuit_measurement = true
+
+        # This field is currently unchecked but it is reserved for the purpose of
+        # determining if the device supports dynamic qubit allocation/deallocation.
+        dynamic_qubit_management = false 
+
+        [options]
+        # Options is an optional field.
+        # These options represent runtime parameters that can be passed to the device
+        # upon the device initialization.
+        # The option key will be the key in a dictionary.
+        # The string corresponds to a field queried in the `qml.Device` instance.
+        option_key = "option_field"
+        # In the above example, a dictionary will be constructed at run time.
+        # The dictionary will contain the string key "option_key" and its value
+        # will be the value in `qml.Device` `option_field`.
+        # The value can be any Python type, but will be converted to a string.
+        # During the initialization of your `class QuantumDevice`, the dictionary
+        # will be sent to the constructor of your implementation of `class QuantumDevice`.
+        # The dictionary will be a JSON string like the following:
+        # { 'option_key': option_field }
