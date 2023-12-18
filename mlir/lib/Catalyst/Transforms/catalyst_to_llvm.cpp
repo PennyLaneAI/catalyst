@@ -440,9 +440,10 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Encode args
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         SmallVector<LLVM::AllocaOp> encoded;
-        for (auto tuple : llvm::drop_begin(llvm::zip(args, argsConverted))) {
+        for (auto tuple : llvm::zip(args, argsConverted)) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             auto encoded_arg = EncodeMemRef(loc, rewriter, memref_type, std::get<1>(tuple));
+
             LLVM::AllocaOp alloca =
                 rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_arg.getType(), c1, 0);
             // Use volatile store to suppress expensive LLVM optimizations.
@@ -453,7 +454,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         // We store encoded arguments as `!llvm.array<ptr x len>`.
         size_t len = encoded.size();
-        std::cout << len << std::endl;
         Type typeArgs = LLVM::LLVMArrayType::get(ptr, len);
 
         // Prepare an array for encoded arguments.
@@ -523,7 +523,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         auto encodedResults = allocaRes;
         // Call op
         SmallVector<Value> callArgs{encodedArguments, encodedResults};
-        auto call = rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
         rewriter.eraseOp(op);
         return success();
     }
