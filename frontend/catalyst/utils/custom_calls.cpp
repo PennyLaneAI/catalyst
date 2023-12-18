@@ -56,16 +56,14 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
 void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
 {
     std::vector<void *> data;
-    for (size_t i = 0; dataEncoded[i] != (void *)0x20c; ++i) {
+    for (size_t i = 0; i<7; ++i) {
         auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
-        // std::cout << encodedMemref.dtype << " " << encodedMemref.rank << std::endl;
         data.push_back(encodedMemref.data);
     }
 
     std::vector<void *> out;
-    for (size_t i = 0; resultsEncoded[i] != (void *)0xc9; ++i) {
+    for (size_t i = 0; i<7; ++i) {
         auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
-        // std::cout << encodedMemref.dtype << " " << encodedMemref.rank << std::endl;
         out.push_back(encodedMemref.data);
     }
 
