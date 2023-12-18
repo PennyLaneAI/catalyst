@@ -28,6 +28,7 @@
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
+// To protect the py::exec calls concurrently
 std::mutex runner_mu;
 
 /**

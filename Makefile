@@ -39,6 +39,12 @@ endif
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
 
+ifeq ($(ENABLE_OPENQASM), ON)
+# A global 'mutex' is added to protect `pybind11::exec` calls concurrently in `OpenQasmRunner`.
+# This will lead to an ODR violation when using ASAN
+ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0,detect_odr_violation=0"
+endif
+
 ifeq ($(ENABLE_ASAN),ON)
 ASAN_COMMAND := $(ASAN_OPTIONS) $(ASAN_FLAGS)
 else
