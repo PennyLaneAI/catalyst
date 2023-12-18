@@ -167,7 +167,7 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-mlir clean-runtime clean-all
+.PHONY: clean clean-runtime clean-mlir clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst

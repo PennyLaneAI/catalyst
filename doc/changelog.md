@@ -87,7 +87,7 @@
   the `__quantum__rt__device_release()` runtime instruction updating the status
   of the device instance from `Active` to `Inactive`. The runtime will reuse this
   deactivated instance instead of creating a new one automatically at runtime in a
-  multi-qnode workflow when another device with identicalspecifications is requested.
+  multi-qnode workflow when another device with identical specifications is requested.
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 <h3>Breaking changes</h3>
