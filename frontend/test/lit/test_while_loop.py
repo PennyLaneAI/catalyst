@@ -133,6 +133,3 @@ def test_while_loop_simple(x: float):
 
 print("test_while_loop_simple")
 print(test_while_loop_simple.jaxpr)
-
-
-

@@ -117,4 +117,3 @@ def test_qjit_aot(a: ShapedArray([1, 3, 1], dtype=float)):
 
 
 print_mlir(test_qjit_aot, aot=True)
-

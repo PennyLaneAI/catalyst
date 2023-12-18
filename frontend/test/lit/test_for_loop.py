@@ -81,6 +81,3 @@ def test_for_loop_simple(x: float, n: int):
 
 print("test_for_loop_simple")
 print(test_for_loop_simple.jaxpr)
-
-
-
