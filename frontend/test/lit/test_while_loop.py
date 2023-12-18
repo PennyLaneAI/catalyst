@@ -110,3 +110,29 @@ def circuit_multiple_args(n: int):
 
 
 print(circuit_multiple_args.mlir)
+
+
+# CHECK-NOT: Verification failed
+# CHECK-LABEL: test_while_loop_simple
+@qjit(target="mlir")
+def test_while_loop_simple(x: float):
+    # CHECK:       { lambda ; [[a:.]]:f64[]. let
+    # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[] = while_loop[
+    # CHECK:            body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+    # CHECK:            body_nconsts=0
+    # CHECK:            cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+    # CHECK:            cond_nconsts=0
+    # CHECK:         ] 0 [[a]]
+    # CHECK:       in ([[b]], [[c]]) }
+    @while_loop(lambda v: v[0] < 10)
+    def loop(v):
+        return v[0] + 1, v[1]
+
+    return loop((0, x))
+
+
+print("test_while_loop_simple")
+print(test_while_loop_simple.jaxpr)
+
+
+

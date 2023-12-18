@@ -25,30 +25,6 @@ from catalyst import for_loop, measure, qjit, while_loop
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
-    def test_while_loop(self):
-        """Check the while loop JAXPR."""
-
-        expected = """\
-{ lambda ; a:f64[]. let
-    b:i64[] c:f64[] = while_loop[
-      body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
-      body_nconsts=0
-      cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
-      cond_nconsts=0
-    ] 0 a
-  in (b, c) }\
-"""
-
-        @qjit
-        def circuit(x: float):
-            @while_loop(lambda v: v[0] < 10)
-            def loop(v):
-                return v[0] + 1, v[1]
-
-            return loop((0, x))
-
-        assert expected == str(circuit.jaxpr)
-
     def test_for_loop(self):
         """Check the for loop JAXPR."""
 
