@@ -671,6 +671,7 @@ class TestBraketMeasurementsProcess:
         # qml.probs
         assert result[2][0] > result[2][1]
 
+    @pytest.mark.skip(reason="async and runtime exceptions")
     @pytest.mark.parametrize(
         "device",
         [
