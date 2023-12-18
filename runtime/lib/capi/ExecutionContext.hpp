@@ -207,6 +207,7 @@ class RTDevice {
     std::string rtd_name;
     std::string rtd_kwargs;
 
+    std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::shared_ptr<QuantumDevice> rtd_qdevice{nullptr};
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
@@ -254,7 +255,7 @@ class RTDevice {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
-    ~RTDevice() = default;
+    ~RTDevice() { rtd_dylib.reset(nullptr); }
 
     auto operator==(const RTDevice &other) const -> bool
     {
@@ -268,8 +269,7 @@ class RTDevice {
             return rtd_qdevice;
         }
 
-        std::unique_ptr<SharedLibraryManager> rtd_dylib =
-            std::make_unique<SharedLibraryManager>(rtd_lib);
+        rtd_dylib = std::make_unique<SharedLibraryManager>(rtd_lib);
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
         QuantumDevice *impl =
@@ -315,13 +315,13 @@ class ExecutionContext final {
     explicit ExecutionContext() : initial_tape_recorder_status(false)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
-    };
+    }
 
     ~ExecutionContext()
     {
         memory_man_ptr.reset(nullptr);
         py_guard.reset(nullptr);
-    };
+    }
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
