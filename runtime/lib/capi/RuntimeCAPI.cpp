@@ -56,6 +56,7 @@ thread_local static RTDevice *RTD_PTR = nullptr;
     auto &&device = ec->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs);
     if (device) {
         RTD_PTR = device.get();
+        RT_ASSERT(RTD_PTR);
         return true;
     }
     return false;

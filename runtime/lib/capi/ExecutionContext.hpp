@@ -356,13 +356,13 @@ class ExecutionContext final {
 
         // Add a new device
         device_pool.push_back(device);
+        device_pool[key]->setDeviceStatus(RTDeviceStatus::Active);
 
 #ifdef __build_with_pybind11
         if (!py_guard && device->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
             py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
         }
 #endif
-
         return device_pool[key];
     }
 
