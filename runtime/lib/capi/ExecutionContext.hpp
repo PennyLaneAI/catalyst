@@ -382,6 +382,16 @@ class ExecutionContext final {
         return device_pool[device_key];
     }
 
+    void inactivateDevice(RTDevice *RTD_PTR)
+    {
+        if (!RTD_PTR) {
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(pool_mu);
+        RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
+    }
+
     friend bool getOrCreateDevice(ExecutionContext *ec, std::string_view rtd_lib,
                                   std::string_view rtd_name, std::string_view rtd_kwargs);
 };

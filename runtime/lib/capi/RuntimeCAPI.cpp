@@ -71,11 +71,7 @@ auto getDevicePtr() -> std::shared_ptr<QuantumDevice> { return RTD_PTR->getQuant
  */
 void inactivateDevice(ExecutionContext *ec)
 {
-    if (!RTD_PTR) {
-        return;
-    }
-
-    RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
+    ec->inactivateDevice(RTD_PTR);
     RTD_PTR = nullptr;
 }
 } // namespace Catalyst::Runtime
