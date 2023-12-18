@@ -53,15 +53,14 @@ TEST_CASE("Test error message if init device fails", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
     std::string file("libm.so.6");
-    REQUIRE_THROWS_WITH(initDevice(driver.get(), file, "", ""),
-                        Catch::Contains("undefined symbol: Factory"));
+    REQUIRE_THROWS_WITH(loadDevice("", file), Catch::Contains("undefined symbol: Factory"));
 }
 #endif
 
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
-    CHECK(initDevice(driver.get(), "libdummy_device" + get_dylib_ext(), "DummyDevice", ""));
+    CHECK(loadDevice("DummyDevice", "libdummy_device" + get_dylib_ext()));
 }
 
 TEST_CASE("Test __quantum__rt__device_init registering a custom device with shots=500 and "
