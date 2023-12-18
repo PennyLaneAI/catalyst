@@ -1897,7 +1897,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
 
-        Adjoint(
+        return Adjoint(
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=[],
             regions=[adjoint_region],
@@ -1999,10 +1999,11 @@ def ctrl(
 
         region = HybridOpRegion(None, quantum_tape, [], [])
 
-        QCtrl(
-            control_wire_tracers=control,
-            control_value_tracers=control_values,
-            work_wire_tracers=work_wires,
+        # Return the operation instance since PL expects this for qml.ctrl(op).
+        return QCtrl(
+            control_wires=control,
+            control_values=control_values,
+            work_wires=work_wires,
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=out_classical_tracers,
             regions=[region],
@@ -2014,6 +2015,7 @@ def ctrl(
             return _call_handler(*args, _callee=f, **kwargs)
 
         return _callable
+
     elif isinstance(f, Operator):
         QueuingManager.remove(f)
 
@@ -2021,5 +2023,6 @@ def ctrl(
             QueuingManager.append(f)
 
         return _call_handler(_callee=_callee)
+
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
