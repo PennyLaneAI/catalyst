@@ -202,6 +202,11 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
+        with pytest.raises(
+            TypeError, match="Conditional requires consistent return types across all branches"
+        ):
+            qjit(circuit)
+
     def test_branch_return_mismatch(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
