@@ -13,6 +13,7 @@
 # limitations under the License.
 """This module isolates utility functions that depend on JAX low-level internals
 """
+# pylint: disable=too-many-lines
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
@@ -29,12 +30,13 @@ from typing import (
     Set,
     Type,
     TypeVar,
+    Tuple,
 )
 
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import DBIdx, _update_thread_local_jit_state, same_referent
+from jax._src.core import (DBIdx, _update_thread_local_jit_state, same_referent)
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -59,6 +61,7 @@ from jax.core import (
     ConcreteArray,
     DShapedArray,
     InDBIdx,
+    InputType,
     Jaxpr,
     JaxprEqn,
     MainTrace,
@@ -125,7 +128,7 @@ __all__ = (
     "convert_element_type",
     "collapse",
     "deduce_avals",
-    "deduce_avals2",
+    # "deduce_avals2",
     "deduce_avals3",
     "infer_output_type_python",
     "infer_output_type_jaxpr",
@@ -329,8 +332,11 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 
 
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
+    """ Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
+    same constants. """
     newvar = gensym(jaxprs, suffix="_")
 
+    # pylint: disable=too-many-nested-blocks
     all_padded_constvars = []
     for jaxpr in jaxprs:
         padded_constvars = []
@@ -410,6 +416,8 @@ def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
 
 @transformation
 def expanded_fun(in_type, *args_expanded):
+    """ Function transformation making the function to accept its arguments in the expanded format
+    (with the dimension variables added)"""
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     ans = yield args_collapsed, {}
     yield ans
@@ -417,6 +425,8 @@ def expanded_fun(in_type, *args_expanded):
 
 @transformation_with_aux
 def expanded_fun2(static_args, *args_expanded):
+    """ Function transformation making the function to accept its arguments in the expanded format
+    (with the dimension variables added)"""
     (in_type, expansion_strategy) = static_args
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
@@ -429,23 +439,29 @@ def expanded_fun2(static_args, *args_expanded):
 
 @dataclass
 class InputSignature:
+    """ Meta-parameters of a function which are available before the tracing to the function
+    starts."""
     in_type: InputType
     in_tree: PyTreeDef
     in_expanded_args: List[DynamicJaxprTracer]
 
-    def num_implicit_inputs(self):
+    def num_implicit_inputs(self) -> int:
+        """ Return the number of implicit input arguments of the function """
         return len([() for _, k in self.in_type if not k])
 
 
 @dataclass
 class OutputSignature:
+    """ Meta-parameters of a function which become available after the tracing to the function is
+    complete."""
     out_jaxpr: Callable[[], ClosedJaxpr]
     out_type: Callable[[], OutputType]
     out_consts: Callable[[], list]
     out_tree: Callable[[], PyTreeDef]
     out_initial_jaxpr: Callable[[], Jaxpr]
 
-    def num_implicit_outputs(self):
+    def num_implicit_outputs(self) -> int:
+        """ Return the number of implicit resuts of the function """
         return len([() for _, k in self.out_type() if not k])
 
 
@@ -475,22 +491,6 @@ def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
             lambda: out_sig_promise()[0],
         ),
     )
-
-
-def deduce_avals2(f: Callable, args, kwargs):
-    """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
-    and returning expanded flatten results. Calculate input abstract values and output_tree promise.
-    The promise must be called after the resulting wrapped function is evaluated."""
-    flat_args, in_tree = tree_flatten((args, kwargs))
-    abstracted_axes = None
-    axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
-    in_type = infer_lambda_input_type(axes_specs, flat_args)
-    in_avals, keep_inputs = unzip2(in_type)
-    wf = wrap_init(f)
-    wf, out_tree_promise = flatten_fun(wf, in_tree)
-    wf = expanded_fun(wf, in_type)
-    wf = annotate(wf, in_type)
-    return wf, in_avals, keep_inputs, out_tree_promise
 
 
 def deduce_avals(f: Callable, args, kwargs):
@@ -746,15 +746,15 @@ def input_type_to_tracers(
     in_type: InputType, maker: Callable[[AbstractValue], DynamicJaxprTracer]
 ) -> List[DynamicJaxprTracer]:
     """Creates an expanded list of tracers representing an input values of a Jaxpr program"""
-    in_aval, in_keep = unzip2(in_type)
+    in_aval, _ = unzip2(in_type)
     return _input_type_to_tracers(maker, in_aval)
 
 
-def get_referent_frame(self, frame):
-    """Find referents in the specific frame"""
-    # TODO: clarify the logic! Can we need other frames?
-    val = frame.constvar_to_val.get(frame.tracer_to_var.get(id(self)))
-    return self if val is None else get_referent_frame(val)
+# def get_referent_frame(frame):
+#     """Find referents in the specific frame"""
+#     # TODO: clarify the logic! Can we need other frames?
+#     val = frame.constvar_to_val.get(frame.tracer_to_var.get(id(self)))
+#     return self if val is None else get_referent_frame(val)
 
 
 def output_type_to_tracers(
@@ -768,12 +768,12 @@ def output_type_to_tracers(
     the Jax dynamic API and might contain ``in_tracers`` of the same Jaxpr program."""
     out_tracers = []
     for aval, _ in out_type:
-        if type(aval) is DShapedArray:
+        if isinstance(aval, DShapedArray):
             shape = [
                 [*out_consts, *in_tracers][d.val]
-                if type(d) is InDBIdx
+                if isinstance(d, InDBIdx)
                 else out_tracers[d.val]
-                if type(d) is OutDBIdx
+                if isinstance(d, OutDBIdx)
                 else d
                 for d in aval.shape
             ]
@@ -785,9 +785,8 @@ def output_type_to_tracers(
 TracerLike = TypeVar("TracerLike")
 
 
-def infer_input_type_unshared(
-    inputs: List[TracerLike],
-) -> Tuple[List[TracerLike], InputType]:
+def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
+    """ Infer the input type of a function having `inputs` Jax tracers. """
     def _is_tracer_like(x):
         return hasattr(x, "aval")
 
@@ -812,6 +811,7 @@ def infer_input_type_unshared(
 
 @dataclass
 class ExpansionStrategy:
+    """ Describe the settings affecting the Jax dyanmic API tracing of the nested programs."""
     axes_specs: Sequence[AbstractedAxesSpec] | None
     input_unshare_variables: bool
     output_include_indbidx_vars: bool
