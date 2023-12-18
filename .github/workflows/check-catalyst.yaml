@@ -534,7 +534,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        echo "SKIP"
+        make pytest TEST_BRAKET=LOCAL
 
   runtime-device-tests:
     name: Runtime Tests (Linux)
