@@ -119,7 +119,7 @@ def test_qjit_aot(a: ShapedArray([1, 3, 1], dtype=float)):
 print_mlir(test_qjit_aot, aot=True)
 
 
-# CHECK-LABEL: test_qnode_dynamic_result_complex
+# CHECK-LABEL: test_qnode_dynamic_indexing
 @qjit
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def test_qnode_dynamic_indexing(a):
