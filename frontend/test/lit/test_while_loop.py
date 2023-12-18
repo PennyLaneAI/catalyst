@@ -118,9 +118,9 @@ print(circuit_multiple_args.mlir)
 def test_while_loop_simple(x: float):
     # CHECK:       { lambda ; [[a:.]]:f64[]. let
     # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[] = while_loop[
-    # CHECK:            body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+    # CHECK:            body_jaxpr={ lambda ; [[d:.]]:i64[] [[e:.]]:f64[]. let [[f:.]]:i64[] = add [[d]] 1 in ([[f]], [[e]]) }
     # CHECK:            body_nconsts=0
-    # CHECK:            cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+    # CHECK:            cond_jaxpr={ lambda ; [[g:.]]:i64[] [[h:.]]:f64[]. let [[i:.]]:bool[] = lt [[g]] 10 in ([[i]],) }
     # CHECK:            cond_nconsts=0
     # CHECK:         ] 0 [[a]]
     # CHECK:       in ([[b]], [[c]]) }

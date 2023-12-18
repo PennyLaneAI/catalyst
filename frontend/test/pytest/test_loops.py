@@ -22,35 +22,6 @@ from catalyst import for_loop, measure, qjit, while_loop
 # pylint: disable=no-value-for-parameter
 
 
-class TestLoopToJaxpr:
-    """Collection of tests that examine the generated JAXPR of loops."""
-
-    def test_for_loop(self):
-        """Check the for loop JAXPR."""
-
-        expected = """\
-{ lambda ; a:f64[] b:i64[]. let
-    c:i64[] d:f64[] = for_loop[
-      apply_reverse_transform=False
-      body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
-          h:i64[] = add f 1
-        in (h, g) }
-      body_nconsts=0
-    ] 0 b 1 0 0 a
-  in (c, d) }\
-"""
-
-        @qjit
-        def circuit(x: float, n: int):
-            @for_loop(0, n, 1)
-            def loop(_, v):
-                return v[0] + 1, v[1]
-
-            return loop((0, x))
-
-        assert expected == str(circuit.jaxpr)
-
-
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 

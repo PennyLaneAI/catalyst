@@ -56,3 +56,31 @@ def loop_circuit(n: int, inc: float):
 
 
 print(loop_circuit.mlir)
+
+
+# CHECK-NOT: Verification failed
+# CHECK-LABEL: test_for_loop_simple
+@qjit(target="mlir")
+def test_for_loop_simple(x: float, n: int):
+    # CHECK:       { lambda ; [[a:.]]:f64[] [[b:.]]:i64[]. let
+    # CHECK:         [[c:.]]:i64[] [[d:.]]:f64[] = for_loop[
+    # CHECK:           apply_reverse_transform=False
+    # CHECK:           body_jaxpr={ lambda ; [[e:.]]:i64[] [[f:.]]:i64[] [[g:.]]:f64[]. let
+    # CHECK:             [[h:.]]:i64[] = add [[f]] 1
+    # CHECK:           in ([[h]], [[g]]) }
+    # CHECK:           body_nconsts=0
+    # CHECK:           nimplicit=0
+    # CHECK:         ] 0 [[b]] 1 0 0 [[a]]
+    # CHECK:       in ([[c]], [[d]]) }
+    @for_loop(0, n, 1)
+    def loop(_, v):
+        return v[0] + 1, v[1]
+
+    return loop((0, x))
+
+
+print("test_for_loop_simple")
+print(test_for_loop_simple.jaxpr)
+
+
+
