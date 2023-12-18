@@ -50,10 +50,10 @@ thread_local static RTDevice *RTD_PTR = nullptr;
  * @brief Initialize the device instance and update the value of RTD_PTR
  * to the new initialized device pointer.
  */
-[[nodiscard]] bool getOrCreateDevice(ExecutionContext *ec, std::string_view rtd_lib,
-                                     std::string_view rtd_name, std::string_view rtd_kwargs)
+[[nodiscard]] bool getOrCreateDevice(std::string_view rtd_lib, std::string_view rtd_name,
+                                     std::string_view rtd_kwargs)
 {
-    auto &&device = ec->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs);
+    auto &&device = CTX->getOrCreateDevice(rtd_lib, rtd_name, rtd_kwargs);
     if (device) {
         RTD_PTR = device.get();
         RT_ASSERT(RTD_PTR);
@@ -70,9 +70,9 @@ auto getDevicePtr() -> std::shared_ptr<QuantumDevice> { return RTD_PTR->getQuant
 /**
  * @brief Inactivate the active device instance.
  */
-void inactivateDevice(ExecutionContext *ec)
+void deactivateDevice()
 {
-    ec->inactivateDevice(RTD_PTR);
+    CTX->deactivateDevice(RTD_PTR);
     RTD_PTR = nullptr;
 }
 } // namespace Catalyst::Runtime
@@ -160,7 +160,6 @@ void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()
 {
-    Catalyst::Runtime::RTD_PTR = nullptr;
     Catalyst::Runtime::CTX = std::make_unique<Catalyst::Runtime::ExecutionContext>();
 }
 
@@ -182,8 +181,7 @@ void __quantum__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_k
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!Catalyst::Runtime::getOrCreateDevice(Catalyst::Runtime::CTX.get(), args[0], args[1],
-                                                     args[2]),
+    RT_FAIL_IF(!Catalyst::Runtime::getOrCreateDevice(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
     if (Catalyst::Runtime::CTX->getDeviceRecorderStatus()) {
         Catalyst::Runtime::getDevicePtr()->StartTapeRecording();
@@ -192,8 +190,10 @@ void __quantum__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_k
 
 void __quantum__rt__device_release()
 {
+    RT_FAIL_IF(!Catalyst::Runtime::CTX,
+               "Cannot release an ACTIVE device out of scope of the global driver");
     // TODO: This will be used for the async support
-    Catalyst::Runtime::inactivateDevice(Catalyst::Runtime::CTX.get());
+    Catalyst::Runtime::deactivateDevice();
 }
 
 void __quantum__rt__print_state() { Catalyst::Runtime::getDevicePtr()->PrintState(); }

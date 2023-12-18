@@ -173,7 +173,7 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-runtime clean-mlir clean-all
+.PHONY: clean clean-mlir clean-runtime clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -181,19 +181,17 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-runtime:
-	$(MAKE) -C runtime clean
-
 clean-mlir:
 	$(MAKE) -C mlir clean
 
-clean-all:
-	@echo "uninstall catalyst and delete all temporary, cache files"
+clean-runtime:
+	$(MAKE) -C runtime clean
+
+clean-all: clean-mlir clean-runtime
+	@echo "uninstall catalyst and delete all build directories, temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
-	$(MAKE) -C mlir clean
-	$(MAKE) -C runtime clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
