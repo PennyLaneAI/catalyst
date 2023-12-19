@@ -24,17 +24,7 @@ from numpy.testing import assert_allclose
 
 from catalyst import cond, for_loop, qjit, while_loop
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.jax_extras import (
-    DBIdx,
-    DShapedArray,
-    ShapedArray,
-    collapse,
-    deduce_avals3,
-    expand_args,
-    infer_lambda_input_type,
-    input_type_to_tracers,
-    while_loop_expansion_strategy,
-)
+from catalyst.utils.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -47,7 +37,8 @@ def assert_array_and_dtype_equal(a, b):
     assert a.dtype == b.dtype
 
 
-def test_jax_typing():
+def test_jax_arg_expansion():
+    """Test the argument expansion using different stategies"""
     with EvaluationContext(
         EvaluationMode.CLASSICAL_COMPILATION
     ) as ctx, EvaluationContext.frame_tracing_context(ctx) as trace:
@@ -301,12 +292,14 @@ def test_classical_tracing_2():
 
 
 def test_qjit_forloop_identity():
+    """Test simple for-loop primitive vs dynamic dimensions"""
+
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 2)
-        def loop(i, a):
+        def loop(_, a):
             return a
 
         a2 = loop(a)
@@ -318,13 +311,15 @@ def test_qjit_forloop_identity():
 
 
 def test_qjit_forloop_shared_indbidx():
+    """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
+
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 2)
-        def loop(i, a, b):
+        def loop(_, a, b):
             return (a, b)
 
         a2, b2 = loop(a, b)
@@ -336,13 +331,15 @@ def test_qjit_forloop_shared_indbidx():
 
 
 def test_qjit_forloop_indbidx_outdbidx():
+    """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
+
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 2)
-        def loop(i, a, _):
+        def loop(_i, a, _b):
             b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
 
@@ -355,6 +352,8 @@ def test_qjit_forloop_indbidx_outdbidx():
 
 
 def test_qjit_forloop_index_indbidx():
+    """Test for-loops referring loop index in the results, qjit mode."""
+
     @qjit()
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -372,13 +371,15 @@ def test_qjit_forloop_index_indbidx():
 
 
 def test_qnode_forloop_identity():
+    """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
+
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 2)
-        def loop(i, a):
+        def loop(_, a):
             return a
 
         a2 = loop(a)
@@ -390,6 +391,8 @@ def test_qnode_forloop_identity():
 
 
 def test_qnode_forloop_shared_indbidx():
+    """Test for-loops with shared input dimension variables in quantum tracing."""
+
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -397,7 +400,7 @@ def test_qnode_forloop_shared_indbidx():
         b = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 2)
-        def loop(i, a, b):
+        def loop(_, a, b):
             return (a, b)
 
         a2, b2 = loop(a, b)
@@ -409,6 +412,8 @@ def test_qnode_forloop_shared_indbidx():
 
 
 def test_qnode_forloop_indbidx_outdbidx():
+    """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
+
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -416,7 +421,7 @@ def test_qnode_forloop_indbidx_outdbidx():
         b = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 2)
-        def loop(i, a, _):
+        def loop(_i, a, _b):
             b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
 
@@ -429,6 +434,8 @@ def test_qnode_forloop_indbidx_outdbidx():
 
 
 def test_qnode_forloop_index_indbidx():
+    """Test for-loops referring loop index as a dimension during the quantum tracing."""
+
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -543,7 +550,7 @@ def test_qnode_while_outer():
         a0 = jnp.ones([sz], dtype=float)
 
         @while_loop(lambda _a, i: i < 3)
-        def loop(a, i):
+        def loop(_a, i):
             i += 1
             return (a0, i)
 
@@ -604,8 +611,8 @@ def test_qjit_while_3():
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @while_loop(lambda a, b: False, preserve_dimensions=False)
-        def loop(a, b):
+        @while_loop(lambda _a, _b: False, preserve_dimensions=False)
+        def loop(_a, _b):
             return (input_a, input_b)
 
         outputs = loop(input_a, input_a)

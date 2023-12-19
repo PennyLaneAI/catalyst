@@ -207,9 +207,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
     acc, consts2 = [], []
     for j, a in zip(jaxprs, consts):
-        _, out_sig = _apply_result_type_conversion2(
-            ctx, j, a, promoted_types, num_implicit_outputs
-        )
+        _, out_sig = _apply_result_type_conversion2(ctx, j, a, promoted_types, num_implicit_outputs)
         acc.append(out_sig.out_initial_jaxpr())
         consts2.append(out_sig.out_consts())
     return acc, out_sig.out_type(), consts2
@@ -399,7 +397,7 @@ def has_nested_tapes(op: Operation) -> bool:
 
 
 def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
-    """ Trace Python function supporting variable dimensions in its arguments and/or results """
+    """Trace Python function supporting variable dimensions in its arguments and/or results"""
     wfun, in_sig, out_sig = deduce_avals3(fun, args, kwargs, expansion_strategy=expansion_strategy)
     with EvaluationContext.frame_tracing_context(ctx) as trace:
         arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
