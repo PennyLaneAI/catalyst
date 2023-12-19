@@ -140,30 +140,6 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 
 
 def _apply_result_type_conversion(
-    jaxpr: ClosedJaxpr, target_types: List[ShapedArray]
-) -> ClosedJaxpr:
-    # TODO: Remove
-    with_qreg = isinstance(target_types[-1], AbstractQreg)
-    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
-            in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
-            out_tracers = [
-                trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
-            ]
-            out_tracers_, target_types_ = (
-                (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
-            )
-            out_promoted_tracers = [
-                (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
-                for tr, ty in zip(out_tracers_, target_types_)
-            ]
-            jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(
-                out_promoted_tracers + ([out_tracers[-1]] if with_qreg else [])
-            )
-    return ClosedJaxpr(jaxpr2, consts)
-
-
-def _apply_result_type_conversion2(
     ctx, jaxpr: ClosedJaxpr, consts, target_types: List[ShapedArray], num_implicit_outputs
 ):
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
@@ -206,7 +182,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
     acc, consts2 = [], []
     for j, a in zip(jaxprs, consts):
-        _, out_sig = _apply_result_type_conversion2(ctx, j, a, promoted_types, num_implicit_outputs)
+        _, out_sig = _apply_result_type_conversion(ctx, j, a, promoted_types, num_implicit_outputs)
         acc.append(out_sig.out_initial_jaxpr())
         consts2.append(out_sig.out_consts())
     return acc, out_sig.out_type(), consts2
