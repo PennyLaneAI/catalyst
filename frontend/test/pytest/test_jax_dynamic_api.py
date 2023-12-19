@@ -719,8 +719,8 @@ def test_qjit_cond_identity():
 
     @qjit
     def f(flag, sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.zeros([sz], dtype=float)
+        a = jnp.ones([sz, 3], dtype=float)
+        b = jnp.zeros([sz, 3], dtype=float)
 
         @cond(flag)
         def case():
@@ -735,8 +735,8 @@ def test_qjit_cond_identity():
         assert c.shape[0] is b.shape[0]
         return c
 
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
-    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(False, 3), jnp.zeros([3, 3]))
 
 
 def test_qjit_cond_outdbidx():
@@ -746,16 +746,16 @@ def test_qjit_cond_outdbidx():
     def f(flag, sz):
         @cond(flag)
         def case():
-            return jnp.ones([sz + 1], dtype=float)
+            return jnp.ones([sz + 1, 3], dtype=float)
 
         @case.otherwise
         def case():
-            return jnp.zeros([sz + 1], dtype=float)
+            return jnp.zeros([sz + 1, 3], dtype=float)
 
         return case()
 
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones(4))
-    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(4))
+    assert_array_and_dtype_equal(f(True, 3), jnp.ones([4, 3]))
+    assert_array_and_dtype_equal(f(False, 3), jnp.zeros([4, 3]))
 
 
 def test_qjit_cond_const_outdbidx():

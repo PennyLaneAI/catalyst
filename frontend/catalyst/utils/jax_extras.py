@@ -497,15 +497,6 @@ def custom_lower_jaxpr_to_module(
     return ctx.module, ctx.context
 
 
-def new_inner_tracer2(frame, trace, aval) -> DynamicJaxprTracer:
-    """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
-    primitive."""
-    dt = DynamicJaxprTracer(trace, aval, jax_current())
-    frame.tracers.append(dt)
-    frame.tracer_to_var[id(dt)] = frame.newvar(aval)
-    return dt
-
-
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
