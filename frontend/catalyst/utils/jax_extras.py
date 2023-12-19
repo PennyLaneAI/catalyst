@@ -1086,8 +1086,6 @@ class DynshapePrimitive(Primitive):
     """Primitive containing nested Jaxpr programs accepting and returning values with dynamic
     shapes."""
 
-    # pylint: disable=abstract-method
-
     def bind(self, *args, **params):
         """Bind the Jax primitive into a Jaxpr program. This method are called both when tracing a
         Python program and evaluating a Jaxpr program.
