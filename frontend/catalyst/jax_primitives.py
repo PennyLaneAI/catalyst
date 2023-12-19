@@ -69,7 +69,6 @@ from catalyst.utils.jax_extras import (
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
     out_type_force_outdbidx,
-    out_type_shift_indbidx,
     while_loop_expansion_strategy,
 )
 

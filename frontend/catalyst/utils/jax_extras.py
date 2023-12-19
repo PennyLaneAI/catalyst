@@ -28,15 +28,15 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Tuple,
     Type,
     TypeVar,
-    Tuple,
 )
 
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import (DBIdx, _update_thread_local_jit_state, same_referent)
+from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -75,7 +75,6 @@ from jax.core import (
     eval_jaxpr,
     find_top_trace,
     gensym,
-    get_referent,
     new_jaxpr_eqn,
     thread_local_state,
 )
@@ -332,8 +331,8 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 
 
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
-    """ Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
-    same constants. """
+    """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
+    same constants."""
     newvar = gensym(jaxprs, suffix="_")
 
     # pylint: disable=too-many-nested-blocks
@@ -416,7 +415,7 @@ def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
 
 @transformation
 def expanded_fun(in_type, *args_expanded):
-    """ Function transformation making the function to accept its arguments in the expanded format
+    """Function transformation making the function to accept its arguments in the expanded format
     (with the dimension variables added)"""
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     ans = yield args_collapsed, {}
@@ -425,7 +424,7 @@ def expanded_fun(in_type, *args_expanded):
 
 @transformation_with_aux
 def expanded_fun2(static_args, *args_expanded):
-    """ Function transformation making the function to accept its arguments in the expanded format
+    """Function transformation making the function to accept its arguments in the expanded format
     (with the dimension variables added)"""
     (in_type, expansion_strategy) = static_args
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
@@ -439,21 +438,23 @@ def expanded_fun2(static_args, *args_expanded):
 
 @dataclass
 class InputSignature:
-    """ Meta-parameters of a function which are available before the tracing to the function
+    """Meta-parameters of a function which are available before the tracing to the function
     starts."""
+
     in_type: InputType
     in_tree: PyTreeDef
     in_expanded_args: List[DynamicJaxprTracer]
 
     def num_implicit_inputs(self) -> int:
-        """ Return the number of implicit input arguments of the function """
+        """Return the number of implicit input arguments of the function"""
         return len([() for _, k in self.in_type if not k])
 
 
 @dataclass
 class OutputSignature:
-    """ Meta-parameters of a function which become available after the tracing to the function is
+    """Meta-parameters of a function which become available after the tracing to the function is
     complete."""
+
     out_jaxpr: Callable[[], ClosedJaxpr]
     out_type: Callable[[], OutputType]
     out_consts: Callable[[], list]
@@ -461,7 +462,7 @@ class OutputSignature:
     out_initial_jaxpr: Callable[[], Jaxpr]
 
     def num_implicit_outputs(self) -> int:
-        """ Return the number of implicit resuts of the function """
+        """Return the number of implicit resuts of the function"""
         return len([() for _, k in self.out_type() if not k])
 
 
@@ -786,7 +787,8 @@ TracerLike = TypeVar("TracerLike")
 
 
 def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
-    """ Infer the input type of a function having `inputs` Jax tracers. """
+    """Infer the input type of a function having `inputs` Jax tracers."""
+
     def _is_tracer_like(x):
         return hasattr(x, "aval")
 
@@ -811,7 +813,18 @@ def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
 
 @dataclass
 class ExpansionStrategy:
-    """ Describe the settings affecting the Jax dyanmic API tracing of the nested programs."""
+    """Describe the settings affecting the Jax dyanmic API tracing of the nested programs.
+    Args:
+        axes_specs: Axes specification used to convert static dimensions to the dynamic ones
+        input_unshare_variables: Treat each dynamic dimension as a distinct dimension, even if some
+                                 of them are described by the same dimension variables.
+        output_include_indbidx_vars: Include variables corresponding to the InDBIdx references in
+                                     the result
+        output_force_arg0_outdbidx: Force all references pointing to the first arguments to be
+                                    OutDBIdx. This is typically required to avoid input references
+                                    to the loop iteration variable.
+    """
+
     axes_specs: Sequence[AbstractedAxesSpec] | None
     input_unshare_variables: bool
     output_include_indbidx_vars: bool
@@ -819,18 +832,22 @@ class ExpansionStrategy:
 
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
+    """Arguments and results expansion strategy for while-loops."""
     return ExpansionStrategy(None, not preserve_dimensions, True, False)
 
 
 def for_loop_expansion_strategy():
+    """Arguments and results expansion strategy for for-loops."""
     return ExpansionStrategy(None, True, True, True)
 
 
 def cond_expansion_strategy():
+    """Arguments and results expansion strategy for conditionals."""
     return ExpansionStrategy(None, False, True, False)
 
 
 def default_expansion_strategy(axes_spec):
+    """Arguments and results expansion strategy implicitly used in Jax by default."""
     return ExpansionStrategy(axes_spec, False, False, False)
 
 
@@ -903,6 +920,8 @@ def infer_output_type_jaxpr(
     expansion_strategy,
     num_implicit_inputs: int | None = None,
 ) -> OutputType:
+    """Infers the OutputType record based on the Jaxpr program's result variables, expanded inputs
+    and constants."""
     _, out_type = infer_output_type(
         constants, expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
     )
@@ -914,7 +933,10 @@ def infer_output_type_python(
     outputs: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int,
-) -> OutputType:
+) -> Tuple[List[TracerLike], Tuple[Jaxpr, OutputType, List[TracerLike]]]:
+    """Infers the OutputType record of the Python function's result values. In addition to the
+    OutputType, returns the corresponding Jaxpr program, expanded list of outputs, and the
+    constants."""
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
@@ -922,7 +944,7 @@ def infer_output_type_python(
         [], expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
     )
 
-    jaxpr, out_type_, consts = trace.frame.to_jaxpr2(expanded_outputs)
+    jaxpr, _, consts = trace.frame.to_jaxpr2(expanded_outputs)
 
     expanded_outputs2, out_type2 = infer_output_type(
         [trace.full_raise(t) for t in consts],
@@ -933,8 +955,8 @@ def infer_output_type_python(
     )
 
     assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
-    out_aval1, out_keep1 = unzip2(out_type1)
-    out_aval2, out_keep2 = unzip2(out_type2)
+    _, out_keep1 = unzip2(out_type1)
+    out_aval2, _ = unzip2(out_type2)
     out_type3 = tuple(zip(out_aval2, out_keep1))
 
     return expanded_outputs2, (jaxpr, out_type3, consts)
@@ -945,6 +967,18 @@ def expand_args(
     expansion_strategy: ExpansionStrategy,
     in_type=None,
 ) -> Tuple[List[TracerLike], InputType]:
+    """Calculate the expanded list of arguments of a Python program, based on the list of its
+    explicit arguments.
+
+    Args:
+        args: List of explicit arguments of the Python program
+        expansion_strategy: Argument expansion options
+        in_type: pre-calculated InputType. If None, the type will be recalculated.
+
+    Returns:
+        List of arguments containing both explicit and implicit arguments
+        OutputType describing the expanded result
+    """
     s = expansion_strategy
     if in_type is None:
         if s.input_unshare_variables is True:
@@ -965,16 +999,34 @@ def expand_results(
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
+    """Calculate the expanded list of results of a Python function, based on its input and output
+    tracers/variables.
+
+    Args:
+        constants: List of constants of the program
+        expanded_inputs: Expanded list of arguments of the program
+        results: List of explicit results
+        expansion_strategy: Expansion options
+        num_implicit_inputs: Number of implicit inputs found in the `expanded_inputs` parameter
+
+    Returns:
+        List of arguments containing both explicit and implicit arguments
+        OutputType describing the expanded result
+
+    """
     return infer_output_type(
         constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs
     )
 
 
 def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:
+    """Collapse the expanded list of parameters by cutting the implicit dimension variables, as
+    specified by the type of the parameters."""
     return [t for t, (_, k) in zip(params, typ) if k]
 
 
 def tracer_index(x: TracerLike, ls: List[TracerLike]) -> Optional[int]:
+    """Return the index of Jax tracer `x` in the list of tracers `ls`, or None."""
     for i, t in enumerate(ls):
         if x is t:
             return i
@@ -988,6 +1040,20 @@ def out_type_force_outdbidx(
     inputs: List[TracerLike],
     outputs: List[TracerLike],
 ) -> OutputType:
+    """Convert all references to the specified input argument of a Python or Jaxpr program into the
+    OutDBIdx format. This function is typically needed to remove references to the loop body
+    iterator.
+
+    Args:
+        out_type: Jax OutputType of results of the program
+        input_idx: Index of the input argument that should be converted from InDBIdx to OutDBIdx
+        consts: Constants used in the program
+        inputs: Expanded list of inputs of the program
+        outputs: Expanded list of outputs of the program
+
+    Returns:
+        New OutputType containing no InDBIdx references to the specified argument.
+    """
     assert len(out_type) == len(outputs), "Outputs must be expanded"
     x_in_idx = input_idx
     x_out_idx = tracer_index([*consts, *inputs][x_in_idx], outputs)
@@ -1016,26 +1082,26 @@ def out_type_force_outdbidx(
     return out_type2
 
 
-def out_type_shift_indbidx(out_type: OutputType, delta: int) -> OutputType:
-    out_type2 = []
-    for aval, k in out_type:
-        if isinstance(aval, DShapedArray):
-            shape2 = []
-            for d in aval.shape:
-                shape2.append(InDBIdx(d.val + delta) if isinstance(d, InDBIdx) else d)
-            aval2 = aval.update(shape=tuple(shape2))
-        else:
-            aval2 = copy(aval)
-        out_type2.append((aval2, k))
-    return tuple(out_type2)
-
-
 class DynshapePrimitive(Primitive):
-    # TODO: Contribute this class to Jax, namely to the
-    # `jax.DynamicJaxprTrace.default_process_primitive`
+    """Primitive containing nested Jaxpr programs accepting and returning values with dynamic
+    shapes."""
 
-    def bind(primitive, *args, **params):
-        # By current convention, we can not return out_type, but we should, because otherwise we
+    # pylint: disable=abstract-method
+
+    def bind(self, *args, **params):
+        """Bind the Jax primitive into a Jaxpr program. This method are called both when tracing a
+        Python program and evaluating a Jaxpr program.
+
+        Args:
+            *args: arguments of this bind primitive. Must be Jax tracers (when tracing a Python
+                   program) or Jaxpr variables (when evaluating Jaxpr program).
+            **params: Any valid Python variables used as parameters for this primitive.
+
+        Returns:
+            Output Python tracers or Jax variables.
+
+        """
+        # Note: We do not return out_type, but we should, because currently we
         # lose the explicitness information.
 
         trace = find_top_trace(args)
@@ -1043,7 +1109,7 @@ class DynshapePrimitive(Primitive):
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
-        out_type, effects = primitive.abstract_eval(*in_type, **params)
+        out_type, effects = self.abstract_eval(*in_type, **params)
         assert len(effects) == 0, f"Effects are not supported, got ({effects})"
 
         out_tracers = output_type_to_tracers(
@@ -1056,6 +1122,6 @@ class DynshapePrimitive(Primitive):
         invars = map(trace.getvar, tracers)
         outvars = map(trace.makevar, out_tracers)
 
-        eqn = new_jaxpr_eqn(invars, outvars, primitive, params, [], source_info)
+        eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
-        return out_tracers if primitive.multiple_results else out_tracers.pop()
+        return out_tracers if self.multiple_results else out_tracers.pop()
