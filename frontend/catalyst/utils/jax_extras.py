@@ -13,7 +13,6 @@
 # limitations under the License.
 """This module isolates utility functions that depend on JAX low-level internals
 """
-# pylint: disable=too-many-lines
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
@@ -45,7 +44,7 @@ from jax._src.interpreters.partial_eval import (
     infer_lambda_input_type,
     trace_to_jaxpr_dynamic2,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
+from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.lax import _abstractify, xla
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
