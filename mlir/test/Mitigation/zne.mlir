@@ -34,6 +34,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
     quantum.dealloc %r : !quantum.reg
+    quantum.release_device
     func.return %expval : f64
 }
 

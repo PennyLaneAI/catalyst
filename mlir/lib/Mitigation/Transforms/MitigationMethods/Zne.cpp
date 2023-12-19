@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -171,7 +171,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                     Region *adjointRegion = &adjointOp.getRegion();
                     Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
 
-                    std::vector<Value> argsAndQregAdjoint = {fnFoldedOp.getArguments().begin(),
+                    std::vector<Value> argsAndQregAdjoint {fnFoldedOp.getArguments().begin(),
                                                              fnFoldedOp.getArguments().end()};
                     argsAndQregAdjoint.pop_back();
                     argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));

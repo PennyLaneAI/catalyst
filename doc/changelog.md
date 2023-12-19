@@ -2,8 +2,8 @@
 
 <h3>New features</h3>
 
-* A mitigation dialect (MLIR) was added. It initially contains a Zero noise extrapolation operation, with a lowering to 
-  a global folded circuit.
+* A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
+  with a lowering to a global folded circuit.
   [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
 
 * Initial support for transforms. QFunc transforms are supported. QNode transforms have limited
