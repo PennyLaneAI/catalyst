@@ -1890,6 +1890,9 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
+    if not EvaluationContext.is_tracing():
+        return qml.adjoint(f)
+
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."
@@ -1989,6 +1992,9 @@ def ctrl(
     >>> workflow(jnp.pi/4, 1, 0)
     array([0.25, 0.25, 0.03661165, 0.46338835])
     """
+
+    if not EvaluationContext.is_tracing():
+        return qml.ctrl(f, control, control_values, work_wires)
 
     if control_values is not None and (
         (len(control) if isinstance(control, Sized) else 1)
