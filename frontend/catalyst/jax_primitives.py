@@ -41,7 +41,8 @@ from mlir_quantum.dialects.quantum import (
     CountsOp,
     CustomOp,
     DeallocOp,
-    DeviceOp,
+    DeviceInitOp,
+    DeviceReleaseOp,
     ExpvalOp,
     ExtractOp,
     HamiltonianOp,
@@ -505,7 +506,9 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    DeviceOp(ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs))
+    DeviceInitOp(
+        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs)
+    )
 
     return ()
 
@@ -557,6 +560,7 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
+    DeviceReleaseOp()  # end of qnode
     return ()
 
 

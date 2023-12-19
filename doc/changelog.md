@@ -50,6 +50,13 @@
   for `lightning.qubit` and `lightning.kokkos` devices.
   [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
 
+* The runtime now supports multiple active devices managed via a device pool.
+  The new `RTDevice` data-class and `RTDeviceStatus` along with the `thread_local`
+  device instance pointer enable the runtime to better scope the lifetime of device
+  instances concurrently. With these changes, one can create multiple active devices
+  and execute multiple programs in a multithreaded environment.
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+
 <h3>Improvements</h3>
 
 * Support for `mcmc` sampling in `lightning.qubit`.
@@ -79,6 +86,13 @@
   and lowers the operation to one single device initialization call:
   `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
   [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
+
+* Add `DeviceReleaseOp` to the Quantum MLIR dialect. This will be lowered to
+  the `__quantum__rt__device_release()` runtime instruction updating the status
+  of the device instance from `Active` to `Inactive`. The runtime will reuse this
+  deactivated instance instead of creating a new one automatically at runtime in a
+  multi-qnode workflow when another device with identical specifications is requested.
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 <h3>Breaking changes</h3>
 
