@@ -1186,7 +1186,7 @@ def qctrl_distribute(
         else:
             ops2.append(
                 Controlled(
-                    type(op)(*op.parameters, wires=op.wires),
+                    op,
                     control_wires=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
