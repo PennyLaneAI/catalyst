@@ -124,7 +124,6 @@ __all__ = (
     "convert_element_type",
     "collapse",
     "deduce_avals",
-    # "deduce_avals2",
     "deduce_avals3",
     "infer_output_type_python",
     "infer_output_type_jaxpr",
@@ -291,7 +290,7 @@ def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
 
 
 @transformation_with_aux
-def expanded_fun2(static_args, *args_expanded):
+def expanded_fun(static_args, *args_expanded):
     """Function transformation making the function to accept its arguments in the expanded format
     (with the dimension variables added)"""
     (in_type, expansion_strategy) = static_args
@@ -347,7 +346,7 @@ def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
     )
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
-    wf, out_sig_promise = expanded_fun2(wf, (in_type, expansion_strategy))
+    wf, out_sig_promise = expanded_fun(wf, (in_type, expansion_strategy))
     wf = annotate(wf, in_type)
     return (
         wf,
@@ -866,24 +865,22 @@ def out_type_force_outdbidx(
 
     out_type2 = []
     for i, ((aval, k), t) in enumerate(zip(out_type, outputs)):
-        if hasattr(t, "aval"):
-            if isinstance(aval, DShapedArray):
-                shape2 = []
-                for d in aval.shape:
-                    if isinstance(d, InDBIdx) and d.val == x_in_idx:
-                        assert x_out_idx is not None, (
-                            "Target tracer does not exist in the outputs "
-                            "(see force_implicit_indbidx=True)"
-                        )
-                        assert x_out_idx < i, "Target tracer is not available for OutDBIdx"
-                        shape2.append(OutDBIdx(x_out_idx))
-                    else:
-                        shape2.append(d)
-                aval2 = aval.update(shape=tuple(shape2))
-            else:
-                aval2 = copy(aval)
+        assert hasattr(t, "aval"), "Outputs are expected to be Jax tracers or Jaxpr variables"
+        if isinstance(aval, DShapedArray):
+            shape2 = []
+            for d in aval.shape:
+                if isinstance(d, InDBIdx) and d.val == x_in_idx:
+                    assert x_out_idx is not None, (
+                        "Target tracer does not exist in the outputs "
+                        "(see force_implicit_indbidx=True)"
+                    )
+                    assert x_out_idx < i, "Target tracer is not available for OutDBIdx"
+                    shape2.append(OutDBIdx(x_out_idx))
+                else:
+                    shape2.append(d)
+            aval2 = aval.update(shape=tuple(shape2))
         else:
-            aval2 = aval
+            aval2 = copy(aval)
         out_type2.append((aval2, k))
     return out_type2
 
