@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # RUN: %PYTHON %s | FileCheck %s
+# pylint: disable=line-too-long
 
 import pennylane as qml
 
@@ -116,6 +117,8 @@ print(circuit_multiple_args.mlir)
 # CHECK-LABEL: test_while_loop_simple
 @qjit(target="mlir")
 def test_while_loop_simple(x: float):
+    """Check simple while-loop lowering"""
+
     # CHECK:       { lambda ; [[a:.]]:f64[]. let
     # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[] = while_loop[
     # CHECK:            body_jaxpr={ lambda ; [[d:.]]:i64[] [[e:.]]:f64[]. let [[f:.]]:i64[] = add [[d]] 1 in ([[f]], [[e]]) }

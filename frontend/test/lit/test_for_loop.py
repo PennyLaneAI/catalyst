@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # RUN: %PYTHON %s | FileCheck %s
+# pylint: disable=line-too-long
 
 import pennylane as qml
 
@@ -62,6 +63,8 @@ print(loop_circuit.mlir)
 # CHECK-LABEL: test_for_loop_simple
 @qjit(target="mlir")
 def test_for_loop_simple(x: float, n: int):
+    """Check simple for-loop Jaxpr lowering"""
+
     # CHECK:       { lambda ; [[a:.]]:f64[] [[b:.]]:i64[]. let
     # CHECK:         [[c:.]]:i64[] [[d:.]]:f64[] = for_loop[
     # CHECK:           apply_reverse_transform=False
