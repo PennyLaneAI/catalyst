@@ -52,9 +52,9 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
              double *u, lapack_int *ldu, double *vt, lapack_int *ldvt, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *info);
 
-
-// Wrapper to call the SVD solver dgesdd_ from Lapack: https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc
-// released under the Apache License, Version 2.0, with the following copyright notice:
+// Wrapper to call the SVD solver dgesdd_ from Lapack:
+// https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc released under the Apache
+// License, Version 2.0, with the following copyright notice:
 
 // Copyright 2021 The JAX Authors.
 void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
@@ -81,8 +81,10 @@ void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
 
     double *a_out = reinterpret_cast<double *>(out[0]);
     double *s = reinterpret_cast<double *>(out[1]);
-    double *u = reinterpret_cast<double *>(out[2]);
-    double *vt = reinterpret_cast<double *>(out[3]);
+    // U and vt are switched to produce the right results...
+    double *vt = reinterpret_cast<double *>(out[2]);
+    double *u = reinterpret_cast<double *>(out[3]);
+
     int *info = reinterpret_cast<int *>(out[4]);
     int *iwork = reinterpret_cast<int *>(out[5]);
     double *work = reinterpret_cast<double *>(out[6]);
