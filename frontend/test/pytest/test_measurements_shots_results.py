@@ -124,7 +124,7 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hermitian(self, backend, tol_stochastic):
+    def test_hermitian(self, backend):
         """Test expval Hermitian observables with shots."""
 
         @qjit
@@ -332,7 +332,7 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hermitian_shots(self, backend, tol_stochastic):
+    def test_hermitian_shots(self, backend):
         """Test var Hermitian observables with shots."""
 
         @qjit
@@ -413,7 +413,7 @@ class TestVar:
         result = qjit(circuit)(0.432, 0.123, -0.543)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_pauliz_hamiltonian(self, backend, tol_stochastic):
+    def test_pauliz_hamiltonian(self, backend):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -471,3 +471,69 @@ class TestProbs:
         expected = circuit(0.432)
         result = qjit(circuit)(0.432)
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
+
+
+class TestOtherMeasurements:
+    """Test other measurement processes."""
+
+    def test_multiple_return_values(self, backend, tol_stochastic):
+        """Test multiple return values."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2, shots=10000))
+        def all_measurements(x):
+            qml.RY(x, wires=0)
+            return (
+                qml.sample(),
+                qml.counts(),
+                qml.expval(qml.PauliZ(0)),
+                qml.var(qml.PauliZ(0)),
+                qml.probs(wires=[0, 1]),
+                qml.state(),
+            )
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10000))
+        def expected(x, measurement):
+            qml.RY(x, wires=0)
+            return qml.apply(measurement)
+
+        x = 0.7
+        result = all_measurements(x)
+
+        # qml.sample
+        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=10000).shape
+
+        # qml.counts
+        for r, e in zip(
+            result[1][0], expected(x, qml.counts(all_outcomes=True), shots=10000).keys()
+        ):
+            assert format(int(r), "02b") == e
+        assert sum(result[1][1]) == 10000
+
+        # qml.expval
+        assert np.allclose(
+            result[2],
+            expected(x, qml.expval(qml.PauliZ(0))),
+            atol=tol_stochastic,
+            rtol=tol_stochastic,
+        )
+
+        # qml.var
+        assert np.allclose(
+            result[3], expected(x, qml.var(qml.PauliZ(0))), atol=tol_stochastic, rtol=tol_stochastic
+        )
+
+        # qml.probs
+        assert np.allclose(
+            result[4],
+            expected(x, qml.probs(wires=[0, 1])),
+            atol=tol_stochastic,
+            rtol=tol_stochastic,
+        )
+
+        # qml.state
+        assert np.allclose(result[5], expected(x, qml.state()))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
