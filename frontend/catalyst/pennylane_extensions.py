@@ -1702,18 +1702,6 @@ def for_loop(lower_bound, upper_bound, step):
                 with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
                     arg_classical_tracers = input_type_to_tracers(in_type, inner_trace.new_arg)
 
-# =======
-#                     in_classical_tracers = [
-#                         lower_bound,
-#                         upper_bound,
-#                         step,
-#                         lower_bound,
-#                     ] + tree_flatten(init_state)[0]
-#                     wffa, in_avals, _, body_tree = deduce_avals(
-#                         body_fn, [lower_bound] + list(init_state), {}
-#                     )
-#                     arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
-# >>>>>>> plai/main
                     with QueuingManager.stop_recording(), quantum_tape:
                         res_classical_tracers = [
                             inner_trace.full_raise(t)

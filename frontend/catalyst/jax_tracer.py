@@ -66,7 +66,6 @@ from catalyst.utils.jax_extras import (
     deduce_avals,
     deduce_avals3,
     eval_jaxpr,
-    gensym,
     input_type_to_tracers,
     jaxpr_remove_implicit,
     jaxpr_to_mlir,

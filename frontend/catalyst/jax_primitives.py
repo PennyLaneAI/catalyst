@@ -1346,12 +1346,9 @@ def _for_loop_def_impl(
     raise NotImplementedError()
 
 
-# pylint: disable=too-many-statements, too-many-arguments
+# pylint: disable=too-many-statements
 def _for_loop_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    # lower_bound: ir.Value,
-    # upper_bound: ir.Value,
-    # step: ir.Value,
     *iter_args_plus_consts: tuple,
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
