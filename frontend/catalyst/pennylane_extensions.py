@@ -22,6 +22,7 @@ import numbers
 import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
+from collections.abc import Sized
 
 import jax
 import jax.numpy as jnp
@@ -1099,15 +1100,21 @@ class Adjoint(HybridOp):
         return qrp2
 
 
+# TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
+#       to this class whenever a qjit context is active.
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def __init__(
-        self, *args, control_wire_tracers, control_value_tracers, work_wire_tracers, **kwargs
-    ):
-        self.control_wire_tracers: List[Any] = control_wire_tracers
-        self.control_value_tracers: List[Any] = control_value_tracers
-        self.work_wire_tracers: Optional[List[Any]] = work_wire_tracers
+    def __init__(self, *args, control_wires, control_values=None, work_wires=None, **kwargs):
+        self._control_wires = qml.wires.Wires(control_wires)
+        self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
+        if control_values is None:
+            self._control_values = [True] * len(self._control_wires)
+        elif isinstance(control_values, (int, bool)):
+            self._control_values = [control_values]
+        else:
+            self._control_values = control_values
+
         super().__init__(*args, **kwargs)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
@@ -1121,11 +1128,23 @@ class QCtrl(HybridOp):
         _check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
             self.regions[0].quantum_tape,
-            self.control_wire_tracers,
-            self.control_value_tracers,
-            self.work_wire_tracers,
+            self._control_wires,
+            self._control_values,
+            self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def control_wires(self):
+        return self._control_wires
+
+    @property
+    def control_values(self):
+        return self._control_values
+
+    @property
+    def work_wires(self):
+        return self._work_wires
 
 
 def qctrl_distribute(
@@ -1152,11 +1171,9 @@ def qctrl_distribute(
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     tape2 = qctrl_distribute(
                         region.quantum_tape,
-                        control_wires + op.control_wire_tracers,
-                        control_values + op.control_value_tracers,
-                        ((work_wires or []) + (op.work_wire_tracers or []))
-                        if (work_wires is not None or op.work_wire_tracers is not None)
-                        else None,
+                        control_wires + op.control_wires,
+                        control_values + op.control_values,
+                        work_wires + op.work_wires,
                     )
                     ops2.extend(tape2.operations)
             else:
@@ -1170,7 +1187,7 @@ def qctrl_distribute(
             ops2.append(
                 Controlled(
                     type(op)(*op.parameters, wires=op.wires),
-                    control_wires=qml.wires.Wires(control_wires),
+                    control_wires=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
                 )
@@ -1973,17 +1990,14 @@ def ctrl(
     array([0.25, 0.25, 0.03661165, 0.46338835])
     """
 
-    def _tolist(x):
-        return [x] if not isinstance(x, list) else x
-
-    control = _tolist(control)
-    control_values = _tolist(control_values) if control_values is not None else [1] * len(control)
-    if len(control) != len(control_values):
+    if control_values is not None and (
+        (len(control) if isinstance(control, Sized) else 1)
+        != (len(control_values) if isinstance(control_values, Sized) else 1)
+    ):
         raise ValueError(
             f"Length of the control_values ({len(control_values)}) must be None or equal "
             f"to the lenght of control ({len(control)})"
         )
-    work_wires = _tolist(work_wires) if work_wires is not None else None
 
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
