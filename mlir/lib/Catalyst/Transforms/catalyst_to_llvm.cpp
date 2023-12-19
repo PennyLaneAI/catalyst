@@ -157,8 +157,6 @@ std::optional<int8_t> encodeNumericType(Type elemType)
 Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
                          Type llvmMemrefType, Value memrefLlvm)
 {
-    memrefType.dump();
-    memrefLlvm.dump();
     auto ctx = rewriter.getContext();
 
     // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
