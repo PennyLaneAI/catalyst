@@ -151,9 +151,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
         }
 
         this->observables_.push_back(std::make_pair(
-            std::make_shared<Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>>(
-                Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>::create(
-                    obs_vec)),
+            Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>::create(obs_vec),
             ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);

@@ -274,7 +274,6 @@ class AdjointGenerator {
         SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
         func::FuncOp funcOp =
             dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
-
         assert(funcOp != nullptr && "The funcOp is null and therefore not supported.");
 
         auto resultTypes = funcOp.getResultTypes();

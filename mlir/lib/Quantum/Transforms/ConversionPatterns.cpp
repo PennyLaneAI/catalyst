@@ -96,10 +96,10 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
     }
 };
 
-struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
+struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(DeviceOp op, DeviceOpAdaptor adaptor,
+    LogicalResult matchAndRewrite(DeviceInitOp op, DeviceInitOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
@@ -131,6 +131,26 @@ struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
         rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 
         rewriter.eraseOp(op);
+
+        return success();
+    }
+};
+
+struct DeviceReleaseOpPattern : public OpConversionPattern<DeviceReleaseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DeviceReleaseOp op, DeviceReleaseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = this->getContext();
+
+        StringRef qirName = "__quantum__rt__device_release";
+
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+
+        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
 
         return success();
     }
@@ -724,7 +744,8 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
-    patterns.add<DeviceOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());

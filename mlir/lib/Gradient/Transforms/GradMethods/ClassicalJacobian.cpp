@@ -88,7 +88,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
             }
             // Any other gates or quantum instructions can also be stripped.
             // Measurements are handled separately.
-            else if (isa<quantum::DeviceOp>(op)) {
+            else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
@@ -100,6 +100,10 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
             }
+            else if (isa<quantum::DeviceReleaseOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+
             // Replace any return statements from the original function with the parameter count.
             else if (isa<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -172,7 +176,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
             }
             // Any other gates or quantum instructions also need to be stripped.
             // Measurements are handled separately.
-            else if (isa<quantum::DeviceOp>(op)) {
+            else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
@@ -184,6 +188,10 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
             }
+            else if (isa<quantum::DeviceReleaseOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+
             // Return ops should be preceded with calls to the modified QNode
             else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
@@ -262,7 +270,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
             }
             // Any other gates or quantum instructions also need to be stripped.
             // Measurements are handled separately.
-            else if (isa<quantum::DeviceOp>(op)) {
+            else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
@@ -274,6 +282,10 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
             else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
             }
+            else if (isa<quantum::DeviceReleaseOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+
             else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(returnOp);

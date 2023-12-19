@@ -222,6 +222,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             auto results = callOp.getResultTypes();
 
             bool multiReturns = results.size() > 1;
+
             bool quantum = std::any_of(results.begin(), results.end(),
                                        [](const auto &value) { return isa<QuregType>(value); });
 

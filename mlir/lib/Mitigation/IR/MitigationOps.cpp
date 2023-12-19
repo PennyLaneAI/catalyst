@@ -53,9 +53,11 @@ LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     auto callee = this->getCalleeAttr();
     func::FuncOp fn =
         symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
-    if (!fn)
+    if (!fn) {
         return this->emitOpError("invalid function name specified: ") << callee;
-    if (!fn->hasAttrOfType<UnitAttr>("qnode"))
-        return this->emitOpError("ZNE can only be applied on QNodes. ") << callee;
+    }
+    if (!fn->hasAttrOfType<UnitAttr>("qnode")) {
+        return this->emitOpError("ZNE can only be applied on QNodes: ") << callee;
+    }
     return success();
 }

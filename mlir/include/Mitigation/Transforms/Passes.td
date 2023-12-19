@@ -18,7 +18,7 @@
 include "mlir/Pass/PassBase.td"
 
 def MitigationLoweringPass : Pass<"lower-mitigation"> {
-    let summary = "Lower the Zne operation in the mitigation dialect to core MLIR dialects.";
+    let summary = "Lower the ZNE operation in the mitigation dialect to core MLIR dialects.";
 
     let dependentDialects = [
         "arith::ArithDialect",

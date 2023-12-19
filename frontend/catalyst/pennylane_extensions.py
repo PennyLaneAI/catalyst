@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
+import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -85,7 +86,7 @@ from catalyst.utils.jax_extras import (
     unzip2,
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.runtime import extract_backend_info, get_lib_path
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -115,19 +116,40 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device):
+    def __init__(self, fn, device):  # pragma: nocover
         self.func = fn
         self.device = device
         update_wrapper(self, fn)
 
+    @staticmethod
+    def _add_toml_file(device):
+        """Temporary function. This function adds the config field to devices.
+        TODO: Remove this function when `qml.Device`s are guaranteed to have their own
+        config file field."""
+        if hasattr(device, "config"):  # pragma: no cover
+            # Devices that already have a config field do not need it to be overwritten.
+            return
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        name = device.name
+        if isinstance(device, qml.Device):
+            name = device.short_name
+
+        # The toml files name convention we follow is to replace
+        # the dots with underscores in the device short name.
+        toml_file_name = name.replace(".", "_") + ".toml"
+        # And they are currently saved in the following directory.
+        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+        device.config = toml_file
+
     def __call__(self, *args, **kwargs):
         qnode = None
-        if isinstance(self, QNode):
+        if isinstance(self, qml.QNode):
             qnode = self
-            device = QJITDevice(
-                self.device.shots, self.device.wires, *extract_backend_info(self.device)
-            )
-        else:
+            QFunc._add_toml_file(self.device)
+            dev_args = extract_backend_info(self.device)
+            config, rest = dev_args[0], dev_args[1:]
+            device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
+        else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
@@ -168,22 +190,24 @@ class QJITDevice(qml.QubitDevice):
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
-    operations = [
-        "MidCircuitMeasure",
-        "Cond",
-        "WhileLoop",
-        "ForLoop",
+
+    # These must be present even if empty.
+    operations = []
+    observables = []
+
+    operations_supported_by_QIR_runtime = {
+        "Identity",
         "PauliX",
         "PauliY",
         "PauliZ",
         "Hadamard",
-        "Identity",
         "S",
         "T",
         "PhaseShift",
         "RX",
         "RY",
         "RZ",
+        "Rot",
         "CNOT",
         "CY",
         "CZ",
@@ -191,31 +215,76 @@ class QJITDevice(qml.QubitDevice):
         "IsingXX",
         "IsingYY",
         "IsingXY",
-        "IsingZZ",
         "ControlledPhaseShift",
         "CRX",
         "CRY",
         "CRZ",
         "CRot",
         "CSWAP",
+        "Toffoli",
         "MultiRZ",
         "QubitUnitary",
-        "Adjoint",
-    ]
-    observables = [
-        "Identity",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "Hadamard",
-        "Hermitian",
-        "Hamiltonian",
-    ]
+    }
+
+    @staticmethod
+    def _get_operations_to_convert_to_matrix(_config):
+        # We currently override and only set MultiControlledX to preserve current behaviour.
+        # We could choose to read from config and use the "matrix" gates.
+        # However, that affects differentiability.
+        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
+        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
+        return {"MultiControlledX"}
+
+    @staticmethod
+    def _check_mid_circuit_measurement(config):
+        return config["compilation"]["mid_circuit_measurement"]
+
+    @staticmethod
+    def _check_adjoint(config):
+        return config["compilation"]["quantum_adjoint"]
+
+    @staticmethod
+    def _check_quantum_control(config):
+        return config["compilation"]["quantum_control"]
+
+    @staticmethod
+    def _set_supported_operations(config):
+        """Override the set of supported operations."""
+        native_gates = set(config["operators"]["gates"][0]["native"])
+        qir_gates = QJITDevice.operations_supported_by_QIR_runtime
+        QJITDevice.operations = list(native_gates.intersection(qir_gates))
+
+        # These are added unconditionally.
+        QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
+
+        if QJITDevice._check_mid_circuit_measurement(config):  # pragma: no branch
+            QJITDevice.operations += ["MidCircuitMeasure"]
+
+        if QJITDevice._check_adjoint(config):
+            QJITDevice.operations += ["Adjoint"]
+
+        if QJITDevice._check_quantum_control(config):  # pragma: nocover
+            QJITDevice.operations += ["QCtrl"]
+
+    @staticmethod
+    def _set_supported_observables(config):
+        """Override the set of supported observables."""
+        QJITDevice.observables = config["operators"]["observables"]
 
     # pylint: disable=too-many-arguments
     def __init__(
-        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+        self,
+        config,
+        shots=None,
+        wires=None,
+        backend_name=None,
+        backend_lib=None,
+        backend_kwargs=None,
     ):
+        QJITDevice._set_supported_operations(config)
+        QJITDevice._set_supported_observables(config)
+
+        self.config = config
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
@@ -248,22 +317,25 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
+        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
+
+        def _decomp_to_unitary(self, *_args, **_kwargs):
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
         # numbers of qubits, a unitary gate might be faster, while for large qubit numbers prior
         # decomposition is generally faster.
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-
-        def _decomp_controlled(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
-
-        with Patcher(
+        overriden_methods = [  # pragma: no cover
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
-            (qml.ops.Controlled, "decomposition", _decomp_controlled),
-            # TODO: Remove once work_wires is no longer needed for decomposition.
-            (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
-        ):
+            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
+        ]
+        for gate in decompose_to_qubit_unitary:
+            overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
+
+        with Patcher(*overriden_methods):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
         self.check_validity(expanded_tape.operations, [])
