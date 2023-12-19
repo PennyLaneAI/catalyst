@@ -207,6 +207,7 @@ class RTDevice {
     std::string rtd_name;
     std::string rtd_kwargs;
 
+    std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::shared_ptr<QuantumDevice> rtd_qdevice{nullptr};
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
@@ -254,7 +255,7 @@ class RTDevice {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
-    ~RTDevice() = default;
+    ~RTDevice() { rtd_dylib.reset(nullptr); }
 
     auto operator==(const RTDevice &other) const -> bool
     {
@@ -268,8 +269,7 @@ class RTDevice {
             return rtd_qdevice;
         }
 
-        std::unique_ptr<SharedLibraryManager> rtd_dylib =
-            std::make_unique<SharedLibraryManager>(rtd_lib);
+        rtd_dylib = std::make_unique<SharedLibraryManager>(rtd_lib);
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
         QuantumDevice *impl =
@@ -284,6 +284,7 @@ class RTDevice {
     {
         return {rtd_lib, rtd_name, rtd_kwargs};
     }
+};
 
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
 
@@ -315,13 +316,13 @@ class ExecutionContext final {
     explicit ExecutionContext() : initial_tape_recorder_status(false)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
-    };
+    }
 
     ~ExecutionContext()
     {
         memory_man_ptr.reset(nullptr);
         py_guard.reset(nullptr);
-    };
+    }
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
@@ -355,8 +356,8 @@ class ExecutionContext final {
         RT_ASSERT(device->getQuantumDevicePtr());
 
         // Add a new device
+        device->setDeviceStatus(RTDeviceStatus::Active);
         device_pool.push_back(device);
-        device_pool[key]->setDeviceStatus(RTDeviceStatus::Active);
 
 #ifdef __build_with_pybind11
         if (!py_guard && device->getDeviceName() == "OpenQasmDevice" && !Py_IsInitialized()) {
@@ -382,12 +383,8 @@ class ExecutionContext final {
         return device_pool[device_key];
     }
 
-    void inactivateDevice(RTDevice *RTD_PTR)
+    void deactivateDevice(RTDevice *RTD_PTR)
     {
-        if (!RTD_PTR) {
-            return;
-        }
-
         std::lock_guard<std::mutex> lock(pool_mu);
         RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
     }
