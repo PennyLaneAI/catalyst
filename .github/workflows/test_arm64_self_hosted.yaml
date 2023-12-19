@@ -1,0 +1,14 @@
+name: Testing ARM
+on:
+  pull_request:
+
+concurrency:
+  group: test
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: xanadu-arm64-mac
+
+    steps:
+      - run: echo 'Hello World'
