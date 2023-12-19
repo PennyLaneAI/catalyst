@@ -652,9 +652,9 @@ def while_loop_expansion_strategy(preserve_dimensions=False):
     return ExpansionStrategy(None, not preserve_dimensions, True, False)
 
 
-def for_loop_expansion_strategy():
+def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
-    return ExpansionStrategy(None, True, True, True)
+    return ExpansionStrategy(None, not preserve_dimensions, True, True)
 
 
 def cond_expansion_strategy():

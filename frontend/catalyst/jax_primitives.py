@@ -1319,14 +1319,14 @@ def _while_loop_lowering(
 # for loop
 #
 @for_p.def_abstract_eval
-def _for_loop_abstract_eval(*args, body_jaxpr, nimplicit=0, **kwargs):
+def _for_loop_abstract_eval(*args, body_jaxpr, nimplicit, preserve_dimensions, **kwargs):
     _assert_jaxpr_without_constants(body_jaxpr)
 
     return infer_output_type_jaxpr(
         [],
         body_jaxpr.jaxpr.invars,
         body_jaxpr.jaxpr.outvars[nimplicit:],
-        expansion_strategy=for_loop_expansion_strategy(),
+        expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
         num_implicit_inputs=nimplicit,
     )
 
@@ -1342,6 +1342,7 @@ def _for_loop_def_impl(
     body_jaxpr,
     nimplicit=0,
     body_nconsts,
+    preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1352,7 +1353,8 @@ def _for_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
-    nimplicit: int = 0,
+    nimplicit: int,
+    preserve_dimensions,
 ):
     # Separate constants from iteration arguments.
     # The MLIR value provided by JAX for the iteration index is not needed

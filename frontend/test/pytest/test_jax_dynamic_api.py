@@ -370,6 +370,28 @@ def test_qjit_forloop_index_indbidx():
     assert_array_and_dtype_equal(res_a, jnp.ones(9))
 
 
+def test_qjit_forloop_shared_dimensions():
+    """Test catalyst for-loop primitive's preserve_dimensions option"""
+
+    @qjit
+    def f(sz: int):
+        input_a = jnp.ones([sz + 1], dtype=float)
+        input_b = jnp.ones([sz + 2], dtype=float)
+
+        @for_loop(0, 10, 1, preserve_dimensions=True)
+        def loop(i, _a, _b):
+            return (input_a, input_a)
+
+        outputs = loop(input_b, input_b)
+        assert outputs[0].shape[0] is outputs[1].shape[0]
+        return outputs
+
+    result = f(3)
+    expected = (jnp.ones(4, dtype=float), jnp.ones(4, dtype=float))
+    assert_array_and_dtype_equal(result[0], expected[0])
+    assert_array_and_dtype_equal(result[1], expected[1])
+
+
 def test_qnode_forloop_identity():
     """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
@@ -603,26 +625,26 @@ def test_qjit_while_2():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_while_3():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
+def test_qjit_while_shared_dimensions():
+    """Test catalyst while loop primitive's preserve dimensions option"""
 
     @qjit
     def f(sz: int):
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @while_loop(lambda _a, _b: False, preserve_dimensions=False)
-        def loop(_a, _b):
-            return (input_a, input_b)
+        @while_loop(lambda _a, _b, c: c, preserve_dimensions=True)
+        def loop(_a, _b, _c):
+            return (input_a, input_a, False)
 
-        outputs = loop(input_a, input_a)
+        outputs = loop(input_b, input_b, True)
+        assert outputs[0].shape[0] is outputs[1].shape[0]
         return outputs
 
     result = f(3)
-    print(f.jaxpr)
-    print(result)
-    # assert False
-    # TODO: fix
+    expected = (jnp.ones(4, dtype=float), jnp.ones(4, dtype=float))
+    assert_array_and_dtype_equal(result[0], expected[0])
+    assert_array_and_dtype_equal(result[1], expected[1])
 
 
 def test_qjit_while_shared_indbidx():

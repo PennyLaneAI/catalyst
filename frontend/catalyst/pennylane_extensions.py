@@ -966,6 +966,7 @@ class ForLoop(HybridOp):
         op = self
         inner_trace = op.regions[0].trace
         inner_tape = op.regions[0].quantum_tape
+        expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
@@ -974,7 +975,7 @@ class ForLoop(HybridOp):
 
             arg_expanded_tracers = expand_args(
                 self.regions[0].arg_classical_tracers + [qreg_in],
-                expansion_strategy=for_loop_expansion_strategy(),
+                expansion_strategy=expansion_strategy,
             )[0]
 
             nimplicit = len(arg_expanded_tracers) - len(self.regions[0].arg_classical_tracers) - 1
@@ -983,16 +984,14 @@ class ForLoop(HybridOp):
                 [],
                 arg_expanded_tracers,
                 self.regions[0].res_classical_tracers + [qreg_out],
-                expansion_strategy=for_loop_expansion_strategy(),
+                expansion_strategy=expansion_strategy,
                 num_implicit_inputs=nimplicit,
             )
             jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
 
         in_expanded_tracers = [
             *[trace.full_raise(c) for c in consts],
-            *expand_args(op.in_classical_tracers, expansion_strategy=for_loop_expansion_strategy())[
-                0
-            ],
+            *expand_args(op.in_classical_tracers, expansion_strategy=expansion_strategy)[0],
             qrp.actualize(),
         ]
 
@@ -1000,7 +999,7 @@ class ForLoop(HybridOp):
             [],
             in_expanded_tracers,
             self.out_classical_tracers,
-            expansion_strategy=for_loop_expansion_strategy(),
+            expansion_strategy=expansion_strategy,
             num_implicit_inputs=nimplicit,
         )[0]
 
@@ -1014,6 +1013,7 @@ class ForLoop(HybridOp):
                 body_nconsts=len(consts),
                 apply_reverse_transform=self.apply_reverse_transform,
                 nimplicit=nimplicit,
+                preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
         return qrp2
@@ -1605,7 +1605,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step):
+def for_loop(lower_bound, upper_bound, step, preserve_dimensions: bool = False):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -1681,6 +1681,8 @@ def for_loop(lower_bound, upper_bound, step):
     [array(0.97926626), array(0.55395718)]
     """
 
+    expansion_strategy = for_loop_expansion_strategy(preserve_dimensions)
+
     def _body_query(body_fn):
         apply_reverse_transform = isinstance(step, int) and step < 0
 
@@ -1695,7 +1697,7 @@ def for_loop(lower_bound, upper_bound, step):
                     body_fn,
                     (aux_classical_tracers[0], *init_state),
                     {},
-                    for_loop_expansion_strategy(),
+                    expansion_strategy,
                 )
                 in_type = in_sig.in_type
 
@@ -1713,7 +1715,7 @@ def for_loop(lower_bound, upper_bound, step):
 
                 in_expanded_classical_tracers, in_type2 = expand_args(
                     aux_classical_tracers + collapse(in_type, in_sig.in_expanded_args),
-                    for_loop_expansion_strategy(),
+                    expansion_strategy,
                 )
                 out_expanded_classical_tracers = output_type_to_tracers(
                     out_type,
@@ -1734,6 +1736,7 @@ def for_loop(lower_bound, upper_bound, step):
                         )
                     ],
                     apply_reverse_transform=apply_reverse_transform,
+                    expansion_strategy=expansion_strategy,
                 )
 
                 return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
@@ -1746,14 +1749,14 @@ def for_loop(lower_bound, upper_bound, step):
                     ctx,
                     body_fn,
                     *(aux_tracers[0], *init_state),
-                    expansion_strategy=for_loop_expansion_strategy(),
+                    expansion_strategy=expansion_strategy,
                 )
 
                 in_expanded_tracers = [
                     *out_sig.out_consts(),
                     *expand_args(
                         aux_tracers + collapse(in_sig.in_type, in_sig.in_expanded_args),
-                        expansion_strategy=for_loop_expansion_strategy(),
+                        expansion_strategy=expansion_strategy,
                     )[0],
                 ]
 
@@ -1763,6 +1766,7 @@ def for_loop(lower_bound, upper_bound, step):
                     body_nconsts=len(out_sig.out_consts()),
                     apply_reverse_transform=apply_reverse_transform,
                     nimplicit=in_sig.num_implicit_inputs(),
+                    preserve_dimensions=preserve_dimensions,
                 )
 
                 return tree_unflatten(
