@@ -135,8 +135,6 @@ __all__ = (
     "expand_args",
     "expand_results",
     "eval_jaxpr",
-    "initial_style_jaxprs_with_common_consts1",
-    "initial_style_jaxprs_with_common_consts2",
     "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
@@ -145,7 +143,6 @@ __all__ = (
     "output_type_to_tracers",
     "jaxpr_to_mlir",
     "jaxpr_remove_implicit",
-    "jaxpr_force_outvars",
     "make_jaxpr_effects",
     "make_jaxpr2",
     "new_dynamic_main2",
@@ -259,77 +256,6 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[Primitive]) -> 
     return [b.e for b in stable_toposort(boxes)]  # [4]
 
 
-def initial_style_jaxprs_with_common_consts1(
-    funs: Sequence[Callable], in_tree, in_avals, primitive_name: str
-):
-    """This function is the head (shorter) part of the original
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The algorithm is the
-    same at the time of this writing, we use this function only to avoid conflicts with future
-    versions of JAX.
-    """
-    jaxprs, all_consts, all_out_trees = unzip3(
-        _initial_style_open_jaxpr(fun, in_tree, in_avals, primitive_name) for fun in funs
-    )
-    closed_jaxprs, consts = initial_style_jaxprs_with_common_consts2(jaxprs, all_consts)
-    return closed_jaxprs, consts, all_out_trees
-
-
-def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
-    """This function is the tail (largest) part of the
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The JAX version
-    traces argument Python functions in order to determine signatures to be unified. Here we rely on
-    the fact that the tracing was already done elsewhere - and this is the only difference.
-    """
-
-    all_const_avals = [map(_abstractify, consts) for consts in all_consts]
-    for consts_avals in all_const_avals:
-        for aval in consts_avals:
-            assert not isinstance(
-                aval, state.AbstractRef
-            ), "AbstractRefs are not supported in this Catalyst version of this function"
-    canonical_ref_indices = []
-    canonical_refs: List[Any] = []
-    all_nonref_consts = []
-    canonical_ref_avals = []
-    all_nonref_const_avals = []
-    for consts, consts_avals in zip(all_consts, all_const_avals):
-        ref_indices = []
-        nonref_consts = []
-        nonref_const_avals = []
-        for c, aval in zip(consts, consts_avals):
-            assert not isinstance(
-                aval, state.AbstractRef
-            ), "AbstractRefs are not supported in this Catalyst version of this function"
-            nonref_consts.append(c)
-            nonref_const_avals.append(aval)
-        all_nonref_consts.append(nonref_consts)
-        all_nonref_const_avals.append(nonref_const_avals)
-        canonical_ref_indices.append(ref_indices)
-
-    newvar = gensym(jaxprs, suffix="_")
-    unused_ref_const_vars = map(newvar, canonical_ref_avals)
-    unused_const_vars = [map(newvar, const_avals) for const_avals in all_nonref_const_avals]
-
-    def pad_jaxpr_constvars(i, jaxpr):
-        is_ref = [isinstance(v.aval, state.AbstractRef) for v in jaxpr.constvars]
-        nonref_constvars, ref_constvars = partition_list(is_ref, jaxpr.constvars)
-        padded_ref_constvars = unused_ref_const_vars[:]
-        for canonical_id, ref_var in zip(canonical_ref_indices[i], ref_constvars):
-            padded_ref_constvars[canonical_id] = ref_var  # pragma: no cover
-        const_prefix = util.concatenate(unused_const_vars[:i])
-        const_suffix = util.concatenate(unused_const_vars[i + 1 :])
-        constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
-        jaxpr = jaxpr.replace(constvars=constvars)
-        effects = make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
-        jaxpr = jaxpr.replace(effects=effects)
-        return jaxpr
-
-    consts = [*canonical_refs, *util.concatenate(all_nonref_consts)]
-    jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
-    closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
-    return closed_jaxprs, consts
-
-
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
     """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
     same constants."""
@@ -365,61 +291,6 @@ def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
             ClosedJaxpr(convert_constvars_jaxpr(jaxpr.replace(constvars=padded_constvars)), ())
         )
     return acc
-
-    # all_const_avals = [map(_abstractify, consts) for consts in all_consts]
-
-    # canonical_ref_indices = []
-    # canonical_refs: List[Any] = []
-    # all_nonref_consts = []
-    # canonical_ref_avals = []
-    # all_nonref_const_avals = []
-    # for consts, consts_avals in zip(all_consts, all_const_avals):
-    #     ref_indices = []
-    #     nonref_consts = []
-    #     nonref_const_avals = []
-    #     for c, aval in zip(consts, consts_avals):
-    #         assert not isinstance(
-    #             aval, state.AbstractRef
-    #         ), "AbstractRefs are not supported in this Catalyst version of this function"
-    #         nonref_consts.append(c)
-    #         nonref_const_avals.append(aval)
-    #     all_nonref_consts.append(nonref_consts)
-    #     all_nonref_const_avals.append(nonref_const_avals)
-    #     canonical_ref_indices.append(ref_indices)
-
-    # newvar = gensym(jaxprs, suffix="_")
-    # unused_ref_const_vars = map(newvar, canonical_ref_avals)
-    # unused_const_vars = [map(newvar, const_avals) for const_avals in all_nonref_const_avals]
-
-    # def pad_jaxpr_constvars(i, jaxpr):
-    #     is_ref = [isinstance(v.aval, state.AbstractRef) for v in jaxpr.constvars]
-    #     nonref_constvars, ref_constvars = partition_list(is_ref, jaxpr.constvars)
-    #     padded_ref_constvars = unused_ref_const_vars[:]
-
-    #     for canonical_id, ref_var in zip(canonical_ref_indices[i], ref_constvars):
-    #         padded_ref_constvars[canonical_id] = ref_var  # pragma: no cover
-
-    #     const_prefix = util.concatenate(unused_const_vars[:i])
-    #     const_suffix = util.concatenate(unused_const_vars[i + 1 :])
-    #     constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
-    #     jaxpr = jaxpr.replace(constvars=constvars)
-    #     effects = make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
-    #     jaxpr = jaxpr.replace(effects=effects)
-    #     return jaxpr
-
-    # consts = [*canonical_refs, *util.concatenate(all_nonref_consts)]
-    # jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
-    # closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
-    # return closed_jaxprs, consts
-
-
-@transformation
-def expanded_fun(in_type, *args_expanded):
-    """Function transformation making the function to accept its arguments in the expanded format
-    (with the dimension variables added)"""
-    args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
-    ans = yield args_collapsed, {}
-    yield ans
 
 
 @transformation_with_aux
@@ -673,48 +544,6 @@ def jaxpr_remove_implicit(
     return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
 
 
-def jaxpr_force_outvars(
-    closed_jaxpr: ClosedJaxpr, out_type: OutputType
-) -> tuple[ClosedJaxpr, OutputType]:
-    """Turn all the InDBIdx references in a Jaxpr program into OutDBIdx."""
-    jaxpr = closed_jaxpr.jaxpr
-    out_aval, out_keep = unzip2(out_type)
-    num_inrefs = max(
-        sum(
-            (
-                [d.val for d in a.shape if isinstance(d, InDBIdx)]
-                for a in out_aval
-                if hasattr(a, "shape")
-            ),
-            [0],
-        )
-    )
-
-    def _new_shape(shape):
-        shape2 = []
-        for d in shape:
-            if isinstance(d, InDBIdx):
-                d2 = OutDBIdx(d.val)
-            elif isinstance(d, OutDBIdx):
-                d2 = OutDBIdx(d.val + num_inrefs)
-            else:
-                d2 = d
-            shape2.append(d2)
-        return tuple(shape2)
-
-    for v in out_aval:
-        if hasattr(v, "shape"):
-            v.update(shape=_new_shape(v.shape))
-    outvars2 = jaxpr.invars[:num_inrefs] + jaxpr.outvars
-    out_type2 = tuple((i.aval, False) for i in jaxpr.invars[:num_inrefs]) + tuple(
-        zip(out_aval, out_keep)
-    )
-    jaxpr2 = Jaxpr(
-        jaxpr.constvars, jaxpr.invars, outvars2, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
-    )
-    return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
-
-
 def make_jaxpr2(
     fun: Callable,
     abstracted_axes: Any | None = None,
@@ -846,11 +675,6 @@ def cond_expansion_strategy():
     return ExpansionStrategy(None, False, True, False)
 
 
-def default_expansion_strategy(axes_spec):
-    """Arguments and results expansion strategy implicitly used in Jax by default."""
-    return ExpansionStrategy(axes_spec, False, False, False)
-
-
 def infer_output_type(
     constants: List[TracerLike],
     expanded_inputs: List[TracerLike],
@@ -965,7 +789,6 @@ def infer_output_type_python(
 def expand_args(
     args: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
-    in_type=None,
 ) -> Tuple[List[TracerLike], InputType]:
     """Calculate the expanded list of arguments of a Python program, based on the list of its
     explicit arguments.
@@ -973,22 +796,17 @@ def expand_args(
     Args:
         args: List of explicit arguments of the Python program
         expansion_strategy: Argument expansion options
-        in_type: pre-calculated InputType. If None, the type will be recalculated.
 
     Returns:
         List of arguments containing both explicit and implicit arguments
         OutputType describing the expanded result
     """
     s = expansion_strategy
-    if in_type is None:
-        if s.input_unshare_variables is True:
-            assert s.axes_specs is None
-            in_type = infer_input_type_unshared(args)
-        else:
-            in_type = infer_lambda_input_type(s.axes_specs, args)
-    else:
+    if s.input_unshare_variables is True:
         assert s.axes_specs is None
-        assert s.input_unshare_variables is False
+        in_type = infer_input_type_unshared(args)
+    else:
+        in_type = infer_lambda_input_type(s.axes_specs, args)
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
 
