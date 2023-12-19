@@ -65,10 +65,8 @@ from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynshapePrimitive,
     cond_expansion_strategy,
-    default_expansion_strategy,
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
-    out_type_force_outdbidx,
     while_loop_expansion_strategy,
 )
 
@@ -1223,7 +1221,7 @@ def _cond_lowering(
 
 #
 # while loop
-#
+# pylint: disable=too-many-arguments
 @while_p.def_impl
 def _while_loop_def_impl(
     ctx,

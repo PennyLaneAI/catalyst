@@ -26,8 +26,6 @@ from typing import Any, Callable, Iterable, List, Optional, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax._src.api_util import shaped_abstractify
-from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
@@ -68,34 +66,23 @@ from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (  # infer_output_type3,
     ClosedJaxpr,
     DynamicJaxprTracer,
-    ExpansionStrategy,
     Jaxpr,
     ShapedArray,
-    _extract_implicit_args,
-    _initial_style_jaxpr,
     _input_type_to_tracers,
     collapse,
     cond_expansion_strategy,
     convert_constvars_jaxpr,
     deduce_avals,
     deduce_avals3,
-    default_expansion_strategy,
     expand_args,
     expand_results,
     find_top_trace,
     for_loop_expansion_strategy,
     get_implicit_and_explicit_flat_args,
-    initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
     input_type_to_tracers,
-    jaxpr_force_outvars,
     jaxpr_pad_consts,
-    make_jaxpr2,
     new_inner_tracer,
-    new_inner_tracer2,
-    out_type_force_outdbidx,
     output_type_to_tracers,
-    tracer_index,
     unzip2,
     while_loop_expansion_strategy,
 )
@@ -1001,7 +988,7 @@ class Cond(HybridOp):
         nouts_s = list(set(nouts))
         assert len(nouts_s) == 1
         num_implicit_outputs = nouts_s[0]
-        all_jaxprs, out_type2, all_consts = unify_convert_result_types(
+        all_jaxprs, _, all_consts = unify_convert_result_types(
             ctx, jaxprs, consts, num_implicit_outputs
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)

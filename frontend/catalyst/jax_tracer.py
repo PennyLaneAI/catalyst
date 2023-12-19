@@ -54,24 +54,18 @@ from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracin
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
-    ConcreteArray,
-    DShapedArray,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    Jaxpr,
-    OutputType,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
     _abstractify,
     _input_type_to_tracers,
     cond_expansion_strategy,
-    convert_constvars_jaxpr,
     convert_element_type,
     deduce_avals,
     deduce_avals3,
     eval_jaxpr,
-    expand_args,
     gensym,
     input_type_to_tracers,
     jaxpr_remove_implicit,
@@ -81,7 +75,6 @@ from catalyst.utils.jax_extras import (
     tree_flatten,
     tree_structure,
     tree_unflatten,
-    unzip2,
     wrap_init,
 )
 
@@ -175,7 +168,6 @@ def _apply_result_type_conversion2(
     ctx, jaxpr: ClosedJaxpr, consts, target_types: List[ShapedArray], num_implicit_outputs
 ):
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
-    newvar = gensym([jaxpr], suffix="_")
     args = [AbstractQreg()] if with_qreg else []
 
     def _fun(*in_tracers):
@@ -215,7 +207,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
     acc, consts2 = [], []
     for j, a in zip(jaxprs, consts):
-        in_sig, out_sig = _apply_result_type_conversion2(
+        _, out_sig = _apply_result_type_conversion2(
             ctx, j, a, promoted_types, num_implicit_outputs
         )
         acc.append(out_sig.out_initial_jaxpr())
@@ -407,6 +399,7 @@ def has_nested_tapes(op: Operation) -> bool:
 
 
 def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
+    """ Trace Python function supporting variable dimensions in its arguments and/or results """
     wfun, in_sig, out_sig = deduce_avals3(fun, args, kwargs, expansion_strategy=expansion_strategy)
     with EvaluationContext.frame_tracing_context(ctx) as trace:
         arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
