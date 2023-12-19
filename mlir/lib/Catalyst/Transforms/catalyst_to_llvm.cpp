@@ -167,11 +167,11 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     Type ptr = LLVM::LLVMPointerType::get(ctx);
     auto type = LLVM::LLVMStructType::getLiteral(ctx, {i64, ptr, i8});
 
-    std::optional<int8_t> element_dtype = encodeNumericType(memrefType.getElementType());
+    std::optional<int8_t> elementDtype = encodeNumericType(memrefType.getElementType());
 
     // Create values for filling encoded memref struct.
     Value dtype = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI8IntegerAttr(static_cast<uint8_t>(element_dtype.value())));
+        loc, rewriter.getI8IntegerAttr(elementDtype.value()));
     Value rank =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(memrefType.getRank()));
 
@@ -276,8 +276,6 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
 Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
                        Type llvmMemrefType, Value memrefLlvm)
 {
-    memrefType.dump();
-    memrefLlvm.dump();
     auto ctx = rewriter.getContext();
 
     // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
@@ -286,11 +284,11 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     Type ptr = LLVM::LLVMPointerType::get(ctx);
     auto type = LLVM::LLVMStructType::getLiteral(ctx, {i64, ptr, i8});
 
-    std::optional<int8_t> element_dtype = encodeNumericType(memrefType.getElementType());
+    std::optional<int8_t> elementDtype = encodeNumericType(memrefType.getElementType());
 
     // Create values for filling encoded memref struct.
     Value dtype = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI8IntegerAttr(static_cast<uint8_t>(element_dtype.value())));
+        loc, rewriter.getI8IntegerAttr(elementDtype.value()));
     Value rank =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(memrefType.getRank()));
 
@@ -346,22 +344,22 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         // Encode args
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        SmallVector<LLVM::AllocaOp> encoded;
+        SmallVector<LLVM::AllocaOp> encodedArgs;
         for (auto tuple : llvm::zip(args, argsConverted)) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             Type llvmMemrefType = std::get<1>(tuple).getType();
-            auto encoded_arg =
+            auto encodedArg =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
             LLVM::AllocaOp alloca =
-                rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_arg.getType(), c1, 0);
+                rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedArg.getType(), c1, 0);
             // Use volatile store to suppress expensive LLVM optimizations.
-            rewriter.create<LLVM::StoreOp>(loc, encoded_arg, alloca, /*alignment=*/0,
+            rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca, /*alignment=*/0,
                                            /*isVolatile=*/true);
-            encoded.push_back(alloca);
+            encodedArgs.push_back(alloca);
         }
 
         // We store encoded arguments as `!llvm.array<ptr x len>`.
-        size_t len = encoded.size();
+        size_t len = encodedArgs.size();
         Type typeArgs = LLVM::LLVMArrayType::get(ptr, len);
 
         // Prepare an array for encoded arguments.
@@ -370,7 +368,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             arrArgs = rewriter.create<LLVM::InsertValueOp>(loc, arrArgs, value, offset);
         };
         // Store pointer to encoded arguments into the allocated storage.
-        for (const auto &pair : llvm::enumerate(encoded)) {
+        for (const auto &pair : llvm::enumerate(encodedArgs)) {
             int64_t offset = pair.index();
             insertValueArgs(pair.value(), offset);
         }
@@ -387,22 +385,22 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Results: ########
 
         // Encode all returns as a set of pointers
-        SmallVector<LLVM::AllocaOp> encodedRes;
+        SmallVector<LLVM::AllocaOp> encodedRess;
         for (auto tuple : llvm::zip(res, resConverted)) {
             auto memref_type = std::get<0>(tuple).getType().cast<MemRefType>();
             Type llvmMemrefType = std::get<1>(tuple).getType();
-            auto encoded_res =
+            auto encodedRes =
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
             LLVM::AllocaOp alloca =
-                rewriter.create<LLVM::AllocaOp>(loc, ptr, encoded_res.getType(), c1, 0);
+                rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedRes.getType(), c1, 0);
             // Use volatile store to suppress expensive LLVM optimizations.
-            rewriter.create<LLVM::StoreOp>(loc, encoded_res, alloca, /*alignment=*/0,
+            rewriter.create<LLVM::StoreOp>(loc, encodedRes, alloca, /*alignment=*/0,
                                            /*isVolatile=*/true);
-            encodedRes.push_back(alloca);
+            encodedRess.push_back(alloca);
         }
 
         // We store encoded results as `!llvm.array<ptr x len>`.
-        size_t lenRes = encodedRes.size();
+        size_t lenRes = encodedRess.size();
         Type typeRes = LLVM::LLVMArrayType::get(ptr, lenRes);
 
         // Prepare an array for encoding results.
@@ -412,7 +410,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         };
 
         // Store encoded results into the allocated storage.
-        for (const auto &pair : llvm::enumerate(encodedRes)) {
+        for (const auto &pair : llvm::enumerate(encodedRess)) {
             int64_t offset = pair.index();
             insertValueRes(pair.value(), offset);
         }
