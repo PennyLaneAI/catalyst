@@ -20,9 +20,9 @@ while using :func:`~.qjit`.
 
 import numbers
 import pathlib
+from collections.abc import Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
-from collections.abc import Sized
 
 import jax
 import jax.numpy as jnp
@@ -1136,14 +1136,17 @@ class QCtrl(HybridOp):
 
     @property
     def control_wires(self):
+        """Wires used in quantum conditioning."""
         return self._control_wires
 
     @property
     def control_values(self):
+        """(Boolean) Values upon which to condition on."""
         return self._control_values
 
     @property
     def work_wires(self):
+        """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
 
 
