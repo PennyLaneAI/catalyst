@@ -1,1 +1,0 @@
-void initlapack_wrapper(void) {}
