@@ -43,7 +43,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     // Scalar factors
     auto scalarFactors = op.getScalarFactors();
     RankedTensorType scalarFactorType = scalarFactors.getType().cast<RankedTensorType>();
-    auto sizeInt = scalarFactorType.getDimSize(0);
+    const auto sizeInt = scalarFactorType.getDimSize(0);
 
     // Create the folded circuit function
     FlatSymbolRefAttr foldedCircuitRefAttr =
@@ -64,7 +64,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
             .create<scf::ForOp>(
                 loc, c0, size, c1, /*iterArgsInit=*/results,
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                    std::vector<Value> newArgs{op.getArgs().begin(), op.getArgs().end()};
+                    std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
                     SmallVector<Value> index = {i};
                     Value scalarFactor =
                         builder.create<tensor::ExtractOp>(loc, scalarFactors, index);
@@ -128,7 +128,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     // Function folded: Create the folded circuit (withoutMeasurement *
     // Adjoint(withoutMeasurement))**scalar_factor * withMeasurements
     rewriter.setInsertionPointToStart(moduleOp.getBody());
-    SmallVector<Type> typesFolded = {originalTypes.begin(), originalTypes.end()};
+    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
     Type indexType = rewriter.getIndexType();
     typesFolded.push_back(indexType);
     FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
@@ -155,8 +155,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                 loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                     Value qreg = iterArgs.front();
-                    std::vector<Value> argsAndQreg = {fnFoldedOp.getArguments().begin(),
-                                                      fnFoldedOp.getArguments().end()};
+                    std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
+                                                   fnFoldedOp.getArguments().end());
                     argsAndQreg.pop_back();
                     argsAndQreg.push_back(qreg);
 
@@ -171,8 +171,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                     Region *adjointRegion = &adjointOp.getRegion();
                     Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
 
-                    std::vector<Value> argsAndQregAdjoint {fnFoldedOp.getArguments().begin(),
-                                                             fnFoldedOp.getArguments().end()};
+                    std::vector<Value> argsAndQregAdjoint(fnFoldedOp.getArguments().begin(),
+                                                          fnFoldedOp.getArguments().end());
                     argsAndQregAdjoint.pop_back();
                     argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));
                     Value fnWithoutMeasurementsAdjointQreg =
@@ -184,8 +184,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                     builder.create<scf::YieldOp>(loc, adjointOp.getResult());
                 })
             .getResult(0);
-    std::vector<Value> argsAndRegMeasurement = {fnFoldedOp.getArguments().begin(),
-                                                fnFoldedOp.getArguments().end()};
+    std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
+                                             fnFoldedOp.getArguments().end());
     argsAndRegMeasurement.pop_back();
     argsAndRegMeasurement.push_back(loopedQreg);
     ValueRange funcFolded =
@@ -228,16 +228,15 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    Type qregType = quantum::QuregType::get(rewriter.getContext());
-    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    TypeRange originalTypes = op.getArgs().getTypes();
-
     std::string fnWithoutMeasurementsName = op.getCallee().str() + ".withoutMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
     }
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    TypeRange originalTypes = op.getArgs().getTypes();
 
-    SmallVector<Type> typesWithoutMeasurements = {originalTypes.begin(), originalTypes.end()};
+    SmallVector<Type> typesWithoutMeasurements(originalTypes.begin(), originalTypes.end());
     typesWithoutMeasurements.push_back(qregType);
 
     FunctionType fnWithoutMeasurementsType = FunctionType::get(ctx, /*inputs=*/
@@ -276,15 +275,17 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
     MLIRContext *ctx = rewriter.getContext();
     OpBuilder::InsertionGuard guard(rewriter);
     ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-    Type qregType = quantum::QuregType::get(rewriter.getContext());
-    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    TypeRange originalTypes = op.getArgs().getTypes();
 
     std::string fnWithMeasurementsName = op.getCallee().str() + ".withMeasurements";
     if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
         return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
     }
-    SmallVector<Type> typesWithQreg = {originalTypes.begin(), originalTypes.end()};
+
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    TypeRange originalTypes = op.getArgs().getTypes();
+
+    SmallVector<Type> typesWithQreg(originalTypes.begin(), originalTypes.end());
     typesWithQreg.push_back(qregType);
 
     FunctionType fnWithMeasurementsType = FunctionType::get(ctx, /*inputs=*/

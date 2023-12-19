@@ -15,7 +15,8 @@
 #ifndef MITIGATION_DIALECT
 #define MITIGATION_DIALECT
 
-include "mlir/IR/OpBase.td"
+include "mlir/IR/DialectBase.td"
+include "mlir/IR/AttrTypeBase.td"
 
 //===----------------------------------------------------------------------===//
 // Mitigation dialect definition.
@@ -29,6 +30,10 @@ def Mitigation_Dialect : Dialect {
         as well as lowering mechanisms to compute the mitigated expectation value.
     }];
     let cppNamespace = "::catalyst::mitigation";
+
+    /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
+    // let useDefaultTypePrinterParser = 1;
+    // let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//
