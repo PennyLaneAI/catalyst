@@ -25,6 +25,10 @@ from numpy.testing import assert_allclose
 from catalyst import cond, for_loop, qjit, while_loop
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy
+from numpy import array_equal
+from numpy.testing import assert_allclose
+
+from catalyst import qjit, while_loop
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -282,7 +286,7 @@ def test_slice_dynamic_array_dynamic_index():
 
 
 def test_classical_tracing_2():
-    """Test that tensor primitive work in the classical tracing mode, the traced dimention case"""
+    """Test that tensor primitive work in the classical tracing mode, the traced dimension case"""
 
     @qjit
     def f(x):
@@ -783,10 +787,35 @@ def test_qjit_cond_const_outdbidx():
 
 
 @pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
+def test_quantum_tracing_1():
+    """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(shape):
+        i = 0
+        a = jnp.ones(shape, dtype=float)
+
+        @while_loop(lambda _, i: i < 3)
+        def loop(_, i):
+            qml.PauliX(wires=0)
+            b = jnp.ones(shape, dtype=float)
+            i += 1
+            return (b, i)
+
+        a2, _ = loop(a, i)
+        return a2
+
+    result = f([2, 3])
+    expected = jnp.ones([2, 3]) * 8
+    assert_array_and_dtype_equal(result, expected)
+
+
+@pytest.mark.skip("Dynamic arrays support in quantum control flow is not implemented")
 def test_quantum_tracing_2():
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(x, y):
         i = 0
@@ -841,7 +870,10 @@ def test_invalid_shapes_2():
 
 
 def test_shapes_type_conversion():
-    """Test fixes jax behavior regarding the shape conversions"""
+    """We allow floats to be passed as dynamic shapes. This test fixes the current behavior of this
+    mechanism.
+    Note: Jax seems to call `canonicalize_shape` function on every input. Probably we should follow
+    this approach in future."""
 
     def f(x):
         return jnp.empty(shape=[2, x], dtype=int)
@@ -860,6 +892,21 @@ def test_accessing_shapes():
         return jnp.sum(sa)
 
     assert f(3) == 6
+
+
+def test_no_recompilation():
+    """Test that the function is not recompiled when changing the argument shape across
+    invocations."""
+
+    @qjit(abstracted_axes={0: "n"})
+    def i(x):
+        return x
+
+    i(jnp.array([1]))
+    _id0 = id(i.compiled_function)
+    i(jnp.array([1, 1]))
+    _id1 = id(i.compiled_function)
+    assert _id0 == _id1
 
 
 if __name__ == "__main__":

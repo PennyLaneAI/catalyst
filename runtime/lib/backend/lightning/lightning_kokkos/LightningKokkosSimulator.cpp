@@ -193,14 +193,14 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 
     // update tape caching
     if (this->tape_recording) {
-        cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
+        cache_manager.addObservable(obsKey, MeasurementsT::Expval);
     }
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return m.expval(*obs);
+    return device_shots ? m.expval(*obs, device_shots, {}) : m.expval(*obs);
 }
 
 auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
@@ -210,14 +210,14 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 
     // update tape caching
     if (this->tape_recording) {
-        this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
+        this->cache_manager.addObservable(obsKey, MeasurementsT::Var);
     }
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
-    return m.var(*obs);
+    return device_shots ? m.var(*obs, device_shots) : m.var(*obs);
 }
 
 void LightningKokkosSimulator::State(DataView<std::complex<double>, 1> &state)
@@ -244,7 +244,7 @@ void LightningKokkosSimulator::State(DataView<std::complex<double>, 1> &state)
 void LightningKokkosSimulator::Probs(DataView<double, 1> &probs)
 {
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = m.probs();
+    auto &&dv_probs = device_shots ? m.probs(device_shots) : m.probs();
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
@@ -262,7 +262,7 @@ void LightningKokkosSimulator::PartialProbs(DataView<double, 1> &probs,
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::LightningKokkos::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = m.probs(dev_wires);
+    auto &&dv_probs = device_shots ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
                "Invalid size for the pre-allocated partial-probabilities");
@@ -484,7 +484,7 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
     auto &&obs_callees = this->cache_manager.getObservablesCallees();
     bool is_valid_measurements =
         std::all_of(obs_callees.begin(), obs_callees.end(),
-                    [](const auto &m) { return m == Lightning::Measurements::Expval; });
+                    [](const auto &m) { return m == MeasurementsT::Expval; });
     RT_FAIL_IF(!is_valid_measurements,
                "Unsupported measurements to compute gradient; "
                "Adjoint differentiation method only supports expectation return type");
@@ -538,3 +538,6 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
 }
 
 } // namespace Catalyst::Runtime::Simulator
+
+GENERATE_DEVICE_FACTORY(LightningKokkosSimulator,
+                        Catalyst::Runtime::Simulator::LightningKokkosSimulator);

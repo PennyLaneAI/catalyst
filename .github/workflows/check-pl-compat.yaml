@@ -156,6 +156,11 @@ jobs:
       if: ${{ inputs.pennylane == 'stable' }}
       run: |
         pip install --upgrade pennylane
+        
+    - name: Install PennyLane (release-candidate)
+      if: ${{ inputs.pennylane == 'release-candidate' }}
+      run: |
+        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.33.0-rc0
 
 
     - name: Add Frontend Dependencies to PATH

@@ -37,6 +37,7 @@ import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
 from jax._src.core import DBIdx, _update_thread_local_jit_state
+from jax._src.core import _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -76,6 +77,7 @@ from jax.core import (
     find_top_trace,
     gensym,
     new_jaxpr_eqn,
+    gensym,
     thread_local_state,
 )
 from jax.interpreters.mlir import (

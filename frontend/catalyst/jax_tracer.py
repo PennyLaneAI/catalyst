@@ -102,7 +102,7 @@ class Function:
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(out_tree, retval)
 
 
@@ -862,8 +862,11 @@ def trace_quantum_function(
                 trees = return_values_tree
 
             with EvaluationContext.frame_tracing_context(ctx, trace):
-                qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
-                qdevice_p.bind(spec="backend", val=device.backend_name)
+                qdevice_p.bind(
+                    rtd_lib=device.backend_lib,
+                    rtd_name=device.backend_name,
+                    rtd_kwargs=str(device.backend_kwargs),
+                )
                 qreg_in = qalloc_p.bind(len(device.wires))
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)

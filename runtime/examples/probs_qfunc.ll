@@ -23,10 +23,11 @@ target triple = "x86_64-pc-linux-gnu"
 %struct.MemRefT = type { double*, double*, i64, [1 x i64], [1 x i64] }
 
 @.str = private constant [16 x i8] c"probs[%d] = %f\0A\00", align 1
-@backend = private constant [8 x i8] c"backend\00"
-@backend_default = private constant [8 x i8] c"default\00"
+@rtd_lib = internal constant [33 x i8] c"../build/lib/librtd_lightning.so\00"
+@rtd_name = internal constant [19 x i8] c"LightningSimulator\00"
+@rtd_kwargs = internal constant [11 x i8] c"{shots: 0}\00"
 
-declare void @__quantum__rt__device(i8*, i8*)
+declare void @__quantum__rt__device_init(i8*, i8*, i8*)
 
 declare void @__quantum__rt__initialize()
 
@@ -59,7 +60,7 @@ define void @print_probs_at(double* %0, i64 %1) {
 define i32 @main() {
   ; Initialize quantum runtime
   call void @__quantum__rt__initialize()
-  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
+  call void @__quantum__rt__device_init(i8* getelementptr ([33 x i8], [33 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([11 x i8], [11 x i8]* @rtd_kwargs, i64 0, i64 0))
 
   ; Allocate 2 qubits
   %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)

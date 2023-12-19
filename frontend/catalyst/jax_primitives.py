@@ -15,12 +15,13 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from itertools import chain
 from typing import Dict, Iterable, List
 
 import jax
 import numpy as np
+import pennylane as qml
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
@@ -57,7 +58,6 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -260,7 +260,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
     func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
 
-    if isinstance(fn, pennylane_QNode):
+    if isinstance(fn, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
         # "best", the default option in PennyLane, chooses backprop on the device
         # if supported and parameter-shift otherwise. Emulating the same behaviour
@@ -327,6 +327,9 @@ class GradParams:
     h: float
     argnum: List[int]
 
+    def __iter__(self):
+        return iter(astuple(self))
+
 
 @grad_p.def_impl
 def _grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
@@ -366,8 +369,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnum)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
 
-    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn.fn, call=False)
-    symbol_name = mlir_fn_cache[fn.fn]
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
@@ -505,24 +508,20 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 # qdevice
 #
 @qdevice_p.def_impl
-def _qdevice_def_impl(ctx, spec, val):  # pragma: no cover
+def _qdevice_def_impl(ctx, rtd_lib, rtd_name, rtd_kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qdevice_p.def_abstract_eval
-def _qdevice_abstract_eval(spec, val):
+def _qdevice_abstract_eval(rtd_lib, rtd_name, rtd_kwargs):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, spec, val):
+def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    backend_attr = ir.StringAttr.get(spec)
-    backend_val = "default" if val == "qjit.device" else val
-    val_attr = ir.StringAttr.get(backend_val)
-
-    DeviceOp(specs=ir.ArrayAttr.get([backend_attr, val_attr]))
+    DeviceOp(ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs))
 
     return ()
 

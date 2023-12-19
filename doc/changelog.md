@@ -21,6 +21,32 @@
       return jax.numpy.ones([size,size], dtype=float)
   ```
 
+* The plugin system of Catalyst for backend devices. This system in runtime
+  is backed by `dlopen` and enables the devices to be packaged separately from
+  the runtime CAPI and loaded at run time instead of being linked at compile time.
+  This provides flexibility and extensibility to Catalyst allowing users to
+  load quantum devices dynamically.
+  [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
+  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
+
+
+* Support for dynamically-shaped arrays has been added.
+  [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
+  [(#386)](https://github.com/PennyLaneAI/catalyst/pull/385)
+  [(#390)](https://github.com/PennyLaneAI/catalyst/pull/390)
+
+  Catalyst now accepts tensors whose dimensions are not known at compile time.
+  Standard tensor initialisation functions `jax.numpy.ones`, `jnp.zeros`, and
+  `jnp.empty`, now accept dynamic variables (where the value is only known at
+  runtime). Note that support for dynamic arrays in control-flow primitives
+  is not yet supported and still a work-in-progress.
+
+  ``` python
+  @qjit
+  def func(size: int):
+      return jax.numpy.ones([size, size], dtype=float)
+  ```
+
   ``` pycon
   >>> func(3)
   [[1. 1. 1.]
@@ -29,6 +55,21 @@
   ```
 
 <h3>Improvements</h3>
+
+* Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
+  for `lightning.qubit` and `lightning.kokkos` devices.
+  [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
+
+<h3>Improvements</h3>
+
+* Support for `mcmc` sampling in `lightning.qubit`.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+
+* Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
+  outside a `@qjit` context. This simplifies the process of writing functions where compilation
+  can be turned on and off easily by adding or removing the decorator. The functions dispatch to
+  their JAX equivalents when the compilation is turned off.
+  [(#375)](https://github.com/PennyLaneAI/catalyst/pull/375)
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
@@ -43,17 +84,38 @@
   operations and control flow operations.
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
+* Update the `DeviceOp` definition in the Quantum MLIR dialect.
+  `DeviceOp` gets the tuple of device info: ('lib', 'name', 'kwargs')
+  and lowers the operation to one single device initialization call:
+  `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
+  [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
+
 <h3>Breaking changes</h3>
 
+* Third party devices must now specify a configuration toml file.
+  For more information please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+
 <h3>Bug fixes</h3>
+
+* Resolve a bug in the compiler's differentiation engine that results in a crash with the Enzyme
+  error message "attempting to differentiate function without definition" (see issue
+  [#384](https://github.com/PennyLaneAI/catalyst/issues/384)).
+  The fix ensures that all current quantum operation types are removed during gradient passes that
+  extract classical from a QNode function. It also adds a verification step that will raise an error
+  if a gradient pass cannot successfully eliminate all quantum operations for such functions.
+  [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
+David Ittah,
 Erick Ochoa Lopez,
 Romain Moyard,
-Sergei Mironov.
+Sergei Mironov,
+Shuli Shu.
 
 # Release 0.3.2
 
@@ -247,7 +309,7 @@ Sergei Mironov.
 
   - `qjit`: Path to the JIT compiler decorator provided by the compiler. This decorator should have
     the signature `qjit(fn, *args, **kwargs)`, where `fn` is the function to be compiled.
-  
+
 * The compiler driver diagnostic output has been improved, and now includes failing IR as well as
   the names of failing passes.
   [(#349)](https://github.com/PennyLaneAI/catalyst/pull/349)
