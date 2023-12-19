@@ -44,7 +44,7 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     LogicalResult matchAndRewrite(CustomCallOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        // Check arguments
+        // Add bufferized arguments
         SmallVector<Value> bufferArgs;
         auto operands = op.getOperands();
         for (auto operand : operands) {
@@ -57,7 +57,7 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
                 rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, operand);
         }
 
-        // Allocate returns.
+        // Add bufferized return values to the arguments
         auto results = op.getResults();
         for (Value result : results) {
             auto &newBuffer = bufferArgs.emplace_back();
@@ -72,8 +72,11 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
             newBuffer =
                 rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
         }
+        // Add the initial number of arguments
         auto numArguments = static_cast<int32_t>(op.getNumOperands());
         auto numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
+
+        // Create an updated custom call operation
         rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs,
                                                    op.getCallTargetName(), numArgumentsDenseAttr);
         size_t startIndex = bufferArgs.size() - op.getNumResults();

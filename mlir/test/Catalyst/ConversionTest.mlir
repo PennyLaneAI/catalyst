@@ -23,10 +23,10 @@
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {
     // CHECK: [[memref:%.+]] = builtin.unrealized_conversion_cast %arg0
-
+    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(5 : i8)
+    // CHECK: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[struct:%.+]] = llvm.mlir.undef : !llvm.struct<(i64, ptr, i8)>
 
-    // CHECK: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[struct0:%.+]] = llvm.insertvalue [[rank]], [[struct]][0]
 
     // CHECK: [[memref_ptr:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
@@ -34,7 +34,6 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
     // CHECK: [[memref_ptr_cast:%.+]] = llvm.bitcast [[memref_ptr]] : {{.*}} to !llvm.ptr
     // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr_cast]], [[struct0]][1]
 
-    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(5 : i8)
     // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
 
     // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>

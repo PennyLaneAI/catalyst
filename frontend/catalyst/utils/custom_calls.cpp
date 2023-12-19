@@ -41,10 +41,9 @@ extern "C" {
 
 // MemRef type
 struct EncodedMemref {
-    uint8_t dtype;
-    uint8_t rank;
+    int64_t rank;
     void *data;
-    int64_t dims[];
+    int8_t dtype;
 };
 
 typedef struct EncodedMemref;
@@ -56,13 +55,13 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
 void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
 {
     std::vector<void *> data;
-    for (size_t i = 0; i<7; ++i) {
+    for (size_t i = 0; i < 7; ++i) {
         auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
         data.push_back(encodedMemref.data);
     }
 
     std::vector<void *> out;
-    for (size_t i = 0; i<7; ++i) {
+    for (size_t i = 0; i < 7; ++i) {
         auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
         out.push_back(encodedMemref.data);
     }
