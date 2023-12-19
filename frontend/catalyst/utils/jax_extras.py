@@ -35,7 +35,6 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src import state, util
 from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
@@ -53,7 +52,7 @@ from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
+from jax._src.util import safe_map, unzip2, wrap_name, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
@@ -92,7 +91,7 @@ from jax.interpreters.partial_eval import (
     make_jaxpr_effects,
 )
 from jax.lax import convert_element_type
-from jax.linear_util import transformation, transformation_with_aux, wrap_init
+from jax.linear_util import transformation_with_aux, wrap_init
 from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -114,7 +113,6 @@ __all__ = (
     "for_loop_expansion_strategy",
     "cond_expansion_strategy",
     "while_loop_expansion_strategy",
-    "default_expansion_strategy",
     "Jaxpr",
     "PyTreeDef",
     "PyTreeRegistry",
