@@ -52,6 +52,11 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
              double *u, lapack_int *ldu, double *vt, lapack_int *ldvt, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *info);
 
+
+// Wrapper to call the SVD solver dgesdd_ from Lapack: https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc
+// released under the Apache License, Version 2.0, with the following copyright notice:
+
+// Copyright 2021 The JAX Authors.
 void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
 {
     std::vector<void *> data;
