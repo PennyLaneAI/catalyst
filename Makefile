@@ -41,7 +41,8 @@ ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
 
 ifeq ($(ENABLE_OPENQASM), ON)
 # A global 'mutex' is added to protect `pybind11::exec` calls concurrently in `OpenQasmRunner`.
-# This will lead to an ODR violation when using ASAN
+# TODO: Remove this global 'mutex' to enable concurrent execution of remote calls.
+# This 'mutex' leads to an ODR violation when using ASAN
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0,detect_odr_violation=0"
 endif
 
@@ -60,11 +61,13 @@ help:
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
-	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
+	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
+	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
+	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
@@ -188,7 +191,7 @@ clean-runtime:
 	$(MAKE) -C runtime clean
 
 clean-all: clean-mlir clean-runtime
-	@echo "uninstall catalyst and delete all build directories, temporary and cache files"
+	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
