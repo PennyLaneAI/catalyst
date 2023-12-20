@@ -13,13 +13,12 @@
 # limitations under the License.
 
 """Integration tests for the async execution of QNodes features."""
-import jax
 import pennylane as qml
 import pytest
 import numpy as np
 from jax import numpy as jnp
 
-from catalyst import grad, jacobian, qjit
+from catalyst import grad, qjit
 
 
 def test_qnode_execution():
@@ -27,14 +26,13 @@ def test_qnode_execution():
     dev = qml.device("lightning.qubit", wires=2)
 
     def multiple_qnodes(params):
-
         @qml.qnode(device=dev)
         def circuit1(params):
             qml.RX(params[0], wires=0)
             qml.RY(params[1], wires=1)
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliZ(wires=0))
-        
+
         @qml.qnode(device=dev)
         def circuit2(params):
             qml.RY(params[0], wires=0)
@@ -48,7 +46,7 @@ def test_qnode_execution():
             qml.RX(params[1], wires=1)
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliY(wires=0))
-        
+
         new_params = jnp.array([circuit1(params), circuit2(params)])
         return circuit3(new_params)
 
@@ -56,7 +54,9 @@ def test_qnode_execution():
     assert np.allclose(qjit()(multiple_qnodes)(params), qjit(asyn=True)(multiple_qnodes)(params))
 
 
-@pytest.mark.parametrize("diff_methods", [("parameter-shift", "auto"), ("finite-diff", "fd"), ("adjoint", "auto")])
+@pytest.mark.parametrize(
+    "diff_methods", [("parameter-shift", "auto"), ("finite-diff", "fd"), ("adjoint", "auto")]
+)
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_gradient(inp, diff_methods):
     """Parameter shift and finite diff generate multiple QNode that are run async."""

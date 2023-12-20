@@ -190,19 +190,19 @@ MLIR_TO_LLVM_PASS = (
 )
 
 
-MLIR_TO_LLVM_ASYNC_PASS = MLIR_TO_LLVM_PASS
-MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
-    "qnode-to-async-lowering",
-    "async-func-to-async-runtime",
-    "async-to-async-runtime",
-    "convert-async-to-llvm",
-]
-
 DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_PASS,
+]
+
+MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
+MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
+    "qnode-to-async-lowering",
+    "async-func-to-async-runtime",
+    "async-to-async-runtime",
+    "convert-async-to-llvm",
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
