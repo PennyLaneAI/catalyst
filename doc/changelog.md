@@ -8,7 +8,6 @@
 
   ``` python
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=4))
   def circuit(sz):
       a = jnp.ones([sz], dtype=float)
 
