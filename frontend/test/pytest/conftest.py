@@ -25,6 +25,15 @@ except (ImportError, ModuleNotFoundError) as e:
 else:
     tf_available = True
 
+# Default from PennyLane
+TOL_STOCHASTIC = 0.05
+
+
+@pytest.fixture(scope="session")
+def tol_stochastic():
+    """Numerical tolerance for equality tests of stochastic values."""
+    return TOL_STOCHASTIC
+
 
 def pytest_addoption(parser):
     """Add pytest custom options."""

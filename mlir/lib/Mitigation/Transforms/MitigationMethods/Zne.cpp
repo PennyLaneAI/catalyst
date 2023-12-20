@@ -216,7 +216,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     Block *allocBloc = fnAlloc.addEntryBlock();
     rewriter.setInsertionPointToStart(allocBloc);
     Value nQubits = allocBloc->getArgument(0);
-    IntegerAttr intAttr;
+    IntegerAttr intAttr{};
     auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, nQubits, intAttr);
     rewriter.create<func::ReturnOp>(loc, qreg.getResult());
     return SymbolRefAttr::get(ctx, fnAllocName);
@@ -257,11 +257,10 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     rewriter.eraseOp(allocOp);
     rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
 
-    std::vector<Operation *> insertOps;
+    Operation *lastOp;
+    fnWithoutMeasurementsOp.walk([&](quantum::InsertOp insertOp) { lastOp = insertOp; });
     fnWithoutMeasurementsOp.walk(
-        [&](quantum::InsertOp insertOp) { insertOps.push_back(insertOp); });
-    fnWithoutMeasurementsOp.walk(
-        [&](func::ReturnOp returnOp) { returnOp->setOperands(insertOps.back()->getResult(0)); });
+        [&](func::ReturnOp returnOp) { returnOp->setOperands(lastOp->getResult(0)); });
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
