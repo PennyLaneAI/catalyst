@@ -321,7 +321,7 @@ class LinkerDriver:
             outfile (str): output file name
         """
         infile_path = pathlib.Path(infile)
-        if not path.exists():
+        if not infile_path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
         return str(infile_path.with_suffix(".so"))
 
