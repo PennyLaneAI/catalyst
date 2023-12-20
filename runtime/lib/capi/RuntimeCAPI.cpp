@@ -162,7 +162,6 @@ void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()
 {
-    Catalyst::Runtime::RTD_PTR = nullptr;
     Catalyst::Runtime::CTX = std::make_unique<Catalyst::Runtime::ExecutionContext>();
 }
 

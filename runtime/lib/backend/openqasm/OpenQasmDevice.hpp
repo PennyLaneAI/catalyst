@@ -30,7 +30,6 @@
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
 #include "Utils.hpp"
-#include <mutex>
 
 #include <pybind11/embed.h>
 
@@ -38,7 +37,6 @@
 #include "OpenQasmObsManager.hpp"
 #include "OpenQasmRunner.hpp" // <pybind11/embed.h>
 
-std::mutex mu; // To guard the python interpreter.
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
   private:

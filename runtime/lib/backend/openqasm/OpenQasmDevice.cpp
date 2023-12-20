@@ -96,7 +96,6 @@ void OpenQasmDevice::PrintState()
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&state = runner->State(circuit, device_info, device_shots, GetNumQubits(), s3_folder_str);
 
     const size_t num_qubits = GetNumQubits();
@@ -207,7 +206,6 @@ auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     return runner->Expval(circuit, device_info, device_shots, s3_folder_str);
 }
 
@@ -241,7 +239,6 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     return runner->Var(circuit, device_info, device_shots, s3_folder_str);
 }
 
@@ -264,7 +261,6 @@ void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &s
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&dv_state =
         runner->State(circuit, device_info, device_shots, GetNumQubits(), s3_folder_str);
     RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
@@ -287,7 +283,6 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&dv_probs = runner->Probs(builder->toOpenQasm(), device_info, device_shots,
                                     GetNumQubits(), s3_folder_str);
 
@@ -320,7 +315,6 @@ void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&dv_probs =
         runner->Probs(circuit, device_info, device_shots, wires.size(), s3_folder_str);
 
@@ -344,7 +338,6 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_info, device_shots,
                                        GetNumQubits(), s3_folder_str);
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
@@ -386,7 +379,6 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_info, device_shots,
                                        GetNumQubits(), s3_folder_str);
 
@@ -420,7 +412,6 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_info, device_shots,
                                        GetNumQubits(), s3_folder_str);
 
@@ -464,7 +455,6 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
         device_info = device_kwargs["backend"];
     }
 
-    std::lock_guard<std::mutex> lock(mu);
     auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_info, device_shots,
                                        GetNumQubits(), s3_folder_str);
 

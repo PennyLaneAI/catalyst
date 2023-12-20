@@ -284,7 +284,6 @@ class RTDevice {
     {
         return {rtd_lib, rtd_name, rtd_kwargs};
     }
-};
 
     [[nodiscard]] auto getDeviceName() const -> const std::string & { return rtd_name; }
 
@@ -389,7 +388,5 @@ class ExecutionContext final {
         RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
     }
 
-    friend bool getOrCreateDevice(ExecutionContext *ec, std::string_view rtd_lib,
-                                  std::string_view rtd_name, std::string_view rtd_kwargs);
 };
 } // namespace Catalyst::Runtime
