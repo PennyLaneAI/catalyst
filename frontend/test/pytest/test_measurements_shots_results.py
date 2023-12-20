@@ -124,7 +124,6 @@ class TestExpval:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.skip(reason="async and runtime errors do not get along yet.")
     def test_hermitian(self, backend):
         """Test expval Hermitian observables with shots."""
 
@@ -333,7 +332,6 @@ class TestVar:
         result = qjit(circuit)()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.skip(reason="async and runtime errors do not get along yet.")
     def test_hermitian_shots(self, backend):
         """Test var Hermitian observables with shots."""
 
