@@ -189,42 +189,14 @@ MLIR_TO_LLVM_PASS = (
     ],
 )
 
-MLIR_TO_LLVM_ASYNC_PASS = (
-    "MLIRToLLVMDialect",
-    [
-        "qnode-to-async-lowering",
-        "async-func-to-async-runtime",
-        "async-to-async-runtime",
-        "convert-async-to-llvm",
-        "convert-gradient-to-llvm",
-        "func.func(convert-linalg-to-loops)",
-        "convert-scf-to-cf",
-        # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
-        # strides) into a sequence of easier to analyze constructs. In particular, this pass
-        # transforms ops into explicit sequence of operations that model the effect of this
-        # operation on the different metadata. This pass uses affine constructs to materialize
-        # these effects. Concretely, expanded-strided-metadata is used to decompose
-        # memref.subview as it has no lowering in -finalize-memref-to-llvm.
-        "expand-strided-metadata",
-        "lower-affine",
-        "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-        "convert-complex-to-standard",  # added for complex.exp lowering
-        "convert-complex-to-llvm",
-        "convert-math-to-llvm",
-        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-        "convert-math-to-libm",
-        "convert-arith-to-llvm",
-        "finalize-memref-to-llvm{use-generic-functions}",
-        "convert-index-to-llvm",
-        "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm",
-        "emit-catalyst-py-interface",
-        # Remove any dead casts as the final pass expects to remove all existing casts,
-        # but only those that form a loop back to the original type.
-        "canonicalize",
-        "reconcile-unrealized-casts",
-    ],
-)
+
+MLIR_TO_LLVM_ASYNC_PASS = MLIR_TO_LLVM_PASS
+MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
+    "qnode-to-async-lowering",
+    "async-func-to-async-runtime",
+    "async-to-async-runtime",
+    "convert-async-to-llvm",
+]
 
 DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
