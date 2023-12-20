@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """Integration tests for the async execution of QNodes features."""
+import numpy as np
 import pennylane as qml
 import pytest
-import numpy as np
 from jax import numpy as jnp
 
 from catalyst import grad, qjit
