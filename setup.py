@@ -19,9 +19,9 @@ from os import path
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
 from setuptools import (  # pylint: disable=wrong-import-order
+    Extension,
     find_namespace_packages,
     setup,
-    Extension,
 )
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:

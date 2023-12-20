@@ -23,10 +23,10 @@ import shutil
 import subprocess
 import sys
 import warnings
-from os import path
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
+from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
