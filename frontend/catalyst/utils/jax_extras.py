@@ -333,10 +333,9 @@ class OutputSignature:
         return len([() for _, k in self.out_type() if not k])
 
 
-def deduce_signatures(f: Callable,
-                  args, kwargs,
-                  expansion_strategy
-                  ) -> Tuple[Callable, InputSignature, OutputSignature]:
+def deduce_signatures(
+    f: Callable, args, kwargs, expansion_strategy
+) -> Tuple[Callable, InputSignature, OutputSignature]:
     """Prepares the callable ``f`` for tracing by wrapping it into a WrappedFun container accepting
     expanded flattened arguments and returning expanded flatten results. Jax input and output types
     are returned along with the other related information aggregated into input and output signature
