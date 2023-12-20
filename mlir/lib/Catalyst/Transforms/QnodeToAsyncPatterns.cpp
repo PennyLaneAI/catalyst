@@ -72,10 +72,11 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         auto asyncValues = executeOp.getResults();
 
-        // Only one use
-        // And in the same basic block
-        // If it is not in the same basic block
-        // It may be in a loop.
+        // TODO: Come up with a better algorithm
+        // We restrict the delay of await to the case where we have 
+        // one result with a single use. (Uses are not necessarily ordered)
+        // We also restrict the uses to be in the same basic block
+        // Not being in the same block means that it may be in a loop.
         // And therefore we may execute the drop_ref multiple times
         // which is a runtime error.
         auto results = op.getResults();

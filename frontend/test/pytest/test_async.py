@@ -51,7 +51,7 @@ def test_qnode_execution():
         return circuit3(new_params)
 
     params = jnp.array([1.0, 2.0])
-    assert np.allclose(qjit()(multiple_qnodes)(params), qjit(asyn=True)(multiple_qnodes)(params))
+    assert np.allclose(qjit()(multiple_qnodes)(params), qjit(async_qnodes=True)(multiple_qnodes)(params))
 
 
 @pytest.mark.parametrize(
@@ -65,7 +65,7 @@ def test_gradient(inp, diff_methods):
         qml.RX(x * 2, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit(asyn=True)
+    @qjit(async_qnodes=True)
     def compiled(x: float):
         g = qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1])

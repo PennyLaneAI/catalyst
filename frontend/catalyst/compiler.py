@@ -51,7 +51,7 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
-        asyn (Optional[bool]): flag indicating whether experimental asynchronous execution of
+        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution of
             QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
@@ -64,7 +64,7 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
-    asyn: Optional[bool] = False
+    async_qnodes: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
 
@@ -83,7 +83,7 @@ class CompileOptions:
         """Get effective pipelines"""
         if self.pipelines:
             return self.pipelines
-        elif self.asyn:
+        elif self.async_qnodes:
             return DEFAULT_ASYNC_PIPELINES
         return DEFAULT_PIPELINES
 
