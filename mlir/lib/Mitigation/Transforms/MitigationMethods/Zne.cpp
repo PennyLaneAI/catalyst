@@ -216,7 +216,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     Block *allocBloc = fnAlloc.addEntryBlock();
     rewriter.setInsertionPointToStart(allocBloc);
     Value nQubits = allocBloc->getArgument(0);
-    IntegerAttr intAttr;
+    IntegerAttr intAttr{};
     auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, nQubits, intAttr);
     rewriter.create<func::ReturnOp>(loc, qreg.getResult());
     return SymbolRefAttr::get(ctx, fnAllocName);
