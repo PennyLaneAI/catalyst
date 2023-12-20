@@ -40,6 +40,7 @@ package_root = os.path.dirname(__file__)
 
 DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
 
+
 # pylint: disable=too-many-instance-attributes
 @dataclass
 class CompileOptions:
@@ -237,7 +238,9 @@ class LinkerDriver:
         file_prefix = "custom_calls"
         file_extension = ".so"
         search_pattern = f"{file_prefix}*{file_extension}"
-        custom_calls_so_file = glob.glob(f"{search_pattern}", root_dir=DEFAULT_CUSTOM_CALLS_LIB_PATH)[0]
+        custom_calls_so_file = glob.glob(
+            f"{search_pattern}", root_dir=DEFAULT_CUSTOM_CALLS_LIB_PATH
+        )[0]
         custom_calls_so_flag = f"-l:{custom_calls_so_file}"
 
         ### rpath: scipy
@@ -264,7 +267,7 @@ class LinkerDriver:
             *lib_path_flags,
             "-lrt_capi",
             "-lpthread",
-            "-lmlir_c_runner_utils", # required for memref.copy
+            "-lmlir_c_runner_utils",  # required for memref.copy
             custom_calls_so_flag,
         ]
 
