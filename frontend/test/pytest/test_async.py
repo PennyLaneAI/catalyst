@@ -51,7 +51,9 @@ def test_qnode_execution():
         return circuit3(new_params)
 
     params = jnp.array([1.0, 2.0])
-    assert np.allclose(qjit()(multiple_qnodes)(params), qjit(async_qnodes=True)(multiple_qnodes)(params))
+    assert np.allclose(
+        qjit()(multiple_qnodes)(params), qjit(async_qnodes=True)(multiple_qnodes)(params)
+    )
 
 
 @pytest.mark.parametrize(
