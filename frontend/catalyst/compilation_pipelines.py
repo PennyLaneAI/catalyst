@@ -828,7 +828,7 @@ def qjit(
     fn=None,
     *,
     autograph=False,
-    asyn=False,
+    asyn=True,
     target="binary",
     keep_intermediate=False,
     verbose=False,
