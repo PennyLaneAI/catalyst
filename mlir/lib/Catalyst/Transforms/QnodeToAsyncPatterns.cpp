@@ -48,7 +48,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         }
 
         if (op->hasAttrOfType<UnitAttr>("transformed")) {
-            // Nothing to change. (For functions which are not qnodes).
+            // Nothing to change. (For func calls that have already been transformed by this pass).
             return failure();
         }
 
