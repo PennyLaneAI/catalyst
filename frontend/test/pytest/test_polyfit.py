@@ -21,13 +21,21 @@ from jax import numpy as jnp
 
 from catalyst import qjit
 
-@pytest.mark.parametrize("x, y, deg", [(jnp.array([1.0, 2.0, 3.0]), jnp.array([1.0, 4.0, 9.0]), 2), (jnp.array([1.0, 2.0, 3.0, 4.0]), jnp.array([1.0, 8.0, 27.0, 64.0]), 3)])
+
+@pytest.mark.parametrize(
+    "x, y, deg",
+    [
+        (jnp.array([1.0, 2.0, 3.0]), jnp.array([1.0, 4.0, 9.0]), 2),
+        (jnp.array([1.0, 2.0, 3.0, 4.0]), jnp.array([1.0, 8.0, 27.0, 64.0]), 3),
+    ],
+)
 def test_polyfit(x, y, deg):
     """Test that polyfit from Jax produces same results qjitted or not."""
 
     @qjit
     def polyfit_qjit(x, y):
         return jax.numpy.polyfit(x, y, deg)
+
     res = polyfit_qjit(x, y)
     res_expected = jax.numpy.polyfit(x, y, deg)
     assert np.allclose(res, res_expected)
