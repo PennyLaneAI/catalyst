@@ -387,5 +387,17 @@ def test_no_recompilation():
     assert _id0 == _id1
 
 
+def test_indexing():
+    """Test the support of indexing of dynamically-shaped arrays"""
+
+    @qjit
+    def fun(sz, idx):
+        r = jnp.ones((sz, 3, sz + 1), dtype=int)
+        return r[idx, 2, idx]
+
+    res = fun(5, 2)
+    assert res == 1
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
