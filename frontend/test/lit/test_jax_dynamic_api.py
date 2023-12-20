@@ -117,3 +117,13 @@ def test_qjit_aot(a: ShapedArray([1, 3, 1], dtype=float)):
 
 
 print_mlir(test_qjit_aot, aot=True)
+
+
+@qjit
+def test_qjit_indexing(sz):
+    r = jnp.ones((sz + 1,), dtype=int)
+    # CHECK:        gather
+    return r[0]
+
+
+print_mlir(test_qjit_indexing, 3)
