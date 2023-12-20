@@ -387,6 +387,5 @@ class ExecutionContext final {
         std::lock_guard<std::mutex> lock(pool_mu);
         RTD_PTR->setDeviceStatus(RTDeviceStatus::Inactive);
     }
-
 };
 } // namespace Catalyst::Runtime
