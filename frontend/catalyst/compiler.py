@@ -51,8 +51,8 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
-        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution of
-            QNodes support is to be enabled.
+        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution 
+            of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
