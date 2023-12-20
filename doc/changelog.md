@@ -58,7 +58,7 @@
   and execute multiple programs in a multithreaded environment.
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
-* Qjitted functions now support asynchronuous execution of QNodes. Simply use ``qjit(asyn=True)`` to
+* Qjitted functions now support asynchronuous execution of QNodes. Simply use ``qjit(async_qnodes=True)`` to
   enable the async execution of QNodes. It is useful for finite differences and parameter-shift, as those
   differentiation methods can generate multiple circuit. Support for the async MLIR dialect was added.
   [(#374](https://github.com/PennyLaneAI/catalyst/pull/374)
@@ -67,7 +67,7 @@
   ```python
   dev = qml.device("lightning.qubit", wires=2)
 
-  @qjit(asyn=True)
+  @qjit(async_qnodes=True)
   def multiple_qnodes(params):
       @qml.qnode(device=dev)
       def circuit1(params):
