@@ -64,7 +64,7 @@ from catalyst.utils.jax_extras import (
     cond_expansion_strategy,
     convert_element_type,
     deduce_avals,
-    deduce_avals3,
+    deduce_signatures,
     eval_jaxpr,
     input_type_to_tracers,
     jaxpr_remove_implicit,
@@ -373,7 +373,7 @@ def has_nested_tapes(op: Operation) -> bool:
 
 def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
     """Trace Python function supporting variable dimensions in its arguments and/or results"""
-    wfun, in_sig, out_sig = deduce_avals3(fun, args, kwargs, expansion_strategy=expansion_strategy)
+    wfun, in_sig, out_sig = deduce_signatures(fun, args, kwargs, expansion_strategy=expansion_strategy)
     with EvaluationContext.frame_tracing_context(ctx) as trace:
         arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
         res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)

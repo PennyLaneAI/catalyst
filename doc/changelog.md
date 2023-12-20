@@ -2,6 +2,28 @@
 
 <h3>New features</h3>
 
+* Catalyst control-flow primitives are now compatible with Jax dynamic API. For-loops, while-loops
+  and conditionals now can accept and return tensors with dynamic dimensions.
+  [(#370)](https://github.com/PennyLaneAI/catalyst/pull/370)
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def circuit(sz):
+      a = jnp.ones([sz], dtype=float)
+
+      @for_loop(0, 10, 2)
+      def loop(_, a):
+          return a
+
+      return loop(a)
+  ```
+
+  ``` pycon
+  >>> circuit(3)
+  array([1., 1., 1.])
+  ```
+
 * Initial support for transforms. QFunc transforms are supported. QNode transforms have limited
   support. QNode transforms cannot be composed, and transforms are limited to what is currently
   available in PennyLane. This means that operations defined in Catalyst like `cond`, `for_loop`,

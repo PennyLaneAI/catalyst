@@ -124,7 +124,7 @@ __all__ = (
     "convert_element_type",
     "collapse",
     "deduce_avals",
-    "deduce_avals3",
+    "deduce_signatures",
     "infer_output_type_python",
     "infer_output_type_jaxpr",
     "infer_lambda_input_type",
@@ -333,10 +333,30 @@ class OutputSignature:
         return len([() for _, k in self.out_type() if not k])
 
 
-def deduce_avals3(f: Callable, args, kwargs, expansion_strategy):
-    """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
-    and returning expanded flatten results. Calculate input abstract values and output_tree promise.
-    The promise must be called after the resulting wrapped function is evaluated."""
+def deduce_signatures(f: Callable,
+                  args, kwargs,
+                  expansion_strategy
+                  ) -> Tuple[Callable, InputSignature, OutputSignature]:
+    """Prepares the callable ``f`` for tracing by wrapping it into a WrappedFun container accepting
+    expanded flattened arguments and returning expanded flatten results. Jax input and output types
+    are returned along with the other related information aggregated into input and output signature
+    datatypes.
+
+    Args:
+        f (Callable): Python function to trace. By definition, the function accepts collapsed
+                      unflattened arguments and returns collapsed unflattened results.
+        args (Any): Positional arguments to be passed to ``f``, typically Jax tracers.
+        kwargs (dict): Keyword arguments to be passed to ``f``.
+        expansion_strategy (ExpansionStrategy): Argument and result expansion settings to use when
+                                                expanding arguments and results.
+
+    Returns:
+        Callable: Python function, accepting flattened expanded arguments and returning flattened
+                  expanded results
+        InputSignature: Input signature of the function
+        OutputSignature: Output signature of the function. Fields of the output signature are
+                         available after exiting from the Callable.
+    """
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
     flat_tracers = [trace.full_raise(a) for a in flat_args]

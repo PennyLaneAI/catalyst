@@ -79,7 +79,7 @@ from catalyst.utils.jax_extras import (  # infer_output_type3,
     cond_expansion_strategy,
     convert_constvars_jaxpr,
     deduce_avals,
-    deduce_avals3,
+    deduce_signatures,
     expand_args,
     expand_results,
     find_top_trace,
@@ -1341,7 +1341,7 @@ class CondCallable:
         in_sigs, out_sigs = [], []
         for branch_fn in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
-            wfun, in_sig, out_sig = deduce_avals3(
+            wfun, in_sig, out_sig = deduce_signatures(
                 branch_fn, [], {}, expansion_strategy=self.expansion_strategy
             )
             assert len(in_sig.in_type) == 0
@@ -1693,7 +1693,7 @@ def for_loop(lower_bound, upper_bound, step, preserve_dimensions: bool = False):
                 aux_classical_tracers = [
                     outer_trace.full_raise(t) for t in [lower_bound, upper_bound, step]
                 ]
-                wfun, in_sig, out_sig = deduce_avals3(
+                wfun, in_sig, out_sig = deduce_signatures(
                     body_fn,
                     (aux_classical_tracers[0], *init_state),
                     {},
@@ -1865,10 +1865,10 @@ def while_loop(cond_fn, preserve_dimensions: bool = False):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
 
-                cond_wffa, _, cond_out_sig = deduce_avals3(
+                cond_wffa, _, cond_out_sig = deduce_signatures(
                     cond_fn, init_state, {}, expansion_strategy
                 )
-                body_wffa, in_sig, out_sig = deduce_avals3(
+                body_wffa, in_sig, out_sig = deduce_signatures(
                     body_fn, init_state, {}, expansion_strategy
                 )
                 in_type = in_sig.in_type
