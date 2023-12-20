@@ -257,11 +257,11 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     rewriter.eraseOp(allocOp);
     rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
 
-    std::vector<Operation *> insertOps;
+    Operation * lastOp;
     fnWithoutMeasurementsOp.walk(
-        [&](quantum::InsertOp insertOp) { insertOps.push_back(insertOp); });
+        [&](quantum::InsertOp insertOp) { lastOp = insertOp; });
     fnWithoutMeasurementsOp.walk(
-        [&](func::ReturnOp returnOp) { returnOp->setOperands(insertOps.back()->getResult(0)); });
+        [&](func::ReturnOp returnOp) { returnOp->setOperands(lastOp->getResult(0)); });
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
