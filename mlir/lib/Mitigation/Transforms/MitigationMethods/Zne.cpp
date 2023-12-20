@@ -257,9 +257,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     rewriter.eraseOp(allocOp);
     rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
 
-    Operation * lastOp;
-    fnWithoutMeasurementsOp.walk(
-        [&](quantum::InsertOp insertOp) { lastOp = insertOp; });
+    Operation *lastOp;
+    fnWithoutMeasurementsOp.walk([&](quantum::InsertOp insertOp) { lastOp = insertOp; });
     fnWithoutMeasurementsOp.walk(
         [&](func::ReturnOp returnOp) { returnOp->setOperands(lastOp->getResult(0)); });
 
