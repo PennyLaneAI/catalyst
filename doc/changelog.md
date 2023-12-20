@@ -2,6 +2,10 @@
 
 <h3>New features</h3>
 
+* A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
+  with a lowering to a global folded circuit.
+  [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
+
 * Initial support for transforms. QFunc transforms are supported. QNode transforms have limited
   support. QNode transforms cannot be composed, and transforms are limited to what is currently
   available in PennyLane. This means that operations defined in Catalyst like `cond`, `for_loop`,
