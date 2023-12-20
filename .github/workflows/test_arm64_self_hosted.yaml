@@ -10,5 +10,16 @@ jobs:
   test:
     runs-on: xanadu-arm64-mac
 
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+
     steps:
-      - run: echo 'Hello World'
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - run: |
+          which python
+          python --version
+          python -c 'print("Hello World")'
