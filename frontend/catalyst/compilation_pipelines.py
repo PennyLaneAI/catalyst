@@ -854,7 +854,8 @@ def qjit(
             ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
             available TensorFlow installation. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
-        async_qnodes (bool): Experimental support for automatically executing :class:`QNode` asynchronously.
+        async_qnodes (bool): Experimental support for automatically executing :class:`QNode`
+            asynchronously.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
