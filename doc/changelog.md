@@ -49,6 +49,7 @@
 * Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
   for `lightning.qubit` and `lightning.kokkos` devices.
   [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
+  [(#410)](https://github.com/PennyLaneAI/catalyst/pull/410)
 
 * The runtime now supports multiple active devices managed via a device pool.
   The new `RTDevice` data-class and `RTDeviceStatus` along with the `thread_local`
