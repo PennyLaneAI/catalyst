@@ -14,7 +14,8 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
-
+import glob
+import importlib
 import os
 import pathlib
 import platform
@@ -22,8 +23,6 @@ import shutil
 import subprocess
 import sys
 import warnings
-import glob
-import importlib
 from os import path
 from copy import deepcopy
 from dataclasses import dataclass
@@ -321,10 +320,10 @@ class LinkerDriver:
             infile (str): input file name
             outfile (str): output file name
         """
-        path = pathlib.Path(infile)
+        infile_path = pathlib.Path(infile)
         if not path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
-        return str(path.with_suffix(".so"))
+        return str(infile_path.with_suffix(".so"))
 
     @staticmethod
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):

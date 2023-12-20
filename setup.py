@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from os import path
-import importlib.util
 import glob
+import importlib.util
+from os import path
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
