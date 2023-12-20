@@ -25,5 +25,4 @@ void populateScatterPatterns(mlir::RewritePatternSet &);
 
 void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
-
 } // namespace catalyst

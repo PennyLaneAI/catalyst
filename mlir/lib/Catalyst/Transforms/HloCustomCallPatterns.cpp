@@ -19,8 +19,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-#include "mhlo/IR/hlo_ops.h"
 #include "Catalyst/IR/CatalystOps.h"
+#include "mhlo/IR/hlo_ops.h"
 
 using namespace mlir;
 
@@ -35,7 +35,8 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<mhlo::Custo
         StringRef calleeName = op.getCallTargetName();
         auto operands = op.getOperands();
         TypeRange resultsType = op.getResultTypes();
-        rewriter.replaceOpWithNewOp<catalyst::CustomCallOp>(op, resultsType, operands, calleeName, nullptr);
+        rewriter.replaceOpWithNewOp<catalyst::CustomCallOp>(op, resultsType, operands, calleeName,
+                                                            nullptr);
         return success();
     }
 };

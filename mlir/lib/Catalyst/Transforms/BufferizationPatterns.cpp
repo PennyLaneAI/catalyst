@@ -77,8 +77,8 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
         auto numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
 
         // Create an updated custom call operation
-        rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs,
-                                                   op.getCallTargetName(), numArgumentsDenseAttr);
+        rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs, op.getCallTargetName(),
+                                      numArgumentsDenseAttr);
         size_t startIndex = bufferArgs.size() - op.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         rewriter.replaceOp(op, bufferResults);

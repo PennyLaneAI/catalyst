@@ -168,8 +168,8 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     std::optional<int8_t> elementDtype = encodeNumericType(memrefType.getElementType());
 
     // Create values for filling encoded memref struct.
-    Value dtype = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI8IntegerAttr(elementDtype.value()));
+    Value dtype =
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI8IntegerAttr(elementDtype.value()));
     Value rank =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(memrefType.getRank()));
 
@@ -285,8 +285,8 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     std::optional<int8_t> elementDtype = encodeNumericType(memrefType.getElementType());
 
     // Create values for filling encoded memref struct.
-    Value dtype = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI8IntegerAttr(elementDtype.value()));
+    Value dtype =
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI8IntegerAttr(elementDtype.value()));
     Value rank =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(memrefType.getRank()));
 
