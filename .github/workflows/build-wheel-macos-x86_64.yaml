@@ -112,7 +112,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -183,7 +183,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
