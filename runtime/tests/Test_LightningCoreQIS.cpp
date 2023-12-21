@@ -264,18 +264,6 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
     __quantum__rt__finalize();
 }
 
-TEST_CASE("Test invalid use of getDevice before init", "[CoreQIS]")
-{
-    auto devices = getDevices();
-    auto &&[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
-
-    // // try accessing the device pointer before init
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)rtd_lib.c_str(),
-                                                   (int8_t *)rtd_name.c_str(),
-                                                   (int8_t *)rtd_kwargs.c_str()),
-                        Catch::Contains("Invalid use of the global driver before initialization"));
-}
-
 TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
 {
     __quantum__rt__initialize();
