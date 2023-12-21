@@ -38,6 +38,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
+    "scipy",
 ]
 
 classifiers = [
@@ -91,7 +92,6 @@ elif system_platform == "Darwin":
     file_prefix = "libopenblas"
     file_extension = ".dylib"
     search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-    print(search_pattern)
     openblas_dylib_file = glob.glob(search_pattern)[0]
     openblas_lib_name = path.basename(openblas_dylib_file)[3:-6]
     custom_calls_extension = Extension(
