@@ -120,6 +120,7 @@ HLO_LOWERING_PASS = (
         "func.func(scalarize)",
         "canonicalize",
         "scatter-lowering",
+        "hlo-custom-call-lowering",
     ],
 )
 
@@ -144,9 +145,9 @@ BUFFERIZATION_PASS = (
         "empty-tensor-to-alloc-tensor",
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
+        "catalyst-bufferize",
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
-        "catalyst-bufferize",
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
@@ -259,7 +260,7 @@ class LinkerDriver:
             ]
         else:
             pass  # pragma: nocover
-        
+
         ### rpath and -L: custom calls
         lib_path_flags += [
             f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
