@@ -363,6 +363,7 @@ class ExecutionContext final {
             py_guard = std::make_unique<PythonInterpreterGuard>(); // LCOV_EXCL_LINE
         }
 #endif
+
         return device_pool[key];
     }
 
