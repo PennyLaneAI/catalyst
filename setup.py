@@ -14,6 +14,7 @@
 
 import glob
 import importlib.util
+import platform
 from os import path
 
 import numpy as np
@@ -23,6 +24,8 @@ from setuptools import (  # pylint: disable=wrong-import-order
     find_namespace_packages,
     setup,
 )
+
+system_platform = platform.system()
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
     version = f.readlines()[-1].split()[-1].strip("\"'")
@@ -63,27 +66,41 @@ description = {
 }
 
 package_name = "scipy"
-file_path_within_package = "../scipy.libs/"
 
 scipy_package = importlib.util.find_spec(package_name)
+package_directory = path.dirname(scipy_package.origin)
 
-if scipy_package is not None:
-    package_directory = path.dirname(scipy_package.origin)
-    scipy_lib_path = path.join(package_directory, file_path_within_package)
+if system_platform == "Linux":
+    file_path_within_package_linux = "../scipy.libs/"
+    scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
     file_prefix = "libopenblasp"
     file_extension = ".so"
     search_pattern = f"{file_prefix}*{file_extension}"
     openblas_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
     openblas_lib_name = openblas_so_file[3:-3]
+    openblas_so = scipy_lib_path + openblas_so_file
+    custom_calls_extension = Extension(
+        "catalyst.utils.custom_calls",
+        sources=["frontend/catalyst/utils/custom_calls.cpp"],
+        libraries=[openblas_lib_name],
+        library_dirs=[scipy_lib_path],
+    )
 
-openblas_so = scipy_lib_path + openblas_so_file
-
-custom_calls_extension = Extension(
-    "catalyst.utils.custom_calls",
-    sources=["frontend/catalyst/utils/custom_calls.cpp"],
-    libraries=[openblas_lib_name],
-    library_dirs=[scipy_lib_path],
-)
+elif system_platform == "Darwin":
+    file_path_within_package_macos = "/linalg/"
+    scipy_linalg_path = path.join(package_directory, file_path_within_package_macos)
+    file_prefix = "_flapack"
+    file_extension = ".so"
+    search_pattern = f"{file_prefix}*{file_extension}"
+    flapack_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_linalg_path)[0]
+    flapack_lib_name = flapack_so_file[0:-3]
+    openblas_so = scipy_linalg_path + flapack_so_file
+    custom_calls_extension = Extension(
+        "catalyst.utils.custom_calls",
+        sources=["frontend/catalyst/utils/custom_calls.cpp"],
+        libraries=[flapack_lib_name],
+        library_dirs=[scipy_linalg_path],
+    )
 
 ext_modules = [custom_calls_extension]
 

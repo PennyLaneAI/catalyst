@@ -259,7 +259,7 @@ class LinkerDriver:
             ]
         else:
             pass  # pragma: nocover
-
+        
         ### rpath and -L: custom calls
         lib_path_flags += [
             f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
@@ -273,12 +273,19 @@ class LinkerDriver:
         )[0]
         custom_calls_so_flag = f"-l:{custom_calls_so_file}"
 
-        ### rpath: scipy
-        package_name = "scipy"
-        file_path_within_package = "../scipy.libs/"
-        scipy_package = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(scipy_package.origin)
-        scipy_lib_path = path.join(package_directory, file_path_within_package)
+        if platform.system() == "Linux":
+            ### rpath: scipy
+            package_name = "scipy"
+            file_path_within_package = "../scipy.libs/"
+            scipy_package = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(scipy_package.origin)
+            scipy_lib_path = path.join(package_directory, file_path_within_package)
+        elif platform.system() == "Darwin":
+            package_name = "scipy"
+            file_path_within_package = "/linalg/"
+            scipy_package = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(scipy_package.origin)
+            scipy_lib_path = path.join(package_directory, file_path_within_package)
 
         lib_path_flags += [
             f"-Wl,-rpath,{scipy_lib_path}",
