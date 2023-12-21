@@ -828,6 +828,7 @@ def qjit(
     fn=None,
     *,
     autograph=False,
+    async_qnodes=False,
     target="binary",
     keep_intermediate=False,
     verbose=False,
@@ -853,6 +854,8 @@ def qjit(
             ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
             available TensorFlow installation. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
+        async_qnodes (bool): Experimental support for automatically executing :class:`QNode`
+            asynchronously.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
@@ -1055,6 +1058,7 @@ def qjit(
                 keep_intermediate,
                 pipelines,
                 autograph,
+                async_qnodes,
                 abstracted_axes=axes,
             ),
         )
@@ -1069,6 +1073,7 @@ def qjit(
                 keep_intermediate,
                 pipelines,
                 autograph,
+                async_qnodes,
                 abstracted_axes=axes,
             ),
         )
