@@ -87,7 +87,7 @@ if system_platform == "Linux":
     )
 
 elif system_platform == "Darwin":
-    file_path_within_package_macos = "/.dylibs/"
+    file_path_within_package_macos = ".dylibs/"
     scipy_lib_path = path.join(package_directory, file_path_within_package_macos)
     file_prefix = "libopenblas"
     file_extension = ".dylib"
