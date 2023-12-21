@@ -33,5 +33,6 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createCatalystConversionPass);
+    mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createTestPass);
 }
