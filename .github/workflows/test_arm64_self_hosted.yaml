@@ -15,6 +15,7 @@ jobs:
         python-version: ['3.9', '3.10', '3.11']
 
     steps:
+      - run: '[[ ":$PATH:" != *":/opt/homebrew/bin:"* ]] && echo "/opt/homebrew/bin" >> $GITHUB_PATH'
       - run: source ~/.profile
       - run: pyenv global ${{ matrix.python-version }}
       - run: |
