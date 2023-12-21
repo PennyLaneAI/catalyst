@@ -48,29 +48,30 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
         SmallVector<Value> bufferArgs;
         auto operands = op.getOperands();
         for (auto operand : operands) {
-            auto &newBuffer = bufferArgs.emplace_back();
             auto operandType = operand.getType();
             auto tensorOperandType = operandType.dyn_cast<RankedTensorType>();
             auto memrefType =
                 MemRefType::get(tensorOperandType.getShape(), tensorOperandType.getElementType());
-            newBuffer =
+            auto newBuffer =
                 rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, operand);
+            bufferArgs.push_back(newBuffer);
         }
 
         // Add bufferized return values to the arguments
         auto results = op.getResults();
         for (Value result : results) {
-            auto &newBuffer = bufferArgs.emplace_back();
             auto resultType = result.getType();
             auto tensorType = resultType.dyn_cast<RankedTensorType>();
-            if (!tensorType)
+            if (!tensorType) {
                 return failure();
+            }
             auto options = bufferization::BufferizationOptions();
             FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
                 rewriter, op->getLoc(), result, false, options, false);
             auto memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-            newBuffer =
+            auto newBuffer =
                 rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
+            bufferArgs.push_back(newBuffer);
         }
         // Add the initial number of arguments
         auto numArguments = static_cast<int32_t>(op.getNumOperands());

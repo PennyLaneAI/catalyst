@@ -42,7 +42,7 @@ extern "C" {
 // MemRef type
 struct EncodedMemref {
     int64_t rank;
-    void *data;
+    void *data_aligned;
     int8_t dtype;
 };
 
@@ -68,13 +68,13 @@ void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
     std::vector<void *> data;
     for (size_t i = 0; i < 7; ++i) {
         auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
-        data.push_back(encodedMemref.data);
+        data.push_back(encodedMemref.data_aligned);
     }
 
     std::vector<void *> out;
     for (size_t i = 0; i < 7; ++i) {
         auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
-        out.push_back(encodedMemref.data);
+        out.push_back(encodedMemref.data_aligned);
     }
 
     int32_t job_opt_full_matrices = *(reinterpret_cast<int32_t *>(data[0]));
