@@ -75,9 +75,9 @@ if system_platform == "Linux":
     scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
     file_prefix = "libopenblasp"
     file_extension = ".so"
-    search_pattern = f"{file_prefix}*{file_extension}"
-    openblas_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
-    openblas_lib_name = openblas_so_file[3:-3]
+    search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
+    openblas_so_file = glob.glob(search_pattern)[0]
+    openblas_lib_name = path.basename(openblas_so_file)[3:-3]
     custom_calls_extension = Extension(
         "catalyst.utils.custom_calls",
         sources=["frontend/catalyst/utils/custom_calls.cpp"],
@@ -90,9 +90,9 @@ elif system_platform == "Darwin":
     scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
     file_prefix = "libopenblas"
     file_extension = ".dylib"
-    search_pattern = f"{file_prefix}*{file_extension}"
-    openblas_dylib_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
-    openblas_lib_name = openblas_dylib_file[3:-6]
+    search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
+    openblas_dylib_file = glob.glob(search_pattern)[0]
+    openblas_lib_name = path.basename(openblas_dylib_file)[3:-6]
     custom_calls_extension = Extension(
         "catalyst.utils.custom_calls",
         sources=["frontend/catalyst/utils/custom_calls.cpp"],

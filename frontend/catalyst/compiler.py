@@ -268,25 +268,22 @@ class LinkerDriver:
         ]
         file_prefix = "custom_calls"
         file_extension = ".so"
-        search_pattern = f"{file_prefix}*{file_extension}"
-        custom_calls_so_file = glob.glob(
-            f"{search_pattern}", root_dir=DEFAULT_CUSTOM_CALLS_LIB_PATH
-        )[0]
+
+        search_pattern = path.join(DEFAULT_CUSTOM_CALLS_LIB_PATH, f"{file_prefix}*{file_extension}")
+        custom_calls_so_file = path.basename(glob.glob(f"{search_pattern}")[0])
         custom_calls_so_flag = f"-l:{custom_calls_so_file}"
 
+        ### rpath: scipy
+        package_name = "scipy"
+
         if platform.system() == "Linux":
-            ### rpath: scipy
-            package_name = "scipy"
             file_path_within_package = "../scipy.libs/"
-            scipy_package = importlib.util.find_spec(package_name)
-            package_directory = path.dirname(scipy_package.origin)
-            scipy_lib_path = path.join(package_directory, file_path_within_package)
         elif platform.system() == "Darwin":
-            package_name = "scipy"
             file_path_within_package = "/.dylibs/"
-            scipy_package = importlib.util.find_spec(package_name)
-            package_directory = path.dirname(scipy_package.origin)
-            scipy_lib_path = path.join(package_directory, file_path_within_package)
+        
+        scipy_package = importlib.util.find_spec(package_name)
+        package_directory = path.dirname(scipy_package.origin)
+        scipy_lib_path = path.join(package_directory, file_path_within_package)
 
         lib_path_flags += [
             f"-Wl,-rpath,{scipy_lib_path}",
