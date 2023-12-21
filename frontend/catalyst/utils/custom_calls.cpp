@@ -114,7 +114,6 @@ void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
 #elif defined(__APPLE__)
         _dgesdd_(&jobz, &m, &n, a_out, &lda, s, u, &ldu, vt, &ldvt, work, &lwork, iwork, info);
 #endif
-        dgesdd_(&jobz, &m, &n, a_out, &lda, s, u, &ldu, vt, &ldvt, work, &lwork, iwork, info);
         a_out += static_cast<int64_t>(m) * n;
         s += std::min(m, n);
         u += static_cast<int64_t>(m) * tdu;

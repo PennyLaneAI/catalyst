@@ -78,7 +78,6 @@ if system_platform == "Linux":
     search_pattern = f"{file_prefix}*{file_extension}"
     openblas_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
     openblas_lib_name = openblas_so_file[3:-3]
-    openblas_so = scipy_lib_path + openblas_so_file
     custom_calls_extension = Extension(
         "catalyst.utils.custom_calls",
         sources=["frontend/catalyst/utils/custom_calls.cpp"],
@@ -94,7 +93,6 @@ elif system_platform == "Darwin":
     search_pattern = f"{file_prefix}*{file_extension}"
     flapack_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_linalg_path)[0]
     flapack_lib_name = flapack_so_file[0:-3]
-    openblas_so = scipy_linalg_path + flapack_so_file
     custom_calls_extension = Extension(
         "catalyst.utils.custom_calls",
         sources=["frontend/catalyst/utils/custom_calls.cpp"],
