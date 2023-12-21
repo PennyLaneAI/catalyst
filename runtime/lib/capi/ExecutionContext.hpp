@@ -208,7 +208,7 @@ class RTDevice {
     std::string rtd_kwargs;
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
-    std::shared_ptr<QuantumDevice> rtd_qdevice{nullptr};
+    QuantumDevice *rtd_qdevice{nullptr};
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
@@ -263,7 +263,7 @@ class RTDevice {
                this->rtd_kwargs == other.rtd_kwargs;
     }
 
-    [[nodiscard]] auto getQuantumDevicePtr() -> std::shared_ptr<QuantumDevice>
+    [[nodiscard]] auto getQuantumDevicePtr() -> QuantumDevice *
     {
         if (rtd_qdevice) {
             return rtd_qdevice;
@@ -272,11 +272,10 @@ class RTDevice {
         rtd_dylib = std::make_unique<SharedLibraryManager>(rtd_lib);
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
-        QuantumDevice *impl =
+        rtd_qdevice =
             f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                   : nullptr;
 
-        rtd_qdevice.reset(impl);
         return rtd_qdevice;
     }
 
