@@ -97,7 +97,8 @@ elif system_platform == "Darwin":
         "catalyst.utils.custom_calls",
         sources=["frontend/catalyst/utils/custom_calls.cpp"],
         libraries=[openblas_lib_name],
-        library_dirs=[scipy_lib_path],)
+        library_dirs=[scipy_lib_path],
+    )
 
 ext_modules = [custom_calls_extension]
 
