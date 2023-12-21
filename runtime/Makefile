@@ -14,7 +14,7 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?="maa/fix-unregistered-kernel-issue-mac" # TODO: Update to v0.34.0
+LIGHTNING_GIT_TAG_VALUE?="23ee599" # TODO: Update to v0.34.0
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 ifeq ($(shell uname), Darwin)
