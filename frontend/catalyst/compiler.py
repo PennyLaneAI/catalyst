@@ -298,6 +298,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
+            custom_calls_so_flag,
             "-lmlir_async_runtime",
         ]
 
