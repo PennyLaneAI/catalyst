@@ -64,6 +64,7 @@
   [(#374](https://github.com/PennyLaneAI/catalyst/pull/374)
 
   In this example below, the first and second circuit are executed in parrallel if two threads are available.
+  To see a speed up in your code, you should use circuits with more gates and/or more qubits.
   ```python
   dev = qml.device("lightning.qubit", wires=2)
 
