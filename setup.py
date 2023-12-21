@@ -86,11 +86,12 @@ if system_platform == "Linux":
     )
 
 elif system_platform == "Darwin":
-    file_path_within_package_linux = "/.dylibs/"
-    scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
+    file_path_within_package_macos = "/.dylibs/"
+    scipy_lib_path = path.join(package_directory, file_path_within_package_macos)
     file_prefix = "libopenblas"
     file_extension = ".dylib"
     search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
+    print(search_pattern)
     openblas_dylib_file = glob.glob(search_pattern)[0]
     openblas_lib_name = path.basename(openblas_dylib_file)[3:-6]
     custom_calls_extension = Extension(
