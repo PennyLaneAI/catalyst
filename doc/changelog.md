@@ -58,6 +58,47 @@
   and execute multiple programs in a multithreaded environment.
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
+* Qjitted functions now support asynchronuous execution of QNodes. Simply use ``qjit(async_qnodes=True)`` to
+  enable the async execution of QNodes. It is useful for finite differences and parameter-shift, as those
+  differentiation methods can generate multiple circuit. Support for the async MLIR dialect was added.
+  [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
+
+  In this example below, the first and second circuit are executed in parrallel if two threads are available.
+  To see a speed up in your code, you should use circuits with more gates and/or more qubits.
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit(async_qnodes=True)
+  def multiple_qnodes(params):
+      @qml.qnode(device=dev)
+      def circuit1(params):
+          qml.RX(params[0], wires=0)
+          qml.RY(params[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliZ(wires=0))
+
+      @qml.qnode(device=dev)
+      def circuit2(params):
+          qml.RY(params[0], wires=0)
+          qml.RZ(params[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliX(wires=0))
+
+      @qml.qnode(device=dev)
+      def circuit3(params):
+          qml.RZ(params[0], wires=0)
+          qml.RX(params[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliZ(wires=0))
+
+      new_params = jnp.array([circuit1(params), circuit2(params)])
+      return circuit3(new_params)
+  ```
+  ``` pycon
+  >>> func(jnp.array([1.0, 2.0]))
+  1.0
+  ```
+
 <h3>Improvements</h3>
 
 * Support for `mcmc` sampling in `lightning.qubit`.

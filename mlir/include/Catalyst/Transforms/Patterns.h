@@ -25,4 +25,6 @@ void populateScatterPatterns(mlir::RewritePatternSet &);
 
 void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
+void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
+
 } // namespace catalyst

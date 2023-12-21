@@ -79,4 +79,15 @@ def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
     let constructor = "catalyst::createHloCustomCallLoweringPass()";
 }
 
+def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
+    let summary = "Lower Qnode func and call operations to async func and call operations.";
+
+    let dependentDialects = [
+        "async::AsyncDialect",
+        "mlir::memref::MemRefDialect",
+        "bufferization::BufferizationDialect"
+    ];
+
+    let constructor = "catalyst::QnodeToAsyncLoweringPass()";
+}
 #endif // CATALYST_PASSES

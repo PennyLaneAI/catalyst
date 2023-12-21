@@ -57,6 +57,8 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
+        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
+            of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
@@ -68,6 +70,7 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
+    async_qnodes: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
 
@@ -84,7 +87,11 @@ class CompileOptions:
 
     def get_pipelines(self) -> List[Tuple[str, List[str]]]:
         """Get effective pipelines"""
-        return self.pipelines if self.pipelines is not None else DEFAULT_PIPELINES
+        if self.pipelines:
+            return self.pipelines
+        elif self.async_qnodes:
+            return DEFAULT_ASYNC_PIPELINES
+        return DEFAULT_PIPELINES
 
 
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
@@ -100,91 +107,115 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
+HLO_LOWERING_PASS = (
+    "HLOLoweringPass",
+    [
+        "canonicalize",
+        "func.func(chlo-legalize-to-hlo)",
+        "stablehlo-legalize-to-hlo",
+        "func.func(mhlo-legalize-control-flow)",
+        "func.func(hlo-legalize-to-linalg)",
+        "func.func(mhlo-legalize-to-std)",
+        "convert-to-signless",
+        "func.func(scalarize)",
+        "canonicalize",
+        "scatter-lowering",
+    ],
+)
+
+QUANTUM_COMPILATION_PASS = (
+    "QuantumCompilationPass",
+    [
+        "lower-gradients",
+        "adjoint-lowering",
+    ],
+)
+
+BUFFERIZATION_PASS = (
+    "BufferizationPass",
+    [
+        "one-shot-bufferize{dialect-filter=memref}",
+        "inline",
+        "gradient-bufferize",
+        "scf-bufferize",
+        "convert-tensor-to-linalg",  # tensor.pad
+        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+        "arith-bufferize",
+        "empty-tensor-to-alloc-tensor",
+        "func.func(bufferization-bufferize)",
+        "func.func(tensor-bufferize)",
+        "func.func(linalg-bufferize)",
+        "func.func(tensor-bufferize)",
+        "catalyst-bufferize",
+        "quantum-bufferize",
+        "func-bufferize",
+        "func.func(finalizing-bufferize)",
+        "func.func(buffer-hoisting)",
+        "func.func(buffer-loop-hoisting)",
+        "func.func(buffer-deallocation)",
+        "convert-arraylist-to-memref",
+        "convert-bufferization-to-memref",
+        "canonicalize",
+        # "cse",
+        "cp-global-memref",
+    ],
+)
+
+
+MLIR_TO_LLVM_PASS = (
+    "MLIRToLLVMDialect",
+    [
+        "convert-gradient-to-llvm",
+        "func.func(convert-linalg-to-loops)",
+        "convert-scf-to-cf",
+        # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
+        # strides) into a sequence of easier to analyze constructs. In particular, this pass
+        # transforms ops into explicit sequence of operations that model the effect of this
+        # operation on the different metadata. This pass uses affine constructs to materialize
+        # these effects. Concretely, expanded-strided-metadata is used to decompose
+        # memref.subview as it has no lowering in -finalize-memref-to-llvm.
+        "expand-strided-metadata",
+        "lower-affine",
+        "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
+        "convert-complex-to-standard",  # added for complex.exp lowering
+        "convert-complex-to-llvm",
+        "convert-math-to-llvm",
+        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
+        "convert-math-to-libm",
+        "convert-arith-to-llvm",
+        "finalize-memref-to-llvm{use-generic-functions}",
+        "convert-index-to-llvm",
+        "convert-catalyst-to-llvm",
+        "convert-quantum-to-llvm",
+        "emit-catalyst-py-interface",
+        # Remove any dead casts as the final pass expects to remove all existing casts,
+        # but only those that form a loop back to the original type.
+        "canonicalize",
+        "reconcile-unrealized-casts",
+    ],
+)
+
+
 DEFAULT_PIPELINES = [
-    (
-        "HLOLoweringPass",
-        [
-            "canonicalize",
-            "func.func(chlo-legalize-to-hlo)",
-            "stablehlo-legalize-to-hlo",
-            "func.func(mhlo-legalize-control-flow)",
-            "func.func(hlo-legalize-to-linalg)",
-            "func.func(mhlo-legalize-to-std)",
-            "convert-to-signless",
-            "func.func(scalarize)",
-            "canonicalize",
-            "scatter-lowering",
-            "hlo-custom-call-lowering",
-        ],
-    ),
-    (
-        "QuantumCompilationPass",
-        [
-            "lower-gradients",
-            "adjoint-lowering",
-        ],
-    ),
-    (
-        "BufferizationPass",
-        [
-            "one-shot-bufferize{dialect-filter=memref}",
-            "inline",
-            "gradient-bufferize",
-            "scf-bufferize",
-            "convert-tensor-to-linalg",  # tensor.pad
-            "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-            "arith-bufferize",
-            "empty-tensor-to-alloc-tensor",
-            "func.func(bufferization-bufferize)",
-            "func.func(tensor-bufferize)",
-            "catalyst-bufferize",  # figure out why before linalg.
-            "func.func(linalg-bufferize)",
-            "func.func(tensor-bufferize)",
-            "quantum-bufferize",
-            "func-bufferize",
-            "func.func(finalizing-bufferize)",
-            "func.func(buffer-hoisting)",
-            "func.func(buffer-loop-hoisting)",
-            "func.func(buffer-deallocation)",
-            "convert-arraylist-to-memref",
-            "convert-bufferization-to-memref",
-            "canonicalize",
-            # "cse",
-            "cp-global-memref",
-        ],
-    ),
-    (
-        "MLIRToLLVMDialect",
-        [
-            "convert-gradient-to-llvm",
-            "func.func(convert-linalg-to-loops)",
-            "convert-scf-to-cf",
-            # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
-            # strides) into a sequence of easier to analyze constructs. In particular, this pass
-            # transforms ops into explicit sequence of operations that model the effect of this
-            # operation on the different metadata. This pass uses affine constructs to materialize
-            # these effects. Concretely, expanded-strided-metadata is used to decompose
-            # memref.subview as it has no lowering in -finalize-memref-to-llvm.
-            "expand-strided-metadata",
-            "lower-affine",
-            "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-            "convert-complex-to-standard",  # added for complex.exp lowering
-            "convert-complex-to-llvm",
-            "convert-math-to-llvm",
-            # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-            "convert-math-to-libm",
-            "convert-arith-to-llvm",
-            "finalize-memref-to-llvm{use-generic-functions}",
-            "convert-index-to-llvm",
-            "convert-catalyst-to-llvm",
-            "convert-quantum-to-llvm",
-            "emit-catalyst-py-interface",
-            # Remove any dead casts as the final pass expects to remove all existing casts,
-            # but only those that form a loop back to the original type.
-            "canonicalize",
-            "reconcile-unrealized-casts",
-        ],
-    ),
+    HLO_LOWERING_PASS,
+    QUANTUM_COMPILATION_PASS,
+    BUFFERIZATION_PASS,
+    MLIR_TO_LLVM_PASS,
+]
+
+MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
+MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
+    "qnode-to-async-lowering",
+    "async-func-to-async-runtime",
+    "async-to-async-runtime",
+    "convert-async-to-llvm",
+]
+
+DEFAULT_ASYNC_PIPELINES = [
+    HLO_LOWERING_PASS,
+    QUANTUM_COMPILATION_PASS,
+    BUFFERIZATION_PASS,
+    MLIR_TO_LLVM_ASYNC_PASS,
 ]
 
 
@@ -267,7 +298,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            custom_calls_so_flag,
+            "-lmlir_async_runtime",
         ]
 
         return default_flags
