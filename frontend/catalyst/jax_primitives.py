@@ -59,6 +59,7 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+from mlir_quantum.mitigation import ZNEOp
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -207,6 +208,8 @@ adjoint_p = jax.core.Primitive("adjoint")
 adjoint_p.multiple_results = True
 print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
+zne_p = jax.core.Primitive("zne")
+zne_p.multiple_results = True
 
 
 #
@@ -488,6 +491,21 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
+#
+# ZNE
+#
+@zne_p.def_impl
+def _zne_def_impl(ctx, *args, jaxpr, fn, zne_params):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@zne_p.def_abstract_eval
+def _zne_abstract_eval(ctx, *args, jaxpr, fn, zne_params):
+    return ()
+
+
+def _zne_lowering(ctx, *args, jaxpr, fn, zne_params):
+    return ()
 
 #
 # qdevice
