@@ -86,19 +86,18 @@ if system_platform == "Linux":
     )
 
 elif system_platform == "Darwin":
-    file_path_within_package_macos = "/linalg/"
-    scipy_linalg_path = path.join(package_directory, file_path_within_package_macos)
-    file_prefix = "_flapack"
-    file_extension = ".so"
+    file_path_within_package_linux = "/.dylibs/"
+    scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
+    file_prefix = "libopenblas"
+    file_extension = ".dylib"
     search_pattern = f"{file_prefix}*{file_extension}"
-    flapack_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_linalg_path)[0]
-    flapack_lib_name = flapack_so_file[0:-3]
+    openblas_so_file = glob.glob(f"{search_pattern}", root_dir=scipy_lib_path)[0]
+    openblas_lib_name = openblas_so_file[3:-3]
     custom_calls_extension = Extension(
         "catalyst.utils.custom_calls",
         sources=["frontend/catalyst/utils/custom_calls.cpp"],
-        libraries=[flapack_lib_name],
-        library_dirs=[scipy_linalg_path],
-    )
+        libraries=[openblas_lib_name],
+        library_dirs=[scipy_lib_path],)
 
 ext_modules = [custom_calls_extension]
 

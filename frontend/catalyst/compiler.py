@@ -283,7 +283,7 @@ class LinkerDriver:
             scipy_lib_path = path.join(package_directory, file_path_within_package)
         elif platform.system() == "Darwin":
             package_name = "scipy"
-            file_path_within_package = "/linalg/"
+            file_path_within_package = "/.dylibs/"
             scipy_package = importlib.util.find_spec(package_name)
             package_directory = path.dirname(scipy_package.origin)
             scipy_lib_path = path.join(package_directory, file_path_within_package)
