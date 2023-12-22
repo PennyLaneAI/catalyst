@@ -77,12 +77,25 @@ class CustomBuildExt(build_ext):
         # Run the original build_ext command
         build_ext.run(self)
         package_root = path.dirname(__file__)
-        # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-        library_path = f"build/lib.macosx-13-arm64-cpython-310/catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
-        new_path = f"catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
-        subprocess.run(
-            ["/usr/bin/install_name_tool", "-id", library_path, new_path], check=False
-        )
+
+        # Construct library name based on known file name
+        library_name = f"libcustom_calls{variables['EXT_SUFFIX']}"
+
+        frontend_path = glob.glob(path.join("frontend", "**", library_name), recursive=True)
+        build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
+
+        if frontend_path:
+            # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
+            subprocess.run(
+                ["/usr/bin/install_name_tool", "-id", frontend_path[0], frontend_path[0]],
+                check=False,
+            )
+        elif build_path:
+            new_path = f"catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
+            # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
+            subprocess.run(
+                ["/usr/bin/install_name_tool", "-id", new_path, build_path[0]], check=False
+            )
 
 
 package_name = "scipy"
