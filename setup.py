@@ -78,7 +78,7 @@ class CustomBuildExt(build_ext):
         build_ext.run(self)
         package_root = path.dirname(__file__)
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-        library_path = f"frontend/catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
+        library_path = f"catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
         subprocess.run(
             ["/usr/bin/install_name_tool", "-id", library_path, library_path], check=False
         )
