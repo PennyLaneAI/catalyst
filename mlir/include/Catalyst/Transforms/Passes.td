@@ -74,6 +74,7 @@ def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
     let dependentDialects = [
         "index::IndexDialect",
         "mlir::func::FuncDialect",
+        "catalyst::CatalystDialect",
     ];
 
     let constructor = "catalyst::createHloCustomCallLoweringPass()";

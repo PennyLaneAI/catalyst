@@ -26,6 +26,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Patterns.h"
 
 using namespace llvm;
