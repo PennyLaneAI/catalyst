@@ -475,13 +475,14 @@ def make_jaxpr2(
         in_type = infer_lambda_input_type(axes_specs, flat_args)
         return in_type, in_tree
 
+    # TODO: See the `_gather_shape_rule_dynamic` comment. Remove once the upstream change is
+    # applied.
     gather2_p = standard_primitive(
         _gather_shape_rule_dynamic,
         _gather_dtype_rule,
         "gather",
         weak_type_rule=_argnum_weak_type(0),
     )
-
     register_lowering(gather2_p, _gather_lower)
 
     @wraps(fun)
@@ -586,6 +587,19 @@ def _gather_shape_rule_dynamic(operand, indices, *, dimension_numbers,
             f"output_slice_sizes={offset_dims}, collapsed_slice_dims="
             f"{collapsed_slice_dims}."
         )
+
+    # This section contains a patch suggested to the upstream.
+    for i in range(len(slice_sizes)):
+        slice_size = slice_sizes[i]
+        corresponding_input_size = operand.shape[i]
+
+        if jax.core.is_constant_dim(corresponding_input_size):
+            if not (slice_size >= 0 and corresponding_input_size >= slice_size):
+                raise TypeError(
+                    f"Slice size at index {i} in gather op is out of range, "
+                    f"must be within [0, {corresponding_input_size} + 1), "
+                    f"got {slice_size}."
+                )
 
     for i in range(len(collapsed_slice_dims)):
         bound = slice_sizes[collapsed_slice_dims[i]]
