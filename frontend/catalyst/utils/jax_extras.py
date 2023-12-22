@@ -799,7 +799,6 @@ def infer_output_type_python(
     See the ``infer_output_type`` for the additional explanation.
     """
 
-
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
@@ -982,8 +981,9 @@ class DynshapePrimitive(Primitive):
 
         out_tracers = output_type_to_tracers(
             out_type,
-            [],  # FIXME: we have no information about the constants at this point so we expect that
-                 # the `abstract_eval` returned `out_type` calculated for empty constants.
+            # FIXME: we have no information about the constants at this point so we expect that the
+            # `abstract_eval` returned `out_type` calculated for empty constants.
+            [],
             tracers,
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
         )
