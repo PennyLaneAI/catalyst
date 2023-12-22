@@ -71,7 +71,7 @@ description = {
 
 
 class CustomBuildExt(build_ext):
-    """Override build ext from setuptools in order to change the LC_ID_DYLIB that otherwise 
+    """Override build ext from setuptools in order to change the LC_ID_DYLIB that otherwise
     is constant and equal to where the share library was created."""
 
     def run(self):
