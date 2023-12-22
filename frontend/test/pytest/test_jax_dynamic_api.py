@@ -399,7 +399,7 @@ def test_array_indexing():
     assert res == 1
 
 
-def test_array_assigning():
+def test_array_assignment():
     """Test the support of assigning a value to a dynamically-shaped array"""
 
     @qjit
@@ -410,6 +410,23 @@ def test_array_assigning():
 
     result = fun(5, 2, 33)
     expected = jnp.ones((5, 3, 5), dtype=int).at[2, 0, 2].set(33)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qjit_forloop_array_assignment():
+    """Test the array assignment in a loop"""
+
+    @qjit
+    def fun(sz):
+        @for_loop(0, sz, 1)
+        def loop(i, a):
+            a = a.at[i].set(i)
+            return a
+
+        return loop(jnp.zeros([sz], dtype=int))
+
+    result = fun(5)
+    expected = jnp.array((0, 1, 2, 3, 4), dtype=int)
     assert_array_and_dtype_equal(result, expected)
 
 
