@@ -23,4 +23,6 @@ void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSe
 
 void populateScatterPatterns(mlir::RewritePatternSet &);
 
+void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
+
 } // namespace catalyst

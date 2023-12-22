@@ -197,6 +197,7 @@ TEST_CASE("Test device release after driver release", "[CoreQIS]")
     QUBIT *q = __quantum__rt__qubit_allocate();
     __quantum__rt__qubit_release(q);
     __quantum__rt__finalize();
+
     REQUIRE_THROWS_WITH(
         __quantum__rt__device_release(),
         Catch::Contains("Cannot release an ACTIVE device out of scope of the global driver"));
