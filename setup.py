@@ -81,19 +81,19 @@ if system_platform == "Linux":
     file_extension = ".so"
     search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
     openblas_so_file = glob.glob(search_pattern)[0]
-    openblas_lib_name = path.basename(openblas_so_file)[3:-len(file_extension)]
+    openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
         libraries=[openblas_lib_name],
         library_dirs=[scipy_lib_path],
     )
-    cmd_class={}
+    cmd_class = {}
 
 elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
     # Here we need to switch the deault to MacOs dynamic lib
-    variables['LDSHARED'] = variables['LDSHARED'].replace('-bundle', '-dynamiclib')
+    variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
 
     file_path_within_package_macos = ".dylibs/"
     scipy_lib_path = path.join(package_directory, file_path_within_package_macos)
@@ -101,17 +101,19 @@ elif system_platform == "Darwin":
     file_extension = ".dylib"
     search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
     openblas_dylib_file = glob.glob(search_pattern)[0]
-    openblas_lib_name = path.basename(openblas_dylib_file)[3:-len(file_extension)]
+    openblas_lib_name = path.basename(openblas_dylib_file)[3 : -len(file_extension)]
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
         libraries=[openblas_lib_name],
         library_dirs=[scipy_lib_path],
     )
-    cmd_class={'build_ext': CustomBuildExt}
+    cmd_class = {"build_ext": CustomBuildExt}
+
 
 class CustomBuildExt(build_ext):
     """Override build ext from setuptools."""
+
     def run(self):
         # Run the original build_ext command
         build_ext.run(self)
@@ -119,7 +121,8 @@ class CustomBuildExt(build_ext):
         DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "frontend/catalyst/utils")
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
         library_path = f"{DEFAULT_CUSTOM_CALLS_LIB_PATH}/libcustom_calls{variables['EXT_SUFFIX']}"
-        subprocess.run(['install_name_tool', '-id', library_path, library_path], check=False)
+        subprocess.run(["install_name_tool", "-id", library_path, library_path], check=False)
+
 
 ext_modules = [custom_calls_extension]
 
