@@ -688,8 +688,29 @@ def infer_output_type(
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
 ) -> Tuple[List[TracerLike], OutputType]:
-    """Deduce the Jax ``out_type`` given input and ouputs abstract entities. By abstract entities
-    we mean either Jax tracers or Jaxpr variables."""
+    """Deduce the Jax ``OutputType`` of a part of program (typically, a function) given its
+    constants, input and ouput tracers or variables. Return the expanded outputs along with the
+    output type calculated.
+
+    The core task of this function is to find out which tracers have dynamic dimensions and
+    translate this information into the language of the De Brujin indices residing in Jax types. In
+    order to do this, we scan the outputs and mind what dimensions are already known (from the
+    intputs) and what are not known. The known dimensions are marked with InDBIdx and the unknown
+    dimensions are treated as calculated and marked using OutDBIdx.
+
+
+    Args:
+        constants: Constants which are required to evaluate the program.
+        expanded_inputs: Input tracers of the program. Implicit dimension tracers must be included.
+        outputs: Explicit output tracers of the program, as return by Python function.
+        expansion_strategy: Output expansion options.
+        num_implicit_inputs: The number of implicit inputs residing in the `expanded_inputs`
+                             argument.
+
+    Returns:
+        List[TracerLike]: Expanded outputs, with the dynamic dimension variabiles set correctly
+        OutputType: Jax ``OutputType`` of the program, including all the required *DBIdx.
+    """
     s = expansion_strategy
 
     def _is_tracer_like(x):
@@ -750,8 +771,11 @@ def infer_output_type_jaxpr(
     expansion_strategy,
     num_implicit_inputs: int | None = None,
 ) -> OutputType:
-    """Infers the OutputType record based on the Jaxpr program's result variables, expanded inputs
-    and constants."""
+    """Infers the Jax ``OutputType`` based on the Jaxpr program's result variables, expanded inputs
+    and constants.
+
+    See the ``infer_output_type`` for the additional explanation.
+    """
     _, out_type = infer_output_type(
         constants, expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
     )
@@ -764,18 +788,30 @@ def infer_output_type_python(
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int,
 ) -> Tuple[List[TracerLike], Tuple[Jaxpr, OutputType, List[TracerLike]]]:
-    """Infers the OutputType record of the Python function's result values. In addition to the
-    OutputType, returns the corresponding Jaxpr program, expanded list of outputs, and the
-    constants."""
+    """Infers the Jax ``OutputType`` of a traced Python program. In addition to the
+    output type, alaso return the corresponding Jaxpr program, expanded list of outputs, and the
+    constants.
+
+    In this function we attempt to overcome Jax incompatibilities regarding the dynamic API support
+    in loops.  Namely, we (1) handle additional expansion options encoded as ``expansion_strategy``,
+    (2) Make sure that Jaxpr constants are counted correctly.
+
+    See the ``infer_output_type`` for the additional explanation.
+    """
+
+
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
+    # Infer output type assuming the empty list of constants
     expanded_outputs, out_type1 = infer_output_type(
         [], expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
     )
 
+    # Calculate constants using the expanded outputs
     jaxpr, _, consts = trace.frame.to_jaxpr2(expanded_outputs)
 
+    # Calculate output type containing the correct De Brjuin indices
     expanded_outputs2, out_type2 = infer_output_type(
         [trace.full_raise(t) for t in consts],
         expanded_inputs,
@@ -784,11 +820,13 @@ def infer_output_type_python(
         num_implicit_inputs,
     )
 
+    # Combine the explicitness information with the correct De Brjuin indices
     assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
     _, out_keep1 = unzip2(out_type1)
     out_aval2, _ = unzip2(out_type2)
     out_type3 = tuple(zip(out_aval2, out_keep1))
 
+    # Return the final results
     return expanded_outputs2, (jaxpr, out_type3, consts)
 
 
@@ -905,24 +943,34 @@ def out_type_force_outdbidx(
 
 
 class DynshapePrimitive(Primitive):
-    """Primitive containing nested Jaxpr programs accepting and returning values with dynamic
-    shapes."""
+    """Primitive containing nested Jaxpr programs accepting and returning Jax values with shapes
+    containing dynamic dimensions."""
 
     def bind(self, *args, **params):
-        """Bind the Jax primitive into a Jaxpr program. This method are called both when tracing a
-        Python program and evaluating a Jaxpr program.
+        """Bind the Jax primitive into a Jaxpr program. This method are called during both the
+        tracing of a Python program and during the evaluation of a Jaxpr program.
+
+        In contrast to other Jax primitives, this one accepts expanded arguments (shapes of
+        inputs might contain tracers), deduces the Jax ``InputType``, passes it to the abstract
+        evaluation callback and correctly interprets the returned ``OutputType``. This means that it
+        correctly processes the InDBIdx/OutDBIdx residing in the OutputType by creating resulting
+        tracers with the right dynamic dimensions. For the details, refer to the definition of the
+        ``InputType`` and ``OutputType`` of Jax.
 
         Args:
             *args: arguments of this bind primitive. Must be Jax tracers (when tracing a Python
-                   program) or Jaxpr variables (when evaluating Jaxpr program).
+                   program) or Jaxpr variables (when evaluating Jaxpr program). Dynamic dimensions
+                   are supported.
             **params: Any valid Python variables used as parameters for this primitive.
 
         Returns:
-            Output Python tracers or Jax variables.
+            Output Python tracers or Jaxpr variables, with the dynamic dimensions set in accordance
+            with the the output type calculated by the ``abstract_eval``.
 
         """
-        # Note: We do not return out_type, but we should, because currently we
-        # lose the explicitness information.
+        # Note: We do not return `out_type` along with the results in order to match the Jax bind
+        # API.  but it would be good to return it, because otherwise we lose the information about
+        # explicintess.
 
         trace = find_top_trace(args)
         tracers = map(trace.full_raise, args)
@@ -930,12 +978,13 @@ class DynshapePrimitive(Primitive):
 
         in_type = infer_lambda_input_type(None, tracers)
         out_type, effects = self.abstract_eval(*in_type, **params)
-        assert len(effects) == 0, f"Effects are not supported, got ({effects})"
+        assert len(effects) == 0, f"Jax effects are not supported, got ({effects})"
 
         out_tracers = output_type_to_tracers(
             out_type,
-            [],
-            tracers,  # FIXME: what to do with constants here???
+            [],  # FIXME: we have no information about the constants at this point so we expect that
+                 # the `abstract_eval` returned `out_type` calculated for empty constants.
+            tracers,
             maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
         )
 
