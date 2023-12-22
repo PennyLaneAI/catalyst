@@ -507,9 +507,10 @@ def make_jaxpr2(
 def _gather_shape_rule_dynamic(operand, indices, *, dimension_numbers,
                                slice_sizes, unique_indices, indices_are_sorted,
                                mode, fill_value):
-  offset_dims = dimension_numbers.offset_dims
-  collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
-  start_index_map = dimension_numbers.start_index_map
+
+    offset_dims = dimension_numbers.offset_dims
+    collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
+    start_index_map = dimension_numbers.start_index_map
 
     # Note: in JAX, index_vector_dim is always computed as below, cf. the
     # documentation of the GatherDimensionNumbers class.
