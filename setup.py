@@ -16,8 +16,9 @@ import glob
 import importlib.util
 import platform
 import subprocess
-from os import path
 from distutils import sysconfig
+from os import path
+
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
 from setuptools import (  # pylint: disable=wrong-import-order
