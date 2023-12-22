@@ -46,15 +46,9 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     {
         // Add bufferized arguments
         SmallVector<Value> bufferArgs;
-        auto operands = op.getOperands();
+        auto operands = adaptor.getOperands();
         for (auto operand : operands) {
-            auto operandType = operand.getType();
-            auto tensorOperandType = operandType.dyn_cast<RankedTensorType>();
-            auto memrefType =
-                MemRefType::get(tensorOperandType.getShape(), tensorOperandType.getElementType());
-            auto newBuffer =
-                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, operand);
-            bufferArgs.push_back(newBuffer);
+            bufferArgs.push_back(operand);
         }
 
         // Add bufferized return values to the arguments
