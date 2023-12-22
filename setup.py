@@ -71,33 +71,33 @@ description = {
 
 
 class CustomBuildExt(build_ext):
-    """Override build ext from setuptools."""
+    """Override build ext from setuptools in order to change the LC_ID_DYLIB that otherwise is constant
+    and equal to where the share library was created."""
 
     def run(self):
         # Run the original build_ext command
         build_ext.run(self)
-        package_root = path.dirname(__file__)
 
-        # Construct library name based on known file name
+        # Construct library name based on ext suffix (contains python version, architecture and .so)
         library_name = f"libcustom_calls{variables['EXT_SUFFIX']}"
 
-        frontend_path = glob.glob(
-            path.join(package_root, "frontend", "**", library_name), recursive=True
-        )
+        package_root = path.dirname(__file__)
+        frontend_path = glob.glob(path.join(package_root, "frontend", "**", library_name), recursive=True)
         build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
+        lib_with_r_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
 
+        # For dev installation
         if frontend_path:
             # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-            new_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
             subprocess.run(
-                ["/usr/bin/install_name_tool", "-id", new_path, frontend_path[0]],
+                ["/usr/bin/install_name_tool", "-id", lib_with_r_path, frontend_path[0]],
                 check=False,
             )
+        #For building wheels
         elif build_path:
-            new_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
-            # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
+            # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in build/)
             subprocess.run(
-                ["/usr/bin/install_name_tool", "-id", new_path, build_path[0]], check=False
+                ["/usr/bin/install_name_tool", "-id", lib_with_r_path, build_path[0]], check=False
             )
 
 
@@ -106,6 +106,7 @@ package_name = "scipy"
 scipy_package = importlib.util.find_spec(package_name)
 package_directory = path.dirname(scipy_package.origin)
 
+# Compile the library of custom calls in the frontend
 if system_platform == "Linux":
     file_path_within_package_linux = "../scipy.libs/"
     scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
