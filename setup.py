@@ -77,10 +77,11 @@ class CustomBuildExt(build_ext):
         # Run the original build_ext command
         build_ext.run(self)
         package_root = path.dirname(__file__)
-        DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "frontend/catalyst/utils")
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-        library_path = f"{DEFAULT_CUSTOM_CALLS_LIB_PATH}/libcustom_calls{variables['EXT_SUFFIX']}"
-        subprocess.run(["/usr/bin/install_name_tool", "-id", library_path, library_path], check=False)
+        library_path = f"frontend/catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
+        subprocess.run(
+            ["/usr/bin/install_name_tool", "-id", library_path, library_path], check=False
+        )
 
 
 package_name = "scipy"
