@@ -82,16 +82,17 @@ class CustomBuildExt(build_ext):
         library_name = f"libcustom_calls{variables['EXT_SUFFIX']}"
 
         frontend_path = glob.glob(path.join(package_root, "frontend", "**", library_name), recursive=True)
-        catalyst_path = glob.glob(path.join("catalyst", "**", library_name), recursive=True)
+        build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
 
         if frontend_path:
             # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
+            new_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
             subprocess.run(
-                ["/usr/bin/install_name_tool", "-id", frontend_path[0], frontend_path[0]],
+                ["/usr/bin/install_name_tool", "-id", new_path, frontend_path[0]],
                 check=False,
             )
         elif build_path:
-            new_path = f"/DLC/catalyst/utils/libcustom_calls{variables['EXT_SUFFIX']}"
+            new_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
             # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
             subprocess.run(
                 ["/usr/bin/install_name_tool", "-id", new_path, build_path[0]], check=False
