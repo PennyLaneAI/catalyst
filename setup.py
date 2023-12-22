@@ -15,8 +15,9 @@
 import glob
 import importlib.util
 import platform
+import subprocess
 from os import path
-
+from distutils import sysconfig
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
 from setuptools import (  # pylint: disable=wrong-import-order
@@ -24,6 +25,7 @@ from setuptools import (  # pylint: disable=wrong-import-order
     find_namespace_packages,
     setup,
 )
+from setuptools.command.build_ext import build_ext
 
 system_platform = platform.system()
 
@@ -66,6 +68,19 @@ description = {
     "license": "Apache License 2.0",
 }
 
+
+class CustomBuildExt(build_ext):
+    def run(self):
+        # Run the original build_ext command
+        build_ext.run(self)
+        package_root = path.dirname(__file__)
+        DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "frontend/catalyst/utils")
+        # Run install_name_tool to modify LC_ID_DYLIB
+        library_path = f"{DEFAULT_CUSTOM_CALLS_LIB_PATH}/libcustom_calls{variables['EXT_SUFFIX']}"
+        print(library_path)
+        subprocess.run(["install_name_tool", "-id", library_path, library_path])
+
+
 package_name = "scipy"
 
 scipy_package = importlib.util.find_spec(package_name)
@@ -80,13 +95,17 @@ if system_platform == "Linux":
     openblas_so_file = glob.glob(search_pattern)[0]
     openblas_lib_name = path.basename(openblas_so_file)[3:-3]
     custom_calls_extension = Extension(
-        "catalyst.utils.custom_calls",
-        sources=["frontend/catalyst/utils/custom_calls.cpp"],
+        "catalyst.utils.libcustom_calls",
+        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
         libraries=[openblas_lib_name],
         library_dirs=[scipy_lib_path],
     )
 
 elif system_platform == "Darwin":
+    variables = sysconfig.get_config_vars()
+    variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
+    # variables['EXT_SUFFIX'] = variables['EXT_SUFFIX'].replace('.so', '.dylib')
+
     file_path_within_package_macos = ".dylibs/"
     scipy_lib_path = path.join(package_directory, file_path_within_package_macos)
     file_prefix = "libopenblas"
@@ -95,8 +114,8 @@ elif system_platform == "Darwin":
     openblas_dylib_file = glob.glob(search_pattern)[0]
     openblas_lib_name = path.basename(openblas_dylib_file)[3:-6]
     custom_calls_extension = Extension(
-        "catalyst.utils.custom_calls",
-        sources=["frontend/catalyst/utils/custom_calls.cpp"],
+        "catalyst.utils.libcustom_calls",
+        sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
         libraries=[openblas_lib_name],
         library_dirs=[scipy_lib_path],
     )
@@ -139,5 +158,6 @@ setup(
     package_dir={"": "frontend"},
     include_package_data=True,
     ext_modules=ext_modules,
+    cmdclass={"build_ext": CustomBuildExt},
     **description,
 )

@@ -266,13 +266,14 @@ class LinkerDriver:
             f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
             f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
         ]
-        file_prefix = "custom_calls"
-        file_extension = ".so"
-
+        file_prefix = "libcustom_calls"
+        if platform.system() == "Linux":
+            file_extension = ".so"
+        elif platform.system() == "Darwin":
+            file_extension = ".so"
         search_pattern = path.join(DEFAULT_CUSTOM_CALLS_LIB_PATH, f"{file_prefix}*{file_extension}")
         custom_calls_so_file = path.basename(glob.glob(f"{search_pattern}")[0])
-        custom_calls_so_flag = f"-l:{custom_calls_so_file}"
-
+        custom_calls_so_flag = f"-l{custom_calls_so_file[3:-len(file_extension)]}"
         ### rpath: scipy
         package_name = "scipy"
 
@@ -306,7 +307,7 @@ class LinkerDriver:
             custom_calls_so_flag,
             "-lmlir_async_runtime",
         ]
-
+        print(default_flags)
         return default_flags
 
     @staticmethod
@@ -386,6 +387,7 @@ class LinkerDriver:
             options = CompileOptions()
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            print(success)
             if success:
                 return outfile
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "

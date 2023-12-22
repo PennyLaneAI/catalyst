@@ -48,15 +48,9 @@ struct EncodedMemref {
 
 typedef struct EncodedMemref;
 
-#ifdef __linux__
 void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *lda, double *s,
              double *u, lapack_int *ldu, double *vt, lapack_int *ldvt, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *info);
-#elif defined(__APPLE__)
-void _dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *lda, double *s,
-              double *u, lapack_int *ldu, double *vt, lapack_int *ldvt, double *work,
-              lapack_int *lwork, lapack_int *iwork, lapack_int *info);
-#endif
 
 // Wrapper to call the SVD solver dgesdd_ from Lapack:
 // https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc released under the Apache
@@ -109,11 +103,7 @@ void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
     int ldvt = job_opt_full_matrices ? n : std::min(m, n);
 
     for (int i = 0; i < b; ++i) {
-#ifdef __linux__
         dgesdd_(&jobz, &m, &n, a_out, &lda, s, u, &ldu, vt, &ldvt, work, &lwork, iwork, info);
-#elif defined(__APPLE__)
-        _dgesdd_(&jobz, &m, &n, a_out, &lda, s, u, &ldu, vt, &ldvt, work, &lwork, iwork, info);
-#endif
         a_out += static_cast<int64_t>(m) * n;
         s += std::min(m, n);
         u += static_cast<int64_t>(m) * tdu;
