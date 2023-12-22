@@ -81,7 +81,9 @@ class CustomBuildExt(build_ext):
         # Construct library name based on known file name
         library_name = f"libcustom_calls{variables['EXT_SUFFIX']}"
 
-        frontend_path = glob.glob(path.join(package_root, "frontend", "**", library_name), recursive=True)
+        frontend_path = glob.glob(
+            path.join(package_root, "frontend", "**", library_name), recursive=True
+        )
         build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
 
         if frontend_path:

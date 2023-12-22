@@ -39,9 +39,7 @@ static char GesddJobz(bool job_opt_compute_uv, bool job_opt_full_matrices)
 
 extern "C" {
 
-
 // MemRef type
-
 struct EncodedMemref {
     int64_t rank;
     void *data_aligned;
