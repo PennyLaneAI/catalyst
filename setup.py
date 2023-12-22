@@ -82,7 +82,9 @@ class CustomBuildExt(build_ext):
         library_name = f"libcustom_calls{variables['EXT_SUFFIX']}"
 
         package_root = path.dirname(__file__)
-        frontend_path = glob.glob(path.join(package_root, "frontend", "**", library_name), recursive=True)
+        frontend_path = glob.glob(
+            path.join(package_root, "frontend", "**", library_name), recursive=True
+        )
         build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
         lib_with_r_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
 
@@ -93,7 +95,7 @@ class CustomBuildExt(build_ext):
                 ["/usr/bin/install_name_tool", "-id", lib_with_r_path, frontend_path[0]],
                 check=False,
             )
-        #For building wheels
+        # For building wheels
         elif build_path:
             # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in build/)
             subprocess.run(
