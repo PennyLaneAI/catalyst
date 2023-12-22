@@ -18,15 +18,14 @@ import platform
 import subprocess
 from distutils import sysconfig
 from os import path
-
-import numpy as np
-from pybind11.setup_helpers import intree_extensions
 from setuptools import (  # pylint: disable=wrong-import-order
     Extension,
     find_namespace_packages,
     setup,
 )
 from setuptools.command.build_ext import build_ext
+import numpy as np
+from pybind11.setup_helpers import intree_extensions
 
 system_platform = platform.system()
 
@@ -69,6 +68,20 @@ description = {
     "license": "Apache License 2.0",
 }
 
+
+class CustomBuildExt(build_ext):
+    """Override build ext from setuptools."""
+
+    def run(self):
+        # Run the original build_ext command
+        build_ext.run(self)
+        package_root = path.dirname(__file__)
+        DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "frontend/catalyst/utils")
+        # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
+        library_path = f"{DEFAULT_CUSTOM_CALLS_LIB_PATH}/libcustom_calls{variables['EXT_SUFFIX']}"
+        subprocess.run(["install_name_tool", "-id", library_path, library_path], check=False)
+
+
 package_name = "scipy"
 
 scipy_package = importlib.util.find_spec(package_name)
@@ -88,7 +101,7 @@ if system_platform == "Linux":
         libraries=[openblas_lib_name],
         library_dirs=[scipy_lib_path],
     )
-    cmd_class = {}
+    cmdclass = {}
 
 elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
@@ -108,20 +121,7 @@ elif system_platform == "Darwin":
         libraries=[openblas_lib_name],
         library_dirs=[scipy_lib_path],
     )
-    cmd_class = {"build_ext": CustomBuildExt}
-
-
-class CustomBuildExt(build_ext):
-    """Override build ext from setuptools."""
-
-    def run(self):
-        # Run the original build_ext command
-        build_ext.run(self)
-        package_root = path.dirname(__file__)
-        DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "frontend/catalyst/utils")
-        # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-        library_path = f"{DEFAULT_CUSTOM_CALLS_LIB_PATH}/libcustom_calls{variables['EXT_SUFFIX']}"
-        subprocess.run(["install_name_tool", "-id", library_path, library_path], check=False)
+    cmdclass = {"build_ext": CustomBuildExt}
 
 
 ext_modules = [custom_calls_extension]
