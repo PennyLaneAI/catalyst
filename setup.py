@@ -18,14 +18,15 @@ import platform
 import subprocess
 from distutils import sysconfig
 from os import path
+
+import numpy as np
+from pybind11.setup_helpers import intree_extensions
 from setuptools import (  # pylint: disable=wrong-import-order
     Extension,
     find_namespace_packages,
     setup,
 )
 from setuptools.command.build_ext import build_ext
-import numpy as np
-from pybind11.setup_helpers import intree_extensions
 
 system_platform = platform.system()
 
