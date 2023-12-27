@@ -88,19 +88,13 @@ class CustomBuildExt(build_ext):
         build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
         lib_with_r_path = f"@rpath/libcustom_calls{variables['EXT_SUFFIX']}"
 
-        # For dev installation
-        if frontend_path:
-            # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
-            subprocess.run(
-                ["/usr/bin/install_name_tool", "-id", lib_with_r_path, frontend_path[0]],
-                check=False,
-            )
-        # For building wheels
-        elif build_path:
-            # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in build/)
-            subprocess.run(
-                ["/usr/bin/install_name_tool", "-id", lib_with_r_path, build_path[0]], check=False
-            )
+        path = frontend_path[0] if frontend_path else build_path[0]
+
+        # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
+        subprocess.run(
+            ["/usr/bin/install_name_tool", "-id", lib_with_r_path, path],
+            check=False,
+        )
 
 
 package_name = "scipy"
