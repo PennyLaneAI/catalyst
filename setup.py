@@ -97,7 +97,7 @@ class CustomBuildExtMacos(build_ext):
         build_ext.run(self)
 
         # Construct library name based on ext suffix (contains python version, architecture and .so)
-        library_name = "libcustom_calls"
+        library_name = "libcustom_calls.so"
 
         package_root = path.dirname(__file__)
         frontend_path = glob.glob(
@@ -105,7 +105,8 @@ class CustomBuildExtMacos(build_ext):
         )
         build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
         lib_with_r_path = "@rpath/libcustom_calls"
-
+        print(frontend_path)
+        print(build_path)
         original_path = frontend_path[0] if frontend_path else build_path[0]
 
         # Run install_name_tool to modify LC_ID_DYLIB(other the rpath stays in vars/folder)
