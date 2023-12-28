@@ -14,7 +14,6 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
-import glob
 import importlib
 import os
 import pathlib

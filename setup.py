@@ -74,11 +74,11 @@ class CustomBuildExtLinux(build_ext):
     """Override build ext from setuptools in order to remove the architecture/python
     version suffix of the library name."""
 
-    def get_ext_filename(self, ext_name):
-        filename = super().get_ext_filename(ext_name)
+    def get_ext_filename(self, fullname):
+        filename = super().get_ext_filename(fullname)
         suffix = sysconfig.get_config_var("EXT_SUFFIX")
-        ext = path.splitext(filename)[1]
-        return filename.replace(suffix, "") + ext
+        extension = path.splitext(filename)[1]
+        return filename.replace(suffix, "") + extension
 
 
 class CustomBuildExtMacos(build_ext):
@@ -86,25 +86,25 @@ class CustomBuildExtMacos(build_ext):
     version suffix of the library name and to change the LC_ID_DYLIB that otherwise is constant
     and equal to where the shared library was created."""
 
-    def get_ext_filename(self, ext_name):
-        filename = super().get_ext_filename(ext_name)
+    def get_ext_filename(self, fullname):
+        filename = super().get_ext_filename(fullname)
         suffix = sysconfig.get_config_var("EXT_SUFFIX")
-        ext = path.splitext(filename)[1]
-        return filename.replace(suffix, "") + ext
+        extension = path.splitext(filename)[1]
+        return filename.replace(suffix, "") + extension
 
     def run(self):
         # Run the original build_ext command
         build_ext.run(self)
 
         # Construct library name based on ext suffix (contains python version, architecture and .so)
-        library_name = f"libcustom_calls"
+        library_name = "libcustom_calls"
 
         package_root = path.dirname(__file__)
         frontend_path = glob.glob(
             path.join(package_root, "frontend", "**", library_name), recursive=True
         )
         build_path = glob.glob(path.join("build", "**", library_name), recursive=True)
-        lib_with_r_path = f"@rpath/libcustom_calls"
+        lib_with_r_path = "@rpath/libcustom_calls"
 
         original_path = frontend_path[0] if frontend_path else build_path[0]
 
