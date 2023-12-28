@@ -10,6 +10,8 @@ file(GLOB SRC
     BufferizationPatterns.cpp
     catalyst_bufferize.cpp
     catalyst_to_llvm.cpp
+    hlo_custom_call_lowering.cpp
+    HloCustomCallPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

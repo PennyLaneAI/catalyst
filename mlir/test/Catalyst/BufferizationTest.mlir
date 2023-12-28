@@ -45,3 +45,17 @@ func.func @dbprint_str() {
 
     return
 }
+
+// -----
+
+func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
+    // CHECK: [[memrefArg:%.+]] = bufferization.to_memref %arg0 : memref<3x3xf64>
+    // CHECK: [[alloc:%.+]] = bufferization.alloc_tensor() {{.*}}: tensor<3x3xf64>
+    // CHECK: [[allocmemref:%.+]]  = bufferization.to_memref [[alloc]] : memref<3x3xf64>
+    // CHECK: catalyst.custom_call fn("lapack_dgesdd") ([[memrefArg]], [[allocmemref]]) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
+    // CHECK: [[res:%.+]] = bufferization.to_tensor [[allocmemref]] : memref<3x3xf64>
+    // CHECK: return [[res]] : tensor<3x3xf64>
+    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) : (tensor<3x3xf64>) -> (tensor<3x3xf64>)
+
+    return %0 : tensor<3x3xf64>
+}

@@ -14,7 +14,7 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
-
+import importlib
 import os
 import pathlib
 import platform
@@ -25,6 +25,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
+from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
@@ -32,6 +33,10 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
+
+package_root = os.path.dirname(__file__)
+
+DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -114,6 +119,7 @@ HLO_LOWERING_PASS = (
         "func.func(scalarize)",
         "canonicalize",
         "scatter-lowering",
+        "hlo-custom-call-lowering",
     ],
 )
 
@@ -138,9 +144,9 @@ BUFFERIZATION_PASS = (
         "empty-tensor-to-alloc-tensor",
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
+        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
-        "catalyst-bufferize",
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
@@ -254,6 +260,28 @@ class LinkerDriver:
         else:
             pass  # pragma: nocover
 
+        # Discover the custom call library provided by the frontend & add it to the rpath and -L.
+        lib_path_flags += [
+            f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+            f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+        ]
+
+        # Discover the LAPACK library provided by scipy & add it to the rpath.
+        package_name = "scipy"
+
+        if platform.system() == "Linux":
+            file_path_within_package = "../scipy.libs/"
+        elif platform.system() == "Darwin":  # pragma: nocover
+            file_path_within_package = ".dylibs/"
+
+        scipy_package = importlib.util.find_spec(package_name)
+        package_directory = path.dirname(scipy_package.origin)
+        scipy_lib_path = path.join(package_directory, file_path_within_package)
+
+        lib_path_flags += [
+            f"-Wl,-rpath,{scipy_lib_path}",
+        ]
+
         system_flags = []
         if platform.system() == "Linux":
             system_flags += ["-Wl,-no-as-needed"]
@@ -268,9 +296,9 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
+            "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
-
         return default_flags
 
     @staticmethod
@@ -321,10 +349,10 @@ class LinkerDriver:
             infile (str): input file name
             outfile (str): output file name
         """
-        path = pathlib.Path(infile)
-        if not path.exists():
+        infile_path = pathlib.Path(infile)
+        if not infile_path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
-        return str(path.with_suffix(".so"))
+        return str(infile_path.with_suffix(".so"))
 
     @staticmethod
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
