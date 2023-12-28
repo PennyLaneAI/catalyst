@@ -327,6 +327,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type);
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
+
         // Setup args and res
         int32_t numberArg = op.getNumberOriginalArgAttr()[0];
         SmallVector<Value> operands = op.getOperands();

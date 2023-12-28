@@ -271,7 +271,8 @@ class LinkerDriver:
         search_pattern = path.join(DEFAULT_CUSTOM_CALLS_LIB_PATH, f"{file_prefix}*{file_extension}")
         custom_calls_so_file = path.basename(glob.glob(f"{search_pattern}")[0])
         custom_calls_so_flag = f"-l{custom_calls_so_file[3:-len(file_extension)]}"
-        ### rpath: scipy
+
+        # Discover the LAPACK library provided by scipy & add it to the rpath.
         package_name = "scipy"
 
         if platform.system() == "Linux":
