@@ -386,6 +386,15 @@ Shuli Shu.
     return l
   ```
 
+* Catalyst now supports `jax.numpy.polyfit` inside a qjitted function.
+  [(#367)](https://github.com/PennyLaneAI/catalyst/pull/367/)
+
+* Catalyst now supports custom calls (including the one from HLO). We added support in MLIR (operation, bufferization 
+  and lowering). In the `lib_custom_calls`, developers then implement their custom calls and use external functions 
+  directly (e.g. Lapack). The OpenBlas library is taken from Scipy and linked in Catalyst, therefore any function from 
+  it can be used.
+  [(#367)](https://github.com/PennyLaneAI/catalyst/pull/367/)
+
 <h3>Breaking changes</h3>
 
 * The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assuming we have
