@@ -261,16 +261,11 @@ class LinkerDriver:
         else:
             pass  # pragma: nocover
 
-        ### rpath and -L: custom calls
+        # Discover the custom call library provided by the frontend & add it to the rpath and -L.
         lib_path_flags += [
             f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
             f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
         ]
-        file_prefix = "libcustom_calls"
-        file_extension = ".so"
-        search_pattern = path.join(DEFAULT_CUSTOM_CALLS_LIB_PATH, f"{file_prefix}*{file_extension}")
-        custom_calls_so_file = path.basename(glob.glob(f"{search_pattern}")[0])
-        custom_calls_so_flag = f"-l{custom_calls_so_file[3:-len(file_extension)]}"
 
         # Discover the LAPACK library provided by scipy & add it to the rpath.
         package_name = "scipy"
@@ -302,7 +297,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            custom_calls_so_flag,
+            "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
         return default_flags
