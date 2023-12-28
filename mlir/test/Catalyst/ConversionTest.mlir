@@ -83,11 +83,11 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[encodeData:%.+]] = llvm.insertvalue [[getPtr]], [[encodeRank]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodeType:%.+]] = llvm.insertvalue [[numericTypeArg]], [[encodeData]][2] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
-    // CHECK-NEXT: llvm.store volatile [[encodeType]], [[alloca]] : !llvm.struct<(i64, ptr, i8)>, !llvm.ptr
+    // CHECK-NEXT: llvm.store [[encodeType]], [[alloca]] : !llvm.struct<(i64, ptr, i8)>, !llvm.ptr
     // CHECK-NEXT: [[undefPtr:%.+]] = llvm.mlir.undef : !llvm.array<1 x ptr>
     // CHECK-NEXT: [[allocaInserted:%.+]] = llvm.insertvalue [[alloca]], [[undefPtr]][0] : !llvm.array<1 x ptr> 
     // CHECK-NEXT: [[allocaArray:%.+]] = llvm.alloca [[c1]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
-    // CHECK-NEXT: llvm.store volatile [[allocaInserted]], [[allocaArray]] : !llvm.array<1 x ptr>, !llvm.ptr
+    // CHECK-NEXT: llvm.store [[allocaInserted]], [[allocaArray]] : !llvm.array<1 x ptr>, !llvm.ptr
     // CHECK-NEXT: [[numericTypeRes:%.+]] = llvm.mlir.constant(7 : i8) : i8
     // CHECK-NEXT: [[c2_1:%.+]] = llvm.mlir.constant(2 : i64) : i64
     // CHECK-NEXT: [[undef1_1:%.+]] = llvm.mlir.undef : !llvm.struct<(i64, ptr, i8)>
@@ -98,15 +98,15 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[encodedResData:%.+]] = llvm.insertvalue [[getPtrRes]], [[encodedRes]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodedResType:%.+]] = llvm.insertvalue [[numericTypeRes]], [[encodedResData]][2] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[allocaRes:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
-    // CHECK: llvm.store volatile [[encodedResType]], [[allocaRes]] : !llvm.struct<(i64, ptr, i8)>, !llvm.ptr
+    // CHECK: llvm.store [[encodedResType]], [[allocaRes]] : !llvm.struct<(i64, ptr, i8)>, !llvm.ptr
     // CHECK: [[arrayRes:%.+]] = llvm.mlir.undef : !llvm.array<1 x ptr>
     // CHECK: [[allocaInsertedRes:%.+]] = llvm.insertvalue [[allocaRes]], [[arrayRes]][0] : !llvm.array<1 x ptr> 
     // CHECK: [[allocaArrayRes:%.+]] = llvm.alloca [[c1]] x !llvm.array<1 x ptr> : (i64) -> !llvm.ptr
-    // CHECK: llvm.store volatile [[allocaInsertedRes]], [[allocaArrayRes]] : !llvm.array<1 x ptr>, !llvm.ptr
+    // CHECK: llvm.store [[allocaInsertedRes]], [[allocaArrayRes]] : !llvm.array<1 x ptr>, !llvm.ptr
     // CHECK: llvm.call @lapack_dgesdd([[allocaArray]], [[allocaArrayRes]]) : (!llvm.ptr, !llvm.ptr) -> ()
     // CHECK: return [[alloc]] : memref<3x3xf64>
 
     %alloc = memref.alloc() : memref<3x3xf64>
-    catalyst.custom_call custom("lapack_dgesdd") (%arg0, %alloc) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
+    catalyst.custom_call fn("lapack_dgesdd") (%arg0, %alloc) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
     return %alloc: memref<3x3xf64>
 }

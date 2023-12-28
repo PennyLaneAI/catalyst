@@ -46,30 +46,31 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     {
         // Add bufferized arguments
         SmallVector<Value> bufferArgs;
-        auto operands = adaptor.getOperands();
-        for (auto operand : operands) {
+        ValueRange operands = adaptor.getOperands();
+        for (Value operand : operands) {
             bufferArgs.push_back(operand);
         }
 
         // Add bufferized return values to the arguments
-        auto results = op.getResults();
+        ValueRange results = op.getResults();
         for (Value result : results) {
-            auto resultType = result.getType();
-            auto tensorType = resultType.dyn_cast<RankedTensorType>();
+            Type resultType = result.getType();
+            RankedTensorType tensorType = resultType.dyn_cast<RankedTensorType>();
             if (!tensorType) {
                 return failure();
             }
             auto options = bufferization::BufferizationOptions();
             FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
                 rewriter, op->getLoc(), result, false, options, false);
-            auto memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            MemRefType memrefType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto newBuffer =
                 rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
             bufferArgs.push_back(newBuffer);
         }
         // Add the initial number of arguments
-        auto numArguments = static_cast<int32_t>(op.getNumOperands());
-        auto numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
+        int32_t numArguments = static_cast<int32_t>(op.getNumOperands());
+        DenseI32ArrayAttr numArgumentsDenseAttr = rewriter.getDenseI32ArrayAttr({numArguments});
 
         // Create an updated custom call operation
         rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs, op.getCallTargetName(),

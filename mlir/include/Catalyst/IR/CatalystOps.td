@@ -96,7 +96,7 @@ def CustomCallOp: Catalyst_Op<"custom_call"> {
   let results = (outs Variadic<AnyType>);
 
   let assemblyFormat = [{
-    `custom` `(`$call_target_name`)` `(` $inputs `)`
+    `fn` `(`$call_target_name`)` `(` $inputs `)`
       attr-dict `:` functional-type(operands, results)
   }];
 }

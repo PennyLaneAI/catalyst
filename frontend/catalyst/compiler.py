@@ -145,7 +145,7 @@ BUFFERIZATION_PASS = (
         "empty-tensor-to-alloc-tensor",
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
-        "catalyst-bufferize",
+        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
         "quantum-bufferize",

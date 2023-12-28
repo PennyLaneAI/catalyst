@@ -350,9 +350,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
             LLVM::AllocaOp alloca =
                 rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedArg.getType(), c1, 0);
-            // Use volatile store to suppress expensive LLVM optimizations.
-            rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca, /*alignment=*/0,
-                                           /*isVolatile=*/true);
+            rewriter.create<LLVM::StoreOp>(loc, encodedArg, alloca);
             encodedArgs.push_back(alloca);
         }
 
@@ -373,9 +371,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Get allocation for packed arguments pointers.
         LLVM::AllocaOp alloca = rewriter.create<LLVM::AllocaOp>(loc, ptr, arrArgs.getType(), c1, 0);
 
-        // Store constructed arguments pointers array into the alloca. Use volatile
-        // store to suppress expensive LLVM optimizations.
-        rewriter.create<LLVM::StoreOp>(loc, arrArgs, alloca, /*alignment=*/0, /*isVolatile=*/true);
+        // Store constructed arguments pointers array into the alloca.
+        rewriter.create<LLVM::StoreOp>(loc, arrArgs, alloca);
 
         // Alloca that encodes the custom call arguments.
         auto encodedArguments = alloca.getResult();
@@ -391,9 +388,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
                 EncodeDataMemRef(loc, rewriter, memref_type, llvmMemrefType, std::get<1>(tuple));
             LLVM::AllocaOp alloca =
                 rewriter.create<LLVM::AllocaOp>(loc, ptr, encodedRes.getType(), c1, 0);
-            // Use volatile store to suppress expensive LLVM optimizations.
-            rewriter.create<LLVM::StoreOp>(loc, encodedRes, alloca, /*alignment=*/0,
-                                           /*isVolatile=*/true);
+            rewriter.create<LLVM::StoreOp>(loc, encodedRes, alloca);
             encodedRess.push_back(alloca);
         }
 
@@ -417,10 +412,8 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         LLVM::AllocaOp allocaRes =
             rewriter.create<LLVM::AllocaOp>(loc, ptr, arrRes.getType(), c1, 0);
 
-        // Store constructed results pointers array on the stack. Use volatile
-        // store to suppress expensive LLVM optimizations.
-        rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes, /*alignment=*/0,
-                                       /*isVolatile=*/true);
+        // Store constructed results pointers array on the stack.
+        rewriter.create<LLVM::StoreOp>(loc, arrRes, allocaRes);
 
         // Alloca that encodes the custom call returns.
         auto encodedResults = allocaRes.getResult();

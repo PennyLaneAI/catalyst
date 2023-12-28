@@ -46,8 +46,6 @@ struct EncodedMemref {
     int8_t dtype;
 };
 
-typedef struct EncodedMemref;
-
 void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *lda, double *s,
              double *u, lapack_int *ldu, double *vt, lapack_int *ldvt, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *info);

@@ -41,7 +41,6 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
-    "scipy",
 ]
 
 classifiers = [
