@@ -936,14 +936,12 @@ class Zne:
             args_data, _ = tree_flatten(args)
 
             # It always returns list as required by catalyst control-flows
-            results = zne_p.bind(
-                *args_data, jaxpr=jaxpr, fn=self.fn, scalar_factors=self.scalar_factors
-            )
+            results = zne_p.bind(*args_data, self.scalar_factors, jaxpr=jaxpr, fn=self.fn)
         # raise ... else:
 
-        return jax.numpy.polyfit(
-            jnp.array(self.scalar_factors, dtype=float), jax.numpy.array(results), self.deg
-        )[0]
+        return jax.numpy.polyfit(jnp.array(self.scalar_factors, dtype=float), results[0], self.deg)[
+            0
+        ]
 
 
 def mitigate_with_zne(f, *, scalar_factors=None, deg=None):

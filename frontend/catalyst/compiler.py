@@ -123,6 +123,13 @@ HLO_LOWERING_PASS = (
     ],
 )
 
+MITIGATION_LOWERING_PASS = (
+    "MitigationLoweringPass",
+    [
+        "lower-mitigation",
+    ],
+)
+
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
@@ -198,6 +205,7 @@ MLIR_TO_LLVM_PASS = (
 
 DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
+    MITIGATION_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
     MLIR_TO_LLVM_PASS,

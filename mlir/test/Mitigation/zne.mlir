@@ -15,6 +15,7 @@
 // RUN: quantum-opt %s --lower-mitigation --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
+    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -34,6 +35,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
     quantum.dealloc %r : !quantum.reg
+    quantum.device_release
     func.return %expval : f64
 }
 
@@ -41,6 +43,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     // CHECK:    [[nQubits:%.+]] = arith.constant 1 : i64
     // CHECK:    %idx0 = index.constant 0
     // CHECK:    %idx1 = index.constant 1
+    // CHECK:    quantum.device["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
     // CHECK:    [[qReg:%.+]] = call @simpleCircuit.quantumAlloc([[nQubits]]) : (i64) -> !quantum.reg
     // CHECK:    [[outQregFor:%.+]]  = scf.for %arg2 = %idx0 to %arg1 step %idx1 iter_args([[inQreg:%.+]] = [[qReg]]) -> (!quantum.reg) {
         // CHECK:    [[outQreg1:%.+]] = func.call @simpleCircuit.withoutMeasurements(%arg0, [[inQreg]]) : (tensor<3xf64>, !quantum.reg) -> !quantum.reg
@@ -50,6 +53,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
             // CHECK:    quantum.yield [[callWithoutMeasurements]] : !quantum.reg
         // CHECK:    scf.yield [[outQreg2]] : !quantum.reg
     // CHECK:    [[results:%.+]]  = call @simpleCircuit.withMeasurements(%arg0, [[outQregFor]]) : (tensor<3xf64>, !quantum.reg) -> f64
+    // CHECK:    quantum.device_release
     // CHECK:    return [[results]] : f64
 
 // CHECK:    func.func private @simpleCircuit.quantumAlloc(%arg0: i64) -> !quantum.reg {

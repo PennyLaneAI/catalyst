@@ -498,25 +498,27 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
 
 @zne_p.def_impl
-def _zne_def_impl(ctx, *args, jaxpr, fn, scalar_factors):  # pragma: no cover
+def _zne_def_impl(ctx, *args, jaxpr, fn):  # pragma: no cover
     raise NotImplementedError()
 
 
 @zne_p.def_abstract_eval
-def _zne_abstract_eval(*args, jaxpr, fn, scalar_factors):
-    return jaxpr.out_avals * len(scalar_factors)
+def _zne_abstract_eval(*args, jaxpr, fn):
+    return [core.ShapedArray(args[-1].shape, jaxpr.out_avals[0].dtype)]
+    # return jaxpr.out_avals * args[-1].shape[0]
 
 
-def _zne_lowering(ctx, *args, jaxpr, fn, scalar_factors):
+def _zne_lowering(ctx, *args, jaxpr, fn):
     _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
     symbol_name = mlir_fn_cache[fn]
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
+
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),
-        mlir.flatten_lowering_ir_args(args),
-        scalar_factors,
+        mlir.flatten_lowering_ir_args(args[0:-1]),
+        args[-1],
     ).results
 
 
