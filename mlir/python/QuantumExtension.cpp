@@ -61,4 +61,17 @@ PYBIND11_MODULE(_quantumDialects, m)
             }
         },
         py::arg("context") = py::none(), py::arg("load") = true);
+
+    auto mitigation_m = m.def_submodule("mitigation");
+
+    mitigation_m.def(
+        "register_dialect",
+        [](MlirContext context, bool load) {
+            MlirDialectHandle handle = mlirGetDialectHandle__mitigation__();
+            mlirDialectHandleRegisterDialect(handle, context);
+            if (load) {
+                mlirDialectHandleLoadDialect(handle, context);
+            }
+        },
+        py::arg("context") = py::none(), py::arg("load") = true);
 }

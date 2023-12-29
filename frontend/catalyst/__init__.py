@@ -61,7 +61,9 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleTy
 sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleType(
     "mlir_quantum._mlir_libs._quantumDialects.catalyst"
 )
-
+sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.ModuleType(
+    "mlir_quantum._mlir_libs._quantumDialects.mitigation"
+)
 
 from catalyst import debug
 from catalyst.ag_utils import AutoGraphError, autograph_source
@@ -77,6 +79,7 @@ from catalyst.pennylane_extensions import (
     measure,
     vjp,
     while_loop,
+    mitigate_with_zne,
 )
 from catalyst.utils.exceptions import CompileError
 

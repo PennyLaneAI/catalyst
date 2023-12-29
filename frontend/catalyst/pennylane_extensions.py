@@ -57,6 +57,7 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     vjp_p,
     while_p,
+    zne_p,
 )
 from catalyst.jax_tracer import (
     Function,
@@ -917,6 +918,45 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         results = vjp_fn(cotangents)
 
     return results
+
+
+class Zne:
+    """An"""
+
+    def __init__(self, fn: Callable, scalar_factors: jax.numpy.ndarray, deg: int):
+        self.fn = fn
+        self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
+        self.scalar_factors = scalar_factors
+        self.deg = deg
+
+    def __call__(self, *args, **kwargs):
+        """Specifies that an actual call to the differentiated function."""
+        if EvaluationContext.is_tracing():
+            jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
+            args_data, _ = tree_flatten(args)
+
+            # It always returns list as required by catalyst control-flows
+            results = zne_p.bind(
+                *args_data, jaxpr=jaxpr, fn=self.fn, scalar_factors=self.scalar_factors
+            )
+        # raise ... else:
+
+        return jax.numpy.polyfit(
+            jnp.array(self.scalar_factors, dtype=float), jax.numpy.array(results), self.deg
+        )[0]
+
+
+def mitigate_with_zne(f, *, scalar_factors=None, deg=None):
+    """A :func:`~.qjit` compatible ZNE.
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    """
+    return Zne(f, scalar_factors, deg)
 
 
 def _aval_to_primitive_type(aval):
