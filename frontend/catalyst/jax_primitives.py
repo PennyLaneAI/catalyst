@@ -34,6 +34,7 @@ from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
+from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
     AllocOp,
@@ -59,7 +60,6 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-from mlir_quantum.dialects.mitigation import ZneOp
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -392,7 +392,7 @@ def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 def _jvp_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=unused-argument
     """This function is called with abstract arguments for tracing.
     Note: argument names must match these of `_jvp_lowering`."""
-    return jaxpr.out_avals
+    return jaxpr.out_avals + jaxpr.out_avals
 
 
 def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):

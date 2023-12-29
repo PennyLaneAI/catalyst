@@ -77,9 +77,9 @@ from catalyst.pennylane_extensions import (
     jacobian,
     jvp,
     measure,
+    mitigate_with_zne,
     vjp,
     while_loop,
-    mitigate_with_zne,
 )
 from catalyst.utils.exceptions import CompileError
 
