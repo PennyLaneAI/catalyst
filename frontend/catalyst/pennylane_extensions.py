@@ -18,6 +18,7 @@ while using :func:`~.qjit`.
 
 # pylint: disable=too-many-lines
 
+import copy
 import numbers
 import pathlib
 from collections.abc import Sized
@@ -1189,7 +1190,7 @@ def qctrl_distribute(
         else:
             ops2.append(
                 Controlled(
-                    op,
+                    copy.copy(op),
                     control_wires=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
