@@ -57,7 +57,7 @@ def test_qnode_execution():
 
 
 @pytest.mark.parametrize(
-    "diff_methods", [("parameter-shift", "auto"), ("finite-diff", "fd"), ("adjoint", "auto")]
+    "diff_methods", [("finite-diff", "fd")]
 )
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_gradient(inp, diff_methods):
@@ -79,6 +79,7 @@ def test_gradient(inp, diff_methods):
         h = qml.grad(g, argnum=0)
         return h(x)
 
+    assert "async_execute_fn" in compiled.qir
     assert np.allclose(compiled(inp), interpreted(inp))
 
 

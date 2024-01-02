@@ -149,10 +149,13 @@ BUFFERIZATION_PASS = (
         "func.func(tensor-bufferize)",
         "quantum-bufferize",
         "func-bufferize",
+        "qnode-to-async-lowering",
         "func.func(finalizing-bufferize)",
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
         "func.func(buffer-deallocation)",
+        "async-func-to-async-runtime",
+        "async-to-async-runtime",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         "canonicalize",
@@ -165,6 +168,7 @@ BUFFERIZATION_PASS = (
 MLIR_TO_LLVM_PASS = (
     "MLIRToLLVMDialect",
     [
+        "convert-async-to-llvm",
         "convert-gradient-to-llvm",
         "func.func(convert-linalg-to-loops)",
         "convert-scf-to-cf",
@@ -199,23 +203,18 @@ MLIR_TO_LLVM_PASS = (
 DEFAULT_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
+    (
+        "BufferizationPass",
+        list(filter(lambda x: x != "qnode-to-async-lowering", BUFFERIZATION_PASS[1])),
+    ),
     MLIR_TO_LLVM_PASS,
-]
-
-MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
-MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
-    "qnode-to-async-lowering",
-    "async-func-to-async-runtime",
-    "async-to-async-runtime",
-    "convert-async-to-llvm",
 ]
 
 DEFAULT_ASYNC_PIPELINES = [
     HLO_LOWERING_PASS,
     QUANTUM_COMPILATION_PASS,
     BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_ASYNC_PASS,
+    MLIR_TO_LLVM_PASS,
 ]
 
 
