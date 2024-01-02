@@ -1646,6 +1646,14 @@ def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions: b
         lower_bound (int): starting value of the iteration index
         upper_bound (int): (exclusive) upper bound of the iteration index
         step (int): increment applied to the iteration index at the end of each iteration
+        experimental_preserve_dimensions (bool): this option selects the strategy of handling the
+                           case of multiple tensors with variable shapes. When set to ``True`` (the
+                           default), passing several input tensors with shared dimensions means that
+                           the outputs must follow the same sharing pattern. As a result, mutual
+                           operations are allowed on such tensors inside the loop body. The
+                           ``False`` value makes Catalyst treat every variable dimension as a
+                           separate dimension that might be changed inside the loop, at the cost of
+                           disallowing mutual operations on such tensors.
 
     Returns:
         Callable[[int, ...], ...]: A wrapper around the loop body function.
@@ -1826,6 +1834,14 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
 
     Args:
         cond_fn (Callable): the condition function in the while loop
+        experimental_preserve_dimensions (bool): this option selects the strategy of handling the
+                           case of multiple tensors with variable shapes. When set to ``True`` (the
+                           default), passing several input tensors with shared dimensions means that
+                           the outputs must follow the same sharing pattern. As a result, mutual
+                           operations are allowed on such tensors inside the loop body. The
+                           ``False`` value makes Catalyst treat every variable dimension as a
+                           separate dimension that might be changed inside the loop, at the cost of
+                           disallowing mutual operations on such tensors.
 
     Returns:
         Callable: A wrapper around the while-loop function.
