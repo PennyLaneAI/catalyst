@@ -946,7 +946,7 @@ class DynshapePrimitive(Primitive):
     containing dynamic dimensions."""
 
     def bind(self, *args, **params):
-        """Bind the Jax primitive into a Jaxpr program. This method are called during both the
+        """Bind the Jax primitive into a Jaxpr program. This method is called during both the
         tracing of a Python program and during the evaluation of a Jaxpr program.
 
         In contrast to other Jax primitives, this one accepts expanded arguments (shapes of
