@@ -1004,7 +1004,7 @@ class ForLoop(HybridOp):
         )[0]
 
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers2(
+            op.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
@@ -1028,7 +1028,7 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, [qubit], op.out_classical_tracers)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -1083,7 +1083,7 @@ class Cond(HybridOp):
         )[0]
 
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers2(
+            op.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 in_expanded_tracers=in_expanded_classical_tracers,
@@ -1155,7 +1155,7 @@ class WhileLoop(HybridOp):
         )[0]
 
         qrp2 = QRegPromise(
-            self.bind_overwrite_classical_tracers2(
+            self.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
