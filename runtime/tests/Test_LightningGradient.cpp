@@ -28,6 +28,7 @@ TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
                                    (int8_t *)rtd_kwargs.c_str());
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient(0, nullptr));
+        __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
 }
@@ -41,6 +42,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 
         REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(nullptr, 0, nullptr),
                             Catch::Contains("Invalid number of trainable parameters"));
+        __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
 }
@@ -70,6 +72,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
 
         __quantum__rt__qubit_release(q);
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
     delete[] buffer;
@@ -86,9 +89,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __quantum__rt__initialize();
-
         // To check toggle_recorder before device initialization
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -112,8 +114,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
         __quantum__rt__qubit_release(q);
-        __quantum__rt__finalize();
+        __quantum__rt__device_release();
     }
+    __quantum__rt__finalize();
 
     delete[] buffer;
 }
@@ -131,8 +134,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __quantum__rt__initialize();
         __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                    (int8_t *)rtd_kwargs.c_str());
 
@@ -156,8 +159,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(-sin(-M_PI / 7) == Approx(result.data_aligned[0]));
 
         __quantum__rt__qubit_release(q);
-        __quantum__rt__finalize();
+        __quantum__rt__device_release();
     }
+    __quantum__rt__finalize();
 
     delete[] buffer;
     delete[] buffer_tp;
@@ -213,6 +217,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         delete h_matrix;
         __quantum__rt__qubit_release(q);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -262,6 +267,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
         CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
 
         __quantum__rt__qubit_release(q);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -327,6 +333,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
         __quantum__rt__qubit_release(q1);
         __quantum__rt__qubit_release(q0);
+        __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
 
@@ -372,6 +379,7 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
         CHECK(expected[1] == Approx(result1.data_aligned[0]).margin(1e-5));
 
         __quantum__rt__qubit_release_array(qs);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -429,6 +437,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
         CHECK(expected[2] == Approx(result2.data_aligned[2]).margin(1e-5));
 
         __quantum__rt__qubit_release_array(qs);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -503,6 +512,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
         __quantum__rt__qubit_release_array(qs);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -578,6 +588,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
         __quantum__rt__qubit_release_array(qs);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -655,6 +666,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
         __quantum__rt__qubit_release_array(qs);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 
@@ -724,6 +736,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         delete h_matrix;
         __quantum__rt__qubit_release(q);
+        __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
 

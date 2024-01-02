@@ -44,8 +44,6 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
     static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
 
-    static constexpr size_t default_device_shots{0}; // tidy: readability-magic-numbers
-
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
     std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
@@ -80,7 +78,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
-                           : default_device_shots;
+                           : 0;
 
         if (device_kwargs.contains("device_type")) {
             if (device_kwargs["device_type"] == "braket.aws.qubit") {

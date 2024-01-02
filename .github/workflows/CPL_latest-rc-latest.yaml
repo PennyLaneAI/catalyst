@@ -1,0 +1,15 @@
+name: Check CPL latest/rc/latest
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  build-config:
+    name: CPL latest/rc/latest
+    uses: ./.github/workflows/check-pl-compat.yaml
+    with:
+      catalyst: latest
+      pennylane: release-candidate
+      lightning: latest

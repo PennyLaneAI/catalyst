@@ -623,50 +623,6 @@ class TestOtherMeasurements:
         observed = state(0.0)
         assert np.array_equal(observed, expected)
 
-    def test_multiple_return_values(self, backend):
-        """Test multiple return values."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
-        def all_measurements(x):
-            qml.RY(x, wires=0)
-            return (
-                qml.sample(),
-                qml.counts(),
-                qml.expval(qml.PauliZ(0)),
-                qml.var(qml.PauliZ(0)),
-                qml.probs(wires=[0, 1]),
-                qml.state(),
-            )
-
-        @qml.qnode(qml.device("default.qubit", wires=2))
-        def expected(x, measurement):
-            qml.RY(x, wires=0)
-            return qml.apply(measurement)
-
-        x = 0.7
-        result = all_measurements(x)
-
-        # qml.sample
-        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=100).shape
-
-        # qml.counts
-        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True), shots=100).keys()):
-            assert format(int(r), "02b") == e
-        assert sum(result[1][1]) == 100
-
-        # qml.expval
-        assert np.allclose(result[2], expected(x, qml.expval(qml.PauliZ(0))))
-
-        # qml.var
-        assert np.allclose(result[3], expected(x, qml.var(qml.PauliZ(0))))
-
-        # qml.probs
-        assert np.allclose(result[4], expected(x, qml.probs(wires=[0, 1])))
-
-        # qml.state
-        assert np.allclose(result[5], expected(x, qml.state()))
-
 
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
