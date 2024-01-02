@@ -455,3 +455,13 @@ def test_adjoint_for_nested(backend):
 
     dev = qml.device(backend, wires=1)
     verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)
+
+
+def test_adjoint_outside_qjit():
+    """Test that the Catalyst adjoint function can be used without jitting."""
+
+    assert C_adjoint(qml.T(wires=0)) == PL_adjoint(qml.T(wires=0))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
