@@ -338,7 +338,7 @@ def test_qjit_forloop_indbidx_outdbidx():
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2)
+        @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
         def loop(_i, a, _b):
             b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
@@ -371,14 +371,14 @@ def test_qjit_forloop_index_indbidx():
 
 
 def test_qjit_forloop_shared_dimensions():
-    """Test catalyst for-loop primitive's preserve_dimensions option"""
+    """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
 
     @qjit
     def f(sz: int):
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @for_loop(0, 10, 1, preserve_dimensions=True)
+        @for_loop(0, 10, 1, experimental_preserve_dimensions=True)
         def loop(i, _a, _b):
             return (input_a, input_a)
 
@@ -442,7 +442,7 @@ def test_qnode_forloop_indbidx_outdbidx():
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2)
+        @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
         def loop(_i, a, _b):
             b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
@@ -547,9 +547,9 @@ def test_qnode_while_indbidx_outdbidx():
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz + 1], dtype=float)
+        b = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3)
+        @while_loop(lambda _a, _b, i: i < 3, experimental_preserve_dimensions=False)
         def loop(a, _, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -633,7 +633,7 @@ def test_qjit_while_shared_dimensions():
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @while_loop(lambda _a, _b, c: c, preserve_dimensions=True)
+        @while_loop(lambda _a, _b, c: c, experimental_preserve_dimensions=True)
         def loop(_a, _b, _c):
             return (input_a, input_a, False)
 
@@ -674,9 +674,9 @@ def test_qjit_while_indbidx_outdbidx():
     @qjit()
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
-        b0 = jnp.ones([sz + 1], dtype=float)
+        b0 = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3)
+        @while_loop(lambda _a, _b, i: i < 3, experimental_preserve_dimensions=False)
         def loop(a, _, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1

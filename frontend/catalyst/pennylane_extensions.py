@@ -1605,7 +1605,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step, preserve_dimensions: bool = False):
+def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions: bool = True):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -1681,7 +1681,7 @@ def for_loop(lower_bound, upper_bound, step, preserve_dimensions: bool = False):
     [array(0.97926626), array(0.55395718)]
     """
 
-    expansion_strategy = for_loop_expansion_strategy(preserve_dimensions)
+    expansion_strategy = for_loop_expansion_strategy(experimental_preserve_dimensions)
 
     def _body_query(body_fn):
         apply_reverse_transform = isinstance(step, int) and step < 0
@@ -1766,7 +1766,7 @@ def for_loop(lower_bound, upper_bound, step, preserve_dimensions: bool = False):
                     body_nconsts=len(out_sig.out_consts()),
                     apply_reverse_transform=apply_reverse_transform,
                     nimplicit=in_sig.num_implicit_inputs(),
-                    preserve_dimensions=preserve_dimensions,
+                    preserve_dimensions=experimental_preserve_dimensions,
                 )
 
                 return tree_unflatten(
@@ -1795,7 +1795,7 @@ def for_loop(lower_bound, upper_bound, step, preserve_dimensions: bool = False):
     return _body_query
 
 
-def while_loop(cond_fn, preserve_dimensions: bool = False):
+def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
     This decorator provides a functional version of the traditional while
@@ -1858,7 +1858,7 @@ def while_loop(cond_fn, preserve_dimensions: bool = False):
     [array(-0.02919952), array(2.56)]
     """
 
-    expansion_strategy = while_loop_expansion_strategy(preserve_dimensions)
+    expansion_strategy = while_loop_expansion_strategy(experimental_preserve_dimensions)
 
     def _body_query(body_fn):
         def _call_handler(*init_state):
@@ -1955,7 +1955,7 @@ def while_loop(cond_fn, preserve_dimensions: bool = False):
                     cond_nconsts=len(out_cond_sig.out_consts()),
                     body_nconsts=len(out_body_sig.out_consts()),
                     nimplicit=in_body_sig.num_implicit_inputs(),
-                    preserve_dimensions=preserve_dimensions,
+                    preserve_dimensions=experimental_preserve_dimensions,
                 )
                 return tree_unflatten(
                     out_body_sig.out_tree(), collapse(out_body_sig.out_type(), out_expanded_tracers)
