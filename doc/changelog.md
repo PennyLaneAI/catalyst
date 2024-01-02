@@ -152,6 +152,10 @@
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
 
+* Resolve a bug with printing multiple strings from multiple functions with `debug.print` by introducing
+  a NULL terminator to traced strings.
+  [(#418)](https://github.com/PennyLaneAI/catalyst/pull/418)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
