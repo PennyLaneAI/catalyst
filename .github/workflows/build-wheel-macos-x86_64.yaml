@@ -112,7 +112,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja --break-system-packages
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -183,7 +183,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy --break-system-packages
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -258,7 +258,7 @@ jobs:
 
     - name: Test Catalyst-Runtime
       run: |
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin --break-system-packages
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
@@ -330,17 +330,17 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist --break-system-packages
-        python${{ matrix.python_version }} -m pip install tensorflow-cpu  --break-system-packages # for autograph tests
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install tensorflow-cpu  # for autograph tests
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --break-system-packages
+        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
 
     - name: Install PennyLane Plugins
       run: |
-        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos --break-system-packages
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin --break-system-packages
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
     - name: Run Python Pytest Tests
       run: |
