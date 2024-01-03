@@ -661,13 +661,20 @@ PennyLane provides a wide variety of
 :doc:`transforms <code/qml_transforms>` that
 convert a circuit to one or more circuits.
 
-As a general rule of thumb, transforms that result in a single circuit are
-generally applied before/outside the QNode decorator, while transforms that result in
-multiple circuits to be executed (**batch transforms**, such as
-:func:`~pennylane.transforms.split_non_commuting`) are applied after/inside the QNode decorator.
+Currently, most PennyLane transforms will work with Catalyst
+as long as:
 
-Currently, batch transforms and transforms that apply *inside* or *within* the QNode decorator will
-not work with Catalyst:
+- The circuit does not include any Catalyst-specific features, such
+  as Catalyst control flow or measurement,
+
+- The QNode returns only lists of measurement processes,
+
+- AutoGraph is disabled, and
+
+- The transformation does not require or depend on the numeric value of
+  dynamic variables.
+
+This includes transforms that generate many circuits,
 
 .. code-block:: python
 
@@ -679,26 +686,15 @@ not work with Catalyst:
         return [qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))]
 
 >>> circuit(0.4)
-CompileError: QuantumCompilationPass failed.
+[array(-0.51413599), array(0.85770868)]
 
-However, transforms that are applied *before* the QNode decorator will work with
-Catalyst, as long as:
-
-- The circuit does not include any Catalyst-specific features, such
-  as Catalyst control flow or measurement,
-
-- AutoGraph is disabled, and
-
-- The transformation does not require or depend on the numeric value of
-  dynamic variables.
-
-For example:
+as well as transforms that simply map the circuit to another:
 
 .. code-block:: python
 
     @qjit
-    @qml.qnode(dev)
     @qml.transforms.merge_rotations()
+    @qml.qnode(dev)
     def circuit(x):
         qml.RX(x, wires=0)
         qml.RX(x ** 2, wires=0)
@@ -714,22 +710,26 @@ a single RX gate is being applied due to the rotation gate merger:
 { lambda ; a:f64[]. let
     b:f64[] = func[
       call_jaxpr={ lambda ; c:f64[]. let
-           = qdevice[spec=kwargs val={'shots': 0}]
-           = qdevice[spec=backend val=lightning.qubit]
-          d:AbstractQreg() = qalloc 1
+          d:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] c
           e:f64[] = integer_pow[y=2] c
-          f:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] c
-          g:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] e
-          h:f64[1] = add f g
-          i:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] h
-          j:f64[] = squeeze[dimensions=(0,)] i
-          k:AbstractQbit() = qextract d 0
-          l:AbstractQbit() = qinst[op=RX qubits_len=1] k j
+          f:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] e
+          g:f64[1] = add d f
+          h:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] g
+          i:f64[] = squeeze[dimensions=(0,)] h
+           = qdevice[
+            rtd_kwargs={'shots': 0, 'mcmc': False}
+            rtd_lib=/usr/local/lib/python3.10/dist-packages/catalyst/utils/../lib/librtd_lightning.so
+            rtd_name=LightningSimulator
+          ]
+          j:AbstractQreg() = qalloc 2
+          k:AbstractQbit() = qextract j 0
+          l:AbstractQbit() = qinst[op=RX qubits_len=1] k i
           m:AbstractObs(num_qubits=None,primitive=None) = namedobs[kind=PauliZ] l
           n:f64[] = expval[shots=None] m
-           = qdealloc d
+          o:AbstractQreg() = qinsert j 0 l
+           = qdealloc o
         in (n,) }
-      fn=<QNode: wires=1, device='lightning.qubit', interface='auto', diff_method='best'>
+      fn=<QNode: wires=2, device='lightning.qubit', interface='auto', diff_method='best'>
     ] a
   in (b,) }
 
