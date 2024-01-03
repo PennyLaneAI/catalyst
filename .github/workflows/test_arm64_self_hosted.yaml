@@ -130,8 +130,7 @@ jobs:
         run: python -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
       - name: Build LLVM / MLIR
-        # TODO: Change this back to `true`
-        if: steps.cache-llvm-build.outputs.cache-hit != 'true-false'
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
         run: |
           cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
@@ -186,30 +185,254 @@ jobs:
           rm -rf .github
           pip cache purge
 
+  catalyst-macos-wheels-arm64:
+    needs: [constants, build-dependencies]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
-
-  test:
+    name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
 
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Setup PyEnv
+      run: |
+        pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
+        for pyenv_path in ${pyenv_paths[@]};
+        do
+          [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
+        done
+        echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
+
+    - name: Setup Python
+      id: setup_python_venv
+      env:
+        VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
+      run: |
+        rm -rf "$VENV_NAME"
+        pyenv global ${{ matrix.python_version }}
+        python -m venv "$VENV_NAME"
+
+        # Add the venv to PATH for subsequent steps
+        echo "$VENV_NAME/bin" >> $GITHUB_PATH
+
+        # Adding venv name as an output for subsequent steps to reference if needed
+        echo "venv_name=$VENV_NAME" >> $GITHUB_OUTPUT
+
+    - name: Display Python-Path
+      run: |
+        which python
+        which pip
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/llvm-project
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/Enzyme
+        key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v3
+      with:
+        path:  enzyme-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        fail-on-cache-miss: True
+
+    # Build Catalyst-Runtime
+    - name: Build Catalyst-Runtime
+      run: |
+        # TODO: Update LIGHTNING_GIT_TAG to 'latest_version' after v0.34.0
+        cmake -S runtime -B runtime-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
+              -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
+              -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DLIGHTNING_GIT_TAG="8101e42" \
+              -DKokkos_ENABLE_SERIAL=ON \
+              -DKokkos_ENABLE_OPENMP=OFF \
+              -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
+              -DENABLE_WARNINGS=OFF \
+              -DENABLE_OPENQASM=ON \
+              -DENABLE_OPENMP=OFF
+
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
+
+    - name: Test Catalyst-Runtime
+      run: |
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
+        ./runtime-build/tests/runner_tests_lightning
+        ./runtime-build/tests/runner_tests_openqasm
+
+    # Build Quantum and Gradient Dialects
+    - name: Build MLIR Dialects
+      run: |
+        cmake -S mlir -B quantum-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
+              -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
+              -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
+              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_LLD=OFF
+
+        cmake --build quantum-build --target check-dialects compiler_driver
+
+    - name: Build wheel
+      run: |
+        PYTHON=python${{ matrix.python_version }} \
+        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
+        MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
+        DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
+        RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+        ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        make wheel
+
+    - name: Upload Wheel Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
+        path: dist/
+        retention-days: 14
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf ${{ steps.setup_python_venv.outputs.venv_name }}
+        rm -rf *
+        rm -rf .git
+        rm -rf .gitignore
+        rm -rf .github
+        pip cache purge
+
+  test-wheels:
+    needs: [constants, catalyst-macos-wheels-arm64]
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+
+    # To check all wheels for supported python3 versions
+    name: Test Wheels (Python ${{ matrix.python_version }}) on xanadu-arm64-mac
+    runs-on: xanadu-arm64-mac
 
     steps:
-      - name: Setup PyEnv
-        run: |
-          pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
-          for pyenv_path in ${pyenv_paths[@]};
-          do
-            [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
-          done
-          echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
 
-      - run: pyenv global ${{ matrix.python-version }}
+    - name: Download Wheel Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
+        path: dist
 
-      - run: echo $PATH
+    - name: Setup PyEnv
+      run: |
+        pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
+        for pyenv_path in ${pyenv_paths[@]};
+        do
+          [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
+        done
+        echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
 
-      - run: |
-          which python3
-          python3 --version
-          python3 -c 'print("Hello World")'
+    - name: Setup Python
+      id: setup_python_venv
+      env:
+        VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
+      run: |
+        rm -rf "$VENV_NAME"
+        pyenv global ${{ matrix.python_version }}
+        python -m venv "$VENV_NAME"
+
+        # Add the venv to PATH for subsequent steps
+        echo "$VENV_NAME/bin" >> $GITHUB_PATH
+
+        # Adding venv name as an output for subsequent steps to reference if needed
+        echo "venv_name=$VENV_NAME" >> $GITHUB_OUTPUT
+
+    - name: Display Python-Path
+      run: |
+        which python${{ matrix.python_version }}
+        which pip
+
+    - name: Install Python dependencies
+      run: |
+        # tensorflow-cpu is not distributed for macOS ARM
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install tensorflow  # for autograph tests
+
+    - name: Install Catalyst
+      run: |
+        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
+
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+
+    - name: Run Python Pytest Tests
+      run: |
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf ${{ steps.setup_python_venv.outputs.venv_name }}
+        rm -rf *
+        rm -rf .git
+        rm -rf .gitignore
+        rm -rf .github
+        pip cache purge
