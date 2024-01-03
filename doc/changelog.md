@@ -139,10 +139,35 @@
   ```
 
   When passing tensor arguments to compiled functions as arguments, the
-  `abstracted_axes` keyword argument to the `@qjit`
+  `abstracted_axes` keyword argument to the `@qjit` can be used to specify
+  which axes of the input arguments should be treated as abstract (and thus
+  avoid recompilation).
 
-  Note that support for dynamic arrays in control-flow primitives
-  is not yet supported and still a work-in-progress.
+  For example, without specifying `abstracted_axes`, the following `sum` function
+  would recompile each time an array of different size is passed
+  as an argument:
+
+  ```python
+  @qjit
+  def sum(arr):
+      return jnp.sum(arr)
+  >>> sum(jnp.array([1]))     # Compilation happens here.
+  >>> sum(jnp.array([1, 1]))  # And here!
+  ```
+
+  By passing `abstracted_axes`, we can specify that the first axes
+  of the first argument is to be treated as dynamic during initial compilation:
+
+  ```python
+  @qjit(abstracted_axes={0: "n"})
+  def sum_abstracted(arr):
+      return jnp.sum(arr)
+  >>> sum(jnp.array([1]))     # Compilation happens here.
+  >>> sum(jnp.array([1, 1]))  # No need to recompile.
+  ```
+
+  Note that support for dynamic arrays in control-flow primitives (such as loops)
+  is not yet supported.
 
 
 * A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
