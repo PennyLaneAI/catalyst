@@ -7,6 +7,187 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+
+  build-dependencies:
+    needs:
+      - constants
+
+    strategy:
+      matrix:
+        python-version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
+    runs-on: xanadu-arm64-mac
+
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      # Cache external project sources
+      - name: Cache LLVM Source
+        id: cache-llvm-source
+        uses: actions/cache@v3
+        with:
+          path: mlir/llvm-project
+          key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+          enableCrossOsArchive: True
+
+      - name: Cache MHLO Source
+        id: cache-mhlo-source
+        uses: actions/cache@v3
+        with:
+          path: mlir/mlir-hlo
+          key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+          enableCrossOsArchive: True
+
+      - name: Cache Enzyme Source
+        id: cache-enzyme-source
+        uses: actions/cache@v3
+        with:
+          path: mlir/Enzyme
+          key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+          enableCrossOsArchive: True
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      - name: Clone MHLO Submodule
+        if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+        with:
+          repository: tensorflow/mlir-hlo
+          ref: ${{ needs.constants.outputs.mhlo_version }}
+          path: mlir/mlir-hlo
+
+      - name: Clone Enzyme Submodule
+        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+        with:
+          repository: EnzymeAD/Enzyme
+          ref: ${{ needs.constants.outputs.enzyme_version }}
+          path: mlir/Enzyme
+
+      # Cache external project builds
+      - name: Cache LLVM Build
+        id: cache-llvm-build
+        uses: actions/cache@v3
+        with:
+          path: llvm-build
+          key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+
+      - name: Cache MHLO Build
+        id: cache-mhlo-build
+        uses: actions/cache@v3
+        with:
+          path: mhlo-build
+          key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+
+      - name: Cache Enzyme Build
+        id: cache-enzyme-build
+        uses: actions/cache@v3
+        with:
+          path: enzyme-build
+          key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+
+      - name: Setup PyEnv
+        run: |
+          pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
+          for pyenv_path in ${pyenv_paths[@]};
+          do
+            [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
+          done
+          echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
+
+      - name: Setup Python
+        id: setup_python_venv
+        env:
+          VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python-version }}_${{ github.sha }}
+        run: |
+          rm -rf "$VENV_NAME"
+          pyenv global ${{ matrix.python-version }}
+          python -m venv "$VENV_NAME"
+          
+          # Add the venv to PATH for subsequent steps
+          echo "$VENV_NAME/bin" >> $GITHUB_PATH
+
+          # Adding venv name as an output for subsequent steps to reference if needed
+          echo "venv_name=$VENV_NAME" >> $GITHUB_OUTPUT
+
+      - name: Display Python-Path
+        run: |
+          which python
+          which pip
+
+      - name: Install Python dependencies
+        run: python -m pip install wheel numpy pybind11 PyYAML cmake ninja
+
+      - name: Build LLVM / MLIR
+        # TODO: Change this back to `true`
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true-false'
+        run: |
+          cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_BUILD_EXAMPLES=OFF \
+                -DLLVM_TARGETS_TO_BUILD="host" \
+                -DLLVM_ENABLE_PROJECTS="mlir" \
+                -DLLVM_ENABLE_ASSERTIONS=ON \
+                -DLLVM_INSTALL_UTILS=ON \
+                -DLLVM_ENABLE_ZLIB=OFF \
+                -DLLVM_ENABLE_ZSTD=OFF \
+                -DLLVM_ENABLE_LLD=OFF \
+                -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+                -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+                -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+
+          # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
+          # and remove filter
+          # This tests fails on CI/CD not locally.
+          LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
+
+      - name: Build MHLO Dialect
+        if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+        run: |
+          export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+          cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DLLVM_ENABLE_LLD=OFF \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF
+
+          cmake --build mhlo-build --target check-mlir-hlo
+
+      - name: Build Enzyme
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        run: |
+          cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+              -DENZYME_STATIC_LIB=ON
+
+          cmake --build enzyme-build --target EnzymeStatic-18
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf ${{ steps.setup_python_venv.outputs.venv_name }}
+          rm -rf *
+          rm -rf .git
+          rm -rf .gitignore
+          rm -rf .github
+          pip cache purge
+
+
+
   test:
     runs-on: xanadu-arm64-mac
 
