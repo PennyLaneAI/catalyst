@@ -31,8 +31,8 @@ namespace catalyst {
 struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallOp> {
     using mlir::OpRewritePattern<func::CallOp>::OpRewritePattern;
 
-    void insertDropRefOp(func::CallOp op, async::ExecuteOp executeOp,
-                         PatternRewriter &rewriter) const
+    void insertDropRefOps(func::CallOp op, async::ExecuteOp executeOp,
+                          PatternRewriter &rewriter) const
     {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         // Let's first place the awaits just before the terminator of this block.
@@ -61,6 +61,92 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         for (auto refCountedValue : executeOp.getResults()) {
             rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), refCountedValue,
                                                      rewriter.getI64IntegerAttr(1));
+        }
+    }
+
+    void insertAwaitOps(func::CallOp op, async::ExecuteOp executeOp,
+                        PatternRewriter &rewriter) const
+    {
+        // The async.execute instruction returns a promise.
+        //
+        //    %token, %promise = async.execute {
+        //       // body...
+        //       async.yield %0 : !some.type
+        //    }
+        //
+        //  Then we would wait on the promise or the token like so:
+        //
+        //     async.await %token
+        //     async.await %promise
+        //
+        //  If called async for the first time and the value is not available, the thread will wait
+        //  until the value becomes available. If the value is available, the function returns
+        //  practically immediately. For example.
+        //
+        //     %1 = async.await %promise // promise is not yet available, will wait.
+        //     %2 = async.await %promise // promise is now available, will not wait.
+        //
+        //  This makes the job of deciding where to place awaits really easy.
+        //  We just need to place awaits just before every use of the original value.
+        //  For example, take the following piece of code
+        //
+        //     %quantum_results = call @qnode
+        //
+        //     // Arbitrary control flow
+        //     // This use might be inside a different basic block.
+        //     %some_val = some.op %quantum_results
+        //
+        //  First we translate the call to an async.execute (which was performed before this
+        //  function was called) When this function was called, the transformation is not yet
+        //  complete. Because there are still uses of %quantum_results.
+        //
+        //     %async_quantum_results = call @qnode
+        //
+        //     // Arbitrary control flow
+        //     // This use might be inside a different basic block.
+        //     %some_val = some.op %quantum_results
+        //
+        //  This function will perform the following change:
+        //
+        //     %async_quantum_results = call @qnode
+        //
+        //     // Arbitrary control flow
+        //     // This use might be inside a different basic block.
+        //     %await_quantum_results = async.await %async_quantum_results
+        //     %some_val = some.op %await_quantum_results
+        //
+        //  And it will do so for every use of %quantum_results
+        //  E.g.
+        //
+        //     %async_quantum_results = call @qnode
+        //
+        //     // Arbitrary control flow
+        //     // This use might be inside a different basic block.
+        //     %await_quantum_results_0 = async.await %async_quantum_results
+        //     %some_val_0 = some.op %await_quantum_results_0
+        //     %await_quantum_results_1 = async.await %async_quantum_results_1
+        //     %some_val_1 = some.op %await_quantum_results_1
+        //
+        //  However, we can do a bit better and avoid this extra awaits that follow.
+        auto results = executeOp.getResults();
+        // The first value is just a token.
+        std::vector<Value> bodyReturns(results.begin() + 1, results.end());
+        // TODO: Assert/FAIL that op.getResults() and bodyReturns have the same number of elements.
+        if (bodyReturns.size() == op.getResults().size()) {
+            for (auto [oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
+                auto _users = oldVal.getUsers();
+                // Insert users into a vector to avoid modifying users during a loop.
+                std::vector<Operation *> users(_users.begin(), _users.end());
+                for (auto user : users) {
+                    // Now we can safely modify users
+                    PatternRewriter::InsertionGuard insertGuard(rewriter);
+                    rewriter.setInsertionPoint(user);
+                    auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
+                    auto awaitVal = awaitOp.getResults();
+                    rewriter.replaceUsesWithIf(
+                        oldVal, awaitVal, [&](OpOperand &use) { return use.getOwner() == user; });
+                }
+            }
         }
     }
 
@@ -103,28 +189,8 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             rewriter.create<async::YieldOp>(op.getLoc(), cloneOp->getResults());
         }
 
-        auto asyncValues = executeOp.getResults();
-
-        insertDropRefOp(op, executeOp, rewriter);
-
-        std::vector<Value> bodyReturns(asyncValues.begin() + 1, asyncValues.end());
-        // TODO: Assert/FAIL that op.getResults() and bodyReturns have the same number of elements.
-        if (bodyReturns.size() == op.getResults().size()) {
-            for (auto [oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
-                auto _users = oldVal.getUsers();
-                // Insert users into a vector to avoid modifying users during a loop.
-                std::vector<Operation *> users(_users.begin(), _users.end());
-                for (auto user : users) {
-                    // Now we can safely modify users
-                    PatternRewriter::InsertionGuard insertGuard(rewriter);
-                    rewriter.setInsertionPoint(user);
-                    auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
-                    auto awaitVal = awaitOp.getResults();
-                    rewriter.replaceUsesWithIf(
-                        oldVal, awaitVal, [&](OpOperand &use) { return use.getOwner() == user; });
-                }
-            }
-        }
+        insertDropRefOps(op, executeOp, rewriter);
+        insertAwaitOps(op, executeOp, rewriter);
 
         rewriter.eraseOp(op);
 
