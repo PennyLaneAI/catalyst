@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
