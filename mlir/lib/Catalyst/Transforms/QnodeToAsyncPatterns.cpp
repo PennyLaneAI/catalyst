@@ -31,6 +31,31 @@ namespace catalyst {
 struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallOp> {
     using mlir::OpRewritePattern<func::CallOp>::OpRewritePattern;
 
+    void insertDropRefOp(func::CallOp op, async::ExecuteOp executeOp,
+                         PatternRewriter &rewriter) const
+    {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        // Let's first place the awaits just before the terminator of this block.
+        // If there is no terminator in this block, then we will place the await
+        // at the end of the block.
+        Block *block = op->getBlock();
+        // TODO: Once we update LLVM versions, we might have access to function
+        // `mightHaveTerminator` For now, we have ''inlined'' the definition here.
+        bool mightHaveTerminator =
+            !block->empty() && block->back().mightHaveTrait<OpTrait::IsTerminator>();
+        if (mightHaveTerminator) {
+            rewriter.setInsertionPoint(block->getTerminator());
+        }
+        else {
+            rewriter.setInsertionPointToEnd(block);
+        }
+
+        for (auto refCountedValue : executeOp.getResults()) {
+            rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), refCountedValue,
+                                                     rewriter.getI64IntegerAttr(1));
+        }
+    }
+
     mlir::LogicalResult matchAndRewrite(func::CallOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
@@ -72,28 +97,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         auto asyncValues = executeOp.getResults();
 
-        {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            // Let's first place the awaits just before the terminator of this block.
-            // If there is no terminator in this block, then we will place the await
-            // at the end of the block.
-            Block *block = op->getBlock();
-            // TODO: Once we update LLVM versions, we might have access to function
-            // `mightHaveTerminator` For now, we have ''inlined'' the definition here.
-            bool mightHaveTerminator =
-                !block->empty() && block->back().mightHaveTrait<OpTrait::IsTerminator>();
-            if (mightHaveTerminator) {
-                rewriter.setInsertionPoint(block->getTerminator());
-            }
-            else {
-                rewriter.setInsertionPointToEnd(block);
-            }
-
-            for (auto refCountedValue : executeOp.getResults()) {
-                rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), refCountedValue,
-                                                         rewriter.getI64IntegerAttr(1));
-            }
-        }
+        insertDropRefOp(op, executeOp, rewriter);
 
         // TODO: Come up with a better algorithm
         // We restrict the delay of await to the case where we have
