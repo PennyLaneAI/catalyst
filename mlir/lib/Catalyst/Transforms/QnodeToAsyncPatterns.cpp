@@ -50,6 +50,14 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             rewriter.setInsertionPointToEnd(block);
         }
 
+        // TODO: Here we place an await until the very end.
+        // The reason for this is because if the call returns no values,
+        // then we will never execute it.
+        // Potentially we could just remove the call altogether.
+        // But we should make sure that there are no side effects in the call.
+        // One possible side effect is printing to stdout.
+        rewriter.create<async::AwaitOp>(op.getLoc(), executeOp.getResults().front());
+
         for (auto refCountedValue : executeOp.getResults()) {
             rewriter.create<async::RuntimeDropRefOp>(op.getLoc(), refCountedValue,
                                                      rewriter.getI64IntegerAttr(1));
@@ -99,33 +107,22 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         insertDropRefOp(op, executeOp, rewriter);
 
-        // TODO: Come up with a better algorithm
-        // We restrict the delay of await to the case where we have
-        // one result with a single use. (Uses are not necessarily ordered)
-        // We also restrict the uses to be in the same basic block
-        // Not being in the same block means that it may be in a loop.
-        // And therefore we may execute the drop_ref multiple times
-        // which is a runtime error.
-        auto results = op.getResults();
-        if (results.size() == 1) {
-            for (auto result : results) {
-                if (result.hasOneUse()) {
-                    for (Operation *user : result.getUsers()) {
-                        if (op->getBlock() == user->getBlock()) {
-                            rewriter.setInsertionPoint(user);
-                        }
-                    }
-                }
-            }
-        }
-
-        rewriter.create<async::AwaitOp>(op.getLoc(), asyncValues.front());
-
         std::vector<Value> bodyReturns(asyncValues.begin() + 1, asyncValues.end());
-        if (bodyReturns.size() > 0) {
+        // TODO: Assert/FAIL that op.getResults() and bodyReturns have the same number of elements.
+        if (bodyReturns.size() == op.getResults().size()) {
             for (auto [oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
-                auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
-                rewriter.replaceAllUsesWith(oldVal, awaitOp.getResults());
+                auto _users = oldVal.getUsers();
+                // Insert users into a vector to avoid modifying users during a loop.
+                std::vector<Operation *> users(_users.begin(), _users.end());
+                for (auto user : users) {
+                    // Now we can safely modify users
+                    PatternRewriter::InsertionGuard insertGuard(rewriter);
+                    rewriter.setInsertionPoint(user);
+                    auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
+                    auto awaitVal = awaitOp.getResults();
+                    rewriter.replaceUsesWithIf(
+                        oldVal, awaitVal, [&](OpOperand &use) { return use.getOwner() == user; });
+                }
             }
         }
 
