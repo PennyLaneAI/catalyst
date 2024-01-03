@@ -127,7 +127,11 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         //     %await_quantum_results_1 = async.await %async_quantum_results_1
         //     %some_val_1 = some.op %await_quantum_results_1
         //
-        //  However, we can do a bit better and avoid this extra awaits that follow.
+        //  However, we can do a bit better and avoid this extra awaits that are
+        //  dominated by the first await. Keeping the awaits is not incur a large increase
+        //  in run time. Removing the awaits involves using the dominator analysis, which we need
+        //  some time to investigate how to use. Not much, but sufficient enough for a future
+        //  improvement. See TODO inside replaceUsesWithIf.
         auto results = executeOp.getResults();
         // The first value is just a token.
         std::vector<Value> bodyReturns(results.begin() + 1, results.end());
@@ -143,8 +147,14 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
                     rewriter.setInsertionPoint(user);
                     auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
                     auto awaitVal = awaitOp.getResults();
-                    rewriter.replaceUsesWithIf(
-                        oldVal, awaitVal, [&](OpOperand &use) { return use.getOwner() == user; });
+                    rewriter.replaceUsesWithIf(oldVal, awaitVal, [&](OpOperand &use) {
+                        // TODO:
+                        // Change the line below to use.getOwner is strictly dominated by user.
+                        // For introductory explanation on dominators see here:
+                        //
+                        //    https://en.wikipedia.org/wiki/Dominator_(graph_theory)
+                        return use.getOwner() == user;
+                    });
                 }
             }
         }
