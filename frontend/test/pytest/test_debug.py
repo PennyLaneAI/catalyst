@@ -13,6 +13,7 @@ import re
 
 import jax.numpy as jnp
 import numpy as np
+import pennylane as qml
 import pytest
 
 from catalyst import debug, for_loop, qjit
@@ -162,6 +163,25 @@ class TestDebugPrint:
         out, err = capfd.readouterr()
         assert err == ""
         assert out == expected
+
+    def test_multiple_prints(self, capfd):
+        "Test printing strings in multiple prints"
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def func1():
+            debug.print("hello")
+            return qml.state()
+
+        @qjit
+        def func2():
+            func1()
+            debug.print("goodbye")
+            return
+
+        func2()
+        out, err = capfd.readouterr()
+        assert err == ""
+        assert out == "hello\ngoodbye\n"
 
 
 if __name__ == "__main__":
