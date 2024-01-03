@@ -8,7 +8,7 @@ pre-built binaries are being distributed via the Python Package Index (PyPI) for
 
 .. code-block:: console
 
-    pip install pennylane-catalyst
+    pip install PennyLane-Catalyst
 
 .. warning::
 
@@ -203,7 +203,7 @@ You can also choose to build the custom Catalyst dialects only, with:
 Frontend
 """"""""
 
-To install the ``pennylane-catalyst`` Python package (the compiler frontend) in editable mode:
+To install the ``PennyLane-Catalyst`` Python package (the compiler frontend) in editable mode:
 
 .. code-block:: console
 

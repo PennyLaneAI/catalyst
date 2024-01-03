@@ -77,7 +77,7 @@ binaries are being distributed via the Python Package Index (PyPI) for Python ve
 higher. To install it, simply run the following ``pip`` command:
 
 ```console
-pip install pennylane-catalyst
+pip install PennyLane-Catalyst
 ```
 
 Pre-built packages for Windows are not yet available, and comptability with Windows 
