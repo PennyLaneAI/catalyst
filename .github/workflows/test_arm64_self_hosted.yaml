@@ -109,10 +109,10 @@ jobs:
       - name: Setup Python
         id: setup_python_venv
         env:
-          VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python-version }}_${{ github.sha }}
+          VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
         run: |
           rm -rf "$VENV_NAME"
-          pyenv global ${{ matrix.python-version }}
+          pyenv global ${{ matrix.python_version }}
           python -m venv "$VENV_NAME"
           
           # Add the venv to PATH for subsequent steps
