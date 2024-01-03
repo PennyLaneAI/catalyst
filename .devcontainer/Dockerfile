@@ -24,7 +24,7 @@ USER $USERNAME
 # Install Python kernel for use with Jupyter Notebooks.
 RUN pip install --no-cache-dir ipykernel
 
-RUN pip install --no-cache-dir PennyLane-Catalyst
+RUN pip install --no-cache-dir pennylane-catalyst
 
 ENV SHELL /bin/bash
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
