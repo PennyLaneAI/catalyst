@@ -195,6 +195,10 @@ jobs:
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
 
+    env:
+      CPATH: /opt/homebew/include
+      LIBRARY_PATH: /opt/homebrew/lib
+
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
