@@ -666,6 +666,10 @@ class ExpansionStrategy:
     output_force_arg0_outdbidx: bool
 
 
+def default_expansion_strategy(axes_specs):
+    return ExpansionStrategy(axes_specs, False, False, False)
+
+
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
     return ExpansionStrategy(None, not preserve_dimensions, True, False)
@@ -944,39 +948,26 @@ def out_type_force_outdbidx(
 class DynshapePrimitive(Primitive):
     """Primitive containing nested Jaxpr programs accepting and returning Jax values with shapes
     containing dynamic dimensions."""
+    pass
 
-    def bind(self, *args, **params):
-        """Bind the Jax primitive into a Jaxpr program. This method are called during both the
-        tracing of a Python program and during the evaluation of a Jaxpr program.
 
-        In contrast to other Jax primitives, this one accepts expanded arguments (shapes of
-        inputs might contain tracers), deduces the Jax ``InputType``, passes it to the abstract
-        evaluation callback and correctly interprets the returned ``OutputType``. This means that it
-        correctly processes the InDBIdx/OutDBIdx residing in the OutputType by creating resulting
-        tracers with the right dynamic dimensions. For the details, refer to the definition of the
-        ``InputType`` and ``OutputType`` of Jax.
+class DynamicJaxprTraceEx(DynamicJaxprTrace):
 
-        Args:
-            *args: arguments of this bind primitive. Must be Jax tracers (when tracing a Python
-                   program) or Jaxpr variables (when evaluating Jaxpr program). Dynamic dimensions
-                   are supported.
-            **params: Any valid Python variables used as parameters for this primitive.
+    def __init__(self, *args, dynamic=True, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        Returns:
-            Output Python tracers or Jaxpr variables, with the dynamic dimensions set in accordance
-            with the the output type calculated by the ``abstract_eval``.
+    def default_process_primitive(self, primitive, tracers, params):
 
-        """
-        # Note: We do not return `out_type` along with the results in order to match the Jax bind
-        # API.  but it would be good to return it, because otherwise we lose the information about
-        # explicintess.
+        if not isinstance(primitive, DynshapePrimitive):
+            return super().default_process_primitive(primitive, tracers, params)
 
-        trace = find_top_trace(args)
-        tracers = map(trace.full_raise, args)
+        trace = self
+        tracers = map(trace.full_raise, tracers)
         source_info = jax_current()
 
         in_type = infer_lambda_input_type(None, tracers)
-        out_type, effects = self.abstract_eval(*in_type, **params)
+        out_type, effects = primitive.abstract_eval(*in_type, **params)
+
         assert len(effects) == 0, f"Jax effects are not supported, got ({effects})"
 
         out_tracers = output_type_to_tracers(
@@ -991,6 +982,7 @@ class DynshapePrimitive(Primitive):
         invars = map(trace.getvar, tracers)
         outvars = map(trace.makevar, out_tracers)
 
-        eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
+        eqn = new_jaxpr_eqn(invars, outvars, primitive, params, [], source_info)
         trace.frame.add_eqn(eqn)
-        return out_tracers if self.multiple_results else out_tracers.pop()
+        return out_tracers if primitive.multiple_results else out_tracers.pop()
+

@@ -24,7 +24,7 @@ from typing import ContextManager, Dict, List, Optional, Tuple
 from jax._src.core import MainTrace as JaxMainTrace
 from jax._src.core import cur_sublevel, new_base_main
 from jax._src.interpreters.partial_eval import (
-    DynamicJaxprTrace,
+    # DynamicJaxprTrace,
     JaxprStackFrame,
     extend_jaxpr_stack,
 )
@@ -33,7 +33,7 @@ from jax.core import find_top_trace
 from pennylane.queuing import QueuingManager
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import new_dynamic_main2
+from catalyst.utils.jax_extras import new_dynamic_main2, DynamicJaxprTraceEx
 
 
 class EvaluationMode(Enum):
@@ -65,9 +65,9 @@ class JaxTracingContext:
     """
 
     main: JaxMainTrace
-    frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
-    mains: Dict[DynamicJaxprTrace, JaxMainTrace]
-    trace: Optional[DynamicJaxprTrace]
+    frames: Dict[DynamicJaxprTraceEx, JaxprStackFrame]
+    mains: Dict[DynamicJaxprTraceEx, JaxMainTrace]
+    trace: Optional[DynamicJaxprTraceEx]
 
     def __init__(self, main: JaxMainTrace):
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
@@ -93,7 +93,7 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def _create_tracing_context(cls, mode) -> ContextManager[JaxTracingContext]:
-        with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
+        with new_base_main(DynamicJaxprTraceEx, dynamic=True) as main:
             main.jaxpr_stack = ()
             cls._tracing_stack.append((mode, JaxTracingContext(main)))
             try:
@@ -113,18 +113,18 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, ctx: JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
-    ) -> ContextManager[DynamicJaxprTrace]:
+        cls, ctx: JaxTracingContext, trace: Optional[DynamicJaxprTraceEx] = None
+    ) -> ContextManager[DynamicJaxprTraceEx]:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
         main = ctx.mains[trace] if trace is not None else None
-        with new_dynamic_main2(DynamicJaxprTrace, main=main) as nmain:
+        with new_dynamic_main2(DynamicJaxprTraceEx, main=main) as nmain:
             nmain.jaxpr_stack = ()
             frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
             with extend_jaxpr_stack(nmain, frame), reset_name_stack():
                 parent_trace = ctx.trace
-                ctx.trace = DynamicJaxprTrace(nmain, cur_sublevel()) if trace is None else trace
+                ctx.trace = DynamicJaxprTraceEx(nmain, cur_sublevel()) if trace is None else trace
                 ctx.frames[ctx.trace] = frame
                 ctx.mains[ctx.trace] = nmain
                 try:
