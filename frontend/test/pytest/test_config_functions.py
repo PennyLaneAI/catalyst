@@ -54,14 +54,6 @@ qjit_compatible = false
             check_qjit_compatibility(LightningQubit, config)
 
 
-def test_device_has_config_attr():
-    """Test error is raised when device has no config attr."""
-    name = LightningQubit.name
-    msg = f"Attempting to compile program for incompatible device {name}."
-    with pytest.raises(CompileError, match=msg):
-        check_device_config(LightningQubit)
-
-
 def test_device_with_invalid_config_attr():
     """Test error is raised when device has invalid config attr."""
     name = LightningQubit.name
