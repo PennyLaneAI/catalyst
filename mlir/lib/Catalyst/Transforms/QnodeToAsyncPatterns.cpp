@@ -135,27 +135,24 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         auto results = executeOp.getResults();
         // The first value is just a token.
         std::vector<Value> bodyReturns(results.begin() + 1, results.end());
-        // TODO: Assert/FAIL that op.getResults() and bodyReturns have the same number of elements.
-        if (bodyReturns.size() == op.getResults().size()) {
-            for (auto &&[oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
-                auto _users = oldVal.getUsers();
-                // Insert users into a vector to avoid modifying users during a loop.
-                std::vector<Operation *> users(_users.begin(), _users.end());
-                for (auto user : users) {
-                    // Now we can safely modify users
-                    PatternRewriter::InsertionGuard insertGuard(rewriter);
-                    rewriter.setInsertionPoint(user);
-                    auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
-                    auto awaitVal = awaitOp.getResults();
-                    rewriter.replaceUsesWithIf(oldVal, awaitVal, [&](OpOperand &use) {
-                        // TODO:
-                        // Change the line below to use.getOwner is strictly dominated by user.
-                        // For introductory explanation on dominators see here:
-                        //
-                        //    https://en.wikipedia.org/wiki/Dominator_(graph_theory)
-                        return use.getOwner() == user;
-                    });
-                }
+        for (auto &&[oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
+            auto _users = oldVal.getUsers();
+            // Insert users into a vector to avoid modifying users during a loop.
+            std::vector<Operation *> users(_users.begin(), _users.end());
+            for (auto user : users) {
+                // Now we can safely modify users
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(user);
+                auto awaitOp = rewriter.create<async::AwaitOp>(op.getLoc(), newVal);
+                auto awaitVal = awaitOp.getResults();
+                rewriter.replaceUsesWithIf(oldVal, awaitVal, [&](OpOperand &use) {
+                    // TODO:
+                    // Change the line below to use.getOwner is strictly dominated by user.
+                    // For introductory explanation on dominators see here:
+                    //
+                    //    https://en.wikipedia.org/wiki/Dominator_(graph_theory)
+                    return use.getOwner() == user;
+                });
             }
         }
     }
