@@ -307,7 +307,10 @@ jobs:
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
     - name: Test Catalyst-Runtime
+      env:
+        VENV_LOCATION: ${{ steps.setup_python_venv.outputs.venv_name }}
       run: |
+        source "$VENV_LOCATION/bin/activate"
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
