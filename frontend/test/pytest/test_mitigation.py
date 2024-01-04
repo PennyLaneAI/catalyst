@@ -16,10 +16,10 @@
 
 import jax
 import numpy as np
+import pennylane as qml
 import pytest
 
 import catalyst
-import pennylane as qml
 
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
