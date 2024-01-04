@@ -165,14 +165,16 @@ class AdjointGenerator {
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
             OpBuilder::InsertionGuard insertionGuard(builder);
             builder.setInsertionPoint(clone);
-            SmallVector<Value> cachedParams;
             ValueRange params = parametrizedGate.getAllParams();
-            for (Value param : params) {
+            size_t numParams = params.size();
+            SmallVector<Value> cachedParams(numParams);
+            // popping gives the parameters in reverse
+            for (auto [idx, param] : llvm::enumerate(llvm::reverse(params))) {
                 Type paramType = param.getType();
                 verifyTypeIsCacheable(paramType, operation);
                 if (paramType.isF64()) {
-                    cachedParams.push_back(
-                        builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector));
+                    cachedParams[numParams - 1 - idx] =
+                        builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector);
                     continue;
                 }
 
@@ -256,7 +258,7 @@ class AdjointGenerator {
                 }
 
                 Value recreatedTensor = iForLoop.getResult(0);
-                cachedParams.push_back(recreatedTensor);
+                cachedParams[numParams - 1 - idx] = recreatedTensor;
             }
             MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
                 .assign(cachedParams);

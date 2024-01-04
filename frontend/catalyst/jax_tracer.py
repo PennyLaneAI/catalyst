@@ -372,7 +372,7 @@ def trace_quantum_tape(
         device: PennyLane quantum device.
         qreg: JAX tracer for quantum register in its initial state.
         ctx: JAX tracing context object.
-        trace: JAX frame to emit the Jaxpr quations into.
+        trace: JAX frame to emit the Jaxpr equations into.
 
     Returns:
         qrp: QRegPromise object holding the JAX tracer representing the quantum register into its
@@ -381,10 +381,10 @@ def trace_quantum_tape(
     # Notes:
     # [1] - At this point JAX equation contains both equations added during the classical tracing
     #       and the equations added during the quantum tracing. The equations are linked by named
-    #       variables which are in 1-to-1 correspondance with JAX tracers. Since we create
+    #       variables which are in 1-to-1 correspondence with JAX tracers. Since we create
     #       classical tracers (e.g. for mid-circuit measurements) during the classical tracing, but
     #       emit the corresponding equations only now by ``bind``-ing primitives, we might get
-    #       equatoins in a wrong order. The set of variables are always complete though, so we sort
+    #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
     qrp = QRegPromise(qreg)
