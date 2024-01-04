@@ -21,7 +21,7 @@
   def circuit(theta):
       qml.Hadamard(wires=0)
       qml.RX(theta, wires=1)
-      qml.CNOT(wires=[0,1])
+      qml.CNOT(wires=[0, 1])
       return qml.expval(qml.PauliZ(wires=1))
   ```
 
@@ -45,6 +45,7 @@
 
 * Just-in-time compiled functions now support asynchronuous execution of QNodes.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
   Simply specify ``async_qnodes=True`` when using the `@qjit` decorator to enable the async
   execution of QNodes. Currently, asynchronous execution is only supported by
@@ -147,7 +148,7 @@
   would recompile each time an array of different size is passed
   as an argument:
 
-  ```python
+  ```pycon
   @qjit
   def sum(arr):
       return jnp.sum(arr)
@@ -158,7 +159,7 @@
   By passing `abstracted_axes`, we can specify that the first axes
   of the first argument is to be treated as dynamic during initial compilation:
 
-  ```python
+  ```pycon
   @qjit(abstracted_axes={0: "n"})
   def sum_abstracted(arr):
       return jnp.sum(arr)
@@ -173,82 +174,134 @@
   with a lowering to a global folded circuit.
   [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
 
-* The plugin system of Catalyst for backend devices. This system in runtime
-  is backed by `dlopen` and enables the devices to be packaged separately from
-  the runtime CAPI and loaded at run time instead of being linked at compile time.
-  This provides flexibility and extensibility to Catalyst allowing users to
-  load quantum devices dynamically.
+<h3>Improvements</h3>
+
+* The three backend devices provided with Catalyst, `lightning.qubit`, `lightning.kokkos`, and
+  `braket.aws`, are now dynamically loaded at runtime.
   [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
   [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
 
-* Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
-  for `lightning.qubit` and `lightning.kokkos` devices.
+  This takes advantage of the new backend plugin system provided in Catalyst v0.3.2,
+  and allows the devices to be packaged separately from the runtime CAPI. Provided backend
+  devices are now loaded at runtime, instead of being linked at compile time.
+
+  For more details on the backend plugin system, see the
+  [custom devices documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html).
+
+* Finite-shot measurement statistics (`expval`, `var`, and `probs`) are now supported
+  for the `lightning.qubit` and `lightning.kokkos` devices. Previously, exact statistics
+  were returned even when finite shots were specified.
   [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
   [(#410)](https://github.com/PennyLaneAI/catalyst/pull/410)
 
-* The runtime now supports multiple active devices managed via a device pool.
-  The new `RTDevice` data-class and `RTDeviceStatus` along with the `thread_local`
-  device instance pointer enable the runtime to better scope the lifetime of device
-  instances concurrently. With these changes, one can create multiple active devices
-  and execute multiple programs in a multithreaded environment.
-  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
-
-
-<h3>Improvements</h3>
-
-* Support for `mcmc` sampling in `lightning.qubit`.
-  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+  ```pycon
+  >>> dev = qml.device("lightning.qubit", wires=2, shots=100)
+  >>> @qjit
+  >>> @qml.qnode(dev)
+  >>> def circuit(x):
+  >>>     qml.RX(x, wires=0)
+  >>>     return qml.probs(wires=0)
+  >>> circuit(0.54)
+  array([0.94, 0.06])
+  >>> circuit(0.54)
+  array([0.93, 0.07])
+  ```
 
 * Catalyst gradient functions `grad`, `jacobian`, `jvp`, and `vjp` can now be invoked from
-  outside a `@qjit` context. This simplifies the process of writing functions where compilation
+  outside a `@qjit` context.
+  [(#375)](https://github.com/PennyLaneAI/catalyst/pull/375)
+
+  This simplifies the process of writing functions where compilation
   can be turned on and off easily by adding or removing the decorator. The functions dispatch to
   their JAX equivalents when the compilation is turned off.
-  [(#375)](https://github.com/PennyLaneAI/catalyst/pull/375)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> grad(circuit)(0.54)  # dispatches to jax.grad
+  Array(-0.51413599, dtype=float64, weak_type=True)
+  >>> qjit(grad(circuit))(0.54). # differentiates using Catalyst
+  array(-0.51413599)
+  ```
+
+* All `lightning.qubit` configuration options are now supported via the `qml.device` loader,
+  including Markov Chain Monte Carlo sampling support.
+  [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2, shots=1000, mcmc=True)
+
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x, wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> circuit(0.54)
+  array(0.856)
+  ```
+
+* Improvements have been made to the runtime and quantum MLIR dialect in order
+  to support asynchronous execution.
+
+  - The runtime now supports multiple active devices managed via a device pool. The new `RTDevice`
+    data-class and `RTDeviceStatus` along with the `thread_local` device instance pointer enable
+    the runtime to better scope the lifetime of device instances concurrently. With these changes,
+    one can create multiple active devices and execute multiple programs in a multithreaded
+    environment.
+    [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+
+  - The ability to dynamically release devices has been added via `DeviceReleaseOp` in the Quantum
+    MLIR dialect. This is lowered to the `__quantum__rt__device_release()` runtime instruction,
+    which updates the status of the device instance from `Active` to `Inactive`. The runtime will reuse
+    this deactivated instance instead of creating a new one automatically at runtime in a
+    multi-QNode workflow when another device with identical specifications is requested.
+    [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+
+  - The `DeviceOp` definition in the Quantum MLIR dialect has been updated to lower a tuple
+    of device information `('lib', 'name', 'kwargs')` to a single device initialization call
+    `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`. This allows the runtime to initialize
+    device instances without keeping partial information of the device
+    [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
+
+* The quantum adjoint compiler routine has been extended to support function calls that affect the
+  quantum state within an adjoint region. Note that the function may only provide a single result
+  consisting of the quantum register. By itself this provides no user-facing changes, but compiler
+  pass developers may now generate quantum adjoint operations around a block of code containing
+  function calls as well as quantum operations and control flow operations.
+  [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
 * ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
   register in functions and can be given to another function (useful for quantum transformation).
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
 
-* The quantum adjoint compiler routine has been extended to support function calls that affect the
-  quantum state within an adjoint region. Note that the function may only provide a single result
-  consisting of the quantum register.
-  By itself this provides no user-facing changes, but compiler pass developers may now generate
-  quantum adjoint operations around a block of code containing function calls as well as quantum
-  operations and control flow operations.
-  [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
-
-* Update the `DeviceOp` definition in the Quantum MLIR dialect.
-  `DeviceOp` gets the tuple of device info: ('lib', 'name', 'kwargs')
-  and lowers the operation to one single device initialization call:
-  `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
-  [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
-
-* Add `DeviceReleaseOp` to the Quantum MLIR dialect. This will be lowered to
-  the `__quantum__rt__device_release()` runtime instruction updating the status
-  of the device instance from `Active` to `Inactive`. The runtime will reuse this
-  deactivated instance instead of creating a new one automatically at runtime in a
-  multi-qnode workflow when another device with identical specifications is requested.
-  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
-
 <h3>Breaking changes</h3>
 
-* Third party devices must now specify a configuration toml file.
-  For more information please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
+* Third party devices must now specify a configuration TOML file, in order to specify their
+  supported operations, measurements, and features for Catalyst compatibility. For more information
+  please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
 <h3>Bug fixes</h3>
 
-* Resolve a bug in the compiler's differentiation engine that results in a crash with the Enzyme
-  error message "attempting to differentiate function without definition" (see issue
-  [#384](https://github.com/PennyLaneAI/catalyst/issues/384)).
+* Resolves a bug in the compiler's differentiation engine that results in a segmentation fault
+  when [attempting to differentiate non-differentiable quantum operations](https://github.com/PennyLaneAI/catalyst/issues/384).
   The fix ensures that all current quantum operation types are removed during gradient passes that
   extract classical from a QNode function. It also adds a verification step that will raise an error
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
 
-* Resolve a bug with printing multiple strings from multiple functions with `debug.print` by introducing
-  a NULL terminator to traced strings.
+* Resolves a bug where printing multiple strings from multiple functions with `debug.print` could
+  result in a segfault, the printing garbage values, or accidental printing of adjacent strings.
   [(#418)](https://github.com/PennyLaneAI/catalyst/pull/418)
 
 <h3>Contributors</h3>
