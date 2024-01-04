@@ -50,10 +50,10 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
             rewriter.setInsertionPointToEnd(block);
         }
 
-        // TODO: Here we place an await until the very end.
+        // Here we place an await until the very end.
         // The reason for this is because if the call returns no values,
         // then we will never execute it.
-        // Potentially we could just remove the call altogether.
+        // TODO: We could just remove the call altogether.
         // But we should make sure that there are no side effects in the call.
         // One possible side effect is printing to stdout.
         rewriter.create<async::AwaitOp>(op.getLoc(), executeOp.getResults().front());
