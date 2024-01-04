@@ -137,7 +137,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         std::vector<Value> bodyReturns(results.begin() + 1, results.end());
         // TODO: Assert/FAIL that op.getResults() and bodyReturns have the same number of elements.
         if (bodyReturns.size() == op.getResults().size()) {
-            for (auto [oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
+            for (auto &&[oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
                 auto _users = oldVal.getUsers();
                 // Insert users into a vector to avoid modifying users during a loop.
                 std::vector<Operation *> users(_users.begin(), _users.end());
