@@ -205,7 +205,7 @@ jobs:
 
     - name: Setup PyEnv
       run: |
-        pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
+        pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
         for pyenv_path in ${pyenv_paths[@]};
         do
           [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
