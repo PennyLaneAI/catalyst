@@ -51,7 +51,6 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
 
-    // TODO: update
     RankedTensorType resultType = op.getResultTypes().front().cast<RankedTensorType>();
 
     // Loop over the scalars to create a folded circuit per factor
@@ -94,7 +93,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                     else {
                         // Multiple measurements
                         ValueRange resultValuesMulti = callOp.getResults();
-                        SmallVector<Value> vectorResults;
+                        SmallVector<Value> vectorResultsMulti;
                         // Create a tensor
                         for (Value resultValue : resultValuesMulti) {
                             Value resultExtracted;
@@ -105,12 +104,13 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                             else {
                                 resultExtracted = resultValue;
                             }
-                            vectorResults.push_back(resultExtracted);
+                            vectorResultsMulti.push_back(resultExtracted);
                         }
                         SmallVector<int64_t> resShape = {numResults};
-                        Type type = RankedTensorType::get(resShape, vectorResults[0].getType());
+                        Type type =
+                            RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
                         auto tensorResults =
-                            builder.create<tensor::FromElementsOp>(loc, type, vectorResults);
+                            builder.create<tensor::FromElementsOp>(loc, type, vectorResultsMulti);
                         Value sizeResultsValue =
                             rewriter.create<index::ConstantOp>(loc, numResults);
                         Value resultValuesFor =
