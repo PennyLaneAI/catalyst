@@ -17,8 +17,8 @@
 import tempfile
 from pathlib import Path
 
+import pennylane as qml
 import pytest
-from pennylane_lightning.lightning_qubit.lightning_qubit import LightningQubit
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import (
@@ -31,6 +31,13 @@ from catalyst.utils.runtime import (
     get_native_gates,
 )
 from catalyst.utils.toml import toml_load
+
+
+class TestDevice(qml.QubitDevice):
+    """Test device"""
+
+    name = "Test Device"
+    short_name = "test.device"
 
 
 def test_toml_file():
@@ -47,31 +54,31 @@ qjit_compatible = false
         config = toml_load(f)
         f.close()
 
-        name = LightningQubit.name
+        name = TestDevice.name
         with pytest.raises(
             CompileError, match=f"Attempting to compile program for incompatible device {name}."
         ):
-            check_qjit_compatibility(LightningQubit, config)
+            check_qjit_compatibility(TestDevice, config)
 
 
 def test_device_has_config_attr():
     """Test error is raised when device has no config attr."""
-    name = LightningQubit.name
+    name = TestDevice.name
     msg = f"Attempting to compile program for incompatible device {name}."
     with pytest.raises(CompileError, match=msg):
-        check_device_config(LightningQubit)
+        check_device_config(TestDevice)
 
 
 def test_device_with_invalid_config_attr():
     """Test error is raised when device has invalid config attr."""
-    name = LightningQubit.name
+    name = TestDevice.name
     with tempfile.NamedTemporaryFile(mode="w+b") as f:
         f.close()
-        setattr(LightningQubit, "config", Path(f.name))
+        setattr(TestDevice, "config", Path(f.name))
         msg = f"Attempting to compile program for incompatible device {name}."
         with pytest.raises(CompileError, match=msg):
-            check_device_config(LightningQubit)
-        delattr(LightningQubit, "config")
+            check_device_config(TestDevice)
+        delattr(TestDevice, "config")
 
 
 def test_get_native_gates():
