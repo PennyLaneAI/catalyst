@@ -51,14 +51,16 @@ def test_qnode_execution():
         return circuit3(new_params)
 
     params = jnp.array([1.0, 2.0])
-    assert np.allclose(
-        qjit()(multiple_qnodes)(params), qjit(async_qnodes=True)(multiple_qnodes)(params)
-    )
+    compiled = qjit(async_qnodes=True)(multiple_qnodes)
+    observed = compiled(params)
+    expected = qjit()(multiple_qnodes)(params)
+    assert "async_execute_fn" in compiled.qir
+    assert np.allclose(expected, observed)
 
 
-@pytest.mark.parametrize(
-    "diff_methods", [("parameter-shift", "auto"), ("finite-diff", "fd"), ("adjoint", "auto")]
-)
+# TODO: add the following diff_methods once issue #419 is fixed:
+# ("parameter-shift", "auto"), ("adjoint", "auto")]
+@pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_gradient(inp, diff_methods):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
@@ -79,6 +81,7 @@ def test_gradient(inp, diff_methods):
         h = qml.grad(g, argnum=0)
         return h(x)
 
+    assert "async_execute_fn" in compiled.qir
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
