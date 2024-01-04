@@ -47,9 +47,9 @@
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
-  Simply specify ``async_qnodes=True`` when using the `@qjit` decorator to enable the async
+  Simply specify `async_qnodes=True` when using the `@qjit` decorator to enable the async
   execution of QNodes. Currently, asynchronous execution is only supported by
-  ``lightning.qubit`` and ``lightning.kokkos``.
+  `lightning.qubit` and `lightning.kokkos`.
 
   Asynchronous execution will be most beneficial for just-in-time compiled functions that
   contain --- or generate --- multiple QNodes. An example of the latter includes computing
@@ -81,7 +81,7 @@
   ```
 
   Here, the first two circuit executions will occur in parallel across multiple threads,
-  as they're execution can occur indepdently.
+  as their execution can occur indepdently.
 
 * Preliminary support for PennyLane transforms has been added.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
@@ -149,9 +149,9 @@
   as an argument:
 
   ```pycon
-  @qjit
-  def sum(arr):
-      return jnp.sum(arr)
+  >>> @qjit
+  >>> def sum(arr):
+  >>>     return jnp.sum(arr)
   >>> sum(jnp.array([1]))     # Compilation happens here.
   >>> sum(jnp.array([1, 1]))  # And here!
   ```
@@ -160,9 +160,9 @@
   of the first argument is to be treated as dynamic during initial compilation:
 
   ```pycon
-  @qjit(abstracted_axes={0: "n"})
-  def sum_abstracted(arr):
-      return jnp.sum(arr)
+  >>> @qjit(abstracted_axes={0: "n"})
+  >>> def sum_abstracted(arr):
+  >>>     return jnp.sum(arr)
   >>> sum(jnp.array([1]))     # Compilation happens here.
   >>> sum(jnp.array([1, 1]))  # No need to recompile.
   ```
@@ -279,7 +279,7 @@
   function calls as well as quantum operations and control flow operations.
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
-* ``AllocOp``, ``DeallocOp`` have now (only) value semantics. In the frontend, the last
+* `AllocOp`, `DeallocOp` have now (only) value semantics. In the frontend, the last
   quantum register is deallocated instead of the first one. This allows to return the quantum
   register in functions and can be given to another function (useful for quantum transformation).
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)

@@ -810,6 +810,11 @@ array(0.2)
 
     The Catalyst ``@qjit`` decorator doesn't yet support this functionality.
 
+Dynamically-shaped arrays
+-------------------------
+
+TODO.
+
 
 Returning multiple measurements
 -------------------------------
