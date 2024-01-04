@@ -2,6 +2,12 @@
 
 <h3>New features</h3>
 
+* Error mitigation using the zero-noise extrapolation method is now available through the
+  `catalyst.mitigate_with_zne` transform.
+
+  TODO: meaningful example
+  [(#414)](https://github.com/PennyLaneAI/catalyst/pull/414)
+
 * A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
   with a lowering to a global folded circuit.
   [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
