@@ -103,5 +103,20 @@ def test_single_measurement_control_flow(params):
     assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
 
 
+def test_not_qnode_error():
+    """Test that when applied not on a QNode the transform raises an error."""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    def circuit(x):
+        return jax.numpy.sin(x)
+
+    @catalyst.qjit(keep_intermediate=True)
+    def mitigated_function(args):
+        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(args)
+
+    with pytest.raises(TypeError, match="A QNode is expected, got the classical function"):
+        mitigated_function(0.1)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

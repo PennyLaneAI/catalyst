@@ -934,7 +934,7 @@ class Zne:
 
     def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
         if not isinstance(fn, qml.QNode):
-            raise TypeError(f"A QNode is expected, got the classical function {self.fn}")
+            raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.scale_factors = scale_factors
@@ -963,7 +963,8 @@ class Zne:
 
 
 def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
-    """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise extrapolation.
+    """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
+    extrapolation.
 
     Error mitigation is a precursor to error correction and is compatible with near-term quantum
     devices. It aims to lower the impact of noise when evaluating a circuit on a quantum device by
@@ -979,8 +980,8 @@ def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
         deg (int): the degree of the polymonial used for fitting.
 
     Returns:
-        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode` for the given
-                  arguments.
+        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
+                  for the given arguments.
 
     **Example:**
 
