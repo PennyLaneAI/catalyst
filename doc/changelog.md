@@ -6,6 +6,36 @@
   `catalyst.mitigate_with_zne` transform.
 
   TODO: meaningful example
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qml.qnode(device=dev)
+  def circuit(x, n):
+      @catalyst.for_loop(0, n, 1)
+      def loop_rx(i):
+          qml.RX(x, wires=0)
+
+      loop_rx()
+
+      qml.Hadamard(wires=0)
+      qml.RZ(x, wires=0)
+      loop_rx()
+      qml.RZ(x, wires=0)
+      qml.CNOT(wires=[1, 0])
+      qml.Hadamard(wires=1)
+      return qml.expval(qml.PauliY(wires=0))
+
+  @catalyst.qjit(keep_intermediate=True)
+  def mitigated_circuit(args, n):
+      return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
+          args, n
+      )
+  ```
+
+  ```pycon
+  >>> mitigated_circuit(0.2, 5)
+  0.5655341100116512
+  ```
   [(#414)](https://github.com/PennyLaneAI/catalyst/pull/414)
 
 * A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
