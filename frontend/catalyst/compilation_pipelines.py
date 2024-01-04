@@ -946,9 +946,9 @@ def qjit(
     .. details::
         :title: AutoGraph and Python control flow
 
-        Catalyst also supports capturing imperative Python control flow in compiled programs. You can
-        enable this feature via the ``autograph=True`` parameter. Note that it does come with some
-        restrictions, in particular whenever global state is involved. Refer to the
+        Catalyst also supports capturing imperative Python control flow in compiled programs. You
+        can enable this feature via the ``autograph=True`` parameter. Note that it does come with
+        some restrictions, in particular whenever global state is involved. Refer to the
         :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
         supported and unsupported use-cases.
 
@@ -971,11 +971,12 @@ def qjit(
         >>> circuit(5)
         array(1.)
 
-        Note that imperative control flow will still work in Catalyst even when the AutoGraph feature is
-        turned off, it just won't be captured in the compiled program and cannot involve traced values.
-        The example above would then raise a tracing error, as there is no value for ``x`` yet than can
-        be compared in the if statement. A loop like ``for i in range(5)`` would be unrolled during
-        tracing, "copy-pasting" the body 5 times into the program rather than appearing as is.
+        Note that imperative control flow will still work in Catalyst even when the AutoGraph
+        feature is turned off, it just won't be captured in the compiled program and cannot involve
+        traced values. The example above would then raise a tracing error, as there is no value for
+        ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
+        be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
+        appearing as is.
 
     .. details::
         :title: Dynamically-shaped arrays
