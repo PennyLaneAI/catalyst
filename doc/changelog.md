@@ -63,6 +63,7 @@
   Support for the async MLIR dialect was added.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
   [(#424)](https://github.com/PennyLaneAI/catalyst/pull/424)
+  [(#420)](https://github.com/PennyLaneAI/catalyst/pull/420)
 
   In this example below, the first and second circuit are executed in parrallel if two threads are available.
   To see a speed up in your code, you should use circuits with more gates and/or more qubits.
