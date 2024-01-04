@@ -67,6 +67,10 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
     void insertAwaitOps(func::CallOp op, async::ExecuteOp executeOp,
                         PatternRewriter &rewriter) const
     {
+        // If there are no results for the call, just return
+        if (op.getResults().size() == 0) {
+            return;
+        }
         // The async.execute instruction returns a promise.
         //
         //    %token, %promise = async.execute {
@@ -135,6 +139,8 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         auto results = executeOp.getResults();
         // The first value is just a token.
         std::vector<Value> bodyReturns(results.begin() + 1, results.end());
+
+        // It is guaranteed that op.getResults().size() and bodyReturns.size() are equal.
         for (auto &&[oldVal, newVal] : llvm::zip(op.getResults(), bodyReturns)) {
             auto _users = oldVal.getUsers();
             // Insert users into a vector to avoid modifying users during a loop.
