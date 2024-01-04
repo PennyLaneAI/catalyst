@@ -176,7 +176,7 @@ ext_modules.extend(intree_extension_list)
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
 setup(
     classifiers=classifiers,
-    name="pennylane-catalyst",
+    name="PennyLane-Catalyst",
     provides=["catalyst"],
     version=version,
     python_requires=">=3.9",

@@ -289,5 +289,13 @@ def test_qctrl_no_end_circuit_measurements(backend):
         qjit(circuit)(0.1)
 
 
+def test_control_outside_qjit():
+    """Test that the Catalyst control function can be used without jitting."""
+
+    assert C_ctrl(
+        qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3
+    ) == PL_ctrl(qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

@@ -59,9 +59,10 @@
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
 
 * Qjitted functions now support asynchronuous execution of QNodes. Simply use ``qjit(async_qnodes=True)`` to
-  enable the async execution of QNodes. It is useful for finite differences and parameter-shift, as those
-  differentiation methods can generate multiple circuit. Support for the async MLIR dialect was added.
+  enable the async execution of QNodes. It is useful for finite differences as it generates multiple circuits.
+  Support for the async MLIR dialect was added.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
+  [(#424)](https://github.com/PennyLaneAI/catalyst/pull/424)
 
   In this example below, the first and second circuit are executed in parrallel if two threads are available.
   To see a speed up in your code, you should use circuits with more gates and/or more qubits.
@@ -151,6 +152,10 @@
   extract classical from a QNode function. It also adds a verification step that will raise an error
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
+
+* Resolve a bug with printing multiple strings from multiple functions with `debug.print` by introducing
+  a NULL terminator to traced strings.
+  [(#418)](https://github.com/PennyLaneAI/catalyst/pull/418)
 
 <h3>Contributors</h3>
 
