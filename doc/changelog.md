@@ -166,9 +166,8 @@
   >>> sum(jnp.array([1, 1]))  # No need to recompile.
   ```
 
-  Note that support for dynamic arrays in control-flow primitives (such as loops)
-  is not yet supported.
-
+  Note that support for dynamic arrays in control-flow primitives (such as loops),
+  as well as the ability to index dynamic arrays, is not yet supported.
 
 * A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
   with a lowering to a global folded circuit.
