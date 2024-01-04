@@ -70,13 +70,14 @@ def test_multiple_measurements(params):
 
 @pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
 def test_single_measurement_control_flow(params):
-    """Test that without noise the same results are returned for single measurement and with control flow."""
+    """Test that without noise the same results are returned for single measurement and with
+    control flow."""
     dev = qml.device("lightning.qubit", wires=2)
 
     @qml.qnode(device=dev)
     def circuit(x, n):
         @catalyst.for_loop(0, n, 1)
-        def loop_0(i):
+        def loop_0(i):  # pylint: disable=unused-argument
             qml.RX(x, wires=0)
 
         loop_0()
@@ -88,7 +89,7 @@ def test_single_measurement_control_flow(params):
         qml.Hadamard(wires=1)
 
         @catalyst.for_loop(0, n, 1)
-        def loop_1(i):
+        def loop_1(i):  # pylint: disable=unused-argument
             qml.RX(x, wires=0)
 
         loop_1()
@@ -105,7 +106,6 @@ def test_single_measurement_control_flow(params):
 
 def test_not_qnode_error():
     """Test that when applied not on a QNode the transform raises an error."""
-    dev = qml.device("lightning.qubit", wires=2)
 
     def circuit(x):
         return jax.numpy.sin(x)
@@ -116,6 +116,56 @@ def test_not_qnode_error():
 
     with pytest.raises(TypeError, match="A QNode is expected, got the classical function"):
         mitigated_function(0.1)
+
+
+def test_dtype_error():
+    """Test that an error is raised when multiple results do not have the same dtype."""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit(x):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0)), 1
+
+    @catalyst.qjit
+    def mitigated_qnode(args):
+        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(
+            args
+        )
+
+    with pytest.raises(
+        TypeError, match="Dtypes of expectation values and classical classical values must match"
+    ):
+        mitigated_qnode(0.1)
+
+
+def test_shape_error():
+    """Test that an error is raised when results have shape."""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit(x):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.probs(wires=0)
+
+    @catalyst.qjit
+    def mitigated_qnode(args):
+        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(
+            args
+        )
+
+    with pytest.raises(
+        TypeError, match="Only expectations values and classical scalar values can be returned"
+    ):
+        mitigated_qnode(0.1)
 
 
 if __name__ == "__main__":
