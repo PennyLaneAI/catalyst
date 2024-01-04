@@ -921,40 +921,73 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
 
 class Zne:
-    """An"""
+    """An object that specifies how a circuit is mitigated with ZNE.
 
-    def __init__(self, fn: Callable, scalar_factors: jax.numpy.ndarray, deg: int):
+    Args:
+        fn (Callable): the circuit to be mitigated with ZNE.
+        scale_factors (array[int]): the range of noise scale factors used.
+        deg (int): the degree of the polymonial used for fitting.
+
+    Raises:
+        TypeError: Non-QNode object was passed as `fn`.
+    """
+
+    def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
+        if not isinstance(fn, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {self.fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
-        self.scalar_factors = scalar_factors
+        self.scale_factors = scale_factors
         self.deg = deg
 
     def __call__(self, *args, **kwargs):
-        """Specifies that an actual call to the differentiated function."""
-        if EvaluationContext.is_tracing():
-            jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
-            args_data, _ = tree_flatten(args)
+        """Specifies the an actual call to the folded circuit."""
+        jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
+        shapes = [out_val.shape for out_val in jaxpr.out_avals]
+        dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
+        if any(shapes):
+            raise TypeError("Only expectations values and classical scalar values can be returned.")
+        if len(set(dtypes)) != 1:
+            raise TypeError(
+                "Dtypes of expectation values and classical classical values must match."
+            )
+        args_data, _ = tree_flatten(args)
+        results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
+        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
+        results = jax.numpy.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        # Single measurement
+        if results.shape == ():
+            return results
+        # Multiple measurements
+        return tuple(res for res in results)
 
-            # It always returns list as required by catalyst control-flows
-            results = zne_p.bind(*args_data, self.scalar_factors, jaxpr=jaxpr, fn=self.fn)
-        # raise ... else:
 
-        return jax.numpy.polyfit(jnp.array(self.scalar_factors, dtype=float), results[0], self.deg)[
-            0
-        ]
+def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
+    """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise extrapolation.
 
-
-def mitigate_with_zne(f, *, scalar_factors=None, deg=None):
-    """A :func:`~.qjit` compatible ZNE.
+    Error mitigation is a precursor to error correction and is compatible with near-term quantum
+    devices. It aims to lower the impact of noise when evaluating a circuit on a quantum device by
+    evaluating multiple variations of the circuit and post-processing the results into a
+    noise-reduced estimate. This transform implements the zero-noise extrapolation (ZNE) method
+    originally introduced by
+    `Temme et al. <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.119.180509>`__ and
+    `Li et al. <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.7.021050>`__.
 
     Args:
+        f (qml.QNode): the circuit to be mitigated.
+        scale_factors (array[int]): the range of noise scale factors used.
+        deg (int): the degree of the polymonial used for fitting.
 
     Returns:
+        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode` for the given
+                  arguments.
 
-    Raises:
+    **Example:**
 
     """
-    return Zne(f, scalar_factors, deg)
+    if deg is None:
+        deg = len(scale_factors) - 1
+    return Zne(f, scale_factors, deg)
 
 
 def _aval_to_primitive_type(aval):

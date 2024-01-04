@@ -34,7 +34,7 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     %12 = quantum.insert %r[ 0], %q_3 : !quantum.reg, !quantum.bit
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
-    quantum.dealloc %r : !quantum.reg
+    quantum.dealloc %12 : !quantum.reg
     quantum.device_release
     func.return %expval : f64
 }
@@ -73,9 +73,10 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
     // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
     // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
     // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
-    // CHECK:    [[q_4:%.+]] = quantum.namedobs [[q_3]][ PauliX] : !quantum.obs
-    // CHECK:    [[resulst:%.+]] = quantum.expval [[q_4]] : f64
-    // CHECK:    quantum.dealloc %arg1 : !quantum.reg
+    // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
+    // CHECK:    [[q_5:%.+]] = quantum.namedobs [[q_3]][ PauliX] : !quantum.obs
+    // CHECK:    [[resulst:%.+]] = quantum.expval [[q_5]] : f64
+    // CHECK:    quantum.dealloc [[q_4]] : !quantum.reg
     // CHECK:    return [[resulst]] : f64
 
 // CHECK:    func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {

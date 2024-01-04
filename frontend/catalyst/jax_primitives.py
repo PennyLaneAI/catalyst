@@ -503,17 +503,25 @@ def _zne_def_impl(ctx, *args, jaxpr, fn):  # pragma: no cover
 
 
 @zne_p.def_abstract_eval
-def _zne_abstract_eval(*args, jaxpr, fn):
-    return [core.ShapedArray(args[-1].shape, jaxpr.out_avals[0].dtype)]
-    # return jaxpr.out_avals * args[-1].shape[0]
+def _zne_abstract_eval(*args, jaxpr, fn):  # pylint: disable=unused-argument
+    shape = list(args[-1].shape)
+    if len(jaxpr.out_avals) > 1:
+        shape.append(len(jaxpr.out_avals))
+    return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
 
 
 def _zne_lowering(ctx, *args, jaxpr, fn):
+    """Lowering function to the ZNE opearation.
+    Args:
+        ctx: the MLIR context
+        args: the arguments with scale factors as last
+        jaxpr: the jaxpr representation of the circuit
+        fn: the function to be mitigated
+    """
     _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
     symbol_name = mlir_fn_cache[fn]
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-
     return ZneOp(
         flat_output_types,
         ir.FlatSymbolRefAttr.get(symbol_name),

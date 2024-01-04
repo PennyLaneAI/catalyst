@@ -50,6 +50,8 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
         getOrInsertFoldedCircuit(loc, rewriter, op, scalarFactorType.getElementType());
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
+
+    // TODO: update
     RankedTensorType resultType = op.getResultTypes().front().cast<RankedTensorType>();
 
     // Loop over the scalars to create a folded circuit per factor
@@ -72,19 +74,63 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                         builder.create<index::CastSOp>(loc, builder.getIndexType(), scalarFactor);
                     newArgs.push_back(scalarFactorCasted);
 
-                    Value resultValue =
-                        builder.create<func::CallOp>(loc, foldedCircuit, newArgs).getResult(0);
+                    func::CallOp callOp = builder.create<func::CallOp>(loc, foldedCircuit, newArgs);
+                    int64_t numResults = callOp.getNumResults();
 
-                    Value resultExtracted;
-                    if (isa<RankedTensorType>(resultValue.getType())) {
-                        resultExtracted = builder.create<tensor::ExtractOp>(loc, resultValue);
+                    if (numResults == 1) {
+                        // Single measurement
+                        Value resultValue = callOp.getResult(0);
+                        Value resultExtracted;
+                        if (isa<RankedTensorType>(resultValue.getType())) {
+                            resultExtracted = builder.create<tensor::ExtractOp>(loc, resultValue);
+                        }
+                        else {
+                            resultExtracted = resultValue;
+                        }
+                        Value resultInserted = builder.create<tensor::InsertOp>(
+                            loc, resultExtracted, iterArgs.front(), index);
+                        builder.create<scf::YieldOp>(loc, resultInserted);
                     }
                     else {
-                        resultExtracted = resultValue;
+                        // Multiple measurements
+                        ValueRange resultValuesMulti = callOp.getResults();
+                        SmallVector<Value> vectorResults;
+                        // Create a tensor
+                        for (Value resultValue : resultValuesMulti) {
+                            Value resultExtracted;
+                            if (isa<RankedTensorType>(resultValue.getType())) {
+                                resultExtracted =
+                                    builder.create<tensor::ExtractOp>(loc, resultValue);
+                            }
+                            else {
+                                resultExtracted = resultValue;
+                            }
+                            vectorResults.push_back(resultExtracted);
+                        }
+                        SmallVector<int64_t> resShape = {numResults};
+                        Type type = RankedTensorType::get(resShape, vectorResults[0].getType());
+                        auto tensorResults =
+                            builder.create<tensor::FromElementsOp>(loc, type, vectorResults);
+                        Value sizeResultsValue =
+                            rewriter.create<index::ConstantOp>(loc, numResults);
+                        Value resultValuesFor =
+                            rewriter
+                                .create<scf::ForOp>(
+                                    loc, c0, sizeResultsValue, c1,
+                                    /*iterArgsInit=*/iterArgs.front(),
+                                    [&](OpBuilder &builder, Location loc, Value j,
+                                        ValueRange iterArgsIn) {
+                                        Value resultExtracted = builder.create<tensor::ExtractOp>(
+                                            loc, tensorResults, j);
+                                        SmallVector<Value> indices = {i, j};
+                                        Value resultInserted = builder.create<tensor::InsertOp>(
+                                            loc, resultExtracted, iterArgsIn.front(), indices);
+
+                                        builder.create<scf::YieldOp>(loc, resultInserted);
+                                    })
+                                .getResult(0);
+                        builder.create<scf::YieldOp>(loc, resultValuesFor);
                     }
-                    Value resultInserted = builder.create<tensor::InsertOp>(
-                        loc, resultExtracted, iterArgs.front(), index);
-                    builder.create<scf::YieldOp>(loc, resultInserted);
                 })
             .getResult(0);
     // Replace the original results
@@ -282,9 +328,9 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
     rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
 
     Operation *lastOp;
-    fnWithoutMeasurementsOp.walk([&](quantum::InsertOp insertOp) { lastOp = insertOp; });
+    fnWithoutMeasurementsOp.walk([&](quantum::DeallocOp deallocOp) { lastOp = deallocOp; });
     fnWithoutMeasurementsOp.walk(
-        [&](func::ReturnOp returnOp) { returnOp->setOperands(lastOp->getResult(0)); });
+        [&](func::ReturnOp returnOp) { returnOp->setOperands(lastOp->getOperands()); });
 
     quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
     rewriter.eraseOp(localDealloc);
