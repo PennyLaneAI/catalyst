@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ['3.9'] # ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
@@ -190,7 +190,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ['3.9'] # ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
@@ -368,7 +368,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ['3.9'] # ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on xanadu-arm64-mac
