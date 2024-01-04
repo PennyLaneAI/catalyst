@@ -987,6 +987,34 @@ def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
 
     **Example:**
 
+    In this example "noisy.device" must be replaced by a valid noisy device (e.g. HW accessed
+    from Amazon braket).
+
+    .. code-block:: python
+
+        dev = qml.device("noisy.device", wires=2)
+
+        @qml.qnode(device=dev)
+        def circuit(x, n):
+            @catalyst.for_loop(0, n, 1)
+            def loop_rx(i):
+                qml.RX(x, wires=0)
+
+            loop_rx()
+
+            qml.Hadamard(wires=0)
+            qml.RZ(x, wires=0)
+            loop_rx()
+            qml.RZ(x, wires=0)
+            qml.CNOT(wires=[1, 0])
+            qml.Hadamard(wires=1)
+            return qml.expval(qml.PauliY(wires=0))
+
+        @catalyst.qjit
+        def mitigated_circuit(args, n):
+            return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
+                args, n
+            )
     """
     if deg is None:
         deg = len(scale_factors) - 1

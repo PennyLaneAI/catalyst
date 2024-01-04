@@ -5,9 +5,13 @@
 * Error mitigation using the zero-noise extrapolation method is now available through the
   `catalyst.mitigate_with_zne` transform.
 
-  TODO: meaningful example
+  Here is an example of how to use the transform on a noisy device. (Currently the only
+  access to hardware is through Amazon Braket). In this example "noisy.device" must be 
+  replaced by a valid noisy device (e.g. HW accessed from Amazon braket).
+
   ```python
-  dev = qml.device("lightning.qubit", wires=2)
+  # noisy.device must be replaced
+  dev = qml.device("noisy.device", wires=2)
 
   @qml.qnode(device=dev)
   def circuit(x, n):
@@ -25,7 +29,7 @@
       qml.Hadamard(wires=1)
       return qml.expval(qml.PauliY(wires=0))
 
-  @catalyst.qjit(keep_intermediate=True)
+  @catalyst.qjit
   def mitigated_circuit(args, n):
       return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
           args, n
