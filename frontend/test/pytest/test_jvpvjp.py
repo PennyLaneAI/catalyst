@@ -577,5 +577,59 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
     assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
 
 
+def test_jvp_invalid_tangent_type_var():
+    """Test that jvp rejects integer tangents (variable)"""
+
+    def fun(x):
+        return 2 * x, x * x
+
+    def workflow(x: float, y: int):
+        return C_jvp(fun, (x,), (y,))
+
+    with pytest.raises(ValueError, match="must be floats"):
+        qjit(workflow)(1.0, 1)
+
+
+@pytest.mark.parametrize("val", [(1,), jnp.ones([1], dtype=int)])
+def test_jvp_invalid_tangent_type_const(val):
+    """Test that jvp rejects integer tangents (constants)"""
+
+    def fun(x):
+        return 2 * x, x * x
+
+    def workflow(x: float):
+        return C_jvp(fun, (x,), val)
+
+    with pytest.raises(ValueError, match="must be floats"):
+        qjit(workflow)(1.0)
+
+
+def test_vjp_invalid_cotangent_type_var():
+    """Test that vjp rejects integer cotangents (variables)"""
+
+    def fun(x):
+        return 2 * x, x * x
+
+    def workflow(x: float, y: jax.core.ShapedArray([2], int)):
+        return C_vjp(fun, (x,), y)
+
+    with pytest.raises(ValueError, match="must be floats"):
+        qjit(workflow)(1.0, jnp.array([1, 2]))
+
+
+@pytest.mark.parametrize("val", [(1, 2), jnp.ones([2], dtype=int)])
+def test_vjp_invalid_cotangent_type_const(val):
+    """Test that vjp rejects integer cotangents (constants)"""
+
+    def fun(x):
+        return 2 * x, x * x
+
+    def workflow(x: float):
+        return C_vjp(fun, (x,), val)
+
+    with pytest.raises(ValueError, match="must be floats"):
+        qjit(workflow)(1.0)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

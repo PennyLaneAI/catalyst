@@ -84,6 +84,7 @@ from catalyst.utils.jax_extras import (
     get_implicit_and_explicit_flat_args,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
+    issubdtype,
     new_inner_tracer,
     unzip2,
 )
@@ -105,6 +106,26 @@ def _check_no_measurements(tape: QuantumTape) -> None:
         else:
             if isinstance(op, MidCircuitMeasure):
                 raise ValueError(msg)
+
+
+def _check_is_iterable(x: Any, hint: str) -> None:
+    """Check that input is iterable."""
+    if not isinstance(x, Iterable):
+        raise ValueError(f"{hint} argument must be an iterable, not {type(x)}")
+
+
+def _check_contains_floats(x: Any, hint: str) -> None:
+    """Check that ``x`` is PyTree-compatible structure containing ``float`` leaves"""
+    x_flat, _ = tree_flatten(x)
+    for item in x_flat:
+        if hasattr(item, "dtype"):
+            if not issubdtype(item.dtype, float):
+                raise ValueError(f"{hint} items must be floats, {item.dtype} seen")
+        elif hasattr(item, "aval"):
+            if not issubdtype(item.aval.dtype, float):
+                raise ValueError(f"{hint} items must be floats, {item.dtype} seen")
+        elif not isinstance(item, float):
+            raise ValueError(f"{hint} items must be floats, {item} is {type(item)}")
 
 
 class QFunc:
@@ -823,12 +844,9 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     [array(0.78766064), array(-0.7011436)]
     """
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-
-    check_is_iterable(params, "params")
-    check_is_iterable(tangents, "tangents")
+    _check_is_iterable(params, "jvp 'params'")
+    _check_is_iterable(tangents, "jvp 'tangents'")
+    _check_contains_floats(tangents, "jvp 'tangents'")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -889,12 +907,9 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     array([-0.43750208,  0.07000001])]
     """
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-
-    check_is_iterable(params, "params")
-    check_is_iterable(cotangents, "cotangents")
+    _check_is_iterable(params, "vjp 'params'")
+    _check_is_iterable(cotangents, "vjp 'cotangents'")
+    _check_contains_floats(cotangents, "jvp 'cotangents'")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
