@@ -47,6 +47,8 @@
 * Just-in-time compiled functions now support asynchronuous execution of QNodes.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+  [(#420)](https://github.com/PennyLaneAI/catalyst/pull/420)
+  [(#424)](https://github.com/PennyLaneAI/catalyst/pull/424)
   [(#433)](https://github.com/PennyLaneAI/catalyst/pull/433)
 
   Simply specify `async_qnodes=True` when using the `@qjit` decorator to enable the async
@@ -172,9 +174,47 @@
   Note that support for dynamic arrays in control-flow primitives (such as loops),
   as well as the ability to index dynamic arrays, is not yet supported.
 
-* A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
-  with a lowering to a global folded circuit.
+* Error mitigation using the zero-noise extrapolation method is now available through the
+  `catalyst.mitigate_with_zne` transform.
   [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
+  [(#414)](https://github.com/PennyLaneAI/catalyst/pull/414)
+
+  For example, given a noisy device (such as noisy hardware available through Amazon Braket):
+
+  ```python
+  dev = qml.device("noisy.device", wires=2)
+
+  @qml.qnode(device=dev)
+  def circuit(x, n):
+
+      @for_loop(0, n, 1)
+      def loop_rx(i):
+          qml.RX(x, wires=0)
+
+      loop_rx()
+
+      qml.Hadamard(wires=0)
+      qml.RZ(x, wires=0)
+      loop_rx()
+      qml.RZ(x, wires=0)
+      qml.CNOT(wires=[1, 0])
+      qml.Hadamard(wires=1)
+      return qml.expval(qml.PauliY(wires=0))
+
+  @qjit
+  def mitigated_circuit(args, n):
+      s = jax.numpy.array([1, 2, 3])
+      return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+  ```
+
+  ```pycon
+  >>> mitigated_circuit(0.2, 5)
+  0.5655341100116512
+  ```
+
+  In addition, a mitigation dialect has been added to the MLIR layer of Catalyst.
+  It contains a Zero Noise Extrapolation (ZNE) operation,
+  with a lowering to a global folded circuit.
 
 <h3>Improvements</h3>
 

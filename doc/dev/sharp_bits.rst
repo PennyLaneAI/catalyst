@@ -960,22 +960,7 @@ in Python with PennyLane, and easily scale up prototypes by simply adding ``@qji
 This will require that all PennyLane functionality behaves identically whether or not
 the ``@qjit`` decorator is applied.
 
-Currently, however, this is not the case in two places.
-
-- **Finite-shot measurement statistics**. The Catalyst-Lightning runtime does not
-  at the moment have support for finite-shot measurement statistics. As a result,
-  measurement statistics will always be exact within a ``@qjit``, even when Lightning
-  is configured with finite-shots.
-
-  >>> dev = qml.device("lightning.qubit", wires=1, shots=10)
-  ... @qml.qnode(dev)
-  ... def circuit(x):
-  ...     qml.RX(x, wires=0)
-  ...     return qml.expval(qml.PauliZ(0))
-  >>> circuit(0.4)
-  array(0.8)
-  >>> qjit(circuit)(0.4)
-  array(0.92106099)
+Currently, however, this is not the case for measurements.
 
 - **Measurement behaviour**. :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
