@@ -497,7 +497,7 @@ class TestPyTreesFuncArgs:
             for wire in wires:
                 qml.PauliX(wire)
 
-        dev = qml.device("lightning.qubit", wires=3)
+        dev = qml.device(backend, wires=3)
 
         @qjit
         @qml.qnode(dev)
