@@ -308,9 +308,12 @@ jobs:
 
     - name: Test Catalyst-Runtime
       env:
+        PYTHONPATH: ${{
         VENV_LOCATION: ${{ steps.setup_python_venv.outputs.venv_name }}
       run: |
         source "$VENV_LOCATION/bin/activate"
+        export PYTHONPATH="$VENV_LOCATION/lib/python${{ matrix.python_version }}/site-packages:$PYTHONPATH"
+        
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
