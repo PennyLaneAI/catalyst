@@ -76,9 +76,11 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                     func::CallOp callOp = builder.create<func::CallOp>(loc, foldedCircuit, newArgs);
                     int64_t numResults = callOp.getNumResults();
 
-                    if (numResults == 1) {
-                        // Single measurement
-                        Value resultValue = callOp.getResult(0);
+                    // Measurements
+                    ValueRange resultValuesMulti = callOp.getResults();
+                    SmallVector<Value> vectorResultsMulti;
+                    // Create a tensor
+                    for (Value resultValue : resultValuesMulti) {
                         Value resultExtracted;
                         if (isa<RankedTensorType>(resultValue.getType())) {
                             resultExtracted = builder.create<tensor::ExtractOp>(loc, resultValue);
@@ -86,51 +88,36 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                         else {
                             resultExtracted = resultValue;
                         }
-                        Value resultInserted = builder.create<tensor::InsertOp>(
-                            loc, resultExtracted, iterArgs.front(), index);
-                        builder.create<scf::YieldOp>(loc, resultInserted);
+                        vectorResultsMulti.push_back(resultExtracted);
                     }
-                    else {
-                        // Multiple measurements
-                        ValueRange resultValuesMulti = callOp.getResults();
-                        SmallVector<Value> vectorResultsMulti;
-                        // Create a tensor
-                        for (Value resultValue : resultValuesMulti) {
-                            Value resultExtracted;
-                            if (isa<RankedTensorType>(resultValue.getType())) {
-                                resultExtracted =
-                                    builder.create<tensor::ExtractOp>(loc, resultValue);
-                            }
-                            else {
-                                resultExtracted = resultValue;
-                            }
-                            vectorResultsMulti.push_back(resultExtracted);
-                        }
-                        SmallVector<int64_t> resShape = {numResults};
-                        Type type =
-                            RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
-                        auto tensorResults =
-                            builder.create<tensor::FromElementsOp>(loc, type, vectorResultsMulti);
-                        Value sizeResultsValue =
-                            rewriter.create<index::ConstantOp>(loc, numResults);
-                        Value resultValuesFor =
-                            rewriter
-                                .create<scf::ForOp>(
-                                    loc, c0, sizeResultsValue, c1,
-                                    /*iterArgsInit=*/iterArgs.front(),
-                                    [&](OpBuilder &builder, Location loc, Value j,
-                                        ValueRange iterArgsIn) {
-                                        Value resultExtracted = builder.create<tensor::ExtractOp>(
-                                            loc, tensorResults, j);
-                                        SmallVector<Value> indices = {i, j};
-                                        Value resultInserted = builder.create<tensor::InsertOp>(
-                                            loc, resultExtracted, iterArgsIn.front(), indices);
+                    SmallVector<int64_t> resShape = {numResults};
+                    Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
+                    auto tensorResults =
+                        builder.create<tensor::FromElementsOp>(loc, type, vectorResultsMulti);
+                    Value sizeResultsValue = rewriter.create<index::ConstantOp>(loc, numResults);
+                    Value resultValuesFor =
+                        rewriter
+                            .create<scf::ForOp>(
+                                loc, c0, sizeResultsValue, c1,
+                                /*iterArgsInit=*/iterArgs.front(),
+                                [&](OpBuilder &builder, Location loc, Value j,
+                                    ValueRange iterArgsIn) {
+                                    Value resultExtracted =
+                                        builder.create<tensor::ExtractOp>(loc, tensorResults, j);
+                                    SmallVector<Value> indices;
+                                    if (numResults == 1) {
+                                        indices = {i};
+                                    }
+                                    else {
+                                        indices = {i, j};
+                                    }
+                                    Value resultInserted = builder.create<tensor::InsertOp>(
+                                        loc, resultExtracted, iterArgsIn.front(), indices);
 
-                                        builder.create<scf::YieldOp>(loc, resultInserted);
-                                    })
-                                .getResult(0);
-                        builder.create<scf::YieldOp>(loc, resultValuesFor);
-                    }
+                                    builder.create<scf::YieldOp>(loc, resultInserted);
+                                })
+                            .getResult(0);
+                    builder.create<scf::YieldOp>(loc, resultValuesFor);
                 })
             .getResult(0);
     // Replace the original results

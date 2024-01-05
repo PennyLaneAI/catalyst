@@ -922,7 +922,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return results
 
 
-class Zne:
+class ZNE:
     """An object that specifies how a circuit is mitigated with ZNE.
 
     Args:
@@ -947,11 +947,12 @@ class Zne:
         jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
         shapes = [out_val.shape for out_val in jaxpr.out_avals]
         dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
+        set_dtypes = set(dtypes)
         if any(shapes):
             raise TypeError("Only expectations values and classical scalar values can be returned.")
-        if len(set(dtypes)) != 1:
+        if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
             raise TypeError(
-                "Dtypes of expectation values and classical classical values must match."
+                "Dtypes of expectation values and classical classical values must match and be float."
             )
         args_data, _ = tree_flatten(args)
         results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
@@ -1018,7 +1019,7 @@ def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
     """
     if deg is None:
         deg = len(scale_factors) - 1
-    return Zne(f, scale_factors, deg)
+    return ZNE(f, scale_factors, deg)
 
 
 def _aval_to_primitive_type(aval):
