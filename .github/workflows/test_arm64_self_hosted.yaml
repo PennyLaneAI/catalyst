@@ -308,7 +308,6 @@ jobs:
 
     - name: Test Catalyst-Runtime
       env:
-        PYTHONPATH: ${{
         VENV_LOCATION: ${{ steps.setup_python_venv.outputs.venv_name }}
       run: |
         source "$VENV_LOCATION/bin/activate"
