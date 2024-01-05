@@ -358,16 +358,6 @@ jobs:
         path: dist/
         retention-days: 14
 
-    - name: Cleanup
-      if: always()
-      run: |
-        rm -rf ${{ steps.setup_python_venv.outputs.venv_name }}
-        rm -rf *
-        rm -rf .git
-        rm -rf .gitignore
-        rm -rf .github
-        pip cache purge
-
   test-wheels:
     needs: [constants, catalyst-macos-wheels-arm64]
     strategy:
@@ -435,6 +425,6 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n 0
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n 0
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n 0
