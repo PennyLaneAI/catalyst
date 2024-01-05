@@ -344,7 +344,7 @@ circuit, are measuring an expectation value, and are optimizing the result:
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
 
-Let's switch over to [Lightning](https://docs.pennylane.ai/projects/lightning/en/stable/), our high-performance statevector simulator,
+Let's switch over to `Lightning <https://docs.pennylane.ai/projects/lightning/en/stable/>`_, our high-performance statevector simulator,
 alongside the adjoint differentiation method. To do so, we change the first
 two lines of the above code-block to set the device as ``"lightning.qubit"``,
 and specify ``diff_method="adjoint"`` in the QNode decorator. With this
