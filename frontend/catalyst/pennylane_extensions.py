@@ -981,8 +981,8 @@ def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
         deg (int): the degree of the polymonial used for fitting.
 
     Returns:
-        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
-                  for the given arguments.
+        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode` 
+        for the given arguments.
 
     **Example:**
 
