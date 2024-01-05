@@ -114,7 +114,7 @@ LLVM::LLVMFunctionType convertFunctionTypeCatalystWrapper(PatternRewriter &rewri
         inputType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), inputType);
     }
     if (inputType.isa<LLVM::LLVMStructType>()) {
-        inputType = LLVM::LLVMPointerType::get(inputType);
+        inputType = LLVM::LLVMPointerType::get(rewriter.getContext());
     }
     transformedInputs.push_back(inputType);
 
@@ -154,7 +154,8 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 
     if (hasInputs) {
         Value arg = wrapperFuncOp.getArgument(1);
-        Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, arg);
+        auto argType = wrapperFuncType.getParamType(1);
+        Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, argType, arg);
 
         for (size_t idx = 0; idx < params.size(); idx++) {
             Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, idx);

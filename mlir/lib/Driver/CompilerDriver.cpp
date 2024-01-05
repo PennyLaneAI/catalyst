@@ -18,7 +18,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "gml_st/transforms/passes.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -399,7 +398,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     initialized |= true;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
-    gml_st::registerGmlStPasses();
 
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -67,7 +67,7 @@ LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options
     TargetOptions opt;
     auto targetMachine =
         target->createTargetMachine(targetTriple, cpu, features, opt, Reloc::Model::PIC_);
-    targetMachine->setOptLevel(CodeGenOpt::None);
+    targetMachine->setOptLevel(CodeGenOptLevel::None);
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetTriple);
 
@@ -80,7 +80,7 @@ LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options
     }
 
     legacy::PassManager pm;
-    if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CGFT_ObjectFile)) {
+    if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CodeGenFileType::ObjectFile)) {
         CO_MSG(options, Verbosity::Urgent, "TargetMachine can't emit an .o file\n");
         return failure();
     }
