@@ -7,8 +7,8 @@
   functionality.
 
   Through the use of the `qml.qjit` decorator, entire workflows can be JIT
-  compiled — including both quantum and classical processing — down to a machine binary on
-  first-function execution. Subsequent calls to the compiled function will execute
+  compiled down to a machine binary on first-function execution, including both quantum
+  and classical processing. Subsequent calls to the compiled function will execute
   the previously-compiled binary, resulting in significant performance improvements.
 
   ```python
@@ -46,6 +46,7 @@
 * Just-in-time compiled functions now support asynchronuous execution of QNodes.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
   [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+  [(#433)](https://github.com/PennyLaneAI/catalyst/pull/433)
 
   Simply specify `async_qnodes=True` when using the `@qjit` decorator to enable the async
   execution of QNodes. Currently, asynchronous execution is only supported by
@@ -123,7 +124,7 @@
   is supported without recompilation.
 
   In addition, standard tensor initialisation functions `jax.numpy.ones`, `jnp.zeros`, and
-  `jnp.empty`, now accept dynamic variables (where the value is only known at
+  `jnp.empty` now accept dynamic variables (where the value is only known at
   runtime). 
 
   ``` python
@@ -139,8 +140,8 @@
    [1. 1. 1.]]
   ```
 
-  When passing tensor arguments to compiled functions as arguments, the
-  `abstracted_axes` keyword argument to the `@qjit` can be used to specify
+  When passing tensors as arguments to compiled functions, the
+  `abstracted_axes` keyword argument to the `@qjit` decorator can be used to specify
   which axes of the input arguments should be treated as abstract (and thus
   avoid recompilation).
 
@@ -231,7 +232,7 @@
   array(-0.51413599)
   ```
 
-* All `lightning.qubit` configuration options are now supported via the `qml.device` loader,
+* New `lightning.qubit` configuration options are now supported via the `qml.device` loader,
   including Markov Chain Monte Carlo sampling support.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
 
@@ -279,14 +280,18 @@
   function calls as well as quantum operations and control flow operations.
   [(#353)](https://github.com/PennyLaneAI/catalyst/pull/353)
 
-* `AllocOp`, `DeallocOp` have now (only) value semantics. In the frontend, the last
-  quantum register is deallocated instead of the first one. This allows to return the quantum
-  register in functions and can be given to another function (useful for quantum transformation).
+* The allocation and deallocation operations in MLIR (`AllocOp`, `DeallocOp`) now follow simple
+  value semantics for qubit register values, instead of modelling memory in the MLIR trait system.
+  Similarly, the frontend generates proper value semantics by deallocating the final register value.
+  
+  The change enables functions at the MLIR level to accept and return quantum register values,
+  which would otherwise not be correctly identified as aliases of existing register values by the
+  bufferization system. 
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
 
 <h3>Breaking changes</h3>
 
-* Third party devices must now specify a configuration TOML file, in order to specify their
+* Third party devices must now provide a configuration TOML file, in order to specify their
   supported operations, measurements, and features for Catalyst compatibility. For more information
   please visit the [Custom Devices](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html) section in our documentation.
   [(#369)](https://github.com/PennyLaneAI/catalyst/pull/369)
@@ -295,13 +300,13 @@
 
 * Resolves a bug in the compiler's differentiation engine that results in a segmentation fault
   when [attempting to differentiate non-differentiable quantum operations](https://github.com/PennyLaneAI/catalyst/issues/384).
-  The fix ensures that all current quantum operation types are removed during gradient passes that
-  extract classical from a QNode function. It also adds a verification step that will raise an error
+  The fix ensures that all existing quantum operation types are removed during gradient passes that
+  extract classical code from a QNode function. It also adds a verification step that will raise an error
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
 
-* Resolves a bug where printing multiple strings from multiple functions with `debug.print` could
-  result in a segfault, the printing garbage values, or accidental printing of adjacent strings.
+* Resolves a bug that caused unpredictable behaviour when printing string values with
+  the `debug.print` function. The issue was caused by non-null-terminated strings.
   [(#418)](https://github.com/PennyLaneAI/catalyst/pull/418)
 
 <h3>Contributors</h3>
