@@ -126,7 +126,7 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
             Value newArg =
-                rewriter.create<LLVM::AllocaOp>(loc, vectorType, LLVM::LLVMPointerType::get(rewriter.getContext()), c1);
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             args.push_back(newArg);
         }

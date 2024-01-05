@@ -233,9 +233,7 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
         SmallVector<Value> operands = {adaptor.getQreg(), index};
 
         Value elemPtr = rewriter.create<LLVM::CallOp>(loc, fnDecl, operands).getResult();
-        Value qubitPtr = rewriter.create<LLVM::BitcastOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), elemPtr);
-        rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, IntegerType::get(ctx, 8), qubitPtr);
+        rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, conv->convertType(QubitType::get(ctx)), elemPtr);
 
         return success();
     }
