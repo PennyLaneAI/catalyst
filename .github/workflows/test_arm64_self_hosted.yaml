@@ -196,7 +196,7 @@ jobs:
     runs-on: xanadu-arm64-mac
 
     env:
-      CPATH: /opt/homebew/include
+      CPATH: /opt/homebrew/include
       LIBRARY_PATH: /opt/homebrew/lib
 
     steps:
@@ -321,6 +321,19 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
+        set -x
+        echo "Github Workspace -> $GITHUB_WORKSPACE"
+        echo "Echoing at gh workspace"
+        pwd
+        ls -ltrh
+        
+        ls -ltrh llvm-build/lib/cmake/mlir
+        ls -ltrh llvm-build/lib/cmake/llvm
+        ls -ltrh mhlo-build/lib/cmake/mlir-hlo
+        
+        set +x
+        
+        
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
