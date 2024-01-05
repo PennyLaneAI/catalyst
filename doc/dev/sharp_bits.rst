@@ -734,6 +734,7 @@ a single RX gate is being applied due to the rotation gate merger:
     ] a
   in (b,) }
 
+Note that currently PennyLane transforms **cannot** be applied when ``autograph=True``.
 
 Function argument restrictions
 ------------------------------

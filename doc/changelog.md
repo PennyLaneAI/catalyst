@@ -56,9 +56,7 @@
   `lightning.qubit` and `lightning.kokkos`.
 
   Asynchronous execution will be most beneficial for just-in-time compiled functions that
-  contain --- or generate --- multiple QNodes. An example of the latter includes computing
-  gradients using the method of finite-differences or the parameter-shift rule, which generates
-  multiple circuits which scale as the number of parameters within circuits increases.
+  contain --- or generate --- multiple QNodes.
 
   For example,
 
