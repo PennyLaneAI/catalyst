@@ -138,7 +138,32 @@ def test_dtype_error():
         )
 
     with pytest.raises(
-        TypeError, match="Dtypes of expectation values and classical classical values must match"
+        TypeError, match="All expectation and classical values dtypes must match and be float."
+    ):
+        mitigated_qnode(0.1)
+
+
+def test_dtype_not_float_error():
+    """Test that an error is raised when results are not float."""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def circuit(x):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return 1
+
+    @catalyst.qjit
+    def mitigated_qnode(args):
+        return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(
+            args
+        )
+
+    with pytest.raises(
+        TypeError, match="All expectation and classical values dtypes must match and be float."
     ):
         mitigated_qnode(0.1)
 

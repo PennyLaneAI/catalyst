@@ -951,9 +951,7 @@ class ZNE:
         if any(shapes):
             raise TypeError("Only expectations values and classical scalar values can be returned.")
         if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
-            raise TypeError(
-                "Dtypes of expectation values and classical classical values must match and be float."
-            )
+            raise TypeError("All expectation and classical values dtypes must match and be float.")
         args_data, _ = tree_flatten(args)
         results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
