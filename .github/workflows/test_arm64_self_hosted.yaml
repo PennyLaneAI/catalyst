@@ -424,7 +424,9 @@ jobs:
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
     - name: Run Python Pytest Tests
+      env:
+        OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n 0
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n 0
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n 0
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
