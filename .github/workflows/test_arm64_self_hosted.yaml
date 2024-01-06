@@ -286,7 +286,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="8101e42" \
+              -DLIGHTNING_GIT_TAG="489cff7" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=OFF \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
@@ -310,20 +310,7 @@ jobs:
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
-      run: |
-        set -x
-        echo "Github Workspace -> $GITHUB_WORKSPACE"
-        echo "Echoing at gh workspace"
-        pwd
-        ls -ltrh
-        
-        ls -ltrh llvm-build/lib/cmake/mlir
-        ls -ltrh llvm-build/lib/cmake/llvm
-        ls -ltrh mhlo-build/lib/cmake/mlir-hlo
-        
-        set +x
-        
-        
+      run: |        
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -411,7 +398,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         # tensorflow-cpu is not distributed for macOS ARM
-        python${{ matrix.python_version }} -m pip install pytest
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
         python${{ matrix.python_version }} -m pip install tensorflow  # for autograph tests
 
     - name: Install Catalyst
@@ -428,6 +415,6 @@ jobs:
         no_proxy: '*'
         OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos"
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
