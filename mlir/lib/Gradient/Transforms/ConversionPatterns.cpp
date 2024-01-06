@@ -125,8 +125,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
-            Value newArg =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
+            Value newArg = rewriter.create<LLVM::AllocaOp>(
+                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             args.push_back(newArg);
         }
@@ -160,8 +160,8 @@ static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, const LLVMTypeConverter *typeConverter, PatternRewriter &rewriter,
-                    Location loc, bool volatileArgs = false)
+void wrapMemRefArgs(func::FuncOp func, const LLVMTypeConverter *typeConverter,
+                    PatternRewriter &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
@@ -292,10 +292,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
-            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
-                moduleOp, getTypeConverter()->getIndexType());
-            LLVM::LLVMFuncOp freeFn =
-                LLVM::lookupOrCreateGenericFreeFn(moduleOp);
+            LLVM::LLVMFuncOp allocFn =
+                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType());
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp);
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with

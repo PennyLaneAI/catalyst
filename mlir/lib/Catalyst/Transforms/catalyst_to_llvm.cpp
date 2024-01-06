@@ -67,9 +67,10 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     auto idx =
         rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(rewriter.getContext(), 64),
                                           rewriter.getIntegerAttr(rewriter.getIndexType(), 0));
-    return rewriter.create<LLVM::GEPOp>(
-        loc, LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(rewriter.getContext(), 8),
-        rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
+    return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+                                        IntegerType::get(rewriter.getContext(), 8),
+                                        rewriter.create<LLVM::AddressOfOp>(loc, glb),
+                                        ArrayRef<Value>({idx, idx}));
 }
 
 enum NumericType : int8_t {
@@ -180,8 +181,8 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     // Memref
     Type voidPtrType = LLVM::LLVMPointerType::get(ctx);
     Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Value memrefPtr =
-        rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()), llvmMemrefType, c1);
+    Value memrefPtr = rewriter.create<LLVM::AllocaOp>(
+        loc, LLVM::LLVMPointerType::get(rewriter.getContext()), llvmMemrefType, c1);
     rewriter.create<LLVM::StoreOp>(loc, memrefLlvm, memrefPtr);
     memrefPtr = rewriter.create<LLVM::BitcastOp>(loc, voidPtrType, memrefPtr);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, memrefPtr, 1);
@@ -249,8 +250,8 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
 
             Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
-            Value structPtr =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
+            Value structPtr = rewriter.create<LLVM::AllocaOp>(
+                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
             rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
 
             Value printDescriptor = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),

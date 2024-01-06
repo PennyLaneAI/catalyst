@@ -131,6 +131,11 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
     bool hasInputs = functionHasInputs(callee);
 
     LLVM::LLVMFunctionType functionType = op.getFunctionType();
+    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    LLVMTypeConverter typeConverter(rewriter.getContext());
+    Type inputType =
+        hasInputs ? typeConverter.packFunctionResults(functionType.getParams()) : ptrType;
+
     LLVM::LLVMFunctionType wrapperFuncType =
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
 
@@ -154,7 +159,7 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 
     if (hasInputs) {
         Value arg = wrapperFuncOp.getArgument(1);
-        auto argType = wrapperFuncType.getParamType(1);
+        auto argType = inputType;
         Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, argType, arg);
 
         for (size_t idx = 0; idx < params.size(); idx++) {

@@ -151,7 +151,6 @@ LogicalResult GradOp::verify()
     return success();
 }
 
-
 MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
 
 //===----------------------------------------------------------------------===//
