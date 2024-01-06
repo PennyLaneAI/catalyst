@@ -68,10 +68,6 @@ TEST_CASE("Test Driver", "[Driver]")
     // check device specs update
     driver->setDeviceRecorderStatus(true);
     CHECK(driver->getDeviceRecorderStatus() == true);
-
-    // try accessing the device pointer before init
-    REQUIRE_THROWS_WITH(driver->getDevice(),
-                        Catch::Contains("Invalid use of the device pointer before initialization"));
 }
 
 TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes)

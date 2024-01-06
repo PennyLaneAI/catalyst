@@ -34,6 +34,7 @@ from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
+from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
     AllocOp,
@@ -41,7 +42,8 @@ from mlir_quantum.dialects.quantum import (
     CountsOp,
     CustomOp,
     DeallocOp,
-    DeviceOp,
+    DeviceInitOp,
+    DeviceReleaseOp,
     ExpvalOp,
     ExtractOp,
     HamiltonianOp,
@@ -163,6 +165,8 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 # Primitives #
 ##############
 
+zne_p = core.Primitive("zne")
+zne_p.multiple_results = True
 qdevice_p = core.Primitive("qdevice")
 qdevice_p.multiple_results = True
 qalloc_p = core.Primitive("qalloc")
@@ -223,7 +227,7 @@ def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
-    const_val = ir.StringAttr.get(string) if string else None
+    const_val = ir.StringAttr.get(string + "\0") if string else None
     return PrintOp(val=val, const_val=const_val, print_descriptor=memref).results
 
 
@@ -489,6 +493,44 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
 
 #
+# zne
+#
+
+
+@zne_p.def_impl
+def _zne_def_impl(ctx, *args, jaxpr, fn):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@zne_p.def_abstract_eval
+def _zne_abstract_eval(*args, jaxpr, fn):  # pylint: disable=unused-argument
+    shape = list(args[-1].shape)
+    if len(jaxpr.out_avals) > 1:
+        shape.append(len(jaxpr.out_avals))
+    return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
+
+
+def _zne_lowering(ctx, *args, jaxpr, fn):
+    """Lowering function to the ZNE opearation.
+    Args:
+        ctx: the MLIR context
+        args: the arguments with scale factors as last
+        jaxpr: the jaxpr representation of the circuit
+        fn: the function to be mitigated
+    """
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    return ZneOp(
+        flat_output_types,
+        ir.FlatSymbolRefAttr.get(symbol_name),
+        mlir.flatten_lowering_ir_args(args[0:-1]),
+        args[-1],
+    ).results
+
+
+#
 # qdevice
 #
 @qdevice_p.def_impl
@@ -505,7 +547,9 @@ def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, rtd_lib, rtd_name, rtd_
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    DeviceOp(ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs))
+    DeviceInitOp(
+        ir.StringAttr.get(rtd_lib), ir.StringAttr.get(rtd_name), ir.StringAttr.get(rtd_kwargs)
+    )
 
     return ()
 
@@ -557,6 +601,7 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
     DeallocOp(qreg)
+    DeviceReleaseOp()  # end of qnode
     return ()
 
 
@@ -1458,6 +1503,7 @@ def _adjoint_lowering(
 # registration
 #
 
+mlir.register_lowering(zne_p, _zne_lowering)
 mlir.register_lowering(qdevice_p, _qdevice_lowering)
 mlir.register_lowering(qalloc_p, _qalloc_lowering)
 mlir.register_lowering(qdealloc_p, _qdealloc_lowering)

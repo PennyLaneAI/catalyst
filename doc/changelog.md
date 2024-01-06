@@ -2,6 +2,50 @@
 
 <h3>New features</h3>
 
+* Error mitigation using the zero-noise extrapolation method is now available through the
+  `catalyst.mitigate_with_zne` transform.
+
+  Here is an example of how to use the transform on a noisy device. (Currently the only
+  access to hardware is through Amazon Braket). In this example "noisy.device" must be 
+  replaced by a valid noisy device (e.g. HW accessed from Amazon braket).
+
+  ```python
+  # noisy.device must be replaced
+  dev = qml.device("noisy.device", wires=2)
+
+  @qml.qnode(device=dev)
+  def circuit(x, n):
+      @catalyst.for_loop(0, n, 1)
+      def loop_rx(i):
+          qml.RX(x, wires=0)
+
+      loop_rx()
+
+      qml.Hadamard(wires=0)
+      qml.RZ(x, wires=0)
+      loop_rx()
+      qml.RZ(x, wires=0)
+      qml.CNOT(wires=[1, 0])
+      qml.Hadamard(wires=1)
+      return qml.expval(qml.PauliY(wires=0))
+
+  @catalyst.qjit
+  def mitigated_circuit(args, n):
+      return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
+          args, n
+      )
+  ```
+
+  ```pycon
+  >>> mitigated_circuit(0.2, 5)
+  0.5655341100116512
+  ```
+  [(#414)](https://github.com/PennyLaneAI/catalyst/pull/414)
+
+* A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
+  with a lowering to a global folded circuit.
+  [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
+
 * Initial support for transforms. QFunc transforms are supported. QNode transforms have limited
   support. QNode transforms cannot be composed, and transforms are limited to what is currently
   available in PennyLane. This means that operations defined in Catalyst like `cond`, `for_loop`,
@@ -45,6 +89,57 @@
 * Add support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
   for `lightning.qubit` and `lightning.kokkos` devices.
   [(#392)](https://github.com/PennyLaneAI/catalyst/pull/392)
+  [(#410)](https://github.com/PennyLaneAI/catalyst/pull/410)
+
+* The runtime now supports multiple active devices managed via a device pool.
+  The new `RTDevice` data-class and `RTDeviceStatus` along with the `thread_local`
+  device instance pointer enable the runtime to better scope the lifetime of device
+  instances concurrently. With these changes, one can create multiple active devices
+  and execute multiple programs in a multithreaded environment.
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+
+* Qjitted functions now support asynchronuous execution of QNodes. Simply use ``qjit(async_qnodes=True)`` to
+  enable the async execution of QNodes. It is useful for finite differences as it generates multiple circuits.
+  Support for the async MLIR dialect was added.
+  [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
+  [(#424)](https://github.com/PennyLaneAI/catalyst/pull/424)
+  [(#420)](https://github.com/PennyLaneAI/catalyst/pull/420)
+
+  In this example below, the first and second circuit are executed in parrallel if two threads are available.
+  To see a speed up in your code, you should use circuits with more gates and/or more qubits.
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit(async_qnodes=True)
+  def multiple_qnodes(params):
+      @qml.qnode(device=dev)
+      def circuit1(params):
+          qml.RX(params[0], wires=0)
+          qml.RY(params[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliZ(wires=0))
+
+      @qml.qnode(device=dev)
+      def circuit2(params):
+          qml.RY(params[0], wires=0)
+          qml.RZ(params[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliX(wires=0))
+
+      @qml.qnode(device=dev)
+      def circuit3(params):
+          qml.RZ(params[0], wires=0)
+          qml.RX(params[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliZ(wires=0))
+
+      new_params = jnp.array([circuit1(params), circuit2(params)])
+      return circuit3(new_params)
+  ```
+  ``` pycon
+  >>> func(jnp.array([1.0, 2.0]))
+  1.0
+  ```
 
 <h3>Improvements</h3>
 
@@ -76,6 +171,13 @@
   `__quantum__rt__device_init(int8_t *, int8_t *, int8_t *)`.
   [(#396)](https://github.com/PennyLaneAI/catalyst/pull/396)
 
+* Add `DeviceReleaseOp` to the Quantum MLIR dialect. This will be lowered to
+  the `__quantum__rt__device_release()` runtime instruction updating the status
+  of the device instance from `Active` to `Inactive`. The runtime will reuse this
+  deactivated instance instead of creating a new one automatically at runtime in a
+  multi-qnode workflow when another device with identical specifications is requested.
+  [(#381)](https://github.com/PennyLaneAI/catalyst/pull/381)
+
 <h3>Breaking changes</h3>
 
 * Third party devices must now specify a configuration toml file.
@@ -91,6 +193,10 @@
   extract classical from a QNode function. It also adds a verification step that will raise an error
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
+
+* Resolve a bug with printing multiple strings from multiple functions with `debug.print` by introducing
+  a NULL terminator to traced strings.
+  [(#418)](https://github.com/PennyLaneAI/catalyst/pull/418)
 
 <h3>Contributors</h3>
 
@@ -325,6 +431,15 @@ Shuli Shu.
         l = jnp.kron(l, l)
     return l
   ```
+
+* Catalyst now supports `jax.numpy.polyfit` inside a qjitted function.
+  [(#367)](https://github.com/PennyLaneAI/catalyst/pull/367/)
+
+* Catalyst now supports custom calls (including the one from HLO). We added support in MLIR (operation, bufferization 
+  and lowering). In the `lib_custom_calls`, developers then implement their custom calls and use external functions 
+  directly (e.g. Lapack). The OpenBlas library is taken from Scipy and linked in Catalyst, therefore any function from 
+  it can be used.
+  [(#367)](https://github.com/PennyLaneAI/catalyst/pull/367/)
 
 <h3>Breaking changes</h3>
 

@@ -83,7 +83,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], jnp.pi)
         assert jnp.allclose(result[1], ip_result)
 
-    def test_return_value_tuples(self, backend):
+    def test_return_value_tuples(self, backend, tol_stochastic):
         """Test tuples."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -133,7 +133,7 @@ class TestPyTreesReturnValues:
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
         assert len(result[1]) == 4
-        assert jnp.allclose(result[2], expected_expval, atol=0.05)
+        assert jnp.allclose(result[2], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
 
         @qjit
         def workflow(x):
@@ -216,7 +216,7 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
-    def test_return_value_dict(self, backend):
+    def test_return_value_dict(self, backend, tol_stochastic):
         """Test dictionaries."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -257,7 +257,9 @@ class TestPyTreesReturnValues:
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
         assert len(result["state"]) == 4
-        assert jnp.allclose(result["expval"]["z0"], expected_expval, atol=0.05)
+        assert jnp.allclose(
+            result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
+        )
 
         @qjit
         def workflow1(param):

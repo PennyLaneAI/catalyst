@@ -133,6 +133,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
 
         rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
         rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
+        rewriter.create<catalyst::quantum::DeviceReleaseOp>(loc);
+
         rewriter.eraseOp(op);
 
         return success();
