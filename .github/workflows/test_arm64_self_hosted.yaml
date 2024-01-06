@@ -425,6 +425,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       env:
+        no_proxy: '*'
         OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
