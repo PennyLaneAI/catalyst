@@ -49,22 +49,17 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
 {
+    auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
         OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
         rewriter.setInsertionPointToStart(mod.getBody());
-        glb = rewriter.create<LLVM::GlobalOp>(
-            loc, LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
-            true, LLVM::Linkage::Internal, key, rewriter.getStringAttr(value));
+        glb = rewriter.create<LLVM::GlobalOp>(loc, type, true, LLVM::Linkage::Internal, key,
+                                              rewriter.getStringAttr(value));
     }
-
-    auto idx =
-        rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(rewriter.getContext(), 64),
-                                          rewriter.getIntegerAttr(rewriter.getIndexType(), 0));
-    auto type = IntegerType::get(rewriter.getContext(), 8);
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                         type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<Value>({idx, idx}));
+                                        ArrayRef<LLVM::GEPArg>{0, 0});
 }
 
 ////////////////////////

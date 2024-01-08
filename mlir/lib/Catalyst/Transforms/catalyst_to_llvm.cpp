@@ -55,22 +55,17 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
 {
+    auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
         OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
         rewriter.setInsertionPointToStart(mod.getBody());
-        glb = rewriter.create<LLVM::GlobalOp>(
-            loc, LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
-            true, LLVM::Linkage::Internal, key, rewriter.getStringAttr(value));
+        glb = rewriter.create<LLVM::GlobalOp>(loc, type, true, LLVM::Linkage::Internal, key,
+                                              rewriter.getStringAttr(value));
     }
-
-    auto idx =
-        rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(rewriter.getContext(), 64),
-                                          rewriter.getIntegerAttr(rewriter.getIndexType(), 0));
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                        IntegerType::get(rewriter.getContext(), 8),
-                                        rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<Value>({idx, idx}));
+                                        type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
+                                        ArrayRef<LLVM::GEPArg>{0, 0});
 }
 
 enum NumericType : int8_t {
