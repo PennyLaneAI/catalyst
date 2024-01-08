@@ -513,7 +513,7 @@ def _gather_shape_rule_dynamic(
     indices_are_sorted,
     mode,
     fill_value,
-): # pragma: no cover
+):  # pragma: no cover
     """Validates the well-formedness of the arguments to Gather. Compared to the original version,
     this implementation skips static shape checks if variable dimensions are used.
 
@@ -523,6 +523,10 @@ def _gather_shape_rule_dynamic(
 
     Copyright 2021 The JAX Authors.
     """
+    # pylint: diable=unused-argument
+    # pylint: diable=too-many-branches
+    # pylint: diable=consider-using-enumerate
+    # pylint: diable=chained-comparison
     offset_dims = dimension_numbers.offset_dims
     collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
     start_index_map = dimension_numbers.start_index_map
