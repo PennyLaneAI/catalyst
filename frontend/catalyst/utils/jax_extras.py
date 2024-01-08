@@ -514,6 +514,15 @@ def _gather_shape_rule_dynamic(
     mode,
     fill_value,
 ):
+    """Validates the well-formedness of the arguments to Gather. Compared to the original version,
+    this implementation skips static shape checks if variable dimensions are used.
+
+    This function has been modified from its original form in the JAX project at
+    https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/lax/slicing.py#L1438
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2021 The JAX Authors.
+    """
     offset_dims = dimension_numbers.offset_dims
     collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
     start_index_map = dimension_numbers.start_index_map
