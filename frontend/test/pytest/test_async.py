@@ -85,5 +85,20 @@ def test_gradient(inp, diff_methods, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+@pytest.mark.xfail()
+def test_exception(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit()
+    def wrapper():
+        return circuit(0)
+
+    with pytest.raises(RuntimeError):
+        wrapper()
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
