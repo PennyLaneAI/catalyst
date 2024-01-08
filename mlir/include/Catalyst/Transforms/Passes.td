@@ -91,4 +91,14 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
 
     let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
+
+def DetectQnodePass : Pass<"detect-qnode"> {
+    let summary = "Detect qnodes";
+
+    let dependentDialects = [
+        "LLVM::LLVMDialect",
+    ];
+
+    let constructor = "catalyst::createDetectQnodePass()";
+}
 #endif // CATALYST_PASSES
