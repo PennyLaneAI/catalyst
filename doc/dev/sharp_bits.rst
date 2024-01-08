@@ -834,11 +834,11 @@ array(0.2)
 Dynamically-shaped arrays
 -------------------------
 
-Catalyst provides experimental support for for compiling functions that accepts
-or contains tensors whose dimensions are not know at compile time, without
+Catalyst provides experimental support for compiling functions that accept
+or contain tensors whose dimensions are not know at compile time, without
 needing to recompile the function when tensor shapes change.
 
-For example, one might consider a case where a dynamic variable specify the shape
+For example, one might consider a case where a dynamic variable specifies the shape
 of a tensor created within (or returned by) the compiled function:
 
 >>> @qjit
