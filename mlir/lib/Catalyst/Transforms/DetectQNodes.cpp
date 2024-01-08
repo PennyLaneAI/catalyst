@@ -35,7 +35,8 @@ bool hasDetectedAttribute(LLVM::LLVMFuncOp funcOp)
 
 void setDetectedAttribute(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
 {
-    rewriter.updateRootInPlace(funcOp, [&] { funcOp->setAttr("catalyst.detected", rewriter.getUnitAttr()); });
+    rewriter.updateRootInPlace(
+        funcOp, [&] { funcOp->setAttr("catalyst.detected", rewriter.getUnitAttr()); });
 }
 
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
@@ -45,18 +46,22 @@ struct DetectQnodeTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult DetectQnodeTransform::match(LLVM::LLVMFuncOp funcOp) const {
-	// Only match with QNodes.
-	// TODO: This should actually be about async.
-	// Right now we use the `qnode` attribute to determine async regions.
-	// But that might not be the case in the future,
-	// So, change this whenever we no longer create async.execute operations based on qnode.
-	bool valid = hasQnodeAttribute(funcOp) && !hasDetectedAttribute(funcOp);
-	return hasQnodeAttribute(funcOp) ? success() : failure();
+LogicalResult DetectQnodeTransform::match(LLVM::LLVMFuncOp funcOp) const
+{
+    // Only match with QNodes.
+    // TODO: This should actually be about async.
+    // Right now we use the `qnode` attribute to determine async regions.
+    // But that might not be the case in the future,
+    // So, change this whenever we no longer create async.execute operations based on qnode.
+    bool valid = hasQnodeAttribute(funcOp) && !hasDetectedAttribute(funcOp);
+    return valid ? success() : failure();
 }
 
-void DetectQnodeTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const {}
-        
+void DetectQnodeTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
+{
+    setDetectedAttribute(op, rewriter);
+}
+
 } // namespace
 
 namespace catalyst {
@@ -67,7 +72,16 @@ namespace catalyst {
 struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
     using DetectQnodePassBase::DetectQnodePassBase;
 
-    void runOnOperation() final {}
+    void runOnOperation() final
+    {
+        MLIRContext *context = &getContext();
+        RewritePatternSet patterns(context);
+        patterns.add<DetectQnodeTransform>(context);
+
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+            signalPassFailure();
+        }
+    }
 };
 
 std::unique_ptr<Pass> createDetectQnodePass() { return std::make_unique<DetectQnodePass>(); }
