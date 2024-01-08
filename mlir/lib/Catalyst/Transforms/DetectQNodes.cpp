@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,7 +24,8 @@ using namespace mlir;
 
 namespace {
 
-const char *transformedAttr = "catalyst.transformed";
+static constexpr llvm::StringRef transformedAttr = "catalyst.transformed";
+static constexpr llvm::StringRef personalityName = "__gxx_personality_v4";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp callOp)
 {
@@ -37,11 +39,15 @@ bool hasTransformedAttribute(LLVM::CallOp callOp)
 
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
 {
-    mlir::Operation *currentOperation = callOp;
-    do {
-        currentOperation = currentOperation->getParentOp();
-    } while (!isa<LLVM::LLVMFuncOp>(currentOperation));
-    return cast<LLVM::LLVMFuncOp>(currentOperation);
+    return callOp->getParentOfType<LLVM::LLVMFuncOp>();
+}
+
+LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    auto i32Ty = IntegerType::get(ctx, 32);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, personalityName, {}, i32Ty, true);
 }
 
 std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
@@ -56,15 +62,6 @@ std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
         callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(caller, calleeAttr);
     }
     return callee;
-}
-
-LLVM::LLVMFuncOp getCalleeUnsafe(LLVM::CallOp callOp)
-{
-    std::optional<LLVM::LLVMFuncOp> optionalCallee = getCalleeSafe(callOp);
-    if (!optionalCallee) {
-        callOp->emitError() << "Couldn't resolve callee for call.";
-    }
-    return optionalCallee.value();
 }
 
 void setTransformedAttribute(LLVM::CallOp callOp, PatternRewriter &rewriter)
@@ -95,6 +92,8 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
 
 void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
+    auto moduleOp = callOp->getParentOfType<ModuleOp>();
+    auto personalityFuncOp = lookupOrCreatePersonality(moduleOp);
     setTransformedAttribute(callOp, rewriter);
 }
 
