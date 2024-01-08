@@ -21,8 +21,10 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import CompileError, cond, for_loop, grad, jacobian, qjit
+from catalyst import cond, for_loop, grad, jacobian, qjit
 from catalyst.pennylane_extensions import DifferentiableCompileError
+
+# pylint: disable=too-many-lines
 
 
 class TestGradShape:
@@ -963,6 +965,38 @@ def test_multiple_grad_invocations(backend):
     expected = jax.jacobian(f, argnums=(0, 1))(0.1, 0.2)
     for actual_entry, expected_entry in zip(actual, expected):
         assert actual_entry == pytest.approx(expected_entry)
+
+
+def test_loop_with_dyn_wires(backend):
+    """Test the gradient on a function with a loop and modular wire arithmetic."""
+    num_wires = 4
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def cat(phi):
+        @for_loop(0, 3, 1)
+        def loop(i):
+            qml.RY(phi, wires=jnp.mod(i, num_wires))
+
+        loop()
+
+        return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
+
+    @qml.qnode(dev)
+    def pl(phi):
+        @for_loop(0, 3, 1)
+        def loop(i):
+            qml.RY(phi, wires=i % num_wires)
+
+        loop()
+
+        return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
+
+    arg = 0.75
+    result = qjit(grad(cat))(arg)
+    expected = qml.grad(pl, argnum=0)(arg)
+
+    assert np.allclose(result, expected)
 
 
 if __name__ == "__main__":
