@@ -513,7 +513,7 @@ def _gather_shape_rule_dynamic(
     indices_are_sorted,
     mode,
     fill_value,
-):
+): # pragma: no cover
     """Validates the well-formedness of the arguments to Gather. Compared to the original version,
     this implementation skips static shape checks if variable dimensions are used.
 
