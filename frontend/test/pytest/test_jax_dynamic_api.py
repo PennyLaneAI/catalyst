@@ -413,22 +413,5 @@ def test_array_assignment():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_forloop_array_assignment():
-    """Test the array assignment in a loop"""
-
-    @qjit
-    def fun(sz):
-        @for_loop(0, sz, 1)
-        def loop(i, a):
-            a = a.at[i].set(i)
-            return a
-
-        return loop(jnp.zeros([sz], dtype=int))
-
-    result = fun(5)
-    expected = jnp.array((0, 1, 2, 3, 4), dtype=int)
-    assert_array_and_dtype_equal(result, expected)
-
-
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

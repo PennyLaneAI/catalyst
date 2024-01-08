@@ -49,7 +49,6 @@ from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
-from jax._src.util import safe_map, unzip2, wrap_name, wraps
 from jax.api_util import flatten_fun
 from jax.core import AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
 from jax.core import Primitive as JaxprPrimitive
@@ -504,10 +503,17 @@ def make_jaxpr2(
     return make_jaxpr_f
 
 
-def _gather_shape_rule_dynamic(operand, indices, *, dimension_numbers,
-                               slice_sizes, unique_indices, indices_are_sorted,
-                               mode, fill_value):
-
+def _gather_shape_rule_dynamic(
+    operand,
+    indices,
+    *,
+    dimension_numbers,
+    slice_sizes,
+    unique_indices,
+    indices_are_sorted,
+    mode,
+    fill_value,
+):
     offset_dims = dimension_numbers.offset_dims
     collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
     start_index_map = dimension_numbers.start_index_map
