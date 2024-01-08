@@ -104,14 +104,14 @@
 
   Currently, most PennyLane transforms will work with Catalyst
   as long as:
-  
+
   - The circuit does not include any Catalyst-specific features, such
     as Catalyst control flow or measurement,
-  
+
   - The QNode returns only lists of measurement processes,
-  
+
   - AutoGraph is disabled, and
-  
+
   - The transformation does not require or depend on the numeric value of
     dynamic variables.
 
@@ -119,14 +119,15 @@
   [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
   [(#386)](https://github.com/PennyLaneAI/catalyst/pull/385)
   [(#390)](https://github.com/PennyLaneAI/catalyst/pull/390)
+  [(#411)](https://github.com/PennyLaneAI/catalyst/pull/411)
 
   The `@qjit` decorator can now be used to compile functions that accepts or contain tensors
   whose dimensions are not known at compile time; runtime execution with different shapes
   is supported without recompilation.
 
-  In addition, standard tensor initialisation functions `jax.numpy.ones`, `jnp.zeros`, and
+  In addition, standard tensor initialization functions `jax.numpy.ones`, `jnp.zeros`, and
   `jnp.empty` now accept dynamic variables (where the value is only known at
-  runtime). 
+  runtime).
 
   ``` python
   @qjit
@@ -170,7 +171,7 @@
   ```
 
   Note that support for dynamic arrays in control-flow primitives (such as loops),
-  as well as the ability to index dynamic arrays, is not yet supported.
+  is not yet supported.
 
 * Error mitigation using the zero-noise extrapolation method is now available through the
   `catalyst.mitigate_with_zne` transform.
@@ -322,10 +323,10 @@
 * The allocation and deallocation operations in MLIR (`AllocOp`, `DeallocOp`) now follow simple
   value semantics for qubit register values, instead of modelling memory in the MLIR trait system.
   Similarly, the frontend generates proper value semantics by deallocating the final register value.
-  
+
   The change enables functions at the MLIR level to accept and return quantum register values,
   which would otherwise not be correctly identified as aliases of existing register values by the
-  bufferization system. 
+  bufferization system.
   [(#360)](https://github.com/PennyLaneAI/catalyst/pull/360)
 
 <h3>Breaking changes</h3>
@@ -585,9 +586,9 @@ Shuli Shu.
 * Catalyst now supports `jax.numpy.polyfit` inside a qjitted function.
   [(#367)](https://github.com/PennyLaneAI/catalyst/pull/367/)
 
-* Catalyst now supports custom calls (including the one from HLO). We added support in MLIR (operation, bufferization 
-  and lowering). In the `lib_custom_calls`, developers then implement their custom calls and use external functions 
-  directly (e.g. Lapack). The OpenBlas library is taken from Scipy and linked in Catalyst, therefore any function from 
+* Catalyst now supports custom calls (including the one from HLO). We added support in MLIR (operation, bufferization
+  and lowering). In the `lib_custom_calls`, developers then implement their custom calls and use external functions
+  directly (e.g. Lapack). The OpenBlas library is taken from Scipy and linked in Catalyst, therefore any function from
   it can be used.
   [(#367)](https://github.com/PennyLaneAI/catalyst/pull/367/)
 
