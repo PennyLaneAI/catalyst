@@ -364,6 +364,10 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     void clearData()
     {
         data_.clear();
+
+        // reduce allocated memory to fit in the updated size (0)
+        // data_.shrink_to_fit();
+
         this->setNumQubits(0);
 
         // the init state-vector
