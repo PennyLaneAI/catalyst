@@ -982,20 +982,20 @@ def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
-                  for the given arguments.
+        for the given arguments.
 
     **Example:**
 
-    In this example "noisy.device" must be replaced by a valid noisy device (e.g. HW accessed
-    from Amazon braket).
+    For example, given a noisy device (such as noisy hardware available through Amazon Braket):
 
     .. code-block:: python
 
+        # replace "noisy.device" with your noisy device
         dev = qml.device("noisy.device", wires=2)
 
         @qml.qnode(device=dev)
         def circuit(x, n):
-            @catalyst.for_loop(0, n, 1)
+            @for_loop(0, n, 1)
             def loop_rx(i):
                 qml.RX(x, wires=0)
 
@@ -1009,11 +1009,10 @@ def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
             qml.Hadamard(wires=1)
             return qml.expval(qml.PauliY(wires=0))
 
-        @catalyst.qjit
+        @qjit
         def mitigated_circuit(args, n):
-            return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
-                args, n
-            )
+            s = jax.numpy.array([1, 2, 3])
+            return mitigate_with_zne(circuit, scale_factors=s)(args, n)
     """
     if deg is None:
         deg = len(scale_factors) - 1
