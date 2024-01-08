@@ -192,6 +192,25 @@ rather than runtime.
 
     For more details, see the :doc:`AutoGraph guide <autograph>`.
 
+Printing at runtime
+-------------------
+
+In the previous section, we saw that the Python ``print`` statement will only
+be executed during tracing/compilation, and in particular, will not print
+out the value of dynamic variables (since their values are only known at *runtime*).
+
+If we wish to print the value of variables at *runtime*, we can instead use the
+:func:`catalyst.debug.print` function:
+
+
+>>> from catalyst import debug
+>>> @qjit
+... def g(x):
+...     debug.print(x)
+...     return x ** 2
+>>> g(2.)
+[2.]
+array(4.)
 
 Avoiding recompilation
 ----------------------
@@ -815,8 +834,82 @@ array(0.2)
 Dynamically-shaped arrays
 -------------------------
 
-TODO.
+Catalyst provides experimental support for for compiling functions that accepts
+or contains tensors whose dimensions are not know at compile time, without
+needing to recompile the function when tensor shapes change.
 
+For example, one might consider a case where a dynamic variable specify the shape
+of a tensor created within (or returned by) the compiled function:
+
+>>> @qjit
+... def func(size: int):
+...     print("Compiling")
+...     return jax.numpy.ones([size, size], dtype=float)
+>>> func(3)
+Compiling
+array([[1., 1., 1.],
+       [1., 1., 1.],
+       [1., 1., 1.]])
+>>> func(4)
+array([[1., 1., 1., 1.],
+       [1., 1., 1., 1.],
+       [1., 1., 1., 1.],
+       [1., 1., 1., 1.]])
+
+We can also pass tensors of variable shape directly as arguments to compiled
+functions, however we need to provide the ``abstracted_axes`` argument,
+to specify which axes of the tensors should be considered dynamic during compilation.
+
+>>> @qjit(abstracted_axes={0: "n"})
+... def sum_fn(x):
+...     print("Compiling")
+...     return jnp.sum(x)
+>>> sum_fn(jnp.array([1., 0.5]))
+Compiling
+array(1.5)
+>>> sum_fn(jnp.array([1., 0.5, 0.6]))
+array(2.1)
+
+Note that failure to specify this argument will cause re-compilation each time
+input tensor arguments change shape:
+
+>>> @qjit
+... def sum_fn(x):
+...     print("Compiling")
+...     return jnp.sum(x)
+>>> sum_fn(jnp.array([1., 0.5]))
+Compiling
+array(1.5)
+>>> sum_fn(jnp.array([1., 0.5, 0.6]))
+Compiling
+array(2.1)
+
+For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
+
+Note that indexing of dynamically-shaped arrays is not currently supported:
+
+>>> @qjit
+... def almost_sum_fn(x):
+...     print("Compiling")
+...     return jnp.sum(x[0:-1]). # indexing into dynamic array x
+>>> almost_sum_fn(jnp.array([1., 0.5]))
+IndexError: Cannot use NumPy slice indexing on an array dimension whose
+size is not statically known (Traced<ShapedArray(int64[], weak_type=True)>with<
+DynamicJaxprTrace(level=1/0)>). Try using lax.dynamic_slice/dynamic_update_slice
+
+Similarly, using dynamically-shaped arrays within for loops, while loops, and
+conditional statements, is not currently supported:
+
+>>> @qjit
+... def f(size):
+...     a = jnp.ones([size], dtype=float)
+...     for i in range(10):
+...         a = a
+...     @for_loop(0, 10, 2)
+...     def loop(_, a):
+...         return a
+...     return loop(a)
+KeyError: 137774138140016
 
 Returning multiple measurements
 -------------------------------

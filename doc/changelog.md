@@ -152,10 +152,10 @@
 
   ```pycon
   >>> @qjit
-  >>> def sum(arr):
-  >>>     return jnp.sum(arr)
-  >>> sum(jnp.array([1]))     # Compilation happens here.
-  >>> sum(jnp.array([1, 1]))  # And here!
+  >>> def sum_fn(x):
+  >>>     return jnp.sum(x)
+  >>> sum_fn(jnp.array([1]))     # Compilation happens here.
+  >>> sum_fn(jnp.array([1, 1]))  # And here!
   ```
 
   By passing `abstracted_axes`, we can specify that the first axes
@@ -163,10 +163,10 @@
 
   ```pycon
   >>> @qjit(abstracted_axes={0: "n"})
-  >>> def sum_abstracted(arr):
-  >>>     return jnp.sum(arr)
-  >>> sum(jnp.array([1]))     # Compilation happens here.
-  >>> sum(jnp.array([1, 1]))  # No need to recompile.
+  >>> def sum_fn(x):
+  >>>     return jnp.sum(x)
+  >>> sum_fn(jnp.array([1]))     # Compilation happens here.
+  >>> sum_fn(jnp.array([1, 1]))  # No need to recompile.
   ```
 
   Note that support for dynamic arrays in control-flow primitives (such as loops),
