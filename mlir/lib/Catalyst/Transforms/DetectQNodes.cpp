@@ -23,43 +23,79 @@ using namespace mlir;
 
 namespace {
 
-bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp)
+const char *transformedAttr = "catalyst.transformed";
+
+bool hasQnodeAttribute(LLVM::LLVMFuncOp callOp)
 {
-    return (bool)(funcOp->getAttrOfType<UnitAttr>("qnode"));
+    return (bool)(callOp->getAttrOfType<UnitAttr>("qnode"));
 }
 
-bool hasDetectedAttribute(LLVM::LLVMFuncOp funcOp)
+bool hasTransformedAttribute(LLVM::CallOp callOp)
 {
-    return (bool)(funcOp->getAttrOfType<UnitAttr>("catalyst.detected"));
+    return (bool)(callOp->getAttrOfType<UnitAttr>(transformedAttr));
 }
 
-void setDetectedAttribute(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
+LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
 {
-    rewriter.updateRootInPlace(
-        funcOp, [&] { funcOp->setAttr("catalyst.detected", rewriter.getUnitAttr()); });
+    mlir::Operation *currentOperation = callOp;
+    do {
+        currentOperation = currentOperation->getParentOp();
+    } while (!isa<LLVM::LLVMFuncOp>(currentOperation));
+    return cast<LLVM::LLVMFuncOp>(currentOperation);
 }
 
-struct DetectQnodeTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
-    using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
+std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
+{
+    std::optional<LLVM::LLVMFuncOp> callee;
+    auto calleeAttr = callOp.getCalleeAttr();
+    auto caller = getCaller(callOp);
+    if (!calleeAttr) {
+        callee = std::nullopt;
+    }
+    else {
+        callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(caller, calleeAttr);
+    }
+    return callee;
+}
 
-    LogicalResult match(LLVM::LLVMFuncOp op) const override;
-    void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
+LLVM::LLVMFuncOp getCalleeUnsafe(LLVM::CallOp callOp)
+{
+    std::optional<LLVM::LLVMFuncOp> optionalCallee = getCalleeSafe(callOp);
+    if (!optionalCallee) {
+        callOp->emitError() << "Couldn't resolve callee for call.";
+    }
+    return optionalCallee.value();
+}
+
+void setTransformedAttribute(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(callOp,
+                               [&] { callOp->setAttr(transformedAttr, rewriter.getUnitAttr()); });
+}
+
+struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult DetectQnodeTransform::match(LLVM::LLVMFuncOp funcOp) const
+LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
 {
-    // Only match with QNodes.
+    // Only match with direct calls to qnodes.
     // TODO: This should actually be about async.
     // Right now we use the `qnode` attribute to determine async regions.
     // But that might not be the case in the future,
     // So, change this whenever we no longer create async.execute operations based on qnode.
-    bool valid = hasQnodeAttribute(funcOp) && !hasDetectedAttribute(funcOp);
-    return valid ? success() : failure();
+    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
+    bool validCandidate =
+        candidate && hasQnodeAttribute(candidate.value()) && !hasTransformedAttribute(callOp);
+    return validCandidate ? success() : failure();
 }
 
-void DetectQnodeTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
+void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
-    setDetectedAttribute(op, rewriter);
+    setTransformedAttribute(callOp, rewriter);
 }
 
 } // namespace

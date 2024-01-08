@@ -16,9 +16,13 @@
 
 // Check anything just to make sure that the option is available.
 module {
-  // CHECK: @annotated()
-  // CHECK-SAME: catalyst.detected
-  llvm.func internal @annotated() attributes { qnode } {
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @caller() {
+    // CHECK: catalyst.transformed
+    llvm.call @callee() : () -> ()
     llvm.return
   }
 }
