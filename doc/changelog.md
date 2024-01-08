@@ -193,6 +193,7 @@
   extract classical from a QNode function. It also adds a verification step that will raise an error
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
+  [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
 
 * Resolve a bug with printing multiple strings from multiple functions with `debug.print` by introducing
   a NULL terminator to traced strings.
