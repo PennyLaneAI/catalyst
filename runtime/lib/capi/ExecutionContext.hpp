@@ -255,7 +255,7 @@ class RTDevice {
         _pl2runtime_device_info(rtd_lib, rtd_name);
     }
 
-    ~RTDevice() { rtd_dylib.reset(nullptr); }
+    ~RTDevice() = default;
 
     auto operator==(const RTDevice &other) const -> bool
     {
@@ -316,11 +316,7 @@ class ExecutionContext final {
         memory_man_ptr = std::make_unique<MemoryManager>();
     }
 
-    ~ExecutionContext()
-    {
-        memory_man_ptr.reset(nullptr);
-        py_guard.reset(nullptr);
-    }
+    ~ExecutionContext() = default;
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
