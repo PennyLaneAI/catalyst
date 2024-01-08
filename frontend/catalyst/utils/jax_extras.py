@@ -523,10 +523,10 @@ def _gather_shape_rule_dynamic(
 
     Copyright 2021 The JAX Authors.
     """
-    # pylint: diable=unused-argument
-    # pylint: diable=too-many-branches
-    # pylint: diable=consider-using-enumerate
-    # pylint: diable=chained-comparison
+    # pylint: disable=unused-argument
+    # pylint: disable=too-many-branches
+    # pylint: disable=consider-using-enumerate
+    # pylint: disable=chained-comparison
     offset_dims = dimension_numbers.offset_dims
     collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
     start_index_map = dimension_numbers.start_index_map
