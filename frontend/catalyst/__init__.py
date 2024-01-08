@@ -176,6 +176,7 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
+    "mitigate_with_zne",
     "debug",
     "autograph_source",
     "autograph_ignore_fallbacks",

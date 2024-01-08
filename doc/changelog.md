@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Catalyst supports indexing and assignments of the dynamically-shaped arrays.
+  [(#411)](https://github.com/PennyLaneAI/catalyst/pull/411)
+
 * Error mitigation using the zero-noise extrapolation method is now available through the
   `catalyst.mitigate_with_zne` transform.
 
