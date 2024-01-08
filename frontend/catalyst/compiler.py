@@ -126,6 +126,7 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
     ],

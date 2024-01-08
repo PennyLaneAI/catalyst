@@ -2,6 +2,49 @@
 
 <h3>New features</h3>
 
+* Catalyst supports indexing and assignments of the dynamically-shaped arrays.
+  [(#411)](https://github.com/PennyLaneAI/catalyst/pull/411)
+
+* Error mitigation using the zero-noise extrapolation method is now available through the
+  `catalyst.mitigate_with_zne` transform.
+
+  Here is an example of how to use the transform on a noisy device. (Currently the only
+  access to hardware is through Amazon Braket). In this example "noisy.device" must be 
+  replaced by a valid noisy device (e.g. HW accessed from Amazon braket).
+
+  ```python
+  # noisy.device must be replaced
+  dev = qml.device("noisy.device", wires=2)
+
+  @qml.qnode(device=dev)
+  def circuit(x, n):
+      @catalyst.for_loop(0, n, 1)
+      def loop_rx(i):
+          qml.RX(x, wires=0)
+
+      loop_rx()
+
+      qml.Hadamard(wires=0)
+      qml.RZ(x, wires=0)
+      loop_rx()
+      qml.RZ(x, wires=0)
+      qml.CNOT(wires=[1, 0])
+      qml.Hadamard(wires=1)
+      return qml.expval(qml.PauliY(wires=0))
+
+  @catalyst.qjit
+  def mitigated_circuit(args, n):
+      return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
+          args, n
+      )
+  ```
+
+  ```pycon
+  >>> mitigated_circuit(0.2, 5)
+  0.5655341100116512
+  ```
+  [(#414)](https://github.com/PennyLaneAI/catalyst/pull/414)
+
 * A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
   with a lowering to a global folded circuit.
   [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
@@ -63,6 +106,7 @@
   Support for the async MLIR dialect was added.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
   [(#424)](https://github.com/PennyLaneAI/catalyst/pull/424)
+  [(#420)](https://github.com/PennyLaneAI/catalyst/pull/420)
 
   In this example below, the first and second circuit are executed in parrallel if two threads are available.
   To see a speed up in your code, you should use circuits with more gates and/or more qubits.

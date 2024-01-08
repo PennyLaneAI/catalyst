@@ -21,9 +21,9 @@ from jax import numpy as jnp
 from catalyst import grad, qjit
 
 
-def test_qnode_execution():
+def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qml.device(backend, wires=2)
 
     def multiple_qnodes(params):
         @qml.qnode(device=dev)
@@ -51,16 +51,18 @@ def test_qnode_execution():
         return circuit3(new_params)
 
     params = jnp.array([1.0, 2.0])
-    assert np.allclose(
-        qjit()(multiple_qnodes)(params), qjit(async_qnodes=True)(multiple_qnodes)(params)
-    )
+    compiled = qjit(async_qnodes=True)(multiple_qnodes)
+    observed = compiled(params)
+    expected = qjit()(multiple_qnodes)(params)
+    assert "async_execute_fn" in compiled.qir
+    assert np.allclose(expected, observed)
 
 
-@pytest.mark.parametrize(
-    "diff_methods", [("parameter-shift", "auto"), ("finite-diff", "fd"), ("adjoint", "auto")]
-)
+# TODO: add the following diff_methods once issue #419 is fixed:
+# ("parameter-shift", "auto"), ("adjoint", "auto")]
+@pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_gradient(inp, diff_methods):
+def test_gradient(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
     def f(x):
@@ -69,7 +71,7 @@ def test_gradient(inp, diff_methods):
 
     @qjit(async_qnodes=True)
     def compiled(x: float):
-        g = qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=diff_methods[0])(f)
+        g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1])
         return h(x)
 
@@ -79,6 +81,7 @@ def test_gradient(inp, diff_methods):
         h = qml.grad(g, argnum=0)
         return h(x)
 
+    assert "async_execute_fn" in compiled.qir
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
