@@ -42,7 +42,7 @@
 
   For more details on these functions, please refer to the
  [PennyLane compiler documentation](https://docs.pennylane.ai/en/stable/introduction/compiling_workflows.html) and
- [`qml.compiler`](https://docs.pennylane.ai/en/stable/code/qml_compiler.html).
+ [compiler module documentation](https://docs.pennylane.ai/en/stable/code/qml_compiler.html).
 
 * Just-in-time compiled functions now support asynchronuous execution of QNodes.
   [(#374)](https://github.com/PennyLaneAI/catalyst/pull/374)
