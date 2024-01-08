@@ -20,7 +20,7 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: xanadu-arm64-mac
+    runs-on: 'Office 24th floor M2 Mac'
 
     steps:
       - name: Checkout Catalyst repo
@@ -112,7 +112,7 @@ jobs:
           VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
         run: |
           rm -rf "$VENV_NAME"
-          pyenv global ${{ matrix.python_version }}
+          echo '${{ matrix.python_version }}' >> "$GITHUB_WORKSPACE/.python-version"
           python -m venv "$VENV_NAME"
           
           # Add the venv to PATH for subsequent steps
@@ -183,7 +183,7 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: xanadu-arm64-mac
+    runs-on: 'Office 24th floor M2 Mac'
 
     env:
       CPATH: /opt/homebrew/include
@@ -208,7 +208,7 @@ jobs:
         VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
       run: |
         rm -rf "$VENV_NAME"
-        pyenv global ${{ matrix.python_version }}
+        echo '${{ matrix.python_version }}' >> "$GITHUB_WORKSPACE/.python-version"
         python -m venv "$VENV_NAME"
 
         # Add the venv to PATH for subsequent steps
@@ -354,7 +354,7 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on xanadu-arm64-mac
-    runs-on: xanadu-arm64-mac
+    runs-on: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
@@ -381,7 +381,7 @@ jobs:
         VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
       run: |
         rm -rf "$VENV_NAME"
-        pyenv global ${{ matrix.python_version }}
+        echo '${{ matrix.python_version }}' >> "$GITHUB_WORKSPACE/.python-version"
         python -m venv "$VENV_NAME"
 
         # Add the venv to PATH for subsequent steps
@@ -412,6 +412,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       env:
+        no_proxy: '*'
         OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES 
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
