@@ -14,14 +14,31 @@
 
 // RUN: quantum-opt --detect-qnode --verify-diagnostics --split-input-file %s | FileCheck %s
 
-// Check anything just to make sure that the option is available.
+// Check to make sure that personality was added
+
+module {
+  // CHECK-LABEL: @__gxx_personality_v4
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @caller() {
+    llvm.call @callee() : () -> ()
+    llvm.return
+  }
+}
+
+// -----
+
+// Check to make sure that the the `llvm.call` op has been annotated
 module {
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
 
   llvm.func @caller() {
-    // CHECK: catalyst.transformed
+    // CHECK: llvm.call
+    // CHECK-SAME: catalyst.transformed
     llvm.call @callee() : () -> ()
     llvm.return
   }
