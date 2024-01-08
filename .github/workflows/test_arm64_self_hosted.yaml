@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        python_version: ['3.9'] # ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
@@ -180,7 +180,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ['3.9'] # ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on: xanadu-arm64-mac
@@ -350,7 +350,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ['3.9'] # ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on xanadu-arm64-mac
@@ -411,9 +411,6 @@ jobs:
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
     - name: Run Python Pytest Tests
-      env:
-        no_proxy: '*'
-        OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
