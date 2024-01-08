@@ -151,6 +151,7 @@ endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
 	$(ASAN_COMMAND) $(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos/qml/*.ipynb --nbmake $(PARALLELIZE)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
