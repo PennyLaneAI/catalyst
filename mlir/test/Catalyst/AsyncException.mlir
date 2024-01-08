@@ -15,7 +15,10 @@
 // RUN: quantum-opt --detect-qnode --verify-diagnostics --split-input-file %s | FileCheck %s
 
 // Check anything just to make sure that the option is available.
-// CHECK: {{.*}}
 module {
+  // CHECK: {{.*}}
+  llvm.func internal @annotated() attributes {qnode} {
+    llvm.return
+  }
 }
 

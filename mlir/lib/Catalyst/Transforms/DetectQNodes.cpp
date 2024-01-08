@@ -23,6 +23,21 @@ using namespace mlir;
 
 namespace {
 
+bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp)
+{
+    return (bool)(funcOp->getAttrOfType<UnitAttr>("qnode"));
+}
+
+bool hasDetectedAttribute(LLVM::LLVMFuncOp funcOp)
+{
+    return (bool)(funcOp->getAttrOfType<UnitAttr>("catalyst.detected"));
+}
+
+void setDetectedAttribute(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(funcOp, [&] { funcOp->setAttr("catalyst.detected", rewriter.getUnitAttr()); });
+}
+
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
@@ -30,9 +45,18 @@ struct DetectQnodeTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult DetectQnodeTransform::match(LLVM::LLVMFuncOp op) const { return failure(); }
+LogicalResult DetectQnodeTransform::match(LLVM::LLVMFuncOp funcOp) const {
+	// Only match with QNodes.
+	// TODO: This should actually be about async.
+	// Right now we use the `qnode` attribute to determine async regions.
+	// But that might not be the case in the future,
+	// So, change this whenever we no longer create async.execute operations based on qnode.
+	bool valid = hasQnodeAttribute(funcOp) && !hasDetectedAttribute(funcOp);
+	return hasQnodeAttribute(funcOp) ? success() : failure();
+}
 
 void DetectQnodeTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const {}
+        
 } // namespace
 
 namespace catalyst {
