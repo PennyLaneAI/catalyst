@@ -85,7 +85,6 @@ def test_gradient(inp, diff_methods, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.xfail()
 def test_exception(backend):
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
@@ -96,7 +95,8 @@ def test_exception(backend):
     def wrapper():
         return circuit(0)
 
-    with pytest.raises(RuntimeError):
+    msg = "Control and target qubit operands must be distinct"
+    with pytest.raises(RuntimeError, match=msg):
         wrapper()
 
 

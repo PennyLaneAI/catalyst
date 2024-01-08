@@ -433,6 +433,8 @@ void __quantum__qis__Rot(double phi, double theta, double omega, QUBIT *qubit, b
 
 void __quantum__qis__CNOT(QUBIT *control, QUBIT *target, bool adjoint)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CNOT gate. Control and target qubit operands must be distinct.");
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "CNOT", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
