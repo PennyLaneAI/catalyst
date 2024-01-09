@@ -89,7 +89,7 @@ module {
   llvm.func @caller() {
     %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
-    // CHECK: llvm.call @mlirAsyncRuntimeDropRef
+    // CHECK: llvm.call @mlirAsyncRuntimeSetTokenError
     llvm.return
   }
 }
