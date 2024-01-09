@@ -14,10 +14,11 @@
 
 // RUN: quantum-opt --detect-qnode --verify-diagnostics --split-input-file %s | FileCheck %s
 
-// Check to make sure that personality was added
+// Check to make sure that personality and abort were added
 
 module {
   // CHECK: llvm.func @__gxx_personality_v0
+  // CHECK: llvm.func @abort
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
