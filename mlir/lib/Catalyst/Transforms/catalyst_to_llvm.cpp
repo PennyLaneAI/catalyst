@@ -174,12 +174,10 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, rank, 0);
 
     // Memref
-    Type voidPtrType = LLVM::LLVMPointerType::get(ctx);
     Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
     Value memrefPtr = rewriter.create<LLVM::AllocaOp>(
         loc, LLVM::LLVMPointerType::get(rewriter.getContext()), llvmMemrefType, c1);
     rewriter.create<LLVM::StoreOp>(loc, memrefLlvm, memrefPtr);
-    memrefPtr = rewriter.create<LLVM::BitcastOp>(loc, voidPtrType, memrefPtr);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, memrefPtr, 1);
 
     // Dtype

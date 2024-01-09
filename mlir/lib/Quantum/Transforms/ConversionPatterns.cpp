@@ -531,9 +531,7 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
 
         Value resultPtr =
             rewriter.create<LLVM::CallOp>(loc, fnDecl, adaptor.getInQubit()).getResult();
-        Value boolPtr = rewriter.create<LLVM::BitcastOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), resultPtr);
-        Value mres = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 1), boolPtr);
+        Value mres = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 1), resultPtr);
         rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
 
         return success();
