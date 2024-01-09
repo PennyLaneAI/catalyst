@@ -24,18 +24,10 @@ using namespace mlir;
 
 namespace {
 
-static constexpr llvm::StringRef transformedAttr = "catalyst.transformed";
+static constexpr llvm::StringRef scheduleInvoke = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 
-bool hasQnodeAttribute(LLVM::LLVMFuncOp callOp)
-{
-    return (bool)(callOp->getAttrOfType<UnitAttr>("qnode"));
-}
-
-bool hasTransformedAttribute(LLVM::CallOp callOp)
-{
-    return (bool)(callOp->getAttrOfType<UnitAttr>(transformedAttr));
-}
+bool hasQnodeAttribute(LLVM::LLVMFuncOp callOp) { return callOp->hasAttr("qnode"); }
 
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
 {
@@ -87,19 +79,13 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
 
     rewriter.setInsertionPointToEnd(unwindBlock);
     bool isCleanUp = false;
-    SmallVector<Value> operands {nullOp.getResult()};
+    SmallVector<Value> operands{nullOp.getResult()};
     auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
     auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
     rewriter.create<LLVM::LandingpadOp>(callOp.getLoc(), structTy, isCleanUp, operands);
     rewriter.create<LLVM::UnreachableOp>(callOp.getLoc());
 
-    return std::tuple<Block *, Block*, Block*>(blockContainingCall, successBlock, unwindBlock);
-}
-
-void setTransformedAttribute(LLVM::CallOp callOp, PatternRewriter &rewriter)
-{
-    rewriter.updateRootInPlace(callOp,
-                               [&] { callOp->setAttr(transformedAttr, rewriter.getUnitAttr()); });
+    return std::tuple<Block *, Block *, Block *>(blockContainingCall, successBlock, unwindBlock);
 }
 
 void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
@@ -111,10 +97,14 @@ void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp persona
     });
 }
 
-void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock, PatternRewriter &rewriter) {
+void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
+                           PatternRewriter &rewriter)
+{
     auto calleeAttr = callOp.getCalleeAttr();
     SmallVector<Value> unwindArgs;
-    auto invokeOp = rewriter.create<LLVM::InvokeOp>(callOp.getLoc(), callOp.getResultTypes(), calleeAttr, callOp.getOperands(), successBlock, ValueRange(), failBlock, unwindArgs);
+    auto invokeOp = rewriter.create<LLVM::InvokeOp>(callOp.getLoc(), callOp.getResultTypes(),
+                                                    calleeAttr, callOp.getOperands(), successBlock,
+                                                    ValueRange(), failBlock, unwindArgs);
     rewriter.replaceOp(callOp, invokeOp);
 }
 
@@ -133,8 +123,7 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
     // But that might not be the case in the future,
     // So, change this whenever we no longer create async.execute operations based on qnode.
     std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
-    bool validCandidate =
-        candidate && hasQnodeAttribute(candidate.value()) && !hasTransformedAttribute(callOp);
+    bool validCandidate = candidate && hasQnodeAttribute(candidate.value());
     return validCandidate ? success() : failure();
 }
 
