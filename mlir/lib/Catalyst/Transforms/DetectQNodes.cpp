@@ -50,6 +50,14 @@ LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp)
     return mlir::LLVM::lookupOrCreateFn(moduleOp, personalityName, {}, i32Ty, isVarArg);
 }
 
+LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp)
+{
+    static constexpr llvm::StringRef abortName = "abort";
+    MLIRContext *ctx = moduleOp.getContext();
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, abortName, {}, voidTy);
+}
+
 std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
 {
     std::optional<LLVM::LLVMFuncOp> callee;
@@ -103,6 +111,7 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
 {
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
     auto personality = lookupOrCreatePersonality(moduleOp);
+    auto abortFuncOp = lookupOrCreateAbort(moduleOp);
     auto caller = getCaller(callOp);
     setPersonalityAttribute(caller, personality, rewriter);
     setTransformedAttribute(callOp, rewriter);
