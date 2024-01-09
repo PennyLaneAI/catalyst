@@ -17,11 +17,28 @@
 // Check to make sure that personality was added
 
 module {
-  // CHECK-LABEL: @__gxx_personality_v4
+  // CHECK: llvm.func @__gxx_personality_v0
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
 
+  llvm.func @caller() {
+    llvm.call @callee() : () -> ()
+    llvm.return
+  }
+}
+
+// -----
+
+// Check to make sure that the caller was annotated with personality
+
+module {
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  // CHECK: llvm.func @caller
+  // CHECK-SAME: personality = @__gxx_personality_v0
   llvm.func @caller() {
     llvm.call @callee() : () -> ()
     llvm.return
