@@ -349,6 +349,9 @@
   the `debug.print` function. The issue was caused by non-null-terminated strings.
   [(#418)](https://github.com/PennyLaneAI/catalyst/pull/418)
 
+* Address the issue of missing calls to device destructors at the end of programs.
+  [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
