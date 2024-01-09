@@ -14,15 +14,17 @@
 
 // RUN: quantum-opt --annotate-async-call-with-invoke --verify-diagnostics --split-input-file %s | FileCheck %s
 
-// Check to mkae sure that option exist.
+
+// Test to make sure that we are annotating calls with coroutine attr.
 
 module {
-  // CHECK: {{.*}}
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
 
-  llvm.func @caller() {
+  llvm.func @caller() attributes { passthrough = ["presplitcoroutine"] } {
+    // CHECK: llvm.call
+    // CHECK-SAME: catalyst.preInvoke
     llvm.call @callee() : () -> ()
     llvm.return
   }
