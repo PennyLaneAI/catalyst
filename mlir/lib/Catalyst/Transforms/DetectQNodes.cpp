@@ -28,6 +28,9 @@ static constexpr llvm::StringRef qnodeAttr = "qnode";
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
+static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
+static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
+static constexpr llvm::StringRef mlirAsyncRuntimeDropRefName = "mlirAsyncRuntimeDropRef";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
 bool isScheduledForTransformation(LLVM::CallOp callOp)
@@ -54,6 +57,16 @@ LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp)
     MLIRContext *ctx = moduleOp.getContext();
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(moduleOp, abortName, {}, voidTy);
+}
+
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeDropRef(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto i64Ty = IntegerType::get(ctx, 64);
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeDropRefName, {ptrTy, i64Ty},
+                                        voidTy);
 }
 
 std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
@@ -89,7 +102,6 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
     auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
     auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
     rewriter.create<LLVM::LandingpadOp>(callOp.getLoc(), structTy, isCleanUp, operands);
-    rewriter.create<LLVM::UnreachableOp>(callOp.getLoc());
 
     return std::tuple<Block *, Block *, Block *>(blockContainingCall, successBlock, unwindBlock);
 }
@@ -114,6 +126,83 @@ void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *fail
     rewriter.replaceOp(callOp, invokeOp);
 }
 
+bool isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName)
+{
+    llvm::StringRef observedName = funcOp.getSymName();
+    return observedName.equals(expectedName);
+}
+
+bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp)
+{
+    return isFunctionNamed(funcOp, mlirAsyncRuntimeCreateValueName);
+}
+
+bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
+{
+    return isFunctionNamed(funcOp, mlirAsyncRuntimeCreateTokenName);
+}
+
+bool isMlirAsyncRuntimeFunctionThatCreatesRefCountedVariables(LLVM::LLVMFuncOp funcOp)
+{
+    return isMlirAsyncRuntimeCreateValue(funcOp) || isMlirAsyncRuntimeCreateToken(funcOp);
+}
+
+std::vector<Value> collectRefCountedValues(LLVM::LLVMFuncOp funcOp)
+{
+    // Since we are guaranteed to be in an asynchronous execution function
+    // we need to gather all values generated from mlirAsyncRuntimeCreateToken
+    // and mlirAsyncRuntimeCreateValue.
+    // Assumptions: these functions are not called indirectly
+    std::vector<Value> collectedValues;
+    funcOp.walk([&](LLVM::CallOp call) {
+        auto calleeMaybeIndirect = getCalleeSafe(call);
+        if (!calleeMaybeIndirect)
+            return;
+
+        auto callee = calleeMaybeIndirect.value();
+        bool match = isMlirAsyncRuntimeFunctionThatCreatesRefCountedVariables(callee);
+        if (!match)
+            return;
+
+        for (auto value : call.getResults()) {
+            collectedValues.push_back(value);
+        }
+    });
+    return collectedValues;
+}
+
+void insertCallToMlirAsyncRuntimeDropRef(Value value, Value count, Block *failBlock,
+                                         PatternRewriter &rewriter)
+{
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPointToEnd(failBlock);
+    auto landingPad = failBlock->begin();
+    auto loc = landingPad->getLoc();
+    auto moduleOp = landingPad->getParentOfType<ModuleOp>();
+    LLVM::LLVMFuncOp fnDecl = lookupOrCreateMlirAsyncRuntimeDropRef(moduleOp);
+    SmallVector<Value> operands = {value, count};
+    rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+}
+
+void insertCallsToMlirAsyncRuntimeDropRef(std::vector<Value> values, Block *failBlock,
+                                          PatternRewriter &rewriter)
+{
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPointToEnd(failBlock);
+    auto ctx = rewriter.getContext();
+    auto i64Ty = IntegerType::get(ctx, 64);
+    auto one = rewriter.getIntegerAttr(i64Ty, 1);
+    auto landingPad = failBlock->begin();
+    auto loc = landingPad->getLoc();
+    Value count = rewriter.create<LLVM::ConstantOp>(loc, i64Ty, one);
+    for (auto value : values) {
+        insertCallToMlirAsyncRuntimeDropRef(value, count, failBlock, rewriter);
+    }
+
+    // Move until the end.
+    rewriter.create<LLVM::UnreachableOp>(loc);
+}
+
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
@@ -130,7 +219,9 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
     // So, change this whenever we no longer create async.execute operations based on qnode.
     std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
     bool validCandidate =
-        candidate && hasQnodeAttribute(candidate.value()) && isScheduledForTransformation(callOp);
+        candidate &&
+        hasQnodeAttribute(candidate.value()) // This one guarantees that we are in async.
+        && isScheduledForTransformation(callOp);
     return validCandidate ? success() : failure();
 }
 
@@ -146,12 +237,10 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
 
     transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
-}
 
-void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
-{
-    rewriter.updateRootInPlace(
-        callOp, [&] { callOp->setAttr(scheduleInvokeAttr, rewriter.getUnitAttr()); });
+    auto refCountedValues = collectRefCountedValues(caller);
+
+    insertCallsToMlirAsyncRuntimeDropRef(refCountedValues, failBlock, rewriter);
 }
 
 } // namespace

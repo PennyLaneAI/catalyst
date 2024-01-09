@@ -77,3 +77,19 @@ module {
   }
 }
 
+// -----
+
+// Check to make sure that the token gets deleted
+module {
+  llvm.func @mlirAsyncRuntimeCreateToken() -> !llvm.ptr
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @caller() {
+    %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: llvm.call @mlirAsyncRuntimeDropRef
+    llvm.return
+  }
+}
