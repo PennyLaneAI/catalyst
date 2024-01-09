@@ -95,7 +95,7 @@ def test_single_measurement_control_flow(params):
         loop_1()
         return qml.expval(qml.PauliY(wires=0))
 
-    @catalyst.qjit(keep_intermediate=True)
+    @catalyst.qjit
     def mitigated_qnode(args, n):
         return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(
             args, n
@@ -110,7 +110,7 @@ def test_not_qnode_error():
     def circuit(x):
         return jax.numpy.sin(x)
 
-    @catalyst.qjit(keep_intermediate=True)
+    @catalyst.qjit
     def mitigated_function(args):
         return catalyst.mitigate_with_zne(circuit, scale_factors=jax.numpy.array([1, 2, 3]))(args)
 
