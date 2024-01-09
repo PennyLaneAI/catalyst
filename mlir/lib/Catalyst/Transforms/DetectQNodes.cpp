@@ -25,7 +25,7 @@ using namespace mlir;
 namespace {
 
 static constexpr llvm::StringRef transformedAttr = "catalyst.transformed";
-static constexpr llvm::StringRef personalityName = "__gxx_personality_v4";
+static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp callOp)
 {
@@ -45,9 +45,9 @@ LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
 LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
-    auto voidTy = LLVM::LLVMVoidType::get(ctx);
     auto i32Ty = IntegerType::get(ctx, 32);
-    return mlir::LLVM::lookupOrCreateFn(moduleOp, personalityName, {}, i32Ty, true);
+    bool isVarArg = true;
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, personalityName, {}, i32Ty, isVarArg);
 }
 
 std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
@@ -68,6 +68,15 @@ void setTransformedAttribute(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(callOp,
                                [&] { callOp->setAttr(transformedAttr, rewriter.getUnitAttr()); });
+}
+
+void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
+                             PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(callerOp, [&] {
+        auto personalityAttr = FlatSymbolRefAttr::get(personality.getSymNameAttr());
+        callerOp.setPersonalityAttr(personalityAttr);
+    });
 }
 
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
@@ -93,7 +102,9 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
 void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto personalityFuncOp = lookupOrCreatePersonality(moduleOp);
+    auto personality = lookupOrCreatePersonality(moduleOp);
+    auto caller = getCaller(callOp);
+    setPersonalityAttribute(caller, personality, rewriter);
     setTransformedAttribute(callOp, rewriter);
 }
 
