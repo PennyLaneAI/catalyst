@@ -55,8 +55,7 @@ module {
   }
 
   llvm.func @caller() {
-    // CHECK: llvm.call
-    // CHECK-SAME: catalyst.transformed
+    // CHECK: llvm.invoke
     llvm.call @callee() : () -> ()
     llvm.return
   }

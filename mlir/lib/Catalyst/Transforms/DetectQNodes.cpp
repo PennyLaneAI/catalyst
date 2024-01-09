@@ -74,6 +74,7 @@ std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
 
 std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
+    // TODO: Maybe split this logic a bit?
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     Block *blockContainingCall = callOp->getBlock();
     rewriter.setInsertionPointAfter(callOp);
@@ -110,6 +111,13 @@ void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp persona
     });
 }
 
+void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock, PatternRewriter &rewriter) {
+    auto calleeAttr = callOp.getCalleeAttr();
+    SmallVector<Value> unwindArgs;
+    auto invokeOp = rewriter.create<LLVM::InvokeOp>(callOp.getLoc(), callOp.getResultTypes(), calleeAttr, callOp.getOperands(), successBlock, ValueRange(), failBlock, unwindArgs);
+    rewriter.replaceOp(callOp, invokeOp);
+}
+
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
@@ -142,12 +150,7 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
 
     auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
 
-    // transformCallToInvoke(callOp, rewriter);
-    auto calleeAttr = callOp.getCalleeAttr();
-    SmallVector<Value> unwindArgs;
-    auto invokeOp = rewriter.create<LLVM::InvokeOp>(callOp.getLoc(), callOp.getResultTypes(), calleeAttr, callOp.getOperands(), successBlock, ValueRange(), failBlock, unwindArgs);
-    rewriter.replaceOp(callOp, invokeOp);
-
+    transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
 }
 
 } // namespace
