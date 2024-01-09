@@ -14,6 +14,22 @@
 
 // RUN: quantum-opt --detect-qnode --verify-diagnostics --split-input-file %s | FileCheck %s
 
+// Check to make sure that calls which are not annotated are left alone.
+
+module {
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @caller() {
+    // CHECK-NOT: llvm.invoke
+    llvm.call @callee() : () -> ()
+    llvm.return
+  }
+}
+
+// -----
+
 // Check to make sure that personality and abort were added
 
 module {
@@ -24,7 +40,7 @@ module {
   }
 
   llvm.func @caller() {
-    llvm.call @callee() : () -> ()
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
     llvm.return
   }
 }
@@ -41,14 +57,14 @@ module {
   // CHECK: llvm.func @caller
   // CHECK-SAME: personality = @__gxx_personality_v0
   llvm.func @caller() {
-    llvm.call @callee() : () -> ()
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
     llvm.return
   }
 }
 
 // -----
 
-// Check to make sure that the the `llvm.call` op has been annotated
+// Check to make sure that the the `llvm.call` op has been transformed to llvm.invoke
 module {
   llvm.func @callee() attributes { qnode } {
     llvm.return
@@ -56,7 +72,7 @@ module {
 
   llvm.func @caller() {
     // CHECK: llvm.invoke
-    llvm.call @callee() : () -> ()
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
     llvm.return
   }
 }

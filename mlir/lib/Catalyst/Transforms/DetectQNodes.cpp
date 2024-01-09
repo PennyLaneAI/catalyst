@@ -24,10 +24,16 @@ using namespace mlir;
 
 namespace {
 
-static constexpr llvm::StringRef scheduleInvoke = "catalyst.preInvoke";
+static constexpr llvm::StringRef qnodeAttr = "qnode";
+static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
+static constexpr llvm::StringRef passthroughAttr = "passthrough";
 
-bool hasQnodeAttribute(LLVM::LLVMFuncOp callOp) { return callOp->hasAttr("qnode"); }
+bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
+bool isScheduledForTransformation(LLVM::CallOp callOp)
+{
+    return callOp->hasAttr(scheduleInvokeAttr);
+}
 
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
 {
@@ -123,7 +129,8 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
     // But that might not be the case in the future,
     // So, change this whenever we no longer create async.execute operations based on qnode.
     std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
-    bool validCandidate = candidate && hasQnodeAttribute(candidate.value());
+    bool validCandidate =
+        candidate && hasQnodeAttribute(candidate.value()) && isScheduledForTransformation(callOp);
     return validCandidate ? success() : failure();
 }
 
@@ -135,11 +142,16 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     auto caller = getCaller(callOp);
 
     setPersonalityAttribute(caller, personality, rewriter);
-    setTransformedAttribute(callOp, rewriter);
 
     auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
 
     transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
+}
+
+void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(
+        callOp, [&] { callOp->setAttr(scheduleInvokeAttr, rewriter.getUnitAttr()); });
 }
 
 } // namespace
