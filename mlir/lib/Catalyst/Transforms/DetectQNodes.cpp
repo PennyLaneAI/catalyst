@@ -30,7 +30,8 @@ static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
-static constexpr llvm::StringRef mlirAsyncRuntimeDropRefName = "mlirAsyncRuntimeDropRef";
+static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName = "mlirAsyncRuntimeSetValueError";
+static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName = "mlirAsyncRuntimeSetTokenError";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
 bool isScheduledForTransformation(LLVM::CallOp callOp)
@@ -59,13 +60,21 @@ LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp)
     return mlir::LLVM::lookupOrCreateFn(moduleOp, abortName, {}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeDropRef(ModuleOp moduleOp)
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
-    auto i64Ty = IntegerType::get(ctx, 64);
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
-    return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeDropRefName, {ptrTy, i64Ty},
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeSetValueErrorName, {ptrTy},
+                                        voidTy);
+}
+
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeSetTokenErrorName, {ptrTy},
                                         voidTy);
 }
 
@@ -142,36 +151,42 @@ bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
     return isFunctionNamed(funcOp, mlirAsyncRuntimeCreateTokenName);
 }
 
-bool isMlirAsyncRuntimeFunctionThatCreatesRefCountedVariables(LLVM::LLVMFuncOp funcOp)
-{
-    return isMlirAsyncRuntimeCreateValue(funcOp) || isMlirAsyncRuntimeCreateToken(funcOp);
-}
-
-std::vector<Value> collectRefCountedValues(LLVM::LLVMFuncOp funcOp)
+std::tuple<std::vector<Value>, std::vector<Value>> collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
 {
     // Since we are guaranteed to be in an asynchronous execution function
     // we need to gather all values generated from mlirAsyncRuntimeCreateToken
     // and mlirAsyncRuntimeCreateValue.
     // Assumptions: these functions are not called indirectly
+    std::vector<Value> collectedTokens;
     std::vector<Value> collectedValues;
+
     funcOp.walk([&](LLVM::CallOp call) {
         auto calleeMaybeIndirect = getCalleeSafe(call);
         if (!calleeMaybeIndirect)
             return;
 
         auto callee = calleeMaybeIndirect.value();
-        bool match = isMlirAsyncRuntimeFunctionThatCreatesRefCountedVariables(callee);
-        if (!match)
-            return;
+        bool tokens = isMlirAsyncRuntimeCreateToken(callee);
+	bool values = isMlirAsyncRuntimeCreateValue(callee);
+	bool skip = !tokens && !values;
+	if (skip) return;
 
-        for (auto value : call.getResults()) {
-            collectedValues.push_back(value);
-        }
+	if (tokens) {
+            for (auto value : call.getResults()) {
+                collectedTokens.push_back(value);
+            }
+	}
+
+	if (values) {
+            for (auto value : call.getResults()) {
+                collectedValues.push_back(value);
+            }
+	}
     });
-    return collectedValues;
+    return std::tuple<std::vector<Value>, std::vector<Value>>(collectedTokens, collectedValues);
 }
 
-void insertCallToMlirAsyncRuntimeDropRef(Value value, Value count, Block *failBlock,
+void insertCallToMlirAsyncRuntimeSetTokenError(Value token, Block *failBlock,
                                          PatternRewriter &rewriter)
 {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -179,24 +194,41 @@ void insertCallToMlirAsyncRuntimeDropRef(Value value, Value count, Block *failBl
     auto landingPad = failBlock->begin();
     auto loc = landingPad->getLoc();
     auto moduleOp = landingPad->getParentOfType<ModuleOp>();
-    LLVM::LLVMFuncOp fnDecl = lookupOrCreateMlirAsyncRuntimeDropRef(moduleOp);
-    SmallVector<Value> operands = {value, count};
+    LLVM::LLVMFuncOp fnDecl = lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
+    SmallVector<Value> operands = {token};
     rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
 }
 
-void insertCallsToMlirAsyncRuntimeDropRef(std::vector<Value> values, Block *failBlock,
-                                          PatternRewriter &rewriter)
+void insertCallToMlirAsyncRuntimeSetValueError(Value value, Block *failBlock,
+                                         PatternRewriter &rewriter)
 {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointToEnd(failBlock);
-    auto ctx = rewriter.getContext();
-    auto i64Ty = IntegerType::get(ctx, 64);
-    auto one = rewriter.getIntegerAttr(i64Ty, 1);
     auto landingPad = failBlock->begin();
     auto loc = landingPad->getLoc();
-    Value count = rewriter.create<LLVM::ConstantOp>(loc, i64Ty, one);
+    auto moduleOp = landingPad->getParentOfType<ModuleOp>();
+    LLVM::LLVMFuncOp fnDecl = lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
+    SmallVector<Value> operands = {value};
+    rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+}
+
+void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Block *failBlock,
+                                          PatternRewriter &rewriter)
+{
+    // At the fail block, it is guaranteed that all runtime values are available
+    // but they
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPointToEnd(failBlock);
+    auto ctx = rewriter.getContext();
+    auto landingPad = failBlock->begin();
+    auto loc = landingPad->getLoc();
+
+    for (auto token : tokens) {
+        insertCallToMlirAsyncRuntimeSetTokenError(token, failBlock, rewriter);
+    }
+
     for (auto value : values) {
-        insertCallToMlirAsyncRuntimeDropRef(value, count, failBlock, rewriter);
+        insertCallToMlirAsyncRuntimeSetValueError(value, failBlock, rewriter);
     }
 
     // Move until the end.
@@ -238,9 +270,9 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
 
     transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
 
-    auto refCountedValues = collectRefCountedValues(caller);
+    auto [tokens, values] = collectRefCountedTokensAndValues(caller);
 
-    insertCallsToMlirAsyncRuntimeDropRef(refCountedValues, failBlock, rewriter);
+    insertErrorCalls(tokens, values, failBlock, rewriter);
 }
 
 } // namespace
