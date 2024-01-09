@@ -30,7 +30,15 @@ static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
 
 bool isAsync(LLVM::LLVMFuncOp funcOp) {
-    return funcOp->hasAttr("presplitcoroutine");
+    if (!funcOp->hasAttr("passthrough")) return false;
+
+    auto haystack = funcOp->getAttrOfType<ArrayAttr>("passthrough");
+    auto needle = StringAttr::get(funcOp.getContext(), "presplitcoroutine");
+    for (auto maybeNeedle : haystack) {
+       if (maybeNeedle == needle) return true;
+    }
+
+    return false;
 }
 
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
