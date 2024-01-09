@@ -186,30 +186,13 @@ std::tuple<std::vector<Value>, std::vector<Value>> collectRefCountedTokensAndVal
     return std::tuple<std::vector<Value>, std::vector<Value>>(collectedTokens, collectedValues);
 }
 
-void insertCallToMlirAsyncRuntimeSetTokenError(Value token, Block *failBlock,
+void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnDecl, Block *failBlock,
                                          PatternRewriter &rewriter)
 {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointToEnd(failBlock);
-    auto landingPad = failBlock->begin();
-    auto loc = landingPad->getLoc();
-    auto moduleOp = landingPad->getParentOfType<ModuleOp>();
-    LLVM::LLVMFuncOp fnDecl = lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
-    SmallVector<Value> operands = {token};
-    rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
-}
-
-void insertCallToMlirAsyncRuntimeSetValueError(Value value, Block *failBlock,
-                                         PatternRewriter &rewriter)
-{
-    PatternRewriter::InsertionGuard insertGuard(rewriter);
-    rewriter.setInsertionPointToEnd(failBlock);
-    auto landingPad = failBlock->begin();
-    auto loc = landingPad->getLoc();
-    auto moduleOp = landingPad->getParentOfType<ModuleOp>();
-    LLVM::LLVMFuncOp fnDecl = lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
     SmallVector<Value> operands = {value};
-    rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+    rewriter.create<LLVM::CallOp>(fnDecl.getLoc(), fnDecl, operands);
 }
 
 void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Block *failBlock,
@@ -222,13 +205,16 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     auto ctx = rewriter.getContext();
     auto landingPad = failBlock->begin();
     auto loc = landingPad->getLoc();
+    auto moduleOp = landingPad->getParentOfType<ModuleOp>();
 
+    LLVM::LLVMFuncOp setTokenError = lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
     for (auto token : tokens) {
-        insertCallToMlirAsyncRuntimeSetTokenError(token, failBlock, rewriter);
+        insertCallToMlirAsyncRuntimeErrorFunction(token, setTokenError, failBlock, rewriter);
     }
 
+    LLVM::LLVMFuncOp setValueError = lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
     for (auto value : values) {
-        insertCallToMlirAsyncRuntimeSetValueError(value, failBlock, rewriter);
+        insertCallToMlirAsyncRuntimeErrorFunction(value, setValueError, failBlock, rewriter);
     }
 
     // Move until the end.
