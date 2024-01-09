@@ -72,6 +72,29 @@ std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
     return callee;
 }
 
+std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    Block *blockContainingCall = callOp->getBlock();
+    rewriter.setInsertionPointAfter(callOp);
+    Block *successBlock = rewriter.splitBlock(blockContainingCall, rewriter.getInsertionPoint());
+
+    rewriter.setInsertionPoint(callOp);
+    Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
+    auto nullOp = rewriter.create<LLVM::NullOp>(callOp.getLoc(), ptrTy);
+    Block *unwindBlock = rewriter.createBlock(successBlock);
+
+    rewriter.setInsertionPointToEnd(unwindBlock);
+    bool isCleanUp = false;
+    SmallVector<Value> operands {nullOp.getResult()};
+    auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
+    auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
+    rewriter.create<LLVM::LandingpadOp>(callOp.getLoc(), structTy, isCleanUp, operands);
+    rewriter.create<LLVM::UnreachableOp>(callOp.getLoc());
+
+    return std::tuple<Block *, Block*, Block*>(blockContainingCall, successBlock, unwindBlock);
+}
+
 void setTransformedAttribute(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(callOp,
@@ -113,8 +136,18 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     auto personality = lookupOrCreatePersonality(moduleOp);
     auto abortFuncOp = lookupOrCreateAbort(moduleOp);
     auto caller = getCaller(callOp);
+
     setPersonalityAttribute(caller, personality, rewriter);
     setTransformedAttribute(callOp, rewriter);
+
+    auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
+
+    // transformCallToInvoke(callOp, rewriter);
+    auto calleeAttr = callOp.getCalleeAttr();
+    SmallVector<Value> unwindArgs;
+    auto invokeOp = rewriter.create<LLVM::InvokeOp>(callOp.getLoc(), callOp.getResultTypes(), calleeAttr, callOp.getOperands(), successBlock, ValueRange(), failBlock, unwindArgs);
+    rewriter.replaceOp(callOp, invokeOp);
+
 }
 
 } // namespace
