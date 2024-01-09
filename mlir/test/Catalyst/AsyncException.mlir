@@ -79,7 +79,7 @@ module {
 
 // -----
 
-// Check to make sure that the token gets deleted
+// Check to make sure that the token gets set to error
 module {
   llvm.func @mlirAsyncRuntimeCreateToken() -> !llvm.ptr
   llvm.func @callee() attributes { qnode } {
@@ -90,6 +90,23 @@ module {
     %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
     // CHECK: llvm.call @mlirAsyncRuntimeSetTokenError
+    llvm.return
+  }
+}
+
+// -----
+
+// Check to make sure that the value gets set to error
+module {
+  llvm.func @mlirAsyncRuntimeCreateValue() -> !llvm.ptr
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @caller() {
+    %0 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: llvm.call @mlirAsyncRuntimeSetValueError
     llvm.return
   }
 }
