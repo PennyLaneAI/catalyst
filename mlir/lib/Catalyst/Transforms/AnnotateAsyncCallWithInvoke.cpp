@@ -29,13 +29,16 @@ static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
 
-bool isAsync(LLVM::LLVMFuncOp funcOp) {
-    if (!funcOp->hasAttr("passthrough")) return false;
+bool isAsync(LLVM::LLVMFuncOp funcOp)
+{
+    if (!funcOp->hasAttr("passthrough"))
+        return false;
 
     auto haystack = funcOp->getAttrOfType<ArrayAttr>("passthrough");
     auto needle = StringAttr::get(funcOp.getContext(), "presplitcoroutine");
     for (auto maybeNeedle : haystack) {
-       if (maybeNeedle == needle) return true;
+        if (maybeNeedle == needle)
+            return true;
     }
 
     return false;
@@ -62,10 +65,9 @@ std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
 
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
-    rewriter.updateRootInPlace(callOp,
-                               [&] { callOp->setAttr(scheduleInvokeAttr, rewriter.getUnitAttr()); });
+    rewriter.updateRootInPlace(
+        callOp, [&] { callOp->setAttr(scheduleInvokeAttr, rewriter.getUnitAttr()); });
 }
-
 
 struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
@@ -77,17 +79,18 @@ struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp
 LogicalResult DetectCallsInAsyncRegionsTransform::match(LLVM::CallOp callOp) const
 {
     std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
-    if (!candidate) return failure();
+    if (!candidate)
+        return failure();
 
     LLVM::LLVMFuncOp callee = candidate.value();
     auto caller = getCaller(callOp);
-    bool validCandidate = callee->hasAttr(qnodeAttr) \
-			  && !callOp->hasAttr(scheduleInvokeAttr) \
-			  && isAsync(caller);
+    bool validCandidate =
+        callee->hasAttr(qnodeAttr) && !callOp->hasAttr(scheduleInvokeAttr) && isAsync(caller);
     return validCandidate ? success() : failure();
 }
 
-void DetectCallsInAsyncRegionsTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+void DetectCallsInAsyncRegionsTransform::rewrite(LLVM::CallOp callOp,
+                                                 PatternRewriter &rewriter) const
 {
     scheduleCallToInvoke(callOp, rewriter);
 }
@@ -99,7 +102,8 @@ namespace catalyst {
 #define GEN_PASS_DEF_ANNOTATEASYNCCALLWITHINVOKEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct AnnotateAsyncCallWithInvokePass : impl::AnnotateAsyncCallWithInvokePassBase<AnnotateAsyncCallWithInvokePass> {
+struct AnnotateAsyncCallWithInvokePass
+    : impl::AnnotateAsyncCallWithInvokePassBase<AnnotateAsyncCallWithInvokePass> {
     using AnnotateAsyncCallWithInvokePassBase::AnnotateAsyncCallWithInvokePassBase;
 
     void runOnOperation() final
@@ -114,6 +118,9 @@ struct AnnotateAsyncCallWithInvokePass : impl::AnnotateAsyncCallWithInvokePassBa
     }
 };
 
-std::unique_ptr<Pass> createAnnotateAsyncCallWithInvokePass() { return std::make_unique<AnnotateAsyncCallWithInvokePass>(); }
+std::unique_ptr<Pass> createAnnotateAsyncCallWithInvokePass()
+{
+    return std::make_unique<AnnotateAsyncCallWithInvokePass>();
+}
 
 } // namespace catalyst
