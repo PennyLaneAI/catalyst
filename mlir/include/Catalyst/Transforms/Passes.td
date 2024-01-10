@@ -102,13 +102,4 @@ def DetectQnodePass : Pass<"detect-qnode"> {
     let constructor = "catalyst::createDetectQnodePass()";
 }
 
-def AnnotateAsyncCallWithInvokePass : Pass <"annotate-async-call-with-invoke"> {
-    let summary = "Add attribute to callOps that call qnode in async regions to mark them for change.";
-
-    let dependentDialects = [
-        "LLVM::LLVMDialect",
-    ];
-
-    let constructor = "catalyst::createAnnotateAsyncCallWithInvokePass()";
-}
 #endif // CATALYST_PASSES

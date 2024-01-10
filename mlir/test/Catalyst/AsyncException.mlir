@@ -110,3 +110,18 @@ module {
     llvm.return
   }
 }
+
+// -----
+
+// Check to make sure that the we unconditionally jump from failure to success
+module {
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: ^bb1
+    llvm.return
+  }
+}

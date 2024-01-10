@@ -30,10 +30,13 @@ static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
-static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName = "mlirAsyncRuntimeSetValueError";
-static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName = "mlirAsyncRuntimeSetTokenError";
+static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName =
+    "mlirAsyncRuntimeSetValueError";
+static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName =
+    "mlirAsyncRuntimeSetTokenError";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
+
 bool isScheduledForTransformation(LLVM::CallOp callOp)
 {
     return callOp->hasAttr(scheduleInvokeAttr);
@@ -151,7 +154,8 @@ bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
     return isFunctionNamed(funcOp, mlirAsyncRuntimeCreateTokenName);
 }
 
-std::tuple<std::vector<Value>, std::vector<Value>> collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
+std::tuple<std::vector<Value>, std::vector<Value>>
+collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
 {
     // Since we are guaranteed to be in an asynchronous execution function
     // we need to gather all values generated from mlirAsyncRuntimeCreateToken
@@ -167,27 +171,28 @@ std::tuple<std::vector<Value>, std::vector<Value>> collectRefCountedTokensAndVal
 
         auto callee = calleeMaybeIndirect.value();
         bool tokens = isMlirAsyncRuntimeCreateToken(callee);
-	bool values = isMlirAsyncRuntimeCreateValue(callee);
-	bool skip = !tokens && !values;
-	if (skip) return;
+        bool values = isMlirAsyncRuntimeCreateValue(callee);
+        bool skip = !tokens && !values;
+        if (skip)
+            return;
 
-	if (tokens) {
+        if (tokens) {
             for (auto value : call.getResults()) {
                 collectedTokens.push_back(value);
             }
-	}
+        }
 
-	if (values) {
+        if (values) {
             for (auto value : call.getResults()) {
                 collectedValues.push_back(value);
             }
-	}
+        }
     });
     return std::tuple<std::vector<Value>, std::vector<Value>>(collectedTokens, collectedValues);
 }
 
-void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnDecl, Block *failBlock,
-                                         PatternRewriter &rewriter)
+void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnDecl,
+                                               Block *failBlock, PatternRewriter &rewriter)
 {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointToEnd(failBlock);
@@ -196,15 +201,13 @@ void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnD
 }
 
 void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Block *failBlock,
-                                          PatternRewriter &rewriter)
+                      PatternRewriter &rewriter)
 {
     // At the fail block, it is guaranteed that all runtime values are available
     // but they
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointToEnd(failBlock);
-    auto ctx = rewriter.getContext();
     auto landingPad = failBlock->begin();
-    auto loc = landingPad->getLoc();
     auto moduleOp = landingPad->getParentOfType<ModuleOp>();
 
     LLVM::LLVMFuncOp setTokenError = lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
@@ -216,12 +219,33 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     for (auto value : values) {
         insertCallToMlirAsyncRuntimeErrorFunction(value, setValueError, failBlock, rewriter);
     }
+}
 
-    // Move until the end.
-    rewriter.create<LLVM::UnreachableOp>(loc);
+void insertBranchFromFailToSuccess(Block *fail, Block *success, PatternRewriter &rewriter)
+{
+    // The reason why we are unconditionally jumping from failure to success
+    // is because the failure is communicated through the state of the runtime tokens
+    // and values.
+    //
+    // The error will finally be managed by the main thread.
+    // But this thread is expected to end normally.
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPointToEnd(fail);
+
+    auto landingPad = fail->begin();
+    auto loc = landingPad->getLoc();
+
+    rewriter.create<LLVM::BrOp>(loc, success);
 }
 
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
     LogicalResult match(LLVM::CallOp op) const override;
@@ -259,6 +283,47 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     auto [tokens, values] = collectRefCountedTokensAndValues(caller);
 
     insertErrorCalls(tokens, values, failBlock, rewriter);
+    insertBranchFromFailToSuccess(failBlock, successBlock, rewriter);
+}
+
+void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(
+        callOp, [&] { callOp->setAttr(scheduleInvokeAttr, rewriter.getUnitAttr()); });
+}
+
+bool isAsync(LLVM::LLVMFuncOp funcOp)
+{
+    if (!funcOp->hasAttr(passthroughAttr))
+        return false;
+
+    auto haystack = funcOp->getAttrOfType<ArrayAttr>(passthroughAttr);
+    auto needle = StringAttr::get(funcOp.getContext(), "presplitcoroutine");
+    for (auto maybeNeedle : haystack) {
+        if (maybeNeedle == needle)
+            return true;
+    }
+
+    return false;
+}
+
+LogicalResult DetectCallsInAsyncRegionsTransform::match(LLVM::CallOp callOp) const
+{
+    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
+    if (!candidate)
+        return failure();
+
+    LLVM::LLVMFuncOp callee = candidate.value();
+    auto caller = getCaller(callOp);
+    bool validCandidate =
+        callee->hasAttr(qnodeAttr) && !callOp->hasAttr(scheduleInvokeAttr) && isAsync(caller);
+    return validCandidate ? success() : failure();
+}
+
+void DetectCallsInAsyncRegionsTransform::rewrite(LLVM::CallOp callOp,
+                                                 PatternRewriter &rewriter) const
+{
+    scheduleCallToInvoke(callOp, rewriter);
 }
 
 } // namespace
@@ -274,10 +339,17 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
     void runOnOperation() final
     {
         MLIRContext *context = &getContext();
-        RewritePatternSet patterns(context);
-        patterns.add<DetectQnodeTransform>(context);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        RewritePatternSet patterns1(context);
+        patterns1.add<DetectCallsInAsyncRegionsTransform>(context);
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1)))) {
+            signalPassFailure();
+        }
+
+        RewritePatternSet patterns2(context);
+        patterns2.add<DetectQnodeTransform>(context);
+
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2)))) {
             signalPassFailure();
         }
     }
