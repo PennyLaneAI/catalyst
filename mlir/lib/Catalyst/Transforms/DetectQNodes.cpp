@@ -26,6 +26,8 @@ using namespace mlir;
 
 namespace {
 
+// Constants
+
 static constexpr llvm::StringRef qnodeAttr = "qnode";
 static constexpr llvm::StringRef abortName = "abort";
 static constexpr llvm::StringRef unrecoverableErrorName =
@@ -42,6 +44,230 @@ static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName =
     "mlirAsyncRuntimeSetTokenError";
 static constexpr llvm::StringRef mlirAsyncRuntimeIsTokenErrorName = "mlirAsyncRuntimeIsTokenError";
 static constexpr llvm::StringRef mlirAsyncRuntimeIsValueErrorName = "mlirAsyncRuntimeIsValueError";
+
+// Helper function for attributes
+bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp);
+bool isScheduledForTransformation(LLVM::CallOp callOp);
+bool isAsync(LLVM::LLVMFuncOp funcOp);
+void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
+void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
+
+// Helper function for caller/callees
+LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
+std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp);
+
+// Helper functions for matching function names
+bool isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName);
+bool isAbort(LLVM::LLVMFuncOp funcOp);
+bool callsAbort(LLVM::CallOp callOp);
+bool callsAbort(Operation *possibleCall);
+bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp);
+bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp);
+bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp);
+bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp);
+bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
+bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall);
+
+// Helper function for creating function declarations
+LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
+
+// Actual content
+std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
+                             PatternRewriter &rewriter);
+void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
+                           PatternRewriter &rewriter);
+std::tuple<std::vector<Value>, std::vector<Value>>
+collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp);
+void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnDecl,
+                                               Block *failBlock, PatternRewriter &rewriter);
+void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Block *failBlock,
+                      PatternRewriter &rewriter);
+void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter);
+
+/*
+ * This pass is currently structured into three patterns.
+ */
+struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+// Step 1.
+// Find which call sites to change
+
+LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp callOp,
+                                                                  PatternRewriter &rewriter) const
+{
+    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
+    if (!candidate)
+        return failure();
+
+    LLVM::LLVMFuncOp callee = candidate.value();
+    auto caller = getCaller(callOp);
+    bool validCandidate =
+        callee->hasAttr(qnodeAttr) && !callOp->hasAttr(scheduleInvokeAttr) && isAsync(caller);
+    if (!validCandidate)
+        return failure();
+
+    scheduleCallToInvoke(callOp, rewriter);
+    return success();
+}
+
+// Step 2:
+// Change those callsites to use llvm.invoke instead of llvm.call
+void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+{
+    auto moduleOp = callOp->getParentOfType<ModuleOp>();
+    auto personality = lookupOrCreatePersonality(moduleOp);
+    auto abortFuncOp = lookupOrCreateAbort(moduleOp);
+    auto caller = getCaller(callOp);
+
+    setPersonalityAttribute(caller, personality, rewriter);
+
+    auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
+
+    transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
+
+    auto [tokens, values] = collectRefCountedTokensAndValues(caller);
+
+    insertErrorCalls(tokens, values, failBlock, rewriter);
+
+    scheduleAnalysisForErrorHandling(caller, rewriter);
+
+    if (successBlock->hasNoSuccessors()) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToEnd(failBlock);
+        rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
+        return;
+    }
+
+    auto successor = successBlock->getSuccessor(0);
+    insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
+}
+
+// Step 3:
+// Look into the caller of the asynchrnous regions and change the behaviour on error returns.
+void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return;
+
+    auto moduleOp = callOp->getParentOfType<ModuleOp>();
+    auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
+
+    auto callee = maybeCallee.value();
+
+    // At this moment we are at the call which may return an error.
+    // So we need to get the results
+    auto results = callOp.getResults();
+
+    // Values to look for:
+    SmallVector<Value> valuesToLookFor;
+    // TODO: Assert that we have results
+    assert(results.size() == 1);
+
+    Value result = results.front();
+    Type resultTy = result.getType();
+
+    if (isa<LLVM::LLVMPointerType>(resultTy)) {
+        valuesToLookFor.push_back(result);
+    }
+    else if (isa<LLVM::LLVMStructType>(resultTy)) {
+        // How to refer to a value without using llvm.extract
+        for (Operation *user : result.getUsers()) {
+            if (isa<LLVM::ExtractValueOp>(user)) {
+                valuesToLookFor.push_back(user->getResult(0));
+            }
+        }
+    }
+    else {
+        // TODO: unreachable
+    }
+
+    SmallVector<Value> callResults;
+
+    for (Value value : valuesToLookFor) {
+        for (Operation *user : value.getUsers()) {
+            // Use forward slices to prevent checking individual llvm.extract operations
+            bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
+            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsValueError(user);
+            bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
+            if (!isValid)
+                continue;
+
+            auto boolVal = user->getResult(0);
+            callResults.push_back(boolVal);
+        }
+    }
+
+    SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
+
+    for (auto boolVal : callResults) {
+        for (Operation *user : boolVal.getUsers()) {
+            if (isa<LLVM::XOrOp>(user)) {
+                auto xorResult = user->getResult(0);
+                potentialConditions.push_back(xorResult);
+            }
+        }
+    }
+
+    SmallVector<Block *> dests;
+
+    for (auto condition : potentialConditions) {
+        for (Operation *user : condition.getUsers()) {
+            if (isa<LLVM::CondBrOp>(user)) {
+                LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
+                dests.push_back(brOp.getTrueDest());
+                dests.push_back(brOp.getFalseDest());
+            }
+        }
+    }
+
+    SmallVector<LLVM::CallOp> aborts;
+
+    for (Block *block : dests) {
+        block->walk([&](Operation *op) {
+            if (callsAbort(op)) {
+                LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
+                aborts.push_back(abortCall);
+            }
+        });
+    }
+
+    for (auto abort : aborts) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPoint(abort);
+        auto callToHostRuntime =
+            rewriter.create<LLVM::CallOp>(abort.getLoc(), unrecoverableError, abort.getOperands());
+        rewriter.replaceOp(abort, callToHostRuntime);
+    }
+
+    cleanupPreHandleErrorAttr(callee, rewriter);
+}
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
 
@@ -322,27 +548,6 @@ void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewrite
     rewriter.create<LLVM::BrOp>(loc, success);
 }
 
-struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
-    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
-
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
-};
-
-struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp> {
-    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
-
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
-};
-
-struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
-    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
-
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
-};
-
 LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 {
     // TODO: Can we find the callers directly without looking at each call op?
@@ -360,105 +565,6 @@ LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(funcOp, [&] { funcOp->removeAttr(preHandleErrorAttrValue); });
-}
-
-void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
-{
-    auto maybeCallee = getCalleeSafe(callOp);
-    if (!maybeCallee)
-        return;
-
-    auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
-
-    auto callee = maybeCallee.value();
-
-    // At this moment we are at the call which may return an error.
-    // So we need to get the results
-    auto results = callOp.getResults();
-
-    // Values to look for:
-    SmallVector<Value> valuesToLookFor;
-    // TODO: Assert that we have results
-    assert(results.size() == 1);
-
-    Value result = results.front();
-    Type resultTy = result.getType();
-
-    if (isa<LLVM::LLVMPointerType>(resultTy)) {
-        valuesToLookFor.push_back(result);
-    }
-    else if (isa<LLVM::LLVMStructType>(resultTy)) {
-        // How to refer to a value without using llvm.extract
-        for (Operation *user : result.getUsers()) {
-            if (isa<LLVM::ExtractValueOp>(user)) {
-                valuesToLookFor.push_back(user->getResult(0));
-            }
-        }
-    }
-    else {
-        // TODO: unreachable
-    }
-
-    SmallVector<Value> callResults;
-
-    for (Value value : valuesToLookFor) {
-        for (Operation *user : value.getUsers()) {
-            // Use forward slices to prevent checking individual llvm.extract operations
-            bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
-            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsValueError(user);
-            bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
-            if (!isValid)
-                continue;
-
-            auto boolVal = user->getResult(0);
-            callResults.push_back(boolVal);
-        }
-    }
-
-    SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
-
-    for (auto boolVal : callResults) {
-        for (Operation *user : boolVal.getUsers()) {
-            if (isa<LLVM::XOrOp>(user)) {
-                auto xorResult = user->getResult(0);
-                potentialConditions.push_back(xorResult);
-            }
-        }
-    }
-
-    SmallVector<Block *> dests;
-
-    for (auto condition : potentialConditions) {
-        for (Operation *user : condition.getUsers()) {
-            if (isa<LLVM::CondBrOp>(user)) {
-                LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
-                dests.push_back(brOp.getTrueDest());
-                dests.push_back(brOp.getFalseDest());
-            }
-        }
-    }
-
-    SmallVector<LLVM::CallOp> aborts;
-
-    for (Block *block : dests) {
-        block->walk([&](Operation *op) {
-            if (callsAbort(op)) {
-                LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
-                aborts.push_back(abortCall);
-            }
-        });
-    }
-
-    for (auto abort : aborts) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPoint(abort);
-        auto callToHostRuntime =
-            rewriter.create<LLVM::CallOp>(abort.getLoc(), unrecoverableError, abort.getOperands());
-        rewriter.replaceOp(abort, callToHostRuntime);
-    }
-
-    cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
 LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
@@ -482,36 +588,6 @@ void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &
         funcOp, [&] { funcOp->setAttr(preHandleErrorAttrValue, rewriter.getUnitAttr()); });
 }
 
-void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
-{
-    auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto personality = lookupOrCreatePersonality(moduleOp);
-    auto abortFuncOp = lookupOrCreateAbort(moduleOp);
-    auto caller = getCaller(callOp);
-
-    setPersonalityAttribute(caller, personality, rewriter);
-
-    auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
-
-    transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
-
-    auto [tokens, values] = collectRefCountedTokensAndValues(caller);
-
-    insertErrorCalls(tokens, values, failBlock, rewriter);
-
-    scheduleAnalysisForErrorHandling(caller, rewriter);
-
-    if (successBlock->hasNoSuccessors()) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToEnd(failBlock);
-	rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
-	return;
-    }
-
-    auto successor = successBlock->getSuccessor(0);
-    insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
-}
-
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(
@@ -531,25 +607,6 @@ bool isAsync(LLVM::LLVMFuncOp funcOp)
     }
 
     return false;
-}
-
-LogicalResult DetectCallsInAsyncRegionsTransform::match(LLVM::CallOp callOp) const
-{
-    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
-    if (!candidate)
-        return failure();
-
-    LLVM::LLVMFuncOp callee = candidate.value();
-    auto caller = getCaller(callOp);
-    bool validCandidate =
-        callee->hasAttr(qnodeAttr) && !callOp->hasAttr(scheduleInvokeAttr) && isAsync(caller);
-    return validCandidate ? success() : failure();
-}
-
-void DetectCallsInAsyncRegionsTransform::rewrite(LLVM::CallOp callOp,
-                                                 PatternRewriter &rewriter) const
-{
-    scheduleCallToInvoke(callOp, rewriter);
 }
 
 } // namespace
