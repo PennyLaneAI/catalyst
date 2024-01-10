@@ -27,6 +27,7 @@ using namespace mlir;
 namespace {
 
 static constexpr llvm::StringRef qnodeAttr = "qnode";
+static constexpr llvm::StringRef abortName = "abort";
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
@@ -207,6 +208,27 @@ bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall)
     return callsMlirAsyncRuntimeIsValueError(callOp);
 }
 
+bool isAbort(LLVM::LLVMFuncOp funcOp) { return isFunctionNamed(funcOp, abortName); }
+
+bool callsAbort(LLVM::CallOp callOp)
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return isAbort(callee);
+}
+
+bool callsAbort(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return callsAbort(callOp);
+}
+
 std::tuple<std::vector<Value>, std::vector<Value>>
 collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
 {
@@ -366,71 +388,56 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
         // TODO: unreachable
     }
 
-    SmallVector<Value> callIsErrorToken;
-    SmallVector<Value> callIsErrorValue;
+    SmallVector<Value> callResults;
 
     for (Value value : valuesToLookFor) {
         for (Operation *user : value.getUsers()) {
             // Use forward slices to prevent checking individual llvm.extract operations
             bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
             bool isCallToIsValueToken = callsMlirAsyncRuntimeIsTokenError(user);
-            if (isCallToIsErrorToken) {
-                auto boolVal = user->getResult(0);
-                callIsErrorToken.push_back(boolVal);
-            }
-            if (isCallToIsValueToken) {
-                auto boolVal = user->getResult(0);
-                callIsErrorValue.push_back(boolVal);
-            }
+            bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
+            if (!isValid)
+                continue;
+
+            auto boolVal = user->getResult(0);
+            callResults.push_back(boolVal);
         }
     }
 
-    SmallVector<Value> xorTokenError;
-    SmallVector<Value> xorValueError;
+    SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
 
-    for (auto boolVal : callIsErrorToken) {
+    for (auto boolVal : callResults) {
         for (Operation *user : boolVal.getUsers()) {
             if (isa<LLVM::XOrOp>(user)) {
                 auto xorResult = user->getResult(0);
-                xorTokenError.push_back(xorResult);
+                potentialConditions.push_back(xorResult);
             }
         }
     }
 
-    for (auto boolVal : callIsErrorValue) {
-        for (Operation *user : boolVal.getUsers()) {
-            if (isa<LLVM::XOrOp>(user)) {
-                auto xorResult = user->getResult(0);
-                xorValueError.push_back(xorResult);
+    SmallVector<Block *> dests;
+
+    for (auto condition : potentialConditions) {
+        for (Operation *user : condition.getUsers()) {
+            if (isa<LLVM::CondBrOp>(user)) {
+                LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
+                dests.push_back(brOp.getTrueDest());
+                dests.push_back(brOp.getFalseDest());
             }
         }
     }
 
-    SmallVector<Block*> successorBlockTokenCheck;
-    SmallVector<Block*> successorBlockValueCheck;
+    SmallVector<Block *> abortBlocks;
 
-    for (auto boolVal : xorTokenError) {
-        for (Operation *user : boolVal.getUsers()) {
-            if (isa<LLVM::CondBrOp>(user)) {
-	       LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
-               successorBlockTokenCheck.push_back(brOp.getTrueDest());
-               successorBlockTokenCheck.push_back(brOp.getFalseDest());
-	    }
-	}
+    for (Block *block : dests) {
+        block->walk([&](Operation *op) {
+            if (callsAbort(op))
+                abortBlocks.push_back(block);
+        });
     }
 
-    for (auto boolVal : xorValueError) {
-        for (Operation *user : boolVal.getUsers()) {
-            if (isa<LLVM::CondBrOp>(user)) {
-	       LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
-               successorBlockValueCheck.push_back(brOp.getTrueDest());
-               successorBlockValueCheck.push_back(brOp.getFalseDest());
-	    }
-	}
-    }
-
-    for (Block* block : successorBlockTokenCheck) {
-       callOp.emitRemark() << block->front() << "first instruction of block";
+    for (Block *block : abortBlocks) {
+        callOp.emitRemark() << block->front() << " first";
     }
 
     cleanupPreHandleErrorAttr(callee, rewriter);

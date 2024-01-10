@@ -140,6 +140,8 @@ module {
   llvm.func @mlirAsyncRuntimeCreateToken() -> !llvm.ptr
   llvm.func @mlirAsyncRuntimeCreateValue() -> !llvm.ptr
   llvm.func @mlirAsyncRuntimeIsTokenError(!llvm.ptr) -> i1
+  llvm.func @abort()
+
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
@@ -164,6 +166,7 @@ module {
   ^bbgood:
      llvm.return
   ^bbbad:
+     llvm.call @abort() : () -> ()
      llvm.unreachable
   }
 }
