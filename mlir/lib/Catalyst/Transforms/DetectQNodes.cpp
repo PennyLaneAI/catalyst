@@ -305,7 +305,7 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     }
 }
 
-void insertBranchFromFailToSuccess(Block *fail, Block *success, PatternRewriter &rewriter)
+void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter)
 {
     // The reason why we are unconditionally jumping from failure to success
     // is because the failure is communicated through the state of the runtime tokens
@@ -406,7 +406,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
         for (Operation *user : value.getUsers()) {
             // Use forward slices to prevent checking individual llvm.extract operations
             bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
-            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsTokenError(user);
+            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsValueError(user);
             bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
             if (!isValid)
                 continue;
@@ -498,8 +498,18 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     auto [tokens, values] = collectRefCountedTokensAndValues(caller);
 
     insertErrorCalls(tokens, values, failBlock, rewriter);
-    insertBranchFromFailToSuccess(failBlock, successBlock, rewriter);
+
     scheduleAnalysisForErrorHandling(caller, rewriter);
+
+    if (successBlock->hasNoSuccessors()) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToEnd(failBlock);
+	rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
+	return;
+    }
+
+    auto successor = successBlock->getSuccessor(0);
+    insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
 }
 
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
