@@ -397,7 +397,14 @@ def custom_lower_jaxpr_to_module(
     host_callbacks = []
     lowering_params = LoweringParameters()
     ctx = ModuleContext(
-        backend_or_name=None, platforms=[platform], axis_context=axis_context, name_stack=name_stack, keepalives=keepalives, channel_iterator=channel_iter, host_callbacks=host_callbacks, lowering_parameters=lowering_params
+        backend_or_name=None,
+        platforms=[platform],
+        axis_context=axis_context,
+        name_stack=name_stack,
+        keepalives=keepalives,
+        channel_iterator=channel_iter,
+        host_callbacks=host_callbacks,
+        lowering_parameters=lowering_params,
     )
     ctx.context.allow_unregistered_dialects = True
     with ctx.context, ir.Location.unknown(ctx.context):
