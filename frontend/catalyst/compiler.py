@@ -116,7 +116,6 @@ HLO_LOWERING_PASS = (
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
         "convert-to-signless",
-        "func.func(scalarize)",
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
