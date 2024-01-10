@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -35,6 +37,8 @@ static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName =
     "mlirAsyncRuntimeSetValueError";
 static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName =
     "mlirAsyncRuntimeSetTokenError";
+static constexpr llvm::StringRef mlirAsyncRuntimeIsTokenErrorName = "mlirAsyncRuntimeIsTokenError";
+static constexpr llvm::StringRef mlirAsyncRuntimeIsValueErrorName = "mlirAsyncRuntimeIsValueError";
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
 
@@ -155,6 +159,54 @@ bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
     return isFunctionNamed(funcOp, mlirAsyncRuntimeCreateTokenName);
 }
 
+bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp)
+{
+    return isFunctionNamed(funcOp, mlirAsyncRuntimeIsTokenErrorName);
+}
+
+bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
+{
+    return isFunctionNamed(funcOp, mlirAsyncRuntimeIsValueErrorName);
+}
+
+bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp)
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return isMlirAsyncRuntimeIsTokenError(callee);
+}
+
+bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp)
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return isMlirAsyncRuntimeIsValueError(callee);
+}
+
+bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return callsMlirAsyncRuntimeIsTokenError(callOp);
+}
+
+bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return callsMlirAsyncRuntimeIsValueError(callOp);
+}
+
 std::tuple<std::vector<Value>, std::vector<Value>>
 collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
 {
@@ -252,6 +304,66 @@ struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp
     LogicalResult match(LLVM::CallOp op) const override;
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
+
+struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
+{
+    // TODO: Can we find the callers directly without looking at each call op?
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return failure();
+
+    auto calleeFuncOp = maybeCallee.value();
+    if (!calleeFuncOp->hasAttr(preHandleErrorAttrValue))
+        return failure();
+
+    return success();
+}
+
+void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(funcOp, [&] { funcOp->removeAttr(preHandleErrorAttrValue); });
+}
+
+void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return;
+
+    auto callee = maybeCallee.value();
+
+    // At this moment we are at the call which may return an error.
+    // So we need to get the results
+    auto results = callOp.getResults();
+
+    SetVector<Operation *> forwardSlice;
+    // A forward slice are all operations that depend on the call operation.
+    getForwardSlice(callOp.getOperation(), &forwardSlice);
+
+    SetVector<Operation *> callIsErrorToken;
+    SetVector<Operation *> callIsErrorValue;
+
+    for (auto *sliceOp : forwardSlice) {
+        bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(sliceOp);
+        bool isCallToIsValueToken = callsMlirAsyncRuntimeIsTokenError(sliceOp);
+        if (isCallToIsErrorToken)
+            callIsErrorToken.insert(sliceOp);
+        if (isCallToIsValueToken)
+            callIsErrorValue.insert(sliceOp);
+    }
+
+    for (auto *operation : callIsErrorToken) {
+        callOp.emitRemark() << operation;
+    }
+    cleanupPreHandleErrorAttr(callee, rewriter);
+}
 
 LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
 {
@@ -356,8 +468,13 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
 
         RewritePatternSet patterns2(context);
         patterns2.add<DetectQnodeTransform>(context);
-
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2)))) {
+            signalPassFailure();
+        }
+
+        RewritePatternSet patterns3(context);
+        patterns3.add<RemoveAbortInsertCallTransform>(context);
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3)))) {
             signalPassFailure();
         }
     }

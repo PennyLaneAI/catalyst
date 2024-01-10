@@ -21,6 +21,7 @@ module {
     llvm.return
   }
 
+  // CHECK-LABEL: caller
   llvm.func @caller() {
     // CHECK-NOT: llvm.invoke
     llvm.call @callee() : () -> ()
@@ -34,11 +35,11 @@ module {
 
 module {
   // CHECK: llvm.func @__gxx_personality_v0
-  // CHECK: llvm.func @abort
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
 
+  // CHECK-LABEL: @caller
   llvm.func @caller() {
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
     llvm.return
@@ -54,7 +55,7 @@ module {
     llvm.return
   }
 
-  // CHECK: llvm.func @caller
+  // CHECK-LABEL: @caller
   // CHECK-SAME: personality = @__gxx_personality_v0
   llvm.func @caller() {
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
@@ -70,6 +71,7 @@ module {
     llvm.return
   }
 
+  // CHECK-LABEL: caller
   llvm.func @caller() {
     // CHECK: llvm.invoke
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
@@ -86,6 +88,7 @@ module {
     llvm.return
   }
 
+  // CHECK-LABEL: caller
   llvm.func @caller() {
     %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
@@ -103,6 +106,7 @@ module {
     llvm.return
   }
 
+  // CHECK-LABEL: caller
   llvm.func @caller() {
     %0 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
@@ -115,6 +119,7 @@ module {
 
 // Check to make sure that the we unconditionally jump from failure to success
 module {
+  // CHECK-LABEL: caller
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
@@ -131,7 +136,9 @@ module {
 
 // Check to make sure that the caller of async region gets annotated
 module {
+  // CHECK-LABEL: async_region
   llvm.func @mlirAsyncRuntimeCreateValue() -> !llvm.ptr
+  llvm.func @mlirAsyncRuntimeIsTokenError(!llvm.ptr) -> i1
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
@@ -142,10 +149,9 @@ module {
     llvm.return %0 : !llvm.ptr
   }
 
-  // CHECK: catalyst.preHandleError
-  llvm.func @caller() -> !llvm.ptr {
+  llvm.func @caller() {
      %0 = llvm.call @async_region() : () -> !llvm.ptr
-     llvm.return %0 : !llvm.ptr
+     %1 = llvm.call @mlirAsyncRuntimeIsTokenError(%0) : (!llvm.ptr) -> i1
+     llvm.return 
   }
-
 }
