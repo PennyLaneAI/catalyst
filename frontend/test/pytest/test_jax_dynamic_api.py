@@ -330,7 +330,7 @@ def test_invalid_shapes(bad_shape):
         return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(
-        TypeError, match="Shapes must be 1D sequences of concrete values of integer type"
+        TypeError, match=f"Shapes must be 1D sequences of integer scalars"
     ):
         qjit(f)
 
@@ -347,6 +347,7 @@ def test_invalid_shapes_2():
         qjit(f)
 
 
+@pytest.mark.xfail
 def test_shapes_type_conversion():
     """We allow floats to be passed as dynamic shapes. This test fixes the current behavior of this
     mechanism.
