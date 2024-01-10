@@ -50,7 +50,7 @@ llvm.func @_mlir_ciface_foo() {
 llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64, %arg3: !llvm.ptr, %arg4: !llvm.ptr, %arg5: i64) -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> attributes {llvm.emit_c_interface} 
 
 // Test that the return argument type remains unchanged in wrapper function
-// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>, %arg1: !llvm.ptr<struct<(ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64)>>)>>)  
+// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr)  
 
 llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr) {
     %0 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr,  i64)>
@@ -92,7 +92,7 @@ llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr
 llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64, %arg3: !llvm.ptr, %arg4: !llvm.ptr, %arg5: i64) -> () attributes {llvm.emit_c_interface} 
 
 // Test that the input argument is wrapped around a structure and a pointer
-// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr<struct<(ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64)>>)>>)
+// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr)
 
 llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr) {
     %0 = llvm.load %arg0 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
@@ -137,8 +137,7 @@ llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr) {
 llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> () attributes {llvm.emit_c_interface} 
 
 // Test that the input argument is wrapped around a structure and a pointer for only one
-// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr<struct<(ptr<struct<(ptr<f64>, ptr<f64>, i64)>>)>>)
-
+// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr)
 llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr) {
     %0 = llvm.load %arg0 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
     %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 

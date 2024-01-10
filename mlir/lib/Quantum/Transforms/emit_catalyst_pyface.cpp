@@ -131,7 +131,7 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         // for uniformity in Python and in the unwrapping.
         inputType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), inputType);
     }
-    inputType.dump();
+
     LLVM::LLVMFunctionType wrapperFuncType =
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
 
