@@ -34,6 +34,7 @@ from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
+from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
     AllocOp,
@@ -164,6 +165,8 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 # Primitives #
 ##############
 
+zne_p = core.Primitive("zne")
+zne_p.multiple_results = True
 qdevice_p = core.Primitive("qdevice")
 qdevice_p.multiple_results = True
 qalloc_p = core.Primitive("qalloc")
@@ -486,6 +489,44 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         mlir.flatten_lowering_ir_args(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
+    ).results
+
+
+#
+# zne
+#
+
+
+@zne_p.def_impl
+def _zne_def_impl(ctx, *args, jaxpr, fn):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@zne_p.def_abstract_eval
+def _zne_abstract_eval(*args, jaxpr, fn):  # pylint: disable=unused-argument
+    shape = list(args[-1].shape)
+    if len(jaxpr.out_avals) > 1:
+        shape.append(len(jaxpr.out_avals))
+    return [core.ShapedArray(shape, jaxpr.out_avals[0].dtype)]
+
+
+def _zne_lowering(ctx, *args, jaxpr, fn):
+    """Lowering function to the ZNE opearation.
+    Args:
+        ctx: the MLIR context
+        args: the arguments with scale factors as last
+        jaxpr: the jaxpr representation of the circuit
+        fn: the function to be mitigated
+    """
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    return ZneOp(
+        flat_output_types,
+        ir.FlatSymbolRefAttr.get(symbol_name),
+        mlir.flatten_lowering_ir_args(args[0:-1]),
+        args[-1],
     ).results
 
 
@@ -1462,6 +1503,7 @@ def _adjoint_lowering(
 # registration
 #
 
+mlir.register_lowering(zne_p, _zne_lowering)
 mlir.register_lowering(qdevice_p, _qdevice_lowering)
 mlir.register_lowering(qalloc_p, _qalloc_lowering)
 mlir.register_lowering(qdealloc_p, _qdealloc_lowering)

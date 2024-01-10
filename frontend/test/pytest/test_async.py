@@ -21,9 +21,9 @@ from jax import numpy as jnp
 from catalyst import grad, qjit
 
 
-def test_qnode_execution():
+def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
-    dev = qml.device("lightning.qubit", wires=2)
+    dev = qml.device(backend, wires=2)
 
     def multiple_qnodes(params):
         @qml.qnode(device=dev)
@@ -62,7 +62,7 @@ def test_qnode_execution():
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
-def test_gradient(inp, diff_methods):
+def test_gradient(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
     def f(x):
@@ -71,7 +71,7 @@ def test_gradient(inp, diff_methods):
 
     @qjit(async_qnodes=True)
     def compiled(x: float):
-        g = qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=diff_methods[0])(f)
+        g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1])
         return h(x)
 
