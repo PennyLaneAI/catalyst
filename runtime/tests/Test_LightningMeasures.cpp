@@ -248,35 +248,12 @@ TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) shots test", "[Measures]", SimType
     sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
 
     std::vector<std::complex<double>> mat1(16, {0, 0});
+    mat1[1] = {1, 0};
 
     ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
-    REQUIRE_THROWS_WITH(sim->Expval(h1),
-                        Catch::Contains("Hermitian observables do not support shot measurement."));
-}
-
-TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
-{
-    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-
-    // state-vector with #qubits = n
-    constexpr size_t n = 2;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        Qs.push_back(sim->AllocateQubit());
-    }
-
-    constexpr size_t num_shots = 10000;
-    sim->SetDeviceShots(num_shots);
-
-    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
-    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
-
-    std::vector<std::complex<double>> mat1(16, {0, 0});
-
-    ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
-    REQUIRE_THROWS_WITH(sim->Var(h1),
-                        Catch::Contains("Hermitian observables do not support shot measurement."));
+    REQUIRE_THROWS_WITH(
+        sim->Expval(h1),
+        Catch::Contains("The matrix passed to HermitianObs is not a Hermitian matrix."));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
@@ -643,6 +620,36 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", S
     CHECK(sim->Expval(hxhz) == Approx(0.5).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(Hermitian[])) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {2.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hxhz = sim->HamiltonianObservable({0.2, 0.3, 0.6}, {px, h, pz});
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    CHECK(sim->Expval(hxhz) == Approx(0.5).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
                         SimTypes)
 {
@@ -670,6 +677,38 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "
     ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, tp});
 
     CHECK(sim->Expval(hhtp) == Approx(1.2).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) shots test", "[Measures]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tp = sim->TensorObservable({px, pz});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {-1.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, tp});
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    CHECK(sim->Expval(hhtp) == Approx(1.2).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[Measures]",
@@ -805,6 +844,31 @@ TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test", "[Measures]", SimTypes)
     CHECK(sim->Var(h2) == Approx(1.0).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) shots test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}};
+
+    ObsIdType h2 = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+
+    constexpr size_t num_shots = 10000;
+    sim->SetDeviceShots(num_shots);
+
+    CHECK(sim->Var(h2) == Approx(1.0).margin(5e-2));
+}
+
 TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -915,6 +979,29 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", SimT
 
     CHECK(sim->Var(tph1) == Approx(.0).margin(1e-5));
     CHECK(sim->Var(tph2) == Approx(1.0).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) shot test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}};
+
+    ObsIdType h2 = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType tph2 = sim->TensorObservable({h2});
+
+    CHECK(sim->Var(tph2) == Approx(1.0).margin(5e-2));
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", SimTypes)

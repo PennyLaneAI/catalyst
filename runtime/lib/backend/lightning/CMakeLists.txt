@@ -18,16 +18,20 @@ set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
 FetchContent_Declare(
     pennylane_lightning
     GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-    GIT_TAG      ${LIGHTNING_GIT_TAG}
+    #GIT_TAG      ${LIGHTNING_GIT_TAG}
+    GIT_TAG      "c46a0de"
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
 if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
     set(PL_BACKEND "lightning_qubit;lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
+    set(ENABLE_LAPACK "ON" CACHE STRING "Enable Lapack for PennyLane Lightning backend")
 elseif(ENABLE_LIGHTNING)
     set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
+    set(ENABLE_LAPACK "ON" CACHE STRING "Enable Lapack for PennyLane Lightning backend")
 elseif(ENABLE_LIGHTNING_KOKKOS)
     set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
+    set(ENABLE_LAPACK "ON" CACHE STRING "Enable Lapack for PennyLane Lightning backend")
 endif()
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 
