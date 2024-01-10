@@ -28,6 +28,7 @@ static constexpr llvm::StringRef qnodeAttr = "qnode";
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
+static constexpr llvm::StringRef preHandleErrorAttrValue = "catalyst.preHandleError";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
 static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName =
@@ -267,6 +268,12 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
     return validCandidate ? success() : failure();
 }
 
+void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(
+        funcOp, [&] { funcOp->setAttr(preHandleErrorAttrValue, rewriter.getUnitAttr()); });
+}
+
 void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
@@ -284,6 +291,7 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
 
     insertErrorCalls(tokens, values, failBlock, rewriter);
     insertBranchFromFailToSuccess(failBlock, successBlock, rewriter);
+    scheduleAnalysisForErrorHandling(caller, rewriter);
 }
 
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)

@@ -125,3 +125,27 @@ module {
     llvm.return
   }
 }
+
+
+// -----
+
+// Check to make sure that the caller of async region gets annotated
+module {
+  llvm.func @mlirAsyncRuntimeCreateValue() -> !llvm.ptr
+  llvm.func @callee() attributes { qnode } {
+    llvm.return
+  }
+
+  llvm.func @async_region() -> !llvm.ptr {
+    %0 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return %0 : !llvm.ptr
+  }
+
+  // CHECK: catalyst.preHandleError
+  llvm.func @caller() -> !llvm.ptr {
+     %0 = llvm.call @async_region() : () -> !llvm.ptr
+     llvm.return %0 : !llvm.ptr
+  }
+
+}
