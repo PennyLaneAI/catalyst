@@ -343,25 +343,96 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     // So we need to get the results
     auto results = callOp.getResults();
 
-    SetVector<Operation *> forwardSlice;
-    // A forward slice are all operations that depend on the call operation.
-    getForwardSlice(callOp.getOperation(), &forwardSlice);
+    // Values to look for:
+    SmallVector<Value> valuesToLookFor;
+    // TODO: Assert that we have results
+    assert(results.size() == 1);
 
-    SetVector<Operation *> callIsErrorToken;
-    SetVector<Operation *> callIsErrorValue;
+    Value result = results.front();
+    Type resultTy = result.getType();
 
-    for (auto *sliceOp : forwardSlice) {
-        bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(sliceOp);
-        bool isCallToIsValueToken = callsMlirAsyncRuntimeIsTokenError(sliceOp);
-        if (isCallToIsErrorToken)
-            callIsErrorToken.insert(sliceOp);
-        if (isCallToIsValueToken)
-            callIsErrorValue.insert(sliceOp);
+    if (isa<LLVM::LLVMPointerType>(resultTy)) {
+        valuesToLookFor.push_back(result);
+    }
+    else if (isa<LLVM::LLVMStructType>(resultTy)) {
+        // How to refer to a value without using llvm.extract
+        for (Operation *user : result.getUsers()) {
+            if (isa<LLVM::ExtractValueOp>(user)) {
+                valuesToLookFor.push_back(user->getResult(0));
+            }
+        }
+    }
+    else {
+        // TODO: unreachable
     }
 
-    for (auto *operation : callIsErrorToken) {
-        callOp.emitRemark() << operation;
+    SmallVector<Value> callIsErrorToken;
+    SmallVector<Value> callIsErrorValue;
+
+    for (Value value : valuesToLookFor) {
+        for (Operation *user : value.getUsers()) {
+            // Use forward slices to prevent checking individual llvm.extract operations
+            bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
+            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsTokenError(user);
+            if (isCallToIsErrorToken) {
+                auto boolVal = user->getResult(0);
+                callIsErrorToken.push_back(boolVal);
+            }
+            if (isCallToIsValueToken) {
+                auto boolVal = user->getResult(0);
+                callIsErrorValue.push_back(boolVal);
+            }
+        }
     }
+
+    SmallVector<Value> xorTokenError;
+    SmallVector<Value> xorValueError;
+
+    for (auto boolVal : callIsErrorToken) {
+        for (Operation *user : boolVal.getUsers()) {
+            if (isa<LLVM::XOrOp>(user)) {
+                auto xorResult = user->getResult(0);
+                xorTokenError.push_back(xorResult);
+            }
+        }
+    }
+
+    for (auto boolVal : callIsErrorValue) {
+        for (Operation *user : boolVal.getUsers()) {
+            if (isa<LLVM::XOrOp>(user)) {
+                auto xorResult = user->getResult(0);
+                xorValueError.push_back(xorResult);
+            }
+        }
+    }
+
+    SmallVector<Block*> successorBlockTokenCheck;
+    SmallVector<Block*> successorBlockValueCheck;
+
+    for (auto boolVal : xorTokenError) {
+        for (Operation *user : boolVal.getUsers()) {
+            if (isa<LLVM::CondBrOp>(user)) {
+	       LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
+               successorBlockTokenCheck.push_back(brOp.getTrueDest());
+               successorBlockTokenCheck.push_back(brOp.getFalseDest());
+	    }
+	}
+    }
+
+    for (auto boolVal : xorValueError) {
+        for (Operation *user : boolVal.getUsers()) {
+            if (isa<LLVM::CondBrOp>(user)) {
+	       LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
+               successorBlockValueCheck.push_back(brOp.getTrueDest());
+               successorBlockValueCheck.push_back(brOp.getFalseDest());
+	    }
+	}
+    }
+
+    for (Block* block : successorBlockTokenCheck) {
+       callOp.emitRemark() << block->front() << "first instruction of block";
+    }
+
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
 

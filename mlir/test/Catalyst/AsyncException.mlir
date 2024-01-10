@@ -137,21 +137,33 @@ module {
 // Check to make sure that the caller of async region gets annotated
 module {
   // CHECK-LABEL: async_region
+  llvm.func @mlirAsyncRuntimeCreateToken() -> !llvm.ptr
   llvm.func @mlirAsyncRuntimeCreateValue() -> !llvm.ptr
   llvm.func @mlirAsyncRuntimeIsTokenError(!llvm.ptr) -> i1
   llvm.func @callee() attributes { qnode } {
     llvm.return
   }
 
-  llvm.func @async_region() -> !llvm.ptr {
-    %0 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
+  llvm.func @async_region() -> !llvm.struct<(ptr, ptr)> {
+    %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
+    %1 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
-    llvm.return %0 : !llvm.ptr
+    %2 = llvm.mlir.undef : !llvm.struct<(ptr, ptr)>
+    %3 = llvm.insertvalue %0, %2[0] : !llvm.struct<(ptr, ptr)>
+    %4 = llvm.insertvalue %0, %3[0] : !llvm.struct<(ptr, ptr)>
+    llvm.return %4 : !llvm.struct<(ptr, ptr)>
   }
 
   llvm.func @caller() {
-     %0 = llvm.call @async_region() : () -> !llvm.ptr
-     %1 = llvm.call @mlirAsyncRuntimeIsTokenError(%0) : (!llvm.ptr) -> i1
-     llvm.return 
+     %c1 = llvm.mlir.constant(1 : i64) : i1
+     %0 = llvm.call @async_region() : () -> !llvm.struct<(ptr, ptr)>
+     %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr)> 
+     %2 = llvm.call @mlirAsyncRuntimeIsTokenError(%1) : (!llvm.ptr) -> i1
+     %3 = llvm.xor %2, %c1 : i1
+     llvm.cond_br %3, ^bbgood, ^bbbad
+  ^bbgood:
+     llvm.return
+  ^bbbad:
+     llvm.unreachable
   }
 }
