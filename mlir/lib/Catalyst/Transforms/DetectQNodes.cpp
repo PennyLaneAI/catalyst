@@ -28,6 +28,8 @@ namespace {
 
 static constexpr llvm::StringRef qnodeAttr = "qnode";
 static constexpr llvm::StringRef abortName = "abort";
+static constexpr llvm::StringRef unrecoverableErrorName =
+    "__catalyst__host__rt__unrecoverable_error";
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
@@ -85,6 +87,13 @@ LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeSetTokenErrorName, {ptrTy},
                                         voidTy);
+}
+
+LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, unrecoverableErrorName, {}, voidTy);
 }
 
 std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
@@ -359,6 +368,9 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     if (!maybeCallee)
         return;
 
+    auto moduleOp = callOp->getParentOfType<ModuleOp>();
+    auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
+
     auto callee = maybeCallee.value();
 
     // At this moment we are at the call which may return an error.
@@ -427,17 +439,23 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
         }
     }
 
-    SmallVector<Block *> abortBlocks;
+    SmallVector<LLVM::CallOp> aborts;
 
     for (Block *block : dests) {
         block->walk([&](Operation *op) {
-            if (callsAbort(op))
-                abortBlocks.push_back(block);
+            if (callsAbort(op)) {
+                LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
+                aborts.push_back(abortCall);
+            }
         });
     }
 
-    for (Block *block : abortBlocks) {
-        callOp.emitRemark() << block->front() << " first";
+    for (auto abort : aborts) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPoint(abort);
+        auto callToHostRuntime =
+            rewriter.create<LLVM::CallOp>(abort.getLoc(), unrecoverableError, abort.getOperands());
+        rewriter.replaceOp(abort, callToHostRuntime);
     }
 
     cleanupPreHandleErrorAttr(callee, rewriter);
