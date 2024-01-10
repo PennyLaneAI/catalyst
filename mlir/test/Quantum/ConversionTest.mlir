@@ -81,7 +81,7 @@ func.func @device() {
 // Memory Management //
 ///////////////////////
 
-// CHECK: llvm.func @__quantum__rt__qubit_allocate_array(i64) -> !llvm.ptr<struct<"Array", opaque>>
+// CHECK: llvm.func @__quantum__rt__qubit_allocate_array(i64) -> !llvm.ptr
 
 // CHECK-LABEL: @alloc
 func.func @alloc(%c : i64) {
@@ -98,7 +98,7 @@ func.func @alloc(%c : i64) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__rt__qubit_release_array(!llvm.ptr<struct<"Array", opaque>>)
+// CHECK: llvm.func @__quantum__rt__qubit_release_array(!llvm.ptr)
 
 // CHECK-LABEL: @dealloc
 func.func @dealloc(%r : !quantum.reg) {
@@ -111,20 +111,18 @@ func.func @dealloc(%r : !quantum.reg) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__rt__array_get_element_ptr_1d(!llvm.ptr<struct<"Array", opaque>>, i64) -> !llvm.ptr<i8>
+// CHECK: llvm.func @__quantum__rt__array_get_element_ptr_1d(!llvm.ptr, i64) -> !llvm.ptr
 
 // CHECK-LABEL: @extract
 func.func @extract(%r : !quantum.reg, %c : i64) {
 
-    // CHECK: [[elem_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, %arg1)
-    // CHECK: [[qb_ptr:%.+]] = llvm.bitcast [[elem_ptr]]
-    // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr<ptr<struct<"Qubit", opaque>>>
+    // CHECK: [[qb_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, %arg1) : (!llvm.ptr, i64) -> !llvm.ptr
+    // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr -> !llvm.ptr
     quantum.extract %r[%c] : !quantum.reg -> !quantum.bit
 
     // CHECK: [[c5:%.+]] = llvm.mlir.constant(5 : i64)
-    // CHECK: [[elem_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, [[c5]])
-    // CHECK: [[qb_ptr:%.+]] = llvm.bitcast [[elem_ptr]]
-    // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr<ptr<struct<"Qubit", opaque>>>
+    // CHECK: [[qb_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, [[c5]]) : (!llvm.ptr, i64) -> !llvm.ptr
+    // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr -> !llvm.ptr
     quantum.extract %r[5] : !quantum.reg -> !quantum.bit
 
     return
@@ -147,11 +145,11 @@ func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
 // Quantum Gates //
 ///////////////////
 
-// CHECK-DAG: llvm.func @__quantum__qis__Identity(!llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__quantum__qis__RX(f64, !llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__quantum__qis__SWAP(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__quantum__qis__CRot(f64, f64, f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__quantum__qis__Toffoli(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, i1)
+// CHECK-DAG: llvm.func @__quantum__qis__Identity(!llvm.ptr, i1)
+// CHECK-DAG: llvm.func @__quantum__qis__RX(f64, !llvm.ptr, i1)
+// CHECK-DAG: llvm.func @__quantum__qis__SWAP(!llvm.ptr, !llvm.ptr, i1)
+// CHECK-DAG: llvm.func @__quantum__qis__CRot(f64, f64, f64, !llvm.ptr, !llvm.ptr, i1)
+// CHECK-DAG: llvm.func @__quantum__qis__Toffoli(!llvm.ptr, !llvm.ptr, !llvm.ptr, i1)
 
 // CHECK-LABEL: @custom_gate
 func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
@@ -222,7 +220,7 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__QubitUnitary(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, i1, i64, ...)
+// CHECK: llvm.func @__quantum__qis__QubitUnitary(!llvm.ptr, i1, i64, ...)
 
 // CHECK-LABEL: @qubit_unitary
 func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p2 : memref<4x4xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
@@ -271,7 +269,7 @@ func.func @compbasis(%q : !quantum.bit) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__NamedObs(i64, !llvm.ptr<struct<"Qubit", opaque>>) -> i64
+// CHECK: llvm.func @__quantum__qis__NamedObs(i64, !llvm.ptr) -> i64
 
 // CHECK-LABEL: @namedobs
 func.func @namedobs(%q : !quantum.bit) {
@@ -288,7 +286,7 @@ func.func @namedobs(%q : !quantum.bit) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__HermitianObs(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, i64, ...) -> i64
+// CHECK: llvm.func @__quantum__qis__HermitianObs(!llvm.ptr, i64, ...) -> i64
 
 // CHECK-LABEL: @hermitian
 func.func @hermitian(%q : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>, %p2 : memref<4x4xcomplex<f64>>) {
@@ -331,7 +329,7 @@ func.func @tensor(%obs : !quantum.obs) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__HamiltonianObs(!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>, i64, ...) -> i64
+// CHECK: llvm.func @__quantum__qis__HamiltonianObs(!llvm.ptr, i64, ...) -> i64
 
 // CHECK-LABEL: @hamiltonian
 func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
@@ -361,7 +359,7 @@ func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3x
 // Measurements //
 //////////////////
 
-// CHECK: llvm.func @__quantum__qis__Measure(!llvm.ptr<struct<"Qubit", opaque>>) -> !llvm.ptr<struct<"Result", opaque>>
+// CHECK: llvm.func @__quantum__qis__Measure(!llvm.ptr) -> !llvm.ptr
 
 // CHECK-LABEL: @measure
 func.func @measure(%q : !quantum.bit) -> !quantum.bit {
@@ -375,7 +373,7 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__Sample(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, i64, i64, ...)
+// CHECK: llvm.func @__quantum__qis__Sample(!llvm.ptr, i64, i64, ...)
 
 // CHECK-LABEL: @sample
 func.func @sample(%q : !quantum.bit) {
@@ -403,7 +401,7 @@ func.func @sample(%q : !quantum.bit) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__Counts(!llvm.ptr<struct<(struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)>>, i64, i64, ...)
+// CHECK: llvm.func @__quantum__qis__Counts(!llvm.ptr, i64, i64, ...)
 
 // CHECK-LABEL: @counts
 func.func @counts(%q : !quantum.bit) {
@@ -459,7 +457,7 @@ func.func @var(%obs : !quantum.obs) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__Probs(!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>, i64, ...)
+// CHECK: llvm.func @__quantum__qis__Probs(!llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @probs
 func.func @probs(%q : !quantum.bit) {
@@ -485,7 +483,7 @@ func.func @probs(%q : !quantum.bit) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__qis__State(!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>, i64, ...)
+// CHECK: llvm.func @__quantum__qis__State(!llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @state
 func.func @state(%q : !quantum.bit) {
