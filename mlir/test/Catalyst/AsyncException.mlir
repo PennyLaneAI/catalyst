@@ -166,6 +166,7 @@ module {
   ^bbgood:
      llvm.return
   ^bbbad:
+     // CHECK: llvm.call @__catalyst__host__rt__unrecoverable_error
      llvm.call @abort() : () -> ()
      llvm.unreachable
   }
