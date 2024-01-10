@@ -63,11 +63,11 @@ from jax.core import (
 )
 from jax.interpreters.mlir import (
     AxisContext,
+    LoweringParameters,
     ModuleContext,
     ir,
     lower_jaxpr_to_fun,
     lowerable_effects,
-    LoweringParameters,
 )
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,

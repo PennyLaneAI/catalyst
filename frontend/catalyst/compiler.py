@@ -165,6 +165,7 @@ BUFFERIZATION_PASS = (
 MLIR_TO_LLVM_PASS = (
     "MLIRToLLVMDialect",
     [
+        "expand-realloc",
         "convert-gradient-to-llvm",
         "func.func(convert-linalg-to-loops)",
         "convert-scf-to-cf",
