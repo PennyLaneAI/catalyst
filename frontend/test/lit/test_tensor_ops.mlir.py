@@ -186,7 +186,7 @@ test_ewise_float_power.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_maximum(x, y):
-    # CHECK: arith.maxf
+    # CHECK: arith.maximumf
     # CHECK-SAME: f64
     val = jnp.maximum(x, y)
     qml.RZ(val, wires=0)
@@ -204,7 +204,7 @@ test_ewise_maximum.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_minimum(x, y):
-    # CHECK: arith.minf
+    # CHECK: arith.minimumf
     # CHECK-SAME: f64
     val = jnp.minimum(x, y)
     qml.RZ(val, wires=0)
