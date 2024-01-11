@@ -168,7 +168,21 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
 }
 
-void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target, PatternRewriter &rewriter) {
+void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls)
+{
+    for (Block *block : blocks) {
+        block->walk([&](Operation *op) {
+            if (callsAbort(op)) {
+                LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
+                calls.push_back(abortCall);
+            }
+        });
+    }
+}
+
+void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
+                                  PatternRewriter &rewriter)
+{
     for (auto oldCallOp : oldCallOps) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPoint(oldCallOp);
@@ -258,16 +272,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     }
 
     SmallVector<LLVM::CallOp> aborts;
-
-    for (Block *block : dests) {
-        block->walk([&](Operation *op) {
-            if (callsAbort(op)) {
-                LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
-                aborts.push_back(abortCall);
-            }
-        });
-    }
-
+    collectCallsToAbortInBlocks(dests, aborts);
     replaceCallsWithCallToTarget(aborts, unrecoverableError, rewriter);
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
