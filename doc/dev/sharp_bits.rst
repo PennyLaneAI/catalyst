@@ -886,18 +886,7 @@ array(2.1)
 
 For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
 
-Note that indexing of dynamically-shaped arrays is not currently supported:
-
->>> @qjit
-... def almost_sum_fn(x):
-...     print("Compiling")
-...     return jnp.sum(x[0:-1]). # indexing into dynamic array x
->>> almost_sum_fn(jnp.array([1., 0.5]))
-IndexError: Cannot use NumPy slice indexing on an array dimension whose
-size is not statically known (Traced<ShapedArray(int64[], weak_type=True)>with<
-DynamicJaxprTrace(level=1/0)>). Try using lax.dynamic_slice/dynamic_update_slice
-
-Similarly, using dynamically-shaped arrays within for loops, while loops, and
+Note that using dynamically-shaped arrays within for loops, while loops, and
 conditional statements, is not currently supported:
 
 >>> @qjit
