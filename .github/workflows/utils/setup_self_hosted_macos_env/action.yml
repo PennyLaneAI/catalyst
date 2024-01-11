@@ -1,5 +1,7 @@
 name: Setup PATH for Self-Hosted MacOS Runner
-description: This workflow sets up the workflow environment for the Self-Hosted MacOS runner. It should be the first step in workflows that use the runner.
+description: |
+  This workflow sets up the workflow environment for the Self-Hosted MacOS runner. 
+  It should be called right after actions/checkout.
 
 
 inputs:

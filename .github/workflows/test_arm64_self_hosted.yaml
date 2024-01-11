@@ -32,8 +32,6 @@ jobs:
         with:
           python_version: ${{ matrix.python_version }}
 
-      - run: exit 1
-
       # Cache external project sources
       - name: Cache LLVM Source
         id: cache-llvm-source
@@ -105,34 +103,10 @@ jobs:
           path: enzyme-build
           key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
-#      - name: Setup PyEnv
-#        run: |
-#          pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
-#          for pyenv_path in ${pyenv_paths[@]};
-#          do
-#            [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
-#          done
-#          echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
-#
-#      - name: Setup Python
-#        id: setup_python_venv
-#        env:
-#          VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
-#        run: |
-#          rm -rf "$VENV_NAME"
-#          echo '${{ matrix.python_version }}' >> "$GITHUB_WORKSPACE/.python-version"
-#          python -m venv "$VENV_NAME"
-#
-#          # Add the venv to PATH for subsequent steps
-#          echo "$VENV_NAME/bin" >> $GITHUB_PATH
-#
-#          # Adding venv name as an output for subsequent steps to reference if needed
-#          echo "venv_name=$VENV_NAME" >> $GITHUB_OUTPUT
-#
-#      - name: Display Python-Path
-#        run: |
-#          which python
-#          which pip
+      - name: Display Python-Path
+        run: |
+          which python
+          which pip
 
       - name: Install Python dependencies
         run: python -m pip install wheel numpy pybind11 PyYAML cmake ninja
@@ -202,29 +176,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Setup PyEnv
-      run: |
-        pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
-        for pyenv_path in ${pyenv_paths[@]};
-        do
-          [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
-        done
-        echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
-
-    - name: Setup Python
-      id: setup_python_venv
-      env:
-        VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
-      run: |
-        rm -rf "$VENV_NAME"
-        echo '${{ matrix.python_version }}' >> "$GITHUB_WORKSPACE/.python-version"
-        python -m venv "$VENV_NAME"
-
-        # Add the venv to PATH for subsequent steps
-        echo "$VENV_NAME/bin" >> $GITHUB_PATH
-
-        # Adding venv name as an output for subsequent steps to reference if needed
-        echo "venv_name=$VENV_NAME" >> $GITHUB_OUTPUT
+    - name: Setup Runner Environment
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     - name: Display Python-Path
       run: |
@@ -370,35 +325,16 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Setup Runner Environment
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
+
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
-
-    - name: Setup PyEnv
-      run: |
-        pyenv_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims")
-        for pyenv_path in ${pyenv_paths[@]};
-        do
-          [[ ":$PATH:" != *":$pyenv_path:"* ]] && echo "$pyenv_path" >> $GITHUB_PATH
-        done
-        echo "PYENV_ROOT=$HOME/.pyenv" >> $GITHUB_ENV
-
-    - name: Setup Python
-      id: setup_python_venv
-      env:
-        VENV_NAME: ${{ github.workspace }}/venv_${{ matrix.python_version }}_${{ github.sha }}
-      run: |
-        rm -rf "$VENV_NAME"
-        echo '${{ matrix.python_version }}' >> "$GITHUB_WORKSPACE/.python-version"
-        python -m venv "$VENV_NAME"
-
-        # Add the venv to PATH for subsequent steps
-        echo "$VENV_NAME/bin" >> $GITHUB_PATH
-
-        # Adding venv name as an output for subsequent steps to reference if needed
-        echo "venv_name=$VENV_NAME" >> $GITHUB_OUTPUT
 
     - name: Display Python-Path
       run: |
@@ -421,9 +357,6 @@ jobs:
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
     - name: Run Python Pytest Tests
-      env:
-        no_proxy: '*'
-        OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES 
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
