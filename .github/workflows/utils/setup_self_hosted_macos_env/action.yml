@@ -20,6 +20,9 @@ outputs:
   venv_location:
     description: 'The path to the virtualenv created for python'
     value: ${{ steps.python_venv.outputs.venv_location }}
+  venv_site_packages:
+    description: 'The path to the site-packages folder for the python venv created'
+    value: ${{ steps.site_packages.outputs.site_packages_dir }}
 
 
 runs:
@@ -79,6 +82,11 @@ runs:
         PY_VERSION=$(python --version)
         echo "python_path=$PY_PATH" >> $GITHUB_OUTPUT
         echo "python_version=$PY_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Get site-packages path
+      id: site_packages
+      run: |
+        echo "site_packages_dir=$(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())')" >> $GITHUB_OUTPUT
 
     - name: Display Python Setup
       shell: bash

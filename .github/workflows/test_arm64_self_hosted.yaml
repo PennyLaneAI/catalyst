@@ -169,9 +169,9 @@ jobs:
     runs-on:
       group: 'Office 24th floor M2 Mac'
 
-    env:
-      CPATH: /opt/homebrew/include
-      LIBRARY_PATH: /opt/homebrew/lib
+#    env:
+#      CPATH: /opt/homebrew/include
+#      LIBRARY_PATH: /opt/homebrew/lib
 
     steps:
     - name: Checkout Catalyst repo

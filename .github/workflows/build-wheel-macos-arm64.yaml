@@ -23,16 +23,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest-xlarge]
-        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-latest-xlarge
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+    
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     # Cache external project sources
     - name: Cache LLVM Source
@@ -105,10 +110,6 @@ jobs:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
-    - name: Set up Python via brew
-      run: |
-        brew install python@${{ matrix.python_version }}
-
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
@@ -164,20 +165,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest-xlarge]
-        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ${{ matrix.os }}
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Set up Python via brew
-      run: |
-        brew install python@${{ matrix.python_version }}
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
       run: |
@@ -254,7 +256,10 @@ jobs:
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
     - name: Test Catalyst-Runtime
+      env:
+        VENV_SITE_PACKAGES: ${{ steps.setup_env.outputs.venv_site_packages }}
       run: |
+        export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
@@ -302,27 +307,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest-xlarge]
-        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Xanadu M2 Mac
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
-
-    - name: Set up Python via brew
-      run: |
-        brew install python@${{ matrix.python_version }}
 
     - name: Install Python dependencies
       run: |
