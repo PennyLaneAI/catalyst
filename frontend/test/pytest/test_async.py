@@ -85,7 +85,6 @@ def test_gradient(inp, diff_methods, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.skip(reason="Threads that raise exceptions produce a segfault.")
 def test_exception(backend):
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
@@ -96,7 +95,8 @@ def test_exception(backend):
     def wrapper():
         return circuit(0)
 
-    msg = "Control and target qubit operands must be distinct"
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
     with pytest.raises(RuntimeError, match=msg):
         wrapper()
 
