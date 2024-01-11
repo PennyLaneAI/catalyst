@@ -35,6 +35,7 @@ static constexpr llvm::StringRef unrecoverableErrorName =
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
+static constexpr llvm::StringRef livenessAnalysisAttr = "catalyst.liveness";
 static constexpr llvm::StringRef preHandleErrorAttrValue = "catalyst.preHandleError";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
@@ -52,6 +53,8 @@ bool isAsync(LLVM::LLVMFuncOp funcOp);
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
+void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter);
 
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
@@ -180,7 +183,7 @@ void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM:
     }
 }
 
-void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
+void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target, SmallVector<LLVM::CallOp> &newCalls,
                                   PatternRewriter &rewriter)
 {
     for (auto oldCallOp : oldCallOps) {
@@ -189,6 +192,7 @@ void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::L
         auto newCallOp =
             rewriter.create<LLVM::CallOp>(oldCallOp.getLoc(), target, oldCallOp.getOperands());
         rewriter.replaceOp(oldCallOp, newCallOp);
+	newCalls.push_back(newCallOp);
     }
 }
 
@@ -251,8 +255,12 @@ void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLo
             }
         }
     }
-    else {
-        // TODO: unreachable
+}
+
+void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
+{
+    for (auto call : calls) {
+       scheduleLivenessAnalysis(call, rewriter);
     }
 }
 
@@ -292,7 +300,11 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
 
     SmallVector<LLVM::CallOp> aborts;
     collectCallsToAbortInBlocks(dests, aborts);
-    replaceCallsWithCallToTarget(aborts, unrecoverableError, rewriter);
+
+    SmallVector<LLVM::CallOp> newCalls;
+    replaceCallsWithCallToTarget(aborts, unrecoverableError, newCalls, rewriter);
+
+    annotateCallsForLivenessAnalysis(newCalls, rewriter);
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
@@ -613,6 +625,12 @@ void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &
 {
     rewriter.updateRootInPlace(
         funcOp, [&] { funcOp->setAttr(preHandleErrorAttrValue, rewriter.getUnitAttr()); });
+}
+
+void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(
+        callOp, [&] { callOp->setAttr(livenessAnalysisAttr, rewriter.getUnitAttr()); });
 }
 
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
