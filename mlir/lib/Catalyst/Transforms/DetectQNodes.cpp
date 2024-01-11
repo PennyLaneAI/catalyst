@@ -192,6 +192,19 @@ void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::L
     }
 }
 
+void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &dests)
+{
+    for (auto condition : conditions) {
+        for (Operation *user : condition.getUsers()) {
+            if (isa<LLVM::CondBrOp>(user)) {
+                LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
+                dests.push_back(brOp.getTrueDest());
+                dests.push_back(brOp.getFalseDest());
+            }
+        }
+    }
+}
+
 // Step 3:
 // Look into the caller of the asynchrnous regions and change the behaviour on error returns.
 void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
@@ -260,16 +273,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     }
 
     SmallVector<Block *> dests;
-
-    for (auto condition : potentialConditions) {
-        for (Operation *user : condition.getUsers()) {
-            if (isa<LLVM::CondBrOp>(user)) {
-                LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
-                dests.push_back(brOp.getTrueDest());
-                dests.push_back(brOp.getFalseDest());
-            }
-        }
-    }
+    collectSuccessorBlocks(potentialConditions, dests);
 
     SmallVector<LLVM::CallOp> aborts;
     collectCallsToAbortInBlocks(dests, aborts);
