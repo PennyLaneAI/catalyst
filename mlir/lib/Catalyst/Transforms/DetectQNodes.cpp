@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include <mlir/Analysis/DataFlow/LivenessAnalysis.h>
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -57,6 +57,7 @@ void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
 void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter);
+bool callsSource(LLVM::CallOp callOp);
 
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
@@ -77,6 +78,7 @@ bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
 bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall);
+bool hasAbortInBlock(Block *block);
 
 // Helper function for creating function declarations
 LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp);
@@ -84,6 +86,8 @@ LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
+
+void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor);
 
 // Actual content
 std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter);
@@ -143,24 +147,27 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter
 {
     auto caller = getCaller(op);
 
-    // We need to collect calls to:
-    // mlirAsyncRuntimeCreateToken or mlirAsyncRuntimeCreateValue
-    SmallVector<Value> runtimeTokensOrValues;
+    // We need to collect calls to source of tokens
+    // which in this case are already marked as sources.
+    SmallVector<Value> valuesToLookFor;
     caller->walk([&](LLVM::CallOp callOp) {
-        bool isRuntimeValue = callsMlirAsyncRuntimeCreateValue(callOp);
-        bool isRuntimeToken = callsMlirAsyncRuntimeCreateToken(callOp);
-        bool isInteresting = isRuntimeValue || isRuntimeToken;
+        bool isInteresting = callsSource(callOp);
         if (!isInteresting)
             return;
 
-        auto tokenOrValue = callOp.getResult();
-        runtimeTokensOrValues.push_back(tokenOrValue);
+        auto results = callOp.getResults();
+        collectValuesToLookFor(results, valuesToLookFor);
     });
 
-    mlir::dataflow::RunLivenessAnalysis liveness(op);
-    for (auto value : runtimeTokensOrValues) {
-        const mlir::dataflow::Liveness *data = liveness.getLiveness(value);
-        op.emitRemark() << (data->isLive ? "True" : "False");
+    SmallVector<Value> runtimeTokensThatShouldBeDropRef;
+    Liveness liveness(caller);
+    for (auto value : valuesToLookFor) {
+        for (auto operationWhereValueIsAlive : liveness.resolveLiveness(value)) {
+            if (operationWhereValueIsAlive == op) {
+                runtimeTokensThatShouldBeDropRef.push_back(value);
+                // op.emitRemark() << "Place dropref for " << value << " before " << op;
+            }
+        }
     }
 
     cleanupLivenessAnalysis(op, rewriter);
@@ -219,10 +226,17 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
 }
 
+bool hasAbortInBlock(Block *block)
+{
+    bool returnVal = false;
+    block->walk([&](LLVM::CallOp op) { returnVal |= callsAbort(op); });
+    return returnVal;
+}
+
 void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls)
 {
     for (Block *block : blocks) {
-        block->walk([&](Operation *op) {
+        block->walk([&](LLVM::CallOp op) {
             if (callsAbort(op)) {
                 LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
                 calls.push_back(abortCall);
@@ -244,14 +258,21 @@ void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::L
     }
 }
 
-void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &dests)
+void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &aborts,
+                            SmallVector<Block *> &success)
 {
     for (auto condition : conditions) {
         for (Operation *user : condition.getUsers()) {
             if (isa<LLVM::CondBrOp>(user)) {
                 LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
-                dests.push_back(brOp.getTrueDest());
-                dests.push_back(brOp.getFalseDest());
+                Block *trueDest = brOp.getTrueDest();
+                Block *falseDest = brOp.getFalseDest();
+                if (hasAbortInBlock(trueDest)) {
+                    aborts.push_back(trueDest);
+                }
+                if (hasAbortInBlock(falseDest)) {
+                    aborts.push_back(falseDest);
+                }
             }
         }
     }
@@ -318,6 +339,19 @@ void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternR
     }
 }
 
+void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> abortBlocks,
+                                                          SmallVector<Block *> successBlocks,
+                                                          PatternRewriter &rewriter)
+{
+    for (auto [abort, success] : llvm::zip(abortBlocks, successBlocks)) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        auto terminator = abort->getTerminator();
+        rewriter.setInsertionPoint(terminator);
+        auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
+        rewriter.replaceOp(terminator, brOp);
+    }
+}
+
 // Step 3:
 // Look into the caller of the asynchrnous regions and change the behaviour on error returns.
 void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
@@ -349,14 +383,16 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
     collectPotentialConditions(callResults, potentialConditions);
 
-    SmallVector<Block *> dests;
-    collectSuccessorBlocks(potentialConditions, dests);
+    SmallVector<Block *> abortBlocks;
+    SmallVector<Block *> successBlocks;
+    collectSuccessorBlocks(potentialConditions, abortBlocks, successBlocks);
 
     SmallVector<LLVM::CallOp> aborts;
-    collectCallsToAbortInBlocks(dests, aborts);
+    collectCallsToAbortInBlocks(abortBlocks, aborts);
 
     SmallVector<LLVM::CallOp> newCalls;
     replaceCallsWithCallToTarget(aborts, unrecoverableError, newCalls, rewriter);
+    replaceTerminatorWithUnconditionalJumpToSuccessBlock(abortBlocks, successBlocks, rewriter);
 
     annotateCallsForLivenessAnalysis(newCalls, rewriter);
     annotateCallForSource(callOp, rewriter);
@@ -498,6 +534,8 @@ bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
 {
     return isFunctionNamed(funcOp, mlirAsyncRuntimeIsValueErrorName);
 }
+
+bool callsSource(LLVM::CallOp callOp) { return callOp->hasAttr(sourceOfRefCounts); }
 
 bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp)
 {
