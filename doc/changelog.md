@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Add Hermitian support for finite-shot measurement statistics (`expval`, `var`, and `probs`)
+  for `lightning.qubit` and `lightning.kokkos` devices.
+  [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -11,6 +15,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Shuli Shu
 
 
 # Release 0.4.0
