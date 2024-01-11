@@ -47,7 +47,7 @@ runs:
         input_python_version: ${{ inputs.python_version }}
       run: |
         # Check if the requested Python version exists on the runner
-        pyenv versions | grep -q "$input_python_version"
+        pyenv versions | grep "$input_python_version"
         
         if [ $? -ne 0 ]; then
           echo "Installing Python $input_python_version"
