@@ -43,6 +43,10 @@
   due to a different SciPy version being used to build Catalyst than to run it.
   [(#471)](https://github.com/PennyLaneAI/catalyst/pull/471)
 
+* Resolve a memory leak in the runtime stemming from  missing calls to device destructors
+  at the end of programs.
+  [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
