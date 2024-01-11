@@ -223,6 +223,17 @@ void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
     }
 }
 
+void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions) {
+    for (auto boolVal : values) {
+        for (Operation *user : boolVal.getUsers()) {
+            if (isa<LLVM::XOrOp>(user)) {
+                auto xorResult = user->getResult(0);
+                conditions.push_back(xorResult);
+            }
+        }
+    }
+}
+
 // Step 3:
 // Look into the caller of the asynchrnous regions and change the behaviour on error returns.
 void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
@@ -266,16 +277,10 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     SmallVector<Value> callResults;
     collectResultsForMlirAsyncRuntimeErrorFunctions(valuesToLookFor, callResults);
 
+    // We initial potential conditions with call results, as the result might be
+    // used as a condition itself.
     SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
-
-    for (auto boolVal : callResults) {
-        for (Operation *user : boolVal.getUsers()) {
-            if (isa<LLVM::XOrOp>(user)) {
-                auto xorResult = user->getResult(0);
-                potentialConditions.push_back(xorResult);
-            }
-        }
-    }
+    collectPotentialConditions(callResults, potentialConditions);
 
     SmallVector<Block *> dests;
     collectSuccessorBlocks(potentialConditions, dests);
