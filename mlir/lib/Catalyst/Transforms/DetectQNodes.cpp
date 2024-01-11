@@ -168,6 +168,16 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
 }
 
+void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target, PatternRewriter &rewriter) {
+    for (auto oldCallOp : oldCallOps) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPoint(oldCallOp);
+        auto newCallOp =
+            rewriter.create<LLVM::CallOp>(oldCallOp.getLoc(), target, oldCallOp.getOperands());
+        rewriter.replaceOp(oldCallOp, newCallOp);
+    }
+}
+
 // Step 3:
 // Look into the caller of the asynchrnous regions and change the behaviour on error returns.
 void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
@@ -258,14 +268,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
         });
     }
 
-    for (auto abort : aborts) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPoint(abort);
-        auto callToHostRuntime =
-            rewriter.create<LLVM::CallOp>(abort.getLoc(), unrecoverableError, abort.getOperands());
-        rewriter.replaceOp(abort, callToHostRuntime);
-    }
-
+    replaceCallsWithCallToTarget(aborts, unrecoverableError, rewriter);
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
