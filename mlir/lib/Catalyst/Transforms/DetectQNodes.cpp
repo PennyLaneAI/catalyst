@@ -47,6 +47,7 @@ static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName =
     "mlirAsyncRuntimeSetTokenError";
 static constexpr llvm::StringRef mlirAsyncRuntimeIsTokenErrorName = "mlirAsyncRuntimeIsTokenError";
 static constexpr llvm::StringRef mlirAsyncRuntimeIsValueErrorName = "mlirAsyncRuntimeIsValueError";
+static constexpr llvm::StringRef mlirAsyncRuntimeAwaitTokenName = "mlirAsyncRuntimeAwaitTokenName";
 
 // Helper function for attributes
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp);
@@ -74,6 +75,7 @@ bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp);
 bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp);
 bool callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeCreateToken(Operation *possibleCall);
 bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
@@ -86,6 +88,7 @@ LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp);
 
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor);
 
@@ -143,6 +146,16 @@ void cleanupLivenessAnalysis(LLVM::CallOp op, PatternRewriter &rewriter)
     rewriter.updateRootInPlace(op, [&] { op->removeAttr(livenessAnalysisAttr); });
 }
 
+void cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter) {
+    rewriter.updateRootInPlace(source, [&] { source->removeAttr(sourceOfRefCounts); });
+}
+
+void cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter) {
+    for (auto source : sources) {
+       cleanupSource(source, rewriter);
+    }
+}
+
 void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const
 {
     auto caller = getCaller(op);
@@ -150,26 +163,56 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter
     // We need to collect calls to source of tokens
     // which in this case are already marked as sources.
     SmallVector<Value> valuesToLookFor;
+    SmallVector<LLVM::CallOp> annotatedCalls;
     caller->walk([&](LLVM::CallOp callOp) {
         bool isInteresting = callsSource(callOp);
         if (!isInteresting)
             return;
 
+        annotatedCalls.push_back(callOp);
         auto results = callOp.getResults();
         collectValuesToLookFor(results, valuesToLookFor);
     });
 
-    SmallVector<Value> runtimeTokensThatShouldBeDropRef;
+    SmallVector<Value> valuesToDrop;
     Liveness liveness(caller);
     for (auto value : valuesToLookFor) {
         for (auto operationWhereValueIsAlive : liveness.resolveLiveness(value)) {
             if (operationWhereValueIsAlive == op) {
-                runtimeTokensThatShouldBeDropRef.push_back(value);
-                // op.emitRemark() << "Place dropref for " << value << " before " << op;
+                valuesToDrop.push_back(value);
             }
         }
     }
 
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPoint(op);
+    
+    // We are going to place awaits for all of these...
+    // and we won't check them...
+    // we don't care...
+    // we just want the threads to finish execution...
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    auto awaitFnDecl = lookupOrCreateAwaitTokenName(moduleOp);
+
+    Type llvmInt64Type = IntegerType::get(op->getContext(), 64);
+    auto one = rewriter.getIntegerAttr(llvmInt64Type, 1);
+    Value c1 = rewriter.create<LLVM::ConstantOp>(op->getLoc(), llvmInt64Type, one);
+
+    for (auto awaitMe: valuesToDrop) {
+       for (auto user : awaitMe.getUsers()) {
+          if (callsMlirAsyncRuntimeCreateToken(user)) {
+             rewriter.create<LLVM::CallOp>(op.getLoc(), awaitFnDecl, awaitMe);
+             break;
+          }
+       }
+    }
+
+    for (auto dropMe: valuesToDrop) {
+       // insertCallToDrop(dropMe, rewriter);
+    }
+    
+
+    cleanupSource(annotatedCalls, rewriter);
     cleanupLivenessAnalysis(op, rewriter);
 }
 
@@ -427,6 +470,15 @@ LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp)
     return mlir::LLVM::lookupOrCreateFn(moduleOp, abortName, {}, voidTy);
 }
 
+LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeAwaitTokenName, {ptrTy},
+                                        voidTy);
+}
+
 LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
@@ -536,6 +588,15 @@ bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
 }
 
 bool callsSource(LLVM::CallOp callOp) { return callOp->hasAttr(sourceOfRefCounts); }
+
+bool callsMlirAsyncRuntimeCreateToken(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return callsMlirAsyncRuntimeCreateToken(callOp);
+}
 
 bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp)
 {
