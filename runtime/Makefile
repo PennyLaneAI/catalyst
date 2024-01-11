@@ -14,7 +14,7 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?="489cff7" # TODO: Update to v0.34.0
+LIGHTNING_GIT_TAG_VALUE?="v0.34.0"
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 ifeq ($(shell uname), Darwin)
