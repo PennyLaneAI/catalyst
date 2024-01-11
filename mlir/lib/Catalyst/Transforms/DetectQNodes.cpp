@@ -205,6 +205,24 @@ void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *>
     }
 }
 
+void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
+                                                     SmallVector<Value> &results)
+{
+    for (Value value : values) {
+        for (Operation *user : value.getUsers()) {
+            // Use forward slices to prevent checking individual llvm.extract operations
+            bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
+            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsValueError(user);
+            bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
+            if (!isValid)
+                continue;
+
+            auto boolVal = user->getResult(0);
+            results.push_back(boolVal);
+        }
+    }
+}
+
 // Step 3:
 // Look into the caller of the asynchrnous regions and change the behaviour on error returns.
 void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
@@ -246,20 +264,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     }
 
     SmallVector<Value> callResults;
-
-    for (Value value : valuesToLookFor) {
-        for (Operation *user : value.getUsers()) {
-            // Use forward slices to prevent checking individual llvm.extract operations
-            bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
-            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsValueError(user);
-            bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
-            if (!isValid)
-                continue;
-
-            auto boolVal = user->getResult(0);
-            callResults.push_back(boolVal);
-        }
-    }
+    collectResultsForMlirAsyncRuntimeErrorFunctions(valuesToLookFor, callResults);
 
     SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
 
