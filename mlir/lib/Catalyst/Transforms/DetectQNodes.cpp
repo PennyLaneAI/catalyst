@@ -14,6 +14,7 @@
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include <mlir/Analysis/DataFlow/LivenessAnalysis.h>
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -37,6 +38,7 @@ static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
 static constexpr llvm::StringRef livenessAnalysisAttr = "catalyst.liveness";
 static constexpr llvm::StringRef preHandleErrorAttrValue = "catalyst.preHandleError";
+static constexpr llvm::StringRef sourceOfRefCounts = "catalyst.sourceOfRefCounts";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
 static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName =
@@ -69,6 +71,8 @@ bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp);
 bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp);
 bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp);
 bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp);
+bool callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
@@ -125,15 +129,40 @@ struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const {
+LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
+{
     return op->hasAttr(livenessAnalysisAttr) ? success() : failure();
 }
 
-void cleanupLivenessAnalysis(LLVM::CallOp op, PatternRewriter &rewriter) {
+void cleanupLivenessAnalysis(LLVM::CallOp op, PatternRewriter &rewriter)
+{
     rewriter.updateRootInPlace(op, [&] { op->removeAttr(livenessAnalysisAttr); });
 }
 
-void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const {
+void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const
+{
+    auto caller = getCaller(op);
+
+    // We need to collect calls to:
+    // mlirAsyncRuntimeCreateToken or mlirAsyncRuntimeCreateValue
+    SmallVector<Value> runtimeTokensOrValues;
+    caller->walk([&](LLVM::CallOp callOp) {
+        bool isRuntimeValue = callsMlirAsyncRuntimeCreateValue(callOp);
+        bool isRuntimeToken = callsMlirAsyncRuntimeCreateToken(callOp);
+        bool isInteresting = isRuntimeValue || isRuntimeToken;
+        if (!isInteresting)
+            return;
+
+        auto tokenOrValue = callOp.getResult();
+        runtimeTokensOrValues.push_back(tokenOrValue);
+    });
+
+    mlir::dataflow::RunLivenessAnalysis liveness(op);
+    for (auto value : runtimeTokensOrValues) {
+        const mlir::dataflow::Liveness *data = liveness.getLiveness(value);
+        op.emitRemark() << (data->isLive ? "True" : "False");
+    }
+
     cleanupLivenessAnalysis(op, rewriter);
 }
 
@@ -276,6 +305,12 @@ void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLo
     }
 }
 
+void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(callOp,
+                               [&] { callOp->setAttr(sourceOfRefCounts, rewriter.getUnitAttr()); });
+}
+
 void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
 {
     for (auto call : calls) {
@@ -324,6 +359,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     replaceCallsWithCallToTarget(aborts, unrecoverableError, newCalls, rewriter);
 
     annotateCallsForLivenessAnalysis(newCalls, rewriter);
+    annotateCallForSource(callOp, rewriter);
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
@@ -461,6 +497,26 @@ bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp)
 bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
 {
     return isFunctionNamed(funcOp, mlirAsyncRuntimeIsValueErrorName);
+}
+
+bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp)
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return isMlirAsyncRuntimeCreateToken(callee);
+}
+
+bool callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp)
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return isMlirAsyncRuntimeCreateValue(callee);
 }
 
 bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp)
