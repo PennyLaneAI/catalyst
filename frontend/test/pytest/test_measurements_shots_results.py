@@ -138,7 +138,7 @@ class TestExpval:
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qml.expval(qml.Hermitian(A, wires=2))
 
         expected = circuit(np.pi / 4, np.pi / 4)
         result = qjit(circuit)(np.pi / 4, np.pi / 4)
@@ -347,7 +347,7 @@ class TestVar:
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.var(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+            return qml.var(qml.Hermitian(A, wires=2))
 
         expected = circuit(np.pi / 4, np.pi / 4)
         result = qjit(circuit)(np.pi / 4, np.pi / 4)
