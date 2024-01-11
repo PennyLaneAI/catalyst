@@ -223,7 +223,8 @@ void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
     }
 }
 
-void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions) {
+void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions)
+{
     for (auto boolVal : values) {
         for (Operation *user : boolVal.getUsers()) {
             if (isa<LLVM::XOrOp>(user)) {
@@ -231,6 +232,27 @@ void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &
                 conditions.push_back(xorResult);
             }
         }
+    }
+}
+
+void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor)
+{
+    Value result = results.front();
+    Type resultTy = result.getType();
+
+    if (isa<LLVM::LLVMPointerType>(resultTy)) {
+        valuesToLookFor.push_back(result);
+    }
+    else if (isa<LLVM::LLVMStructType>(resultTy)) {
+        // How to refer to a value without using llvm.extract
+        for (Operation *user : result.getUsers()) {
+            if (isa<LLVM::ExtractValueOp>(user)) {
+                valuesToLookFor.push_back(user->getResult(0));
+            }
+        }
+    }
+    else {
+        // TODO: unreachable
     }
 }
 
@@ -255,24 +277,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     SmallVector<Value> valuesToLookFor;
     // TODO: Assert that we have results
     assert(results.size() == 1);
-
-    Value result = results.front();
-    Type resultTy = result.getType();
-
-    if (isa<LLVM::LLVMPointerType>(resultTy)) {
-        valuesToLookFor.push_back(result);
-    }
-    else if (isa<LLVM::LLVMStructType>(resultTy)) {
-        // How to refer to a value without using llvm.extract
-        for (Operation *user : result.getUsers()) {
-            if (isa<LLVM::ExtractValueOp>(user)) {
-                valuesToLookFor.push_back(user->getResult(0));
-            }
-        }
-    }
-    else {
-        // TODO: unreachable
-    }
+    collectValuesToLookFor(results, valuesToLookFor);
 
     SmallVector<Value> callResults;
     collectResultsForMlirAsyncRuntimeErrorFunctions(valuesToLookFor, callResults);
