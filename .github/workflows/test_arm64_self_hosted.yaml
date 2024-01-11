@@ -20,7 +20,8 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: 'Office 24th floor M2 Mac'
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
       - name: Checkout Catalyst repo
@@ -183,7 +184,8 @@ jobs:
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: 'Office 24th floor M2 Mac'
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     env:
       CPATH: /opt/homebrew/include
@@ -354,7 +356,8 @@ jobs:
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on xanadu-arm64-mac
-    runs-on: 'Office 24th floor M2 Mac'
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
