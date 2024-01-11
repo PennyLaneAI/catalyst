@@ -8,6 +8,10 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve a memory leak in the runtime stemming from  missing calls to device destructors
+  at the end of programs.
+  [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
