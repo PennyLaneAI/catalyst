@@ -194,6 +194,7 @@ MLIR_TO_LLVM_PASS = (
         # but only those that form a loop back to the original type.
         "canonicalize",
         "reconcile-unrealized-casts",
+        "detect-qnode",
     ],
 )
 
