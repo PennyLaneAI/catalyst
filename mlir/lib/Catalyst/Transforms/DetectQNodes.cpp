@@ -118,6 +118,25 @@ struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
+struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const {
+    return op->hasAttr(livenessAnalysisAttr) ? success() : failure();
+}
+
+void cleanupLivenessAnalysis(LLVM::CallOp op, PatternRewriter &rewriter) {
+    rewriter.updateRootInPlace(op, [&] { op->removeAttr(livenessAnalysisAttr); });
+}
+
+void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const {
+    cleanupLivenessAnalysis(op, rewriter);
+}
+
 // Step 1.
 // Find which call sites to change
 
@@ -183,8 +202,8 @@ void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM:
     }
 }
 
-void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target, SmallVector<LLVM::CallOp> &newCalls,
-                                  PatternRewriter &rewriter)
+void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
+                                  SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter)
 {
     for (auto oldCallOp : oldCallOps) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -192,7 +211,7 @@ void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::L
         auto newCallOp =
             rewriter.create<LLVM::CallOp>(oldCallOp.getLoc(), target, oldCallOp.getOperands());
         rewriter.replaceOp(oldCallOp, newCallOp);
-	newCalls.push_back(newCallOp);
+        newCalls.push_back(newCallOp);
     }
 }
 
@@ -260,7 +279,7 @@ void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLo
 void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
 {
     for (auto call : calls) {
-       scheduleLivenessAnalysis(call, rewriter);
+        scheduleLivenessAnalysis(call, rewriter);
     }
 }
 
@@ -683,6 +702,12 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
         RewritePatternSet patterns3(context);
         patterns3.add<RemoveAbortInsertCallTransform>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns3)))) {
+            signalPassFailure();
+        }
+
+        RewritePatternSet patterns4(context);
+        patterns4.add<LivenessAnalysisDropRef>(context);
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4)))) {
             signalPassFailure();
         }
     }
