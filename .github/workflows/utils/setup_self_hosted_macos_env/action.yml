@@ -13,10 +13,13 @@ inputs:
 outputs:
   python_version:
     description: 'The version of Python that was setup'
-    value: ${{ steps.python_venv.outputs.python_path }}
+    value: ${{ steps.python_venv.outputs.python_version }}
   python_path:
     description: 'Full absolute path to the python binary'
-    value: ${{ steps.python_venv.outputs.python_version }}
+    value: ${{ steps.python_venv.outputs.python_path }}
+  venv_location:
+    description: 'The path to the virtualenv created for python'
+    value: ${{ steps.python_venv.outputs.venv_location }}
 
 
 runs:
@@ -70,6 +73,7 @@ runs:
         python -m venv "$venv_name"
         
         echo "$GITHUB_WORKSPACE/$venv_name/bin" >> $GITHUB_PATH
+        echo "venv_location=$GITHUB_WORKSPACE/$venv_name" >> $GITHUB_OUTPUT
         
         PY_PATH="$GITHUB_WORKSPACE/$venv_name/bin/python"
         PY_VERSION=$(python --version)

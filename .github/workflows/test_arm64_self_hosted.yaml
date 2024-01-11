@@ -28,6 +28,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Runner Environment
+        id: setup_env
         uses: ./.github/workflows/utils/setup_self_hosted_macos_env
         with:
           python_version: ${{ matrix.python_version }}
@@ -177,6 +178,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Setup Runner Environment
+      id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
@@ -262,10 +264,9 @@ jobs:
 
     - name: Test Catalyst-Runtime
       env:
-        VENV_LOCATION: ${{ steps.setup_python_venv.outputs.venv_name }}
+        VENV_SITE_PACKAGES: ${{ steps.setup_env.outputs.venv_location }}/lib/python${{ matrix.python_version }}/site-packages
       run: |
-        source "$VENV_LOCATION/bin/activate"
-        export PYTHONPATH="$VENV_LOCATION/lib/python${{ matrix.python_version }}/site-packages:$PYTHONPATH"
+        export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
@@ -326,6 +327,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Setup Runner Environment
+      id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
