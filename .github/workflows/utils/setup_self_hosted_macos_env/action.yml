@@ -24,12 +24,14 @@ runs:
     # These environment variables ensure multi-threading workloads (ex: pytest-xdist)
     # work without any issues. Without them, the tests take hours to complete.
     - name: Setup MacOS Env Vars
+      shell: bash
       run: |
         echo 'no_proxy=*' >> $GITHUB_ENV
         echo 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES' >> $GITHUB_ENV
 
     # These binaries are added to PATH as there were issues adding them by default on job start
     - name: Add additional binaries to PATH
+      shell: bash
       run: |
         additional_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
         for _path in ${additional_paths[@]};
@@ -40,6 +42,7 @@ runs:
 
     - name: Setup Python ${{ inputs.python_version }}
       id: python_setup
+      shell: bash
       env:
         input_python_version: ${{ inputs.python_version }}
       run: |
@@ -53,6 +56,7 @@ runs:
 
     - name: Setup Python venv
       id: python_venv
+      shell: bash
       env:
         input_python_version: ${{ inputs.python_version }}
         venv_name: py_venv_${{ inputs.python_version }}_${{ github.sha }}
@@ -71,6 +75,7 @@ runs:
         echo "python_version=$PY_VERSION" >> $GITHUB_OUTPUT
 
     - name: Display Python Setup
+      shell: bash
       run: |
         set -x
         which python
