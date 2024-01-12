@@ -85,6 +85,7 @@ runs:
 
     - name: Get site-packages path
       id: site_packages
+      shell: bash
       run: |
         echo "site_packages_dir=$(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())')" >> $GITHUB_OUTPUT
 
