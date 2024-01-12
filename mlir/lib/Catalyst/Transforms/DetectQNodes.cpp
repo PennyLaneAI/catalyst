@@ -36,7 +36,7 @@ static constexpr llvm::StringRef unrecoverableErrorName =
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
-static constexpr llvm::StringRef livenessAnalysisAttr = "catalyst.liveness";
+static constexpr llvm::StringRef sinkAttr = "catalyst.sink";
 static constexpr llvm::StringRef preHandleErrorAttrValue = "catalyst.preHandleError";
 static constexpr llvm::StringRef sourceOfRefCounts = "catalyst.sourceOfRefCounts";
 static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
@@ -58,8 +58,9 @@ void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
 void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter);
-void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter);
+void annotateCallsForSink(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter);
 bool callsSource(LLVM::CallOp callOp);
+void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter);
 
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
@@ -93,6 +94,17 @@ LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp);
 LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp);
 
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor);
+void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
+                                                     SmallVector<Value> &results);
+void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions);
+void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *> &aborts,
+                            SmallVector<Block *> &success);
+void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls);
+void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::LLVMFuncOp target,
+                                  SmallVector<LLVM::CallOp> &newCalls, PatternRewriter &rewriter);
+void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> abortBlocks,
+                                                          SmallVector<Block *> successBlocks,
+                                                          PatternRewriter &rewriter);
 
 // Actual content
 std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter);
@@ -310,12 +322,177 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     scheduleAnalysisForErrorHandling(caller, rewriter);
 }
 
+/* The next step is to inspect callers of the previous caller.
+ * So, in other words, we will be inspecting the callers of functions annotated with {
+ * catalyst.preHandleError }
+ */
 struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
     LogicalResult match(LLVM::CallOp op) const override;
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
+
+// In this pattern we are looking for function calls to functions annotated
+// with the { catalyst.preHandleError } attribute.
+//
+//    llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
+//    // ... snip ...
+//    %results = call @async_execute_fn()
+//
+// These functions return async values or tokens.
+LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return failure();
+
+    // llvm.func @callee() attributes { catalyst.preHandleError }
+    auto calleeFuncOp = maybeCallee.value();
+    if (!calleeFuncOp->hasAttr(preHandleErrorAttrValue))
+        return failure();
+
+    return success();
+}
+
+void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+{
+    auto maybeCallee = getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return;
+
+    // Here, we are declaring an external function which is available in the Catalyst runtime.
+    //     llvm.func @__catalyst__host__rt__unrecoverable_error()
+    auto moduleOp = callOp->getParentOfType<ModuleOp>();
+    auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
+
+    auto callee = maybeCallee.value();
+
+    // llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
+    // %results = call @async_execute_fn()
+    auto results = callOp.getResults();
+
+    // Here, we need to decide what we are looking for.
+    // Because we are in low level code, %results actually is typed
+    // as either a ptr or a tuple of ptrs. If it is a ptr, it means
+    // that the @async_execute_region had no returns and it is only
+    // returning a token to find out if the function finished running.
+    // This would be in the case of the following asynchrnous qnode, for example:
+    //
+    // @qml.qnode()
+    // def foo():
+    //   return
+    //
+    // If it is a struct of ptrs, the first element of the struct will always be the token,
+    // and the rest are the promises.
+    // So, we need to decide if we are looking for just the token, or the token and promises.:
+    SmallVector<Value> valuesToLookFor;
+    // TODO: Assert that we have results
+    assert(results.size() == 1);
+    collectValuesToLookFor(results, valuesToLookFor);
+
+    // Here, we are collecting the results of functions calls to
+    //     %3 = llvm.call @mlirAsyncRuntimeIsTokenError(%0) : (!llvm.ptr) -> i1
+    //     %4 = llvm.call @mlirAsyncRuntimeIsValueError(%1) : (!llvm.ptr) -> i1
+    // These functions take a token or value and return a boolean on whether the
+    // state is an error.
+    //     callResults = { %3, %4 }
+    SmallVector<Value> callResults;
+    collectResultsForMlirAsyncRuntimeErrorFunctions(valuesToLookFor, callResults);
+
+    // These values may be used as conditions in branches.
+    // However, the values may be used as operands in other operations.
+    // For example, the lowering rules for the async runtime use
+    //     %one = llvm.constant 1 : i64
+    //     %5 = llvm.xor %3, %1 : i1
+    //     // ... snip ...
+    //     %6 = llvm.xor %4, %1 : i1
+    // So we must also append these to collectResults.
+    //     potentialConditions = { %3, %4, %5, %6 }
+    SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
+    collectPotentialConditions(callResults, potentialConditions);
+
+    // Now, these values will be used as operands in conditional branches.
+    // We need to decide which of the destination of the branches are successes and which ones are
+    // aborts. We do so by looking into the block. If the block contains a call into an @abort
+    // function, it is an abort block. Otherwise, it is a success block.
+    //
+    //     llvm.cond_br %5, ^bb0, ^bb1
+    //     ^5:
+    //     call @llvm.abort()
+    //     ^6:
+    //     // something else
+    //
+    // abortBlocks = { ^5 }
+    // successBlocks = { ^6 }
+    SmallVector<Block *> abortBlocks;
+    SmallVector<Block *> successBlocks;
+    collectSuccessorBlocks(potentialConditions, abortBlocks, successBlocks);
+
+    // We now collect the aborts from the abort blocks.
+    // aborts = { llvm.call @llvm.abort, ..., ..., ... }
+    SmallVector<LLVM::CallOp> aborts;
+    collectCallsToAbortInBlocks(abortBlocks, aborts);
+
+    SmallVector<LLVM::CallOp> newCalls;
+    // And we replace aborts with calls to unrecoverable errors.
+    // At the same time we populate new calls with calls to unrecoverable error.
+    //
+    //     llvm.cond_br %5, ^bb0, ^bb1
+    //     ^5:
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error()
+    //     ^6:
+    //     // something else
+    //
+    // newCalls = { llvm.call @__catalyst__host_ ..., ..., ... }
+    replaceCallsWithCallToTarget(aborts, unrecoverableError, newCalls, rewriter);
+
+    // This is a subtlety, but it is a very important one!
+    // In order for the (liveness) dataflow analysis, the values need to flow from failure block
+    // to some uses. Otherwise, the values are not alive in the abortBlocks.
+    // So we change:
+    //
+    //     %2 = llvm.call @async_execute_fn()
+    //     %3 = llvm.extract ...
+    //     %4 = llvm.extract ...
+    //     // %3, %4 <-- these are values that must be dropped ref
+    //     llvm.cond_br %5, ^bb0, ^bb1
+    //     ^5:
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error()
+    //     llvm.unreachable
+    //     // All values are dead at the end of basic block ^5
+    //     ^6:
+    //     // %3, %4 are used in either ^6 or successor blocks
+    //
+    // To:
+    //
+    //     // %3, %4 <-- these are values that must be dropped ref
+    //     llvm.cond_br %5, ^bb0, ^bb1
+    //     ^5:
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error()
+    //     llvm.br ^6 // Now values %3 and %4 are alive in block ^5
+    //     ^6:
+    //     // %3, %4 are used in either ^6 or successor blocks
+    replaceTerminatorWithUnconditionalJumpToSuccessBlock(abortBlocks, successBlocks, rewriter);
+
+    // We annotate this call as a source
+    //
+    //     %2 = llvm.call @async_execute_fn() { catalyst.sourceOfRefCounts }
+    annotateCallForSource(callOp, rewriter);
+    // We annotate all of the unrecoverable errors as sinks.
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
+    annotateCallsForSink(newCalls, rewriter);
+
+    // We can make a note here, that we will be interested in the flow of sources to the current
+    // sink. And values that are alive in the sink, must then be deallocated.
+
+    // And we remove catalyst.preHandleError attribute to avoid re-transforming this llvm.call
+    // from:
+    //    llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
+    // to
+    //    llvm.func @async_execute_fn()
+    cleanupPreHandleErrorAttr(callee, rewriter);
+}
 
 struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
@@ -326,12 +503,12 @@ struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
 
 LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
 {
-    return op->hasAttr(livenessAnalysisAttr) ? success() : failure();
+    return op->hasAttr(sinkAttr) ? success() : failure();
 }
 
 void cleanupLivenessAnalysis(LLVM::CallOp op, PatternRewriter &rewriter)
 {
-    rewriter.updateRootInPlace(op, [&] { op->removeAttr(livenessAnalysisAttr); });
+    rewriter.updateRootInPlace(op, [&] { op->removeAttr(sinkAttr); });
 }
 
 void cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter)
@@ -515,7 +692,7 @@ void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter)
                                [&] { callOp->setAttr(sourceOfRefCounts, rewriter.getUnitAttr()); });
 }
 
-void annotateCallsForLivenessAnalysis(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
+void annotateCallsForSink(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
 {
     for (auto call : calls) {
         scheduleLivenessAnalysis(call, rewriter);
@@ -533,53 +710,6 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
         auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
         rewriter.replaceOp(terminator, brOp);
     }
-}
-
-// Step 3:
-// Look into the caller of the asynchrnous regions and change the behaviour on error returns.
-void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
-{
-    auto maybeCallee = getCalleeSafe(callOp);
-    if (!maybeCallee)
-        return;
-
-    auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
-
-    auto callee = maybeCallee.value();
-
-    // At this moment we are at the call which may return an error.
-    // So we need to get the results
-    auto results = callOp.getResults();
-
-    // Values to look for:
-    SmallVector<Value> valuesToLookFor;
-    // TODO: Assert that we have results
-    assert(results.size() == 1);
-    collectValuesToLookFor(results, valuesToLookFor);
-
-    SmallVector<Value> callResults;
-    collectResultsForMlirAsyncRuntimeErrorFunctions(valuesToLookFor, callResults);
-
-    // We initial potential conditions with call results, as the result might be
-    // used as a condition itself.
-    SmallVector<Value> potentialConditions(callResults.begin(), callResults.end());
-    collectPotentialConditions(callResults, potentialConditions);
-
-    SmallVector<Block *> abortBlocks;
-    SmallVector<Block *> successBlocks;
-    collectSuccessorBlocks(potentialConditions, abortBlocks, successBlocks);
-
-    SmallVector<LLVM::CallOp> aborts;
-    collectCallsToAbortInBlocks(abortBlocks, aborts);
-
-    SmallVector<LLVM::CallOp> newCalls;
-    replaceCallsWithCallToTarget(aborts, unrecoverableError, newCalls, rewriter);
-    replaceTerminatorWithUnconditionalJumpToSuccessBlock(abortBlocks, successBlocks, rewriter);
-
-    annotateCallsForLivenessAnalysis(newCalls, rewriter);
-    annotateCallForSource(callOp, rewriter);
-    cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp) { return funcOp->hasAttr(qnodeAttr); }
@@ -910,20 +1040,6 @@ void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewrite
     rewriter.create<LLVM::BrOp>(loc, success);
 }
 
-LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
-{
-    // TODO: Can we find the callers directly without looking at each call op?
-    auto maybeCallee = getCalleeSafe(callOp);
-    if (!maybeCallee)
-        return failure();
-
-    auto calleeFuncOp = maybeCallee.value();
-    if (!calleeFuncOp->hasAttr(preHandleErrorAttrValue))
-        return failure();
-
-    return success();
-}
-
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(funcOp, [&] { funcOp->removeAttr(preHandleErrorAttrValue); });
@@ -937,8 +1053,7 @@ void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &
 
 void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
-    rewriter.updateRootInPlace(
-        callOp, [&] { callOp->setAttr(livenessAnalysisAttr, rewriter.getUnitAttr()); });
+    rewriter.updateRootInPlace(callOp, [&] { callOp->setAttr(sinkAttr, rewriter.getUnitAttr()); });
 }
 
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
