@@ -120,6 +120,7 @@ HLO_LOWERING_PASS = (
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
+        "cse",
     ],
 )
 
