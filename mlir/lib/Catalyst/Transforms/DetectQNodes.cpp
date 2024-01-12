@@ -161,35 +161,22 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
     return success();
 }
 
-/*
- *
- * Note:
- *     I will be using high level MLIR to describe the algorithm,
- *     but this transformation works at the LLVM dialect stage.
- *     Perhaps some of the passes could be made at higher level of abstractions.
- *
- * DetectCallsInAsyncRegionsTransform will match against:
- *
- *
- * into
- *
- * ```llvm
- * llvm.func @callee() attributes { qnode }
- *
- * llvm.func @foo() attributes { passthrough = [presplitcoroutine] } {
- *     llvm.call @callee() { catalyst.preInvoke }
- * }
- * ```
- *
- *
- */
-
+/* Next, we run DetectQnodeTransform */
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
     LogicalResult match(LLVM::CallOp op) const override;
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
+
+/* Here we only match with calls that have the { catalyst.preInvoke } annotations */
+LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
+{
+    // The following is a valid match
+    //     llvm.call @callee() { catalyst.preInvoke }
+    bool validCandidate = isScheduledForTransformation(callOp);
+    return validCandidate ? success() : failure();
+}
 
 struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
@@ -840,21 +827,6 @@ LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(funcOp, [&] { funcOp->removeAttr(preHandleErrorAttrValue); });
-}
-
-LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
-{
-    // Only match with direct calls to qnodes.
-    // TODO: This should actually be about async.
-    // Right now we use the `qnode` attribute to determine async regions.
-    // But that might not be the case in the future,
-    // So, change this whenever we no longer create async.execute operations based on qnode.
-    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
-    bool validCandidate =
-        candidate &&
-        hasQnodeAttribute(candidate.value()) // This one guarantees that we are in async.
-        && isScheduledForTransformation(callOp);
-    return validCandidate ? success() : failure();
 }
 
 void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
