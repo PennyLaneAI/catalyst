@@ -169,13 +169,144 @@ struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
-/* Here we only match with calls that have the { catalyst.preInvoke } annotations */
+/* Here we only match with calls that have the { catalyst.preInvoke } annotations.
+ * The reason behind this separation between the previous pattern and this one,
+ * is that this pattern can potentially be reused as long as this single annotation is present.
+ */
 LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
 {
     // The following is a valid match
     //     llvm.call @callee() { catalyst.preInvoke }
     bool validCandidate = isScheduledForTransformation(callOp);
     return validCandidate ? success() : failure();
+}
+
+void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+{
+    auto moduleOp = callOp->getParentOfType<ModuleOp>();
+    // Here, we are adding a reference to the personality declaration.
+    // From the documentation: https://llvm.org/docs/ExceptionHandling.html#exception-tables
+    auto personality = lookupOrCreatePersonality(moduleOp);
+
+    // We annotate the body of the function containing the callop to have a reference
+    // to the personality.
+    //
+    //     llvm.func caller() attributes { personality = @__gxx_personality_v0 } {
+    //         llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    //         llvm.return
+    //     }
+    auto caller = getCaller(callOp);
+    setPersonalityAttribute(caller, personality, rewriter);
+
+    // Then, the basic block where the call is located is separated into three.
+    // I'll leave the three basic blocks in a broken state (without terminators)
+    // but will still show their place in the code.
+    //
+    //     llvm.func caller() {
+    //         llvm.call @callee() : () -> ()  // This is entry basic block.
+    //     ^bbfail:
+    //         // emptyBlock
+    //     ^bbsuccess:
+    //         llvm.return
+    //     }
+
+    // Right now the logic also adds the following ops which are useful, but maybe
+    // we can separate the logic a bit.
+    //
+    //     llvm.func caller() {
+    //         %null = llvm.mlir.null : !llvm.ptr
+    //         llvm.call @callee() : () -> ()
+    //     ^bbfail:
+    //         %0 = llvm.landingpad (catch %null : !llvm.ptr) : !llvm.struct<(ptr<i8>, i32)>
+    //     ^bbsuccess:
+    //         llvm.return
+    //     }
+    //
+    // The llvm.landingpad must be the first instruction of the failblock.
+    // llvm.landingpad when catching %null is equivalent to a catch statement in C++
+    // without specifying an exception. The argument can be non-null if one wants
+    // to catch specific exceptions.
+    auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
+
+    // We now transform the call to invoke.
+    // Invoke is a version of call that can handle exceptions.
+    //
+    //     llvm.func caller() {
+    //         %null = llvm.mlir.null : !llvm.ptr
+    //         llvm.invoke @callee() to ^bbsuccess unwind ^bbfail : () -> ()
+    //     ^bbfail:
+    //         %0 = llvm.landingpad (catch %null : !llvm.ptr) : !llvm.struct<(ptr<i8>, i32)>
+    //     ^bbsuccess:
+    //         llvm.return
+    //     }
+    transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
+
+    // Here we collect all values from functions that create runtime token or values.
+    // These function calls are made in the same function.
+    //
+    //     llvm.func caller()
+    //         // ...
+    //         %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
+    //         %1 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
+    //         // ...
+    //
+    // These tokens and values are implemented in the MLIRAsyncEngineRuntime.
+    // They contain a state which checks whether the result is:
+    // Unavailable, Available, or Error.
+    auto [tokens, values] = collectRefCountedTokensAndValues(caller);
+
+    // We are setting all of these values to be errors in the fail block.
+    //
+    //     ^bbfail:
+    //         %2 = llvm.landingpad (catch %null : !llvm.ptr) : !llvm.struct<(ptr<i8>, i32)>
+    //         llvm.call @mlirAsyncRuntimeSetTokenError(%0) : (!llvm.ptr) -> ()
+    //         llvm.call @mlirAsyncRuntimeSetValueError(%1) : (!llvm.ptr) -> ()
+    insertErrorCalls(tokens, values, failBlock, rewriter);
+
+    // We will now annotate caller for the next stage.
+    //
+    //     llvm.func caller() attributes { catalyst.preHandleError }
+    scheduleAnalysisForErrorHandling(caller, rewriter);
+
+    // The failBlock still has no successors.
+    // And we need to return these tokens back to the caller so that they
+    // can look into whether or not an error has occured.
+    // We don't want to jump to the successBlock because the success block
+    // will override the state in the vales to Available.
+    // so we jump to the first successor.
+    //
+    // TODO:
+    // Maybe a better answer here would be to copy the contents of the success block
+    // but remove calls to mlirAsyncRuntimeEmplaceValue/Token which are the only
+    // instructions in that block. This is more general, but it looks unnecessary as
+    // guaranteed by the generated code for the async lowerings.
+    if (successBlock->hasNoSuccessors()) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToEnd(failBlock);
+        rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
+        return;
+    }
+
+    auto successor = successBlock->getSuccessor(0);
+
+    // This is roughly what the function looks like after transformation
+    //     llvm.func caller() {
+    //         %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
+    //         %1 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
+    //         %null = llvm.mlir.null : !llvm.ptr
+    //         llvm.invoke @callee() to ^bbsuccess unwind ^bbfail : () -> ()
+    //     ^bbfail:
+    //         %3 = llvm.landingpad (catch %null : !llvm.ptr) : !llvm.struct<(ptr<i8>, i32)>
+    //         llvm.call @mlirAsyncRuntimeSetTokenError(%0) : (!llvm.ptr) -> ()
+    //         llvm.call @mlirAsyncRuntimeSetValueError(%1) : (!llvm.ptr) -> ()
+    //     ^bbsuccess:
+    //         llvm.call @mlirAsyncRuntimeEmplaceToken(%0) : (!llvm.ptr) -> ()
+    //         llvm.call @mlirAsyncRuntimeEmplaceValue(%1) : (!llvm.ptr) -> ()
+    //         llvm.br ^termination
+    //     ^termination:
+    //         // some cleanup and return
+    //     }
+    insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
 }
 
 struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
@@ -273,38 +404,6 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter
 
     // cleanupSource(annotatedCalls, rewriter);
     cleanupLivenessAnalysis(op, rewriter);
-}
-
-// Step 2:
-// Change those callsites to use llvm.invoke instead of llvm.call
-void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
-{
-    auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto personality = lookupOrCreatePersonality(moduleOp);
-    auto abortFuncOp = lookupOrCreateAbort(moduleOp);
-    auto caller = getCaller(callOp);
-
-    setPersonalityAttribute(caller, personality, rewriter);
-
-    auto [callBlock, successBlock, failBlock] = getBlocks(callOp, rewriter);
-
-    transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
-
-    auto [tokens, values] = collectRefCountedTokensAndValues(caller);
-
-    insertErrorCalls(tokens, values, failBlock, rewriter);
-
-    scheduleAnalysisForErrorHandling(caller, rewriter);
-
-    if (successBlock->hasNoSuccessors()) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToEnd(failBlock);
-        rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
-        return;
-    }
-
-    auto successor = successBlock->getSuccessor(0);
-    insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
 }
 
 bool hasAbortInBlock(Block *block)
