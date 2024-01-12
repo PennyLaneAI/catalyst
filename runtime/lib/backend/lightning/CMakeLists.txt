@@ -18,8 +18,7 @@ set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
 FetchContent_Declare(
     pennylane_lightning
     GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-    #GIT_TAG      ${LIGHTNING_GIT_TAG}
-    GIT_TAG      "c9808a7"
+    GIT_TAG      ${LIGHTNING_GIT_TAG}
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
