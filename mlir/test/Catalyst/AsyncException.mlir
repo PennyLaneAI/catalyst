@@ -136,7 +136,6 @@ module {
 
 // Check to make sure that the caller of async region gets annotated
 module {
-  // CHECK-LABEL: caller
   llvm.func @mlirAsyncRuntimeCreateToken() -> !llvm.ptr
   llvm.func @mlirAsyncRuntimeCreateValue() -> !llvm.ptr
   llvm.func @mlirAsyncRuntimeIsTokenError(!llvm.ptr) -> i1
@@ -156,6 +155,7 @@ module {
     llvm.return %4 : !llvm.struct<(ptr, ptr)>
   }
 
+  // CHECK-LABEL: caller
   llvm.func @caller() {
      %c1 = llvm.mlir.constant(1 : i64) : i1
      %0 = llvm.call @async_region() : () -> !llvm.struct<(ptr, ptr)>
@@ -216,6 +216,6 @@ module {
   ^bbbad:
      // CHECK: llvm.call @__catalyst__host__rt__unrecoverable_error
      llvm.call @abort() : () -> ()
-     llvm.br ^finally
+     llvm.unreachable
   }
 }
