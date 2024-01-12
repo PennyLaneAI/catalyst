@@ -582,7 +582,7 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
         canonicalizer_options = deepcopy(self.compile_options)
-        canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
+        canonicalizer_options.pipelines = [("0_canonicalize", ["canonicalize"])]
         canonicalizer_options.lower_to_llvm = False
         canonicalizer = Compiler(canonicalizer_options)
         _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
@@ -854,8 +854,8 @@ def qjit(
             ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
             available TensorFlow installation. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
-        async_qnodes (bool): Experimental support for automatically executing :class:`QNode`
-            asynchronously.
+        async_qnodes (bool): Experimental support for automatically executing
+            QNodes asynchronously, if supported by the device runtime.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
@@ -873,80 +873,8 @@ def qjit(
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
             Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
-            with dynamic shapes.
-
-            There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
-            dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
-
-            .. code-block:: python
-
-                abstracted_axes=((), ('n',), ('m', 'n'))
-
-            Each tuple in the sequence corresponds to one of the arguments in the annotated
-            function. Empty tuples can
-            be used and correspond to parameters with statically known shapes.
-            Non-empty tuples correspond to parameters with dynamically known shapes.
-
-            In this example above,
-
-            - the first argument will have a statically known shape,
-
-            - the second argument has its zeroth axis have dynamic
-              shape ``n``, and
-
-            - the third argument will have its zeroth axis with dynamic shape
-              ``m`` and first axis with dynamic shape ``n``.
-
-            Passing a dictionary:
-
-            .. code-block:: python
-
-                abstracted_axes={0: 'n'}
-
-            This approach allows a concise expression of the relationships
-            between axes for different function arguments. In this example,
-            it specifies that for all function arguments, the zeroth axis will
-            have dynamic shape ``n``.
-
-            Passing a sequence of dictionaries:
-
-            .. code-block:: python
-
-                abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
-
-            The example here is a more verbose version of the tuple example. This convention
-            allows axes to be omitted from the list of abstracted axes.
-
-            Using ``abstracted_axes`` can help avoid the cost of recompilation.
-            By using ``abstracted_axes``, a more general version of the compiled function will be
-            generated. This more general version is parametrized over the abstracted axes and
-            allows results to be computed over tensors independently of their axes lengths.
-
-            For example:
-
-            .. code-block:: python
-
-                @qjit
-                def sum(arr):
-                    return jnp.sum(arr)
-
-                sum(jnp.array([1]))     # Compilation happens here.
-                sum(jnp.array([1, 1]))  # And here!
-
-            The ``sum`` function would recompile each time an array of different size is passed
-            as an argument.
-
-            .. code-block:: python
-
-                @qjit(abstracted_axes={0: "n"})
-                def sum_abstracted(arr):
-                    return jnp.sum(arr)
-
-                sum(jnp.array([1]))     # Compilation happens here.
-                sum(jnp.array([1, 1]))  # No need to recompile.
-
-            the ``sum_abstracted`` function would only compile once and its definition would be
-            reused for subsequent function calls.
+            with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
+            below.
 
     Returns:
         QJIT object.
@@ -1000,37 +928,6 @@ def qjit(
 
     For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
 
-    Catalyst also supports capturing imperative Python control flow in compiled programs. You can
-    enable this feature via the ``autograph=True`` parameter. Note that it does come with some
-    restrictions, in particular whenever global state is involved. Refer to the
-    :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
-    supported and unsupported use-cases.
-
-    .. code-block:: python
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit(x: int):
-
-            if x < 5:
-                qml.Hadamard(wires=0)
-            else:
-                qml.T(wires=0)
-
-            return qml.expval(qml.PauliZ(0))
-
-    >>> circuit(3)
-    array(0.)
-
-    >>> circuit(5)
-    array(1.)
-
-    Note that imperative control flow will still work in Catalyst even when the AutoGraph feature is
-    turned off, it just won't be captured in the compiled program and cannot involve traced values.
-    The example above would then raise a tracing error, as there is no value for ``x`` yet than can
-    be compared in the if statement. A loop like ``for i in range(5)`` would be unrolled during
-    tracing, "copy-pasting" the body 5 times into the program rather than appearing as is.
-
     .. important::
 
         Most decomposition logic will be equivalent to PennyLane's decomposition.
@@ -1045,6 +942,117 @@ def qjit(
         3. The list of device-supported gates employed by Catalyst is currently different than that
             of the ``lightning.qubit`` device, as defined by the
             :class:`~.pennylane_extensions.QJITDevice`.
+
+    .. details::
+        :title: AutoGraph and Python control flow
+
+        Catalyst also supports capturing imperative Python control flow in compiled programs. You
+        can enable this feature via the ``autograph=True`` parameter. Note that it does come with
+        some restrictions, in particular whenever global state is involved. Refer to the
+        :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
+        supported and unsupported use-cases.
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def circuit(x: int):
+
+                if x < 5:
+                    qml.Hadamard(wires=0)
+                else:
+                    qml.T(wires=0)
+
+                return qml.expval(qml.PauliZ(0))
+
+        >>> circuit(3)
+        array(0.)
+
+        >>> circuit(5)
+        array(1.)
+
+        Note that imperative control flow will still work in Catalyst even when the AutoGraph
+        feature is turned off, it just won't be captured in the compiled program and cannot involve
+        traced values. The example above would then raise a tracing error, as there is no value for
+        ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
+        be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
+        appearing as is.
+
+    .. details::
+        :title: Dynamically-shaped arrays
+
+        There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
+        dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
+
+        .. code-block:: python
+
+            abstracted_axes=((), ('n',), ('m', 'n'))
+
+        Each tuple in the sequence corresponds to one of the arguments in the annotated
+        function. Empty tuples can
+        be used and correspond to parameters with statically known shapes.
+        Non-empty tuples correspond to parameters with dynamically known shapes.
+
+        In this example above,
+
+        - the first argument will have a statically known shape,
+
+        - the second argument has its zeroth axis have dynamic
+          shape ``n``, and
+
+        - the third argument will have its zeroth axis with dynamic shape
+          ``m`` and first axis with dynamic shape ``n``.
+
+        Passing a dictionary:
+
+        .. code-block:: python
+
+            abstracted_axes={0: 'n'}
+
+        This approach allows a concise expression of the relationships
+        between axes for different function arguments. In this example,
+        it specifies that for all function arguments, the zeroth axis will
+        have dynamic shape ``n``.
+
+        Passing a sequence of dictionaries:
+
+        .. code-block:: python
+
+            abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
+
+        The example here is a more verbose version of the tuple example. This convention
+        allows axes to be omitted from the list of abstracted axes.
+
+        Using ``abstracted_axes`` can help avoid the cost of recompilation.
+        By using ``abstracted_axes``, a more general version of the compiled function will be
+        generated. This more general version is parametrized over the abstracted axes and
+        allows results to be computed over tensors independently of their axes lengths.
+
+        For example:
+
+        .. code-block:: python
+
+            @qjit
+            def sum(arr):
+                return jnp.sum(arr)
+
+            sum(jnp.array([1]))     # Compilation happens here.
+            sum(jnp.array([1, 1]))  # And here!
+
+        The ``sum`` function would recompile each time an array of different size is passed
+        as an argument.
+
+        .. code-block:: python
+
+            @qjit(abstracted_axes={0: "n"})
+            def sum_abstracted(arr):
+                return jnp.sum(arr)
+
+            sum(jnp.array([1]))     # Compilation happens here.
+            sum(jnp.array([1, 1]))  # No need to recompile.
+
+        the ``sum_abstracted`` function would only compile once and its definition would be
+        reused for subsequent function calls.
     """
 
     axes = abstracted_axes
