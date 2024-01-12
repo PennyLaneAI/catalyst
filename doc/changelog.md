@@ -8,6 +8,26 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve a failure to generate gradient code for specific input circuits.
+  [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
+
+  In this case, [`jnp.mod`](https://github.com/PennyLaneAI/catalyst/issues/437)
+  was used to compute wire values in a for loop, which prevented the gradient
+  architecture from fully separating quantum and classical code. The following
+  program is now supported:
+  ```py
+  @qjit
+  @grad
+  @qml.qnode(dev)
+  def f(x):
+      def cnot_loop(j):
+          qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
+  
+      for_loop(0, 4, 1)(cnot_loop)()
+  
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 * Resolve a memory leak in the runtime stemming from  missing calls to device destructors
   at the end of programs.
   [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
@@ -16,6 +36,8 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
+David Ittah.
 
 # Release 0.4.0
 
@@ -363,7 +385,6 @@ This release contains contributions from (in alphabetical order):
   extract classical code from a QNode function. It also adds a verification step that will raise an error
   if a gradient pass cannot successfully eliminate all quantum operations for such functions.
   [(#397)](https://github.com/PennyLaneAI/catalyst/issues/397)
-  [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
 
 * Resolves a bug that caused unpredictable behaviour when printing string values with
   the `debug.print` function. The issue was caused by non-null-terminated strings.
