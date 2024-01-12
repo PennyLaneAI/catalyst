@@ -263,11 +263,6 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
     //         llvm.call @mlirAsyncRuntimeSetValueError(%1) : (!llvm.ptr) -> ()
     insertErrorCalls(tokens, values, failBlock, rewriter);
 
-    // We will now annotate caller for the next stage.
-    //
-    //     llvm.func caller() attributes { catalyst.preHandleError }
-    scheduleAnalysisForErrorHandling(caller, rewriter);
-
     // The failBlock still has no successors.
     // And we need to return these tokens back to the caller so that they
     // can look into whether or not an error has occured.
@@ -284,29 +279,35 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToEnd(failBlock);
         rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
-        return;
+    }
+    else {
+
+        auto successor = successBlock->getSuccessor(0);
+
+        // This is roughly what the function looks like after transformation
+        //     llvm.func caller() {
+        //         %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
+        //         %1 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
+        //         %null = llvm.mlir.null : !llvm.ptr
+        //         llvm.invoke @callee() to ^bbsuccess unwind ^bbfail : () -> ()
+        //     ^bbfail:
+        //         %3 = llvm.landingpad (catch %null : !llvm.ptr) : !llvm.struct<(ptr<i8>, i32)>
+        //         llvm.call @mlirAsyncRuntimeSetTokenError(%0) : (!llvm.ptr) -> ()
+        //         llvm.call @mlirAsyncRuntimeSetValueError(%1) : (!llvm.ptr) -> ()
+        //     ^bbsuccess:
+        //         llvm.call @mlirAsyncRuntimeEmplaceToken(%0) : (!llvm.ptr) -> ()
+        //         llvm.call @mlirAsyncRuntimeEmplaceValue(%1) : (!llvm.ptr) -> ()
+        //         llvm.br ^termination
+        //     ^termination:
+        //         // some cleanup and return
+        //     }
+        insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
     }
 
-    auto successor = successBlock->getSuccessor(0);
-
-    // This is roughly what the function looks like after transformation
-    //     llvm.func caller() {
-    //         %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
-    //         %1 = llvm.call @mlirAsyncRuntimeCreateValue() : () -> !llvm.ptr
-    //         %null = llvm.mlir.null : !llvm.ptr
-    //         llvm.invoke @callee() to ^bbsuccess unwind ^bbfail : () -> ()
-    //     ^bbfail:
-    //         %3 = llvm.landingpad (catch %null : !llvm.ptr) : !llvm.struct<(ptr<i8>, i32)>
-    //         llvm.call @mlirAsyncRuntimeSetTokenError(%0) : (!llvm.ptr) -> ()
-    //         llvm.call @mlirAsyncRuntimeSetValueError(%1) : (!llvm.ptr) -> ()
-    //     ^bbsuccess:
-    //         llvm.call @mlirAsyncRuntimeEmplaceToken(%0) : (!llvm.ptr) -> ()
-    //         llvm.call @mlirAsyncRuntimeEmplaceValue(%1) : (!llvm.ptr) -> ()
-    //         llvm.br ^termination
-    //     ^termination:
-    //         // some cleanup and return
-    //     }
-    insertBranchFromFailToSuccessor(failBlock, successor, rewriter);
+    // We will now annotate caller for the next stage.
+    //
+    //     llvm.func caller() attributes { catalyst.preHandleError }
+    scheduleAnalysisForErrorHandling(caller, rewriter);
 }
 
 struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
