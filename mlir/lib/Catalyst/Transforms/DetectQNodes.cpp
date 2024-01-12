@@ -109,13 +109,80 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
 void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter);
 
 /*
- * This pass is currently structured into three patterns.
+ * This pass is split into multiple patterns.
+ *
+ * The first pattern is DetectCallsInAsyncRegionsTransform.
  */
+
 struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
+
+/*
+ * DetectCallsInAsyncregionsTransform pattern will match
+ */
+LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp callOp,
+                                                                  PatternRewriter &rewriter) const
+{
+
+    // Calls to direct functions
+    //    llvm.call @callee() : () -> ()
+    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
+    if (!candidate)
+        return failure();
+
+    LLVM::LLVMFuncOp callee = candidate.value();
+    // Where the callee is annotated with the qnode attribute
+    //    llvm.func @callee() attributes { qnode }
+    bool isQnode = callee->hasAttr(qnodeAttr);
+
+    /* And are called from an presplitcoroutine context
+     *
+     *     llvm.func @foo() attributes { passthrough = [presplitcoroutine] } {
+     *         llvm.call @callee()
+     *     }
+     */
+    auto caller = getCaller(callOp);
+    bool validCandidate = isQnode && isAsync(caller);
+
+    if (!validCandidate)
+        return failure();
+
+    bool hasBeenTransformed = callOp->hasAttr(scheduleInvokeAttr);
+    if (hasBeenTransformed)
+        return failure();
+
+    /* Will be transformed to add the attribute catalyst.preInvoke
+     *     llvm.call @callee() { catalyst.preInvoke }
+     */
+    scheduleCallToInvoke(callOp, rewriter);
+    return success();
+}
+
+/*
+ *
+ * Note:
+ *     I will be using high level MLIR to describe the algorithm,
+ *     but this transformation works at the LLVM dialect stage.
+ *     Perhaps some of the passes could be made at higher level of abstractions.
+ *
+ * DetectCallsInAsyncRegionsTransform will match against:
+ *
+ *
+ * into
+ *
+ * ```llvm
+ * llvm.func @callee() attributes { qnode }
+ *
+ * llvm.func @foo() attributes { passthrough = [presplitcoroutine] } {
+ *     llvm.call @callee() { catalyst.preInvoke }
+ * }
+ * ```
+ *
+ *
+ */
 
 struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
@@ -219,27 +286,6 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter
 
     // cleanupSource(annotatedCalls, rewriter);
     cleanupLivenessAnalysis(op, rewriter);
-}
-
-// Step 1.
-// Find which call sites to change
-
-LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp callOp,
-                                                                  PatternRewriter &rewriter) const
-{
-    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
-    if (!candidate)
-        return failure();
-
-    LLVM::LLVMFuncOp callee = candidate.value();
-    auto caller = getCaller(callOp);
-    bool validCandidate =
-        callee->hasAttr(qnodeAttr) && !callOp->hasAttr(scheduleInvokeAttr) && isAsync(caller);
-    if (!validCandidate)
-        return failure();
-
-    scheduleCallToInvoke(callOp, rewriter);
-    return success();
 }
 
 // Step 2:
