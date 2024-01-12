@@ -61,6 +61,9 @@ void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void annotateCallsForSink(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter);
 bool callsSource(LLVM::CallOp callOp);
 void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter);
+void cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter);
+void cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter);
 
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
@@ -494,6 +497,8 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
+// Finally, we come to the liveness analysis, which will find out values that flow from multiple
+// sources to a single sink.
 struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
@@ -503,10 +508,107 @@ struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
 
 LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
 {
+    // We match on function calls that have the sink attribute.
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
     return op->hasAttr(sinkAttr) ? success() : failure();
 }
 
-void cleanupLivenessAnalysis(LLVM::CallOp op, PatternRewriter &rewriter)
+void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewriter) const
+{
+    auto caller = getCaller(sink);
+
+    SmallVector<LLVM::CallOp> sources;
+    SmallVector<Value> values;
+
+    // We are walking the body of the function containing the sink.
+    //     sources = { %0 = llvm.call @async_execute_fn(), %1 = llvm.call @async_execute_fn2(), ...
+    //     } values = { llvm.extract %0[0], llvm.extract %0[1] }
+    // values are values that should be deallocated at some point!
+    // subtletly: they don't necessarily need to be deallocated at this sink.
+    // but at another sink in this same function. This depends on the liveness analysis.
+    caller->walk([&](LLVM::CallOp callOp) {
+        bool isInteresting = callsSource(callOp);
+        if (!isInteresting)
+            return;
+
+        sources.push_back(callOp);
+        auto results = callOp.getResults();
+        collectValuesToLookFor(results, values);
+    });
+
+    // valuesToDrop = subset of values which are live in sink.
+    //
+    //     // %3, %4 <-- these are values that must be dropped ref
+    //     llvm.cond_br %5, ^bb0, ^bb1
+    //     ^5:
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
+    //     llvm.br ^6 // Now values %3 and %4 are alive in block ^5
+    //     ^6:
+    //     // %3, %4 are used in either ^6 or successor blocks
+    //     // %7, %8 are values that are not alive in the sink
+    //
+    // valuesToDrop = { %3, %4 }
+    SmallVector<Value> valuesToDrop;
+    Liveness liveness(caller);
+    for (auto value : values) {
+        for (auto operationWhereValueIsAlive : liveness.resolveLiveness(value)) {
+            if (operationWhereValueIsAlive == sink) {
+                valuesToDrop.push_back(value);
+            }
+        }
+    }
+
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPoint(sink);
+
+    auto moduleOp = sink->getParentOfType<ModuleOp>();
+    // We are going to have to wait for these threads
+    // before we can drop them.
+    // So let's ensure that the declaration is available.
+    //
+    //     llvm.func @mlirAsyncRuntimeAwaitValue(!llvm.ptr)
+    //     llvm.func @mlirAsyncRuntimeAwaitToken(!llvm.ptr)
+    //     llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64)
+    auto awaitFnDecl = lookupOrCreateAwaitTokenName(moduleOp);
+    auto dropRefFnDecl = lookupOrCreateDropRef(moduleOp);
+
+    Type llvmInt64Type = IntegerType::get(sink->getContext(), 64);
+    auto one = rewriter.getIntegerAttr(llvmInt64Type, 1);
+    Value c1 = rewriter.create<LLVM::ConstantOp>(sink->getLoc(), llvmInt64Type, one);
+
+    // We just need to await for the tokens.
+    // The tokens is the aggregate of all values.
+    // Only when all values are available / error, then the token is as well.
+    //
+    //     llvm.call @mlirAsyncRuntimeAwaitToken
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
+    for (auto awaitMe : valuesToDrop) {
+        for (auto user : awaitMe.getUsers()) {
+            if (callsMlirAsyncRuntimeCreateToken(user)) {
+                rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitFnDecl, awaitMe);
+                break;
+            }
+        }
+    }
+
+    // We will drop all values that were alive. Tokens and values.
+    //     llvm.call @mlirAsyncRuntimeAwaitToken
+    //     llvm.call @mlirAsyncRuntimeDropRef(%3, %c1) : (!llvm.ptr, i64) -> ()
+    //     llvm.call @mlirAsyncRuntimeDropRef(%4, %c1) : (!llvm.ptr, i64) -> ()
+    //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
+    for (auto dropMe : valuesToDrop) {
+        SmallVector<Value> params = {dropMe, c1};
+        rewriter.create<LLVM::CallOp>(sink.getLoc(), dropRefFnDecl, params);
+    }
+
+    // It is important that we do not cleanup the source, as other sinks
+    // need this information. It will be cleaned up at a later stage.
+    // NEVER CALL:
+    //    cleanupSource(annotatedCalls, rewriter);
+    cleanupSink(sink, rewriter);
+}
+
+void cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(op, [&] { op->removeAttr(sinkAttr); });
 }
@@ -521,67 +623,6 @@ void cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter
     for (auto source : sources) {
         cleanupSource(source, rewriter);
     }
-}
-
-void LivenessAnalysisDropRef::rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const
-{
-    auto caller = getCaller(op);
-
-    // We need to collect calls to source of tokens
-    // which in this case are already marked as sources.
-    SmallVector<Value> valuesToLookFor;
-    SmallVector<LLVM::CallOp> annotatedCalls;
-    caller->walk([&](LLVM::CallOp callOp) {
-        bool isInteresting = callsSource(callOp);
-        if (!isInteresting)
-            return;
-
-        annotatedCalls.push_back(callOp);
-        auto results = callOp.getResults();
-        collectValuesToLookFor(results, valuesToLookFor);
-    });
-
-    SmallVector<Value> valuesToDrop;
-    Liveness liveness(caller);
-    for (auto value : valuesToLookFor) {
-        for (auto operationWhereValueIsAlive : liveness.resolveLiveness(value)) {
-            if (operationWhereValueIsAlive == op) {
-                valuesToDrop.push_back(value);
-            }
-        }
-    }
-
-    PatternRewriter::InsertionGuard insertGuard(rewriter);
-    rewriter.setInsertionPoint(op);
-
-    // We are going to place awaits for all of these...
-    // and we won't check them...
-    // we don't care...
-    // we just want the threads to finish execution...
-    auto moduleOp = op->getParentOfType<ModuleOp>();
-    auto awaitFnDecl = lookupOrCreateAwaitTokenName(moduleOp);
-    auto dropRefFnDecl = lookupOrCreateDropRef(moduleOp);
-
-    Type llvmInt64Type = IntegerType::get(op->getContext(), 64);
-    auto one = rewriter.getIntegerAttr(llvmInt64Type, 1);
-    Value c1 = rewriter.create<LLVM::ConstantOp>(op->getLoc(), llvmInt64Type, one);
-
-    for (auto awaitMe : valuesToDrop) {
-        for (auto user : awaitMe.getUsers()) {
-            if (callsMlirAsyncRuntimeCreateToken(user)) {
-                rewriter.create<LLVM::CallOp>(op.getLoc(), awaitFnDecl, awaitMe);
-                break;
-            }
-        }
-    }
-
-    for (auto dropMe : valuesToDrop) {
-        SmallVector<Value> params = {dropMe, c1};
-        rewriter.create<LLVM::CallOp>(op.getLoc(), dropRefFnDecl, params);
-    }
-
-    // cleanupSource(annotatedCalls, rewriter);
-    cleanupLivenessAnalysis(op, rewriter);
 }
 
 bool hasAbortInBlock(Block *block)
