@@ -34,6 +34,7 @@ static constexpr llvm::StringRef abortName = "abort";
 static constexpr llvm::StringRef unrecoverableErrorName =
     "__catalyst__host__rt__unrecoverable_error";
 static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
+static constexpr llvm::StringRef changeToUnreachable = "catalyst.unreachable";
 static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
 static constexpr llvm::StringRef passthroughAttr = "passthrough";
 static constexpr llvm::StringRef sinkAttr = "catalyst.sink";
@@ -64,6 +65,7 @@ void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter);
 void cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter);
 void cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter);
+void annotateBrToUnreachable(LLVM::BrOp op, PatternRewriter &rewriter);
 
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
@@ -497,7 +499,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
-// Finally, we come to the liveness analysis, which will find out values that flow from multiple
+// We come to the liveness analysis, which will find out values that flow from multiple
 // sources to a single sink.
 struct LivenessAnalysisDropRef : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
@@ -606,6 +608,39 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     // NEVER CALL:
     //    cleanupSource(annotatedCalls, rewriter);
     cleanupSink(sink, rewriter);
+}
+
+// We now can cleanup the source
+// and change back the branches to unreachable
+struct CleanUpSourceTransform : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
+                                                      PatternRewriter &rewriter) const
+{
+    if (!callsSource(candidate))
+        return failure();
+
+    cleanupSource(candidate, rewriter);
+    return success();
+}
+
+struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
+    using OpRewritePattern<LLVM::BrOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(LLVM::BrOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
+                                                            PatternRewriter &rewriter) const
+{
+    if (!candidate->hasAttr(changeToUnreachable))
+        return failure();
+
+    auto unreachable = rewriter.create<LLVM::UnreachableOp>(candidate.getLoc());
+    rewriter.replaceOp(candidate, unreachable);
+    return success();
 }
 
 void cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
@@ -733,6 +768,12 @@ void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter)
                                [&] { callOp->setAttr(sourceOfRefCounts, rewriter.getUnitAttr()); });
 }
 
+void annotateBrToUnreachable(LLVM::BrOp brOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(brOp,
+                               [&] { brOp->setAttr(changeToUnreachable, rewriter.getUnitAttr()); });
+}
+
 void annotateCallsForSink(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
 {
     for (auto call : calls) {
@@ -750,6 +791,8 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
         rewriter.setInsertionPoint(terminator);
         assert(isa<LLVM::UnreachableOp>(terminator));
         auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
+        // Make sure we clean it up later.
+        annotateBrToUnreachable(brOp, rewriter);
         rewriter.replaceOp(terminator, brOp);
     }
 }
@@ -1154,6 +1197,12 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
         RewritePatternSet patterns4(context);
         patterns4.add<LivenessAnalysisDropRef>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4)))) {
+            signalPassFailure();
+        }
+
+        RewritePatternSet patterns5(context);
+        patterns5.add<CleanUpSourceTransform, BranchToUnreachableTransform>(context);
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns5)))) {
             signalPassFailure();
         }
     }
