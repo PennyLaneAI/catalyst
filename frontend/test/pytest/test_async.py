@@ -101,5 +101,61 @@ def test_exception(backend):
         wrapper()
 
 
+def test_exception2(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(keep_intermediate=True, async_qnodes=True)
+    def wrapper():
+        return circuit(0) + circuit(0)
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper()
+
+
+def test_exception3(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(keep_intermediate=True, async_qnodes=True)
+    def wrapper():
+        circuit(0) + circuit(0)
+        return None
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper()
+
+
+def test_exception4(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit2(x: int):
+        qml.Hadamard(wires=[0])
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(keep_intermediate=True, async_qnodes=True)
+    def wrapper():
+        circuit(0) + circuit2(0)
+        return None
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper()
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

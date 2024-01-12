@@ -50,7 +50,6 @@ help:
 .PHONY: all
 all: llvm mhlo enzyme dialects
 
-# Do not merge until LLVM_ENABLE_ASSERTIONS=ON
 .PHONY: llvm
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
@@ -59,7 +58,7 @@ llvm:
 		-DLLVM_BUILD_EXAMPLES=OFF \
 		-DLLVM_TARGETS_TO_BUILD="host" \
 		-DLLVM_ENABLE_PROJECTS="mlir" \
-		-DLLVM_ENABLE_ASSERTIONS=OFF \
+		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
