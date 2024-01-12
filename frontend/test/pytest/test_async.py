@@ -18,7 +18,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import grad, qjit
+from catalyst import grad, qjit, cond, while_loop, measure
 
 
 def test_qnode_execution(backend):
@@ -107,7 +107,7 @@ def test_exception2(backend):
         qml.CNOT(wires=[x, 0])
         return qml.probs()
 
-    @qjit(keep_intermediate=True, async_qnodes=True)
+    @qjit(async_qnodes=True)
     def wrapper():
         return circuit(0) + circuit(0)
 
@@ -123,7 +123,7 @@ def test_exception3(backend):
         qml.CNOT(wires=[x, 0])
         return qml.probs()
 
-    @qjit(keep_intermediate=True, async_qnodes=True)
+    @qjit(async_qnodes=True)
     def wrapper():
         circuit(0) + circuit(0)
         return None
@@ -146,7 +146,7 @@ def test_exception4(backend):
         qml.CNOT(wires=[x, 0])
         return qml.probs()
 
-    @qjit(keep_intermediate=True, async_qnodes=True)
+    @qjit(async_qnodes=True)
     def wrapper():
         circuit(0) + circuit2(0)
         return None
@@ -155,6 +155,207 @@ def test_exception4(backend):
     msg = "Unrecoverable error"
     with pytest.raises(RuntimeError, match=msg):
         wrapper()
+
+
+def test_exception_conditional(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(async_qnodes=True)
+    def wrapper(x: int):
+        @cond(x == 1)
+        def cond_fn():
+            return circuit(1)
+
+        @cond_fn.otherwise
+        def cond_fn():
+            return circuit(0)
+
+        return circuit(x)
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(1)
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(0)
+
+
+def test_exception_conditional_1(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(async_qnodes=True)
+    def wrapper(x: int):
+        y = circuit(1)
+
+        @cond(x == 1)
+        def cond_fn():
+            return circuit(1)
+
+        @cond_fn.otherwise
+        def cond_fn():
+            return circuit(0)
+
+        return y + circuit(x)
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(1)
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(0)
+
+
+def test_exception_conditional_2(backend):
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(async_qnodes=True)
+    def wrapper(x: int):
+        y = circuit(0)
+
+        @cond(x == 1)
+        def cond_fn():
+            return circuit(1)
+
+        @cond_fn.otherwise
+        def cond_fn():
+            return circuit(1)
+
+        return y + circuit(x)
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(1)
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(0)
+
+
+@pytest.mark.parametrize(
+    "order", [(0, 0, 1), (0, 1, 0), (1, 0, 0), (0, 1, 1), (1, 1, 0), (1, 0, 1), (1, 1, 1)]
+)
+def test_qnode_exception_dependency(order, backend):
+    """The two first QNodes are executed in parrallel."""
+    dev = qml.device(backend, wires=2)
+    x = order[0]
+    y = order[1]
+    z = order[2]
+
+    def multiple_qnodes(params):
+        @qml.qnode(device=dev)
+        def circuit1(params, x):
+            qml.RX(params[0], wires=0)
+            qml.RY(params[1], wires=1)
+            qml.CNOT(wires=[x, 1])
+            return qml.expval(qml.PauliZ(wires=0))
+
+        @qml.qnode(device=dev)
+        def circuit2(params, x):
+            qml.RY(params[0], wires=0)
+            qml.RZ(params[1], wires=1)
+            qml.CNOT(wires=[x, 1])
+            return qml.expval(qml.PauliX(wires=0))
+
+        @qml.qnode(device=dev)
+        def circuit3(params, x):
+            qml.RZ(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            qml.CNOT(wires=[x, 1])
+            return qml.expval(qml.PauliY(wires=0))
+
+        new_params = jnp.array([circuit1(params, x), circuit2(params, y)])
+        return circuit3(new_params, z)
+
+    params = jnp.array([1.0, 2.0])
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        compiled = qjit(async_qnodes=True)(multiple_qnodes)(params)
+
+
+# TODO: add the following diff_methods once issue #419 is fixed:
+# ("parameter-shift", "auto"), ("adjoint", "auto")]
+@pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
+@pytest.mark.parametrize("inp", [(1.0)])
+def test_gradient_exception(inp, diff_methods, backend):
+    """Parameter shift and finite diff generate multiple QNode that are run async."""
+
+    def f(x, y):
+        qml.RX(x * 2, wires=0)
+        qml.CNOT(wires=[0, y])
+        return qml.expval(qml.PauliY(0))
+
+    @qjit(async_qnodes=True)
+    def compiled(x: float):
+        g = qml.qnode(qml.device(backend, wires=1), diff_method=diff_methods[0])(f)
+        h = grad(g, method=diff_methods[1], argnum=[0])
+        return h(x, 0)
+
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        compiled(inp)
+
+
+def test_exception_in_loop(backend):
+
+    @qjit(async_qnodes=True)
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(n):
+        @while_loop(lambda v: v[0] < v[1])
+        def loop(v):
+            qml.CNOT(wires=[n, v[0]])
+            return v[0] + 1, v[1]
+
+        loop((0, 3))
+        return measure(wires=0)
+
+    msg = "Unrecoverable error"
+    # Exception in beginning
+    with pytest.raises(RuntimeError, match=msg):
+        circuit(0)
+    # Exception in middle
+    with pytest.raises(RuntimeError, match=msg):
+        circuit(1)
+    # Exception in end
+    with pytest.raises(RuntimeError, match=msg):
+        circuit(2)
+
+def test_exception_in_loop2(backend):
+
+    @qml.qnode(qml.device(backend, wires=3))
+    def bad(n):
+        @while_loop(lambda v: v[0] < v[1])
+        def loop(v):
+            qml.CNOT(wires=[n, v[0]])
+            return v[0] + 1, v[1]
+
+        loop((0, 3))
+        return measure(wires=0)
+
+     
+    @qml.qnode(qml.device(backend, wires=3))
+    def good():
+       return qml.state()
+
+    @qjit(async_qnodes=True)
+    def wrapper(n):
+       x = good()
+       y = bad(n)
+       return x + y
+    
+
+    msg = "Unrecoverable error"
+    # Exception in beginning
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper(0)
+
 
 
 if __name__ == "__main__":

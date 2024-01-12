@@ -81,8 +81,11 @@ void deactivateDevice()
 
 extern "C" {
 
-void __catalyst__host__rt__unrecoverable_error() {
-    RT_FAIL("Unrecoverable error.");
+extern void __mlir_execution_engine_destroy();
+
+void __catalyst__host__rt__unrecoverable_error() { 
+   RT_FAIL("Unrecoverable error.");
+   __mlir_execution_engine_destroy();
 }
 
 void *_mlir_memref_to_llvm_alloc(size_t size)

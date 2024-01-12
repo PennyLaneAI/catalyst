@@ -611,11 +611,37 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
 }
 
 // We now can cleanup the source
-// and change back the branches to unreachable
+// and change back the branches to unreachable.
+// Which are trivial changes.
 struct CleanUpSourceTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
     LogicalResult matchAndRewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
+
+struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
+    using OpRewritePattern<LLVM::BrOp>::OpRewritePattern;
+    LogicalResult matchAndRewrite(LLVM::BrOp op, PatternRewriter &rewriter) const override;
+};
+
+// This is not over yet though.
+// Because we can have the following situation.
+// Imagine the following call graph.
+//               A
+//           /       \
+//         B        async C
+//         |
+//       async D
+//
+// We can imagine a situation where
+//
+//    A starts running.
+//    A calls C and C executes asynchronously.
+//    A calls B
+//    B calls D and D executes asynchronously
+//
+// Due to the invariants we have placed, we must await on D before returning to A.
+// So, if there was an error in D, we actually never returned to A
+// and we never deallocated the memory for return values from C.
 
 LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
                                                       PatternRewriter &rewriter) const
@@ -626,11 +652,6 @@ LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
     cleanupSource(candidate, rewriter);
     return success();
 }
-
-struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
-    using OpRewritePattern<LLVM::BrOp>::OpRewritePattern;
-    LogicalResult matchAndRewrite(LLVM::BrOp op, PatternRewriter &rewriter) const override;
-};
 
 LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
                                                             PatternRewriter &rewriter) const
