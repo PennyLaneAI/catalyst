@@ -233,6 +233,10 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
+    - name: Install OpenMP
+      run: |
+        brew install libomp
+
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
