@@ -18,7 +18,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import grad, qjit, cond, while_loop, measure
+from catalyst import cond, grad, measure, qjit, while_loop
 
 
 def test_qnode_execution(backend):

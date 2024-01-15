@@ -16,14 +16,9 @@ Pytest configuration file for Catalyst test suite.
 """
 # pylint: disable=unused-import
 import pytest
+import catalyst
 
-try:
-    import catalyst
-    import tensorflow as tf
-except (ImportError, ModuleNotFoundError) as e:
-    tf_available = False
-else:
-    tf_available = True
+tf_available = True
 
 # Default from PennyLane
 TOL_STOCHASTIC = 0.05
