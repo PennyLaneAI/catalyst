@@ -602,12 +602,6 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
             rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitFnDecl, awaitMe);
     }
 
-    for (auto awaitMe : values) {
-        auto contains = valuesToDrop.find(awaitMe) != valuesToDrop.end();
-        if (contains)
-            rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitValFnDecl, awaitMe);
-    }
-
     // We will drop all values that were alive. Tokens and values.
     //     llvm.call @mlirAsyncRuntimeAwaitToken
     //     llvm.call @mlirAsyncRuntimeDropRef(%3, %c1) : (!llvm.ptr, i64) -> ()

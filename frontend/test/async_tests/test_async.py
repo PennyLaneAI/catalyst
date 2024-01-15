@@ -298,7 +298,6 @@ def test_gradient_exception(inp, diff_methods, backend):
 
 
 def test_exception_in_loop(backend):
-
     @qjit(async_qnodes=True)
     @qml.qnode(qml.device(backend, wires=3))
     def circuit(n):
@@ -321,8 +320,8 @@ def test_exception_in_loop(backend):
     with pytest.raises(RuntimeError, match=msg):
         circuit(2)
 
-def test_exception_in_loop2(backend):
 
+def test_exception_in_loop2(backend):
     @qml.qnode(qml.device(backend, wires=3))
     def bad(n):
         @while_loop(lambda v: v[0] < v[1])
@@ -333,23 +332,20 @@ def test_exception_in_loop2(backend):
         loop((0, 3))
         return measure(wires=0)
 
-     
     @qml.qnode(qml.device(backend, wires=3))
     def good():
-       return qml.state()
+        return qml.state()
 
     @qjit(async_qnodes=True)
     def wrapper(n):
-       x = good()
-       y = bad(n)
-       return x + y
-    
+        x = good()
+        y = bad(n)
+        return x + y
 
     msg = "Unrecoverable error"
     # Exception in beginning
     with pytest.raises(RuntimeError, match=msg):
         wrapper(0)
-
 
 
 if __name__ == "__main__":
