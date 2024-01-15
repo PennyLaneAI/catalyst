@@ -169,10 +169,6 @@ jobs:
     runs-on:
       group: 'Office 24th floor M2 Mac'
 
-#    env:
-#      CPATH: /opt/homebrew/include
-#      LIBRARY_PATH: /opt/homebrew/lib
-
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
@@ -289,7 +285,8 @@ jobs:
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=OFF \
-              -DLLVM_ENABLE_LLD=OFF
+              -DLLVM_ENABLE_LLD=OFF \
+              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm
 
         cmake --build quantum-build --target check-dialects compiler_driver
 
