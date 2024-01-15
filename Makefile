@@ -142,7 +142,9 @@ endif
 endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
+ifeq (($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET)
+endif
 
 test-demos:
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
