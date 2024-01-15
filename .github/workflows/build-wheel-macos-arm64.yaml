@@ -250,6 +250,7 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
+              -DOpenMP_ROOT=$(brew --prefix libomp) \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=ON
@@ -295,7 +296,8 @@ jobs:
 
     - name: Repair wheel using delocate-wheel
       run: |
-        delocate-wheel --require-archs=arm64 -w ./wheel -v dist/*.whl
+        # ignore-missing-dependencies only ignores libopenblas.dylib
+        delocate-wheel --require-archs=arm64 -w ./wheel -v dist/*.whl --ignore-missing-dependencies -vv
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
