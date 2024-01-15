@@ -24,6 +24,7 @@ from catalyst import cond, grad, measure, qjit, while_loop
 # the use is awaited.
 # pylint: disable=expression-not-assigned
 
+
 def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
     dev = qml.device(backend, wires=2)
@@ -90,6 +91,7 @@ def test_gradient(inp, diff_methods, backend):
 
 def test_exception(backend):
     "Test exception."
+
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -107,6 +109,7 @@ def test_exception(backend):
 
 def test_exception2(backend):
     "Test exception in multiple async executions."
+
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -124,6 +127,7 @@ def test_exception2(backend):
 
 def test_exception3(backend):
     "Test exception when not used in python."
+
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -191,6 +195,7 @@ def test_exception_conditional(backend):
 
 def test_exception_conditional_1(backend):
     "Test exception happening in else and outside else."
+
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -218,6 +223,7 @@ def test_exception_conditional_1(backend):
 
 def test_exception_conditional_2(backend):
     "Test exception happening in the presence of an if statement but in another."
+
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -309,6 +315,7 @@ def test_gradient_exception(inp, diff_methods, backend):
 
 def test_exception_in_loop(backend):
     "Test exception happening in a loop."
+
     @qjit(async_qnodes=True)
     @qml.qnode(qml.device(backend, wires=3))
     def circuit(n):
@@ -334,6 +341,7 @@ def test_exception_in_loop(backend):
 
 def test_exception_in_loop2(backend):
     "Test exception happening in a loop while one qnode succeeds."
+
     @qml.qnode(qml.device(backend, wires=3))
     def bad(n):
         @while_loop(lambda v: v[0] < v[1])
