@@ -206,7 +206,9 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+ifeq (($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET)
+endif
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
