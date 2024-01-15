@@ -376,8 +376,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
 
     auto callee = maybeCallee.value();
-    rewriter.updateRootInPlace(callee,
-                               [&] { callee.setLinkage(LLVM::Linkage::Internal); });
+    rewriter.updateRootInPlace(callee, [&] { callee.setLinkage(LLVM::Linkage::Internal); });
 
     // llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
     // %results = call @async_execute_fn()
@@ -608,7 +607,6 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
         if (contains)
             rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitValFnDecl, awaitMe);
     }
-
 
     // We will drop all values that were alive. Tokens and values.
     //     llvm.call @mlirAsyncRuntimeAwaitToken
@@ -1175,8 +1173,6 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     for (auto value : values) {
         insertCallToMlirAsyncRuntimeErrorFunction(value, setValueError, failBlock, rewriter);
     }
-
-
 }
 
 void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter)
