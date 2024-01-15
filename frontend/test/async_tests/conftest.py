@@ -16,6 +16,7 @@ Pytest configuration file for Catalyst test suite.
 """
 # pylint: disable=unused-import
 import pytest
+
 import catalyst
 
 tf_available = True
