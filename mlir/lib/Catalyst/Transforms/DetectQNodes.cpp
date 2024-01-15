@@ -48,7 +48,8 @@ static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName =
     "mlirAsyncRuntimeSetTokenError";
 static constexpr llvm::StringRef mlirAsyncRuntimeIsTokenErrorName = "mlirAsyncRuntimeIsTokenError";
 static constexpr llvm::StringRef mlirAsyncRuntimeIsValueErrorName = "mlirAsyncRuntimeIsValueError";
-static constexpr llvm::StringRef mlirAsyncRuntimeAwaitTokenName = "mlirAsyncRuntimeAwaitTokenName";
+static constexpr llvm::StringRef mlirAsyncRuntimeAwaitTokenName = "mlirAsyncRuntimeAwaitToken";
+static constexpr llvm::StringRef mlirAsyncRuntimeAwaitValueName = "mlirAsyncRuntimeAwaitValue";
 static constexpr llvm::StringRef mlirAsyncRuntimeDropRefName = "mlirAsyncRuntimeDropRef";
 
 // Helper function for attributes
@@ -96,9 +97,12 @@ LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp);
+LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp);
 LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp);
 
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor);
+void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &tokens,
+                            SmallVector<Value> &values);
 void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
                                                      SmallVector<Value> &results);
 void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &conditions);
@@ -372,6 +376,8 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
 
     auto callee = maybeCallee.value();
+    rewriter.updateRootInPlace(callee,
+                               [&] { callee.setLinkage(LLVM::Linkage::Internal); });
 
     // llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
     // %results = call @async_execute_fn()
@@ -520,11 +526,13 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     auto caller = getCaller(sink);
 
     SmallVector<LLVM::CallOp> sources;
+    SmallVector<Value> tokens;
     SmallVector<Value> values;
 
     // We are walking the body of the function containing the sink.
-    //     sources = { %0 = llvm.call @async_execute_fn(), %1 = llvm.call @async_execute_fn2(), ...
-    //     } values = { llvm.extract %0[0], llvm.extract %0[1] }
+    //     sources = { %0 = llvm.call @async_execute_fn(), %1 = llvm.call @async_execute_fn2() }}
+    //     tokens = { llvm.extract %0[0], llvm.extract %1[0] }
+    //     values = { llvm.extract %0[1], llvm.extract %1[1] }
     // values are values that should be deallocated at some point!
     // subtletly: they don't necessarily need to be deallocated at this sink.
     // but at another sink in this same function. This depends on the liveness analysis.
@@ -535,7 +543,8 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
 
         sources.push_back(callOp);
         auto results = callOp.getResults();
-        collectValuesToLookFor(results, values);
+
+        collectValuesToLookFor(results, tokens, values);
     });
 
     // valuesToDrop = subset of values which are live in sink.
@@ -550,12 +559,15 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     //     // %7, %8 are values that are not alive in the sink
     //
     // valuesToDrop = { %3, %4 }
-    SmallVector<Value> valuesToDrop;
+    llvm::SmallPtrSet<Value, 8> valuesToDrop;
     Liveness liveness(caller);
-    for (auto value : values) {
+    std::vector<Value> tokensAndValues(tokens.begin(), tokens.end());
+    tokensAndValues.insert(tokensAndValues.end(), values.begin(), values.end());
+
+    for (auto value : tokensAndValues) {
         for (auto operationWhereValueIsAlive : liveness.resolveLiveness(value)) {
             if (operationWhereValueIsAlive == sink) {
-                valuesToDrop.push_back(value);
+                valuesToDrop.insert(value);
             }
         }
     }
@@ -572,6 +584,7 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     //     llvm.func @mlirAsyncRuntimeAwaitToken(!llvm.ptr)
     //     llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64)
     auto awaitFnDecl = lookupOrCreateAwaitTokenName(moduleOp);
+    auto awaitValFnDecl = lookupOrCreateAwaitValueName(moduleOp);
     auto dropRefFnDecl = lookupOrCreateDropRef(moduleOp);
 
     Type llvmInt64Type = IntegerType::get(sink->getContext(), 64);
@@ -584,14 +597,18 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     //
     //     llvm.call @mlirAsyncRuntimeAwaitToken
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
-    for (auto awaitMe : valuesToDrop) {
-        for (auto user : awaitMe.getUsers()) {
-            if (callsMlirAsyncRuntimeCreateToken(user)) {
-                rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitFnDecl, awaitMe);
-                break;
-            }
-        }
+    for (auto awaitMe : tokens) {
+        auto contains = valuesToDrop.find(awaitMe) != valuesToDrop.end();
+        if (contains)
+            rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitFnDecl, awaitMe);
     }
+
+    for (auto awaitMe : values) {
+        auto contains = valuesToDrop.find(awaitMe) != valuesToDrop.end();
+        if (contains)
+            rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitValFnDecl, awaitMe);
+    }
+
 
     // We will drop all values that were alive. Tokens and values.
     //     llvm.call @mlirAsyncRuntimeAwaitToken
@@ -765,6 +782,30 @@ void collectPotentialConditions(SmallVector<Value> &values, SmallVector<Value> &
     }
 }
 
+void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &tokens,
+                            SmallVector<Value> &values)
+{
+    Value result = results.front();
+    Type resultTy = result.getType();
+
+    if (isa<LLVM::LLVMPointerType>(resultTy)) {
+        tokens.push_back(result);
+    }
+    else if (isa<LLVM::LLVMStructType>(resultTy)) {
+        // How to refer to a value without using llvm.extract
+        for (Operation *user : result.getUsers()) {
+            if (isa<LLVM::ExtractValueOp>(user)) {
+                LLVM::ExtractValueOp extract = cast<LLVM::ExtractValueOp>(user);
+                auto isToken = extract.getPosition()[0] == 0;
+                if (isToken)
+                    tokens.push_back(user->getResult(0));
+                else
+                    values.push_back(user->getResult(0));
+            }
+        }
+    }
+}
+
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor)
 {
     Value result = results.front();
@@ -854,6 +895,14 @@ LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
     return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeAwaitTokenName, {ptrTy}, voidTy);
 }
 
+LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, mlirAsyncRuntimeAwaitValueName, {ptrTy}, voidTy);
+}
+
 LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
@@ -917,7 +966,7 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
     Block *unwindBlock = rewriter.createBlock(successBlock);
 
     rewriter.setInsertionPointToEnd(unwindBlock);
-    bool isCleanUp = false;
+    bool isCleanUp = true;
     SmallVector<Value> operands{nullOp.getResult()};
     auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
     auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
@@ -1119,14 +1168,15 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     auto moduleOp = landingPad->getParentOfType<ModuleOp>();
 
     LLVM::LLVMFuncOp setTokenError = lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
+    LLVM::LLVMFuncOp setValueError = lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
     for (auto token : tokens) {
         insertCallToMlirAsyncRuntimeErrorFunction(token, setTokenError, failBlock, rewriter);
     }
-
-    LLVM::LLVMFuncOp setValueError = lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
     for (auto value : values) {
         insertCallToMlirAsyncRuntimeErrorFunction(value, setValueError, failBlock, rewriter);
     }
+
+
 }
 
 void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewriter &rewriter)
