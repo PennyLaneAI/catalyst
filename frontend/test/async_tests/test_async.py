@@ -23,6 +23,7 @@ from catalyst import cond, grad, measure, qjit, while_loop
 # We are explicitly testing that when something is not assigned
 # the use is awaited.
 # pylint: disable=expression-not-assigned
+# pylint: disable=missing-function-docstring
 
 
 def test_qnode_execution(backend):
