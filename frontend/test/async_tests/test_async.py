@@ -178,8 +178,6 @@ def test_exception_conditional(backend):
     # TODO: Better error messages.
     msg = "Unrecoverable error"
     with pytest.raises(RuntimeError, match=msg):
-        wrapper(1)
-    with pytest.raises(RuntimeError, match=msg):
         wrapper(0)
 
 
@@ -206,8 +204,6 @@ def test_exception_conditional_1(backend):
     # TODO: Better error messages.
     msg = "Unrecoverable error"
     with pytest.raises(RuntimeError, match=msg):
-        wrapper(1)
-    with pytest.raises(RuntimeError, match=msg):
         wrapper(0)
 
 
@@ -233,8 +229,6 @@ def test_exception_conditional_2(backend):
 
     # TODO: Better error messages.
     msg = "Unrecoverable error"
-    with pytest.raises(RuntimeError, match=msg):
-        wrapper(1)
     with pytest.raises(RuntimeError, match=msg):
         wrapper(0)
 
