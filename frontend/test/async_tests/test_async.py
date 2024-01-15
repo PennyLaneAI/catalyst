@@ -20,6 +20,9 @@ from jax import numpy as jnp
 
 from catalyst import cond, grad, measure, qjit, while_loop
 
+# We are explicitly testing that when something is not assigned
+# the use is awaited.
+# pylint: disable=expression-not-assigned
 
 def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
@@ -86,6 +89,7 @@ def test_gradient(inp, diff_methods, backend):
 
 
 def test_exception(backend):
+    "Test exception."
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -102,6 +106,7 @@ def test_exception(backend):
 
 
 def test_exception2(backend):
+    "Test exception in multiple async executions."
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -118,6 +123,7 @@ def test_exception2(backend):
 
 
 def test_exception3(backend):
+    "Test exception when not used in python."
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -135,6 +141,7 @@ def test_exception3(backend):
 
 
 def test_exception4(backend):
+    "Test exception happening on two different circuits."
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -173,7 +180,7 @@ def test_exception_conditional(backend):
         def cond_fn():
             return circuit(0)
 
-        return circuit(x)
+        return cond_fn()
 
     # TODO: Better error messages.
     msg = "Unrecoverable error"
@@ -182,6 +189,7 @@ def test_exception_conditional(backend):
 
 
 def test_exception_conditional_1(backend):
+    "Test exception happening in else and outside else."
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -199,7 +207,7 @@ def test_exception_conditional_1(backend):
         def cond_fn():
             return circuit(0)
 
-        return y + circuit(x)
+        return y + cond_fn()
 
     # TODO: Better error messages.
     msg = "Unrecoverable error"
@@ -208,6 +216,7 @@ def test_exception_conditional_1(backend):
 
 
 def test_exception_conditional_2(backend):
+    "Test exception happening in the presence of an if statement but in another."
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -225,7 +234,7 @@ def test_exception_conditional_2(backend):
         def cond_fn():
             return circuit(1)
 
-        return y + circuit(x)
+        return y + cond_fn()
 
     # TODO: Better error messages.
     msg = "Unrecoverable error"
@@ -298,6 +307,7 @@ def test_gradient_exception(inp, diff_methods, backend):
 
 
 def test_exception_in_loop(backend):
+    "Test exception happening in a loop."
     @qjit(async_qnodes=True)
     @qml.qnode(qml.device(backend, wires=3))
     def circuit(n):
@@ -322,6 +332,7 @@ def test_exception_in_loop(backend):
 
 
 def test_exception_in_loop2(backend):
+    "Test exception happening in a loop while one qnode succeeds."
     @qml.qnode(qml.device(backend, wires=3))
     def bad(n):
         @while_loop(lambda v: v[0] < v[1])
