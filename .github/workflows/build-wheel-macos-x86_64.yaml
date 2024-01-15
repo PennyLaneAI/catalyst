@@ -183,7 +183,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy auditwheel
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -297,9 +297,9 @@ jobs:
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
-    - name: Repair wheel using auditwheel
+    - name: Repair wheel using delocate-wheel
       run: |
-        auditwheel repair dist/*.whl -w ./wheel --no-update-tags
+        delocate-wheel --require-archs=x86_64 -w ./wheel -v dist/*.whl
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
