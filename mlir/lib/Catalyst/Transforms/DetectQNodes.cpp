@@ -147,7 +147,6 @@ struct DetectCallsInAsyncRegionsTransform : public OpRewritePattern<LLVM::CallOp
 LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp callOp,
                                                                   PatternRewriter &rewriter) const
 {
-
     // Calls to direct functions
     //    llvm.call @callee() : () -> ()
     std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
@@ -302,7 +301,6 @@ void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewrite
         rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
     }
     else {
-
         auto successor = successBlock->getSuccessor(0);
 
         // This is roughly what the function looks like after transformation

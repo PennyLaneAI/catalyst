@@ -142,6 +142,7 @@ def test_exception3(backend):
 
 def test_exception4(backend):
     "Test exception happening on two different circuits."
+
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(x: int):
         qml.CNOT(wires=[x, 0])
@@ -280,7 +281,7 @@ def test_qnode_exception_dependency(order, backend):
     params = jnp.array([1.0, 2.0])
     msg = "Unrecoverable error"
     with pytest.raises(RuntimeError, match=msg):
-        compiled = qjit(async_qnodes=True)(multiple_qnodes)(params)
+        qjit(async_qnodes=True)(multiple_qnodes)(params)
 
 
 # TODO: add the following diff_methods once issue #419 is fixed:
