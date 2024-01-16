@@ -164,7 +164,7 @@ jobs:
         run: |
           cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_DIR=./llvm-build/lib/cmake/llvm \
+              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON
 
           cmake --build enzyme-build --target EnzymeStatic-18
