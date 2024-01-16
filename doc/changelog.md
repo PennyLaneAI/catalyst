@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Build and package Catalyst wheels with OpenMP and ZStd.
+  [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
