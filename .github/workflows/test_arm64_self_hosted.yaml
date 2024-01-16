@@ -114,22 +114,22 @@ jobs:
         run: |
           if [ -d "${{ steps.cache_dir_name.outputs.dir_loc }}/mlir" ]; then
             echo 'Creating directory at ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir'
-            mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}
+            mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir
           fi
           
           if [ -d "$GITHUB_WORKSPACE/mlir/llvm-project" ]; then
             echo 'Copying mlir/llvm-project to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
-            mv mlir/llvm-project ${{ steps.cache_dir_name.outputs.dir_loc }}/
+            mv mlir/llvm-project ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir
           fi
           
           if [ -d "$GITHUB_WORKSPACE/mlir/mlir-hlo" ]; then
             echo 'Copying mlir/mlir-hlo to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
-            mv mlir/mlir-hlo ${{ steps.cache_dir_name.outputs.dir_loc }}/
+            mv mlir/mlir-hlo ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir
           fi
           
           if [ -d "$GITHUB_WORKSPACE/mlir/Enzyme" ]; then
             echo 'Copying mlir/Enzyme to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
-            mv mlir/Enzyme ${{ steps.cache_dir_name.outputs.dir_loc }}/
+            mv mlir/Enzyme ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir
           fi
           
           ls ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/
@@ -194,7 +194,7 @@ jobs:
           cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo -B ${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMLIR_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=OFF
@@ -209,7 +209,7 @@ jobs:
               -DLLVM_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON
 
-          cmake --build enzyme-build --target EnzymeStatic-18
+          cmake --build ${{ steps.cache_dir_name.outputs.dir_loc }}/enzyme-build --target EnzymeStatic-18
 
   catalyst-macos-wheels-arm64:
     needs: [constants, build-dependencies]
