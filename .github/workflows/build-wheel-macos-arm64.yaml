@@ -39,6 +39,8 @@ jobs:
       with:
         python_version: ${{ matrix.python_version }}
 
+    # The LLVM Caches include directory paths ... which are different on GitHub-Hosted and Self-Hosted runners
+    # This caused issues where caches created on GitHub Hosted runner when restored on Self-Hosted runner would cause issues.
     - name: Cache Prefix
       id: cache_prefix
       env:
@@ -192,6 +194,8 @@ jobs:
       with:
         python_version: ${{ matrix.python_version }}
 
+    # The LLVM Caches include directory paths ... which are different on GitHub-Hosted and Self-Hosted runners
+    # This caused issues where caches created on GitHub Hosted runner when restored on Self-Hosted runner would cause issues.
     - name: Cache Prefix
       id: cache_prefix
       env:

@@ -152,7 +152,7 @@ jobs:
           cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMLIR_DIR=./llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=OFF
@@ -164,7 +164,7 @@ jobs:
         run: |
           cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+              -DLLVM_DIR=./llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON
 
           cmake --build enzyme-build --target EnzymeStatic-18
