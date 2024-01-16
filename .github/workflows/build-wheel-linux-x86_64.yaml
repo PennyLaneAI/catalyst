@@ -263,7 +263,8 @@ jobs:
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=ON
+              -DENABLE_OPENMP=OFF \
+              -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 

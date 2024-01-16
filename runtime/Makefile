@@ -13,15 +13,10 @@ ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
+ENABLE_OPENMP?=ON
 ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?="v0.34.0"
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
-
-ifeq ($(shell uname), Darwin)
-	DEFAULT_ENABLE_OPENMP := OFF
-else
-	DEFAULT_ENABLE_OPENMP := ON
-endif
 
 BUILD_TARGETS := rt_capi
 TEST_TARGETS := ""
@@ -38,8 +33,6 @@ ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
 	TEST_TARGETS += runner_tests_openqasm
 endif
-
-ENABLE_OPENMP?=$(DEFAULT_ENABLE_OPENMP)
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
