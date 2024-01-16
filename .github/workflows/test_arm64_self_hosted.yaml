@@ -110,6 +110,8 @@ jobs:
           ref: ${{ needs.constants.outputs.enzyme_version }}
           path: mlir/Enzyme
 
+      # This step is needed because actions/checkout cannot clone to outside GITHUB_WORKSPACE
+      # https://github.com/actions/checkout/issues/197
       - name: Copy Submodule to tmp cache directory
         run: |
           if [ -d "${{ steps.cache_dir_name.outputs.dir_loc }}/mlir" ]; then
@@ -193,7 +195,7 @@ jobs:
       - name: Build MHLO Dialect
         if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
         run: |
-          export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+          export PATH=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build/bin:$PATH
           cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo -B ${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -226,7 +228,6 @@ jobs:
       group: 'Office 24th floor M2 Mac'
 
     steps:
-    - run: exit 1
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -256,11 +257,28 @@ jobs:
           echo 'prefix=github-hosted' >> $GITHUB_OUTPUT;
         fi
 
+    - name: Cache Directory Name
+      id: cache_dir_name
+      run: |
+        CACHE_DIR_PREFIX='llvm_cache_${{ matrix.python_version }}'
+          
+        echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}"
+        echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" 
+          
+        echo "dir_prefix=${CACHE_DIR_PREFIX}" >> $GITHUB_OUTPUT
+        echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
+
+    - name: Clear cache directory
+      run: |
+        rm -rf /tmp/${{ steps.cache_dir_name.outputs.dir_prefix }}*
+        mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}
+
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
-        path: mlir/llvm-project
+        path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project
         key: Linux-${{ steps.cache_prefix.outputs.prefix }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -269,7 +287,7 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path:  ${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_prefix.outputs.prefix }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
         fail-on-cache-miss: True
 
@@ -277,7 +295,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache@v3
       with:
-        path: mlir/mlir-hlo
+        path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo
         key: Linux-${{ steps.cache_prefix.outputs.prefix }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -286,7 +304,7 @@ jobs:
       id: cache-mhlo-build
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_prefix.outputs.prefix }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
         fail-on-cache-miss: True
 
@@ -294,7 +312,7 @@ jobs:
       id: cache-enzyme-source
       uses: actions/cache@v3
       with:
-        path:  mlir/Enzyme
+        path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme
         key: Linux-${{ steps.cache_prefix.outputs.prefix }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
         fail-on-cache-miss: True
 
@@ -302,7 +320,7 @@ jobs:
       id: cache-enzyme-build
       uses: actions/cache@v3
       with:
-        path:  enzyme-build
+        path: ${{ steps.cache_dir_name.outputs.dir_loc }}/enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_prefix.outputs.prefix }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
@@ -340,32 +358,32 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |        
-        cmake -S mlir -B quantum-build -G Ninja \
+        cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
-              -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
-              -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
-              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DMLIR_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build/lib/cmake/mlir \
+              -DMHLO_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build/lib/cmake/mlir-hlo \
+              -DMHLO_BINARY_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build/bin \
+              -DEnzyme_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/enzyme-build \
+              -DENZYME_SRC_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=OFF \
               -DLLVM_ENABLE_LLD=OFF \
-              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm
+              -DLLVM_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build/lib/cmake/llvm
 
         cmake --build quantum-build --target check-dialects compiler_driver
 
     - name: Build wheel
       run: |
         PYTHON=python${{ matrix.python_version }} \
-        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
-        MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
+        LLVM_BUILD_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build \
+        MHLO_BUILD_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build \
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
-        ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        ENZYME_BUILD_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/enzyme-build \
         make wheel
 
     - name: Upload Wheel Artifact
