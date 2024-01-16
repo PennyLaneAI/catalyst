@@ -358,7 +358,7 @@ jobs:
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |        
-        cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir -B quantum-build -G Ninja \
+        cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
