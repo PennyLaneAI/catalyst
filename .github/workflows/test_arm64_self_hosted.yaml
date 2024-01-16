@@ -47,14 +47,14 @@ jobs:
       - name: Cache Directory Name
         id: cache_dir_name
         run: |
-          PREFIX='llvm_cache_${{ matrix.python_version }}'
+          CACHE_DIR_PREFIX='llvm_cache_${{ matrix.python_version }}'
           
-          echo "dir_name=${PREFIX}_${{ github.sha }}"
-          echo "dir_loc=/tmp/${PREFIX}_${{ github.sha }}" 
+          echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}"
+          echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" 
           
-          echo "dir_prefix=$PREFIX" >> $GITHUB_OUTPUT
-          echo "dir_name=$PREFIX_${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "dir_loc=/tmp/$PREFIX_${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "dir_prefix=${CACHE_DIR_PREFIX}" >> $GITHUB_OUTPUT
+          echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
 
       - name: Clear cache directory
         run: |
