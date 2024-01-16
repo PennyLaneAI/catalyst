@@ -92,7 +92,7 @@ jobs:
         with:
           repository: llvm/llvm-project
           ref: ${{ needs.constants.outputs.llvm_version }}
-          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project
+          path: mlir/llvm-project
 
       - name: Clone MHLO Submodule
         if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
@@ -100,7 +100,7 @@ jobs:
         with:
           repository: tensorflow/mlir-hlo
           ref: ${{ needs.constants.outputs.mhlo_version }}
-          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo
+          path: mlir/mlir-hlo
 
       - name: Clone Enzyme Submodule
         if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -108,7 +108,32 @@ jobs:
         with:
           repository: EnzymeAD/Enzyme
           ref: ${{ needs.constants.outputs.enzyme_version }}
-          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme
+          path: mlir/Enzyme
+
+      - name: Copy Submodule to tmp cache directory
+        run: |
+          if [ -d "${{ steps.cache_dir_name.outputs.dir_loc }}/mlir"]; then
+            echo 'Creating directory at ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir'
+            mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir
+          fi
+          
+          if [ -d "$GITHUB_WORKSPACE/mlir/llvm-project" ]; then
+            echo 'Copying mlir/llvm-project to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
+            mv mlir/llvm-project ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/
+          fi
+          
+          if [ -d "$GITHUB_WORKSPACE/mlir/mlir-hlo"]; then
+            echo 'Copying mlir/mlir-hlo to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
+            mv mlir/mlir-hlo ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/
+          fi
+          
+          if [ -d "$GITHUB_WORKSPACE/mlir/Enzyme"]; then
+            echo 'Copying mlir/Enzyme to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
+            mv mlir/Enzyme ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/
+          fi
+          
+          ls ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/
+
 
       # Cache external project builds
       - name: Cache LLVM Build
