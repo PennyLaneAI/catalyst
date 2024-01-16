@@ -33,7 +33,7 @@ jobs:
         with:
           python_version: ${{ matrix.python_version }}
 
-      - name: Cache Prefix
+      - name: Cache Key Prefix
         id: cache_prefix
         env:
           RUNNER_IS_GITHUB_HOSTED: ${{ startsWith(runner.name, 'GitHub') }}
@@ -44,12 +44,26 @@ jobs:
             echo 'prefix=github-hosted' >> $GITHUB_OUTPUT;
           fi
 
+      - name: Cache Directory Name
+        id: cache_dir_name
+        run: |
+          PREFIX='llvm_cache_${{ matrix.python_version }}'
+          
+          echo "dir_prefix=$PREFIX" >> $GITHUB_OUTPUT
+          echo "dir_name=$PREFIX_${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "dir_loc=/tmp/$PREFIX_${{ github.sha }}" >>$GITHUB_OUTPUT
+
+      - name: Clear cache directory
+        run: |
+          rm -rf /tmp/${{ steps.cache_dir_name.outputs.dir_prefix }}*
+          mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}
+
       # Cache external project sources
       - name: Cache LLVM Source
         id: cache-llvm-source
         uses: actions/cache@v3
         with:
-          path:  mlir/llvm-project
+          path:  ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project
           key: Linux-${{ steps.cache_prefix.outputs.prefix }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
           enableCrossOsArchive: True
 
@@ -57,7 +71,7 @@ jobs:
         id: cache-mhlo-source
         uses: actions/cache@v3
         with:
-          path: mlir/mlir-hlo
+          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo
           key: Linux-${{ steps.cache_prefix.outputs.prefix }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
           enableCrossOsArchive: True
 
@@ -65,7 +79,7 @@ jobs:
         id: cache-enzyme-source
         uses: actions/cache@v3
         with:
-          path:  mlir/Enzyme
+          path:  ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme
           key: Linux-${{ steps.cache_prefix.outputs.prefix }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
           enableCrossOsArchive: True
 
@@ -75,7 +89,7 @@ jobs:
         with:
           repository: llvm/llvm-project
           ref: ${{ needs.constants.outputs.llvm_version }}
-          path: mlir/llvm-project
+          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project
 
       - name: Clone MHLO Submodule
         if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
@@ -83,7 +97,7 @@ jobs:
         with:
           repository: tensorflow/mlir-hlo
           ref: ${{ needs.constants.outputs.mhlo_version }}
-          path: mlir/mlir-hlo
+          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo
 
       - name: Clone Enzyme Submodule
         if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
@@ -91,28 +105,28 @@ jobs:
         with:
           repository: EnzymeAD/Enzyme
           ref: ${{ needs.constants.outputs.enzyme_version }}
-          path: mlir/Enzyme
+          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme
 
       # Cache external project builds
       - name: Cache LLVM Build
         id: cache-llvm-build
         uses: actions/cache@v3
         with:
-          path:  llvm-build
+          path:  ${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build
           key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_prefix.outputs.prefix }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
 
       - name: Cache MHLO Build
         id: cache-mhlo-build
         uses: actions/cache@v3
         with:
-          path:  mhlo-build
+          path:  ${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build
           key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_prefix.outputs.prefix }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
 
       - name: Cache Enzyme Build
         id: cache-enzyme-build
         uses: actions/cache@v3
         with:
-          path:  enzyme-build
+          path: ${{ steps.cache_dir_name.outputs.dir_loc }}/enzyme-build
           key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_prefix.outputs.prefix }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
       - name: Display Python-Path
@@ -126,7 +140,7 @@ jobs:
       - name: Build LLVM / MLIR
         if: steps.cache-llvm-build.outputs.cache-hit != 'true'
         run: |
-          cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+          cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project/llvm -B ${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DLLVM_BUILD_EXAMPLES=OFF \
                 -DLLVM_TARGETS_TO_BUILD="host" \
@@ -143,13 +157,13 @@ jobs:
           # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
           # and remove filter
           # This tests fails on CI/CD not locally.
-          LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
+          LIT_FILTER_OUT="Bytecode" cmake --build ${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build --target check-mlir
 
       - name: Build MHLO Dialect
         if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
         run: |
           export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-          cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+          cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo -B ${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
@@ -157,14 +171,14 @@ jobs:
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=OFF
 
-          cmake --build mhlo-build --target check-mlir-hlo
+          cmake --build ${{ steps.cache_dir_name.outputs.dir_loc }}/mhlo-build --target check-mlir-hlo
 
       - name: Build Enzyme
         if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
         run: |
-          cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
+          cmake -S ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme/enzyme -B ${{ steps.cache_dir_name.outputs.dir_loc }}/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+              -DLLVM_DIR=${{ steps.cache_dir_name.outputs.dir_loc }}/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON
 
           cmake --build enzyme-build --target EnzymeStatic-18
@@ -181,6 +195,7 @@ jobs:
       group: 'Office 24th floor M2 Mac'
 
     steps:
+    - run: exit 1
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
