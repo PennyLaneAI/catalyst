@@ -119,19 +119,19 @@ jobs:
             mkdir -p ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir
           fi
           
-          if [ -d "$GITHUB_WORKSPACE/mlir/llvm-project" ]; then
+          if [ "${{ steps.cache-llvm-source.outputs.cache-hit }}" != 'true' ]; then
             echo 'Copying mlir/llvm-project to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
             mkdir -p ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project
             mv mlir/llvm-project/* ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/llvm-project
           fi
           
-          if [ -d "$GITHUB_WORKSPACE/mlir/mlir-hlo" ]; then
+          if [ "${{ steps.cache-mhlo-source.outputs.cache-hit }}" != 'true' ]; then
             echo 'Copying mlir/mlir-hlo to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
             mkdir -p ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo
             mv mlir/mlir-hlo/* ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/mlir-hlo
           fi
           
-          if [ -d "$GITHUB_WORKSPACE/mlir/Enzyme" ]; then
+          if [ "${{ steps.cache-enzyme-source.outputs.cache-hit }}" != 'true' ]; then
             echo 'Copying mlir/Enzyme to ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/'
             mkdir -p ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme
             mv mlir/Enzyme/* ${{ steps.cache_dir_name.outputs.dir_loc }}/mlir/Enzyme
