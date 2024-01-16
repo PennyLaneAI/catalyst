@@ -22,7 +22,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, for_loop, grad, measure, qjit
+from catalyst import adjoint, cond, for_loop, grad, measure, qjit
 
 
 class TestPyTreesReturnValues:
@@ -489,6 +489,23 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(result, False)
         result = circuit({"wire": 1})
         assert jnp.allclose(result, True)
+
+    def test_dev_wires_have_pytree(self, backend):
+        """Device wires are pytree-compatible."""
+
+        def subroutine(wires):
+            for wire in wires:
+                qml.PauliX(wire)
+
+        dev = qml.device(backend, wires=3)
+
+        @qjit
+        @qml.qnode(dev)
+        def test_function():
+            adjoint(subroutine)(dev.wires)
+            return qml.probs()
+
+        test_function()
 
 
 class TestAuxiliaryData:
