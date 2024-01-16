@@ -49,6 +49,9 @@ jobs:
         run: |
           PREFIX='llvm_cache_${{ matrix.python_version }}'
           
+          echo "dir_name=$PREFIX_${{ github.sha }}"
+          echo "dir_loc=/tmp/$PREFIX_${{ github.sha }}" 
+          
           echo "dir_prefix=$PREFIX" >> $GITHUB_OUTPUT
           echo "dir_name=$PREFIX_${{ github.sha }}" >> $GITHUB_OUTPUT
           echo "dir_loc=/tmp/$PREFIX_${{ github.sha }}" >> $GITHUB_OUTPUT
