@@ -24,14 +24,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
 if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
     set(PL_BACKEND "lightning_qubit;lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
-    set(ENABLE_LAPACK "ON" CACHE STRING "Enable Lapack for PennyLane Lightning backend")
 elseif(ENABLE_LIGHTNING)
     set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
-    set(ENABLE_LAPACK "ON" CACHE STRING "Enable Lapack for PennyLane Lightning backend")
 elseif(ENABLE_LIGHTNING_KOKKOS)
     set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
-    set(ENABLE_LAPACK "ON" CACHE STRING "Enable Lapack for PennyLane Lightning backend")
 endif()
+set(ENABLE_LAPACK ON CACHE BOOL "Enable LAPACK for PennyLane Lightning backend")
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 
 FetchContent_MakeAvailable(pennylane_lightning)
