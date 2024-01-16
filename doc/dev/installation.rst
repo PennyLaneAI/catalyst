@@ -79,7 +79,7 @@ installed and available on the path (depending on the platform):
 
 - The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker
   (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended), and
-  `OpenMP <https://www.openmp.org/>`_ (Linux only).
+  `OpenMP <https://www.openmp.org/>`_.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
   `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
@@ -100,11 +100,12 @@ They can be installed on **Debian/Ubuntu** via:
   versions of it via ``pip install cmake``.
 
 On **macOS**, it is strongly recommended to install the official XCode Command Line Tools
-(for ``clang`` & ``make``). The remaining packages can then be installed via ``pip``:
+(for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and ``brew``:
 
 .. code-block:: console
 
   pip install cmake ninja
+  brew install libomp
 
 If you install Catalyst on a macOS system with ``ARM`` architecture (e.g. Apple M1/M2), you
 additionally need to install `Rust <https://www.rust-lang.org/tools/install>`_ and the
