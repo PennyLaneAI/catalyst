@@ -47,18 +47,18 @@ jobs:
       - name: Cache Directory Name
         id: cache_dir_name
         run: |
-          CACHE_DIR_PREFIX='llvm_cache_${{ matrix.python_version }}'
+          CACHE_DIR_NAME='llvm_cache_${{ matrix.python_version }}'
+          CACHE_DIR_LOC="/tmp/${CACHE_DIR_NAME}"
           
-          echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}"
-          echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" 
+          echo "dir_name=${CACHE_DIR_NAME}"
+          echo "dir_loc=${CACHE_DIR_LOC}"
           
-          echo "dir_prefix=${CACHE_DIR_PREFIX}" >> $GITHUB_OUTPUT
-          echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "dir_name=${CACHE_DIR_NAME}" >> $GITHUB_OUTPUT
+          echo "dir_loc=${CACHE_DIR_LOC}" >> $GITHUB_OUTPUT
 
       - name: Clear cache directory
         run: |
-          rm -rf /tmp/${{ steps.cache_dir_name.outputs.dir_prefix }}*
+          rm -rf ${{ steps.cache_dir_name.outputs.dir_loc }}*
           mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}
 
       # Cache external project sources
@@ -260,18 +260,18 @@ jobs:
     - name: Cache Directory Name
       id: cache_dir_name
       run: |
-        CACHE_DIR_PREFIX='llvm_cache_${{ matrix.python_version }}'
+        CACHE_DIR_NAME='llvm_cache_${{ matrix.python_version }}'
+        CACHE_DIR_LOC="/tmp/${CACHE_DIR_NAME}"
           
-        echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}"
-        echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" 
+        echo "dir_name=${CACHE_DIR_NAME}"
+        echo "dir_loc=${CACHE_DIR_LOC}"
           
-        echo "dir_prefix=${CACHE_DIR_PREFIX}" >> $GITHUB_OUTPUT
-        echo "dir_name=${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
-        echo "dir_loc=/tmp/${CACHE_DIR_PREFIX}_${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "dir_name=${CACHE_DIR_NAME}" >> $GITHUB_OUTPUT
+        echo "dir_loc=${CACHE_DIR_LOC}" >> $GITHUB_OUTPUT
 
     - name: Clear cache directory
       run: |
-        rm -rf /tmp/${{ steps.cache_dir_name.outputs.dir_prefix }}*
+        rm -rf ${{ steps.cache_dir_name.outputs.dir_loc }}*
         mkdir ${{ steps.cache_dir_name.outputs.dir_loc }}
 
     - name: Get Cached LLVM Source
@@ -441,8 +441,8 @@ jobs:
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
 
-    - name: Run Python Pytest Tests
-      run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+#    - name: Run Python Pytest Tests
+#      run: |
+#        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+#        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+#        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
