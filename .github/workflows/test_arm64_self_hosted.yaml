@@ -268,9 +268,11 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
+              -DOpenMP_ROOT=$(brew --prefix libomp) \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF
+              -DENABLE_OPENMP=OFF \
+              -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
