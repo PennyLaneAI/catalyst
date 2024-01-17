@@ -114,9 +114,7 @@ struct BraketRunner : public OpenQasmRunner {
         using namespace py::literals;
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
-        py::module sys = py::module::import("sys");
-        py::print("Rashid -> Printing Python executable");
-        py::print(sys.attr("executable"));
+
         auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
                                "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
 

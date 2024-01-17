@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 13.0
+  MACOSX_DEPLOYMENT_TARGET: 14.0
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -152,7 +152,7 @@ jobs:
                 -DLLVM_ENABLE_ASSERTIONS=ON \
                 -DLLVM_INSTALL_UTILS=ON \
                 -DLLVM_ENABLE_ZLIB=OFF \
-                -DLLVM_ENABLE_ZSTD=OFF \
+                -DLLVM_ENABLE_ZSTD=FORCE_ON \
                 -DLLVM_ENABLE_LLD=OFF \
                 -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
                 -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
@@ -307,7 +307,7 @@ jobs:
               -DEnzyme_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build \
               -DENZYME_SRC_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/llvm
 
