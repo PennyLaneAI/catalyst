@@ -39,7 +39,7 @@ runs:
         echo 'no_proxy=*' >> $GITHUB_ENV
         echo 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES' >> $GITHUB_ENV
         echo 'LDFLAGS=-L/opt/homebrew/opt/libomp/lib' >> $GITHUB_ENV
-        echo 'CPPFLAGS='-I/opt/homebrew/opt/libomp/include' >> $GITHUB_ENV
+        echo 'CPPFLAGS=-I/opt/homebrew/opt/libomp/include' >> $GITHUB_ENV
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
