@@ -307,7 +307,7 @@ void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
 }
 
 void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
-                                     /* results = */...)
+                                      /* results = */...)
 {
     RT_ASSERT(numResults >= 0);
     using ResultType = MemRefT<double, 1>;
@@ -503,7 +503,8 @@ void __catalyst__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target, bool 
         /* inverse = */ adjoint);
 }
 
-void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target, bool adjoint)
+void __catalyst__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target,
+                                           bool adjoint)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "ControlledPhaseShift", {theta},
@@ -540,7 +541,7 @@ void __catalyst__qis__CRZ(double theta, QUBIT *control, QUBIT *target, bool adjo
 }
 
 void __catalyst__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target,
-                          bool adjoint)
+                           bool adjoint)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "CRot", {phi, theta, omega},
@@ -609,7 +610,7 @@ static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubit
 }
 
 void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, bool adjoint, int64_t numQubits,
-                                  /*qubits*/...)
+                                   /*qubits*/...)
 {
     RT_ASSERT(numQubits >= 0);
 
@@ -695,7 +696,7 @@ ObsIdType __catalyst__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
 }
 
 ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numObs,
-                                         /*obsKeys*/...)
+                                          /*obsKeys*/...)
 {
     RT_ASSERT(numObs >= 0);
 
@@ -814,8 +815,8 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t n
     }
 }
 
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
-                            ...)
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots,
+                             int64_t numQubits, ...)
 {
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);

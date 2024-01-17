@@ -25,7 +25,7 @@ TEST_CASE("Test __catalyst__qis__Gradient with numAlloc=0", "[Gradient]")
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         REQUIRE_NOTHROW(__catalyst__qis__Gradient(0, nullptr));
         __catalyst__rt__device_release();
@@ -38,7 +38,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params with numAlloc=0", "[Gradient]")
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         REQUIRE_THROWS_WITH(__catalyst__qis__Gradient_params(nullptr, 0, nullptr),
                             Catch::Contains("Invalid number of trainable parameters"));
@@ -59,7 +59,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params for zero number of obs", "[Grad
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
 
@@ -95,7 +95,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
 
@@ -137,7 +137,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
 
@@ -183,7 +183,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
 
@@ -299,7 +299,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *q0 = __catalyst__rt__qubit_allocate();
         QUBIT *q1 = __catalyst__rt__qubit_allocate();
@@ -354,7 +354,7 @@ TEST_CASE("Test __catalyst__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -406,7 +406,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]",
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -466,7 +466,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -540,7 +540,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -616,7 +616,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
         QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
@@ -690,7 +690,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__initialize();
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qubit_arr = __catalyst__rt__qubit_allocate_array(2);
 

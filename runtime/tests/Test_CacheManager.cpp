@@ -172,7 +172,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables", "[CacheManager]")
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *target = __catalyst__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __catalyst__rt__qubit_allocate_array(1); // id = 1
@@ -223,7 +223,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables using deactiveCacheMa
     __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+                                    (int8_t *)rtd_kwargs.c_str());
 
         QUBIT *target = __catalyst__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __catalyst__rt__qubit_allocate_array(1); // id = 1
