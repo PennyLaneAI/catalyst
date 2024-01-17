@@ -203,7 +203,7 @@ jobs:
         python_version: ${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
-      run: python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy
+      run: python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
