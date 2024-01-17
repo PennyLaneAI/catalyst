@@ -299,6 +299,7 @@ jobs:
 
     - name: Repair wheel using auditwheel
       run: |
+        # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
         auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
     - name: Upload Wheel Artifact
