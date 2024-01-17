@@ -33,31 +33,31 @@ declare i32 @printf(i8*, ...)
 
 declare void @free(i8*)
 
-declare void @__quantum__rt__device_init(i8*, i8*, i8*)
+declare void @__catalyst__rt__device_init(i8*, i8*, i8*)
 
-declare void @__quantum__rt__initialize()
+declare void @__catalyst__rt__initialize()
 
-declare void @__quantum__rt__finalize()
+declare void @__catalyst__rt__finalize()
 
-declare void @__quantum__rt__print_state()
+declare void @__catalyst__rt__print_state()
 
-declare void @__quantum__rt__toggle_recorder(i8)
+declare void @__catalyst__rt__toggle_recorder(i8)
 
 declare i8* @__quantum__rt__array_get_element_ptr_1d(%Array*, i64)
 
-declare %Array* @__quantum__rt__qubit_allocate_array(i64)
+declare %Array* @__catalyst__rt__qubit_allocate_array(i64)
 
-declare void @__quantum__qis__RY(%Qubit*, double, i8)
+declare void @__catalyst__qis__RY(%Qubit*, double, i8)
 
-declare void @__quantum__qis__RZ(%Qubit*, double, i8)
+declare void @__catalyst__qis__RZ(%Qubit*, double, i8)
 
-declare void @__quantum__qis__Hadamard(%Qubit*, i8)
+declare void @__catalyst__qis__Hadamard(%Qubit*, i8)
 
-declare i64 @__quantum__qis__NamedObs(i8, %Qubit*)
+declare i64 @__catalyst__qis__NamedObs(i8, %Qubit*)
 
-declare double @__quantum__qis__Expval(i64)
+declare double @__catalyst__qis__Expval(i64)
 
-declare void @__quantum__qis__Gradient(i64, ...)
+declare void @__catalyst__qis__Gradient(i64, ...)
 
 
 ; Print jacobian results at index %1
@@ -70,28 +70,28 @@ define void @print_jacobian_at(double* %0, i64 %1) {
 
 ; A simple quantum circuit
 define double @circuit(%Qubit* %0) {
-  call void @__quantum__qis__Hadamard(%Qubit* %0, i8 0)
-  call void @__quantum__qis__RZ(%Qubit* %0, double 0.3, i8 0)
-  call void @__quantum__qis__RY(%Qubit* %0, double 0.7, i8 0)
-  call void @__quantum__qis__RZ(%Qubit* %0, double 0.4, i8 0)
-  %2 = call i64 @__quantum__qis__NamedObs(i8 1, %Qubit* %0)
-  %3 = call double @__quantum__qis__Expval(i64 %2)
+  call void @__catalyst__qis__Hadamard(%Qubit* %0, i8 0)
+  call void @__catalyst__qis__RZ(%Qubit* %0, double 0.3, i8 0)
+  call void @__catalyst__qis__RY(%Qubit* %0, double 0.7, i8 0)
+  call void @__catalyst__qis__RZ(%Qubit* %0, double 0.4, i8 0)
+  %2 = call i64 @__catalyst__qis__NamedObs(i8 1, %Qubit* %0)
+  %3 = call double @__catalyst__qis__Expval(i64 %2)
   ret double %3
 }
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__initialize()
-  call void @__quantum__rt__device_init(i8* getelementptr ([33 x i8], [33 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([11 x i8], [11 x i8]* @rtd_kwargs, i64 0, i64 0))
+  call void @__catalyst__rt__initialize()
+  call void @__catalyst__rt__device_init(i8* getelementptr ([33 x i8], [33 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([11 x i8], [11 x i8]* @rtd_kwargs, i64 0, i64 0))
 
   ; Allocate 2 qubits
-  %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)
+  %1 = call %Array* @__catalyst__rt__qubit_allocate_array(i64 2)
   %2 = call i8* @__quantum__rt__array_get_element_ptr_1d(%Array* %1, i64 0)
   %3 = bitcast i8* %2 to %Qubit**
   %4 = load %Qubit*, %Qubit** %3, align 8
 
   ; Activate the recorder
-  call void @__quantum__rt__toggle_recorder(i8 1)
+  call void @__catalyst__rt__toggle_recorder(i8 1)
 
   ; Call a quantum circuit
   %5 = call double @circuit(%Qubit* %4)
@@ -110,10 +110,10 @@ define i32 @main() {
   store %struct.MemRefT %memref, %struct.MemRefT* %memref_ptr, align 8
 
   ; Call the Gradient function
-  call void (i64, ...) @__quantum__qis__Gradient(i64 1, %struct.MemRefT* %memref_ptr)
+  call void (i64, ...) @__catalyst__qis__Gradient(i64 1, %struct.MemRefT* %memref_ptr)
 
   ; Deactivate the recorder
-  call void @__quantum__rt__toggle_recorder(i8 0)
+  call void @__catalyst__rt__toggle_recorder(i8 0)
 
   ; Print results
   call void @print_jacobian_at(double* %buffer_cast, i64 0)
@@ -121,10 +121,10 @@ define i32 @main() {
   call void @print_jacobian_at(double* %buffer_cast, i64 2)
 
   ; Print the updated state-vector
-  call void @__quantum__rt__print_state()
+  call void @__catalyst__rt__print_state()
 
   ; Close the context and free memory
   call void @free(i8* %buffer_allocated)
-  call void @__quantum__rt__finalize()
+  call void @__catalyst__rt__finalize()
   ret i32 0
 }
