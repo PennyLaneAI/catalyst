@@ -334,6 +334,8 @@ class QJITDevice(qml.QubitDevice):
         overriden_methods = [  # pragma: no cover
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
             (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
+            (qml.ops.BlockEncode, "has_decomposition", lambda self: True),
+            (qml.ops.BlockEncode, "decomposition", _decomp_to_unitary),
         ]
         for gate in decompose_to_qubit_unitary:
             overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
