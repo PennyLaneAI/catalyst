@@ -6,7 +6,6 @@ description: |
 
 inputs:
   python_version:
-    type: string
     description: Version of Python being used by the Job
     required: true
 
@@ -23,6 +22,9 @@ outputs:
   venv_site_packages:
     description: 'The path to the site-packages folder for the python venv created'
     value: ${{ steps.site_packages.outputs.site_packages_dir }}
+  dependency_build_dir:
+    description: 'The directory where the LLVM/MLIR/MHLO sources should reside in'
+    value: ${{ steps.build_dir.outputs.dir_name }}
 
 
 runs:
@@ -98,3 +100,15 @@ runs:
         python --version
         pip --version
         set +x
+
+    - name: Setup Build Dir
+      id: build_dir
+      shell: bash
+      env:
+        BUILD_DIR: /tmp/llvm_cache_${{ inputs.python_version }}
+      run: |
+        rm -rf "$BUILD_DIR"*
+        mkdir "$BUILD_DIR"
+        
+        echo "dir_name=${BUILD_DIR}" >> $GITHUB_OUTPUT
+      
