@@ -209,7 +209,7 @@ jobs:
         python_version: ${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
-      run: python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy
+      run: python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -260,10 +260,6 @@ jobs:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
-
-    - name: Install OpenMP
-      run: |
-        brew install libomp
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime

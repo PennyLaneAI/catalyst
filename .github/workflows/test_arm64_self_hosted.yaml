@@ -167,7 +167,7 @@ jobs:
               -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=FORCE_ON
 
           cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build --target check-mlir-hlo
 
@@ -266,7 +266,7 @@ jobs:
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DLIGHTNING_GIT_TAG="v0.34.0" \
               -DKokkos_ENABLE_SERIAL=ON \
-              -DKokkos_ENABLE_OPENMP=OFF \
+              -DKokkos_ENABLE_OPENMP=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
@@ -315,11 +315,16 @@ jobs:
         ENZYME_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build \
         make wheel
 
+    - name: Repair wheel using delocate-wheel
+      run: |
+        # ignore-missing-dependencies only ignores libopenblas.dylib
+        delocate-wheel --require-archs=arm64 -w ./wheel -v dist/*.whl --ignore-missing-dependencies -vv
+
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
-        path: dist/
+        path: wheel/
         retention-days: 14
 
   test-wheels:
