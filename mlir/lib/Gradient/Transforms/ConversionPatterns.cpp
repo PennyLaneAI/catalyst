@@ -94,8 +94,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
 
-        StringRef cacheFnName = "__quantum__rt__toggle_recorder";
-        StringRef gradFnName = "__quantum__qis__Gradient";
+        StringRef cacheFnName = "__catalyst__rt__toggle_recorder";
+        StringRef gradFnName = "__catalyst__qis__Gradient";
         Type cacheFnSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
         Type gradFnSignature = LLVM::LLVMFunctionType::get(
