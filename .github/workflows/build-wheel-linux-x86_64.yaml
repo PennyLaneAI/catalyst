@@ -119,7 +119,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build
+        yum update -y && yum install -y cmake ninja-build libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
@@ -136,7 +136,7 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
@@ -157,7 +157,7 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=FORCE_ON
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -193,7 +193,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build openmpi-devel
+        yum update -y && yum install -y cmake ninja-build openmpi-devel libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
@@ -263,7 +263,8 @@ jobs:
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=ON
+              -DENABLE_OPENMP=OFF \
+              -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
@@ -282,7 +283,7 @@ jobs:
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=FORCE_ON
 
         cmake --build quantum-build --target check-dialects compiler_driver
 
@@ -296,11 +297,16 @@ jobs:
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
+    - name: Repair wheel using auditwheel
+      run: |
+        # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
+        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
+
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
         name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: dist/
+        path: wheel/
         retention-days: 14
 
   test-wheels:

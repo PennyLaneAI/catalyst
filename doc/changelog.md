@@ -1,5 +1,10 @@
 # Release 0.4.1
 
+<h3>Improvements</h3>
+
+* Catalyst wheels are now packaged with OpenMP and ZStd.
+  [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
+
 <h3>Bug fixes</h3>
 
 * Resolve a failure to generate gradient code for specific input circuits.
@@ -22,7 +27,7 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
-* Resolve a memory leak in the runtime stemming from  missing calls to device destructors
+* Resolve a memory leak in the runtime stemming from missing calls to device destructors
   at the end of programs.
   [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
 
