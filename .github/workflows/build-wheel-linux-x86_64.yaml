@@ -139,7 +139,8 @@ jobs:
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -157,7 +158,8 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -167,7 +169,8 @@ jobs:
         cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
-              -DENZYME_STATIC_LIB=ON
+              -DENZYME_STATIC_LIB=ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         cmake --build enzyme-build --target EnzymeStatic-18
 
