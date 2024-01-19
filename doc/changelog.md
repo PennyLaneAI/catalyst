@@ -7,6 +7,10 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve an infinite recursion in the decomposition of the `Controlled`
+  operator whenever computing a Unitary matrix for the operator fails.
+  [(#468)](https://github.com/PennyLaneAI/catalyst/pull/468)
+
 * Resolve a failure to generate gradient code for specific input circuits.
   [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
 
