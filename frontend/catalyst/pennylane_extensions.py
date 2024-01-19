@@ -323,7 +323,7 @@ class QJITDevice(qml.QubitDevice):
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+            return [qml.QubitUnitary(self.matrix(), wires=self.wires)]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
