@@ -7,7 +7,7 @@
 * Build and package Catalyst wheels with OpenMP and ZStd.
   [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
 
-* Remove qextract_p and qinst_p from forced-order primitives.
+* Remove `qextract_p` and `qinst_p` from forced-order primitives.
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
 
 <h3>Breaking changes</h3>
