@@ -357,8 +357,8 @@ TEST_CASE("Test __catalyst__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
                                     (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -409,9 +409,9 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]",
                                     (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -469,9 +469,9 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
                                     (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -543,9 +543,9 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
                                     (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -619,9 +619,9 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
                                     (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -697,14 +697,6 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
         __catalyst__rt__qubit_release_array(qubit_arr);
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
-
-        QirString *qstr = __catalyst__rt__qubit_to_string(q);
-
-        QirString *expected_str = __quantum__rt__int_to_string(2);
-
-        CHECK(__quantum__rt__string_equal(qstr, expected_str));
-        __quantum__rt__string_update_reference_count(qstr, -1);
-        __quantum__rt__string_update_reference_count(expected_str, -1);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 

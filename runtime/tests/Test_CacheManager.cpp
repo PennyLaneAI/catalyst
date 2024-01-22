@@ -177,7 +177,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables", "[CacheManager]")
         QUBIT *target = __catalyst__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __catalyst__rt__qubit_allocate_array(1); // id = 1
 
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(target, false);
@@ -203,7 +203,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables", "[CacheManager]")
         CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
         // qml.expval(qml.PauliZ(wires=1))
-        QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT **qubit = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *qubit);
 
         CHECK(__catalyst__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
@@ -228,7 +228,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables using deactiveCacheMa
         QUBIT *target = __catalyst__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __catalyst__rt__qubit_allocate_array(1); // id = 1
 
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -256,7 +256,7 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables using deactiveCacheMa
         CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
         // qml.expval(qml.PauliZ(wires=1))
-        QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT **qubit = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *qubit);
 
         CHECK(__catalyst__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));

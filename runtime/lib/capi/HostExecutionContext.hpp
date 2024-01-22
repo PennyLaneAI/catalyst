@@ -174,12 +174,13 @@ class SharedLibraryManager final {
 
 /**
  * This indicates the various stages a device can be in:
- * - `Active`   : The device is added to the device pool and the `HostExecutionContext` device pointer
+ * - `Active`   : The device is added to the device pool and the `HostExecutionContext` device
+ * pointer
  *                (`RTD_PTR`) points to this device instance. The CAPI routines have only access to
  *                one single active device per thread via `RTD_PTR`.
  * - `Inactive`  : The device is deactivated meaning `RTD_PTR` does not point to this device.
- *                 The device is not removed from the pool, allowing the `HostExecutionContext` manager
- *                 to reuse this device in a multi-qnode workflow when another device with identical
+ *                 The device is not removed from the pool, allowing the `HostExecutionContext`
+ * manager to reuse this device in a multi-qnode workflow when another device with identical
  *                 specifications is requested.
  */
 enum class RTDeviceStatus : uint8_t {
