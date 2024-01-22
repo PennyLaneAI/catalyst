@@ -242,7 +242,7 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
 
     // I don't like this copying.
     std::vector<QubitIdType> *qubit_vector_ptr =
-        new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.end());
+        new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.begin() + num_qubits);
 
     return (QirArray *)qubit_vector_ptr;
 }
