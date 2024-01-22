@@ -122,11 +122,6 @@ class SharedLibraryManager final {
     SharedLibraryManager() = delete;
     explicit SharedLibraryManager(std::string filename)
     {
-        // RTLD_DEEPBIND is incompatible with sanitizers.
-        // If you have compiled this file with sanitizers and you reach this line
-        // you will get an error.
-        // Please re-compile without sanitizers.
-
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
 #else
