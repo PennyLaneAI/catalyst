@@ -42,9 +42,9 @@
 
 This release contains contributions from (in alphabetical order):
 
+Mikhail Andrenkov,
 Ali Asadi,
-David Ittah,
-Mikhail Andrenkov.
+David Ittah.
 
 # Release 0.4.0
 
