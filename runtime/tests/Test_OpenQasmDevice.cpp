@@ -14,7 +14,7 @@
 
 #include "MemRefUtils.hpp"
 
-#include "ExecutionContext.hpp"
+#include "HostExecutionContext.hpp"
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmDevice.hpp"
 #include "OpenQasmRunner.hpp"

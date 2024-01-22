@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ExecutionContext.hpp"
+#include "HostExecutionContext.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
@@ -43,7 +43,7 @@ TEST_CASE("Test dummy", "[Third Party]")
 #ifdef __linux__
 TEST_CASE("Test error message function not found", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
+    std::unique_ptr<HostExecutionContext> driver = std::make_unique<HostExecutionContext>();
     std::string file("libm.so.6");
     REQUIRE_THROWS_WITH(loadDevice("DummyDevice", file),
                         Catch::Contains("undefined symbol: DummyDeviceFactory"));
@@ -51,7 +51,7 @@ TEST_CASE("Test error message function not found", "[Third Party]")
 
 TEST_CASE("Test error message if init device fails", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
+    std::unique_ptr<HostExecutionContext> driver = std::make_unique<HostExecutionContext>();
     std::string file("libm.so.6");
     REQUIRE_THROWS_WITH(loadDevice("", file), Catch::Contains("undefined symbol: Factory"));
 }
@@ -59,7 +59,7 @@ TEST_CASE("Test error message if init device fails", "[Third Party]")
 
 TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
+    std::unique_ptr<HostExecutionContext> driver = std::make_unique<HostExecutionContext>();
     CHECK(loadDevice("DummyDevice", "libdummy_device" + get_dylib_ext()));
 }
 

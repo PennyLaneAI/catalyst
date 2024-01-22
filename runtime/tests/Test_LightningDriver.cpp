@@ -16,7 +16,7 @@
 #include <numeric>
 #include <string>
 
-#include "ExecutionContext.hpp"
+#include "HostExecutionContext.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 #include "Utils.hpp"
@@ -57,7 +57,7 @@ TEST_CASE("Test parse_kwargs coverage", "[Utils]")
 
 TEST_CASE("Test Driver", "[Driver]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
+    std::unique_ptr<HostExecutionContext> driver = std::make_unique<HostExecutionContext>();
 
     // check the scope of memory-manager
     CHECK(driver->getMemoryManager() != nullptr);

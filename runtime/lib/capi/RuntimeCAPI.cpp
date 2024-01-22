@@ -29,7 +29,7 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
-#include "ExecutionContext.hpp"
+#include "HostExecutionContext.hpp"
 #include "MemRefUtils.hpp"
 
 #include "RuntimeCAPI.h"
@@ -39,7 +39,7 @@ namespace Catalyst::Runtime {
 /**
  * @brief Global quantum device unique pointer.
  */
-static std::unique_ptr<ExecutionContext> CTX = nullptr;
+static std::unique_ptr<HostExecutionContext> CTX = nullptr;
 
 /**
  * @brief Thread local device pointer with internal linkage.
@@ -162,7 +162,7 @@ void __catalyst__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __catalyst__rt__initialize()
 {
-    Catalyst::Runtime::CTX = std::make_unique<Catalyst::Runtime::ExecutionContext>();
+    Catalyst::Runtime::CTX = std::make_unique<Catalyst::Runtime::HostExecutionContext>();
 }
 
 void __catalyst__rt__finalize()
