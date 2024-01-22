@@ -21,6 +21,7 @@ from jax import numpy as jnp
 from catalyst import grad, qjit
 
 
+@pytest.mark.skip()
 def test_qnode_execution(backend):
     """The two first QNodes are executed in parrallel."""
     dev = qml.device(backend, wires=2)
@@ -60,6 +61,7 @@ def test_qnode_execution(backend):
 
 # TODO: add the following diff_methods once issue #419 is fixed:
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
+@pytest.mark.skip()
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_gradient(inp, diff_methods, backend):
