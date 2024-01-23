@@ -66,7 +66,5 @@ def test_qjit_catalyst_to_cuda_jaxpr_actually_call():
     def foo():
         return qml.state()
 
-    cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(foo))
-    with pytest.raises(NotImplementedError, match="TODO"):
-        cuda_jaxpr()
-
+    cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(foo))()
+    print(jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts))
