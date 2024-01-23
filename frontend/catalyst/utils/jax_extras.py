@@ -636,3 +636,15 @@ def _gather_shape_rule_dynamic(
             )
 
     return _gather_shape_computation(indices, dimension_numbers, slice_sizes)
+
+
+def remove_host_context(jaxpr):
+    """This function will remove the host context.
+
+    It is expected that callers to this function do not use the host context
+    and instead forward the arguments directly to the qnode.
+    This is useful for example in the proof-of-concept for cuda integration.
+
+    Later iterations **might** have a host context. This is something not currently planned.
+    """
+    raise NotImplementedError("TODO(@erick-xanadu)")

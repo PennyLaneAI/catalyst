@@ -16,6 +16,7 @@ import pennylane as qml
 from catalyst import qjit
 from catalyst.compilation_pipelines import QJIT_CUDA, QJIT
 from catalyst.compiler import CompileOptions
+from catalyst.utils.jax_extras import remove_host_context
 import pytest
 
 
@@ -37,3 +38,15 @@ def test_qjit_cuda_generate_jaxpr():
     expected_jaxpr = QJIT(foo, opts).jaxpr
     observed_jaxpr = QJIT_CUDA(foo, opts).get_jaxpr()
     assert str(expected_jaxpr) == str(observed_jaxpr)
+
+
+def test_qjit_cuda_remove_host_context():
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def foo():
+        return qml.state()
+
+    opts = CompileOptions()
+    expected_jaxpr = QJIT(foo, opts).jaxpr
+    observed_jaxpr = QJIT_CUDA(foo, opts).get_jaxpr()
+    with pytest.raises(NotImplementedError, match="TODO"):
+        remove_host_context(observed_jaxpr)
