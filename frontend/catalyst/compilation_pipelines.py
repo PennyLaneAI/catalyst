@@ -867,14 +867,9 @@ class QJIT_CUDA:
 
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-            return
 
-        parameter_types = get_type_annotations(self.user_function)
-        if parameter_types is not None:
-            self.user_typed = True
-            self.mlir_module = self.get_mlir(*parameter_types)
-            if self.compile_options.target == "binary":
-                self.compiled_function = self.compile()
+        # TODO(@erick-xanadu): Do tracing if parameters are known.
+        # Originally disabled just to get proof of concept.
 
     def print_stage(self, stage):
         """Print one of the recorded stages.

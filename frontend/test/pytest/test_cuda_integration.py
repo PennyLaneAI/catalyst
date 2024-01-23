@@ -14,13 +14,24 @@
 import pennylane as qml
 
 from catalyst import qjit
+from catalyst.compilation_pipelines import QJIT_CUDA
+from catalyst.compiler import CompileOptions
 import pytest
 
 def test_argument():
     """Test that we can pass cuda-quantum as a compiler to @qjit decorator."""
 
+    @qjit(compiler="cuda-quantum")
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def foo():
+        return qml.state()
+
+def test_qjit_cuda_generate_jaxpr():
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def foo():
+        return qml.state()
+
+    opts = CompileOptions()
     with pytest.raises(RuntimeError, match="cuda quantum"):
-        @qjit(compiler="cuda-quantum")
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def foo():
-            return qml.state()
+        QJIT_CUDA(foo, opts).get_mlir()
