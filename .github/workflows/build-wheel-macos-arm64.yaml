@@ -181,12 +181,12 @@ jobs:
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-          cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme/enzyme -B ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build -G Ninja \
+        cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme/enzyme -B ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON
 
-          cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build --target EnzymeStatic-18
+        cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build --target EnzymeStatic-18
 
   catalyst-macos-wheels-arm64:
     needs: [constants, build-dependencies]
