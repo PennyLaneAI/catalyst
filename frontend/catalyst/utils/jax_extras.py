@@ -647,4 +647,5 @@ def remove_host_context(jaxpr):
 
     Later iterations **might** have a host context. This is something not currently planned.
     """
-    raise NotImplementedError("TODO(@erick-xanadu)")
+    # Is this always the case, let's try with different parameters.
+    return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]

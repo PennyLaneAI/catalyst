@@ -17,6 +17,7 @@ from catalyst import qjit
 from catalyst.compilation_pipelines import QJIT_CUDA, QJIT
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
+from catalyst.cuda_quantum_integration import catalyst_to_cuda
 import pytest
 
 
@@ -48,5 +49,15 @@ def test_qjit_cuda_remove_host_context():
     opts = CompileOptions()
     expected_jaxpr = QJIT(foo, opts).jaxpr
     observed_jaxpr = QJIT_CUDA(foo, opts).get_jaxpr()
+    jaxpr = remove_host_context(observed_jaxpr)
+    assert jaxpr
+
+def test_qjit_catalyst_to_cuda_jaxpr():
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def foo():
+        return qml.state()
+
     with pytest.raises(NotImplementedError, match="TODO"):
-        remove_host_context(observed_jaxpr)
+        cuda_jaxpr = catalyst_to_cuda(foo)
+
