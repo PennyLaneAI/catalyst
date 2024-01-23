@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Remove copies of TOML device configuration files for Lightning device in Catalyst.
+  [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
+
 * Build and package Catalyst wheels with OpenMP and ZStd.
   [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
 
