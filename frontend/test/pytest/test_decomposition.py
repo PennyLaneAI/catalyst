@@ -16,7 +16,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import for_loop, measure, qjit
+from catalyst import CompileError, ctrl, measure, qjit
 from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
@@ -77,3 +77,29 @@ def test_decomposition(param, expected):
         return measure(wires=1)
 
     assert mid_circuit(param) == expected
+
+
+class TestControlledDecomposition:
+    """Test behaviour around the decomposition of the `Controlled` class."""
+
+    def test_no_matrix(self, backend):
+        """Test that controlling an operation without a matrix method raises an error."""
+        dev = qml.device(backend, wires=4)
+
+        class OpWithNoMatrix(qml.operation.Operation):
+            num_wires = qml.operation.AnyWires
+
+            def matrix(self):
+                raise NotImplementedError()
+
+        @qml.qnode(dev)
+        def f():
+            ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
+            return qml.probs()
+
+        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
+            qjit(f, target="jaxpr")
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
