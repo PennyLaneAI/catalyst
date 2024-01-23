@@ -20,6 +20,7 @@ from catalyst.utils.jax_extras import remove_host_context
 from catalyst.cuda_quantum_integration import catalyst_to_cuda
 import pytest
 
+import jax
 
 def test_argument():
     """Test that we can pass cuda-quantum as a compiler to @qjit decorator."""
@@ -58,4 +59,14 @@ def test_qjit_catalyst_to_cuda_jaxpr():
     def foo():
         return qml.state()
 
-    cuda_jaxpr = catalyst_to_cuda(foo)
+    cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(foo))
+
+def test_qjit_catalyst_to_cuda_jaxpr_actually_call():
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def foo():
+        return qml.state()
+
+    cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(foo))
+    with pytest.raises(NotImplementedError, match="TODO"):
+        cuda_jaxpr()
+

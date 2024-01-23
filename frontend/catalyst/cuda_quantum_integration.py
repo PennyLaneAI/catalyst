@@ -311,21 +311,25 @@ def cudaq_sample_abs(kernel, *args, shots_counts=1000):
 
 # There are no lowerings because we will not generate MLIR
 
+def transform_jaxpr_to_cuda_jaxpr(jaxpr, literals, *args):
+    raise NotImplementedError("TODO(@erick-xanadu):")
+
 # So where is this function going to be called?
 # fun has to be a function that returns jaxpr.
 # Normally, we would trace it via `make_jaxpr`.
 # But with Catalyst, we are no longer going through that route.
-
-
 def catalyst_to_cuda(fun):
     """This will likely become what lives in @qjit when cuda-quantum is selected as compiler."""
 
-    @wraps
+    from catalyst.compilation_pipelines import qjit_catalyst, QJIT_CUDA
+    from catalyst.compiler import CompileOptions
+    from catalyst.utils.jax_extras import remove_host_context
+    @wraps(fun)
     def wrapped(*args, **kwargs):
         opts = CompileOptions()
-        catalyst_jaxpr_with_host = QJIT_CUDA(fun, opts).jaxpr
+        catalyst_jaxpr_with_host = QJIT_CUDA(fun, opts).get_jaxpr(*args)
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
-        closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.consts)
+        closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
         out = transform_jaxpr_to_cuda_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
         return out[0]
 
