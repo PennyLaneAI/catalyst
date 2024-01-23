@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MACOSX_DEPLOYMENT_TARGET: 13.0
+  MACOSX_DEPLOYMENT_TARGET: 14.0
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,16 +23,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest-xlarge]
-        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: macos-latest-xlarge
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+    
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     - name: Setup Runner Environment
       id: setup_env
@@ -45,7 +50,7 @@ jobs:
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
-        path:  mlir/llvm-project
+        path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
         enableCrossOsArchive: True
 
@@ -53,7 +58,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache@v3
       with:
-        path: mlir/mlir-hlo
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo
         key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
         enableCrossOsArchive: True
 
@@ -61,7 +66,7 @@ jobs:
       id: cache-enzyme-source
       uses: actions/cache@v3
       with:
-        path:  mlir/Enzyme
+        path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
         enableCrossOsArchive: True
 
@@ -89,40 +94,64 @@ jobs:
         ref: ${{ needs.constants.outputs.enzyme_version }}
         path: mlir/Enzyme
 
+      # This step is needed because actions/checkout cannot clone to outside GITHUB_WORKSPACE
+      # https://github.com/actions/checkout/issues/197
+    - name: Copy Submodule to tmp cache directory
+      run: |
+        if [ ! -d "${{ steps.setup_env.outputs.dependency_build_dir }}/mlir" ]; then
+          echo 'Creating directory at ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir'
+          mkdir -p ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir
+        fi
+
+        if [ "${{ steps.cache-llvm-source.outputs.cache-hit }}" != 'true' ]; then
+          echo 'Copying mlir/llvm-project to ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/'
+          mkdir -p ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project
+          mv mlir/llvm-project/* ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project
+        fi
+
+        if [ "${{ steps.cache-mhlo-source.outputs.cache-hit }}" != 'true' ]; then
+          echo 'Copying mlir/mlir-hlo to ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/'
+          mkdir -p ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo
+          mv mlir/mlir-hlo/* ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo
+        fi
+
+        if [ "${{ steps.cache-enzyme-source.outputs.cache-hit }}" != 'true' ]; then
+          echo 'Copying mlir/Enzyme to ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/'
+          mkdir -p ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme
+          mv mlir/Enzyme/* ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme
+        fi
+
+        ls ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/
+
     # Cache external project builds
     - name: Cache LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
       uses: actions/cache@v3
       with:
-        path:  enzyme-build
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
-    - name: Set up Python via brew
-      run: |
-        brew install python@${{ matrix.python_version }}
-
     - name: Install Dependencies (Python)
-      run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+      run: python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+        cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project/llvm -B ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_BUILD_EXAMPLES=OFF \
               -DLLVM_TARGETS_TO_BUILD="host" \
@@ -140,53 +169,54 @@ jobs:
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
         # This tests fails on CI/CD not locally.
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
+        LIT_FILTER_OUT="Bytecode" cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build --target check-mlir
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+        export PATH=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/bin:$PATH
+        cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo -B ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
-        cmake --build mhlo-build --target check-mlir-hlo
+        cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build --target check-mlir-hlo
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
+        cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme/enzyme -B ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
-        cmake --build enzyme-build --target EnzymeStatic-18
+        cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build --target EnzymeStatic-18
 
   catalyst-macos-wheels-arm64:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest-xlarge]
-        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Wheels (Python ${{ matrix.python_version }})
-    runs-on: ${{ matrix.os }}
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Set up Python via brew
-      run: |
-        brew install python@${{ matrix.python_version }}
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
       run: |
@@ -196,7 +226,7 @@ jobs:
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
-        path: mlir/llvm-project
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -205,7 +235,7 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
         fail-on-cache-miss: True
 
@@ -213,7 +243,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache@v3
       with:
-        path: mlir/mlir-hlo
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo
         key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -222,7 +252,7 @@ jobs:
       id: cache-mhlo-build
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
         fail-on-cache-miss: True
 
@@ -230,7 +260,7 @@ jobs:
       id: cache-enzyme-source
       uses: actions/cache@v3
       with:
-        path:  mlir/Enzyme
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
         fail-on-cache-miss: True
 
@@ -238,13 +268,9 @@ jobs:
       id: cache-enzyme-build
       uses: actions/cache@v3
       with:
-        path:  enzyme-build
+        path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
-
-    - name: Install OpenMP
-      run: |
-        brew install libomp
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
@@ -268,7 +294,10 @@ jobs:
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
     - name: Test Catalyst-Runtime
+      env:
+        VENV_SITE_PACKAGES: ${{ steps.setup_env.outputs.venv_site_packages }}
       run: |
+        export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
@@ -283,25 +312,26 @@ jobs:
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
-              -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
-              -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
-              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
+              -DMHLO_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build/lib/cmake/mlir-hlo \
+              -DMHLO_BINARY_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build/bin \
+              -DEnzyme_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build \
+              -DENZYME_SRC_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
-              -DLLVM_ENABLE_LLD=OFF
+              -DLLVM_ENABLE_LLD=OFF \
+              -DLLVM_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/llvm
 
         cmake --build quantum-build --target check-dialects compiler_driver
 
     - name: Build wheel
       run: |
         PYTHON=python${{ matrix.python_version }} \
-        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
-        MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
+        LLVM_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build \
+        MHLO_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build \
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
-        ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        ENZYME_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build \
         make wheel
 
     - name: Repair wheel using delocate-wheel
@@ -321,27 +351,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest-xlarge]
-        arch: [arm64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Xanadu M2 Mac
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
-
-    - name: Set up Python via brew
-      run: |
-        brew install python@${{ matrix.python_version }}
 
     - name: Install Python dependencies
       run: |
@@ -360,6 +391,6 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest -v $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest -v $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest -v $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
