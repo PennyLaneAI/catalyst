@@ -44,7 +44,7 @@ from mlir_quantum.runtime import (
 import catalyst
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.jax_tracer import trace_to_mlir
+from catalyst.jax_tracer import trace_to_mlir, trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
@@ -922,16 +922,9 @@ class QJIT_CUDA:
             func = self.user_function
             sig = self.c_sig
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(func, abstracted_axes, *sig)
+            jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *sig)
 
-        inject_functions(mlir_module, ctx)
-        self._jaxpr = jaxpr
-        canonicalizer_options = deepcopy(self.compile_options)
-        canonicalizer_options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        canonicalizer_options.lower_to_llvm = False
-        canonicalizer = Compiler(canonicalizer_options)
-        _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
-        return mlir_module
+        raise RuntimeError("Unimplemented integration with cuda quantum")
 
     def compile(self):
         """Compile the current MLIR module."""
