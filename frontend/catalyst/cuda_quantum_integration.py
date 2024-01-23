@@ -52,13 +52,27 @@ class AbsCudaKernel(jax.core.AbstractValue):
 class CudaKernel(cudaq._pycudaq.QuakeValue):
     aval = AbsCudaKernel
 
+class AbsCudaSampleResult(jax.core.AbstractValue):
+    hash_value = hash("AbsCudaSampleResult")
+
+    def __eq__(self, other):
+        return isinstance(other, AbsCudaSampleResult)
+
+    def __hash__(self):
+        return self.hash_value
+
+class CudaSampleResult(cudaq.SampleResult):
+    aval = AbsCudaSampleResult
+
 jax.core.pytype_aval_mappings[CudaValue] = lambda x: x.aval
 jax.core.pytype_aval_mappings[CudaQReg] = lambda x: x.aval
 jax.core.pytype_aval_mappings[CudaQbit] = lambda x: x.aval
+jax.core.pytype_aval_mappings[CudaSampleResult] = lambda x: x.aval
 core.raise_to_shaped_mappings[AbsCudaValue] = lambda aval, _: aval
 core.raise_to_shaped_mappings[AbsCudaQReg] = lambda aval, _: aval
 core.raise_to_shaped_mappings[AbsCudaKernel] = lambda aval, _: aval
 core.raise_to_shaped_mappings[AbsCudaQbit] = lambda aval, _: aval
+core.raise_to_shaped_mappings[AbsCudaSampleResult] = lambda aval, _: aval
 
 # From the documentation
 # https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
@@ -241,3 +255,23 @@ mx_p = make_primitive_for_m("x")
 my_p = make_primitive_for_m("y")
 mz_p = make_primitive_for_m("z")
 
+
+cudaq_sample_p = jax.core.Primitive("cudaq_sample")
+
+def cudaq_sample(kernel, *args, shots_count=1000):
+    return cudaq_sample_p.bind(kernel, *args, shots_count=shots_count)
+
+@cudaq_sample_p.def_impl
+def cudaq_sample_impl(kernel, *args, shots_count=1000):
+    return cudaq.sample(kernel, *args, shots_counts=shots_counts)
+
+@cudaq_sample_p.abstract_eval
+def cudaq_sample_abs(kernel, *args, shots_counts=1000):
+    return AbsCudaSampleResult()
+
+# SKIP Async for the time being
+# SKIP observe (spin_operator map is unclear at the moment)
+# SKIP VQE
+# Ignore everything else?
+
+# There are no lowerings because we will not generate MLIR
