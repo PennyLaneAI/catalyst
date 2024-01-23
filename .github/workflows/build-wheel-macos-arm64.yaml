@@ -169,12 +169,12 @@ jobs:
       run: |
         export PATH=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/bin:$PATH
         cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo -B ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
-            -DLLVM_ENABLE_LLD=OFF \
-            -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=FORCE_ON
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
+              -DLLVM_ENABLE_LLD=OFF \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON
 
         cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build --target check-mlir-hlo
 
