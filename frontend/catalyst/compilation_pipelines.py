@@ -922,6 +922,55 @@ class JAX_QJIT:
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
 
+def qjit_catalyst(
+    fn=None,
+    *,
+    autograph=False,
+    async_qnodes=False,
+    target="binary",
+    keep_intermediate=False,
+    verbose=False,
+    logfile=None,
+    pipelines=None,
+    static_argnums=None,
+    abstracted_axes=None
+):  # pylint: disable=too-many-arguments
+    argnums = static_argnums
+    axes = abstracted_axes
+    if fn is not None:
+        return QJIT(
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                async_qnodes,
+                static_argnums=argnums,
+                abstracted_axes=axes,
+            ),
+        )
+
+    def wrap_fn(fn):
+        return QJIT(
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                async_qnodes,
+                static_argnums=argnums,
+                abstracted_axes=axes,
+            ),
+        )
+
+    return wrap_fn
+
 
 def qjit(
     fn=None,
@@ -935,6 +984,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
+    **kwargs
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -1222,37 +1272,20 @@ def qjit(
     """
 
     argnums = static_argnums
-    axes = abstracted_axes
-    if fn is not None:
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
+    compiler = kwargs.get("compiler")
+    fwd_args = {"fn" : fn,
+                "autograph" : autograph,
+                "async_qnodes" : async_qnodes,
+                "target" : target,
+                "keep_intermediate" : keep_intermediate,
+                "verbose" : verbose,
+                "logfile" : logfile,
+                "pipelines" : pipelines,
+                "static_argnums" : argnums.
+                "abstracted_axes" : abstracted_axes,
+                }
+    if compiler is None or compiler == "catalyst":
+        return qjit_catalyst(**fwd_args)
+    else:
+        return qjit_cuda(**fwd_args)
 
-    def wrap_fn(fn):
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
-
-    return wrap_fn
