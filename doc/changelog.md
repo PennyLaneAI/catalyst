@@ -27,9 +27,13 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
-* Resolve a memory leak in the runtime stemming from missing calls to device destructors
-  at the end of programs.
-  [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
+* Resolve unpredictable behaviour when importing libraries that share Catalyst's LLVM dependency
+  (e.g. TensorFlow). In some cases, both packages exporting the same symbols from their shared
+  libraries can lead to process crashes and other unpredictable behaviour, since the wrong functions
+  can be called if both libraries are loaded in the current process.
+  The fix involves building shared libraries with hidden (macOS) or protected (linux) symbol
+  visibility by default, exporting only what is necessary.
+  [(#465)](https://github.com/PennyLaneAI/catalyst/pull/465)
 
 <h3>Contributors</h3>
 
