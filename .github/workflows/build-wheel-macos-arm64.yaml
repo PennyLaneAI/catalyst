@@ -38,7 +38,8 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
-      # Cache external project sources
+
+    # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
@@ -144,38 +145,38 @@ jobs:
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-          cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project/llvm -B ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DLLVM_BUILD_EXAMPLES=OFF \
-                -DLLVM_TARGETS_TO_BUILD="host" \
-                -DLLVM_ENABLE_PROJECTS="mlir" \
-                -DLLVM_ENABLE_ASSERTIONS=ON \
-                -DLLVM_INSTALL_UTILS=ON \
-                -DLLVM_ENABLE_ZLIB=OFF \
-                -DLLVM_ENABLE_ZSTD=FORCE_ON \
-                -DLLVM_ENABLE_LLD=OFF \
-                -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-                -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-                -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+        cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project/llvm -B ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_BUILD_EXAMPLES=OFF \
+            -DLLVM_TARGETS_TO_BUILD="host" \
+            -DLLVM_ENABLE_PROJECTS="mlir" \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_INSTALL_UTILS=ON \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=FORCE_ON \
+            -DLLVM_ENABLE_LLD=OFF \
+            -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+            -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+            -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
-          # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-          # and remove filter
-          # This tests fails on CI/CD not locally.
-          LIT_FILTER_OUT="Bytecode" cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build --target check-mlir
+        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
+        # and remove filter
+        # This tests fails on CI/CD not locally.
+        LIT_FILTER_OUT="Bytecode" cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build --target check-mlir
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       run: |
-          export PATH=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/bin:$PATH
-          cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo -B ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
-              -DLLVM_ENABLE_LLD=OFF \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=FORCE_ON
+        export PATH=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/bin:$PATH
+        cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo -B ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
+            -DLLVM_ENABLE_LLD=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=FORCE_ON
 
-          cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build --target check-mlir-hlo
+        cmake --build ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build --target check-mlir-hlo
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -294,7 +295,7 @@ jobs:
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
-      run: |        
+      run: |
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \

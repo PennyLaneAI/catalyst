@@ -36,10 +36,15 @@ runs:
     - name: Setup MacOS Env Vars
       shell: bash
       run: |
+        # The following two environment variables are set to ensure no threading related commands are blocked/slowed
+        # by the OS. They may or may not be needed but added to ensure there are no slowdowns.
         echo 'no_proxy=*' >> $GITHUB_ENV
         echo 'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES' >> $GITHUB_ENV
-        echo 'LDFLAGS=-L/opt/homebrew/opt/libomp/lib' >> $GITHUB_ENV
-        echo 'CPPFLAGS=-I/opt/homebrew/opt/libomp/include' >> $GITHUB_ENV
+        
+        # The following two flags are exported to ensure the correct homebrew installed libomp libraries are used
+        # during build time.
+        echo "LDFLAGS=-L/opt/homebrew/opt/libomp/lib $LDFLAGS" >> $GITHUB_ENV
+        echo "CPPFLAGS=-I/opt/homebrew/opt/libomp/include $CPPFLAGS" >> $GITHUB_ENV
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
