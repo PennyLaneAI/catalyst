@@ -14,6 +14,14 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve unpredictable behaviour when importing libraries that share Catalyst's  LLVM dependency
+  (e.g. TensorFlow). In some cases, both packages exporting the same symbols from their shared
+  libraries can lead to process crashes and other unpredictable behaviour, since the wrong functions
+  can be called if both libraries are loaded in the current process.
+  The fix involves building shared libraries with hidden (macOS) or protected (linux) symbol
+  visibility by default, exporting only what is necessary.
+  [(#465)](https://github.com/PennyLaneAI/catalyst/pull/465)
+
 * Resolve an infinite recursion in the decomposition of the `Controlled`
   operator whenever computing a Unitary matrix for the operator fails.
   [(#468)](https://github.com/PennyLaneAI/catalyst/pull/468)
