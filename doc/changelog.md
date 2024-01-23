@@ -7,9 +7,16 @@
 * Build and package Catalyst wheels with OpenMP and ZStd.
   [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
 
+* Remove `qextract_p` and `qinst_p` from forced-order primitives.
+  [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+
+* Resolve an infinite recursion in the decomposition of the `Controlled`
+  operator whenever computing a Unitary matrix for the operator fails.
+  [(#468)](https://github.com/PennyLaneAI/catalyst/pull/468)
 
 * Resolve a failure to generate gradient code for specific input circuits.
   [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
@@ -25,9 +32,9 @@
   def f(x):
       def cnot_loop(j):
           qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
-  
+
       for_loop(0, 4, 1)(cnot_loop)()
-  
+
       return qml.expval(qml.PauliZ(0))
   ```
 
@@ -39,6 +46,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Mikhail Andrenkov,
 Ali Asadi,
 David Ittah.
 
