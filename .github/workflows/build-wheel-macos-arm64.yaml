@@ -146,18 +146,18 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         cmake -S ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project/llvm -B ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_BUILD_EXAMPLES=OFF \
-            -DLLVM_TARGETS_TO_BUILD="host" \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DLLVM_INSTALL_UTILS=ON \
-            -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=FORCE_ON \
-            -DLLVM_ENABLE_LLD=OFF \
-            -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-            -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-            -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_BUILD_EXAMPLES=OFF \
+              -DLLVM_TARGETS_TO_BUILD="host" \
+              -DLLVM_ENABLE_PROJECTS="mlir" \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DLLVM_INSTALL_UTILS=ON \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_LLD=OFF \
+              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
