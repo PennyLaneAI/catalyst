@@ -900,7 +900,7 @@ class QJIT_CUDA:
         """
         return self._llvmir
 
-    def get_mlir(self, *args):
+    def get_jaxpr(self, *args):
         """Trace :func:`~.user_function`
 
         Args:
@@ -919,7 +919,9 @@ class QJIT_CUDA:
             abstracted_axes = self.compile_options.abstracted_axes
             jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *sig)
 
-        raise RuntimeError("Unimplemented integration with cuda quantum")
+        # TODO(@erick-xanadu): Likely we will need more information
+        # from the line directly above.
+        return jaxpr2
 
     def compile(self):
         """Compile the current MLIR module."""
