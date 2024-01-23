@@ -326,6 +326,21 @@ def has_nested_tapes(op: Operation) -> bool:
         and any(r.quantum_tape is not None for r in op.regions)
     )
 
+def trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs):
+    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
+    # which do not exist in the current translation unit will be assumed to exist if an equivalent
+    # python function is seen in the cache. This happens during testing or if we wanted to compile a
+    # single python function multiple times with different options.
+    mlir_fn_cache.clear()
+
+    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+        make_jaxpr_kwargs = {"static_argnums": static_argnums, "abstracted_axes": abstracted_axes}
+        jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+
+    # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
+    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+
+    return jaxpr, jaxpr2, out_type2, out_tree
 
 def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     """Lower a Python function into an MLIR module.
@@ -347,18 +362,7 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
-
-    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        make_jaxpr_kwargs = {"static_argnums": static_argnums, "abstracted_axes": abstracted_axes}
-        jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
-
-    # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+    jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *args, **kwargs)
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
     return module, context, jaxpr, out_type2, out_tree
 
