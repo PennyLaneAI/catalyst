@@ -52,12 +52,10 @@ def test_qjit_cuda_remove_host_context():
     jaxpr = remove_host_context(observed_jaxpr)
     assert jaxpr
 
-def test_qjit_catalyst_to_cuda_jaxpr():
 
+def test_qjit_catalyst_to_cuda_jaxpr():
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def foo():
         return qml.state()
 
-    with pytest.raises(NotImplementedError, match="TODO"):
-        cuda_jaxpr = catalyst_to_cuda(foo)
-
+    cuda_jaxpr = catalyst_to_cuda(foo)

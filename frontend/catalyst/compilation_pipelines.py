@@ -816,6 +816,7 @@ class QJIT:
 
         return data
 
+
 # pylint: disable=too-many-instance-attributes
 class QJIT_CUDA:
     """Class representing a just-in-time compiled hybrid quantum-classical function.
@@ -918,6 +919,8 @@ class QJIT_CUDA:
             sig = self.c_sig
             abstracted_axes = self.compile_options.abstracted_axes
             jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *sig)
+
+        self._jaxpr = jaxpr2
 
         # TODO(@erick-xanadu): Likely we will need more information
         # from the line directly above.
@@ -1052,6 +1055,7 @@ class QJIT_CUDA:
 
         return data
 
+
 class JAX_QJIT:
     """Wrapper class around :class:`~.QJIT` that enables compatibility with JAX transformations.
 
@@ -1157,6 +1161,7 @@ class JAX_QJIT:
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
 
+
 def qjit_cuda(
     fn=None,
     *,
@@ -1167,7 +1172,7 @@ def qjit_cuda(
     verbose=False,
     logfile=None,
     pipelines=None,
-    abstracted_axes=None
+    abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
     axes = abstracted_axes
     if fn is not None:
@@ -1202,6 +1207,7 @@ def qjit_cuda(
 
     return wrap_fn
 
+
 def qjit_catalyst(
     fn=None,
     *,
@@ -1213,7 +1219,7 @@ def qjit_catalyst(
     logfile=None,
     pipelines=None,
     static_argnums=None,
-    abstracted_axes=None
+    abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
     argnums = static_argnums
     axes = abstracted_axes
@@ -1264,7 +1270,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
-    **kwargs
+    **kwargs,
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -1563,9 +1569,8 @@ def qjit(
                 "pipelines" : pipelines,
                 "static_argnums" : argnums.
                 "abstracted_axes" : abstracted_axes,
-                }
+    }
     if compiler is None or compiler == "catalyst":
         return qjit_catalyst(**fwd_args)
     elif compiler == "cuda-quantum":
         return qjit_cuda(**fwd_args)
-
