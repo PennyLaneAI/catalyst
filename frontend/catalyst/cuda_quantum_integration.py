@@ -207,94 +207,31 @@ def cudaq_getstate_primitive_abs(kernel):
 # x(self: cudaq.Kernel, target: cudaq.QuakeValue) -> None
 
 
-def make_primitive_for_gate(gate: str):
-    kernel_gate_p = jax.core.Primitive(f"kernel_{gate}")
+def make_primitive_for_gate():
+    kernel_gate_p = jax.core.Primitive(f"kernel_inst")
     kernel_gate_p.multiple_results = True
-    method = getattr(cudaq.Kernel, gate)
 
-    def gate_func(kernel, target):
-        kernel_gate_p.bind(kernel, target)
+    def gate_func(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+        kernel_gate_p.bind(kernel, *qubits_or_params, inst=inst, qubits_len=qubits_len)
         return tuple()
 
     @kernel_gate_p.def_impl
-    def gate_impl(kernel, target):
-        method(kernel, target)
+    def gate_impl(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+        assert inst
+        method = getattr(cudaq.Kernel, inst)
+        targets = qubits_or_params[:qubits_len]
+        params = qubits_or_params[qubits_len:]
+        method(kernel, *params, *targets)
         return tuple()
 
     @kernel_gate_p.def_abstract_eval
-    def gate_abs(kernel, target):
+    def gate_abs(kernel, *qubits_or_params, inst=None, qubits_len=-1):
         return tuple()
 
-    cgate = f"c{gate}"
-    kernel_cgate_p = jax.core.Primitive(f"kernel_{cgate}")
-    kernel_cgate_p.multiple_results = True
-    cmethod = getattr(cudaq.Kernel, cgate)
-
-    def cgate_func(kernel, control, target):
-        kernel_cgate_p.bind(kernel, control, target)
-
-    @kernel_cgate_p.def_impl
-    def cgate_impl(kernel, control, target):
-        cmethod(kernel, control, target)
-        return tuple()
-
-    @kernel_cgate_p.def_abstract_eval
-    def cgate_abs(kernel, control, target):
-        return tuple()
-
-    return kernel_gate_p, kernel_cgate_p
+    return gate_func, kernel_gate_p
 
 
-x_p, cx_p = make_primitive_for_gate("x")
-y_p, cy_p = make_primitive_for_gate("y")
-z_p, cz_p = make_primitive_for_gate("z")
-h_p, ch_p = make_primitive_for_gate("h")
-s_p, cs_p = make_primitive_for_gate("s")
-t_p, ct_p = make_primitive_for_gate("t")
-
-
-def make_primitive_for_pgate(gate: str):
-    kernel_gate_p = jax.core.Primitive(f"kernel_{gate}")
-    kernel_gate_p.multiple_results = True
-    method = getattr(cudaq.Kernel, gate)
-
-    def gate_func(kernel, param, target):
-        kernel_gate_p.bind(kernel, param, target)
-        return tuple()
-
-    @kernel_gate_p.def_impl
-    def gate_impl(kernel, param, target):
-        method(kernel, param, target)
-        return tuple()
-
-    @kernel_gate_p.def_abstract_eval
-    def gate_abs(kernel, param, target):
-        return tuple()
-
-    cgate = f"c{gate}"
-    kernel_cgate_p = jax.core.Primitive(f"kernel_{cgate}")
-    kernel_cgate_p.multiple_results = True
-    cmethod = getattr(cudaq.Kernel, cgate)
-
-    def cgate_func(kernel, param, control, target):
-        kernel_cgate_p.bind(kernel, param, control, target)
-
-    @kernel_cgate_p.def_impl
-    def cgate_impl(kernel, param, control, target):
-        cmethod(kernel, param, control, target)
-        return tuple()
-
-    @kernel_cgate_p.def_abstract_eval
-    def cgate_abs(kernel, param, control, target):
-        return tuple()
-
-    return gate_func, kernel_gate_p, kernel_cgate_p
-
-
-handle_rx, rx_p, crx_p = make_primitive_for_pgate("rx")
-_, ry_p, cry_p = make_primitive_for_pgate("ry")
-_, rz_p, crz_p = make_primitive_for_pgate("rz")
-_, r1_p, cr1_p = make_primitive_for_pgate("r1")
+cuda_inst, cuda_inst_p = make_primitive_for_gate()
 
 
 def make_primitive_for_m(gate: str):
@@ -489,8 +426,10 @@ def change_register_getitem(ctx, eqn):
     safe_map(ctx.replace, eqn.outvars, outvars)
     safe_map(ctx.write, eqn.outvars, outvals)
 
+
 def change_register_setitem(ctx, eqn):
     from catalyst.jax_primitives import qinsert_p
+
     # There is no __setitem__ for a quake value.
     assert eqn.primitive == qinsert_p
     # We know from the definition of qinsert_p
@@ -517,9 +456,23 @@ def change_register_setitem(ctx, eqn):
     safe_map(ctx.replace, eqn.outvars, [outvar])
     safe_map(ctx.write, eqn.outvars, [old_register])
 
+
 def change_instruction(ctx, eqn, kernel):
     from catalyst.jax_primitives import qinst_p
+
     assert eqn.primitive == qinst_p
+
+    from_catalyst_to_cuda = {
+        "PauliX": "x",
+        "PauliY": "y",
+        "PauliZ": "z",
+        "Hadamard": "h",
+        "S": "s",
+        "T": "t",
+        "RX": "rx",
+        "RY": "ry",
+        "RZ": "rz",
+    }
 
     # From the definition of qinst_p
     # Operands:
@@ -532,25 +485,22 @@ def change_instruction(ctx, eqn, kernel):
     # * qubits_len=-1
     params = eqn.params
     op = params["op"]
+    cuda_inst_name = from_catalyst_to_cuda[op]
     qubits_len = params["qubits_len"]
-
 
     # Let's first determine how many are params and how
     # Many are qubits
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len:]
 
     # Now, we can map to the correct op
     # For now just assume rx
-    handle_rx(kernel, params[0], qubits[0])
+    cuda_inst(kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
 
     # Now that we did this, we need to remember
     # that handle_rx is not in SSA and will not return qubits
     # And so the eqn.outvars should be replaced with something.
     # Let's just replace them with the input values.
     safe_map(ctx.write, eqn.outvars, qubits)
-    
-    
 
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
@@ -593,16 +543,6 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             change_register_setitem(ctx, eqn)
         elif eqn.primitive == qinst_p:
             change_instruction(ctx, eqn, kernel)
-            """
-            # Assume qinst_p is just qml.RX for the time being
-            invals = safe_map(ctx.read, eqn.invars)
-            # none = kernel_rx_primitive_impl(kernel, invals[1], invals[0])
-            none = kernel_rx(kernel, invals[1], invals[0])
-            # Just so that we never use it?
-            # safe_map(replace, eqn.outvars, [UnavailableToken])
-            # We don't even need to write anything here...
-            """
-
         elif eqn.primitive in ignore:
             continue
 
