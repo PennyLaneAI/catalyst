@@ -225,20 +225,21 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         data.insertedWindowsDims = op.getScatterDimensionNumbers().getInsertedWindowDims();
 
         // Separate updated windows dims
+        int64_t start = 0;
+        std::vector<int64_t> dimensions;
+
+        for (int64_t i = start; i <= updatesSize; ++i) {
+            dimensions.push_back(i);
+        }
         if (!data.updatedWindowsDims.empty()) {
-            int64_t start = 0;
-            std::vector<int64_t> dimensions;
-
-            for (int64_t i = start; i <= updatesSize; ++i) {
-                dimensions.push_back(i);
-            }
-
             std::copy_if(data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
                          std::back_inserter(data.updatedScatterDims),
                          [&dimensions](int64_t element) {
                              return std::find(dimensions.begin(), dimensions.end(), element) !=
                                     dimensions.end();
                          });
+        } else {
+            data.updatedScatterDims = dimensions;
         }
 
         // Generate all possible indices for the update given the shape of updates
