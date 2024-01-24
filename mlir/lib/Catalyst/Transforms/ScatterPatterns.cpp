@@ -238,7 +238,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                              return std::find(dimensions.begin(), dimensions.end(), element) !=
                                     dimensions.end();
                          });
-        } else {
+        }
+        else {
             data.updatedScatterDims = dimensions;
         }
 
