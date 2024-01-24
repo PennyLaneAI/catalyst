@@ -17,6 +17,10 @@
 
 <h3>Bug fixes</h3>
 
+* Resolve a failure to find the SciPy OpenBLAS library when running Catalyst,
+  due to a different SciPy version being used to build Catalyst than to run it.
+  [(#471)](https://github.com/PennyLaneAI/catalyst/pull/471)
+
 * Resolve unpredictable behaviour when importing libraries that share Catalyst's  LLVM dependency
   (e.g. TensorFlow). In some cases, both packages exporting the same symbols from their shared
   libraries can lead to process crashes and other unpredictable behaviour, since the wrong functions
