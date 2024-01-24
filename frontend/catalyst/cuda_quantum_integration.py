@@ -463,6 +463,28 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     return register
 
 
+def change_register_getitem(ctx, eqn):
+    from catalyst.jax_primitives import qextract_p
+
+    assert eqn.primitive == qextract_p
+    invals = safe_map(ctx.read, eqn.invars)
+    # We know from the definition of qextract_p
+    # that it takes two operands.
+    # The first one is the qreg and the second one is the
+    # qubit index.
+    # Because we have correctly mapped the replacement,
+    # invals[0] should point to a correct cuda register.
+    register = invals[0]
+    idx = invals[1]
+    cuda_qubit = qreg_getitem(register, idx)
+
+    outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQbit())]
+    outvals = [cuda_qubit]
+
+    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.write, eqn.outvars, outvals)
+
+
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     from jax._src.util import safe_map
     from catalyst.jax_primitives import (
@@ -498,18 +520,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             safe_map(ctx.write, eqn.outvars, outvals)
 
         elif eqn.primitive == qextract_p:
-            # extract_p does take an input and we would like to depend on it
-            invals = safe_map(ctx.read, eqn.invars)
-            # outvals = [qreg_getitem_primitive_impl(qreg, invals[1])]
-            outvals = [qreg_getitem(register, invals[1])]
-            outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQbit())]
-
-            safe_map(ctx.replace, eqn.outvars, outvars)
-            safe_map(ctx.write, eqn.outvars, outvals)
-
-            # We also need to override the first variable that corresponds to
-            # The first invars, which is the qubit
-
+            change_register_getitem(ctx, eqn)
         elif eqn.primitive == qinst_p:
             # Assume qinst_p is just qml.RX for the time being
             invals = safe_map(ctx.read, eqn.invars)
