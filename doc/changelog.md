@@ -6,6 +6,33 @@
 
 <h3>Breaking changes</h3>
 
+* The Catalyst runtime now has a different API from QIR instructions.
+  [(#464)](https://github.com/PennyLaneAI/catalyst/pull/464)
+
+  QIR encodes quantum instructions as LLVM function calls. This allows frontends to generate
+  QIR, middle-ends to optimizie QIR, and code generators to lower these function calls into
+  appropriate instructions for the target. One of the possible implementations for QIR is to
+  lower QIR instructions to function calls with the same signature and implement QIR as a library.
+  Other implementations might choose to lower QIR to platform specific APIs, or replace function
+  calls with semantically equivalent code.
+
+  Catalyst implemented QIR as a library that can be linked against a QIR module.
+  This works great when Catalyst is the only implementor of QIR.
+  However, when other QIR implementors, who also lower implement a quantum runtime as functions to be
+  linked against, this may generate symbol conflicts.
+
+  This PR changes the runtime such that QIR instructions are now lowered to functions where
+  the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
+  the possibility of symbol conflicts with other libraries that implement QIR as a library.
+  However, it doesn't solve it completely. Since the `__catalyst__` functions are still exported
+  if another library implemented the same symbols exported by the runtime, the same problem would
+  presist.
+
+  Another potential way to solve this is for the compiler to generate code for the user's function
+  without referring to any external symbol. This way, the generated code would only refer to symbols
+  inside the translation unit itself. This alternative approach would increase the compilation time.
+  The approach in this commit may be revisited in the future.
+
 <h3>Bug fixes</h3>
 
 * Resolve a failure to generate gradient code for specific input circuits.
