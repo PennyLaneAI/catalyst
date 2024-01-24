@@ -35,6 +35,10 @@
   visibility by default, exporting only what is necessary.
   [(#465)](https://github.com/PennyLaneAI/catalyst/pull/465)
 
+* Resolve a failure to find the SciPy OpenBLAS library when running Catalyst,
+  due to a different SciPy version being used to build Catalyst than to run it.
+  [(#471)](https://github.com/PennyLaneAI/catalyst/pull/471)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
