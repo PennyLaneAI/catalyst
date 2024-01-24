@@ -184,7 +184,7 @@ def cudaq_getstate(kernel):
 
 @cudaq_getstate_p.def_impl
 def cudaq_getstate_primitive_impl(kernel):
-    return jax.numpy.asarray(cudaq.get_state(kernel))
+    return cudaq.get_state(kernel)
 
 
 @cudaq_getstate_p.def_abstract_eval
@@ -399,7 +399,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
 
     # We are creating a new variable that will replace the old
     # variable.
-    outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQReg())]
+    outvars = [ctx.new_variable(AbsCudaQReg)]
     safe_map(ctx.replace, eqn.outvars, outvars)
     safe_map(ctx.write, eqn.outvars, outvals)
     return register
@@ -420,7 +420,7 @@ def change_register_getitem(ctx, eqn):
     idx = invals[1]
     cuda_qubit = qreg_getitem(register, idx)
 
-    outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQbit())]
+    outvars = [ctx.new_variable(AbsCudaQbit)]
     outvals = [cuda_qubit]
 
     safe_map(ctx.replace, eqn.outvars, outvars)
@@ -488,19 +488,62 @@ def change_instruction(ctx, eqn, kernel):
     cuda_inst_name = from_catalyst_to_cuda[op]
     qubits_len = params["qubits_len"]
 
-    # Let's first determine how many are params and how
-    # Many are qubits
-    qubits = qubits_or_params[:qubits_len]
 
     # Now, we can map to the correct op
     # For now just assume rx
     cuda_inst(kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
+
+    # Finally determine how many are qubits.
+    qubits = qubits_or_params[:qubits_len]
 
     # Now that we did this, we need to remember
     # that handle_rx is not in SSA and will not return qubits
     # And so the eqn.outvars should be replaced with something.
     # Let's just replace them with the input values.
     safe_map(ctx.write, eqn.outvars, qubits)
+
+def change_compbasis(ctx, eqn, kernel):
+    from catalyst.jax_primitives import compbasis_p
+    assert eqn.primitive == compbasis_p
+
+    # From compbasis_p's definition, its operands are:
+    # * qubits
+    qubits = safe_map(ctx.read, eqn.invars)
+
+    # We dont have a use for compbasis yet.
+    # So, the evaluation of it might as well just be the same.
+    from catalyst.jax_primitives import AbstractObs
+    outvals = [AbstractObs(len(qubits), compbasis_p)]
+    safe_map(ctx.write, eqn.outvars, outvals)
+    # Note: Other observables won't be so easy...
+
+def change_get_state(ctx, eqn, kernel):
+    from catalyst.jax_primitives import state_p
+    from catalyst.jax_primitives import compbasis_p
+    assert eqn.primitive == state_p
+
+    # From state_p's definition, its operands are:
+    # * an observable
+    # * a shape
+    invals = safe_map(ctx.read, eqn.invars)
+    # Just as state_p, we will only support compbasis.
+    obs_catalyst = invals[0]
+    if obs_catalyst.primitive is not compbasis_p:
+        raise TypeError("state only supports computational basis")
+
+    # We don't really care too much about the shape
+    # It is only used for an assertion in Catalyst.
+    # So, we will ignore it here.
+
+    # To get a state in cuda we need a kernel
+    # which does not flow from eqn.invars
+    # so we get it from the parameter.
+    cuda_state = cudaq_getstate(kernel)
+    outvals = [cuda_state]
+    outvars = [ctx.new_variable(AbsCudaQState)]
+    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.write, eqn.outvars, outvals)
+
 
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
@@ -516,7 +559,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         qdealloc_p,
     )
 
-    ignore = {compbasis_p, qdealloc_p, qdevice_p, qalloc_p}
+    ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
     ctx = TranslatorContext(jaxpr, consts, *args)
     kernel = change_device_to_cuda_device(ctx)
@@ -524,25 +567,15 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
 
     for idx, eqn in enumerate(jaxpr.eqns):
         if eqn.primitive == state_p:
-            # state_p does take an input, but we don't care about the input
-            # here. At least not now for this experiment.
-            # outvals = [cudaq_get_state_primitive_impl(kernel)]
-            outvals = [cudaq_getstate(kernel)]
-            outvars = [
-                jax._src.core.Var(
-                    ctx.get_new_count(), "", jax.core.ShapedArray((2,), jax.numpy.complex128)
-                )
-            ]
-            out_state = outvals[0]
-            safe_map(ctx.replace, eqn.outvars, outvars)
-            safe_map(ctx.write, eqn.outvars, outvals)
-
+            change_get_state(ctx, eqn, kernel)
         elif eqn.primitive == qextract_p:
             change_register_getitem(ctx, eqn)
         elif eqn.primitive == qinsert_p:
             change_register_setitem(ctx, eqn)
         elif eqn.primitive == qinst_p:
             change_instruction(ctx, eqn, kernel)
+        elif eqn.primitive == compbasis_p:
+            change_compbasis(ctx, eqn, kernel)
         elif eqn.primitive in ignore:
             continue
 

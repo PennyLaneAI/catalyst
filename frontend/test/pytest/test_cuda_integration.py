@@ -72,4 +72,4 @@ def test_qjit_catalyst_to_cuda_jaxpr_actually_call():
 
     cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(foo))()
     print(cuda_jaxpr)
-    print(jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts))
+    print(jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)[0])
