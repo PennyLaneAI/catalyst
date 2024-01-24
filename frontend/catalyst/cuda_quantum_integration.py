@@ -5,16 +5,20 @@ import cudaq
 from functools import wraps
 from typing import List
 
+
 class AbsCudaQState(jax.core.AbstractValue):
     hash_value = hash("AbsCudaQState")
+
     def __eq__(self, other):
         return isinstance(other, AbsCudaQState)
 
     def __hash__(self):
         return hash_value
 
+
 class CudaQState(cudaq.State):
     aval = AbsCudaQState
+
 
 class AbsCudaQbit(jax.core.AbstractValue):
     hash_value = hash("AbsCudaQbit")
@@ -172,16 +176,21 @@ def qreg_getitem_primitive_abs(qreg, idx):
 
 
 cudaq_getstate_p = jax.core.Primitive("cudaq_getstate")
+
+
 def cudaq_getstate(kernel):
     return cudaq_getstate_p.bind(kernel)
+
 
 @cudaq_getstate_p.def_impl
 def cudaq_getstate_primitive_impl(kernel):
     return jax.numpy.asarray(cudaq.get_state(kernel))
 
+
 @cudaq_getstate_p.def_abstract_eval
 def cudaq_getstate_primitive_abs(kernel):
     return AbsCudaQState()
+
 
 # Allocate a register of qubits of size `qubit_count` (where `qubit_count` is an existing `QuakeValue`) and return a
 # handle to them as a new `QuakeValue)
@@ -335,20 +344,26 @@ def cudaq_sample_abs(kernel, *args, shots_counts=1000):
 
 # There are no lowerings because we will not generate MLIR
 
-def count(var : jax._src.core.Var):
+
+def count(var: jax._src.core.Var):
     return getattr(var, "count", 0)
 
-def counts(_vars : List[jax._src.core.Var]):
+
+def counts(_vars: List[jax._src.core.Var]):
     return map(count, _vars)
 
-def invars(eqn : jax._src.core.JaxprEqn):
+
+def invars(eqn: jax._src.core.JaxprEqn):
     return eqn.invars
+
 
 def outvars(eqn: jax._src.core.JaxprEqn):
     return eqn.outvars
 
+
 def allvars(eqn: jax._src.core.JaxprEqn):
     return invars(eqn) + outvars(eqn)
+
 
 def get_maximum_variable(jaxpr):
     """This function returns the maximum number of variables for the given jaxpr function.
@@ -360,145 +375,164 @@ def get_maximum_variable(jaxpr):
         max_count = max(0, max_count, *counts(allvars(eqn)))
     return max_count
 
+
 def get_minimum_new_variable_count(jaxpr):
-   """To make sure we avoid duplicating variable names, just find the maximum variable and add one."""
-   return get_maximum_variable(jaxpr) + 1
+    """To make sure we avoid duplicating variable names, just find the maximum variable and add one."""
+    return get_maximum_variable(jaxpr) + 1
 
-def get_device_instruction(jaxpr):
-   """We iterate through the JAXPR and find the first device instruction.
 
-   A well formed JAXPR should only have a single device instruction for a quantum function.
-   """
-   from catalyst.jax_primitives import qdevice_p
-   for eqn in jaxpr.eqns:
-       if eqn.primitive == qdevice_p:
-           return eqn
+def get_instruction(jaxpr, primitive):
+    """We iterate through the JAXPR and find the first device instruction.
 
-def get_alloc_instruction(jaxpr):
+    A well formed JAXPR should only have a single device instruction for a quantum function.
+    """
     for eqn in jaxpr.eqns:
-        if eqn.primitive == qalloc_p:
-           return eqn
+        if eqn.primitive == primitive:
+            return eqn
+
 
 from jax._src.util import safe_map
 
+
 class TranslatorContext:
+    def __init__(self, jaxpr, consts, *args):
+        self.jaxpr = jaxpr
+        self.env = {}
+        self.variable_map = {}
+        safe_map(self.write, jaxpr.invars, args)
+        safe_map(self.write, jaxpr.constvars, consts)
+        self.count = get_minimum_new_variable_count(jaxpr)
 
-   def __init__(self, jaxpr, consts, *args):
-       self.jaxpr = jaxpr
-       self.env = {}
-       self.variable_map = {}
-       safe_map(self.write, jaxpr.invars, args)
-       safe_map(self.write, jaxpr.constvars, consts)
-       self.count = get_minimum_new_variable_count(jaxpr)
+    def read(self, var):
+        if type(var) is jax.core.Literal:
+            return var.val
+        if self.variable_map.get(var):
+            var = self.variable_map[var]
+        return self.env[var]
 
-   def read(self, var):
-       if type(var) is jax.core.Literal:
-           return var.val
-       if self.variable_map.get(var):
-           var = self.variable_map[var]
-       return self.env[var]
+    def write(self, var, val):
+        if self.variable_map.get(var):
+            var = self.variable_map[var]
+        self.env[var] = val
 
-   def write(self, var, val):
-       if self.variable_map.get(var):
-           var = self.variable_map[var]
-       self.env[var] = val
+    def replace(self, original, new):
+        self.variable_map[original] = new
 
-   def replace(self, original, new):
-       self.variable_map[original] = new
+    def get_new_count(self):
+        self.count += 1
+        return self.count
 
-   def get_new_count(self):
-       self.count += 1
-       return self.count
+    def new_variable(self, _type):
+        count = self.get_new_count()
+        return jax._src.core.Var(count, "", _type())
 
-   def new_variable(self, _type):
-       count = self.get_new_count()
-       return jax._src.core.Var(count, "", _type())
 
 def change_device_to_cuda_device(ctx):
-    qdevice_eqn = get_device_instruction(ctx.jaxpr)
+    from catalyst.jax_primitives import qdevice_p
+
+    qdevice_eqn = get_instruction(ctx.jaxpr, qdevice_p)
     kernel = cudaq_make_kernel()
     outvals = [kernel]
     outvars = [ctx.new_variable(AbsCudaKernel)]
     safe_map(ctx.write, outvars, outvals)
     return kernel
 
-def change_alloc_to_cuda_alloc(ctx):
-    ...
-    
+
+def change_alloc_to_cuda_alloc(ctx, kernel):
+    from catalyst.jax_primitives import qalloc_p
+
+    # We know that there will only be one single qalloc instruction
+    # in the generated code for each quantum node.
+    # TODO: maybe add a debug mode that checks if the assumption above is true.
+    # Do not check for all of them indiscriminately since it would take
+    # too much compile time.
+    eqn = get_instruction(ctx.jaxpr, qalloc_p)
+    invals = safe_map(ctx.read, eqn.invars)
+    # We know from the definition of qalloc_p
+    # that there is only one operand
+    # and the operand is the size of the register.
+    size = invals[0]
+    register = kernel_qalloc(kernel, size)
+    outvals = [register]
+
+    # We are creating a new variable that will replace the old
+    # variable.
+    outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQReg())]
+    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.write, eqn.outvars, outvals)
+    return register
+
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     from jax._src.util import safe_map
-    from catalyst.jax_primitives import qdevice_p, qalloc_p, state_p, qextract_p, qinst_p, compbasis_p, qinsert_p, qdealloc_p
+    from catalyst.jax_primitives import (
+        qdevice_p,
+        qalloc_p,
+        state_p,
+        qextract_p,
+        qinst_p,
+        compbasis_p,
+        qinsert_p,
+        qdealloc_p,
+    )
 
-    ignore = { compbasis_p, qinsert_p, qdealloc_p, qdevice_p }
-
-
+    ignore = {compbasis_p, qinsert_p, qdealloc_p, qdevice_p, qalloc_p}
 
     ctx = TranslatorContext(jaxpr, consts, *args)
     kernel = change_device_to_cuda_device(ctx)
-    
+    register = change_alloc_to_cuda_alloc(ctx, kernel)
+
     for idx, eqn in enumerate(jaxpr.eqns):
-         if eqn.primitive == qalloc_p:
-             # qalloc reads
-             invals = safe_map(ctx.read, eqn.invars)
+        if eqn.primitive == state_p:
+            # state_p does take an input, but we don't care about the input
+            # here. At least not now for this experiment.
+            # outvals = [cudaq_get_state_primitive_impl(kernel)]
+            outvals = [cudaq_getstate(kernel)]
+            outvars = [
+                jax._src.core.Var(
+                    ctx.get_new_count(), "", jax.core.ShapedArray((2,), jax.numpy.complex128)
+                )
+            ]
+            out_state = outvals[0]
+            safe_map(ctx.replace, eqn.outvars, outvars)
+            safe_map(ctx.write, eqn.outvars, outvals)
 
-             # We know that invals is actually just 1
-             #outvals = [kernel_qalloc_primitive_impl(kernel, invals[0])]
-             outvals = [kernel_qalloc(kernel, invals[0])]
-             qreg = outvals[0]
-             # And we need a different type
-             outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQReg())]
-             
-             # qalloc_p does return something, so we want to substitute it
-             safe_map(ctx.replace, eqn.outvars, outvars)
-             safe_map(ctx.write, eqn.outvars, outvals)
+        elif eqn.primitive == qextract_p:
+            # extract_p does take an input and we would like to depend on it
+            invals = safe_map(ctx.read, eqn.invars)
+            # outvals = [qreg_getitem_primitive_impl(qreg, invals[1])]
+            outvals = [qreg_getitem(register, invals[1])]
+            outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQbit())]
 
-         elif eqn.primitive == state_p:
-             # state_p does take an input, but we don't care about the input
-             # here. At least not now for this experiment.
-             #outvals = [cudaq_get_state_primitive_impl(kernel)]
-             outvals = [cudaq_getstate(kernel)]
-             outvars = [jax._src.core.Var(ctx.get_new_count(), "", jax.core.ShapedArray((2,), jax.numpy.complex128))]
-             out_state = outvals[0]
-             safe_map(ctx.replace, eqn.outvars, outvars)
-             safe_map(ctx.write, eqn.outvars, outvals)
+            safe_map(ctx.replace, eqn.outvars, outvars)
+            safe_map(ctx.write, eqn.outvars, outvals)
 
-         elif eqn.primitive == qextract_p:
-             # extract_p does take an input and we would like to depend on it
-             invals = safe_map(ctx.read, eqn.invars)
-             #outvals = [qreg_getitem_primitive_impl(qreg, invals[1])]
-             outvals = [qreg_getitem(qreg, invals[1])]
-             outvars = [jax._src.core.Var(ctx.get_new_count(), "", AbsCudaQbit())]
+            # We also need to override the first variable that corresponds to
+            # The first invars, which is the qubit
 
-             safe_map(ctx.replace, eqn.outvars, outvars)
-             safe_map(ctx.write, eqn.outvars, outvals)
+        elif eqn.primitive == qinst_p:
+            # Assume qinst_p is just qml.RX for the time being
+            invals = safe_map(ctx.read, eqn.invars)
+            # none = kernel_rx_primitive_impl(kernel, invals[1], invals[0])
+            none = kernel_rx(kernel, invals[1], invals[0])
+            # Just so that we never use it?
+            # safe_map(replace, eqn.outvars, [UnavailableToken])
+            # We don't even need to write anything here...
 
-             # We also need to override the first variable that corresponds to
-             # The first invars, which is the qubit
+        elif eqn.primitive in ignore:
+            continue
 
-         elif eqn.primitive == qinst_p:
-             # Assume qinst_p is just qml.RX for the time being
-             invals = safe_map(ctx.read, eqn.invars)
-             #none = kernel_rx_primitive_impl(kernel, invals[1], invals[0])
-             none = kernel_rx(kernel, invals[1], invals[0])
-             # Just so that we never use it?
-             # safe_map(replace, eqn.outvars, [UnavailableToken])
-             # We don't even need to write anything here...
-
-         elif eqn.primitive in ignore:
-             continue
-
-         # Do the normal interpretation...
-         else:
-             subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
-             ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
-             if eqn.primitive.multiple_results:
-                 safe_map(ctx.write, eqn.outvars, ans)
-             else:
-                 ctx.write(eqn.outvars[0], ans)
-
+        # Do the normal interpretation...
+        else:
+            subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
+            ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
+            if eqn.primitive.multiple_results:
+                safe_map(ctx.write, eqn.outvars, ans)
+            else:
+                ctx.write(eqn.outvars[0], ans)
 
     return safe_map(ctx.read, jaxpr.outvars)
+
 
 # So where is this function going to be called?
 # fun has to be a function that returns jaxpr.
@@ -510,6 +544,7 @@ def catalyst_to_cuda(fun):
     from catalyst.compilation_pipelines import qjit_catalyst, QJIT_CUDA
     from catalyst.compiler import CompileOptions
     from catalyst.utils.jax_extras import remove_host_context
+
     @wraps(fun)
     def wrapped(*args, **kwargs):
         opts = CompileOptions()
