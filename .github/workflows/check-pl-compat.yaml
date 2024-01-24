@@ -94,14 +94,15 @@ jobs:
 
     - name: Install Catalyst (latest/stable)
       run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
-        ENABLE_LLD=OFF \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        ENABLE_LLD=ON
         make dialects
         pip install --upgrade .
 
