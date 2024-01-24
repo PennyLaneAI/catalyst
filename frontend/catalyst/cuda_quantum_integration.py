@@ -288,13 +288,13 @@ def make_primitive_for_pgate(gate: str):
     def cgate_abs(kernel, param, control, target):
         return tuple()
 
-    return kernel_gate_p, kernel_cgate_p
+    return gate_func, kernel_gate_p, kernel_cgate_p
 
 
-rx_p, crx_p = make_primitive_for_pgate("rx")
-ry_p, cry_p = make_primitive_for_pgate("ry")
-rz_p, crz_p = make_primitive_for_pgate("rz")
-r1_p, cr1_p = make_primitive_for_pgate("r1")
+handle_rx, rx_p, crx_p = make_primitive_for_pgate("rx")
+_, ry_p, cry_p = make_primitive_for_pgate("ry")
+_, rz_p, crz_p = make_primitive_for_pgate("rz")
+_, r1_p, cr1_p = make_primitive_for_pgate("r1")
 
 
 def make_primitive_for_m(gate: str):
@@ -399,6 +399,7 @@ class TranslatorContext:
         self.jaxpr = jaxpr
         self.env = {}
         self.variable_map = {}
+        self.inv_env = {}
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
         self.count = get_minimum_new_variable_count(jaxpr)
@@ -410,9 +411,13 @@ class TranslatorContext:
             var = self.variable_map[var]
         return self.env[var]
 
+    def get_var_for_val(self, val):
+        return self.inv_env[val]
+
     def write(self, var, val):
         if self.variable_map.get(var):
             var = self.variable_map[var]
+        self.inv_env[val] = var
         self.env[var] = val
 
     def replace(self, original, new):
@@ -484,6 +489,69 @@ def change_register_getitem(ctx, eqn):
     safe_map(ctx.replace, eqn.outvars, outvars)
     safe_map(ctx.write, eqn.outvars, outvals)
 
+def change_register_setitem(ctx, eqn):
+    from catalyst.jax_primitives import qinsert_p
+    # There is no __setitem__ for a quake value.
+    assert eqn.primitive == qinsert_p
+    # We know from the definition of qinsert_p
+    # that it takes three operands
+    # * qreg_old
+    # * idx
+    # * qubit
+    #
+    # qinsert_p also returns a new qreg
+    # which represents the new state of the previous
+    # qreg after the insertion.
+    # * qreg_new
+    #
+    # We are just going to map the new register to
+    # the old register, and I think that will keep
+    # the same semantics in place.
+    invals = safe_map(ctx.read, eqn.invars)
+
+    # Because invals has been replaced with the correct
+    # variables, invals[0] now holds a reference to a cuda register
+    old_register = invals[0]
+    outvar = ctx.get_var_for_val(old_register)
+
+    safe_map(ctx.replace, eqn.outvars, [outvar])
+    safe_map(ctx.write, eqn.outvars, [old_register])
+
+def change_instruction(ctx, eqn, kernel):
+    from catalyst.jax_primitives import qinst_p
+    assert eqn.primitive == qinst_p
+
+    # From the definition of qinst_p
+    # Operands:
+    # * qubits_or_params
+    invals = safe_map(ctx.read, eqn.invars)
+    qubits_or_params = invals
+
+    # And two parameters:
+    # * op=None
+    # * qubits_len=-1
+    params = eqn.params
+    op = params["op"]
+    qubits_len = params["qubits_len"]
+
+
+    # Let's first determine how many are params and how
+    # Many are qubits
+    qubits = qubits_or_params[:qubits_len]
+    params = qubits_or_params[qubits_len:]
+
+    # Now, we can map to the correct op
+    # For now just assume rx
+    handle_rx(kernel, params[0], qubits[0])
+
+    # Now that we did this, we need to remember
+    # that handle_rx is not in SSA and will not return qubits
+    # And so the eqn.outvars should be replaced with something.
+    # Let's just replace them with the input values.
+    safe_map(ctx.write, eqn.outvars, qubits)
+    
+    
+
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     from jax._src.util import safe_map
@@ -498,7 +566,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         qdealloc_p,
     )
 
-    ignore = {compbasis_p, qinsert_p, qdealloc_p, qdevice_p, qalloc_p}
+    ignore = {compbasis_p, qdealloc_p, qdevice_p, qalloc_p}
 
     ctx = TranslatorContext(jaxpr, consts, *args)
     kernel = change_device_to_cuda_device(ctx)
@@ -521,7 +589,11 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
 
         elif eqn.primitive == qextract_p:
             change_register_getitem(ctx, eqn)
+        elif eqn.primitive == qinsert_p:
+            change_register_setitem(ctx, eqn)
         elif eqn.primitive == qinst_p:
+            change_instruction(ctx, eqn, kernel)
+            """
             # Assume qinst_p is just qml.RX for the time being
             invals = safe_map(ctx.read, eqn.invars)
             # none = kernel_rx_primitive_impl(kernel, invals[1], invals[0])
@@ -529,6 +601,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             # Just so that we never use it?
             # safe_map(replace, eqn.outvars, [UnavailableToken])
             # We don't even need to write anything here...
+            """
 
         elif eqn.primitive in ignore:
             continue
