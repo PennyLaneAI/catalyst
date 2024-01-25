@@ -454,8 +454,6 @@ class CompiledFunction:
 
     def __call__(self, *args, **kwargs):
         static_argnums = self.compile_options.static_argnums
-        static_argnums = () if static_argnums is None else (static_argnums, ) if \
-            isinstance(static_argnums, int) else static_argnums
         dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
 
         if self.compile_options.abstracted_axes is not None:
@@ -506,6 +504,12 @@ class QJIT:
         self._mlir = None
         self._llvmir = None
         self.stored_compiled_functions = {}
+
+        # Make the format of static_argnums easier to handle.
+        if self.compile_options.static_argnums is None:
+            self.compile_options.static_argnums = ()
+        elif isinstance(self.compile_options.static_argnums, int):
+            self.compile_options.static_argnums = (self.compile_options.static_argnums, )
 
         functools.update_wrapper(self, fn)
 
@@ -578,10 +582,7 @@ class QJIT:
             an MLIR module
         """
         static_argnums = self.compile_options.static_argnums
-        static_argnums = () if static_argnums is None else (static_argnums, ) if \
-            isinstance(static_argnums, int) else static_argnums
         dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
-        static_args = [args[idx] for idx in range(len(args)) if idx in static_argnums]
         self.c_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
 
         with Patcher(
@@ -589,6 +590,7 @@ class QJIT:
         ):
             func = self.user_function
             sig = self.c_sig
+            # Combine dynamic_args (in args) and self.c_sig (and keep the original order).
             if static_argnums:
                 sig = list(args)
                 for i, idx in enumerate([idx for idx in range(len(args)) if idx not in static_argnums]):
@@ -666,10 +668,7 @@ class QJIT:
           *args: arguments that may have been promoted
         """
         static_argnums = self.compile_options.static_argnums
-        static_argnums = () if static_argnums is None else (static_argnums, ) if \
-            isinstance(static_argnums, int) else static_argnums
         dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
-        static_args = [args[idx] for idx in range(len(args)) if idx in static_argnums]    
         r_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
 
         has_been_compiled = self.compiled_function is not None
@@ -688,6 +687,7 @@ class QJIT:
                 warnings.warn(msg, UserWarning)
             if not self.compiling_from_textual_ir:
                 sig = r_sig
+                # Combine dynamic_args (in args) and r_sig (and keep the original order).
                 if static_argnums:
                     sig = list(args)
                     for i, idx in enumerate([idx for idx in range(len(args)) if idx not in static_argnums]):
@@ -717,6 +717,7 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         static_args_hash = tuple()
         if self.compile_options.static_argnums:
+            # Build hash for multiple static arguments.
             static_argnums = self.compile_options.static_argnums
             static_argnums = (static_argnums, ) if isinstance(static_argnums, int) else static_argnums
             static_args_hash = tuple([hash(args[idx]) for idx in range(len(args)) if idx in static_argnums])

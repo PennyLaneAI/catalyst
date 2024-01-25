@@ -494,8 +494,8 @@ def make_jaxpr2(
         ), ExitStack():
             f = wrap_init(fun)
             if static_argnums:
-                static_argnums_pack = [static_argnums] if isinstance(static_argnums, int) else static_argnums
-                dynamic_argnums = [i for i in range(len(args)) if i not in static_argnums_pack]
+                argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
+                dynamic_argnums = [i for i in range(len(args)) if i not in argnums]
                 f, args = jax._src.api_util.argnums_partial(f, dynamic_argnums, args)
             in_type, in_tree = abstractify(args, kwargs)
             f, out_tree_promise = flatten_fun(f, in_tree)
