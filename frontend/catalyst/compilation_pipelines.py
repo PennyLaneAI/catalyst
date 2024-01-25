@@ -1036,6 +1036,42 @@ def qjit(
         appearing as is.
 
     .. details::
+        :title: Static arguments
+
+        ``static_argnums`` defines which elements should be treated as static. If it takes an
+        integer, it means the argument whose index is equal to the integer is static. If it takes
+        an iterable of integers, arguments whose index is contained in the iterable are static.
+        Changing static arguments will introduce re-compilation.
+
+        .. code-block:: python
+
+            @qjit(static_argnums=1)
+            def f(
+                x: int,
+                y: MyClass,
+            ):
+                return x + y.val
+
+            f(1, MyClass(5))
+            f(1, MyClass(6)) # re-compilation
+
+        In the example above, ``y`` is static. Note that the second function calls triggers
+        re-compilation since the input object is different from the previous one.
+
+        .. code-block:: python
+
+            @qjit(static_argnums=(1, 2))
+            def f(
+                x: int,
+                y: MyClass,
+                z: MyClass,
+            ):
+                return x + y.val + z.val
+
+        In the example above, ``y`` and ``z`` are static.
+
+
+    .. details::
         :title: Dynamically-shaped arrays
 
         There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
