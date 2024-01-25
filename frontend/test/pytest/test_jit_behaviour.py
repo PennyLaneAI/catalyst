@@ -15,6 +15,7 @@
 import random
 import warnings
 from timeit import default_timer as timer
+from dataclasses import dataclass
 
 import jax
 import numpy as np
@@ -22,7 +23,6 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy import pi
-from dataclasses import dataclass
 
 from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import CompiledFunction, TypeCompatibility
@@ -991,6 +991,7 @@ class TestStaticArguments:
 
         @dataclass
         class MyClass:
+            """Test class"""
             val: int
 
             def __hash__(self):
@@ -1006,16 +1007,17 @@ class TestStaticArguments:
         assert f(1, MyClass(5)) == 6
         function = f.compiled_function
         assert f(1, MyClass(7)) == 8
-        assert(function != f.compiled_function)
+        assert function != f.compiled_function
         # Same static argument should not trigger re-compilation.
         assert f(2, MyClass(5)) == 7
-        assert(function == f.compiled_function)
+        assert function == f.compiled_function
 
     def test_multiple_static_arguments(self):
         """Test QJIT with more than one static arguments."""
 
         @dataclass
         class MyClass:
+            """Test class"""
             val: int
 
             def __hash__(self):
@@ -1032,15 +1034,16 @@ class TestStaticArguments:
         assert f(MyClass(5), 1, MyClass(5)) == 11
         function = f.compiled_function
         assert f(MyClass(7), 1, MyClass(7)) == 15
-        assert(function != f.compiled_function)
+        assert function != f.compiled_function
         assert f(MyClass(5), 2, MyClass(5)) == 12
-        assert(function == f.compiled_function)
+        assert function == f.compiled_function
 
     def test_mutable_static_arguments(self):
         """Test QJIT with mutable static arguments."""
 
         @dataclass
         class MyClass:
+            """Test class"""
             val0: int
             val1: int
 
@@ -1060,7 +1063,7 @@ class TestStaticArguments:
         # Changing mutable object should introduce re-compilation.
         myObj.val1 = 3
         assert f(1, myObj) == 9
-        assert(function != f.compiled_function)
+        assert function != f.compiled_function
 
 
 if __name__ == "__main__":

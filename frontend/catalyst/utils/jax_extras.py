@@ -464,7 +464,7 @@ def jaxpr_remove_implicit(
 
 def make_jaxpr2(
     fun: Callable,
-    static_argnums: int | Iterable[int] | None = None,
+    static_argnums: Any | None = None,
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""

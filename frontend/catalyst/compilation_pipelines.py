@@ -458,7 +458,8 @@ class CompiledFunction:
 
         if self.compile_options.abstracted_axes is not None:
             abstracted_axes = self.compile_options.abstracted_axes
-            dynamic_args = get_implicit_and_explicit_flat_args(abstracted_axes, *dynamic_args, **kwargs)
+            dynamic_args = get_implicit_and_explicit_flat_args(abstracted_axes,\
+                *dynamic_args, **kwargs)
 
         abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args)
 
@@ -503,6 +504,8 @@ class QJIT:
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
+        self.function_name = None
+        self.preferred_workspace_dir = None
         self.stored_compiled_functions = {}
 
         # Make the format of static_argnums easier to handle.
@@ -521,12 +524,15 @@ class QJIT:
         preferred_workspace_dir = (
             pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
         )
+        self.preferred_workspace_dir = preferred_workspace_dir
+
         # If we are compiling from textual ir, just use this as the name of the function.
         name = "compiled_function"
         if not self.compiling_from_textual_ir:
             # pylint: disable=no-member
             # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
             name = self.__name__
+        self.function_name = name
 
         if not self.compile_options.static_argnums:
             self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
@@ -593,10 +599,12 @@ class QJIT:
             # Combine dynamic_args (in args) and self.c_sig (and keep the original order).
             if static_argnums:
                 sig = list(args)
-                for i, idx in enumerate([idx for idx in range(len(args)) if idx not in static_argnums]):
+                dynamic_indices = [idx for idx in range(len(args)) if idx not in static_argnums]
+                for i, idx in enumerate(dynamic_indices):
                     sig[idx] = self.c_sig[i]
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(func, static_argnums, abstracted_axes, *sig)
+            mlir_module, ctx, jaxpr, _, self.out_tree = \
+                trace_to_mlir(func, static_argnums, abstracted_axes, *sig)
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
@@ -690,7 +698,9 @@ class QJIT:
                 # Combine dynamic_args (in args) and r_sig (and keep the original order).
                 if static_argnums:
                     sig = list(args)
-                    for i, idx in enumerate([idx for idx in range(len(args)) if idx not in static_argnums]):
+                    dynamic_indices = [idx for idx in range(len(args))\
+                        if idx not in static_argnums]
+                    for i, idx in enumerate(dynamic_indices):
                         sig[idx] = r_sig[i]
                 self.mlir_module = self.get_mlir(*sig)
             function = self.compile()
@@ -719,20 +729,15 @@ class QJIT:
         if self.compile_options.static_argnums:
             # Build hash for multiple static arguments.
             static_argnums = self.compile_options.static_argnums
-            static_argnums = (static_argnums, ) if isinstance(static_argnums, int) else static_argnums
-            static_args_hash = tuple([hash(args[idx]) for idx in range(len(args)) if idx in static_argnums])
+            static_argnums = (static_argnums, ) if isinstance(static_argnums, int)\
+                else static_argnums
+            static_args_hash = tuple(hash(args[idx]) for idx in range(len(args))\
+                if idx in static_argnums)
 
             if static_args_hash not in self.stored_compiled_functions:
-                preferred_workspace_dir = (
-                    pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
-                )
-
-                name = "compiled_function"
-                if not self.compiling_from_textual_ir:
-                    name = self.__name__
-
                 # Create new space to avoid using previous compiled functions.
-                self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
+                self.workspace = WorkspaceManager.get_or_create_workspace(self.function_name,\
+                    self.preferred_workspace_dir)
                 self.compiled_function = None
             else:
                 self.compiled_function = self.stored_compiled_functions[static_args_hash]
