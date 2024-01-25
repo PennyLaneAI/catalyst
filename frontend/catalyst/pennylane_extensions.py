@@ -1204,6 +1204,12 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+    @property
+    def wires(self):
+        assert len(self.regions) == 1, "Adjoint is expected to have one region"
+        total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
+        return total_wires
+
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
 #       to this class whenever a qjit context is active.
@@ -1238,6 +1244,15 @@ class QCtrl(HybridOp):
             self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def wires(self):
+        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+        total_wires = sum(
+            (op.wires for op in self.regions[0].quantum_tape.operations),
+            self._control_wires + self._work_wires,
+        )
+        return total_wires
 
     @property
     def control_wires(self):
