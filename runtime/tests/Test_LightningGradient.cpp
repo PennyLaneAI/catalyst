@@ -274,9 +274,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
         CHECK(cos(p) == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
 
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q);
-        }
+        __quantum__rt__qubit_release(q);
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
