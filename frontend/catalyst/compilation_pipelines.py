@@ -505,6 +505,7 @@ class QJIT:
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
+        self.stored_compiled_functions = {}
 
         functools.update_wrapper(self, fn)
 
@@ -531,11 +532,12 @@ class QJIT:
             return
 
         parameter_types = get_type_annotations(self.user_function)
-        if parameter_types is not None and not self.compile_options.static_argnums:
+        if parameter_types is not None:
             self.user_typed = True
-            self.mlir_module = self.get_mlir(*parameter_types)
-            if self.compile_options.target == "binary":
-                self.compiled_function = self.compile()
+            if not self.compile_options.static_argnums:
+                self.mlir_module = self.get_mlir(*parameter_types)
+                if self.compile_options.target == "binary":
+                    self.compiled_function = self.compile()
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -713,17 +715,26 @@ class QJIT:
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
+        static_args_hash = tuple()
         if self.compile_options.static_argnums:
-            preferred_workspace_dir = (
-                pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
-            )
+            static_argnums = self.compile_options.static_argnums
+            static_argnums = (static_argnums, ) if isinstance(static_argnums, int) else static_argnums
+            static_args_hash = tuple([hash(args[idx]) for idx in range(len(args)) if idx in static_argnums])
 
-            name = "compiled_function"
-            if not self.compiling_from_textual_ir:
-                name = self.__name__
+            if static_args_hash not in self.stored_compiled_functions:
+                preferred_workspace_dir = (
+                    pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
+                )
 
-            self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
-            self.compiled_function = None
+                name = "compiled_function"
+                if not self.compiling_from_textual_ir:
+                    name = self.__name__
+
+                # Create new space to avoid using previous compiled functions.
+                self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
+                self.compiled_function = None
+            else:
+                self.compiled_function = self.stored_compiled_functions[static_args_hash]
 
         if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
@@ -732,6 +743,11 @@ class QJIT:
             self.compiled_function, *args
         )
         recompilation_needed = function != self.compiled_function
+
+        # Check if a new function is created.
+        if self.compile_options.static_argnums and recompilation_needed:
+            self.stored_compiled_functions[static_args_hash] = function
+
         self.compiled_function = function
 
         args_data, _args_shape = tree_flatten(args)
