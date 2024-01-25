@@ -208,7 +208,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
         __quantum__rt__device_release();
@@ -263,7 +265,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
         __quantum__rt__device_release();

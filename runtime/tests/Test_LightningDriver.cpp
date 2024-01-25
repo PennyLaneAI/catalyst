@@ -70,7 +70,7 @@ TEST_CASE("Test Driver", "[Driver]")
     CHECK(driver->getDeviceRecorderStatus() == true);
 }
 
-TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes)
+TEMPLATE_TEST_CASE("lightning Basis vector", "[Driver]", LightningSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -135,7 +135,7 @@ TEMPLATE_TEST_CASE("Qubit allocatation and deallocation", "[Driver]", LightningS
     }
 }
 
-TEMPLATE_LIST_TEST_CASE("test AllocateQubits", "[Driver]", SimTypes)
+TEMPLATE_TEST_CASE("test AllocateQubits", "[Driver]", LightningSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -152,20 +152,6 @@ TEMPLATE_LIST_TEST_CASE("test AllocateQubits", "[Driver]", SimTypes)
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("test multiple AllocateQubits", "[Driver]", SimTypes)
-{
-    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-
-    auto &&q1 = sim->AllocateQubits(2);
-    CHECK(q1[0] == 0);
-    CHECK(q1[1] == 1);
-
-    auto &&q2 = sim->AllocateQubits(3);
-    CHECK(q2.size() == 3);
-    CHECK(q2[0] == 2);
-    CHECK(q2[2] == 4);
-}
-
 TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -177,7 +163,7 @@ TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
     CHECK(sim->GetDeviceShots() == 500);
 }
 
-TEMPLATE_LIST_TEST_CASE("compute register tests", "[Driver]", SimTypes)
+TEMPLATE_TEST_CASE("compute register tests", "[Driver]", LightningSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -265,3 +251,37 @@ TEMPLATE_TEST_CASE("QuantumDevice object test [lightning.qubit]", "[Driver]", Li
         // 20, 21, ..., 29
     }
 }
+
+TEMPLATE_LIST_TEST_CASE("Check re-AllocateQubit", "[Driver]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    sim->AllocateQubit();
+    sim->NamedOperation("Hadamard", {}, {0}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+    CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(0.707107).epsilon(1e-5));
+
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+
+    state = std::vector<std::complex<double>>(1U << sim->GetNumQubits());
+    view = DataView<std::complex<double>, 1>(state);
+    sim->State(view);
+    CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
+    CHECK(state[8].real() == Approx(0.707107).epsilon(1e-5));
+}
+
+#ifdef __device_lightning_kokkos
+TEMPLATE_TEST_CASE("Unsupported ReleaseQubit", "[Driver]", LightningKokkosSimulator)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    auto q = sim->AllocateQubit();
+
+    REQUIRE_THROWS_WITH(sim->ReleaseQubit(q), Catch::Contains("Unsupported functionality"));
+}
+#endif

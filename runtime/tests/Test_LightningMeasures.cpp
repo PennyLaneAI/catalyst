@@ -1305,8 +1305,8 @@ TEMPLATE_LIST_TEST_CASE("State test with numWires=4", "[Measures]", SimTypes)
     }
 }
 
-TEMPLATE_LIST_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[Measures]",
-                        SimTypes)
+TEMPLATE_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[Measures]",
+                   LightningSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -1463,8 +1463,8 @@ TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs shots tests with numWires=0-4", 
     }
 }
 
-TEMPLATE_LIST_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[Measures]",
-                        SimTypes)
+TEMPLATE_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[Measures]",
+                   LightningSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -1496,8 +1496,8 @@ TEMPLATE_LIST_TEST_CASE("PartialSample test with incorrect numWires and numAlloc
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEMPLATE_LIST_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[Measures]",
-                        SimTypes)
+TEMPLATE_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[Measures]",
+                   LightningSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 

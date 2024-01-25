@@ -233,7 +233,9 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 
         __quantum__rt__string_update_reference_count(qstr, -1);
 
-        __quantum__rt__qubit_release(q);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(q);
+        }
 
         QirArray *qs = __quantum__rt__qubit_allocate_array(3);
 
@@ -332,8 +334,10 @@ TEST_CASE("Test __quantum__qis__State with wires", "[CoreQIS]")
                                             "Runtime: Partial State-Vector not supported yet"));
 
         freeState(result);
-        __quantum__rt__qubit_release(wire1);
-        __quantum__rt__qubit_release(wire0);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(wire1);
+            __quantum__rt__qubit_release(wire0);
+        }
         __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
@@ -362,8 +366,10 @@ TEST_CASE("Test __quantum__qis__Identity", "[CoreQIS]")
         CHECK(state[1].imag == Approx(0.0).margin(1e-5));
 
         freeState(result);
-        __quantum__rt__qubit_release(wire1);
-        __quantum__rt__qubit_release(wire0);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(wire1);
+            __quantum__rt__qubit_release(wire0);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -392,8 +398,10 @@ TEST_CASE("Test __quantum__qis__PauliX", "[CoreQIS]")
                state[2].imag == Approx(0.0).margin(1e-5)));
 
         freeState(result);
-        __quantum__rt__qubit_release(wire1);
-        __quantum__rt__qubit_release(wire0);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(wire1);
+            __quantum__rt__qubit_release(wire0);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -422,8 +430,10 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[CoreQIS]")
                state[2].imag == Approx(0.9505637859).margin(1e-5)));
 
         freeState(result);
-        __quantum__rt__qubit_release(wire1);
-        __quantum__rt__qubit_release(wire0);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(wire1);
+            __quantum__rt__qubit_release(wire0);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -561,8 +571,10 @@ TEST_CASE("Test __quantum__qis__Measure", "[CoreQIS]")
         Result one = __quantum__rt__result_get_one();
         CHECK(*m == *one);
 
-        __quantum__rt__qubit_release(wire1);
-        __quantum__rt__qubit_release(wire0);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(wire1);
+            __quantum__rt__qubit_release(wire0);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -1385,7 +1397,9 @@ TEST_CASE("Test __quantum__qis__Measure with false", "[CoreQIS]")
         Result zero = __quantum__rt__result_get_zero();
         CHECK(__quantum__rt__result_equal(mres, zero));
 
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -1408,7 +1422,9 @@ TEST_CASE("Test __quantum__qis__Measure with true", "[CoreQIS]")
         Result one = __quantum__rt__result_get_one();
         CHECK(__quantum__rt__result_equal(mres, one));
 
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -1718,7 +1734,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[Co
             Catch::Contains("[Function:__quantum__qis__QubitUnitary] Error in Catalyst Runtime: "
                             "The QubitUnitary matrix must be initialized"));
 
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -1740,7 +1758,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[Co
                             Catch::Contains("Invalid number of wires"));
 
         delete matrix;
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -1767,7 +1787,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
                             Catch::Contains("Invalid given QubitUnitary matrix"));
 
         delete matrix;
-        __quantum__rt__qubit_release(target);
+        if (rtd_name != "lightning.kokkos") {
+            __quantum__rt__qubit_release(target);
+        }
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
