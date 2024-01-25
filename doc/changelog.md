@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Remove copies of TOML device configuration files for Lightning device in Catalyst.
+  [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
+
 * Build and package Catalyst wheels with OpenMP and ZStd.
   [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
 
@@ -13,6 +16,10 @@
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+
+* Resolve a failure to find the SciPy OpenBLAS library when running Catalyst,
+  due to a different SciPy version being used to build Catalyst than to run it.
+  [(#471)](https://github.com/PennyLaneAI/catalyst/pull/471)
 
 * Resolve unpredictable behaviour when importing libraries that share Catalyst's  LLVM dependency
   (e.g. TensorFlow). In some cases, both packages exporting the same symbols from their shared
