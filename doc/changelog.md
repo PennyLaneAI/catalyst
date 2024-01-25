@@ -13,6 +13,10 @@
 * Remove `qextract_p` and `qinst_p` from forced-order primitives.
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
 
+* Update `AllocateQubit` and `AllocateQubits` in `LightningKokkosSimulator` to preserve
+  the current state-vector before qubit re-allocations.
+  [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
