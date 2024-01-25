@@ -729,18 +729,16 @@ class QJIT:
         if self.compile_options.static_argnums:
             # Build hash for multiple static arguments.
             static_argnums = self.compile_options.static_argnums
-            static_argnums = (static_argnums, ) if isinstance(static_argnums, int)\
-                else static_argnums
             static_args_hash = tuple(hash(args[idx]) for idx in range(len(args))\
                 if idx in static_argnums)
 
-            if static_args_hash not in self.stored_compiled_functions:
+            self.compiled_function =\
+                self.stored_compiled_functions.get(static_args_hash, None)
+
+            if not self.compiled_function:
                 # Create new space to avoid using previous compiled functions.
                 self.workspace = WorkspaceManager.get_or_create_workspace(self.function_name,\
                     self.preferred_workspace_dir)
-                self.compiled_function = None
-            else:
-                self.compiled_function = self.stored_compiled_functions[static_args_hash]
 
         if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
