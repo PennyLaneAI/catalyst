@@ -57,6 +57,10 @@
   at the end of programs.
   [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
 
+* Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
+  qubit re-allocation.
+  [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
