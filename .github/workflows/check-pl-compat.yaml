@@ -102,7 +102,7 @@ jobs:
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        ENABLE_LLD=ON
+        ENABLE_LLD=ON \
         make dialects
         pip install --upgrade .
 
