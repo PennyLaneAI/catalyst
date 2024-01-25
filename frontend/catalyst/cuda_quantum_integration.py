@@ -245,8 +245,16 @@ def make_primitive_for_gate():
 
 cuda_inst, cuda_inst_p = make_primitive_for_gate()
 
+import dataclasses
+
+
+@dataclasses.dataclass(frozen=True)
+class SideEffect(jax._src.effects.Effect):
+    __str__ = lambda _: "SideEffect"
+
 
 def make_primitive_for_m(gate: str):
+    gate = f"m{gate}"
     kernel_gate_p = jax.core.Primitive(f"kernel_{gate}")
     method = getattr(cudaq.Kernel, gate)
 
@@ -257,16 +265,18 @@ def make_primitive_for_m(gate: str):
     def gate_impl(kernel, target):
         return method(kernel, target)
 
-    @kernel_gate_p.def_abstract_eval
+    @kernel_gate_p.def_effectful_abstract_eval
     def gate_abs(kernel, target):
-        return AbsCudaValue()
+        effects = set()
+        effects.add(SideEffect)
+        return AbsCudaValue(), effects
 
-    return kernel_gate_p
+    return gate_func, kernel_gate_p
 
 
-mx_p = make_primitive_for_m("x")
-my_p = make_primitive_for_m("y")
-mz_p = make_primitive_for_m("z")
+mx_call, mx_p = make_primitive_for_m("x")
+my_call, my_p = make_primitive_for_m("y")
+mz_call, mz_p = make_primitive_for_m("z")
 
 
 cudaq_sample_p = jax.core.Primitive("cudaq_sample")
@@ -684,6 +694,28 @@ def change_counts(ctx, eqn, kernel):
     return change_sample_or_counts(ctx, eqn, kernel)
 
 
+def change_measure(ctx, eqn, kernel):
+    from catalyst.jax_primitives import qmeasure_p
+
+    assert eqn.primitive == qmeasure_p
+
+    # Operands to measure_p
+    # *qubit
+    invals = safe_map(ctx.read, eqn.invars)
+    # Since we've already replaced it
+    # this qubit refers to one in the cuda program.
+    qubit = invals[0]
+
+    # Cuda can measure in multiple basis.
+    # Catalyst's measure op only measures in the Z basis.
+    # So we map this measurement op to mz in cuda.
+    result = mz_call(kernel, qubit)
+    outvars = [ctx.new_variable(AbsCudaValue()), ctx.new_variable(AbsCudaQbit())]
+    outvals = [result, qubit]
+    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.write, eqn.outvars, outvals)
+
+
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     from jax._src.util import safe_map
     from catalyst.jax_primitives import (
@@ -697,6 +729,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         qdealloc_p,
         sample_p,
         counts_p,
+        qmeasure_p,
     )
 
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
@@ -720,6 +753,8 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             change_sample(ctx, eqn, kernel)
         elif eqn.primitive == counts_p:
             change_counts(ctx, eqn, kernel)
+        elif eqn.primitive == qmeasure_p:
+            change_measure(ctx, eqn, kernel)
         elif eqn.primitive in ignore:
             continue
 

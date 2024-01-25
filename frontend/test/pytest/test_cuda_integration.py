@@ -13,7 +13,7 @@
 # limitations under the License.
 import pennylane as qml
 
-from catalyst import qjit
+from catalyst import qjit, measure
 from catalyst.compilation_pipelines import QJIT_CUDA, QJIT
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
@@ -118,3 +118,18 @@ def test_counts_with_shots():
     expected = qjit(foo)()
     observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)
     assert_allclose(expected, observed)
+
+
+def test_measurement_side_effect():
+    """Test the measurement code is added."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
+    def baz():
+        qml.RX(jnp.pi / 4, wires=[0])
+        measure(0)
+        return qml.state()
+
+    cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(baz))()
+    assert "mz" in str(cuda_jaxpr)
+    observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)[0]
+    assert observed[0] ** 2 == 1 or observed[1] ** 2 == 1
