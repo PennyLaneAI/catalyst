@@ -12,19 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-import warnings
-from timeit import default_timer as timer
+"""Test features related to static arguments."""
+
 from dataclasses import dataclass
-
-import jax
-import numpy as np
-import pennylane as qml
 import pytest
-from jax import numpy as jnp
-from numpy import pi
 
-from catalyst import for_loop, grad, measure, qjit
+from catalyst import qjit
 
 class TestStaticArguments:
     """Test QJIT with static arguments."""
@@ -136,14 +129,13 @@ class TestStaticArguments:
         ):
             return x + y.val0 + y.val1
 
-        myObj = MyClass(5, 5)
-        assert f(1, myObj) == 11
+        my_obj = MyClass(5, 5)
+        assert f(1, my_obj) == 11
         function = f.compiled_function
         # Changing mutable object should introduce re-compilation.
-        myObj.val1 = 3
-        assert f(1, myObj) == 9
+        my_obj.val1 = 3
+        assert f(1, my_obj) == 9
         assert function != f.compiled_function
-
 
 
 if __name__ == "__main__":

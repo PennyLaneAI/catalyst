@@ -15,7 +15,6 @@
 import random
 import warnings
 from timeit import default_timer as timer
-from dataclasses import dataclass
 
 import jax
 import numpy as np
