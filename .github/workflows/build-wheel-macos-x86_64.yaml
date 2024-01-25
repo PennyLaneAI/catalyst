@@ -238,13 +238,10 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
-    - name: Install OpenMP
-      run: |
-        brew install libomp
-
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
+        # Segfaults in computing Lightning's adjoint-jacobian when building with OMP
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
@@ -253,13 +250,12 @@ jobs:
               -DLIGHTNING_GIT_TAG="v0.34.0" \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
-              -DKokkos_ENABLE_OPENMP=ON \
+              -DKokkos_ENABLE_OPENMP=OFF \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
-              -DOpenMP_ROOT=$(brew --prefix libomp) \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=ON \
+              -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
@@ -357,7 +353,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
         # TODO: Uncomment after fixing https://github.com/PennyLaneAI/pennylane-lightning/issues/552
-        # python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos"
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL
+        # python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
