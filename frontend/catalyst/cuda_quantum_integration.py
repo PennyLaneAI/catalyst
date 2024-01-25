@@ -714,6 +714,7 @@ def change_measure(ctx, eqn, kernel):
     outvals = [result, qubit]
     safe_map(ctx.replace, eqn.outvars, outvars)
     safe_map(ctx.write, eqn.outvars, outvals)
+    return result
 
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
@@ -737,6 +738,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     ctx = TranslatorContext(jaxpr, consts, *args)
     kernel, shots = change_device_to_cuda_device(ctx)
     register = change_alloc_to_cuda_alloc(ctx, kernel)
+    measurement_set = set()
 
     for idx, eqn in enumerate(jaxpr.eqns):
         if eqn.primitive == state_p:
@@ -754,7 +756,15 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         elif eqn.primitive == counts_p:
             change_counts(ctx, eqn, kernel)
         elif eqn.primitive == qmeasure_p:
-            change_measure(ctx, eqn, kernel)
+            # TODO: If we are returning the measurement
+            # We must change it to sample with a single shot.
+
+            # Otherwise, we will be returning a quake value
+            # that is opaque and cannot be inspected for a value by the user.
+            # For the time being, we can just add an exception if the return of
+            # measurement is being returned directly.
+            a_measurement = change_measure(ctx, eqn, kernel)
+            measurement_set.add(a_measurement)
         elif eqn.primitive in ignore:
             continue
 
@@ -767,7 +777,12 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             else:
                 ctx.write(eqn.outvars[0], ans)
 
-    return safe_map(ctx.read, jaxpr.outvars)
+    retvals = safe_map(ctx.read, jaxpr.outvars)
+    if set(retvals).issubset(measurement_set):
+        raise NotImplementedError(
+            "You cannot return measurements directly from a tape when compiling for cuda quantum."
+        )
+    return retvals
 
 
 # So where is this function going to be called?

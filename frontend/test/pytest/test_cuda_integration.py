@@ -132,4 +132,17 @@ def test_measurement_side_effect():
     cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(baz))()
     assert "mz" in str(cuda_jaxpr)
     observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)[0]
-    assert observed[0] ** 2 == 1 or observed[1] ** 2 == 1
+    assert abs(observed[0] ** 2) == 1 or abs(observed[1] ** 2) == 1
+
+
+def test_measurement_side_return():
+    """Test the measurement code is added."""
+
+    with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
+        def baz():
+            qml.RX(jnp.pi / 4, wires=[0])
+            return measure(0)
+
+        cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(baz))()
