@@ -22,6 +22,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy import pi
+from dataclasses import dataclass
 
 from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import CompiledFunction, TypeCompatibility
@@ -945,6 +946,28 @@ class TestTwoQJITsOneName:
         assert foo_2() == 2
         foo_1.workspace.cleanup()
         foo_2.workspace.cleanup()
+
+class TestStaticArguments:
+    """Test QJIT with static arguments."""
+
+    def test_one_static_argument(self):
+        """Test QJIT with one static argument."""
+
+        @dataclass
+        class MyClass:
+            val: int
+
+            def __hash__(self):
+                return hash(str(self))
+
+        @qjit(static_argnums=1)
+        def f(
+            x: int,
+            y: MyClass,
+        ):
+            return x + y.val
+
+        assert f(1, MyClass(5)) == 6
 
 
 if __name__ == "__main__":
