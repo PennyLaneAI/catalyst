@@ -104,3 +104,17 @@ def test_sample_with_shots():
     expected_shape = foo()
     observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)[0]
     assert len(observed) == 30
+
+
+def test_counts_with_shots():
+    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=30))
+    def foo():
+        qml.RX(jnp.pi, wires=[0])
+        return qml.counts()
+
+    cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(foo))()
+    assert "counts" in str(cuda_jaxpr)
+    assert "shots_count=30" in str(cuda_jaxpr)
+    expected = qjit(foo)()
+    observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)
+    assert_allclose(expected, observed)

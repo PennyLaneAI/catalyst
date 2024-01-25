@@ -270,6 +270,8 @@ mz_p = make_primitive_for_m("z")
 
 
 cudaq_sample_p = jax.core.Primitive("cudaq_sample")
+cudaq_counts_p = jax.core.Primitive("cudaq_counts")
+cudaq_counts_p.multiple_results = True
 
 
 def cudaq_sample(kernel, *args, shots_count=1000):
@@ -293,6 +295,44 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
 @cudaq_sample_p.def_abstract_eval
 def cudaq_sample_abs(kernel, *args, shots_count=1000):
     return AbsCudaSampleResult()
+
+
+def cudaq_counts(kernel, *args, shape, shots_count=1000):
+    return cudaq_counts_p.bind(kernel, *args, shape=shape, shots_count=shots_count)
+
+
+@cudaq_counts_p.def_impl
+def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
+    # cudaq.sample returns an object which is a compressed version of what
+    # qml.sample returns as samples. Instead of returning an array with the observed
+    # population, cudaq.sample returns a dictionary where the keys are bitstrings and
+    # values are the frequency those bitstrings were observed.
+
+    # In Catalyst, counts returns two arrays.
+    # The first array corresponds to a count from 0..shape
+    # denoting the integers that can be computed from the bitstrings.
+    import math
+    from jax import numpy as jnp
+
+    strings = [x for x in range(shape)]
+    res = {str(s): 0 for s in strings}
+
+    a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
+    # It looks like cuda uses a different endianness than catalyst.
+    a_dict_decimal = {str(int(k[::-1], 2)): v for k, v in a_dict.items()}
+    res.update(a_dict_decimal)
+
+    # The integers are actually floats in Catalyst
+    bitstrings, counts = zip(*[(float(k), v) for k, v in res.items()])
+
+    return jnp.array(bitstrings), jnp.array(counts)
+
+
+@cudaq_counts_p.def_abstract_eval
+def cudaq_counts_abs(kernel, shape, shots_count=1000):
+    bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
+    counts = jax.core.ShapedArray([shape], jax.numpy.int64)
+    return bitstrings, counts
 
 
 # SKIP Async for the time being
@@ -387,7 +427,7 @@ class TranslatorContext:
 
     def new_variable(self, _type):
         count = self.get_new_count()
-        return jax._src.core.Var(count, "", _type())
+        return jax._src.core.Var(count, "", _type)
 
 
 def change_device_to_cuda_device(ctx):
@@ -418,7 +458,7 @@ def change_device_to_cuda_device(ctx):
 
     kernel = cudaq_make_kernel()
     outvals = [kernel]
-    outvars = [ctx.new_variable(AbsCudaKernel)]
+    outvars = [ctx.new_variable(AbsCudaKernel())]
     safe_map(ctx.write, outvars, outvals)
     return kernel, shots
 
@@ -442,7 +482,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
 
     # We are creating a new variable that will replace the old
     # variable.
-    outvars = [ctx.new_variable(AbsCudaQReg)]
+    outvars = [ctx.new_variable(AbsCudaQReg())]
     safe_map(ctx.replace, eqn.outvars, outvars)
     safe_map(ctx.write, eqn.outvars, outvals)
     return register
@@ -463,7 +503,7 @@ def change_register_getitem(ctx, eqn):
     idx = invals[1]
     cuda_qubit = qreg_getitem(register, idx)
 
-    outvars = [ctx.new_variable(AbsCudaQbit)]
+    outvars = [ctx.new_variable(AbsCudaQbit())]
     outvals = [cuda_qubit]
 
     safe_map(ctx.replace, eqn.outvars, outvars)
@@ -587,22 +627,26 @@ def change_get_state(ctx, eqn, kernel):
     # so we get it from the parameter.
     cuda_state = cudaq_getstate(kernel)
     outvals = [cuda_state]
-    outvars = [ctx.new_variable(AbsCudaQState)]
+    outvars = [ctx.new_variable(AbsCudaQState())]
     safe_map(ctx.replace, eqn.outvars, outvars)
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_sample(ctx, eqn, kernel):
-    from catalyst.jax_primitives import sample_p
+def change_sample_or_counts(ctx, eqn, kernel):
+    from catalyst.jax_primitives import sample_p, counts_p
     from catalyst.jax_primitives import compbasis_p
 
-    assert eqn.primitive == sample_p
+    is_sample = eqn.primitive == sample_p
+    is_counts = eqn.primitive == counts_p
+    is_valid = is_sample or is_counts
+    assert is_valid
 
-    # From sample_p's definition
+    # Sample and counts look the same in terms of
+    # operands
     # * obs
     invals = safe_map(ctx.read, eqn.invars)
 
-    # Parameters...
+    # And parameters...
     # * shots
     # * shape
     params = eqn.params
@@ -614,13 +658,30 @@ def change_sample(ctx, eqn, kernel):
     # Technically, we can have other observables,
     # but at the moment in cuda quantum this is not yet implemented.
     if obs_catalyst.primitive is not compbasis_p:
-        raise NotImplementedError("sample only supports computational basis")
+        raise NotImplementedError("sample and counts only supports computational basis")
 
-    shots_result = cudaq_sample(kernel, shots_count=shots)
-    outvals = [shots_result]
-    outvars = [ctx.new_variable(AbsCudaSampleResult)]
-    safe_map(ctx.replace, eqn.outvars, outvars)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    if is_sample:
+        shots_result = cudaq_sample(kernel, shots_count=shots)
+        outvals = [shots_result]
+        outvars = [ctx.new_variable(AbsCudaSampleResult())]
+        safe_map(ctx.replace, eqn.outvars, outvars)
+        safe_map(ctx.write, eqn.outvars, outvals)
+    else:
+        shape = 2**obs_catalyst.num_qubits
+        outvals = cudaq_counts(kernel, shape=shape, shots_count=shots)
+        bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
+        counts = jax.core.ShapedArray([shape], jax.numpy.int64)
+        outvars = [ctx.new_variable(bitstrings), ctx.new_variable(counts)]
+        safe_map(ctx.replace, eqn.outvars, outvars)
+        safe_map(ctx.write, eqn.outvars, outvals)
+
+
+def change_sample(ctx, eqn, kernel):
+    return change_sample_or_counts(ctx, eqn, kernel)
+
+
+def change_counts(ctx, eqn, kernel):
+    return change_sample_or_counts(ctx, eqn, kernel)
 
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
@@ -635,6 +696,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         qinsert_p,
         qdealloc_p,
         sample_p,
+        counts_p,
     )
 
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
@@ -656,6 +718,8 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             change_compbasis(ctx, eqn, kernel)
         elif eqn.primitive == sample_p:
             change_sample(ctx, eqn, kernel)
+        elif eqn.primitive == counts_p:
+            change_counts(ctx, eqn, kernel)
         elif eqn.primitive in ignore:
             continue
 
@@ -689,6 +753,6 @@ def catalyst_to_cuda(fun):
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
         out = transform_jaxpr_to_cuda_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
-        return out[0]
+        return out
 
     return wrapped
