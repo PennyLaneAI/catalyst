@@ -253,7 +253,7 @@ jobs:
               -DLIGHTNING_GIT_TAG="v0.34.0" \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
-              -DKokkos_ENABLE_OPENMP=ON \
+              -DKokkos_ENABLE_OPENMP=OFF \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
               -DOpenMP_ROOT=$(brew --prefix libomp) \
