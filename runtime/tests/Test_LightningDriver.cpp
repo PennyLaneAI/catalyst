@@ -152,6 +152,20 @@ TEMPLATE_LIST_TEST_CASE("test AllocateQubits", "[Driver]", SimTypes)
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("test multiple AllocateQubits", "[Driver]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    auto &&q1 = sim->AllocateQubits(2);
+    CHECK(q1[0] == 0);
+    CHECK(q1[1] == 1);
+
+    auto &&q2 = sim->AllocateQubits(3);
+    CHECK(q2.size() == 3);
+    CHECK(q2[0] == 2);
+    CHECK(q2[2] == 4);
+}
+
 TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();

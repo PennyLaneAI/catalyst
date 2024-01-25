@@ -32,7 +32,7 @@ auto LightningKokkosSimulator::AllocateQubits(size_t num_qubits) -> std::vector<
     const size_t cur_num_qubits = this->device_sv->getNumQubits();
     const size_t new_num_qubits = cur_num_qubits + num_qubits;
     this->device_sv = std::make_unique<StateVectorT>(new_num_qubits);
-    return this->qubit_manager.AllocateRange(cur_num_qubits, new_num_qubits);
+    return this->qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
 }
 
 void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { this->qubit_manager.Release(q); }
