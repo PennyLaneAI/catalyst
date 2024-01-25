@@ -238,9 +238,9 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
-    - name: Install OpenMP
-      run: |
-        brew install libomp
+    # - name: Install OpenMP
+    #   run: |
+    #     brew install libomp
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
@@ -256,7 +256,6 @@ jobs:
               -DKokkos_ENABLE_OPENMP=OFF \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
               -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
-              -DOpenMP_ROOT=$(brew --prefix libomp) \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
