@@ -278,11 +278,20 @@ def cudaq_sample(kernel, *args, shots_count=1000):
 
 @cudaq_sample_p.def_impl
 def cudaq_sample_impl(kernel, *args, shots_count=1000):
-    return cudaq.sample(kernel, *args, shots_counts=shots_counts)
+    # cudaq.sample returns an object which is a compressed version of what
+    # qml.sample returns as samples. Instead of returning an array with the observed
+    # population, cudaq.sample returns a dictionary where the keys are bitstrings and
+    # values are the frequency those bitstrings were observed.
+
+    # In a way qml.count is semantically equivalent to cudaq.sample
+    # So, let's perform a little conversion here...
+    a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
+    lls = [[k] * v for k, v in a_dict.items()]
+    return [l for ls in lls for l in ls]
 
 
 @cudaq_sample_p.def_abstract_eval
-def cudaq_sample_abs(kernel, *args, shots_counts=1000):
+def cudaq_sample_abs(kernel, *args, shots_count=1000):
     return AbsCudaSampleResult()
 
 
@@ -383,13 +392,35 @@ class TranslatorContext:
 
 def change_device_to_cuda_device(ctx):
     from catalyst.jax_primitives import qdevice_p
+    import json
+
+    # The device here might also have some important information for
+    # us. For example, the number of shots.
 
     qdevice_eqn = get_instruction(ctx.jaxpr, qdevice_p)
+
+    # These parameters are stored in a json-like string.
+    # We first convert the string to json.
+    json_like_string = qdevice_eqn.params["rtd_kwargs"]
+    json_like_string = json_like_string.replace("'", '"')
+    json_like_string = json_like_string.replace("True", "true")
+    json_string = json_like_string.replace("False", "false")
+
+    # Finally, we load it
+    parameters = json.loads(json_string)
+
+    # Now we have the number of shots.
+    # Shots are specified in PL at the very beginning, but in cuda
+    # shots are not needed until the very end.
+    # So, we will just return this variable
+    # and it is the responsibility of the caller to propagate this information.
+    shots = parameters.get("shots")
+
     kernel = cudaq_make_kernel()
     outvals = [kernel]
     outvars = [ctx.new_variable(AbsCudaKernel)]
     safe_map(ctx.write, outvars, outvals)
-    return kernel
+    return kernel, shots
 
 
 def change_alloc_to_cuda_alloc(ctx, kernel):
@@ -500,7 +531,6 @@ def change_instruction(ctx, eqn, kernel):
     cuda_inst_name = from_catalyst_to_cuda[op]
     qubits_len = params["qubits_len"]
 
-
     # Now, we can map to the correct op
     # For now just assume rx
     cuda_inst(kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
@@ -514,8 +544,10 @@ def change_instruction(ctx, eqn, kernel):
     # Let's just replace them with the input values.
     safe_map(ctx.write, eqn.outvars, qubits)
 
+
 def change_compbasis(ctx, eqn, kernel):
     from catalyst.jax_primitives import compbasis_p
+
     assert eqn.primitive == compbasis_p
 
     # From compbasis_p's definition, its operands are:
@@ -525,13 +557,16 @@ def change_compbasis(ctx, eqn, kernel):
     # We dont have a use for compbasis yet.
     # So, the evaluation of it might as well just be the same.
     from catalyst.jax_primitives import AbstractObs
+
     outvals = [AbstractObs(len(qubits), compbasis_p)]
     safe_map(ctx.write, eqn.outvars, outvals)
     # Note: Other observables won't be so easy...
 
+
 def change_get_state(ctx, eqn, kernel):
     from catalyst.jax_primitives import state_p
     from catalyst.jax_primitives import compbasis_p
+
     assert eqn.primitive == state_p
 
     # From state_p's definition, its operands are:
@@ -557,6 +592,36 @@ def change_get_state(ctx, eqn, kernel):
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
+def change_sample(ctx, eqn, kernel):
+    from catalyst.jax_primitives import sample_p
+    from catalyst.jax_primitives import compbasis_p
+
+    assert eqn.primitive == sample_p
+
+    # From sample_p's definition
+    # * obs
+    invals = safe_map(ctx.read, eqn.invars)
+
+    # Parameters...
+    # * shots
+    # * shape
+    params = eqn.params
+    shots = params["shots"]
+
+    # We will deal with compbasis in the same way as
+    # when we deal with the state
+    obs_catalyst = invals[0]
+    # Technically, we can have other observables,
+    # but at the moment in cuda quantum this is not yet implemented.
+    if obs_catalyst.primitive is not compbasis_p:
+        raise NotImplementedError("sample only supports computational basis")
+
+    shots_result = cudaq_sample(kernel, shots_count=shots)
+    outvals = [shots_result]
+    outvars = [ctx.new_variable(AbsCudaSampleResult)]
+    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.write, eqn.outvars, outvals)
+
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     from jax._src.util import safe_map
@@ -569,12 +634,13 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         compbasis_p,
         qinsert_p,
         qdealloc_p,
+        sample_p,
     )
 
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
     ctx = TranslatorContext(jaxpr, consts, *args)
-    kernel = change_device_to_cuda_device(ctx)
+    kernel, shots = change_device_to_cuda_device(ctx)
     register = change_alloc_to_cuda_alloc(ctx, kernel)
 
     for idx, eqn in enumerate(jaxpr.eqns):
@@ -588,6 +654,8 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             change_instruction(ctx, eqn, kernel)
         elif eqn.primitive == compbasis_p:
             change_compbasis(ctx, eqn, kernel)
+        elif eqn.primitive == sample_p:
+            change_sample(ctx, eqn, kernel)
         elif eqn.primitive in ignore:
             continue
 
