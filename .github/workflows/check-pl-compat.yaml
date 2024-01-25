@@ -38,7 +38,7 @@ jobs:
 
     - name: Install deps
       run: |
-        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6
+        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         pip install amazon-braket-pennylane-plugin
@@ -94,7 +94,6 @@ jobs:
 
     - name: Install Catalyst (latest/stable)
       run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
