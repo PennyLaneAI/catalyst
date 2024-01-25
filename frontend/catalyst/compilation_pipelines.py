@@ -1174,36 +1174,14 @@ def qjit_cuda(
     pipelines=None,
     abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
+    from catalyst.cuda_quantum_integration import catalyst_to_cuda
     axes = abstracted_axes
+
     if fn is not None:
-        return QJIT_CUDA(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                abstracted_axes=axes,
-            ),
-        )
+        return catalyst_to_cuda(fn)
 
     def wrap_fn(fn):
-        return QJIT_CUDA(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                abstracted_axes=axes,
-            ),
-        )
+        return catalyst_to_cuda(fn)
 
     return wrap_fn
 
