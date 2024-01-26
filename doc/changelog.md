@@ -33,14 +33,9 @@
   This PR changes the runtime such that QIR instructions are now lowered to functions where
   the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
   the possibility of symbol conflicts with other libraries that implement QIR as a library.
-  However, it doesn't solve it completely. Since the `__catalyst__` functions are still exported
-  if another library implemented the same symbols exported by the runtime, the same problem would
+  However, it doesn't solve it completely. Since the `__catalyst__` functions are still exported.
+  If another library implemented the same symbols exported by the runtime, the same problem would
   presist.
-
-  Another potential way to solve this is for the compiler to generate code for the user's function
-  without referring to any external symbol. This way, the generated code would only refer to symbols
-  inside the translation unit itself. This alternative approach would increase the compilation time.
-  The approach in this commit may be revisited in the future.
 
 <h3>Bug fixes</h3>
 
