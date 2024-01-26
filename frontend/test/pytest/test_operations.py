@@ -51,6 +51,7 @@ def test_no_parameters(backend):
         qml.SWAP(wires=[0, 1])
         qml.SWAP(wires=[0, 2])
         qml.SWAP(wires=[1, 2])
+        qml.ISWAP(wires=[0, 1])
 
         qml.CSWAP(wires=[0, 1, 2])
 
@@ -81,7 +82,6 @@ def test_no_parameters(backend):
 
         # Unsupported:
         # qml.SX(wires=0)
-        # qml.ISWAP(wires=[0,1])
         # qml.ECR(wires=[0,1])
         # qml.SISWAP(wires=[0,1])
         # qml.Toffoli(wires=[0,1,2])
@@ -131,6 +131,8 @@ def test_param(backend):
         qml.CRY(y, wires=[1, 2])
         qml.CRZ(y, wires=[1, 2])
 
+        qml.PSWAP(x, wires=[0, 1])
+
         qml.MultiRZ(x, wires=[0, 1, 2, 3])
 
         # Unsupported:
@@ -138,7 +140,6 @@ def test_param(backend):
         # qml.U1(x, wires=0)
         # qml.U2(x, x, wires=0)
         # qml.U3(x, x, x, wires=0)
-        # qml.PSWAP(x, wires=[0,1])
 
         return qml.state()
 

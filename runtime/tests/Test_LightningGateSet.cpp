@@ -478,6 +478,64 @@ TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
     CHECK(state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
+// TODO: Uncomment these tests after `PSWAP` and `ISWAP` are natively supported by Lightning simulators.  
+/*
+TEMPLATE_LIST_TEST_CASE("ISWAP test", "[GateSet]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+
+    for (size_t i = 0; i < n; i++) {
+        Qs[i] = sim->AllocateQubit();
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("ISWAP", {}, {Qs[0], Qs[1]}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 1});
+    CHECK(state.at(2) == std::complex<double>{0, 0});
+    CHECK(state.at(3) == std::complex<double>{0, 0});
+}
+
+TEMPLATE_LIST_TEST_CASE("PSWAP test", "[GateSet]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+
+    for (size_t i = 0; i < n; i++) {
+        Qs[i] = sim->AllocateQubit();
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
+    sim->NamedOperation("PSWAP", {M_PI_2}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(state[0].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.5).epsilon(1e-5));
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state[2].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(-0.5).epsilon(1e-5));
+    CHECK(state.at(3) == std::complex<double>{0, 0});
+}
+*/
+
 TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
