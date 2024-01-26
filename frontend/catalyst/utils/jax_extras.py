@@ -114,6 +114,7 @@ from jaxlib.xla_extension import PyTreeRegistry
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
+# pylint: disable=too-many-lines
 
 __all__ = (
     "ClosedJaxpr",
