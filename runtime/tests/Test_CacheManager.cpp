@@ -167,31 +167,31 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and
     CHECK(obs_keys[2] == pz);
 }
 
-TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
+TEST_CASE("Test __catalyst__qis__ circuit with observables", "[CacheManager]")
 {
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
+        QUBIT *target = __catalyst__rt__qubit_allocate();              // id = 0
+        QirArray *ctrls_arr = __catalyst__rt__qubit_allocate_array(1); // id = 1
 
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target, false);
+        __catalyst__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
+        __catalyst__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
+        __catalyst__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls, false);
+        __catalyst__qis__CRX(0.4, target, *ctrls, false);
 
         size_t buffer_len = 4;
         CplxT_double *buffer = new CplxT_double[buffer_len];
         MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
-        __quantum__qis__State(&result, 0);
+        __catalyst__qis__State(&result, 0);
         CplxT_double *state = result.data_allocated;
 
         CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
@@ -204,47 +204,47 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
         // qml.expval(qml.PauliZ(wires=1))
         QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-        auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
+        auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-        CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+        CHECK(__catalyst__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-        __quantum__rt__qubit_release(target);
-        __quantum__rt__qubit_release_array(ctrls_arr);
+        __catalyst__rt__qubit_release(target);
+        __catalyst__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
-        __quantum__rt__device_release();
+        __catalyst__rt__device_release();
     }
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 }
 
-TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
+TEST_CASE("Test __catalyst__qis__ circuit with observables using deactiveCacheManager",
           "[CacheManager]")
 {
 
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-        __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                                   (int8_t *)rtd_kwargs.c_str());
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
+        QUBIT *target = __catalyst__rt__qubit_allocate();              // id = 0
+        QirArray *ctrls_arr = __catalyst__rt__qubit_allocate_array(1); // id = 1
 
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target, false);
+        __catalyst__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
+        __catalyst__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
+        __catalyst__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls, false);
+        __catalyst__qis__CRX(0.4, target, *ctrls, false);
 
         size_t buffer_len = 4;
         CplxT_double *buffer = new CplxT_double[buffer_len];
         MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
-        __quantum__qis__State(&result, 0);
+        __catalyst__qis__State(&result, 0);
         CplxT_double *state = result.data_allocated;
 
         CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
@@ -257,16 +257,16 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
         // qml.expval(qml.PauliZ(wires=1))
         QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-        auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
+        auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-        CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+        CHECK(__catalyst__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __catalyst__rt__toggle_recorder(/* activate_cm */ false);
 
-        __quantum__rt__qubit_release(target);
-        __quantum__rt__qubit_release_array(ctrls_arr);
+        __catalyst__rt__qubit_release(target);
+        __catalyst__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
-        __quantum__rt__device_release();
+        __catalyst__rt__device_release();
     }
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 }
