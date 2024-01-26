@@ -374,25 +374,52 @@ def test_qctrl_wires_nested(backend):
     assert circuit(0.1, 0, 1, 2, 3) == qml.wires.Wires([2, 0, 3, 1])
 
 
-# # `ctrl.wires` in control-flow branches is not supported!
-# def test_qctrl_wires_controlflow(backend):
-#     """Test the wires property of QCtrl with control flow branches"""
-#     @qml.qjit
-#     @qml.qnode(qml.device(backend, wires=3))
-#     def circuit(theta, w1, w2, cw):
-#         def _func():
-#             qml.RX(theta, wires=[w1])
-#             s = 0
-#             @for_loop(0, w2, 1)
-#             def _for_loop(i, s):
-#                 qml.RY(theta, wires=i)
-#                 return s + 1
-#             s = _for_loop(s)
-#             qml.RZ(s * theta, wires=w1)
-#         qctrl = C_ctrl(_func, control=[cw], control_values=[True])()
-#         return qctrl.wires
-#     # It returns `[2, 0, -1]`
-#     assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
+def test_qctrl_work_wires(backend):
+    """Test the wires property of QCtrl with work-wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=5))
+    def circuit(theta):
+        def _func1():
+            qml.RX(theta, wires=[0])
+
+            def _func2():
+                qml.RY(theta, wires=[0])
+
+            C_ctrl(_func2, control=[3], work_wires=[4])()
+
+            qml.RZ(theta, wires=[0])
+
+        qctrl = C_ctrl(_func1, control=[1], work_wires=[2])()
+        return qctrl.wires
+
+    assert circuit(0.1) == qml.wires.Wires([1, 0, 3, 4, 2])
+
+
+@pytest.mark.xfail(reason="ctrl.wires fails in control-flow branches is not supported")
+def test_qctrl_wires_controlflow(backend):
+    """Test the wires property of QCtrl with control flow branches"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(theta, w1, w2, cw):
+        def _func():
+            qml.RX(theta, wires=[w1])
+            s = 0
+
+            @for_loop(0, w2, 1)
+            def _for_loop(i, s):
+                qml.RY(theta, wires=i)
+                return s + 1
+
+            s = _for_loop(s)
+            qml.RZ(s * theta, wires=w1)
+
+        qctrl = C_ctrl(_func, control=[cw], control_values=[True])()
+        return qctrl.wires
+
+    # It returns `[2, 0, -1]`
+    assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
 
 
 if __name__ == "__main__":

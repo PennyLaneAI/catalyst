@@ -507,43 +507,54 @@ def test_adjoint_wires_qubitunitary(backend):
     assert circuit() == qml.wires.Wires([0, 1])
 
 
-# # Variable wires is not supported!
-# def test_adjoint_var_wires(backend):
-#     """Test catalyst.adjoint.wires with variable wires."""
-#     device = qml.device(backend, wires=3)
-#     def func(w0, w1, theta):
-#         qml.RX(theta * pnp.pi / 2, wires=w0)
-#         qml.RY(theta / 2, wires=w1)
-#         qml.RZ(theta, wires=2)
-#     @qml.qjit
-#     @qml.qnode(device)
-#     def C_workflow(w0, w1, theta):
-#         qml.PauliX(wires=0)
-#         cadj = C_adjoint(func)(w0, w1, theta)
-#         catalyst.debug.print(cadj.wires)
-#         # <Wires =
-#         #    [Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
-#         #     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
-#         #     2]>
-#         return qml.state()
-#     C_workflow(0, 1, 0.23)
+@pytest.mark.xfail(reason="adjoint.wires is not supported with variable wires")
+def test_adjoint_var_wires(backend):
+    """Test catalyst.adjoint.wires with variable wires."""
+
+    from catalyst import debug
+
+    device = qml.device(backend, wires=3)
+
+    def func(w0, w1, theta):
+        qml.RX(theta * pnp.pi / 2, wires=w0)
+        qml.RY(theta / 2, wires=w1)
+        qml.RZ(theta, wires=2)
+
+    @qml.qjit
+    @qml.qnode(device)
+    def C_workflow(w0, w1, theta):
+        qml.PauliX(wires=0)
+        cadj = C_adjoint(func)(w0, w1, theta)
+        debug.print(cadj.wires)
+        # <Wires =
+        #    [Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
+        #     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
+        #     2]>
+
+        return qml.state()
+
+    C_workflow(0, 1, 0.23)
 
 
-# # `adjoint.wires` in control-flow branches is not supported!
-# def test_adjoint_wires_controlflow(backend):
-#     """Test the wires property of Adjoint  in a conditional branch"""
-#     @qml.qjit
-#     @qml.qnode(qml.device(backend, wires=3))
-#     def circuit():
-#         def func(pred, theta):
-#             @cond(pred)
-#             def cond_fn():
-#                 qml.RX(theta, wires=0)
-#             cond_fn()
-#         qadj = C_adjoint(func)(True, 3.14)
-#         return qadj.wires
-#     # It returns `-1` instead of `0`
-#     assert circuit() == qml.wires.Wires([0])
+@pytest.mark.xfail(reason="adjoint.wires is not supported with control-flow branches")
+def test_adjoint_wires_controlflow(backend):
+    """Test the wires property of Adjoint  in a conditional branch"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit():
+        def func(pred, theta):
+            @cond(pred)
+            def cond_fn():
+                qml.RX(theta, wires=0)
+
+            cond_fn()
+
+        qadj = C_adjoint(func)(True, 3.14)
+        return qadj.wires
+
+    # It returns `-1` instead of `0`
+    assert circuit() == qml.wires.Wires([0])
 
 
 if __name__ == "__main__":

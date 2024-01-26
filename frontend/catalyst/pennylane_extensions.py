@@ -1250,12 +1250,13 @@ class QCtrl(HybridOp):
     @property
     def wires(self):
         """The list of all control-wires, work-wires, and active-wires."""
-
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
+
         total_wires = sum(
             (op.wires for op in self.regions[0].quantum_tape.operations),
-            self._control_wires + self._work_wires,
+            self._control_wires,
         )
+        total_wires += self._work_wires
         return total_wires
 
     @property
