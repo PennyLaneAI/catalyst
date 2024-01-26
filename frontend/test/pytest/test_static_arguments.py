@@ -15,42 +15,21 @@
 """Test features related to static arguments."""
 
 from dataclasses import dataclass
+
 import pytest
 
 from catalyst import qjit
+from catalyst.utils.exceptions import CompileError
+
 
 class TestStaticArguments:
     """Test QJIT with static arguments."""
 
-    def test_zero_static_argument(self):
+    @pytest.mark.parametrize("argnums", [(()), (None)])
+    def test_zero_static_argument(self, argnums):
         """Test QJIT with zero static argument."""
 
-        @qjit
-        def f0(
-            x: int,
-        ):
-            return x
-
-        @qjit(static_argnums=())
-        def f1(
-            x: int,
-        ):
-            return x
-
-        @qjit(static_argnums=None)
-        def f2(
-            x: int,
-        ):
-            return x
-
-        assert f0(1) == 1
-        assert f1(2) == 2
-        assert f2(3) == 3
-
-    def test_out_of_bounds_static_argument(self):
-        """Test QJIT with invalid static argument index."""
-
-        @qjit(static_argnums=100)
+        @qjit(static_argnums=argnums)
         def f(
             x: int,
         ):
@@ -58,12 +37,25 @@ class TestStaticArguments:
 
         assert f(1) == 1
 
+    @pytest.mark.parametrize("argnums", [(-1), (100)])
+    def test_out_of_bounds_static_argument(self, argnums):
+        """Test QJIT with invalid static argument index."""
+
+        with pytest.raises(CompileError):
+
+            @qjit(static_argnums=argnums)
+            def f(
+                x: int,
+            ):
+                return x
+
     def test_one_static_argument(self):
         """Test QJIT with one static argument."""
 
         @dataclass
         class MyClass:
             """Test class"""
+
             val: int
 
             def __hash__(self):
@@ -90,17 +82,14 @@ class TestStaticArguments:
         @dataclass
         class MyClass:
             """Test class"""
+
             val: int
 
             def __hash__(self):
                 return hash(str(self))
 
         @qjit(static_argnums=(2, 0))
-        def f(
-            x: MyClass,
-            y: int,
-            z: MyClass
-        ):
+        def f(x: MyClass, y: int, z: MyClass):
             return x.val + y + z.val
 
         assert f(MyClass(5), 1, MyClass(5)) == 11
@@ -116,6 +105,7 @@ class TestStaticArguments:
         @dataclass
         class MyClass:
             """Test class"""
+
             val0: int
             val1: int
 

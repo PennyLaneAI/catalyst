@@ -49,6 +49,7 @@ from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
@@ -458,8 +459,9 @@ class CompiledFunction:
 
         if self.compile_options.abstracted_axes is not None:
             abstracted_axes = self.compile_options.abstracted_axes
-            dynamic_args = get_implicit_and_explicit_flat_args(abstracted_axes,\
-                *dynamic_args, **kwargs)
+            dynamic_args = get_implicit_and_explicit_flat_args(
+                abstracted_axes, *dynamic_args, **kwargs
+            )
 
         abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args)
 
@@ -508,12 +510,6 @@ class QJIT:
         self.preferred_workspace_dir = None
         self.stored_compiled_functions = {}
 
-        # Make the format of static_argnums easier to handle.
-        if self.compile_options.static_argnums is None:
-            self.compile_options.static_argnums = ()
-        elif isinstance(self.compile_options.static_argnums, int):
-            self.compile_options.static_argnums = (self.compile_options.static_argnums, )
-
         functools.update_wrapper(self, fn)
 
         if compile_options.autograph:
@@ -542,12 +538,17 @@ class QJIT:
             return
 
         parameter_types = get_type_annotations(self.user_function)
-        if parameter_types is not None:
+
+        for argnum in self.compile_options.static_argnums:
+            if argnum < 0 or argnum >= len(parameter_types):
+                msg = f"argnum {argnum} is beyond the valid range of [0, {len(parameter_types)})."
+                raise CompileError(msg)
+
+        if parameter_types is not None and not self.compile_options.static_argnums:
             self.user_typed = True
-            if not self.compile_options.static_argnums:
-                self.mlir_module = self.get_mlir(*parameter_types)
-                if self.compile_options.target == "binary":
-                    self.compiled_function = self.compile()
+            self.mlir_module = self.get_mlir(*parameter_types)
+            if self.compile_options.target == "binary":
+                self.compiled_function = self.compile()
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -603,8 +604,9 @@ class QJIT:
                 for i, idx in enumerate(dynamic_indices):
                     sig[idx] = self.c_sig[i]
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, _, self.out_tree = \
-                trace_to_mlir(func, static_argnums, abstracted_axes, *sig)
+            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(
+                func, static_argnums, abstracted_axes, *sig
+            )
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
@@ -698,8 +700,7 @@ class QJIT:
                 # Combine dynamic_args (in args) and r_sig (and keep the original order).
                 if static_argnums:
                     sig = list(args)
-                    dynamic_indices = [idx for idx in range(len(args))\
-                        if idx not in static_argnums]
+                    dynamic_indices = [idx for idx in range(len(args)) if idx not in static_argnums]
                     for i, idx in enumerate(dynamic_indices):
                         sig[idx] = r_sig[i]
                 self.mlir_module = self.get_mlir(*sig)
@@ -729,16 +730,17 @@ class QJIT:
         if self.compile_options.static_argnums:
             # Build hash for multiple static arguments.
             static_argnums = self.compile_options.static_argnums
-            static_args_hash = tuple(hash(args[idx]) for idx in range(len(args))\
-                if idx in static_argnums)
+            static_args_hash = tuple(
+                hash(args[idx]) for idx in range(len(args)) if idx in static_argnums
+            )
 
-            self.compiled_function =\
-                self.stored_compiled_functions.get(static_args_hash, None)
+            self.compiled_function = self.stored_compiled_functions.get(static_args_hash, None)
 
             if not self.compiled_function:
                 # Create new space to avoid using previous compiled functions.
-                self.workspace = WorkspaceManager.get_or_create_workspace(self.function_name,\
-                    self.preferred_workspace_dir)
+                self.workspace = WorkspaceManager.get_or_create_workspace(
+                    self.function_name, self.preferred_workspace_dir
+                )
 
         if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
@@ -927,7 +929,7 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the 
+        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
             positions of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
@@ -1151,8 +1153,14 @@ def qjit(
         reused for subsequent function calls.
     """
 
-    axes = abstracted_axes
+    # Make the format of static_argnums easier to handle.
     argnums = static_argnums
+    if argnums is None:
+        argnums = ()
+    elif isinstance(argnums, int):
+        argnums = (argnums,)
+
+    axes = abstracted_axes
     if fn is not None:
         return QJIT(
             fn,
