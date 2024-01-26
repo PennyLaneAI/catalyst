@@ -478,7 +478,8 @@ TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
     CHECK(state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
-// TODO: Uncomment these tests after `PSWAP` and `ISWAP` are natively supported by Lightning simulators.  
+// TODO: Uncomment these tests after `PSWAP` and `ISWAP` are natively supported by Lightning
+// simulators.
 /*
 TEMPLATE_LIST_TEST_CASE("ISWAP test", "[GateSet]", SimTypes)
 {

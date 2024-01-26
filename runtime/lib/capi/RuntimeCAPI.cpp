@@ -584,14 +584,14 @@ void __catalyst__qis__MultiRZ(double theta, bool adjoint, int64_t numQubits, ...
                                                              /* inverse = */ adjoint);
 }
 
-void __quantum__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, bool adjoint)
+void __catalyst__qis__ISWAP(QUBIT *wire0, QUBIT *wire1, bool adjoint)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "ISWAP", {}, {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1)},
         adjoint);
 }
 
-void __quantum__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, bool adjoint)
+void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, bool adjoint)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "PSWAP", {phi},
