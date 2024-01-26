@@ -266,8 +266,8 @@ def extract_backend_info(device):
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["backend"] = (
-            device._device._delegate.DEVICE_ID
-        )  # pylint: disable=protected-access
+            device._device._delegate.DEVICE_ID  # pylint: disable=protected-access
+        )
     elif dname == "braket.aws.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
         device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
