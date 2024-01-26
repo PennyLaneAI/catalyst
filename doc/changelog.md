@@ -48,6 +48,7 @@
   implemented in Catalyst's runtime:
   * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
   * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
+  
   and the following functions were removed since the frontend does not generate them
   * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
