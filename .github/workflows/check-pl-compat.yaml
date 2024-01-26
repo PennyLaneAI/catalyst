@@ -45,7 +45,7 @@ jobs:
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
-    - uses: actions/cache@v3
+      uses: actions/cache@v3
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
