@@ -1206,6 +1206,8 @@ class Adjoint(HybridOp):
 
     @property
     def wires(self):
+        """The list of all static wires."""
+
         assert len(self.regions) == 1, "Adjoint is expected to have one region"
         total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
         return total_wires
@@ -1247,6 +1249,8 @@ class QCtrl(HybridOp):
 
     @property
     def wires(self):
+        """The list of all control-wires, work-wires, and active-wires."""
+
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
         total_wires = sum(
             (op.wires for op in self.regions[0].quantum_tape.operations),

@@ -13,6 +13,9 @@
 * Remove `qextract_p` and `qinst_p` from forced-order primitives.
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
 
+* Add the `wires` property to `catalyst.adjoint` and `catalyst.ctrl`.
+  [(#480)](https://github.com/PennyLaneAI/catalyst/pull/480)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
