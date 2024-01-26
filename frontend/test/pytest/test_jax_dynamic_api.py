@@ -379,7 +379,7 @@ def test_qjit_forloop_shared_dimensions():
         input_b = jnp.ones([sz + 2], dtype=float)
 
         @for_loop(0, 10, 1, experimental_preserve_dimensions=True)
-        def loop(i, _a, _b):
+        def loop(_i, _a, _b):
             return (input_a, input_a)
 
         outputs = loop(input_b, input_b)
