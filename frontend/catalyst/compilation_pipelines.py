@@ -530,8 +530,7 @@ class QJIT:
             name = self.__name__
         self.function_name = name
 
-        if not self.compile_options.static_argnums:
-            self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
+        self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
 
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
@@ -579,6 +578,39 @@ class QJIT:
         """
         return self._llvmir
 
+    def get_static_args_hash(self, *args):
+        """Get hash values of all static arguments.
+
+        Args:
+            args: arguments to the compiled function.
+        Returns:
+            a tuple of hash values of all static arguments.
+        """
+        static_argnums = self.compile_options.static_argnums
+        static_args_hash = tuple(
+            hash(args[idx]) for idx in range(len(args)) if idx in static_argnums
+        )
+        return static_args_hash
+
+    def merge_sig_into_args(self, args_list, *sig):
+        """Merge runtime signature back to argument list.
+
+        Args:
+            args: arguments to the compiled function.
+            *sig: runtime signature.
+        Returns:
+            a list of dynamic arguments.
+        """
+        static_argnums = self.compile_options.static_argnums
+        # Combine dynamic_args (in args) and sig (and keep the original order).
+        new_sig = sig
+        if static_argnums:
+            new_sig = args_list
+            dynamic_indices = [idx for idx in range(len(args_list)) if idx not in static_argnums]
+            for i, idx in enumerate(dynamic_indices):
+                new_sig[idx] = sig[i]
+        return new_sig
+
     def get_mlir(self, *args):
         """Trace :func:`~.user_function`
 
@@ -596,13 +628,7 @@ class QJIT:
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
-            sig = self.c_sig
-            # Combine dynamic_args (in args) and self.c_sig (and keep the original order).
-            if static_argnums:
-                sig = list(args)
-                dynamic_indices = [idx for idx in range(len(args)) if idx not in static_argnums]
-                for i, idx in enumerate(dynamic_indices):
-                    sig[idx] = self.c_sig[i]
+            sig = self.merge_sig_into_args(list(args), *self.c_sig)
             abstracted_axes = self.compile_options.abstracted_axes
             mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(
                 func, static_argnums, abstracted_axes, *sig
@@ -681,7 +707,14 @@ class QJIT:
         dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
         r_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
 
-        has_been_compiled = self.compiled_function is not None
+        if static_argnums:
+            static_args_hash = self.get_static_args_hash(*args)
+            prev_function = self.stored_compiled_functions.get(static_args_hash, None)
+            function = prev_function if prev_function else function
+            has_been_compiled = prev_function is not None
+        else:
+            has_been_compiled = self.compiled_function is not None
+
         next_action = TypeCompatibility.UNKNOWN
         if not has_been_compiled:
             next_action = TypeCompatibility.NEEDS_COMPILATION
@@ -696,13 +729,7 @@ class QJIT:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             if not self.compiling_from_textual_ir:
-                sig = r_sig
-                # Combine dynamic_args (in args) and r_sig (and keep the original order).
-                if static_argnums:
-                    sig = list(args)
-                    dynamic_indices = [idx for idx in range(len(args)) if idx not in static_argnums]
-                    for i, idx in enumerate(dynamic_indices):
-                        sig[idx] = r_sig[i]
+                sig = self.merge_sig_into_args(list(args), *r_sig)
                 self.mlir_module = self.get_mlir(*sig)
             function = self.compile()
         else:
@@ -726,33 +753,32 @@ class QJIT:
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
-        static_args_hash = tuple()
-        if self.compile_options.static_argnums:
-            # Build hash for multiple static arguments.
-            static_argnums = self.compile_options.static_argnums
-            static_args_hash = tuple(
-                hash(args[idx]) for idx in range(len(args)) if idx in static_argnums
-            )
-
-            self.compiled_function = self.stored_compiled_functions.get(static_args_hash, None)
-
-            if not self.compiled_function:
-                # Create new space to avoid using previous compiled functions.
-                self.workspace = WorkspaceManager.get_or_create_workspace(
-                    self.function_name, self.preferred_workspace_dir
-                )
+        static_argnums = self.compile_options.static_argnums
 
         if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
 
+        # Prevent self.compiled_function from being closed if any static argument exists.
+        if static_argnums:
+            self.compiled_function = None
+
         function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
             self.compiled_function, *args
         )
-        recompilation_needed = function != self.compiled_function
 
-        # Check if a new function is created.
-        if self.compile_options.static_argnums and recompilation_needed:
+        recompilation_needed = (
+            function != self.compiled_function
+        ) and function not in self.stored_compiled_functions.values()
+
+        # Check if a function is created and add newly created ones into the hash table.
+        if static_argnums and recompilation_needed:
+            static_args_hash = self.get_static_args_hash(*args)
             self.stored_compiled_functions[static_args_hash] = function
+            # Create new space for the next function to avoid using the spaces from
+            # the previously compiled ones.
+            self.workspace = WorkspaceManager.get_or_create_workspace(
+                self.function_name, self.preferred_workspace_dir
+            )
 
         self.compiled_function = function
 
