@@ -36,7 +36,7 @@ namespace Catalyst::Runtime {
 /**
  * A (RAII) class for `pybind11::initialize_interpreter` and `pybind11::finalize_interpreter`.
  *
- * @note This is not copyable or movable and used in C++ tests and the HostExecutionContext manager
+ * @note This is not copyable or movable and used in C++ tests and the ExecutionContext manager
  * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
  * tests which also enables the runtime to reuse the same interpreter in the scope of the global
  * quantum device unique pointer.
@@ -174,13 +174,12 @@ class SharedLibraryManager final {
 
 /**
  * This indicates the various stages a device can be in:
- * - `Active`   : The device is added to the device pool and the `HostExecutionContext` device
- * pointer
+ * - `Active`   : The device is added to the device pool and the `ExecutionContext` device pointer
  *                (`RTD_PTR`) points to this device instance. The CAPI routines have only access to
  *                one single active device per thread via `RTD_PTR`.
  * - `Inactive`  : The device is deactivated meaning `RTD_PTR` does not point to this device.
- *                 The device is not removed from the pool, allowing the `HostExecutionContext`
- * manager to reuse this device in a multi-qnode workflow when another device with identical
+ *                 The device is not removed from the pool, allowing the `ExecutionContext` manager
+ *                 to reuse this device in a multi-qnode workflow when another device with identical
  *                 specifications is requested.
  */
 enum class RTDeviceStatus : uint8_t {
@@ -193,7 +192,7 @@ extern "C" Catalyst::Runtime::QuantumDevice *GenericDeviceFactory(const char *kw
 /**
  * Runtime Device data-class.
  *
- * This class introduces an interface for constructed devices by the `HostExecutionContext`
+ * This class introduces an interface for constructed devices by the `ExecutionContext`
  * manager. This includes the device name, library, kwargs, and a shared pointer to the
  * `QuantumDevice` entry point.
  */
@@ -294,7 +293,7 @@ class RTDevice {
     }
 };
 
-class HostExecutionContext final {
+class ExecutionContext final {
   private:
     // Device pool
     std::vector<std::shared_ptr<RTDevice>> device_pool;
@@ -302,17 +301,17 @@ class HostExecutionContext final {
 
     bool initial_tape_recorder_status;
 
-    // HostExecutionContext pointers
+    // ExecutionContext pointers
     std::unique_ptr<MemoryManager> memory_man_ptr{nullptr};
     std::unique_ptr<PythonInterpreterGuard> py_guard{nullptr};
 
   public:
-    explicit HostExecutionContext() : initial_tape_recorder_status(false)
+    explicit ExecutionContext() : initial_tape_recorder_status(false)
     {
         memory_man_ptr = std::make_unique<MemoryManager>();
     }
 
-    ~HostExecutionContext() = default;
+    ~ExecutionContext() = default;
 
     void setDeviceRecorderStatus(bool status) noexcept { initial_tape_recorder_status = status; }
 
