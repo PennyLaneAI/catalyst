@@ -18,8 +18,10 @@ while using :func:`~.qjit`.
 
 # pylint: disable=too-many-lines
 
+import copy
 import numbers
 import pathlib
+from collections.abc import Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -55,6 +57,7 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     vjp_p,
     while_p,
+    zne_p,
 )
 from catalyst.jax_tracer import (
     Function,
@@ -327,7 +330,13 @@ class QJITDevice(qml.QubitDevice):
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+            try:
+                mat = self.matrix()
+            except Exception as e:
+                raise CompileError(
+                    f"Operation {self} could not be decomposed, it might be unsupported."
+                ) from e
+            return [qml.QubitUnitary(mat, wires=self.wires)]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
@@ -926,6 +935,103 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return results
 
 
+class ZNE:
+    """An object that specifies how a circuit is mitigated with ZNE.
+
+    Args:
+        fn (Callable): the circuit to be mitigated with ZNE.
+        scale_factors (array[int]): the range of noise scale factors used.
+        deg (int): the degree of the polymonial used for fitting.
+
+    Raises:
+        TypeError: Non-QNode object was passed as `fn`.
+    """
+
+    def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
+        if not isinstance(fn, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        self.fn = fn
+        self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
+        self.scale_factors = scale_factors
+        self.deg = deg
+
+    def __call__(self, *args, **kwargs):
+        """Specifies the an actual call to the folded circuit."""
+        jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
+        shapes = [out_val.shape for out_val in jaxpr.out_avals]
+        dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
+        set_dtypes = set(dtypes)
+        if any(shapes):
+            raise TypeError("Only expectations values and classical scalar values can be returned.")
+        if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
+            raise TypeError("All expectation and classical values dtypes must match and be float.")
+        args_data, _ = tree_flatten(args)
+        results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
+        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
+        results = jax.numpy.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        # Single measurement
+        if results.shape == ():
+            return results
+        # Multiple measurements
+        return tuple(res for res in results)
+
+
+def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
+    """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
+    extrapolation.
+
+    Error mitigation is a precursor to error correction and is compatible with near-term quantum
+    devices. It aims to lower the impact of noise when evaluating a circuit on a quantum device by
+    evaluating multiple variations of the circuit and post-processing the results into a
+    noise-reduced estimate. This transform implements the zero-noise extrapolation (ZNE) method
+    originally introduced by
+    `Temme et al. <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.119.180509>`__ and
+    `Li et al. <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.7.021050>`__.
+
+    Args:
+        f (qml.QNode): the circuit to be mitigated.
+        scale_factors (array[int]): the range of noise scale factors used.
+        deg (int): the degree of the polymonial used for fitting.
+
+    Returns:
+        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
+        for the given arguments.
+
+    **Example:**
+
+    For example, given a noisy device (such as noisy hardware available through Amazon Braket):
+
+    .. code-block:: python
+
+        # replace "noisy.device" with your noisy device
+        dev = qml.device("noisy.device", wires=2)
+
+        @qml.qnode(device=dev)
+        def circuit(x, n):
+            @for_loop(0, n, 1)
+            def loop_rx(i):
+                qml.RX(x, wires=0)
+
+            loop_rx()
+
+            qml.Hadamard(wires=0)
+            qml.RZ(x, wires=0)
+            loop_rx()
+            qml.RZ(x, wires=0)
+            qml.CNOT(wires=[1, 0])
+            qml.Hadamard(wires=1)
+            return qml.expval(qml.PauliY(wires=0))
+
+        @qjit
+        def mitigated_circuit(args, n):
+            s = jax.numpy.array([1, 2, 3])
+            return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+    """
+    if deg is None:
+        deg = len(scale_factors) - 1
+    return ZNE(f, scale_factors, deg)
+
+
 def _aval_to_primitive_type(aval):
     if isinstance(aval, DynamicJaxprTracer):
         aval = aval.strip_weak_type()
@@ -1200,15 +1306,21 @@ class Adjoint(HybridOp):
         return qrp2
 
 
+# TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
+#       to this class whenever a qjit context is active.
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def __init__(
-        self, *args, control_wire_tracers, control_value_tracers, work_wire_tracers, **kwargs
-    ):
-        self.control_wire_tracers: List[Any] = control_wire_tracers
-        self.control_value_tracers: List[Any] = control_value_tracers
-        self.work_wire_tracers: Optional[List[Any]] = work_wire_tracers
+    def __init__(self, *args, control_wires, control_values=None, work_wires=None, **kwargs):
+        self._control_wires = qml.wires.Wires(control_wires)
+        self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
+        if control_values is None:
+            self._control_values = [True] * len(self._control_wires)
+        elif isinstance(control_values, (int, bool)):
+            self._control_values = [control_values]
+        else:
+            self._control_values = control_values
+
         super().__init__(*args, **kwargs)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
@@ -1222,11 +1334,26 @@ class QCtrl(HybridOp):
         _check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
             self.regions[0].quantum_tape,
-            self.control_wire_tracers,
-            self.control_value_tracers,
-            self.work_wire_tracers,
+            self._control_wires,
+            self._control_values,
+            self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def control_wires(self):
+        """Wires used in quantum conditioning."""
+        return self._control_wires
+
+    @property
+    def control_values(self):
+        """(Boolean) Values upon which to condition on."""
+        return self._control_values
+
+    @property
+    def work_wires(self):
+        """Optional wires that can be used in the expansion of this op."""
+        return self._work_wires
 
 
 def qctrl_distribute(
@@ -1253,11 +1380,9 @@ def qctrl_distribute(
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     tape2 = qctrl_distribute(
                         region.quantum_tape,
-                        control_wires + op.control_wire_tracers,
-                        control_values + op.control_value_tracers,
-                        ((work_wires or []) + (op.work_wire_tracers or []))
-                        if (work_wires is not None or op.work_wire_tracers is not None)
-                        else None,
+                        control_wires + op.control_wires,
+                        control_values + op.control_values,
+                        work_wires + op.work_wires,
                     )
                     ops2.extend(tape2.operations)
             else:
@@ -1270,8 +1395,8 @@ def qctrl_distribute(
         else:
             ops2.append(
                 Controlled(
-                    type(op)(*op.parameters, wires=op.wires),
-                    control_wires=qml.wires.Wires(control_wires),
+                    copy.copy(op),
+                    control_wires=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
                 )
@@ -2116,6 +2241,9 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
+    if not EvaluationContext.is_tracing():
+        return qml.adjoint(f)
+
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."
@@ -2140,7 +2268,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
 
-        Adjoint(
+        return Adjoint(
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=[],
             regions=[adjoint_region],
@@ -2216,17 +2344,17 @@ def ctrl(
     array([0.25, 0.25, 0.03661165, 0.46338835])
     """
 
-    def _tolist(x):
-        return [x] if not isinstance(x, list) else x
+    if not EvaluationContext.is_tracing():
+        return qml.ctrl(f, control, control_values, work_wires)
 
-    control = _tolist(control)
-    control_values = _tolist(control_values) if control_values is not None else [1] * len(control)
-    if len(control) != len(control_values):
+    if control_values is not None and (
+        (len(control) if isinstance(control, Sized) else 1)
+        != (len(control_values) if isinstance(control_values, Sized) else 1)
+    ):
         raise ValueError(
             f"Length of the control_values ({len(control_values)}) must be None or equal "
             f"to the lenght of control ({len(control)})"
         )
-    work_wires = _tolist(work_wires) if work_wires is not None else None
 
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
@@ -2242,10 +2370,11 @@ def ctrl(
 
         region = HybridOpRegion(None, quantum_tape, [], [])
 
-        QCtrl(
-            control_wire_tracers=control,
-            control_value_tracers=control_values,
-            work_wire_tracers=work_wires,
+        # Return the operation instance since PL expects this for qml.ctrl(op).
+        return QCtrl(
+            control_wires=control,
+            control_values=control_values,
+            work_wires=work_wires,
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=out_classical_tracers,
             regions=[region],
@@ -2257,6 +2386,7 @@ def ctrl(
             return _call_handler(*args, _callee=f, **kwargs)
 
         return _callable
+
     elif isinstance(f, Operator):
         QueuingManager.remove(f)
 
@@ -2264,5 +2394,6 @@ def ctrl(
             QueuingManager.append(f)
 
         return _call_handler(_callee=_callee)
+
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover

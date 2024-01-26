@@ -38,7 +38,7 @@ jobs:
 
     - name: Install deps
       run: |
-        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6
+        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         pip install amazon-braket-pennylane-plugin
@@ -97,16 +97,16 @@ jobs:
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
-        ENABLE_LLD=OFF \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        ENABLE_LLD=ON \
         make dialects
         pip install --upgrade .
 
 
-    - name: Build Lightning Runtime (latest)
+    - name: Build Catalyst Runtime (latest)
       if: ${{ inputs.lightning == 'latest' }}
       run: |
         COMPILER_LAUNCHER="" \
@@ -121,7 +121,7 @@ jobs:
         ENABLE_OPENQASM=ON \
         make runtime
 
-    - name: Build Lightning Runtime (stable)
+    - name: Build Catalyst Runtime (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
         COMPILER_LAUNCHER="" \
@@ -130,7 +130,6 @@ jobs:
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
         QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-        LIGHTNING_GIT_TAG_VALUE=latest_release \
         ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
@@ -156,11 +155,11 @@ jobs:
       if: ${{ inputs.pennylane == 'stable' }}
       run: |
         pip install --upgrade pennylane
-        
+
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.33.0-rc0
+        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.34.0-rc0
 
 
     - name: Add Frontend Dependencies to PATH

@@ -366,7 +366,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     auto indexScatter =
                         builder.create<tensor::ExtractOp>(loc, scatterIndices, index);
                     auto indexUpdateCasted =
-                        builder.create<index::CastSOp>(loc, builder.getI32Type(), indexUpdate);
+                        builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                     Value addValue =
                         builder.create<arith::AddIOp>(loc, indexScatter, indexUpdateCasted);
                     Value addValueCasted =
@@ -409,7 +409,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 Value indexScatter = fullStartIndex[i];
                 auto indexUpdate = updateWindowsIndices[i];
                 auto indexUpdateCasted =
-                    builder.create<index::CastSOp>(loc, builder.getI32Type(), indexUpdate);
+                    builder.create<index::CastSOp>(loc, indexScatter.getType(), indexUpdate);
                 Value addValue =
                     builder.create<arith::AddIOp>(loc, indexScatter, indexUpdateCasted);
                 Value addValueCasted =

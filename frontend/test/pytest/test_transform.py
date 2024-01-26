@@ -397,8 +397,11 @@ class TestQFuncTransforms:
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
 
+    @pytest.mark.xfail(reason="qml.ctrl to QCtrl dispatch breaks the method of this transform")
     def test_unroll_ccrz(self, backend):
         """Test unroll_ccrz transform."""
+        # TODO: Test by inspecting the circuit actually produced, testing the
+        #       results does not verify the transform was applied correctly.
 
         @qml.qfunc_transform
         def unroll_ccrz(tape):

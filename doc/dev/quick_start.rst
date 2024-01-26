@@ -666,10 +666,12 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
     import jaxopt
     from jax.lax import fori_loop
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qml.qnode(dev)
     def circuit(param):
         qml.Hadamard(0)
-        qml.CRX(param, wires=[0, 1])
+        qml.RY(param, wires=0)
         return qml.expval(qml.PauliZ(0))
 
     @qjit
@@ -684,13 +686,13 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
             (param, state) = opt.update(*args)
             return (param, state)
 
-        param = 0.0
+        param = 0.1
         state = opt.init_state(param)
-        (param, _) = fori_loop(0, 10, gd_update, (param, state))
+        (param, _) = jax.lax.fori_loop(0, 100, gd_update, (param, state))
         return param
 
 >>> workflow()
-array(4.94807684e-09)
+array(1.57079633)
 
 JAX Integration
 ===============

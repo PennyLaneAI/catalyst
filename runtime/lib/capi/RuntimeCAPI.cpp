@@ -64,7 +64,10 @@ thread_local static RTDevice *RTD_PTR = nullptr;
 /**
  * @brief get the active device.
  */
-auto getQuantumDevicePtr() -> QuantumDevice * { return RTD_PTR->getQuantumDevicePtr(); }
+auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> &
+{
+    return RTD_PTR->getQuantumDevicePtr();
+}
 
 /**
  * @brief Inactivate the active device instance.

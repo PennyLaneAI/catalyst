@@ -14,7 +14,8 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
-
+import glob
+import importlib
 import os
 import pathlib
 import platform
@@ -25,6 +26,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
+from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
@@ -32,6 +34,10 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
+
+package_root = os.path.dirname(__file__)
+
+DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -114,12 +120,15 @@ HLO_LOWERING_PASS = (
         "func.func(scalarize)",
         "canonicalize",
         "scatter-lowering",
+        "hlo-custom-call-lowering",
+        "cse",
     ],
 )
 
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
     ],
@@ -138,9 +147,9 @@ BUFFERIZATION_PASS = (
         "empty-tensor-to-alloc-tensor",
         "func.func(bufferization-bufferize)",
         "func.func(tensor-bufferize)",
+        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
         "func.func(linalg-bufferize)",
         "func.func(tensor-bufferize)",
-        "catalyst-bufferize",
         "quantum-bufferize",
         "func-bufferize",
         "func.func(finalizing-bufferize)",
@@ -254,6 +263,37 @@ class LinkerDriver:
         else:
             pass  # pragma: nocover
 
+        # Discover the custom call library provided by the frontend & add it to the rpath and -L.
+        lib_path_flags += [
+            f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+            f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+        ]
+
+        # Discover the LAPACK library provided by scipy & add link against it.
+        # Doing this here ensures we will always have the correct library name.
+
+        if platform.system() == "Linux":
+            file_path_within_package = "../scipy.libs/"
+            file_extension = ".so"
+        elif platform.system() == "Darwin":  # pragma: nocover
+            file_path_within_package = ".dylibs/"
+            file_extension = ".dylib"
+
+        package_name = "scipy"
+        scipy_package = importlib.util.find_spec(package_name)
+        package_directory = path.dirname(scipy_package.origin)
+        scipy_lib_path = path.join(package_directory, file_path_within_package)
+
+        file_prefix = "libopenblas"
+        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
+        openblas_so_file = glob.glob(search_pattern)[0]
+        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
+
+        lib_path_flags += [
+            f"-Wl,-rpath,{scipy_lib_path}",
+            f"-L{scipy_lib_path}",
+        ]
+
         system_flags = []
         if platform.system() == "Linux":
             system_flags += ["-Wl,-no-as-needed"]
@@ -268,9 +308,10 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
+            f"-l{openblas_lib_name}",  # required for custom_calls lib
+            "-lcustom_calls",
             "-lmlir_async_runtime",
         ]
-
         return default_flags
 
     @staticmethod
@@ -321,10 +362,10 @@ class LinkerDriver:
             infile (str): input file name
             outfile (str): output file name
         """
-        path = pathlib.Path(infile)
-        if not path.exists():
+        infile_path = pathlib.Path(infile)
+        if not infile_path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
-        return str(path.with_suffix(".so"))
+        return str(infile_path.with_suffix(".so"))
 
     @staticmethod
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):

@@ -12,19 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef PYTHON_BINDINGS_MITIGATION_OPS
+#define PYTHON_BINDINGS_MITIGATION_OPS
 
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+include "Mitigation/IR/MitigationOps.td"
 
-namespace catalyst {
-
-void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
-
-void populateScatterPatterns(mlir::RewritePatternSet &);
-
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
-
-void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
-
-} // namespace catalyst
+#endif

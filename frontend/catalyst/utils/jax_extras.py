@@ -37,7 +37,7 @@ from jax import ShapeDtypeStruct
 from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
-from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     AbstractedAxesSpec,
     _input_type_to_tracers,
@@ -46,6 +46,17 @@ from jax._src.interpreters.partial_eval import (
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.lax import _abstractify, xla
+from jax._src.lax.slicing import (
+    _argnum_weak_type,
+    _gather_dtype_rule,
+    _gather_lower,
+    _gather_shape_computation,
+    _is_sorted,
+    _no_duplicate_dims,
+    _rank,
+    _sorted_dims_in_range,
+    standard_primitive,
+)
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.sharding_impls import ReplicaAxisContext
@@ -562,10 +573,23 @@ def make_jaxpr2(
         in_type = infer_lambda_input_type(axes_specs, flat_args)
         return in_type, in_tree
 
+    # TODO: See the `_gather_shape_rule_dynamic` comment. Remove once the upstream change is
+    # applied.
+    gather2_p = standard_primitive(
+        _gather_shape_rule_dynamic,
+        _gather_dtype_rule,
+        "gather",
+        weak_type_rule=_argnum_weak_type(0),
+    )
+    register_lowering(gather2_p, _gather_lower)
+
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
         # TODO: re-use `deduce_avals` here.
-        with Patcher((jax._src.interpreters.partial_eval, "get_aval", get_aval2)), ExitStack():
+        with Patcher(
+            (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+            (jax._src.lax.slicing, "gather_p", gather2_p),
+        ), ExitStack():
             f = wrap_init(fun)
             in_type, in_tree = abstractify(args, kwargs)
             f, out_tree_promise = flatten_fun(f, in_tree)
@@ -994,3 +1018,133 @@ class DynshapePrimitive(Primitive):
         eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()
+
+
+def _gather_shape_rule_dynamic(
+    operand,
+    indices,
+    *,
+    dimension_numbers,
+    slice_sizes,
+    unique_indices,
+    indices_are_sorted,
+    mode,
+    fill_value,
+):  # pragma: no cover
+    """Validates the well-formedness of the arguments to Gather. Compared to the original version,
+    this implementation skips static shape checks if variable dimensions are used.
+
+    This function has been modified from its original form in the JAX project at
+    https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/lax/slicing.py#L1438
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2021 The JAX Authors.
+    """
+    # pylint: disable=unused-argument
+    # pylint: disable=too-many-branches
+    # pylint: disable=consider-using-enumerate
+    # pylint: disable=chained-comparison
+    offset_dims = dimension_numbers.offset_dims
+    collapsed_slice_dims = dimension_numbers.collapsed_slice_dims
+    start_index_map = dimension_numbers.start_index_map
+
+    # Note: in JAX, index_vector_dim is always computed as below, cf. the
+    # documentation of the GatherDimensionNumbers class.
+    index_vector_dim = _rank(indices) - 1
+
+    # This case should never happen in JAX, due to the implicit construction of
+    # index_vector_dim, but is included for completeness.
+    if _rank(indices) < index_vector_dim or index_vector_dim < 0:
+        raise TypeError(
+            f"Gather index leaf dimension must be within [0, rank("
+            f"indices) + 1). rank(indices) is {_rank(indices)} and "
+            f"gather index leaf dimension is {index_vector_dim}."
+        )
+
+    # Start ValidateGatherDimensions
+    # In the error messages output by XLA, "offset_dims" is called "Output window
+    # dimensions" in error messages. For consistency's sake, our error messages
+    # stick to "offset_dims".
+    _is_sorted(offset_dims, "gather", "offset_dims")
+    _no_duplicate_dims(offset_dims, "gather", "offset_dims")
+
+    output_offset_dim_count = len(offset_dims)
+    output_shape_rank = len(offset_dims) + _rank(indices) - 1
+
+    for i in range(output_offset_dim_count):
+        offset_dim = offset_dims[i]
+        if offset_dim < 0 or offset_dim >= output_shape_rank:
+            raise TypeError(
+                f"Offset dimension {i} in gather op is out of bounds; "
+                f"got {offset_dim}, but should have been in "
+                f"[0, {output_shape_rank})"
+            )
+
+    if len(start_index_map) != indices.shape[index_vector_dim]:
+        raise TypeError(
+            f"Gather op has {len(start_index_map)} elements in "
+            f"start_index_map and the bound of dimension "
+            f"{index_vector_dim=} of indices is "
+            f"{indices.shape[index_vector_dim]}. These two "
+            f"numbers must be equal."
+        )
+
+    for i in range(len(start_index_map)):
+        operand_dim_for_start_index_i = start_index_map[i]
+        if operand_dim_for_start_index_i < 0 or operand_dim_for_start_index_i >= _rank(operand):
+            raise TypeError(
+                f"Invalid start_index_map; domain is "
+                f"[0, {_rank(operand)}), got: "
+                f"{i}->{operand_dim_for_start_index_i}."
+            )
+
+    _no_duplicate_dims(start_index_map, "gather", "start_index_map")
+
+    # _is_sorted and _sorted_dims_in_range are checked in the opposite order
+    # compared to the XLA implementation. In cases when the input is not sorted
+    # AND there are problematic collapsed_slice_dims, the error message will thus
+    # be different.
+    _is_sorted(collapsed_slice_dims, "gather", "collapsed_slice_dims")
+    _sorted_dims_in_range(collapsed_slice_dims, _rank(operand), "gather", "collapsed_slice_dims")
+    _no_duplicate_dims(collapsed_slice_dims, "gather", "collapsed_slice_dims")
+    # End ValidateGatherDimensions
+
+    if _rank(operand) != len(slice_sizes):
+        raise TypeError(
+            f"Gather op must have one slice size for every input "
+            f"dimension; got: len(slice_sizes)={len(slice_sizes)}, "
+            f"input_shape.rank={_rank(operand)}"
+        )
+
+    if len(slice_sizes) != len(offset_dims) + len(collapsed_slice_dims):
+        raise TypeError(
+            f"All components of the offset index in a gather op must "
+            f"either be a offset dimension or explicitly collapsed; "
+            f"got len(slice_sizes)={len(slice_sizes)}, "
+            f"output_slice_sizes={offset_dims}, collapsed_slice_dims="
+            f"{collapsed_slice_dims}."
+        )
+
+    # This section contains a patch suggested to the upstream.
+    for i in range(len(slice_sizes)):
+        slice_size = slice_sizes[i]
+        corresponding_input_size = operand.shape[i]
+
+        if jax.core.is_constant_dim(corresponding_input_size):
+            if not (slice_size >= 0 and corresponding_input_size >= slice_size):
+                raise TypeError(
+                    f"Slice size at index {i} in gather op is out of range, "
+                    f"must be within [0, {corresponding_input_size} + 1), "
+                    f"got {slice_size}."
+                )
+
+    for i in range(len(collapsed_slice_dims)):
+        bound = slice_sizes[collapsed_slice_dims[i]]
+        if bound != 1:
+            raise TypeError(
+                f"Gather op can only collapse slice dims with bound 1, "
+                f"but bound is {bound} for index "
+                f"{collapsed_slice_dims[i]} at position {i}."
+            )
+
+    return _gather_shape_computation(indices, dimension_numbers, slice_sizes)

@@ -35,4 +35,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createCatalystConversionPass);
     mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createTestPass);
+    mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
 }

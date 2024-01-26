@@ -119,32 +119,48 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build
+        yum update -y && yum install -y cmake ninja-build libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
 
-    - name: Build LLVM / MLIR
+    # Required for MHLO and building MLIR with protected symbols.
+    # (Don't forget to add the build directory to PATH in subsequent steps, so
+    # other tools can find it, in particular collect2 invoked by gcc.)
+    - name: Build LLD
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_TARGETS_TO_BUILD="host" \
+              -DLLVM_ENABLE_PROJECTS="lld"
+
+        cmake --build llvm-build --target lld
+
+    - name: Build LLVM / MLIR
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_BUILD_EXAMPLES=OFF \
               -DLLVM_TARGETS_TO_BUILD="host" \
-              -DLLVM_ENABLE_PROJECTS="lld;mlir" \
+              -DLLVM_ENABLE_PROJECTS="mlir" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DLLVM_ENABLE_LLD=ON
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
         # This tests fails on CI/CD not locally.
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -155,19 +171,23 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DLLVM_ENABLE_LLD=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DLLVM_ENABLE_LLD=ON
 
         cmake --build mhlo-build --target check-mlir-hlo
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
-              -DENZYME_STATIC_LIB=ON
+              -DENZYME_STATIC_LIB=ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=protected \
+              -DLLVM_ENABLE_LLD=ON
 
         cmake --build enzyme-build --target EnzymeStatic-18
 
@@ -193,7 +213,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build openmpi-devel
+        yum update -y && yum install -y cmake ninja-build openmpi-devel libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
@@ -252,25 +272,26 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
-        # TODO: Update LIGHTNING_GIT_TAG to 'latest_version' after v0.34.0
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="23ee599" \
+              -DLIGHTNING_GIT_TAG="v0.34.0" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=ON
+              -DENABLE_OPENMP=OFF \
+              -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -283,7 +304,8 @@ jobs:
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_ENABLE_LLD=ON
 
         cmake --build quantum-build --target check-dialects compiler_driver
 
@@ -297,11 +319,16 @@ jobs:
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
+    - name: Repair wheel using auditwheel
+      run: |
+        # exclude libopenblas as we rely on the openblas/lapack library shipped by scipy
+        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
+
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
         name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: dist/
+        path: wheel/
         retention-days: 14
 
   test-wheels:
