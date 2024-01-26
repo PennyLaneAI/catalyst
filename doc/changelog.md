@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Add support for the BlockEncode operator in Catalyst.
+  [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
+
 * Remove copies of TOML device configuration files for Lightning device in Catalyst.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
 
