@@ -108,11 +108,10 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
     device->AllocateQubits(1);
     CHECK(device->GetNumQubits() == 1);
 
-    auto wires = device->AllocateQubits(n - 1);
-    CHECK(device->GetNumQubits() == n);
-    CHECK(wires.size() == n);
-    CHECK(wires[0] == 1);
-    CHECK(wires[n - 1] == n);
+    REQUIRE_THROWS_WITH(
+        device->AllocateQubits(n - 1),
+        Catch::Contains("[Function:AllocateQubits] Error in Catalyst Runtime: Partial qubits "
+                        "allocation is not supported by OpenQasmDevice"));
 }
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")

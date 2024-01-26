@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import glob
-import importlib.util
 import platform
 import subprocess
 from distutils import sysconfig
@@ -115,25 +114,11 @@ class CustomBuildExtMacos(build_ext):
         )
 
 
-package_name = "scipy"
-
-scipy_package = importlib.util.find_spec(package_name)
-package_directory = path.dirname(scipy_package.origin)
-
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
-    file_path_within_package_linux = "../scipy.libs/"
-    scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
-    file_prefix = "libopenblasp"
-    file_extension = ".so"
-    search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-    openblas_so_file = glob.glob(search_pattern)[0]
-    openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
-        libraries=[openblas_lib_name],
-        library_dirs=[scipy_lib_path],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -141,19 +126,9 @@ elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
     # Here we need to switch the deault to MacOs dynamic lib
     variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
-
-    file_path_within_package_macos = ".dylibs/"
-    scipy_lib_path = path.join(package_directory, file_path_within_package_macos)
-    file_prefix = "libopenblas"
-    file_extension = ".dylib"
-    search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-    openblas_dylib_file = glob.glob(search_pattern)[0]
-    openblas_lib_name = path.basename(openblas_dylib_file)[3 : -len(file_extension)]
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
-        libraries=[openblas_lib_name],
-        library_dirs=[scipy_lib_path],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
