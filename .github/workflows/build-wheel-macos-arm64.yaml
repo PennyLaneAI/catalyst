@@ -267,6 +267,7 @@ jobs:
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
+    # TODO: Update git tag to v0.35.0 after the next lightning release.
     - name: Build Catalyst-Runtime
       run: |
         cmake -S runtime -B runtime-build -G Ninja \

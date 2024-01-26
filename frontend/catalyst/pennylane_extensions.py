@@ -231,7 +231,7 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config):
-        # We currently override and only set MultiControlledX to preserve current behaviour.
+        # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
         # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
