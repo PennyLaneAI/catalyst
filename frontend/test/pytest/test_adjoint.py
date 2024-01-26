@@ -521,9 +521,10 @@ def test_adjoint_wires_qubitunitary(backend):
 #         qml.PauliX(wires=0)
 #         cadj = C_adjoint(func)(w0, w1, theta)
 #         catalyst.debug.print(cadj.wires)
-#         # <Wires = [Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
-#         #           Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
-#         #           2]>
+#         # <Wires =
+#         #    [Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
+#         #     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=3/1)>,
+#         #     2]>
 #         return qml.state()
 #     C_workflow(0, 1, 0.23)
 

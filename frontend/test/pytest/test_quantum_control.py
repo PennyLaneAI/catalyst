@@ -325,7 +325,7 @@ def test_qctrl_wires_arg_fun(backend):
         def func(anc, wires):
             qml.Hadamard(anc)
             h = pnp.array([[1, 1], [1, -1]]) / pnp.sqrt(2)
-            qml.ctrl(qml.BlockEncode, control=(anc))(h, wires=wires)
+            qml.ctrl(qml.BlockEncode, control=anc)(h, wires=wires)
             qml.Hadamard(anc)
 
         qctrl = C_ctrl(func, control=[1])(0, [2, 3])
@@ -343,7 +343,7 @@ def test_qctrl_var_wires(backend):
         def func(anc, wires):
             qml.Hadamard(anc)
             h = pnp.array([[1, 1], [1, -1]]) / pnp.sqrt(2)
-            qml.ctrl(qml.BlockEncode, control=(anc))(h, wires=wires)
+            qml.ctrl(qml.BlockEncode, control=anc)(h, wires=wires)
             qml.Hadamard(anc)
 
         qctrl = C_ctrl(func, control=[1])(anc, wires)
