@@ -3,6 +3,7 @@
 <h3>New features</h3>
 
 <h3>Improvements</h3>
+
 * Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
 
   ```py
