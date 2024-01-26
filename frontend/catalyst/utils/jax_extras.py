@@ -630,11 +630,11 @@ def output_type_to_tracers(
     for aval, _ in out_type:
         if isinstance(aval, DShapedArray):
             shape = [
-                [*out_consts, *in_tracers][d.val]
-                if isinstance(d, InDBIdx)
-                else out_tracers[d.val]
-                if isinstance(d, OutDBIdx)
-                else d
+                (
+                    [*out_consts, *in_tracers][d.val]
+                    if isinstance(d, InDBIdx)
+                    else out_tracers[d.val] if isinstance(d, OutDBIdx) else d
+                )
                 for d in aval.shape
             ]
             aval = aval.update(shape=tuple(shape))
@@ -762,13 +762,16 @@ def infer_output_type(
 
     out_avals_ = (x.aval for x in all_outs)
     out_avals = [
-        a.update(
-            shape=tuple(
-                in_map.get(id(d), out_map.get(id(d))) if _is_tracer_like(d) else d for d in a.shape
+        (
+            a.update(
+                shape=tuple(
+                    in_map.get(id(d), out_map.get(id(d))) if _is_tracer_like(d) else d
+                    for d in a.shape
+                )
             )
+            if isinstance(a, DShapedArray)
+            else a
         )
-        if isinstance(a, DShapedArray)
-        else a
         for a in out_avals_
     ]
 
