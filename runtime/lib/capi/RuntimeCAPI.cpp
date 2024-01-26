@@ -233,17 +233,24 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
     // But ideally, I think the device should determine the representation.
     // Essentially just forward this to the device library.
     // And the device library can choose how to handle everything.
-    //
-    // Because QirArray* is opaque, we can return anything.
-    // But because this is a C function, we should return a C-like item.
-    // So, let's just return a pointer.
     std::vector<QubitIdType> qubit_vector =
         Catalyst::Runtime::getQuantumDevicePtr()->AllocateQubits(num_qubits);
 
     // I don't like this copying.
     std::vector<QubitIdType> *qubit_vector_ptr =
-        new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.begin() + num_qubits);
+        new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.end());
 
+    // Because this function is interfacing with C
+    // I think we should return a trivial-type
+    //     https://en.cppreference.com/w/cpp/named_req/TrivialType
+    // Why should we return a trivial type?
+    //
+    // Paraphrasing from stackoverflow: https://stackoverflow.com/a/72409589
+    //     extern "C" will avoid name mangling from happening.
+    //     It doesn't prevent a function from returning or accepting a C++ type.
+    //     But the calling language needs to understand the data-layout for the
+    //     type being returned.
+    //     For non-trivial types, this will be difficult to impossible.
     return (QirArray *)qubit_vector_ptr;
 }
 
