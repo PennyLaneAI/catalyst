@@ -481,14 +481,14 @@ def test_qnode_while_1():
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
-        a = jnp.ones([sz + 1], dtype=float)
+        a0 = jnp.ones([sz + 1], dtype=float)
 
         @while_loop(lambda _, i: i < 3)
         def loop(a, i):
             i += 1
             return (a, i)
 
-        a2, _ = loop(a, 0)
+        a2, _ = loop(a0, 0)
         return a2
 
     result = f(3)
