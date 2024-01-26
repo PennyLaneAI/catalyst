@@ -106,8 +106,8 @@ class TestStaticArguments:
         class MyClass:
             """Test class"""
 
-            val0: int
-            val1: int
+            val_0: int
+            val_1: int
 
             def __hash__(self):
                 return hash(str(self))
@@ -117,13 +117,13 @@ class TestStaticArguments:
             x: int,
             y: MyClass,
         ):
-            return x + y.val0 + y.val1
+            return x + y.val_0 + y.val_1
 
         my_obj = MyClass(5, 5)
         assert f(1, my_obj) == 11
         function = f.compiled_function
         # Changing mutable object should introduce re-compilation.
-        my_obj.val1 = 3
+        my_obj.val_1 = 3
         assert f(1, my_obj) == 9
         assert function != f.compiled_function
 

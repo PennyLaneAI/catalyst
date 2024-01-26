@@ -691,7 +691,9 @@ class QJIT:
         """Logic to decide whether the function needs to be recompiled
         given ``*args`` and whether ``*args`` need to be promoted.
         A function may need to be compiled if:
-            1. It was not compiled before
+            1. It was not compiled before. Without static arguments, the compiled function
+                should be stored in ``self.compiled_function``. With static arguments,
+                ``self.compile_options.static_argnums`` stores all previous compiled one.s
             2. The real arguments sent to the function are not promotable to the type of the
                 formal parameters.
 
@@ -1074,7 +1076,17 @@ def qjit(
         an iterable of integers, arguments whose index is contained in the iterable are static.
         Changing static arguments will introduce re-compilation.
 
+        A valid static argument must be hashable and its ``__hash__`` method must be able to
+        reflect any changes of its attributes.
+
         .. code-block:: python
+
+            @dataclass
+            class MyClass:
+                val: int
+
+                def __hash__(self):
+                    return hash(str(self))
 
             @qjit(static_argnums=1)
             def f(
@@ -1085,11 +1097,21 @@ def qjit(
 
             f(1, MyClass(5))
             f(1, MyClass(6)) # re-compilation
+            f(2, MyClass(5)) # no re-compilation
 
-        In the example above, ``y`` is static. Note that the second function calls triggers
-        re-compilation since the input object is different from the previous one.
+        In the example above, ``y`` is static. Note that the second function call triggers
+        re-compilation since the input object is different from the previous one. However,
+        the third function call direcly uses the previous compiled one and does not introduce
+        re-compilation.
 
         .. code-block:: python
+
+            @dataclass
+            class MyClass:
+                val: int
+
+                def __hash__(self):
+                    return hash(str(self))
 
             @qjit(static_argnums=(1, 2))
             def f(
@@ -1099,7 +1121,15 @@ def qjit(
             ):
                 return x + y.val + z.val
 
-        In the example above, ``y`` and ``z`` are static.
+            my_obj_1 = MyClass(5)
+            my_obj_2 = MyClass(6)
+            f(1, my_obj_1, my_obj_2)
+            my_obj_1.val = 7
+            f(1, my_obj_1, my_obj_2) # re-compilation
+
+        In the example above, ``y`` and ``z`` are static. The second function should make
+        function ``f`` be re-compiled because ``my_obj_1`` is changed. This requires that
+        the mutation is properly reflected in the hash value.
 
 
     .. details::
