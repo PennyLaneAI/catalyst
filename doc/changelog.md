@@ -37,6 +37,21 @@
   If another library implemented the same symbols exported by the runtime, the same problem would
   presist.
 
+* The Catalyst runtime no longer depends on QIR runner's stdlib.
+  [(#470)](https://github.com/PennyLaneAI/catalyst/pull/470)
+
+  Similar to changing the runtime API for QIR instructions, we no longer depend nor link against
+  QIR runner's stdlib. With PR #464, most of the symbol conflicts were resolved, but by linking
+  against QIR runner's stdlib, some definitions persisted that may be different than ones
+  used by third party implementors. To prevent symbol conflicts QIR runner's stdlib was removed
+  and is no longer linked against. As a result, the following functions are now defined and
+  implemented in Catalyst's runtime:
+  * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
+  * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
+  and the following functions were removed since the frontend does not generate them
+  * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
+  * `QirString *__catalyst__rt__result_to_string(RESULT *)`
+
 <h3>Bug fixes</h3>
 
 * Resolve a failure to find the SciPy OpenBLAS library when running Catalyst,
