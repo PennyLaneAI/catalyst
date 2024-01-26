@@ -45,11 +45,6 @@ jobs:
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
-      uses: actions/cache@v3
-      with:
-        path: qir-stdlib-build
-        key: Linux-qir-stdlib-build
-        fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: mlir/llvm-project
@@ -114,8 +109,6 @@ jobs:
         CXX_COMPILER=$(which g++ }}) \
         ENABLE_LLD=OFF \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
         LIGHTNING_GIT_TAG_VALUE=master \
         ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
@@ -128,8 +121,6 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
         ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime
