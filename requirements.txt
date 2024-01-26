@@ -21,5 +21,6 @@ nbmake
 
 # optional rt/test dependencies
 tensorflow
+cuda-quantum
 amazon-braket-pennylane-plugin>=1.23.0
 pennylane-lightning[kokkos]
