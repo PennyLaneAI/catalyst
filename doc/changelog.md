@@ -83,6 +83,17 @@
   qubit re-allocation.
   [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
 
+* Add the `wires` property to `catalyst.adjoint` and `catalyst.ctrl`.
+  [(#480)](https://github.com/PennyLaneAI/catalyst/pull/480)
+
+  Without implementing the `wires` property, users would get `<Wires = [<WiresEnum.AnyWires: -1>]>`
+  for the list of wires in these operations.
+  Currently, `catalyst.adjoint.wires` supports static wires and workflows with nested branches,
+  and `catalyst.ctrl.wires` provides support for workflows with static and variable wires as well as
+  nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
+  control flow operations.
+
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
