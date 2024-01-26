@@ -236,7 +236,7 @@ class QJITDevice(qml.QubitDevice):
         # However, that affects differentiability.
         # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX"}
+        return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
     def _check_mid_circuit_measurement(config):
