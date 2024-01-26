@@ -63,39 +63,39 @@ TEST_CASE("Test success of loading dummy device", "[Third Party]")
     CHECK(loadDevice("DummyDevice", "libdummy_device" + get_dylib_ext()));
 }
 
-TEST_CASE("Test __quantum__rt__device_init registering a custom device with shots=500 and "
+TEST_CASE("Test __catalyst__rt__device_init registering a custom device with shots=500 and "
           "device=lightning.qubit",
           "[CoreQIS]")
 {
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
 
     char dev1[17] = "lightning.qubit";
-    __quantum__rt__device_init((int8_t *)dev1, nullptr, nullptr);
-    __quantum__rt__device_release();
+    __catalyst__rt__device_init((int8_t *)dev1, nullptr, nullptr);
+    __catalyst__rt__device_release();
 
     char dev2[15] = "backend.other";
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)dev2, nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)dev2, nullptr, nullptr),
                         Catch::Contains("cannot open shared object file"));
 
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init(nullptr, nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init(nullptr, nullptr, nullptr),
                         Catch::Contains("Invalid device library"));
 
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)dev1, nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)dev1, nullptr, nullptr),
                         Catch::Contains("Invalid use of the global driver before initialization"));
 }
 
 #ifdef __device_lightning_kokkos
-TEST_CASE("Test __quantum__rt__device_init registering device=lightning.kokkos", "[CoreQIS]")
+TEST_CASE("Test __catalyst__rt__device_init registering device=lightning.kokkos", "[CoreQIS]")
 {
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
 
     char rtd_name[18] = "lightning.kokkos";
-    __quantum__rt__device_init((int8_t *)rtd_name, nullptr, nullptr);
+    __catalyst__rt__device_init((int8_t *)rtd_name, nullptr, nullptr);
 
-    __quantum__rt__device_release();
+    __catalyst__rt__device_release();
 
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 }
 #endif

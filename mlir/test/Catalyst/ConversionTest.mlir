@@ -18,7 +18,7 @@
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK: llvm.func @__quantum__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>, i1)
+// CHECK: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>, i1)
 
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {
@@ -39,11 +39,11 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
     // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>
     // CHECK: llvm.store [[struct2]], [[struct_ptr]]
     // CHECK: [[memref_flag:%.+]] = llvm.mlir.constant(false)
-    // CHECK: llvm.call @__quantum__rt__print_tensor([[struct_ptr]], [[memref_flag]])
+    // CHECK: llvm.call @__catalyst__rt__print_tensor([[struct_ptr]], [[memref_flag]])
     "catalyst.print"(%arg0) : (memref<1xi64>) -> ()
 
     // CHECK: [[memref_flag2:%.+]] = llvm.mlir.constant(true)
-    // CHECK: llvm.call @__quantum__rt__print_tensor({{%.+}}, [[memref_flag2]])
+    // CHECK: llvm.call @__catalyst__rt__print_tensor({{%.+}}, [[memref_flag2]])
     "catalyst.print"(%arg0) {print_descriptor} : (memref<1xi64>) -> ()
 
     return
@@ -52,7 +52,7 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 // -----
 
 // CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Hello, Catalyst")
-// CHECK-DAG: llvm.func @__quantum__rt__print_string(!llvm.ptr<i8>)
+// CHECK-DAG: llvm.func @__catalyst__rt__print_string(!llvm.ptr<i8>)
 
 // CHECK-LABEL: @dbprint_str
 func.func @dbprint_str() {
@@ -60,7 +60,7 @@ func.func @dbprint_str() {
     // CHECK: [[C0:%.+]] = llvm.mlir.constant(0 : index)
     // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr<array<15 x i8>>
     // CHECK: [[char_ptr:%.+]] = llvm.getelementptr [[array_ptr]][[[C0]], [[C0]]] : {{.*}} -> !llvm.ptr<i8>
-    // CHECK: llvm.call @__quantum__rt__print_string([[char_ptr]])
+    // CHECK: llvm.call @__catalyst__rt__print_string([[char_ptr]])
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
     return
