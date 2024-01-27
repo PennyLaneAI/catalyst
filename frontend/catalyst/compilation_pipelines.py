@@ -646,7 +646,11 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
 
-        if self.compiled_function and self.compiled_function.shared_object:
+        if (
+            self.compiled_function
+            and self.compiled_function.shared_object
+            and not self.compile_options.static_argnums
+        ):
             self.compiled_function.shared_object.close()
 
         if self.compiling_from_textual_ir:
@@ -759,10 +763,6 @@ class QJIT:
 
         if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
-
-        # Prevent self.compiled_function from being closed if any static argument exists.
-        if static_argnums:
-            self.compiled_function = None
 
         function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
             self.compiled_function, *args
@@ -1209,13 +1209,7 @@ def qjit(
         reused for subsequent function calls.
     """
 
-    # Make the format of static_argnums easier to handle.
     argnums = static_argnums
-    if argnums is None:
-        argnums = ()
-    elif isinstance(argnums, int):
-        argnums = (argnums,)
-
     axes = abstracted_axes
     if fn is not None:
         return QJIT(
