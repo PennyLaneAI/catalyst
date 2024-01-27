@@ -77,6 +77,8 @@ def test_no_parameters(backend):
 
         qml.MultiControlledX(wires=[0, 1, 2, 3])
 
+        qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
+
         # Unsupported:
         # qml.SX(wires=0)
         # qml.ISWAP(wires=[0,1])

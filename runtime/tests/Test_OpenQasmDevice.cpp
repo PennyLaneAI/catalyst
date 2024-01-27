@@ -108,11 +108,10 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
     device->AllocateQubits(1);
     CHECK(device->GetNumQubits() == 1);
 
-    auto wires = device->AllocateQubits(n - 1);
-    CHECK(device->GetNumQubits() == n);
-    CHECK(wires.size() == n);
-    CHECK(wires[0] == 1);
-    CHECK(wires[n - 1] == n);
+    REQUIRE_THROWS_WITH(
+        device->AllocateQubits(n - 1),
+        Catch::Contains("[Function:AllocateQubits] Error in Catalyst Runtime: Partial qubits "
+                        "allocation is not supported by OpenQasmDevice"));
 }
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
@@ -513,31 +512,31 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
                         Catch::Contains("Unsupported functionality"));
 }
 
-TEST_CASE("Test __quantum__rt__device_init registering the OpenQasm device", "[CoreQIS]")
+TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
 {
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
 
     char device_aws[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device_init((int8_t *)device_aws, nullptr, nullptr);
+    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)device_aws, nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr),
                         Catch::Contains("cannot open shared object file"));
 #endif
 
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
 
     char device_local[30] = "braket.local.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device_init((int8_t *)device_local, nullptr, nullptr);
+    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr),
                         Catch::Contains("cannot open shared object file"));
 #endif
 
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 }
