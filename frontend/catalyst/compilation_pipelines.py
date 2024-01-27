@@ -693,7 +693,7 @@ class QJIT:
         A function may need to be compiled if:
             1. It was not compiled before. Without static arguments, the compiled function
                 should be stored in ``self.compiled_function``. With static arguments,
-                ``self.compile_options.static_argnums`` stores all previous compiled one.s
+                ``self.compile_options.static_argnums`` stores all previous compiled ones.
             2. The real arguments sent to the function are not promotable to the type of the
                 formal parameters.
 
