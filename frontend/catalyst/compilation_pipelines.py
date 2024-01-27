@@ -94,16 +94,21 @@ class SharedObjectManager:
         self.shared_object = ctypes.CDLL(shared_object_file)
         self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
 
-    def close(self):
-        """Close the shared object"""
+    def close(self, delete_files=True):
+        """Close the shared object
+
+        Args:
+            delete_files: flag that indicates whether to delete generated binary files.
+        """
         self.function = None
         self.setup = None
         self.teardown = None
         self.mem_transfer = None
-        dlclose = ctypes.CDLL(None).dlclose
-        dlclose.argtypes = [ctypes.c_void_p]
-        # pylint: disable=protected-access
-        dlclose(self.shared_object._handle)
+        if delete_files:
+            dlclose = ctypes.CDLL(None).dlclose
+            dlclose.argtypes = [ctypes.c_void_p]
+            # pylint: disable=protected-access
+            dlclose(self.shared_object._handle)
 
     def load_symbols(self, func_name):
         """Load symbols necessary for for execution of the compiled function.
@@ -177,6 +182,7 @@ class CompiledFunction:
         restype,
         compile_options,
     ):
+        self.shared_object_file = shared_object_file
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.return_type_c_abi = None
         self.func_name = func_name
@@ -646,12 +652,8 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
 
-        if (
-            self.compiled_function
-            and self.compiled_function.shared_object
-            and not self.compile_options.static_argnums
-        ):
-            self.compiled_function.shared_object.close()
+        if self.compiled_function and self.compiled_function.shared_object:
+            self.compiled_function.shared_object.close(not self.compile_options.static_argnums)
 
         if self.compiling_from_textual_ir:
             # Module name can be anything.
@@ -715,9 +717,14 @@ class QJIT:
 
         if static_argnums:
             static_args_hash = self.get_static_args_hash(*args)
-            prev_function = self.stored_compiled_functions.get(static_args_hash, None)
-            function = prev_function if prev_function else function
-            has_been_compiled = prev_function is not None
+            (shared_object_file, qfunc_name, restype) = self.stored_compiled_functions.get(
+                static_args_hash, (None, None, None)
+            )
+            if shared_object_file:
+                options = self.compile_options
+                # Rebuild function with tje existing shared object
+                function = CompiledFunction(shared_object_file, qfunc_name, restype, options)
+            has_been_compiled = shared_object_file is not None
         else:
             has_been_compiled = self.compiled_function is not None
 
@@ -775,7 +782,11 @@ class QJIT:
         # Check if a function is created and add newly created ones into the hash table.
         if static_argnums and recompilation_needed:
             static_args_hash = self.get_static_args_hash(*args)
-            self.stored_compiled_functions[static_args_hash] = function
+            self.stored_compiled_functions[static_args_hash] = (
+                function.shared_object_file,
+                function.func_name,
+                function.restype,
+            )
             # Create new space for the next function to avoid using the spaces from
             # the previously compiled ones.
             self.workspace = WorkspaceManager.get_or_create_workspace(
