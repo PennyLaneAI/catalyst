@@ -33,15 +33,12 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-<<<<<<< HEAD
-=======
 
     - name: Setup Runner Environment
       id: setup_env
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
->>>>>>> b3f5f6d3 (Resolve segfaults when TF & Catalyst are both imported (#465))
 
     # Cache external project sources
     - name: Cache LLVM Source
@@ -165,14 +162,9 @@ jobs:
       run: |
         cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
-<<<<<<< HEAD
-              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
-              -DENZYME_STATIC_LIB=ON
-=======
               -DLLVM_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=hidden
->>>>>>> b3f5f6d3 (Resolve segfaults when TF & Catalyst are both imported (#465))
 
         cmake --build enzyme-build --target EnzymeStatic-18
 
