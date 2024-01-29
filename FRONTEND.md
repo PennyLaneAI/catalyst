@@ -13,6 +13,7 @@ Catalyst frontend architecture
   * [InDBIdx/OutDBIdx](#indbidxoutdbidx)
   * [Primitives and binding](#primitives-and-binding)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
+  * [Expanded/collapsed arguments or results](#expandedcollapsed-arguments-or-results)
 * [Tracing problem](#tracing-problem)
 * [Catalyst implementation details](#catalyst-implementation-details)
 
@@ -136,7 +137,7 @@ signature from the known input type signature of the subprogram.
 
 ### Explicit/implicit arguments
 
-Separating explicit and implicit arguments makes sense when we speak about the Python tracing. In
+Separating explicit and implicit arguments makes sense when we argue about the Python tracing. In
 Jaxpr, all arguments are explicit.
 
 Jaxpr variables holding array dimensions must always present in the same scope with their array
@@ -163,13 +164,22 @@ equivalent Jaxpr program
   in (b, c) }
 ```
 
-In Jax this is done by expanding the one-element result tuple of **explicit** values by adding a
-tuple of calculated **implicit** values and by linking them using the de Bruijn indices in type
-signatures.
+In Jax this is done by adding together the tuple of **explicit** values with another
+tuple of calculated **implicit** values.
 
-If we want to use this code as a body of some primitive, we need the binding program to collapse the
-expanded results of the Jaxpr subprogram back into the structured tracer representing the single
-output Python variable to continue the Python-tracing of the outermost program.
+Note that we also link corresponding type signature using the appropriate `*DBIdx` indices.
+
+
+### Expanded/collapsed arguments or results
+
+Python and Jaxpr programs represent function arguments and results in a different level of details.
+In Python tensors are objects holding all the required information about there shapes. In Jaxpr, in
+contrast, shape dimension variables must be passes explicitly as additional arguments. In order to
+encode the program transformation, we attribute argument lists as **collapsed** or
+**expanded**, depending on whether implicit arguments were added or not.
+
+We use `expanded_` prefix in Python list name if the implicit arguments are known to be already
+prepended to the list.
 
 
 Tracing problem
