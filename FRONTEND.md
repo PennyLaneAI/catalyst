@@ -13,7 +13,7 @@ Catalyst frontend architecture
   * [InDBIdx/OutDBIdx](#indbidxoutdbidx)
   * [Primitives and binding](#primitives-and-binding)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
-* [Tracing principles](#tracing-principles)
+* [Tracing problem](#tracing-problem)
 
 <!-- vim-markdown-toc -->
 
@@ -171,14 +171,41 @@ expanded results of the Jaxpr subprogram back into the structured tracer represe
 output Python variable to continue the Python-tracing of the outermost program.
 
 
-Tracing principles
-------------------
+Tracing problem
+---------------
 
-For dynamic shapes, we need to (a) re-define primitive binding in terms of
-[Jax input and output types](https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/core.py#L1304)
-rather than in terms of abstract values, (b) introduce the *implicit* *argument expansion strategy*
-`S` as a parameter (c) return OutputType along with the results. The new edition of the algorithm
-looks like the following:
+To understand the tracing problem, consider the following schematic Python program:
+
+``` python
+def nested_function(*ARGS):
+  ... # calculate RESULTS from ARGS
+  return RESULTS
+
+INPUTS = ... # Obtain INPUTS
+OUTPUTS = bind(nested_function, *INPUTS)
+```
+
+We want to transform this program into another program in (schematic) Jaxpr language:
+
+```
+{ lambda ; INPUTS . let
+    OUTPUTS = call[
+      nested_function = { lambda ; ARGS . let
+        ...  // calculate RESULTS
+      in RESULTS };
+    ] INPUTS;
+  in OUTPUTS }
+```
+
+In order to do so, Jax evaluates the source Python program passing **tracers** objects as INPUTS.
+All operations applied to the tracers, including the nested function call, are recorded into the
+internal Jax equation list, which is then used to print the final Jaxpr program.
+
+In the above example, nested function call, or **bind** in Jax's terms, is shown because it is
+indeed the most important operation, joining the outer and inner tracing processes into a single
+recursive tracing algorithm.
+
+Consider the formal description of the single recursion step of the tracing algorithm.
 
 1. $(Inputs, S) \gets read()$ (obtain from the context)
 2. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
@@ -191,21 +218,26 @@ looks like the following:
 4. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
 5. $return(ExpandedOutputs_s, OutputType_s)$
 
-The above algorithm was implemented in a branch of the Catalyst repository. Below we describe its
-functions and give source code references 
+The above algorithm is implemented in the Catalyst repository. It differs from the similar algorithm
+of the upstream Jax by the extended support of **Dynamic shapes**. Below we describe its steps in a
+more details and give source code references.
 
-- $expandArgs$ determines the implicit input variables using the specified strategy $S$ and
-  calculates the input type signature.
+- $read()$ obtains input **Tracers** from the context.
+- $expandArgs()$ determines the **implicit parameters** using the specified expansion strategy $S$ and
+  calculates the **input type signature**.
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L800)
-- $expandResults$ does the same with the output variables and the output type signature.
+- $expandResults()$ calculates **implicit output variables** and obtains the final **output type
+  signature**.
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L817)
-- $initialize$  reads the type information and creates the required tracers in the given tracing
-  context. Note that the function needs an access to inputs in order to interpret de Brjuin indices
-  referring to them.
+- $initialize()$  reads the input type information and creates the required tracers in the inner
+  tracing context. Note that the function needs an access to input type in order to interpret **de
+  Brjuin indices** which might be contained in inputs.
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L625)
   (inputs)
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L640)
   (outputs)
-- $traceNested$  is a generic Python tracing of a program representing the body of the primitive.
+- $traceNested()$ runs the next recursion step of the tracing. It takes collapsed (not-expanded)
+  **list of input tracers** and calculates the **list of output tracers**.
 
-The purpose of the $Strategy$ parameter is clarified in the next section
+
+
