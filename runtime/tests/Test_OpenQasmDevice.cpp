@@ -497,6 +497,23 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
     }
 }
 
+TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+
+    constexpr size_t n{2};
+    auto wires = device->AllocateQubits(n);
+
+    device->NamedOperation("Hadamard", {}, {wires[0]}, false);
+    device->NamedOperation("ISWAP", {}, {wires[0], wires[1]}, false);
+    device->NamedOperation("PSWAP", {0}, {wires[0], wires[1]}, false);
+
+    auto obs = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{1});
+    auto expval = device->Expval(obs);
+    CHECK(expval == Approx(1).margin(1e-5));
+}
+
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
 {
     auto device = OpenQasmDevice("{shots : 100}");

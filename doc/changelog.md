@@ -42,6 +42,26 @@
 
 <h3>Improvements</h3>
 
+* Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
+
+  ```py
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("braket.local.qubit", wires=2, shots=100)
+
+  @qjit
+  @qml.qnode(dev)
+  def f(x: float):
+      qml.Hadamard(0)
+      qml.PSWAP(x, wires=[0, 1])
+      qml.ISWAP(wires=[1, 0])
+      return qml.probs()
+  ```
+
+would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
+  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
+
 * Add support for the `BlockEncode` operator in Catalyst.
   [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
 
@@ -143,7 +163,8 @@ Mikhail Andrenkov,
 Ali Asadi,
 David Ittah,
 Tzung-Han Juang,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Haochen Paul Wang.
 
 # Release 0.4.0
 
