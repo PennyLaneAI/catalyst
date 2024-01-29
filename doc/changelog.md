@@ -12,7 +12,7 @@
   [(#468)](https://github.com/PennyLaneAI/catalyst/pull/468)
 
 * Resolve a failure to generate gradient code for specific input circuits.
-  [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
+  [(#439)](https://github.com/PennyLaneAI/catalyst/pull/439)
 
   In this case, [`jnp.mod`](https://github.com/PennyLaneAI/catalyst/issues/437)
   was used to compute wire values in a for loop, which prevented the gradient
