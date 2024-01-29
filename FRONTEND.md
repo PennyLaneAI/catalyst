@@ -207,20 +207,21 @@ recursive tracing algorithm.
 
 Consider the formal description of the single recursion step of the tracing algorithm.
 
-1. $(Inputs, S) \gets read()$ (obtain from the context)
-2. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
-3. $OutputType_s \gets AbstractEvaluation(InputType_s)$ where $AbstractEvaluation$ is defined as follows:
-    1. $ExpandedArguments_s \gets initialize(InputType_s)$
-    2. $Arguments \gets collapse(ExpandedArguments_s)$
-    3. $Results \gets traceNested(Arguments)$
-    4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
-    5. $return(OutputType_s)$
-4. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
-5. $return(ExpandedOutputs_s, OutputType_s)$
+* $bind(Function, Inputs, S) -> Outputs_s$, where:
+  1. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
+  2. $OutputType_s \gets AbstractEvaluation(InputType_s)$ where $AbstractEvaluation$ is defined as follows:
+      1. $ExpandedArguments_s \gets initialize(InputType_s)$
+      2. $Arguments \gets collapse(ExpandedArguments_s)$
+      3. $Results \gets traceNested(Function, Arguments)$
+      4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
+      5. $return(OutputType_s)$
+  3. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
+  4. $Outputs_s \gets collapse(ExpandedOutputs_s)$
+  5. $return(Outputs_s)$
 
 The above algorithm is implemented in the Catalyst repository. It differs from the similar algorithm
 of the upstream Jax by the extended support of **Dynamic shapes**. Below we describe its steps in a
-more details and give source code references.
+more details and give source references.
 
 - $read()$ obtains input **Tracers** from the context.
 - $expandArgs()$ determines the **implicit parameters** using the specified expansion strategy $S$ and
