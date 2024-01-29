@@ -218,7 +218,7 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        StringRef qirName = "__quantum__rt__array_get_element_ptr_1d";
+        StringRef qirName = "__catalyst__rt__array_get_element_ptr_1d";
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8)),
             {conv->convertType(QuregType::get(ctx)), IntegerType::get(ctx, 64)});

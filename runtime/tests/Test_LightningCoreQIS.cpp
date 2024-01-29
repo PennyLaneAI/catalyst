@@ -30,15 +30,6 @@
 
 using namespace Catalyst::Runtime;
 
-TEST_CASE("Test __catalyst__rt__print_string", "[qir_lightning_core]")
-{
-    char str[] = "print_string_test";
-    __catalyst__rt__print_string(str);
-
-    char *str_null = nullptr;
-    __catalyst__rt__print_string(str_null);
-}
-
 TEST_CASE("Test __catalyst__rt__print_tensor i1, i8, i16, i32, f32, and c64",
           "[qir_lightning_core]")
 {
@@ -224,42 +215,16 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
 
-        QirString *zero_str = __quantum__rt__int_to_string(0);
-        QirString *one_str = __quantum__rt__int_to_string(1);
-        QirString *three_str = __quantum__rt__int_to_string(3);
-
-        QirString *qstr = __catalyst__rt__qubit_to_string(q);
-
-        CHECK(__quantum__rt__string_equal(qstr, zero_str));
-
-        __quantum__rt__string_update_reference_count(qstr, -1);
-
         __catalyst__rt__qubit_release(q);
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
 
-        CHECK(__quantum__rt__array_get_size_1d(qs) == 3);
+        CHECK(__catalyst__rt__array_get_size_1d(qs) == 3);
 
-        QUBIT *first = *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qs, 0));
-        qstr = __catalyst__rt__qubit_to_string(first);
-        CHECK(__quantum__rt__string_equal(qstr, one_str));
-
-        __quantum__rt__string_update_reference_count(qstr, -1);
-
-        QUBIT *last = *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qs, 2));
-        qstr = __catalyst__rt__qubit_to_string(last);
-        CHECK(__quantum__rt__string_equal(qstr, three_str));
-
-        __quantum__rt__string_update_reference_count(qstr, -1);
-
-        QirArray *copy = __quantum__rt__array_copy(qs, true /*force*/);
-
-        __quantum__rt__string_update_reference_count(zero_str, -1);
-        __quantum__rt__string_update_reference_count(one_str, -1);
-        __quantum__rt__string_update_reference_count(three_str, -1);
+        __catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        __catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__rt__qubit_release_array(qs); // The `qs` is a dangling pointer from now on.
-        __quantum__rt__array_update_reference_count(copy, -1);
         __catalyst__rt__device_release();
     }
     __catalyst__rt__finalize();
@@ -276,7 +241,7 @@ TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
 
         QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
         QUBIT *target =
-            *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(reg, 2));
+            *reinterpret_cast<QUBIT **>(__catalyst__rt__array_get_element_ptr_1d(reg, 2));
 
         __catalyst__qis__RY(angle, target, false);
         __catalyst__qis__RX(angle, target, false);
@@ -578,8 +543,8 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         __catalyst__qis__Hadamard(*target, false);
         __catalyst__qis__PauliZ(*target, false);
@@ -616,9 +581,9 @@ TEST_CASE("Test __catalyst__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls_0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **ctrls_1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls_0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **ctrls_1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__qis__Hadamard(*target, false);
         __catalyst__qis__PauliZ(*target, false);
@@ -656,8 +621,8 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -702,8 +667,8 @@ TEST_CASE("Test __catalyst__qis__ PhaseShift", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -776,7 +741,7 @@ TEST_CASE("Test __catalyst__qis__HermitianObs with invalid number of wires", "[C
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
 
         MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
         matrix->offset = 0;
@@ -802,8 +767,8 @@ TEST_CASE("Test __catalyst__qis__HermitianObs and Expval", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -881,8 +846,8 @@ TEST_CASE("Test __catalyst__qis__TensorProdObs and Expval", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -975,8 +940,8 @@ TEST_CASE("Test __catalyst__qis__HamiltonianObs(h, x) and Expval", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1036,8 +1001,8 @@ TEST_CASE("Test __catalyst__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1098,8 +1063,8 @@ TEST_CASE("Test __catalyst__qis__HamiltonianObs(h, Ham(x)) and Expval", "[CoreQI
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1168,8 +1133,8 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1215,8 +1180,8 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, 
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1261,8 +1226,8 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1298,8 +1263,8 @@ TEST_CASE("Test __catalyst__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pr
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1335,8 +1300,8 @@ TEST_CASE("Test __catalyst__qis__State on the heap using malloc", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1425,8 +1390,8 @@ TEST_CASE("Test __catalyst__qis__MultiRZ", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         __catalyst__qis__RX(M_PI, *q0, false);
         __catalyst__qis__Hadamard(*q0, false);
@@ -1458,9 +1423,9 @@ TEST_CASE("Test __catalyst__qis__CSWAP ", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
 
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         __catalyst__qis__RX(M_PI, *q0, false);
         __catalyst__qis__RX(M_PI, *q1, false);
@@ -1472,23 +1437,8 @@ TEST_CASE("Test __catalyst__qis__CSWAP ", "[CoreQIS]")
         Result zero = __catalyst__rt__result_get_zero();
         Result one = __catalyst__rt__result_get_one();
 
-        // Test via rt__result_to_string
-        QirString *zero_str = __catalyst__rt__result_to_string(zero);
-        QirString *q1_m_str = __catalyst__rt__result_to_string(q1_m);
-        CHECK(__quantum__rt__string_equal(zero_str, q1_m_str));
-
-        QirString *one_str = __catalyst__rt__result_to_string(one);
-        QirString *q2_m_str = __catalyst__rt__result_to_string(q2_m);
-        CHECK(__quantum__rt__string_equal(one_str, q2_m_str));
-
-        // Test via rt__result_equal
         CHECK(__catalyst__rt__result_equal(q1_m, zero));
         CHECK(__catalyst__rt__result_equal(q2_m, one));
-
-        __quantum__rt__string_update_reference_count(zero_str, -1);
-        __quantum__rt__string_update_reference_count(q1_m_str, -1);
-        __quantum__rt__string_update_reference_count(one_str, -1);
-        __quantum__rt__string_update_reference_count(q2_m_str, -1);
 
         __catalyst__rt__qubit_release_array(qs);
         __catalyst__rt__device_release();
@@ -1507,8 +1457,8 @@ TEST_CASE("Test __catalyst__qis__Counts with num_qubits=2 calling Hadamard, Cont
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1554,8 +1504,8 @@ TEST_CASE("Test __catalyst__qis__Counts with num_qubits=2 PartialCounts calling 
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1594,8 +1544,8 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 calling Hadamard, Cont
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1661,8 +1611,8 @@ TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample call
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
         __catalyst__qis__Hadamard(*target, false);
@@ -1784,8 +1734,8 @@ TEST_CASE("Test __catalyst__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
 
-        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
         __catalyst__qis__Hadamard(*target, false);
         __catalyst__qis__CNOT(*target, *ctrls, false);
@@ -1837,9 +1787,9 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(3);
 
-        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
-        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
-        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
         double theta = 3.14 / 2.0;
         CplxT_double matrix_data[4] = {

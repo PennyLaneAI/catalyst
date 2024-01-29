@@ -43,7 +43,7 @@ declare void @__catalyst__rt__print_state()
 
 declare void @__catalyst__rt__toggle_recorder(i8)
 
-declare i8* @__quantum__rt__array_get_element_ptr_1d(%Array*, i64)
+declare i8* @__catalyst__rt__array_get_element_ptr_1d(%Array*, i64)
 
 declare %Array* @__catalyst__rt__qubit_allocate_array(i64)
 
@@ -86,7 +86,7 @@ define i32 @main() {
 
   ; Allocate 2 qubits
   %1 = call %Array* @__catalyst__rt__qubit_allocate_array(i64 2)
-  %2 = call i8* @__quantum__rt__array_get_element_ptr_1d(%Array* %1, i64 0)
+  %2 = call i8* @__catalyst__rt__array_get_element_ptr_1d(%Array* %1, i64 0)
   %3 = bitcast i8* %2 to %Qubit**
   %4 = load %Qubit*, %Qubit** %3, align 8
 
