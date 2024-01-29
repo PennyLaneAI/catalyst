@@ -13,6 +13,7 @@ Catalyst frontend architecture
   * [InDBIdx/OutDBIdx](#indbidxoutdbidx)
   * [Primitives and binding](#primitives-and-binding)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
+* [Tracing principles](#tracing-principles)
 
 <!-- vim-markdown-toc -->
 
@@ -169,3 +170,42 @@ If we want to use this code as a body of some primitive, we need the binding pro
 expanded results of the Jaxpr subprogram back into the structured tracer representing the single
 output Python variable to continue the Python-tracing of the outermost program.
 
+
+Tracing principles
+------------------
+
+For dynamic shapes, we need to (a) re-define primitive binding in terms of
+[Jax input and output types](https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/core.py#L1304)
+rather than in terms of abstract values, (b) introduce the *implicit* *argument expansion strategy*
+`S` as a parameter (c) return OutputType along with the results. The new edition of the algorithm
+looks like the following:
+
+1. $(Inputs, S) \gets read()$ (obtain from the context)
+2. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
+3. $OutputType_s \gets AbstractEvaluation(InputType_s)$ where $AbstractEvaluation$ is defined as follows:
+    1. $ExpandedArguments_s \gets initialize(InputType_s)$
+    2. $Arguments \gets collapse(ExpandedArguments_s)$
+    3. $Results \gets traceNested(Arguments)$
+    4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
+    5. $return(OutputType_s)$
+4. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
+5. $return(ExpandedOutputs_s, OutputType_s)$
+
+The above algorithm was implemented in a branch of the Catalyst repository. Below we describe its
+functions and give source code references 
+
+- $expandArgs$ determines the implicit input variables using the specified strategy $S$ and
+  calculates the input type signature.
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L800)
+- $expandResults$ does the same with the output variables and the output type signature.
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L817)
+- $initialize$  reads the type information and creates the required tracers in the given tracing
+  context. Note that the function needs an access to inputs in order to interpret de Brjuin indices
+  referring to them.
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L625)
+  (inputs)
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L640)
+  (outputs)
+- $traceNested$  is a generic Python tracing of a program representing the body of the primitive.
+
+The purpose of the $Strategy$ parameter is clarified in the next section
