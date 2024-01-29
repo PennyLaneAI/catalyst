@@ -91,6 +91,11 @@ class SharedObjectManager:
     """
 
     def __init__(self, shared_object_file, func_name):
+        self.shared_object = None
+        self.function = None
+        self.setup = None
+        self.teardown = None
+        self.mem_transfer = None
         self.open(shared_object_file, func_name)
 
     def open(self, shared_object_file, func_name):
@@ -172,7 +177,6 @@ class CompiledFunction:
         shared_object_file: path to shared object containing compiled function
         func_name: name of compiled function
         restype: list of MLIR tensor types representing the result of the compiled function
-        workspace: workspace linked to the compiled function to avoid being deleted
     """
 
     def __init__(
@@ -180,7 +184,6 @@ class CompiledFunction:
         shared_object_file,
         func_name,
         restype,
-        workspace,
         compile_options,
     ):
         self.shared_object_file = shared_object_file
@@ -188,7 +191,6 @@ class CompiledFunction:
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
-        self.workspace = workspace
         self.compile_options = compile_options
 
     @staticmethod
@@ -692,8 +694,7 @@ class QJIT:
 
         self._llvmir = llvm_ir
         options = self.compile_options
-        workspace = self.workspace
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, workspace, options)
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
         return compiled_function
 
     def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
@@ -720,7 +721,7 @@ class QJIT:
 
         if static_argnums:
             static_args_hash = self.get_static_args_hash(*args)
-            prev_function = self.stored_compiled_functions.get(static_args_hash, None)
+            prev_function, _ = self.stored_compiled_functions.get(static_args_hash, (None, None))
             has_been_compiled = False
             if prev_function:
                 function = prev_function
@@ -783,7 +784,8 @@ class QJIT:
         # Check if a function is created and add newly created ones into the hash table.
         if static_argnums and recompilation_needed:
             static_args_hash = self.get_static_args_hash(*args)
-            self.stored_compiled_functions[static_args_hash] = function
+            workspace = self.workspace
+            self.stored_compiled_functions[static_args_hash] = (function, workspace)
             # Create new space for the next function to avoid using the spaces from
             # the previously compiled ones.
             self.workspace = WorkspaceManager.get_or_create_workspace(
