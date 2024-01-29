@@ -831,6 +831,32 @@ This is because ``catalyst.cond`` cannot return operations, only capture queued/
 operations, but the ``Operation.compute_decomposition`` API requires that a list of operations is
 returned.
 
+Note that, if preferred, AutoGraph can be experimentally enabled on a subset of code within
+the decomposition as follows:
+
+.. code-block:: python
+
+    from catalyst.autograph import autograph
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+
+            @autograph
+            def f(params):
+                if params[0] == 0.3:
+                    qml.PauliRot(theta, 'XX', wires=wires)
+                else:
+                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+
+            with qml.tape.QuantumTape() as tape:
+                f(params)
+
+            return tape.operations
+
 Function argument restrictions
 ------------------------------
 
