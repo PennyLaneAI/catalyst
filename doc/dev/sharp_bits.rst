@@ -755,6 +755,82 @@ a single RX gate is being applied due to the rotation gate merger:
 
 Note that currently PennyLane transforms **cannot** be applied when ``autograph=True``.
 
+Compatibility with PennyLane decompositions
+-------------------------------------------
+
+When defining decompositions of PennyLane operations, any control flow depending on dynamic
+variables will fail, since decompositions are applied at compile time:
+
+.. code-block:: python
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+            ops = []
+
+            if theta == 0.3:
+                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+            else:
+                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+
+            return ops
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(theta):
+        RXX(theta, wires=[0, 1])
+        qml.Hadamard(1)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.3)
+TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
+See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+
+Instead, Catalyst control flow must be used in order to support control flow on dynamic variables:
+
+.. code-block:: python
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+
+            with qml.tape.QuantumTape() as tape:
+
+                @cond(params[0] == 0.3)
+                def branch_fn():
+                    qml.PauliRot(theta, 'XX', wires=wires)
+
+                @branch_fn.otherwise
+                def branch_fn():
+                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+
+                branch_fn()
+
+            return tape.operations
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(theta):
+        RXX(theta, wires=[0, 1])
+        qml.Hadamard(1)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.3)
+array(0.95533649)
+
+Note that here we make sure to include the Catalyst control flow within a ``QuantumTape`` context.
+This is because ``catalyst.cond`` cannot return operations, only capture queued/instantiated
+operations, but the ``Operation.compute_decomposition`` API requires that a list of operations is
+returned.
+
 Function argument restrictions
 ------------------------------
 
