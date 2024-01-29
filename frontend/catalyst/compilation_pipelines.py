@@ -582,7 +582,7 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
         canonicalizer_options = deepcopy(self.compile_options)
-        canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
+        canonicalizer_options.pipelines = [("0_canonicalize", ["canonicalize"])]
         canonicalizer_options.lower_to_llvm = False
         canonicalizer = Compiler(canonicalizer_options)
         _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)

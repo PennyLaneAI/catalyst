@@ -1538,7 +1538,7 @@ def _scalar_abstractify(t):
     # pylint: disable=protected-access
     if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
-    raise TypeError(f"Cannot convert given type {t} scalar ShapedArray.")
+    raise TypeError(f"Cannot convert given type {t} to scalar ShapedArray.")
 
 
 # pylint: disable=protected-access
