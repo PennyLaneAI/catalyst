@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* Catalyst control-flow primitives are now compatible with Jax dynamic API. For-loops, while-loops
+* Catalyst control-flow primitives are now compatible with dynamic arrays. For-loops, while-loops
   and conditionals can now accept and return tensors with dynamic dimensions.
   [(#370)](https://github.com/PennyLaneAI/catalyst/pull/370)
 
