@@ -42,6 +42,8 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 David Ittah.
 
+# Release 0.4.0
+
 <h3>New features</h3>
 
 * Catalyst is now accessible directly within the PennyLane user interface,
