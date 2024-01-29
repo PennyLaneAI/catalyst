@@ -32,12 +32,6 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-    
-    - name: Setup Runner Environment
-      id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
-      with:
-        python_version: ${{ matrix.python_version }}
 
     - name: Setup Runner Environment
       id: setup_env
