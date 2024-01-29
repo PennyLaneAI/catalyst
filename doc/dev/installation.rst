@@ -159,30 +159,21 @@ beyond ``lightning.qubit``, please follow the instructions below.
 Runtime
 """""""
 
-By default, the runtime builds and installs the `PennyLane-Lightning
-<https://github.com/PennyLaneAI/pennylane-lightning>`_ simulator device, which requires C++20
-standard library features. Older C++ compilers may not support this, so it is recommended to use a
-modern compiler with these features. An additional dependency, the `QIR
-standard library <https://github.com/qir-alliance/qir-runner>`_, is automatically fetched and
-built on supported platforms.
+By default, the runtime builds and installs all supported backend devices, enabling the execution of
+quantum circuits on CPUs, GPUs, and remote services, such as Amazon Braket.
+The `PennyLane-Lightning<https://github.com/PennyLaneAI/pennylane-lightning>`_ suite devices require
+C++20 standard library features. Older C++ compilers may not support this, so it is recommended to use a
+modern compiler with these features.
+
+The full list of supported backends, and additional configuration options, are available in the
+`Catalyst Runtime <https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html>`_
+page.
 
 From the root project directory, the runtime can then be built as follows:
 
 .. code-block:: console
 
   make runtime
-
-Additional devices are constantly added, enabling the execution of quantum circuits on CPUs, GPUs,
-and remote services, such as Amazon Braket. The full list of supported backends, and additional
-configuration options, are available in the
-`Catalyst Runtime <https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html>`_
-page.
-
-To install Catalyst with all available backends, simply run:
-
-.. code-block:: console
-
-  make runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
 MLIR Dialects
 """""""""""""

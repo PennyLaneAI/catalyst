@@ -63,7 +63,6 @@ def circuit():
 
 print(circuit.mlir)
 
-
 # CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("braket.local.qubit", wires=2, shots=100))
