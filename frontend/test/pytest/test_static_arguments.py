@@ -69,14 +69,12 @@ class TestStaticArguments:
             return x + y.val
 
         assert f(1, MyClass(5)) == 6
-        # Since a function's shared_object will be closed and reopened, we check if
-        # the old function and the new one use the same binary file.
-        function_shared_object_file = f.compiled_function.shared_object_file
+        function = f.compiled_function
         assert f(1, MyClass(7)) == 8
-        assert function_shared_object_file != f.compiled_function.shared_object_file
+        assert function != f.compiled_function
         # Same static argument should not trigger re-compilation.
         assert f(2, MyClass(5)) == 7
-        assert function_shared_object_file == f.compiled_function.shared_object_file
+        assert function == f.compiled_function
 
     def test_multiple_static_arguments(self):
         """Test QJIT with more than one static arguments."""
@@ -95,11 +93,11 @@ class TestStaticArguments:
             return x.val + y + z.val
 
         assert f(MyClass(5), 1, MyClass(5)) == 11
-        function_shared_object_file = f.compiled_function.shared_object_file
+        function = f.compiled_function
         assert f(MyClass(7), 1, MyClass(7)) == 15
-        assert function_shared_object_file != f.compiled_function.shared_object_file
+        assert function != f.compiled_function
         assert f(MyClass(5), 2, MyClass(5)) == 12
-        assert function_shared_object_file == f.compiled_function.shared_object_file
+        assert function == f.compiled_function
 
     def test_mutable_static_arguments(self):
         """Test QJIT with mutable static arguments."""
@@ -123,11 +121,11 @@ class TestStaticArguments:
 
         my_obj = MyClass(5, 5)
         assert f(1, my_obj) == 11
-        function_shared_object_file = f.compiled_function.shared_object_file
+        function = f.compiled_function
         # Changing mutable object should introduce re-compilation.
         my_obj.val_1 = 3
         assert f(1, my_obj) == 9
-        assert function_shared_object_file != f.compiled_function.shared_object_file
+        assert function != f.compiled_function
 
 
 if __name__ == "__main__":
