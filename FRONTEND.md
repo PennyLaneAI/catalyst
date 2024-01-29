@@ -14,6 +14,7 @@ Catalyst frontend architecture
   * [Primitives and binding](#primitives-and-binding)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
 * [Tracing problem](#tracing-problem)
+* [Catalyst implementation details](#catalyst-implementation-details)
 
 <!-- vim-markdown-toc -->
 
@@ -231,8 +232,8 @@ more details and give source references.
   signature**.
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L817)
 - $initialize()$  reads the input type information and creates the required tracers in the inner
-  tracing context. Note that the function needs an access to input type in order to interpret **de
-  Brjuin indices** which might be contained in inputs.
+  tracing context. Note that the function interprets **de Brjuin indices** which might exist in
+  inputs.
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L625)
   (inputs)
   [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L640)
@@ -240,5 +241,8 @@ more details and give source references.
 - $traceNested()$ runs the next recursion step of the tracing. It takes collapsed (not-expanded)
   **list of input tracers** and calculates the **list of output tracers**.
 
+Catalyst implementation details
+-------------------------------
 
+TODO
 
