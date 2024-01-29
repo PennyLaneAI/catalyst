@@ -2,8 +2,14 @@
 
 <h3>Improvements</h3>
 
-* Catalyst wheels are now packaged with OpenMP and ZStd.
+* Catalyst wheels are now packaged with OpenMP and ZStd, which avoids installing additional
+  requirements separately in order to use pre-packaged Catalyst binaries.
   [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
+  [(#478)](https://github.com/PennyLaneAI/catalyst/pull/478)
+
+  Note that OpenMP support for the `lightning.kokkos` backend has been disabled on macOS x86_64, due
+  to memory issues in the computation of Lightning's adjoint-jacobian in the presence of multiple
+  OMP threads.
 
 <h3>Bug fixes</h3>
 
@@ -46,10 +52,6 @@
 * Resolve a memory leak in the runtime stemming from  missing calls to device destructors
   at the end of programs.
   [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
-
-* OpenMP support for the `lightning.kokkos` backend has been disabled on macOS x86_64,
-  due to memory issues in the computation of Lightning's adjoint-jacobian in the presence of multiple OMP threads.
-  [(#478)](https://github.com/PennyLaneAI/catalyst/pull/478)
 
 <h3>Contributors</h3>
 
