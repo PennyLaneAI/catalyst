@@ -47,6 +47,10 @@
   at the end of programs.
   [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
 
+* OpenMP support for the `lightning.kokkos` backend has been disabled on macOS x86_64,
+  due to memory issues in the computation of Lightning's adjoint-jacobian in the presence of multiple OMP threads.
+  [(#478)](https://github.com/PennyLaneAI/catalyst/pull/478)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
