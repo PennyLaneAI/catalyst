@@ -130,6 +130,8 @@ class TestBraketGates:
             qml.PhaseShift(x, wires=0)
             qml.PhaseShift(y, wires=1)
 
+            qml.PSWAP(x, wires=[0, 2])
+
             return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 
         qjit_fn = qjit()(qml.qnode(device)(circuit))

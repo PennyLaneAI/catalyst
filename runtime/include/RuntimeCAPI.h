@@ -77,6 +77,8 @@ void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, bool);
 void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, bool);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, bool);
 void __catalyst__qis__MultiRZ(double, bool /*adjoint*/, int64_t, /*qubits*/...);
+void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, bool /*adjoint*/);
+void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, bool /*adjoint*/);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
