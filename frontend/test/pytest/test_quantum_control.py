@@ -19,6 +19,7 @@
 from typing import Callable
 
 import pennylane as qml
+import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
@@ -295,6 +296,130 @@ def test_control_outside_qjit():
     assert C_ctrl(
         qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3
     ) == PL_ctrl(qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3)
+
+
+def test_qctrl_wires(backend):
+    """Test the wires property of QCtrl"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(theta):
+        def func(theta):
+            qml.RX(theta, wires=[0])
+            qml.Hadamard(2)
+            qml.CNOT([0, 2])
+
+        qctrl = C_ctrl(func, control=[1])(theta)
+        return qctrl.wires
+
+    # Without the `wires` property, returns `[-1]`
+    assert circuit(0.3) == qml.wires.Wires([1, 0, 2])
+
+
+def test_qctrl_wires_arg_fun(backend):
+    """Test the wires property of QCtrl with argument wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=4))
+    def circuit():
+        def func(anc, wires):
+            qml.Hadamard(anc)
+            h = pnp.array([[1, 1], [1, -1]]) / pnp.sqrt(2)
+            qml.ctrl(qml.BlockEncode, control=anc)(h, wires=wires)
+            qml.Hadamard(anc)
+
+        qctrl = C_ctrl(func, control=[1])(0, [2, 3])
+        return qctrl.wires
+
+    assert circuit() == qml.wires.Wires([1, 0, 2, 3])
+
+
+def test_qctrl_var_wires(backend):
+    """Test the wires property of QCtrl with variable wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=4))
+    def circuit(anc, wires):
+        def func(anc, wires):
+            qml.Hadamard(anc)
+            h = pnp.array([[1, 1], [1, -1]]) / pnp.sqrt(2)
+            qml.ctrl(qml.BlockEncode, control=anc)(h, wires=wires)
+            qml.Hadamard(anc)
+
+        qctrl = C_ctrl(func, control=[1])(anc, wires)
+        return qctrl.wires
+
+    assert circuit(0, [2, 3]) == qml.wires.Wires([1, 0, 2, 3])
+
+
+def test_qctrl_wires_nested(backend):
+    """Test the wires property of QCtrl with nested branches"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=4))
+    def circuit(theta, w1, w2, cw1, cw2):
+        def _func1():
+            qml.RX(theta, wires=[w1])
+
+            def _func2():
+                qml.RY(theta, wires=[w2])
+
+            C_ctrl(_func2, control=[cw2], control_values=[True])()
+
+            qml.RZ(theta, wires=w1)
+
+        qctrl = C_ctrl(_func1, control=[cw1], control_values=[True])()
+        return qctrl.wires
+
+    assert circuit(0.1, 0, 1, 2, 3) == qml.wires.Wires([2, 0, 3, 1])
+
+
+def test_qctrl_work_wires(backend):
+    """Test the wires property of QCtrl with work-wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=5))
+    def circuit(theta):
+        def _func1():
+            qml.RX(theta, wires=[0])
+
+            def _func2():
+                qml.RY(theta, wires=[0])
+
+            C_ctrl(_func2, control=[3], work_wires=[4])()
+
+            qml.RZ(theta, wires=[0])
+
+        qctrl = C_ctrl(_func1, control=[1], work_wires=[2])()
+        return qctrl.wires
+
+    assert circuit(0.1) == qml.wires.Wires([1, 0, 3, 4, 2])
+
+
+@pytest.mark.xfail(reason="ctrl.wires fails in control-flow branches is not supported")
+def test_qctrl_wires_controlflow(backend):
+    """Test the wires property of QCtrl with control flow branches"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(theta, w1, w2, cw):
+        def _func():
+            qml.RX(theta, wires=[w1])
+            s = 0
+
+            @for_loop(0, w2, 1)
+            def _for_loop(i, s):
+                qml.RY(theta, wires=i)
+                return s + 1
+
+            s = _for_loop(s)
+            qml.RZ(s * theta, wires=w1)
+
+        qctrl = C_ctrl(_func, control=[cw], control_values=[True])()
+        return qctrl.wires
+
+    # It returns `[2, 0, -1]`
+    assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
 
 
 if __name__ == "__main__":

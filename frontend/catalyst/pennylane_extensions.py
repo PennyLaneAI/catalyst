@@ -238,12 +238,12 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config):
-        # We currently override and only set MultiControlledX to preserve current behaviour.
+        # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
         # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX"}
+        return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
     def _check_mid_circuit_measurement(config):
@@ -1305,6 +1305,14 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+    @property
+    def wires(self):
+        """The list of all static wires."""
+
+        assert len(self.regions) == 1, "Adjoint is expected to have one region"
+        total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
+        return total_wires
+
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
 #       to this class whenever a qjit context is active.
@@ -1339,6 +1347,18 @@ class QCtrl(HybridOp):
             self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def wires(self):
+        """The list of all control-wires, work-wires, and active-wires."""
+        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+
+        total_wires = sum(
+            (op.wires for op in self.regions[0].quantum_tape.operations),
+            self._control_wires,
+        )
+        total_wires += self._work_wires
+        return total_wires
 
     @property
     def control_wires(self):
