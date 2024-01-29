@@ -1509,7 +1509,7 @@ class CondCallable:
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # FIXME: Creating output tracers like this is not quite cocrect. We need to calculate the
+        # TODO: Creating output tracers like this is not quite cocrect. We need to calculate the
         # unified result type first and only then use it as the output type of this primitive.
         out_type2 = out_types[-1]
 
