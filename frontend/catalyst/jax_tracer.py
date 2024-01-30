@@ -58,6 +58,8 @@ from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
+    InputSignature,
+    OutputSignature,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
@@ -145,8 +147,28 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 
 
 def _apply_result_type_conversion(
-    ctx, jaxpr: ClosedJaxpr, consts, target_types: List[ShapedArray], num_implicit_outputs
-):
+    ctx: JaxTracingContext,
+    jaxpr: ClosedJaxpr,
+    consts: List[Any],
+    target_types: List[ShapedArray],
+    num_implicit_outputs: int,
+) -> Tuple[InputSignature, OutputSignature]:
+    """Apply type conversion to the results of a Jaxpr program. Return full information about the
+    modified Jaxpr program.
+
+    Args:
+        ctx: Jax tracing context object.
+        jaxpr: The Jaxpr program to apply the conversion to. As any Jaxpr program, it might contain
+               both implicit and explicit arguments and results.
+        consts: List of constant values we need to know to trace this program.
+        target_types: List of types we want to convert the outputs of the program to. The list must
+                      match the number of outputs, except maybe the very last output if it is Qreg.
+        num_implicit_outputs: Number of implicit outputs found in the Jaxpr program.
+
+    Returns:
+        InputSignature: new input signature of the function
+        OutputSignature: new output signature of the function
+    """
     with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
     args = [AbstractQreg()] if with_qreg else []
 
@@ -171,9 +193,9 @@ def _apply_result_type_conversion(
 
 
 def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
-    """Unify result types of the jaxpr equations given.
+    """Unify result types of the jaxpr programs given.
     Args:
-        jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
+        jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
                                       matching sizes and numpy array shapes but dtypes might be
                                       different.
 
@@ -185,12 +207,12 @@ def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
 
     """
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
-    acc, consts2 = [], []
+    jaxpr_acc, consts2 = [], []
     for j, a in zip(jaxprs, consts):
         _, out_sig = _apply_result_type_conversion(ctx, j, a, promoted_types, num_implicit_outputs)
-        acc.append(out_sig.out_initial_jaxpr())
+        jaxpr_acc.append(out_sig.out_initial_jaxpr())
         consts2.append(out_sig.out_consts())
-    return acc, out_sig.out_type(), consts2
+    return jaxpr_acc, out_sig.out_type(), consts2
 
 
 class QRegPromise:
