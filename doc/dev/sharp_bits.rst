@@ -831,7 +831,7 @@ This is because :func:`~.cond` cannot return operations, only capture queued/ins
 operations, but the ``Operation.compute_decomposition`` API requires that a list of operations is
 returned.
 
-Note that, if preferred, AutoGraph can be experimentally enabled on a subset of code within
+If preferred, AutoGraph can be experimentally enabled on a subset of code within
 the decomposition as follows:
 
 .. code-block:: python
