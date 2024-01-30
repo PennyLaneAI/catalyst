@@ -23,8 +23,8 @@ from numpy import array_equal
 from numpy.testing import assert_allclose
 
 from catalyst import cond, for_loop, qjit, while_loop
+from catalyst.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]

@@ -61,9 +61,7 @@ from mlir_quantum.dialects.quantum import (
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 
-from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
-from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.jax_extras import (
+from catalyst.jax_extras import (
     ClosedJaxpr,
     DynshapePrimitive,
     cond_expansion_strategy,
@@ -71,6 +69,8 @@ from catalyst.utils.jax_extras import (
     infer_output_type_jaxpr,
     while_loop_expansion_strategy,
 )
+from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 
 # pylint: disable=unused-argument,too-many-lines
 

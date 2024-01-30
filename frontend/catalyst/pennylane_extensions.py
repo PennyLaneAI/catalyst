@@ -43,6 +43,29 @@ from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (  # infer_output_type3,
+    ClosedJaxpr,
+    DynamicJaxprTracer,
+    Jaxpr,
+    ShapedArray,
+    _input_type_to_tracers,
+    collapse,
+    cond_expansion_strategy,
+    convert_constvars_jaxpr,
+    deduce_avals,
+    deduce_signatures,
+    expand_args,
+    expand_results,
+    find_top_trace,
+    for_loop_expansion_strategy,
+    get_implicit_and_explicit_flat_args,
+    input_type_to_tracers,
+    jaxpr_pad_consts,
+    new_inner_tracer,
+    output_type_to_tracers,
+    unzip2,
+    while_loop_expansion_strategy,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     GradParams,
@@ -72,29 +95,6 @@ from catalyst.jax_tracer import (
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.jax_extras import (  # infer_output_type3,
-    ClosedJaxpr,
-    DynamicJaxprTracer,
-    Jaxpr,
-    ShapedArray,
-    _input_type_to_tracers,
-    collapse,
-    cond_expansion_strategy,
-    convert_constvars_jaxpr,
-    deduce_avals,
-    deduce_signatures,
-    expand_args,
-    expand_results,
-    find_top_trace,
-    for_loop_expansion_strategy,
-    get_implicit_and_explicit_flat_args,
-    input_type_to_tracers,
-    jaxpr_pad_consts,
-    new_inner_tracer,
-    output_type_to_tracers,
-    unzip2,
-    while_loop_expansion_strategy,
-)
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import extract_backend_info, get_lib_path
 

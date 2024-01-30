@@ -44,6 +44,7 @@ from mlir_quantum.runtime import (
 import catalyst
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
@@ -52,7 +53,6 @@ from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
