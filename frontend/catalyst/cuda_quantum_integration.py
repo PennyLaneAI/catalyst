@@ -483,8 +483,8 @@ def change_device_to_cuda_device(ctx):
 
     kernel = cudaq_make_kernel()
     outvals = [kernel]
-    outvars = [ctx.new_variable(AbsCudaKernel())]
-    safe_map(ctx.write, outvars, outvals)
+    outvariables = [ctx.new_variable(AbsCudaKernel())]
+    safe_map(ctx.write, outvariables, outvals)
     return kernel, shots
 
 
@@ -506,8 +506,8 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
 
     # We are creating a new variable that will replace the old
     # variable.
-    outvars = [ctx.new_variable(AbsCudaQReg())]
-    safe_map(ctx.replace, eqn.outvars, outvars)
+    outvariables = [ctx.new_variable(AbsCudaQReg())]
+    safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
     return register
 
@@ -526,10 +526,10 @@ def change_register_getitem(ctx, eqn):
     idx = invals[1]
     cuda_qubit = qreg_getitem(register, idx)
 
-    outvars = [ctx.new_variable(AbsCudaQbit())]
+    outvariables = [ctx.new_variable(AbsCudaQbit())]
     outvals = [cuda_qubit]
 
-    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
@@ -642,8 +642,8 @@ def change_get_state(ctx, eqn, kernel):
     # so we get it from the parameter.
     cuda_state = cudaq_getstate(kernel)
     outvals = [cuda_state]
-    outvars = [ctx.new_variable(AbsCudaQState())]
-    safe_map(ctx.replace, eqn.outvars, outvars)
+    outvariables = [ctx.new_variable(AbsCudaQState())]
+    safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
@@ -676,16 +676,16 @@ def change_sample_or_counts(ctx, eqn, kernel):
     if is_sample:
         shots_result = cudaq_sample(kernel, shots_count=shots)
         outvals = [shots_result]
-        outvars = [ctx.new_variable(AbsCudaSampleResult())]
-        safe_map(ctx.replace, eqn.outvars, outvars)
+        outvariables = [ctx.new_variable(AbsCudaSampleResult())]
+        safe_map(ctx.replace, eqn.outvars, outvariables)
         safe_map(ctx.write, eqn.outvars, outvals)
     else:
         shape = 2**obs_catalyst.num_qubits
         outvals = cudaq_counts(kernel, shape=shape, shots_count=shots)
         bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
         counts = jax.core.ShapedArray([shape], jax.numpy.int64)
-        outvars = [ctx.new_variable(bitstrings), ctx.new_variable(counts)]
-        safe_map(ctx.replace, eqn.outvars, outvars)
+        outvariables = [ctx.new_variable(bitstrings), ctx.new_variable(counts)]
+        safe_map(ctx.replace, eqn.outvars, outvariables)
         safe_map(ctx.write, eqn.outvars, outvals)
 
 
@@ -712,9 +712,9 @@ def change_measure(ctx, eqn, kernel):
     # Catalyst's measure op only measures in the Z basis.
     # So we map this measurement op to mz in cuda.
     result = mz_call(kernel, qubit)
-    outvars = [ctx.new_variable(AbsCudaValue()), ctx.new_variable(AbsCudaQbit())]
+    outvariables = [ctx.new_variable(AbsCudaValue()), ctx.new_variable(AbsCudaQbit())]
     outvals = [result, qubit]
-    safe_map(ctx.replace, eqn.outvars, outvars)
+    safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
     return result
 
