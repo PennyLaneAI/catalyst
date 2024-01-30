@@ -23,10 +23,6 @@
   array([1., 1., 1.])
   ```
 
-* A mitigation dialect (MLIR) was added. It initially contains a Zero Noise Extrapolation (ZNE) operation,
-  with a lowering to a global folded circuit.
-  [(#324)](https://github.com/PennyLaneAI/catalyst/pull/324)
-
 <h3>Improvements</h3>
 
 * Add support for the `BlockEncode` operator in Catalyst.
@@ -220,26 +216,6 @@ Erick Ochoa Lopez.
 
 * Preliminary support for PennyLane transforms has been added.
   [(#280)](https://github.com/PennyLaneAI/catalyst/pull/280)
-
-* Jax dynamic API is enabled and the intial support for dynamically-shaped arrays is added.
-  Catalyst now accepts tensors whose dimensions are not known at the compile time in the top-level
-  programs. Standard tensor initialisation functions `jax.numpy.ones/zeros/empty` now accept
-  variables in shapes. Support for dynamic arrays in control-flow primitives is yet to be done.
-  [(#366)](https://github.com/PennyLaneAI/catalyst/pull/366)
-
-  ``` python
-  @qjit
-  def func(size:int):
-      return jax.numpy.ones([size,size], dtype=float)
-  ```
-
-* The plugin system of Catalyst for backend devices. This system in runtime
-  is backed by `dlopen` and enables the devices to be packaged separately from
-  the runtime CAPI and loaded at run time instead of being linked at compile time.
-  This provides flexibility and extensibility to Catalyst allowing users to
-  load quantum devices dynamically.
-  [(#343)](https://github.com/PennyLaneAI/catalyst/pull/343)
-  [(#400)](https://github.com/PennyLaneAI/catalyst/pull/400)
 
   ```python
   @qjit
