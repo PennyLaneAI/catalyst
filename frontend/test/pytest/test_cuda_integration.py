@@ -24,6 +24,11 @@ from catalyst.compilation_pipelines import QJIT, QJIT_CUDA
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
 
+# This import is here on purpose. We shouldn't ever import CUDA
+# when we are running kokkos. Importing CUDA before running any kokkos
+# kernel polutes the environment and will create a segfault.
+# pylint: disable=import-outside-toplevel
+
 
 @pytest.mark.cuda
 class TestCuda:
@@ -46,7 +51,7 @@ class TestCuda:
 
         opts = CompileOptions()
         expected_jaxpr = QJIT(circuit_foo, opts).jaxpr
-        observed_jaxpr, out_tree = QJIT_CUDA(circuit_foo, opts).get_jaxpr()
+        observed_jaxpr, _ = QJIT_CUDA(circuit_foo, opts).get_jaxpr()
         assert str(expected_jaxpr) == str(observed_jaxpr)
 
     def test_qjit_cuda_remove_host_context(self):
@@ -57,8 +62,7 @@ class TestCuda:
             return qml.state()
 
         opts = CompileOptions()
-        expected_jaxpr = QJIT(circuit_foo, opts).jaxpr
-        observed_jaxpr, out_tree = QJIT_CUDA(circuit_foo, opts).get_jaxpr()
+        observed_jaxpr, _ = QJIT_CUDA(circuit_foo, opts).get_jaxpr()
         jaxpr = remove_host_context(observed_jaxpr)
         assert jaxpr
 
@@ -114,7 +118,7 @@ class TestCuda:
         assert "shots_count=30" in str(cuda_jaxpr)
         # Due to non-determinism, let's just check the length of the samples
 
-        expected_shape = circuit_foo()
+        circuit_foo()
         observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)[0]
         assert len(observed) == 30
 
@@ -162,4 +166,4 @@ class TestCuda:
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
 
-            cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit))()
+            jax.make_jaxpr(catalyst_to_cuda(circuit))()

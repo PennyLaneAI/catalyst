@@ -72,10 +72,10 @@ class AbsCudaQState(jax.core.AbstractValue):
     hash_value = hash("AbsCudaQState")
 
     def __eq__(self, other):
-        return isinstance(other, AbsCudaQState)
+        return isinstance(other, AbsCudaQState)  # pragma: nocover
 
     def __hash__(self):
-        return hash_value
+        return self.hash_value  # pragma: nocover
 
 
 class CudaQState(cudaq.State):
@@ -88,10 +88,10 @@ class AbsCudaQbit(jax.core.AbstractValue):
     hash_value = hash("AbsCudaQbit")
 
     def __eq__(self, other):
-        return isinstance(other, AbsCudaQbit)
+        return isinstance(other, AbsCudaQbit)  # pragma: nocover
 
     def __hash__(self):
-        return self.hash_value
+        return self.hash_value  # pragma: nocover
 
 
 class CudaQbit(cudaq._pycudaq.QuakeValue):
@@ -104,10 +104,10 @@ class AbsCudaQReg(jax.core.AbstractValue):
     hash_value = hash("AbsCudaQReg")
 
     def __eq__(self, other):
-        return isinstance(other, AbsCudaQReg)
+        return isinstance(other, AbsCudaQReg)  # pragma: nocover
 
     def __hash__(self):
-        return self.hash_value
+        return self.hash_value  # pragma: nocover
 
 
 class CudaQReg(cudaq._pycudaq.QuakeValue):
@@ -120,10 +120,10 @@ class AbsCudaValue(jax.core.AbstractValue):
     hash_value = hash("AbsCudaValue")
 
     def __eq__(self, other):
-        return isinstance(other, AbsCudaValue)
+        return isinstance(other, AbsCudaValue)  # pragma: nocover
 
     def __hash__(self):
-        return self.hash_value
+        return self.hash_value  # pragma: nocover
 
 
 class CudaValue(cudaq._pycudaq.QuakeValue):
@@ -136,10 +136,10 @@ class AbsCudaKernel(jax.core.AbstractValue):
     hash_value = hash("AbsCudaKernel")
 
     def __eq__(self, other):
-        return isinstance(other, AbsCudaKernel)
+        return isinstance(other, AbsCudaKernel)  # pragma: nocover
 
     def __hash__(self):
-        return self.hash_value
+        return self.hash_value  # pragma: nocover
 
 
 class CudaKernel(cudaq._pycudaq.QuakeValue):
@@ -152,10 +152,10 @@ class AbsCudaSampleResult(jax.core.AbstractValue):
     hash_value = hash("AbsCudaSampleResult")
 
     def __eq__(self, other):
-        return isinstance(other, AbsCudaSampleResult)
+        return isinstance(other, AbsCudaSampleResult)  # pragma: nocover
 
     def __hash__(self):
-        return self.hash_value
+        return self.hash_value  # pragma: nocover
 
 
 class CudaSampleResult(cudaq.SampleResult):
@@ -285,7 +285,8 @@ def cudaq_getstate_primitive_abs(_kernel):
 # Return the `Kernel` as a string in its MLIR representation using the Quke dialect.
 # SKIP
 
-# Just-In-Time (JIT) compile `self` (`Kernel`) and call the kernel function at the provided concrete arguments.
+# Just-In-Time (JIT) compile `self` (`Kernel`) and call the kernel function at the provided
+# concrete arguments.
 # __call__(self: cudaq.Kernel, *args) -> None
 # SKIP
 
@@ -451,8 +452,8 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
 def cudaq_counts_abs(kernel, shape, shots_count=1000):
     """Abstract evaluation."""
     bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
-    counts = jax.core.ShapedArray([shape], jax.numpy.int64)
-    return bitstrings, counts
+    counts_shape = jax.core.ShapedArray([shape], jax.numpy.int64)
+    return bitstrings, counts_shape
 
 
 # SKIP Async for the time being
@@ -524,7 +525,7 @@ def get_instruction(jaxpr, primitive):
         if eqn.primitive == primitive:
             return eqn
 
-    return None
+    return None  # pragma: nocover
 
 
 class TranslatorContext:
