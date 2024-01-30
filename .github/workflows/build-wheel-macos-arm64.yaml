@@ -13,12 +13,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_if_wheel_build_required:
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
   constants:
+    needs: [check_if_wheel_build_required]
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
   build-dependencies:
-    needs: [constants]
+    needs: [constants, check_if_wheel_build_required]
 
     strategy:
       fail-fast: false
@@ -28,6 +33,8 @@ jobs:
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
+
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
     - name: Checkout Catalyst repo
