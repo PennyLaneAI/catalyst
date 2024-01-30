@@ -4,6 +4,29 @@
 
 <h3>Improvements</h3>
 
+* Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
+
+  ```py
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("braket.local.qubit", wires=2, shots=100)
+
+  @qjit
+  @qml.qnode(dev)
+  def f(x: float):
+      qml.Hadamard(0)
+      qml.PSWAP(x, wires=[0, 1])
+      qml.ISWAP(wires=[1, 0])
+      return qml.probs()
+  ```
+
+would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
+  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
+
+* Add support for the `BlockEncode` operator in Catalyst.
+  [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
+
 * Remove copies of TOML device configuration files for Lightning device in Catalyst.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
 
@@ -14,6 +37,44 @@
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
 
 <h3>Breaking changes</h3>
+
+* The Catalyst runtime now has a different API from QIR instructions.
+  [(#464)](https://github.com/PennyLaneAI/catalyst/pull/464)
+
+  QIR encodes quantum instructions as LLVM function calls. This allows frontends to generate
+  QIR, middle-ends to optimizie QIR, and code generators to lower these function calls into
+  appropriate instructions for the target. One of the possible implementations for QIR is to
+  lower QIR instructions to function calls with the same signature and implement QIR as a library.
+  Other implementations might choose to lower QIR to platform specific APIs, or replace function
+  calls with semantically equivalent code.
+
+  Catalyst implemented QIR as a library that can be linked against a QIR module.
+  This works great when Catalyst is the only implementor of QIR.
+  However, when other QIR implementors, who also lower implement a quantum runtime as functions to be
+  linked against, this may generate symbol conflicts.
+
+  This PR changes the runtime such that QIR instructions are now lowered to functions where
+  the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
+  the possibility of symbol conflicts with other libraries that implement QIR as a library.
+  However, it doesn't solve it completely. Since the `__catalyst__` functions are still exported.
+  If another library implemented the same symbols exported by the runtime, the same problem would
+  presist.
+
+* The Catalyst runtime no longer depends on QIR runner's stdlib.
+  [(#470)](https://github.com/PennyLaneAI/catalyst/pull/470)
+
+  Similar to changing the runtime API for QIR instructions, we no longer depend nor link against
+  QIR runner's stdlib. With PR #464, most of the symbol conflicts were resolved, but by linking
+  against QIR runner's stdlib, some definitions persisted that may be different than ones
+  used by third party implementors. To prevent symbol conflicts QIR runner's stdlib was removed
+  and is no longer linked against. As a result, the following functions are now defined and
+  implemented in Catalyst's runtime:
+  * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
+  * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
+  
+  and the following functions were removed since the frontend does not generate them
+  * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
+  * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
 
@@ -57,13 +118,30 @@
   at the end of programs.
   [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
 
+* Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
+  qubit re-allocation.
+  [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
+
+* Add the `wires` property to `catalyst.adjoint` and `catalyst.ctrl`.
+  [(#480)](https://github.com/PennyLaneAI/catalyst/pull/480)
+
+  Without implementing the `wires` property, users would get `<Wires = [<WiresEnum.AnyWires: -1>]>`
+  for the list of wires in these operations.
+  Currently, `catalyst.adjoint.wires` supports static wires and workflows with nested branches,
+  and `catalyst.ctrl.wires` provides support for workflows with static and variable wires as well as
+  nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
+  control flow operations.
+
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Mikhail Andrenkov,
 Ali Asadi,
-David Ittah.
+David Ittah,
+Erick Ochoa Lopez,
+Haochen Paul Wang.
 
 # Release 0.4.0
 
