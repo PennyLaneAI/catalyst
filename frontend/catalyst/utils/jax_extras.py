@@ -574,6 +574,8 @@ def make_jaxpr2(
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
+    # TODO: Use `deduce_signatures` here. Ideally, unify this function with the
+    # `jax_tracer.trace_function` function.
 
     def abstractify(args, kwargs):
         flat_args, in_tree = tree_flatten((args, kwargs))

@@ -1414,27 +1414,16 @@ def _for_loop_lowering(
 
     loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
-    # all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
-    # Remove header values: lower_bound, upper_bound, step
-    # assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[:3]
-    # loop_carry_types_plus_consts = all_param_types_plus_consts[3:]
+    all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[
+        body_nconsts + nimplicit : body_nconsts + nimplicit + 3
+    ]
+    assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
 
-    # Remove loop body constants.
-    # assert [val.type for val in body_consts] == loop_carry_types_plus_consts[:body_nconsts]
-    # loop_carry_types = loop_carry_types_plus_consts[body_nconsts:]
-
-    # Overwrite the type of the iteration index determined by JAX (= type of lower bound)
-    # in favor of the 'index' type expected by MLIR.
-    # loop_carry_types[0] = ir.IndexType.get()
-
-    # Don't include the iteration index in the result types.
-    # result_types = loop_carry_types[1:]
-    # assert [val.type for val in loop_args] == result_types
-    # assert result_types == [
-    #     mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
-    # ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
-
-    # loop_operands = [*body_implicit]
+    result_types = [v.type for v in loop_args]
+    assert result_types == [
+        mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
+    ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
 
     def _cast_to_index(p):
         p = TensorExtractOp(
@@ -1470,7 +1459,6 @@ def _for_loop_lowering(
 
     name_stack = jax_ctx.module_context.name_stack.extend("for")
     body_block = for_op_scf.body
-    # body_block = for_op_scf.regions[0].blocks.append(*loop_args)
     body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
 
     with ir.InsertionPoint(body_block):
@@ -1490,10 +1478,10 @@ def _for_loop_lowering(
         body_args = [
             [a]
             for a in (
-                *body_consts,
-                *body_args[1 : nimplicit + 1],
-                body_args[0],
-                *body_args[nimplicit + 1 :],
+                *body_consts,  # constants
+                *body_args[1 : nimplicit + 1],  # implicit arguments
+                body_args[0],  # loop iterator
+                *body_args[nimplicit + 1 :],  # explicit arguments
             )
         ]
 

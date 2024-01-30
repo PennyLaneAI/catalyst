@@ -385,7 +385,8 @@ def trace_function(
     """Trace classical Python function containing no quantum computations. Arguments and results of
     the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
     resulting Jaxpr program might or might not preserve sharing among the dynamic dimension
-    variables.
+    variables. The support for expansion options makes this function different from
+    `jax_extras.make_jaxpr2`.
 
     Args:
         ctx: Jax tracing context helper.
