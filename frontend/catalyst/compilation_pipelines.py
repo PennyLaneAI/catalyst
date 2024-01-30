@@ -798,7 +798,7 @@ class QJIT:
 
         args_data, _args_shape = tree_flatten(args)
         if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
-            # Only compile a derivative version of the compiled function when happened.
+            # Only compile a derivative version of the compiled function when needed.
             if self.jaxed_function is None or recompilation_happened:
                 self.jaxed_function = JAX_QJIT(self)
 
