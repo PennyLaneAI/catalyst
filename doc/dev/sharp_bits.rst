@@ -791,7 +791,7 @@ variables will fail, since decompositions are applied at compile time:
 TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
 See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
 
-Instead, Catalyst control flow must be used in order to support control flow on dynamic variables:
+Instead, Catalyst control flow (such as :func:`~.cond` and :func:`.for_loop`) must be used in order to support control flow on dynamic variables:
 
 .. code-block:: python
 
