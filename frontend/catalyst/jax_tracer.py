@@ -58,6 +58,7 @@ from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
+    ExpansionStrategy,
     InputSignature,
     OutputSignature,
     PyTreeDef,
@@ -378,8 +379,26 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
-def trace_function(ctx, fun, *args, expansion_strategy, **kwargs):
-    """Trace Python function supporting variable dimensions in its arguments and/or results"""
+def trace_function(
+    ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Trace classical Python function containing no quantum computations. Arguments and results of
+    the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
+    resulting Jaxpr program might or might not preserve sharing among the dynamic dimension
+    variables.
+
+    Args:
+        ctx: Jax tracing context helper.
+        fun: Callable python function.
+        expansion_strategy: dynamic dimension expansion options.
+        *args: Sample positional arguments of the function.
+        **kwargs: Sample keyword arguments of the function.
+
+    Result:
+        List of output Jax tracers
+        InputSignature of the resulting Jaxpr program
+        OutputSignature of the resulting Jaxpr program
+    """
     wfun, in_sig, out_sig = deduce_signatures(
         fun, args, kwargs, expansion_strategy=expansion_strategy
     )
