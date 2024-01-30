@@ -327,6 +327,22 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 def trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs):
+    """Trace a function to JAXPR.
+
+    Args:
+        func: python function to be lowered
+        abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
+            sizes.
+        args: arguments to ``func``
+        kwargs: keyword arguments to ``func``
+
+    Returns:
+        ClosedJaxpr: the Jaxpr program corresponding to ``func``
+        ClosedJaxpr: the Jaxpr program corresponding to ``func`` without implicit result values.
+        jax.OutputType: Jaxpr output type (a list of abstract values paired with
+                        explicintess flags).
+        PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
+    """
     # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
     # which do not exist in the current translation unit will be assumed to exist if an equivalent
     # python function is seen in the cache. This happens during testing or if we wanted to compile a

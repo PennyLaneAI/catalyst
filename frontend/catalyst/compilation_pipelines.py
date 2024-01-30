@@ -1163,6 +1163,12 @@ class JAX_QJIT:
 
 
 def qjit_cuda(fn=None):
+    """Wrapper around QJIT for CUDA-quantum."""
+
+    # This import is here on purpose. We shouldn't ever import CUDA
+    # when we are running kokkos. Importing CUDA before running any kokkos
+    # kernel polutes the environment and will create a segfault.
+    # pylint: disable=import-outside-toplevel
     from catalyst.cuda_quantum_integration import catalyst_to_cuda
 
     if fn is not None:
@@ -1187,6 +1193,7 @@ def qjit_catalyst(
     static_argnums=None,
     abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
+    """Wrapper around QJIT for Catalyst."""
     argnums = static_argnums
     axes = abstracted_axes
     if fn is not None:
