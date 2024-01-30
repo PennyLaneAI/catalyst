@@ -101,7 +101,7 @@ multiple devices into the same library. However, it is important that the device
 be unique, as best as possible, to avoid clashes with other plugins.
 
 Importantly, the ``<DeviceIdentifier>`` string in the entry point function needs to match
-exactly what is supplied to the ``__quantum__rt__device("rtd_name", "<DeviceIdentifier>")``
+exactly what is supplied to the ``__catalyst__rt__device("rtd_name", "<DeviceIdentifier>")``
 runtime instruction in compiled user programs, or what is returned from the ``get_c_interface``
 function when integrating the device into a PennyLane plugin. Please see the "Integration with
 Python devices" section further down for details.

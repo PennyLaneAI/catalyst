@@ -229,14 +229,29 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
     RT_ASSERT(Catalyst::Runtime::CTX->getMemoryManager() != nullptr);
     RT_ASSERT(num_qubits >= 0);
 
-    QirArray *qubit_array = __quantum__rt__array_create_1d(sizeof(QubitIdType), num_qubits);
-    const auto &&qubit_vector =
+    // For first prototype, we just want to make this work.
+    // But ideally, I think the device should determine the representation.
+    // Essentially just forward this to the device library.
+    // And the device library can choose how to handle everything.
+    std::vector<QubitIdType> qubit_vector =
         Catalyst::Runtime::getQuantumDevicePtr()->AllocateQubits(num_qubits);
-    for (int64_t idx = 0; idx < num_qubits; idx++) {
-        *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qubit_array, idx)) =
-            reinterpret_cast<QUBIT *>(qubit_vector[idx]);
-    }
-    return qubit_array;
+
+    // I don't like this copying.
+    std::vector<QubitIdType> *qubit_vector_ptr =
+        new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.end());
+
+    // Because this function is interfacing with C
+    // I think we should return a trivial-type
+    //     https://en.cppreference.com/w/cpp/named_req/TrivialType
+    // Why should we return a trivial type?
+    //
+    // Paraphrasing from stackoverflow: https://stackoverflow.com/a/72409589
+    //     extern "C" will avoid name mangling from happening.
+    //     It doesn't prevent a function from returning or accepting a C++ type.
+    //     But the calling language needs to understand the data-layout for the
+    //     type being returned.
+    //     For non-trivial types, this will be difficult to impossible.
+    return (QirArray *)qubit_vector_ptr;
 }
 
 void __catalyst__rt__qubit_release(QUBIT *qubit)
@@ -247,23 +262,15 @@ void __catalyst__rt__qubit_release(QUBIT *qubit)
 
 void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
 {
-    // Update the reference count of qubit_array by -1
-    // It will deallocates it iff the reference count becomes 0
-    // The behavior is undefined if the reference count becomes < 0
-    __quantum__rt__array_update_reference_count(qubit_array, -1);
-
     Catalyst::Runtime::getQuantumDevicePtr()->ReleaseAllQubits();
+    std::vector<QubitIdType> *qubit_array_ptr =
+        reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
+    delete qubit_array_ptr;
 }
 
 int64_t __catalyst__rt__num_qubits()
 {
     return static_cast<int64_t>(Catalyst::Runtime::getQuantumDevicePtr()->GetNumQubits());
-}
-
-QirString *__catalyst__rt__qubit_to_string(QUBIT *qubit)
-{
-    return __quantum__rt__string_create(
-        std::to_string(reinterpret_cast<QubitIdType>(qubit)).c_str());
 }
 
 bool __catalyst__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) || (*r0 == *r1); }
@@ -273,13 +280,6 @@ RESULT *__catalyst__rt__result_get_one() { return Catalyst::Runtime::getQuantumD
 RESULT *__catalyst__rt__result_get_zero()
 {
     return Catalyst::Runtime::getQuantumDevicePtr()->Zero();
-}
-
-QirString *__catalyst__rt__result_to_string(RESULT *result)
-{
-    return __catalyst__rt__result_equal(result, __catalyst__rt__result_get_one())
-               ? __quantum__rt__string_create("true")   // one
-               : __quantum__rt__string_create("false"); // zero
 }
 
 void __catalyst__qis__Gradient(int64_t numResults, /* results = */...)
@@ -857,5 +857,18 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shot
         Catalyst::Runtime::getQuantumDevicePtr()->PartialCounts(eigvals_view, counts_view, wires,
                                                                 shots);
     }
+}
+
+int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
+{
+    std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+    return qubit_vector_ptr->size();
+}
+
+int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
+{
+    std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+    QubitIdType *data = qubit_vector_ptr->data();
+    return (int8_t *)&data[idx];
 }
 }
