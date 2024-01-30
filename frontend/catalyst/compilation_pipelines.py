@@ -519,6 +519,7 @@ class QJIT:
         self.function_name = None
         self.preferred_workspace_dir = None
         self.stored_compiled_functions = {}
+        self.workspace_used = False
 
         functools.update_wrapper(self, fn)
 
@@ -719,6 +720,7 @@ class QJIT:
         dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
         r_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
 
+        has_been_compiled = self.compiled_function is not None
         if static_argnums:
             static_args_hash = self.get_static_args_hash(*args)
             prev_function, _ = self.stored_compiled_functions.get(static_args_hash, (None, None))
@@ -727,8 +729,13 @@ class QJIT:
                 function = prev_function
                 has_been_compiled = True
                 function.shared_object.open(function.shared_object_file, function.func_name)
-        else:
-            has_been_compiled = self.compiled_function is not None
+            elif self.workspace_used:
+                # Create a new space for the new function if the workspace is used.
+                self.workspace = WorkspaceManager.get_or_create_workspace(
+                    self.function_name, self.preferred_workspace_dir
+                )
+            # The workspace is unused only for first compilation with static arguments.
+            self.workspace_used = True
 
         next_action = TypeCompatibility.UNKNOWN
         if not has_been_compiled:
@@ -777,27 +784,22 @@ class QJIT:
             self.compiled_function, *args
         )
 
-        recompilation_needed = (
+        recompilation_happened = (
             function != self.compiled_function
         ) and function not in self.stored_compiled_functions.values()
 
         # Check if a function is created and add newly created ones into the hash table.
-        if static_argnums and recompilation_needed:
+        if static_argnums and recompilation_happened:
             static_args_hash = self.get_static_args_hash(*args)
             workspace = self.workspace
             self.stored_compiled_functions[static_args_hash] = (function, workspace)
-            # Create new space for the next function to avoid using the spaces from
-            # the previously compiled ones.
-            self.workspace = WorkspaceManager.get_or_create_workspace(
-                self.function_name, self.preferred_workspace_dir
-            )
 
         self.compiled_function = function
 
         args_data, _args_shape = tree_flatten(args)
         if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
-            # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_function is None or recompilation_needed:
+            # Only compile a derivative version of the compiled function when happened.
+            if self.jaxed_function is None or recompilation_happened:
                 self.jaxed_function = JAX_QJIT(self)
 
             return self.jaxed_function(*args, **kwargs)
