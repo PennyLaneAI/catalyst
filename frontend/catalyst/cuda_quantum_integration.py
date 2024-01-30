@@ -30,7 +30,6 @@ This module also uses the CUDA-quantum API. Here is the reference:
 
 import dataclasses
 import json
-import math
 from functools import wraps
 from typing import List
 
@@ -39,7 +38,7 @@ import jax
 from jax import numpy as jnp
 from jax._src.util import safe_map
 
-from catalyst.compilation_pipelines import QJIT_CUDA, qjit_catalyst
+from catalyst.compilation_pipelines import QJIT_CUDA
 from catalyst.compiler import CompileOptions
 from catalyst.jax_primitives import (
     AbstractObs,
@@ -56,6 +55,16 @@ from catalyst.jax_primitives import (
     state_p,
 )
 from catalyst.utils.jax_extras import remove_host_context
+
+# We disable protected access in particular to avoid warnings with
+# cudaq._pycuda.
+# pylint: disable=protected-access
+# And we disable unused-argument to avoid unused arguments in abstract_eval.
+# Particularly those kwargs.
+# pylint: disable=unused-argument
+# This is for the interpreter loop.
+# TODO: We can possibly remove the branches with a bit of indirection.
+# pylint: disable=too-many-branches
 
 
 class AbsCudaQState(jax.core.AbstractValue):
@@ -224,7 +233,7 @@ def kernel_qalloc_primitive_impl(kernel, size):
 
 
 @kernel_qalloc_p.def_abstract_eval
-def kernel_qalloc_primitive_abs(kernel, size):
+def kernel_qalloc_primitive_abs(_kernel, _size):
     """Abstract evaluation."""
     return AbsCudaQReg()
 
@@ -244,7 +253,7 @@ def qreg_getitem_primitive_impl(qreg, idx):
 
 
 @qreg_getitem_p.def_abstract_eval
-def qreg_getitem_primitive_abs(qreg, idx):
+def qreg_getitem_primitive_abs(_qreg, _idx):
     """Abstract evaluation."""
     return AbsCudaQbit()
 
@@ -264,13 +273,13 @@ def cudaq_getstate_primitive_impl(kernel):
 
 
 @cudaq_getstate_p.def_abstract_eval
-def cudaq_getstate_primitive_abs(kernel):
+def cudaq_getstate_primitive_abs(_kernel):
     """Abstract evaluation."""
     return AbsCudaQState()
 
 
-# Allocate a register of qubits of size `qubit_count` (where `qubit_count` is an existing `QuakeValue`) and return a
-# handle to them as a new `QuakeValue)
+# Allocate a register of qubits of size `qubit_count` (where `qubit_count` is an existing
+# `QuakeValue`) and return a handle to them as a new `QuakeValue)
 # SKIP
 
 # Return the `Kernel` as a string in its MLIR representation using the Quke dialect.
@@ -291,7 +300,7 @@ def make_primitive_for_gate():
       * gate_func: A convenience function for binding
       * kernel_gate_p: A JAX primitive for quantum gates.
     """
-    kernel_gate_p = jax.core.Primitive(f"kernel_inst")
+    kernel_gate_p = jax.core.Primitive("kernel_inst")
     kernel_gate_p.multiple_results = True
 
     def gate_func(kernel, *qubits_or_params, inst=None, qubits_len=-1):
@@ -314,7 +323,7 @@ def make_primitive_for_gate():
         return tuple()
 
     @kernel_gate_p.def_abstract_eval
-    def gate_abs(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+    def gate_abs(_kernel, *_qubits_or_params, inst=None, qubits_len=-1):
         """Abstract evaluation."""
         return tuple()
 
@@ -326,6 +335,8 @@ cuda_inst, cuda_inst_p = make_primitive_for_gate()
 
 @dataclasses.dataclass(frozen=True)
 class SideEffect(jax._src.effects.Effect):
+    """Side effect token."""
+
     __str__ = lambda _: "SideEffect"
 
 
@@ -354,7 +365,7 @@ def make_primitive_for_m(gate: str):
         return method(kernel, target)
 
     @kernel_gate_p.def_effectful_abstract_eval
-    def gate_abs(kernel, _target):
+    def gate_abs(_kernel, _target):
         """Abstract evaluation with side-effect."""
         effects = set()
         effects.add(SideEffect)
@@ -396,7 +407,7 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
 
 
 @cudaq_sample_p.def_abstract_eval
-def cudaq_sample_abs(kernel, *args, shots_count=1000):
+def cudaq_sample_abs(_kernel, *_args, shots_count=1000):
     """Abstract evaluation."""
     return AbsCudaSampleResult()
 
@@ -422,7 +433,7 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
     denoting the integers that can be computed from the bitstrings.
     """
 
-    strings = [x for x in range(shape)]
+    strings = list(range(shape))
     res = {str(s): 0 for s in strings}
 
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
@@ -431,9 +442,9 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
     res.update(a_dict_decimal)
 
     # The integers are actually floats in Catalyst
-    bitstrings, counts = zip(*[(float(k), v) for k, v in res.items()])
+    bitstrings, counts_items = zip(*[(float(k), v) for k, v in res.items()])
 
-    return jnp.array(bitstrings), jnp.array(counts)
+    return jnp.array(bitstrings), jnp.array(counts_items)
 
 
 @cudaq_counts_p.def_abstract_eval
@@ -499,7 +510,8 @@ def get_maximum_variable(jaxpr):
 
 
 def get_minimum_new_variable_count(jaxpr):
-    """To make sure we avoid duplicating variable names, just find the maximum variable and add one."""
+    """To make sure we avoid duplicating variable names, just find the maximum variable and add
+    one."""
     return get_maximum_variable(jaxpr) + 1
 
 
@@ -511,6 +523,8 @@ def get_instruction(jaxpr, primitive):
     for eqn in jaxpr.eqns:
         if eqn.primitive == primitive:
             return eqn
+
+    return None
 
 
 class TranslatorContext:
@@ -565,8 +579,8 @@ class TranslatorContext:
 
     def new_variable(self, _type):
         """Convenience to get a new variable of a given type."""
-        count = self.get_new_count()
-        return jax._src.core.Var(count, "", _type)
+        local_count = self.get_new_count()
+        return jax._src.core.Var(local_count, "", _type)
 
 
 def change_device_to_cuda_device(ctx):
@@ -743,7 +757,7 @@ def change_instruction(ctx, eqn, kernel):
     safe_map(ctx.write, eqn.outvars, qubits)
 
 
-def change_compbasis(ctx, eqn, kernel):
+def change_compbasis(ctx, eqn):
     """Compbasis in Catalyst essentially is the default observable."""
     assert eqn.primitive == compbasis_p
 
@@ -821,8 +835,8 @@ def change_sample_or_counts(ctx, eqn, kernel):
         shape = 2**obs_catalyst.num_qubits
         outvals = cudaq_counts(kernel, shape=shape, shots_count=shots)
         bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
-        counts = jax.core.ShapedArray([shape], jax.numpy.int64)
-        outvariables = [ctx.new_variable(bitstrings), ctx.new_variable(counts)]
+        local_counts = jax.core.ShapedArray([shape], jax.numpy.int64)
+        outvariables = [ctx.new_variable(bitstrings), ctx.new_variable(local_counts)]
         safe_map(ctx.replace, eqn.outvars, outvariables)
         safe_map(ctx.write, eqn.outvars, outvals)
 
@@ -868,8 +882,12 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     is that a new transform function will be traced."""
 
     ctx = TranslatorContext(jaxpr, consts, *args)
-    kernel, shots = change_device_to_cuda_device(ctx)
-    register = change_alloc_to_cuda_alloc(ctx, kernel)
+    # TODO: Do we need these shots?
+    # It looks like measurement operations already come with their own shots value.
+    kernel, _shots = change_device_to_cuda_device(ctx)
+    # TODO: Do we need to keep track of this register.
+    # It looks like other operations already come with the register variable.
+    _register = change_alloc_to_cuda_alloc(ctx, kernel)
     measurement_set = set()
 
     # ignore set of instructions we don't care about.
@@ -878,7 +896,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
     # Main interpreter loop.
-    for idx, eqn in enumerate(jaxpr.eqns):
+    for eqn in jaxpr.eqns:
         if eqn.primitive == state_p:
             change_get_state(ctx, eqn, kernel)
         elif eqn.primitive == qextract_p:
@@ -888,7 +906,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         elif eqn.primitive == qinst_p:
             change_instruction(ctx, eqn, kernel)
         elif eqn.primitive == compbasis_p:
-            change_compbasis(ctx, eqn, kernel)
+            change_compbasis(ctx, eqn)
         elif eqn.primitive == sample_p:
             change_sample(ctx, eqn, kernel)
         elif eqn.primitive == counts_p:
@@ -936,8 +954,10 @@ def catalyst_to_cuda(fun):
        wrapped: A wrapped function that will do the tracing.
     """
 
+    # TODO: kwargs?
+
     @wraps(fun)
-    def wrapped(*args, **kwargs):
+    def wrapped(*args, **_kwargs):
         opts = CompileOptions()
         catalyst_jaxpr_with_host, out_tree = QJIT_CUDA(fun, opts).get_jaxpr(*args)
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)

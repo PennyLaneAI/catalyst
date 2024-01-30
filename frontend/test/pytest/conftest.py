@@ -115,7 +115,6 @@ def pytest_runtest_setup(item):
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
 
-    cuda_val = config.getoption("--cuda")
     # skip braket tests
     skipper = pytest.mark.skip()
     for item in items:

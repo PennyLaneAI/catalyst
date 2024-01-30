@@ -27,6 +27,7 @@ from catalyst.utils.jax_extras import remove_host_context
 
 @pytest.mark.cuda
 class TestCuda:
+    """CUDA integration tests. Skip if kokkos."""
 
     def test_argument(self):
         """Test that we can pass cuda-quantum as a compiler to @qjit decorator."""
@@ -37,6 +38,8 @@ class TestCuda:
             return qml.state()
 
     def test_qjit_cuda_generate_jaxpr(self):
+        """Test the JAXPR generation."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
             return qml.state()
@@ -47,6 +50,8 @@ class TestCuda:
         assert str(expected_jaxpr) == str(observed_jaxpr)
 
     def test_qjit_cuda_remove_host_context(self):
+        """Test removing the host context."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
             return qml.state()
@@ -58,6 +63,7 @@ class TestCuda:
         assert jaxpr
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
+        """Assert that catalyst_to_cuda returns something."""
         from catalyst.cuda_quantum_integration import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -65,8 +71,10 @@ class TestCuda:
             return qml.state()
 
         cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit_foo))
+        assert cuda_jaxpr
 
     def test_qjit_catalyst_to_cuda_jaxpr_actually_call_ry(self):
+        """Assert that catalyst_to_cuda matches the expected results."""
         import cudaq
 
         from catalyst.cuda_quantum_integration import catalyst_to_cuda
@@ -93,6 +101,7 @@ class TestCuda:
         assert_allclose(expected, observed)
 
     def test_sample_with_shots(self):
+        """Assert that catalyst_to_cuda can handle shots."""
         from catalyst.cuda_quantum_integration import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
@@ -110,6 +119,7 @@ class TestCuda:
         assert len(observed) == 30
 
     def test_counts_with_shots(self):
+        """Assert that catalyst_to_cuda can handle counts with shots."""
         from catalyst.cuda_quantum_integration import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=30))
