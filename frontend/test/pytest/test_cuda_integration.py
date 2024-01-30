@@ -24,8 +24,6 @@ from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
 
 
-
-
 @pytest.mark.cuda
 class TestCuda:
 
