@@ -11,18 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import jax
+
 import pennylane as qml
+import pytest
+from jax import numpy as jnp
+from numpy.testing import assert_allclose
 
 from catalyst import qjit, measure
 from catalyst.compilation_pipelines import QJIT_CUDA, QJIT
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
-import pytest
-from numpy.testing import assert_allclose
 
-import jax
 
-from jax import numpy as jnp
 
 
 @pytest.mark.cuda
@@ -68,6 +69,7 @@ class TestCuda:
 
     def test_qjit_catalyst_to_cuda_jaxpr_actually_call_ry(self):
         import cudaq
+
         from catalyst.cuda_quantum_integration import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
