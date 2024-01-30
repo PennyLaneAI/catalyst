@@ -924,7 +924,7 @@ class QJIT_CUDA:
 
         # TODO(@erick-xanadu): Likely we will need more information
         # from the line directly above.
-        return jaxpr2
+        return jaxpr2, out_tree
 
     def compile(self):
         """Compile the current MLIR module."""
@@ -1162,21 +1162,8 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
-def qjit_cuda(
-    fn=None,
-    *,
-    autograph=False,
-    async_qnodes=False,
-    target="binary",
-    keep_intermediate=False,
-    verbose=False,
-    logfile=None,
-    pipelines=None,
-    abstracted_axes=None,
-):  # pylint: disable=too-many-arguments
+def qjit_cuda(fn=None):
     from catalyst.cuda_quantum_integration import catalyst_to_cuda
-
-    axes = abstracted_axes
 
     if fn is not None:
         return catalyst_to_cuda(fn)
@@ -1552,4 +1539,4 @@ def qjit(
     if compiler is None or compiler == "catalyst":
         return qjit_catalyst(**fwd_args)
     elif compiler == "cuda-quantum":
-        return qjit_cuda(**fwd_args)
+        return qjit_cuda(fn)
