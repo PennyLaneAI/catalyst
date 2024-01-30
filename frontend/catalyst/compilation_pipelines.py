@@ -1175,6 +1175,7 @@ def qjit_cuda(
     abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
     from catalyst.cuda_quantum_integration import catalyst_to_cuda
+
     axes = abstracted_axes
 
     if fn is not None:
