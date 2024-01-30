@@ -827,7 +827,7 @@ Instead, Catalyst control flow must be used in order to support control flow on 
 array(0.95533649)
 
 Note that here we make sure to include the Catalyst control flow within a ``QuantumTape`` context.
-This is because ``catalyst.cond`` cannot return operations, only capture queued/instantiated
+This is because :func:`~.cond` cannot return operations, only capture queued/instantiated
 operations, but the ``Operation.compute_decomposition`` API requires that a list of operations is
 returned.
 
