@@ -62,6 +62,12 @@ all: runtime
 .PHONY: configure
 configure:
 	@echo "Configure Catalyst Runtime"
+
+	# Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
+	# is always built with proper cmake values. There is currently an issue with caching the
+	# PL_BACKEND variable which can be fixed here:
+	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
+
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
@@ -81,8 +87,34 @@ configure:
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
 
+lq_configure:
+	@echo "Configure Catalyst Runtime"
+
+	# Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
+	# is always built with proper cmake values. There is currently an issue with caching the
+	# PL_BACKEND variable which can be fixed here:
+	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
+
+	cmake -G Ninja -B $(RT_BUILD_DIR) . \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DENABLE_OPENMP=$(LIGHTNING_ENABLE_OPENMP) \
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
+		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_WARNINGS=OFF \
+		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
+		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		$(CMAKE_ARGS)
+
 $(RT_BUILD_DIR)/lib/librt_capi.so: configure
 	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
+
+lq_target: lq_configure
+	cmake --build $(RT_BUILD_DIR) --target rt_capi rtd_lightning -j$(NPROC)
 
 .PHONY: runtime
 runtime: $(RT_BUILD_DIR)/lib/librt_capi.so
@@ -97,23 +129,25 @@ dummy_device:
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "test the Catalyst runtime test suite"
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
-
 ifeq ($(ENABLE_OPENQASM), ON)
+	# Test the OpenQasm devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
+	# Test the Lightning suite C++ tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
 
 .PHONY: coverage
-coverage: $(RT_BUILD_DIR)/tests/runner_tests_lightning
+coverage: lq_target
 	@echo "check C++ code coverage"
 
+	cmake --build $(RT_BUILD_DIR) --target runner_tests_lightning -j$(NPROC)
 	$(RT_BUILD_DIR)/tests/runner_tests_lightning
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples
-examples: runtime
+examples: lq_target
 	$(MAKE) -C examples all
 
 .PHONY: clean
