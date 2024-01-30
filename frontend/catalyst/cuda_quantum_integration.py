@@ -12,10 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import jax
-import cudaq
+import dataclasses
+import json
+import math
 from functools import wraps
 from typing import List
+
+import cudaq
+import jax
+from jax import numpy as jnp
+from jax._src.util import safe_map
+
+from catalyst.compilation_pipelines import QJIT_CUDA, qjit_catalyst
+from catalyst.compiler import CompileOptions
+from catalyst.jax_primitives import (
+    AbstractObs,
+    compbasis_p,
+    counts_p,
+    qalloc_p,
+    qdealloc_p,
+    qdevice_p,
+    qextract_p,
+    qinsert_p,
+    qinst_p,
+    qmeasure_p,
+    sample_p,
+    state_p,
+)
+from catalyst.utils.jax_extras import remove_host_context
 
 
 class AbsCudaQState(jax.core.AbstractValue):
@@ -245,8 +269,6 @@ def make_primitive_for_gate():
 
 cuda_inst, cuda_inst_p = make_primitive_for_gate()
 
-import dataclasses
-
 
 @dataclasses.dataclass(frozen=True)
 class SideEffect(jax._src.effects.Effect):
@@ -321,8 +343,6 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
     # In Catalyst, counts returns two arrays.
     # The first array corresponds to a count from 0..shape
     # denoting the integers that can be computed from the bitstrings.
-    import math
-    from jax import numpy as jnp
 
     strings = [x for x in range(shape)]
     res = {str(s): 0 for s in strings}
@@ -399,9 +419,6 @@ def get_instruction(jaxpr, primitive):
             return eqn
 
 
-from jax._src.util import safe_map
-
-
 class TranslatorContext:
     def __init__(self, jaxpr, consts, *args):
         self.jaxpr = jaxpr
@@ -441,8 +458,6 @@ class TranslatorContext:
 
 
 def change_device_to_cuda_device(ctx):
-    from catalyst.jax_primitives import qdevice_p
-    import json
 
     # The device here might also have some important information for
     # us. For example, the number of shots.
@@ -474,7 +489,6 @@ def change_device_to_cuda_device(ctx):
 
 
 def change_alloc_to_cuda_alloc(ctx, kernel):
-    from catalyst.jax_primitives import qalloc_p
 
     # We know that there will only be one single qalloc instruction
     # in the generated code for each quantum node.
@@ -499,7 +513,6 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
 
 
 def change_register_getitem(ctx, eqn):
-    from catalyst.jax_primitives import qextract_p
 
     assert eqn.primitive == qextract_p
     invals = safe_map(ctx.read, eqn.invars)
@@ -521,7 +534,6 @@ def change_register_getitem(ctx, eqn):
 
 
 def change_register_setitem(ctx, eqn):
-    from catalyst.jax_primitives import qinsert_p
 
     # There is no __setitem__ for a quake value.
     assert eqn.primitive == qinsert_p
@@ -551,7 +563,6 @@ def change_register_setitem(ctx, eqn):
 
 
 def change_instruction(ctx, eqn, kernel):
-    from catalyst.jax_primitives import qinst_p
 
     assert eqn.primitive == qinst_p
 
@@ -596,8 +607,6 @@ def change_instruction(ctx, eqn, kernel):
 
 
 def change_compbasis(ctx, eqn, kernel):
-    from catalyst.jax_primitives import compbasis_p
-
     assert eqn.primitive == compbasis_p
 
     # From compbasis_p's definition, its operands are:
@@ -606,7 +615,6 @@ def change_compbasis(ctx, eqn, kernel):
 
     # We dont have a use for compbasis yet.
     # So, the evaluation of it might as well just be the same.
-    from catalyst.jax_primitives import AbstractObs
 
     outvals = [AbstractObs(len(qubits), compbasis_p)]
     safe_map(ctx.write, eqn.outvars, outvals)
@@ -614,9 +622,6 @@ def change_compbasis(ctx, eqn, kernel):
 
 
 def change_get_state(ctx, eqn, kernel):
-    from catalyst.jax_primitives import state_p
-    from catalyst.jax_primitives import compbasis_p
-
     assert eqn.primitive == state_p
 
     # From state_p's definition, its operands are:
@@ -643,8 +648,6 @@ def change_get_state(ctx, eqn, kernel):
 
 
 def change_sample_or_counts(ctx, eqn, kernel):
-    from catalyst.jax_primitives import sample_p, counts_p
-    from catalyst.jax_primitives import compbasis_p
 
     is_sample = eqn.primitive == sample_p
     is_counts = eqn.primitive == counts_p
@@ -695,7 +698,6 @@ def change_counts(ctx, eqn, kernel):
 
 
 def change_measure(ctx, eqn, kernel):
-    from catalyst.jax_primitives import qmeasure_p
 
     assert eqn.primitive == qmeasure_p
 
@@ -718,20 +720,6 @@ def change_measure(ctx, eqn, kernel):
 
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
-    from jax._src.util import safe_map
-    from catalyst.jax_primitives import (
-        qdevice_p,
-        qalloc_p,
-        state_p,
-        qextract_p,
-        qinst_p,
-        compbasis_p,
-        qinsert_p,
-        qdealloc_p,
-        sample_p,
-        counts_p,
-        qmeasure_p,
-    )
 
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
@@ -791,10 +779,6 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
 # But with Catalyst, we are no longer going through that route.
 def catalyst_to_cuda(fun):
     """This will likely become what lives in @qjit when cuda-quantum is selected as compiler."""
-
-    from catalyst.compilation_pipelines import qjit_catalyst, QJIT_CUDA
-    from catalyst.compiler import CompileOptions
-    from catalyst.utils.jax_extras import remove_host_context
 
     @wraps(fun)
     def wrapped(*args, **kwargs):
