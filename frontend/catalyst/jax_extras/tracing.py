@@ -1,4 +1,4 @@
-# Copyright 2023 Xanadu Quantum Technologies Inc.
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module isolates utility functions that depend on JAX low-level internals
-"""
+""" Jax extras module containing functions related to the Python program tracing  """
+
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
@@ -25,6 +25,8 @@ from jax._src.core import _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
+from jax._src.core import DBIdx, _update_thread_local_jit_state
+from jax._src.interpreters.mlir import register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
     infer_lambda_input_type,
@@ -32,25 +34,28 @@ from jax._src.interpreters.partial_eval import (
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xla
+from jax._src.lax.control_flow import _initial_style_jaxpr
+from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
     _gather_lower,
-    _gather_shape_computation,
+    standard_primitive,
+    _rank,
     _is_sorted,
     _no_duplicate_dims,
-    _rank,
     _sorted_dims_in_range,
-    standard_primitive,
+    _gather_shape_computation,
 )
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
-from jax._src.sharding_impls import ReplicaAxisContext
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
+from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
-from jax.core import AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
+from jax.core import (AbstractValue, ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType,
+                      ConcreteArray, DShapedArray)
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
     ShapedArray,
@@ -60,13 +65,6 @@ from jax.core import (
     eval_jaxpr,
     gensym,
     thread_local_state,
-)
-from jax.interpreters.mlir import (
-    AxisContext,
-    ModuleContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
 )
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
@@ -85,6 +83,7 @@ from jax.tree_util import (
 )
 from jaxlib.xla_extension import PyTreeRegistry
 
+from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
@@ -296,6 +295,7 @@ def deduce_avals(f: Callable, args, kwargs):
     """Wraps the callable ``f`` into a WrappedFun container accepting collapsed flatten arguments
     and returning expanded flatten results. Calculate input abstract values and output_tree promise.
     The promise must be called after the resulting wrapped function is evaluated."""
+    # TODO: deprecate in favor of `deduce_signatures`
     flat_args, in_tree = tree_flatten((args, kwargs))
     abstracted_axes = None
     axes_specs = _flat_axes_specs(abstracted_axes, *args, **kwargs)
@@ -305,126 +305,6 @@ def deduce_avals(f: Callable, args, kwargs):
     wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = annotate(wff, in_type)
     return wffa, in_avals, keep_inputs, out_tree_promise
-
-
-def get_aval2(x):
-    """An extended version of `jax.core.get_aval` which also accepts AbstractValues."""
-    # TODO: remove this patch when https://github.com/google/jax/pull/18579 is merged
-    if isinstance(x, AbstractValue):
-        return x
-    elif isinstance(x, Tracer):
-        return x.aval
-    else:
-        return concrete_aval(x)
-
-
-def _no_clean_up_dead_vars(_eqn, _env, _last_used):
-    """A stub to workaround the Jax ``KeyError 'a'`` bug during the lowering of Jaxpr programs to
-    MLIR with the dynamic API enabled."""
-    return None
-
-
-def jaxpr_to_mlir(func_name, jaxpr):
-    """Lower a Jaxpr into an MLIR module.
-
-    Args:
-        func_name(str): function name
-        jaxpr(Jaxpr): Jaxpr code to lower
-
-    Returns:
-        module: the MLIR module corresponding to ``func``
-        context: the MLIR context corresponding
-    """
-
-    with Patcher(
-        (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
-        (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
-    ):
-        nrep = jaxpr_replicas(jaxpr)
-        effects = jax_ordered_effects.filter_in(jaxpr.effects)
-        axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-        name_stack = new_name_stack(wrap_name("ok", "jit"))
-        module, context = custom_lower_jaxpr_to_module(
-            func_name="jit_" + func_name,
-            module_name=func_name,
-            jaxpr=jaxpr,
-            effects=effects,
-            platform="cpu",
-            axis_context=axis_context,
-            name_stack=name_stack,
-        )
-
-    return module, context
-
-
-# pylint: disable=too-many-arguments
-def custom_lower_jaxpr_to_module(
-    func_name: str,
-    module_name: str,
-    jaxpr: ClosedJaxpr,
-    effects,
-    platform: str,
-    axis_context: AxisContext,
-    name_stack,
-    replicated_args=None,
-    arg_shardings=None,
-    result_shardings=None,
-):
-    """Lowers a top-level jaxpr to an MHLO module.
-
-    Handles the quirks of the argument/return value passing conventions of the
-    runtime.
-
-    This function has been modified from its original form in the JAX project at
-    https://github.com/google/jax/blob/c4d590b1b640cc9fcfdbe91bf3fe34c47bcde917/jax/interpreters/mlir.py#L625version
-    released under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2021 The JAX Authors.
-    """
-
-    if any(lowerable_effects.filter_not_in(jaxpr.effects)):  # pragma: no cover
-        raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
-
-    assert platform == "cpu"
-    assert arg_shardings is None
-    assert result_shardings is None
-
-    # MHLO channels need to start at 1
-    channel_iter = 1
-    # Create a keepalives list that will be mutated during the lowering.
-    keepalives = []
-    host_callbacks = []
-    ctx = ModuleContext(
-        None, platform, axis_context, name_stack, keepalives, channel_iter, host_callbacks
-    )
-    ctx.context.allow_unregistered_dialects = True
-    with ctx.context, ir.Location.unknown(ctx.context):
-        # register_dialect()
-        # Remove module name characters that XLA would alter. This ensures that
-        # XLA computation preserves the module name.
-        module_name = _module_name_regex.sub("_", module_name)
-        ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
-        lower_jaxpr_to_fun(
-            ctx,
-            func_name,
-            jaxpr,
-            effects,
-            public=True,
-            create_tokens=True,
-            replace_tokens_with_dummy=True,
-            replicated_args=replicated_args,
-            arg_shardings=arg_shardings,
-            result_shardings=result_shardings,
-        )
-
-        for op in ctx.module.body.operations:
-            func_name = str(op.name)
-            is_entry_point = func_name.startswith('"jit_')
-            if is_entry_point:
-                continue
-            op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
-
-    return ctx.module, ctx.context
 
 
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
