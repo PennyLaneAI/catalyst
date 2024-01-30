@@ -743,7 +743,7 @@ def change_instruction(ctx, eqn, kernel):
 
 
 def change_compbasis(ctx, eqn, kernel):
-    """Compbasis in Catalyst essentially is the default observable.""".
+    """Compbasis in Catalyst essentially is the default observable."""
     assert eqn.primitive == compbasis_p
 
     # From compbasis_p's definition, its operands are:
