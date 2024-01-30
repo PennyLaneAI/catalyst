@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import jax
-
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
-from catalyst import qjit, measure
-from catalyst.compilation_pipelines import QJIT_CUDA, QJIT
+from catalyst import measure, qjit
+from catalyst.compilation_pipelines import QJIT, QJIT_CUDA
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
 
