@@ -46,6 +46,13 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
+        "--cuda",
+        action="store",
+        default=True,
+        help="Run cuda tests.",
+    )
+
+    parser.addoption(
         "--runbraket",
         action="store",
         default="NONE",
@@ -72,6 +79,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "braketremote: run on remote aws-braket devices backed by `OpenQasmDevice` in the runtime",
+    )
+
+    config.addinivalue_line(
+        "markers",
+        "cuda: run cuda tests",
     )
 
 
@@ -103,6 +115,13 @@ def pytest_runtest_setup(item):
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
 
+    cuda_val = config.getoption("--cuda")
+    # skip braket tests
+    skipper = pytest.mark.skip()
+    for item in items:
+        if "cuda" in item.keywords and item.get_closest_marker("cuda") == "True":
+            item.add_marker(skipper)
+
     braket_val = config.getoption("--runbraket")
     if braket_val in ["ALL", "LOCAL", "REMOTE"]:
         # only runs test with the braket marker
@@ -114,8 +133,6 @@ def pytest_collection_modifyitems(config, items):
                 braket_tests.append(item)
         items[:] = braket_tests
     else:
-        # skip braket tests
-        skipper = pytest.mark.skip()
         for item in items:
             if "braketlocal" in item.keywords or "braketremote" in item.keywords:
                 item.add_marker(skipper)
