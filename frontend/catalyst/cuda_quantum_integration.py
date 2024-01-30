@@ -12,6 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This module implements a custom Jaxpr interpreter.
+
+  https://jax.readthedocs.io/en/latest/notebooks/Writing_custom_interpreters_in_Jax.html
+
+This custom Jaxpr interpreter will interpret Jaxpr code generated from the tracing
+of catalyst programs and it will interpret it in such a way that instead of interpreting
+Catalyst operations, it will issue calls to cuda-quantum operations.
+
+This effectively transforms a catalyst program into something that can generate cuda
+quantum kernels.
+
+This module also uses the CUDA-quantum API. Here is the reference:
+  https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
+"""
+
 import dataclasses
 import json
 import math
@@ -43,6 +59,7 @@ from catalyst.utils.jax_extras import remove_host_context
 
 
 class AbsCudaQState(jax.core.AbstractValue):
+    "Abstract CUDA-quantum State."
     hash_value = hash("AbsCudaQState")
 
     def __eq__(self, other):
@@ -53,10 +70,12 @@ class AbsCudaQState(jax.core.AbstractValue):
 
 
 class CudaQState(cudaq.State):
+    "Concrete CUDA-quantum state."
     aval = AbsCudaQState
 
 
 class AbsCudaQbit(jax.core.AbstractValue):
+    "Abstract CUDA-quantum qbit."
     hash_value = hash("AbsCudaQbit")
 
     def __eq__(self, other):
@@ -67,10 +86,12 @@ class AbsCudaQbit(jax.core.AbstractValue):
 
 
 class CudaQbit(cudaq._pycudaq.QuakeValue):
+    "Concrete CUDA-quantum qbit."
     aval = AbsCudaQbit
 
 
 class AbsCudaQReg(jax.core.AbstractValue):
+    "Abstract CUDA-quantum quantum register."
     hash_value = hash("AbsCudaQReg")
 
     def __eq__(self, other):
@@ -81,10 +102,12 @@ class AbsCudaQReg(jax.core.AbstractValue):
 
 
 class CudaQReg(cudaq._pycudaq.QuakeValue):
+    "Concrete CUDA-quantum quantum register."
     aval = AbsCudaQReg
 
 
 class AbsCudaValue(jax.core.AbstractValue):
+    "Abstract CUDA-quantum value."
     hash_value = hash("AbsCudaValue")
 
     def __eq__(self, other):
@@ -95,10 +118,12 @@ class AbsCudaValue(jax.core.AbstractValue):
 
 
 class CudaValue(cudaq._pycudaq.QuakeValue):
+    "Concrete CUDA-quantum value."
     aval = AbsCudaValue
 
 
 class AbsCudaKernel(jax.core.AbstractValue):
+    "Abstract CUDA-quantum kernel."
     hash_value = hash("AbsCudaKernel")
 
     def __eq__(self, other):
@@ -109,10 +134,12 @@ class AbsCudaKernel(jax.core.AbstractValue):
 
 
 class CudaKernel(cudaq._pycudaq.QuakeValue):
+    "Concrete CUDA-quantum kernel."
     aval = AbsCudaKernel
 
 
 class AbsCudaSampleResult(jax.core.AbstractValue):
+    "Abstract CUDA-quantum kernel."
     hash_value = hash("AbsCudaSampleResult")
 
     def __eq__(self, other):
@@ -123,6 +150,7 @@ class AbsCudaSampleResult(jax.core.AbstractValue):
 
 
 class CudaSampleResult(cudaq.SampleResult):
+    "Concrete CUDA-quantum kernel."
     aval = AbsCudaSampleResult
 
 
@@ -148,16 +176,19 @@ cudaq_make_kernel_p = jax.core.Primitive("cudaq_make_kernel")
 
 
 def cudaq_make_kernel():
+    """Just a convenience function to bind the cudaq make kernel primitive."""
     return cudaq_make_kernel_p.bind()
 
 
 @cudaq_make_kernel_p.def_impl
 def cudaq_make_kernel_primitive_impl():
+    """Concrete implementation of cudaq.make_kernel is just a call."""
     return cudaq.make_kernel()
 
 
 @cudaq_make_kernel_p.def_abstract_eval
 def cudaq_make_kernel_primitive_abs():
+    """Abstract implementation of cudaq.make_kernel."""
     return AbsCudaKernel()
 
 
@@ -174,23 +205,27 @@ def cudaq_make_kernel_primitive_abs():
 # qalloc(self: cudaq.Kernel)                   -> cudaq.QuakeValue
 # SKIP
 
-# Allocate a register of qubits of size `qubit_count` and return a handle to them as a `QuakeValue`.
+# Allocate a register of qubits of size `qubit_count` and return a handle to them as a
+# `QuakeValue`.
 # qalloc(self: cudaq.Kernel, qubit_count: int) -> cudaq.QuakeValue
 
 kernel_qalloc_p = jax.core.Primitive("kernel_qalloc")
 
 
 def kernel_qalloc(kernel, size):
+    """Convenience for binding."""
     return kernel_qalloc_p.bind(kernel, size)
 
 
 @kernel_qalloc_p.def_impl
 def kernel_qalloc_primitive_impl(kernel, size):
+    """Concrete implementation."""
     return kernel.qalloc(size)
 
 
 @kernel_qalloc_p.def_abstract_eval
 def kernel_qalloc_primitive_abs(kernel, size):
+    """Abstract evaluation."""
     return AbsCudaQReg()
 
 
@@ -198,16 +233,19 @@ qreg_getitem_p = jax.core.Primitive("qreg_getitem")
 
 
 def qreg_getitem(qreg, idx):
+    """Convenience for binding."""
     return qreg_getitem_p.bind(qreg, idx)
 
 
 @qreg_getitem_p.def_impl
 def qreg_getitem_primitive_impl(qreg, idx):
+    """Concrete implementation."""
     return qreg[idx]
 
 
 @qreg_getitem_p.def_abstract_eval
 def qreg_getitem_primitive_abs(qreg, idx):
+    """Abstract evaluation."""
     return AbsCudaQbit()
 
 
@@ -215,16 +253,19 @@ cudaq_getstate_p = jax.core.Primitive("cudaq_getstate")
 
 
 def cudaq_getstate(kernel):
+    """Convenience for binding."""
     return cudaq_getstate_p.bind(kernel)
 
 
 @cudaq_getstate_p.def_impl
 def cudaq_getstate_primitive_impl(kernel):
+    """Concrete implementation."""
     return cudaq.get_state(kernel)
 
 
 @cudaq_getstate_p.def_abstract_eval
 def cudaq_getstate_primitive_abs(kernel):
+    """Abstract evaluation."""
     return AbsCudaQState()
 
 
@@ -244,16 +285,28 @@ def cudaq_getstate_primitive_abs(kernel):
 
 
 def make_primitive_for_gate():
+    """Just a function that wraps the functionality of making the kernel_inst primitive.
+
+    This function will return:
+      * gate_func: A convenience function for binding
+      * kernel_gate_p: A JAX primitive for quantum gates.
+    """
     kernel_gate_p = jax.core.Primitive(f"kernel_inst")
     kernel_gate_p.multiple_results = True
 
     def gate_func(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+        """Convenience.
+
+        Quantum operations in CUDA-quantum return no values. But JAXPR expects return values.
+        We can just say that multiple_results = True and return an empty tuple.
+        """
         kernel_gate_p.bind(kernel, *qubits_or_params, inst=inst, qubits_len=qubits_len)
         return tuple()
 
     @kernel_gate_p.def_impl
     def gate_impl(kernel, *qubits_or_params, inst=None, qubits_len=-1):
-        assert inst
+        """Concrete implementation."""
+        assert inst and qubits_len > 0
         method = getattr(cudaq.Kernel, inst)
         targets = qubits_or_params[:qubits_len]
         params = qubits_or_params[qubits_len:]
@@ -262,6 +315,7 @@ def make_primitive_for_gate():
 
     @kernel_gate_p.def_abstract_eval
     def gate_abs(kernel, *qubits_or_params, inst=None, qubits_len=-1):
+        """Abstract evaluation."""
         return tuple()
 
     return gate_func, kernel_gate_p
@@ -276,19 +330,32 @@ class SideEffect(jax._src.effects.Effect):
 
 
 def make_primitive_for_m(gate: str):
+    """A single function to make primitives for all measurement basis.
+
+    Args:
+      * gate (str): Either "x", "y", or "z" are valid values.
+    Returns:
+      * A function that binds a primitive.
+      * the primitive itself.
+    """
+
+    assert gate in {"x", "y", "z"}
     gate = f"m{gate}"
     kernel_gate_p = jax.core.Primitive(f"kernel_{gate}")
     method = getattr(cudaq.Kernel, gate)
 
     def gate_func(kernel, target):
+        """Convenience."""
         return kernel_gate_p.bind(kernel, target)
 
     @kernel_gate_p.def_impl
     def gate_impl(kernel, target):
+        """Concrete implementation."""
         return method(kernel, target)
 
     @kernel_gate_p.def_effectful_abstract_eval
-    def gate_abs(kernel, target):
+    def gate_abs(kernel, _target):
+        """Abstract evaluation with side-effect."""
         effects = set()
         effects.add(SideEffect)
         return AbsCudaValue(), effects
@@ -307,18 +374,22 @@ cudaq_counts_p.multiple_results = True
 
 
 def cudaq_sample(kernel, *args, shots_count=1000):
+    """Convenience function for binding."""
     return cudaq_sample_p.bind(kernel, *args, shots_count=shots_count)
 
 
 @cudaq_sample_p.def_impl
 def cudaq_sample_impl(kernel, *args, shots_count=1000):
-    # cudaq.sample returns an object which is a compressed version of what
-    # qml.sample returns as samples. Instead of returning an array with the observed
-    # population, cudaq.sample returns a dictionary where the keys are bitstrings and
-    # values are the frequency those bitstrings were observed.
+    """Concrete implementation of cudaq.sample.
 
-    # In a way qml.count is semantically equivalent to cudaq.sample
-    # So, let's perform a little conversion here...
+    `cudaq.sample` returns an object which is a compressed version of what
+    `qml.sample` returns as samples. Instead of returning an array with the observed
+    population, `cudaq.sample` returns a dictionary where the keys are bitstrings and
+    values are the frequency those bitstrings were observed.
+
+    In a way `qml.count` is more similar to `cudaq.sample` than `qml.sample`.
+    So, let's perform a little conversion here.
+    """
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
     lls = [[k] * v for k, v in a_dict.items()]
     return [l for ls in lls for l in ls]
@@ -326,23 +397,30 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
 
 @cudaq_sample_p.def_abstract_eval
 def cudaq_sample_abs(kernel, *args, shots_count=1000):
+    """Abstract evaluation."""
     return AbsCudaSampleResult()
 
 
 def cudaq_counts(kernel, *args, shape, shots_count=1000):
+    """Convenience function for binding."""
     return cudaq_counts_p.bind(kernel, *args, shape=shape, shots_count=shots_count)
 
 
 @cudaq_counts_p.def_impl
 def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
-    # cudaq.sample returns an object which is a compressed version of what
-    # qml.sample returns as samples. Instead of returning an array with the observed
-    # population, cudaq.sample returns a dictionary where the keys are bitstrings and
-    # values are the frequency those bitstrings were observed.
+    """Concrete implementation of counts.
+    `cudaq.sample` returns an object which is a compressed version of what
+    `qml.sample` returns as samples. Instead of returning an array with the observed
+    population, `cudaq.sample` returns a dictionary where the keys are bitstrings and
+    values are the frequency those bitstrings were observed.
 
-    # In Catalyst, counts returns two arrays.
-    # The first array corresponds to a count from 0..shape
-    # denoting the integers that can be computed from the bitstrings.
+    CUDA-quantum does not implement another function similar to `qml.counts`.
+    The closest function is `cudaq.sample`.
+
+    In Catalyst, `qml.counts` returns two arrays.
+    The first array corresponds to a count from 0..shape
+    denoting the integers that can be computed from the bitstrings.
+    """
 
     strings = [x for x in range(shape)]
     res = {str(s): 0 for s in strings}
@@ -360,6 +438,7 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
 
 @cudaq_counts_p.def_abstract_eval
 def cudaq_counts_abs(kernel, shape, shots_count=1000):
+    """Abstract evaluation."""
     bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
     counts = jax.core.ShapedArray([shape], jax.numpy.int64)
     return bitstrings, counts
@@ -374,22 +453,35 @@ def cudaq_counts_abs(kernel, shape, shots_count=1000):
 
 
 def count(var: jax._src.core.Var):
+    """Small function to get the identifier of a variable.
+
+    In JAX, variables have a "count" attribute that is used to identify them.
+    This corresponds to their name. 0 starts with the name a and as the count
+    increases, the name also increases alphabetically.
+
+    This function is safe and uses getattr because `eqn.invars` might return
+    a `jax._src.core.Literal` which is not a `jax._src.core.Var` and has no count.
+    """
     return getattr(var, "count", 0)
 
 
 def counts(_vars: List[jax._src.core.Var]):
+    """Get counts for all elements in _vars."""
     return map(count, _vars)
 
 
 def invars(eqn: jax._src.core.JaxprEqn):
+    """Make invars look like a function instead of an attribute.."""
     return eqn.invars
 
 
 def outvars(eqn: jax._src.core.JaxprEqn):
+    """Make outvars look like a function instead of an attribute.."""
     return eqn.outvars
 
 
 def allvars(eqn: jax._src.core.JaxprEqn):
+    """Create a list of all invars and outvars in an eqn."""
     return invars(eqn) + outvars(eqn)
 
 
@@ -397,6 +489,8 @@ def get_maximum_variable(jaxpr):
     """This function returns the maximum number of variables for the given jaxpr function.
     The count is an internal JAX detail that roughly corresponds to the variable name.
 
+    We want the maximum name to avoid name collisions. I don't think anything happened
+    when I didn't set max_count, but it is probably best to avoid collisions.
     """
     max_count = 1
     for eqn in jaxpr.eqns:
@@ -420,6 +514,17 @@ def get_instruction(jaxpr, primitive):
 
 
 class TranslatorContext:
+    """This class keeps some state that is useful for interpreting an Catalyst and evaluating it in
+    CUDA-quantum primitives.
+
+    It has:
+       * jaxpr: A reference to the program
+       * env: Dict[jax.core._src.Var, AnyType] A map of variables to values.
+       * inv_env: Dict[AnyType, jax.core._src.Var] A map from values to variables.
+       * variable_map: Dict[jax.core._src.Var, jax.core._src.Var]: A map from variables
+               in the old program to the new program.
+       * count [int]: Keeps track of the last variable used.
+    """
     def __init__(self, jaxpr, consts, *args):
         self.jaxpr = jaxpr
         self.env = {}
@@ -430,6 +535,7 @@ class TranslatorContext:
         self.count = get_minimum_new_variable_count(jaxpr)
 
     def read(self, var):
+        """Read the value of variable var."""
         if type(var) is jax.core.Literal:
             return var.val
         if self.variable_map.get(var):
@@ -437,27 +543,37 @@ class TranslatorContext:
         return self.env[var]
 
     def get_var_for_val(self, val):
+        """Get the variable that holds value val."""
         return self.inv_env[val]
 
     def write(self, var, val):
+        """var = val."""
         if self.variable_map.get(var):
             var = self.variable_map[var]
         self.inv_env[val] = var
         self.env[var] = val
 
     def replace(self, original, new):
+        """Replace original variable with new variable."""
         self.variable_map[original] = new
 
     def get_new_count(self):
+        """Increase count and return."""
         self.count += 1
         return self.count
 
     def new_variable(self, _type):
+        """Convenience to get a new variable of a given type."""
         count = self.get_new_count()
         return jax._src.core.Var(count, "", _type)
 
 
 def change_device_to_cuda_device(ctx):
+    """Map Catalyst's qdevice_p primitive to its equivalent CUDA-quantum primitive
+    as defined in this file.
+
+    From here we get shots as well.
+    """
 
     # The device here might also have some important information for
     # us. For example, the number of shots.
@@ -489,6 +605,13 @@ def change_device_to_cuda_device(ctx):
 
 
 def change_alloc_to_cuda_alloc(ctx, kernel):
+    """Change Catalyst's qalloc_p primitive to a CUDA-quantum primitive.
+
+    One difference between both primitives is that Catalyst's qalloc_p primitive
+    does not require a parameter with a sub-program / kernel.
+
+    CUDA-quantum does require a kernel as an operand.
+    """
 
     # We know that there will only be one single qalloc instruction
     # in the generated code for each quantum node.
@@ -513,6 +636,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
 
 
 def change_register_getitem(ctx, eqn):
+    """Change catalyst's qextract_p primitive to a CUDA-quantum primitive."""
 
     assert eqn.primitive == qextract_p
     invals = safe_map(ctx.read, eqn.invars)
@@ -534,6 +658,16 @@ def change_register_getitem(ctx, eqn):
 
 
 def change_register_setitem(ctx, eqn):
+    """Set the correct post-conditions for CUDA-quantum when interpreting qinsert_p primitive
+
+    This method is interesting because CUDA-quantum does not use value semantics for their qubits.
+    This means that each qubit is transformed as a side effect of the operations. Since
+    CUDA-quantum does not use value semantics for their qubits nor their quantum registers,
+    it means that we must map from a value semantics program to a memory semantics program.
+
+    How do we do that?
+    We remove the extra SSA variables, but keep track of which variables refer to which qubits.
+    """
 
     # There is no __setitem__ for a quake value.
     assert eqn.primitive == qinsert_p
@@ -563,9 +697,11 @@ def change_register_setitem(ctx, eqn):
 
 
 def change_instruction(ctx, eqn, kernel):
+    """Change the instruction to one supported in CUDA-quantum."""
 
     assert eqn.primitive == qinst_p
 
+    # This is the map of instruction names.
     from_catalyst_to_cuda = {
         "PauliX": "x",
         "PauliY": "y",
@@ -607,6 +743,7 @@ def change_instruction(ctx, eqn, kernel):
 
 
 def change_compbasis(ctx, eqn, kernel):
+    """Compbasis in Catalyst essentially is the default observable.""".
     assert eqn.primitive == compbasis_p
 
     # From compbasis_p's definition, its operands are:
@@ -615,13 +752,12 @@ def change_compbasis(ctx, eqn, kernel):
 
     # We dont have a use for compbasis yet.
     # So, the evaluation of it might as well just be the same.
-
     outvals = [AbstractObs(len(qubits), compbasis_p)]
     safe_map(ctx.write, eqn.outvars, outvals)
-    # Note: Other observables won't be so easy...
 
 
 def change_get_state(ctx, eqn, kernel):
+    """Change Catalyst's state_p to CUDA-quantum's state primitive."""
     assert eqn.primitive == state_p
 
     # From state_p's definition, its operands are:
@@ -648,6 +784,7 @@ def change_get_state(ctx, eqn, kernel):
 
 
 def change_sample_or_counts(ctx, eqn, kernel):
+    """Change Catalyst's sample_p or counts_p primitive to respective CUDA-quantum primitives."""
 
     is_sample = eqn.primitive == sample_p
     is_counts = eqn.primitive == counts_p
@@ -690,14 +827,17 @@ def change_sample_or_counts(ctx, eqn, kernel):
 
 
 def change_sample(ctx, eqn, kernel):
+    """Convenience function. The name is the documentation."""
     return change_sample_or_counts(ctx, eqn, kernel)
 
 
 def change_counts(ctx, eqn, kernel):
+    """Convenience function. The name is the documentation."""
     return change_sample_or_counts(ctx, eqn, kernel)
 
 
 def change_measure(ctx, eqn, kernel):
+    """Change Catalyst's qmeasure_p to CUDA-quantum measure."""
 
     assert eqn.primitive == qmeasure_p
 
@@ -720,14 +860,24 @@ def change_measure(ctx, eqn, kernel):
 
 
 def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
+    """Implement a custom interpreter for Catalyst's JAXPR operands.
+    Instead of interpreting Catalyst's JAXPR operands, we will execute
+    CUDA-quantum equivalent instructions. As these operations are
+    abstractly evaluated, they will be bound by JAX. The end result
+    is that a new transform function will be traced."""
 
-    ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
     ctx = TranslatorContext(jaxpr, consts, *args)
     kernel, shots = change_device_to_cuda_device(ctx)
     register = change_alloc_to_cuda_alloc(ctx, kernel)
     measurement_set = set()
 
+    # ignore set of instructions we don't care about.
+    # because they have been handled before or they are just
+    # not necessary in the CUDA-quantum API.
+    ignore = {qdealloc_p, qdevice_p, qalloc_p}
+
+    # Main interpreter loop.
     for idx, eqn in enumerate(jaxpr.eqns):
         if eqn.primitive == state_p:
             change_get_state(ctx, eqn, kernel)
@@ -752,6 +902,9 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
             # For the time being, we can just add an exception if the return of
             # measurement is being returned directly.
             a_measurement = change_measure(ctx, eqn, kernel)
+            # Keep track of measurements in a set.
+            # This will be checked at the end to make sure that we do not return
+            # a Quake value.
             measurement_set.add(a_measurement)
         elif eqn.primitive in ignore:
             continue
@@ -773,12 +926,15 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     return retvals
 
 
-# So where is this function going to be called?
-# fun has to be a function that returns jaxpr.
-# Normally, we would trace it via `make_jaxpr`.
-# But with Catalyst, we are no longer going through that route.
 def catalyst_to_cuda(fun):
-    """This will likely become what lives in @qjit when cuda-quantum is selected as compiler."""
+    """Wrapper function that takes a function that will be compiled to JAXPR.
+
+    Args:
+       fun: Function to be traced / converted into CUDA-quantum JAXPR.
+
+    Returns:
+       wrapped: A wrapped function that will do the tracing.
+    """
 
     @wraps(fun)
     def wrapped(*args, **kwargs):
