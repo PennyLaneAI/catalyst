@@ -352,22 +352,41 @@ def test_qjit_forloop_indbidx_outdbidx():
 
 
 def test_qjit_forloop_index_indbidx():
-    """Test for-loops referring loop index in the results, qjit mode."""
+    """Test for-loops referring loop return new dimension variable."""
 
     @qjit()
     def f(sz):
-        a = jnp.ones([sz], dtype=float)
+        a0 = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 10, 1)
         def loop(i, _):
-            b = jnp.ones([i], dtype=float)
-            return b
+            return jnp.ones([i], dtype=float)
 
-        a2 = loop(a)
+        a2 = loop(a0)
+        assert a2.shape[0] is not sz
         return a2
 
     res_a = f(3)
     assert_array_and_dtype_equal(res_a, jnp.ones(9))
+
+
+def test_qjit_forloop_indbidx_const():
+    """Test for-loops preserve type information in the presence of a constant."""
+
+    @qjit()
+    def f(sz):
+        a0 = jnp.ones([sz], dtype=float)
+
+        @for_loop(0, 3, 1)
+        def loop(i, a):
+            return a * sz
+
+        a2 = loop(a0)
+        assert a2.shape[0] is sz
+        return a2
+
+    res_a = f(3)
+    assert_array_and_dtype_equal(res_a, jnp.ones(3) * (3**3))
 
 
 def test_qjit_forloop_shared_dimensions():

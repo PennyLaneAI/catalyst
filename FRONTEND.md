@@ -30,6 +30,12 @@ OK
   * [Expanded/collapsed arguments or results](#expandedcollapsed-arguments-or-results)
 * [Tracing problem generalization](#tracing-problem-generalization)
 * [Catalyst implementation details](#catalyst-implementation-details)
+  * [Arguments and results transformations](#arguments-and-results-transformations)
+  * [Dynamic dimension expansion](#dynamic-dimension-expansion)
+    * [While-loop expansion specific](#while-loop-expansion-specific)
+    * [For-loop expansion specific](#for-loop-expansion-specific)
+  * [Jax constants deduction](#jax-constants-deduction)
+* [Caveats](#caveats)
 
 <!-- vim-markdown-toc -->
 
@@ -48,7 +54,7 @@ def circuit(sz:int):
         return a*sz
 
     a2 = loop(a0)
-    return a2
+    return a0 + a2
 ```
 
 `qjit` decorator at the top means that we are going to *compile* this program rather than interpret
@@ -70,34 +76,38 @@ print(circuit.jaxpr)
 ``` result
 { lambda ; a:i64[]. let
     b:f64[a] = broadcast_in_dim[broadcast_dimensions=() shape=(None,)] 1.0 a
-    c:i64[] d:f64[c] = for_loop[
+    _:i64[] c:f64[a] = for_loop[
       apply_reverse_transform=False
-      body_jaxpr={ lambda ; e:i64[] f:i64[] g:i64[] h:f64[f]. let
-          i:f64[] = convert_element_type[new_dtype=float64 weak_type=False] e
-          j:f64[f] = broadcast_in_dim[broadcast_dimensions=() shape=(None,)] i f
-          k:f64[f] = mul h j
-        in (f, k) }
+      body_jaxpr={ lambda ; d:i64[] e:i64[] f:i64[] g:f64[e]. let
+          h:f64[] = convert_element_type[new_dtype=float64 weak_type=False] d
+          i:f64[e] = broadcast_in_dim[broadcast_dimensions=() shape=(None,)] h e
+          j:f64[e] = mul g i
+        in (e, j) }
       body_nconsts=1
       nimplicit=1
       preserve_dimensions=True
     ] a a 0 10 1 0 b
-  in (c, d) }
+    k:f64[a] = add b c
+  in (k,) }
 ```
 
 The following points are important to note:
 
 * All Jaxpr variables have types. `x:f64[3,2]` means that `x` is a 2D tensor with dimensions 3 and 2
   consisting of 64-bit floating point elements.
-* Jaxpr types are allowed to contain variables. `f:64[d]` means that the single dimension of `f` is
-  not known at compile time. What is known is that at runtime the actual dimension will be available
-  as variable `d`.
+* With dynamic API flag set to True (Catalyst sets it by default) Jaxpr types are allowed to
+  contain variables. `f:64[d]` means that the single dimension of `f` is not known at compile time.
+  What is known is that at runtime the actual dimension will be available as variable `d`.
 * Loop body of the source Python program has two arguments, while the `body_jaxpr` of the resulting
-  Jaxpr program has four arguments. The additional two arguments appeared because:
+  Jaxpr program has four arguments. The additional arguments appeared due to different reasons:
   - `e:i64[]`" Usage of the outer-scope variable in the body loop in the source Python program.
     Jaxpr program does not allow capturing, so we have to pass captured variables as additional
     arguments.
   - `f:i64[]`: Requirement saying that Jaxpr variable must be declared before use. Since we use
     variable `f` in the type of `h`, we pass it an additional argument.
+* Loop argument `b:f64[a]` and loop result `c:f64[a]` have same types. According to Jax, same types
+  means that mutual operations are possible. The very last `add` operation is allowed because of
+  this fact.
 * In contrast to the regular Python evaluation, loop body is evaluated only once during the tracing.
   This is because we only want to record the execution path rather then perform the real
   computation.
@@ -118,8 +128,8 @@ of programs in two “source” languages:
 
 ### Tracer
 
-Tracers are the objects which track arguments of input programs. By means of tracers, Jax turns
-Python interpretation process into a process of program transformation.
+Tracers are the objects which track arguments of input program. By means of tracers, Jax uses
+Python interpretation process for program compilation.
 
 Jax tracers are Python classes having the following properties:
 
@@ -128,10 +138,12 @@ Jax tracers are Python classes having the following properties:
   referring to more than one tracer.
 - Contain AbstractValue subclass in the `aval` field
 - Jax tracks unique identifiers of tracers in order to distinguish them from each other.
+- Belong to Jax `DynamicJaxprTrace` objects representing variable scope during the tracing.
 
-Example representation:
+Examples:
 
-- `Tracer(id=232323, aval=DShapedArray(shape=[3,4],dtype=int))`
+- `Tracer(id=1111, aval=ShapedArray(shape=[3,4], dtype=int))`
+- `Tracer(id=2222, aval=DShapedArray(shape=[ Tracer(id=... aval=...) ], dtype=float))`
 
 ### AbstractValue
 
@@ -168,8 +180,10 @@ Examples:
 
 ### Input Type and Output Type
 
-`in_type/out_type` are lists of tuples of abstract values paired with Booleans. They encode input
-and output parts of the signature of a Jaxpr program.
+`in_type/out_type` are lists of tuples of abstract values paired with Booleans. Types are used in
+Jax to transfer the information about tracers between scopes. Types are typically deduced from the
+in the source scope and then interpreted in target scope. The results of the interpretation are new
+tracers living in the target scope.
 
 - The MyPy type is `tuple[tuple[AbstractValue,bool],...]` [link](https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/core.py#L1304)
 - The `bool` tuple elements represent “explicitness” of an argument in a Python program. Explicit
@@ -223,14 +237,9 @@ signature from the known input type signature of the subprogram.
 
 ### Explicit/implicit arguments
 
-Separating explicit and implicit arguments makes sense when we argue about the Python tracing. In
-Jaxpr, all arguments are explicit.
-
-Jaxpr variables holding array dimensions must always present in the same scope with their array
-variables. For Python, this requirement is relaxed so functions may take and return array variables
-alone. Jax does the dimension variable tracking automatically by linking tracers. The consequence of
-this - Jaxpr programs might have more arguments and results then their source Python programs. The
-automatically added dimension arguments are called *implicit*.
+Separating explicit and implicit arguments makes sense when we argue about the Python tracing.
+**Explicit** arguments/results are those which were explicitly mentioned in the source Python program.
+Implicit arguments are those that are added to the lists in order to meet Jaxpr requirements.
 
 For example, when tracing the following Python program:
 
@@ -276,7 +285,7 @@ Python program:
 
 ``` python
 def nested_function(*ARGS):
-  ... # calculate RESULTS from ARGS
+  ... # Calculate RESULTS from ARGS
   return RESULTS
 
 INPUTS = ... # Obtain INPUTS from the context
@@ -350,5 +359,83 @@ details and give source references.
 Catalyst implementation details
 -------------------------------
 
+### Arguments and results transformations
+
+As illustrated in the overview section, in order to transform Python program into a Jaxpr program,
+arguments and results of functions must be adjusted in the following ways:
+
+1. Variable dimensions must be added as implicit arguments to the corresponding lists in order to
+   the type-correctness of Jaxpr programs.
+2. Additional parameters must be added to handle constant hoisting and outer-scope variable
+   capturing.
+
+### Dynamic dimension expansion
+
+1. Arguments/results mentioned in the source Python program are explicit.
+2. The expansion algorithm prepends the dimension variables to the list of explicit arguments.
+   - In the basic case, the variables are added without duplication.
+   - In case when several tensors use same dimension variables, more decisions are possible. In
+     Catalyst, we support the following two cases:
+     + Add only one implicit argument for shared dimension variable. For example:
+       `a:f64[d], b:f64[d]` becomes `d:i64[], a:f64[d], b:f64[d]`
+     + "Forget" about the sharing and add new variable for every dimension variable separately.
+       For example:
+       `a:f64[d], b:f64[d]` becomes `d1:i64[], d2:i64[], a:f64[d1], b:f64[d2]`
+3. Produce the type (`in_type` for arguments, `out_type` for results), describing the result of the
+   expansion.
+   - For arguments, we may use `DBIdx` in types to refer to position in the same list. For example:
+     `d:i64[], a:f64[d], b:f64[d]` will get
+     `[(i64, True), (f64[DBIdx(0)], False), (f64[DBIdx(0)], False)]`
+     where we assume that it is an aguments list.
+   - For results, we may use `InDBIdx` and `OutDBIdx` in type to refer to positions in the argument
+     list and the result list (the current one) correspondingly.
+
+In Catalyst, we usually record the number of implicit variables added using
+`num_implicit_inputs`/`num_implicit_outputs` attributes.
+
+#### While-loop expansion specific
+
 TODO
+
+#### For-loop expansion specific
+
+TODO
+
+### Jax constants deduction
+
+Deduction of Jax constants happens during the final step of the tracing - at the same time with the
+Jaxpr program generation. Constants are prepended to argument lists. Thus, the program with
+arguments
+
+`d:i64[], a:f64[d], b:f64[d]`
+
+that captures a dinamically-dimensioned tensor `o:f64[od]` from the outside scope might get the
+following final list of arguments:
+
+`od:i64, o:f64[od], d:i64[], a:f64[d], b:f64[d]`
+
+In Catalyst, we usually record the number of constants added using `body_nconsts` attribute. This
+information is used during the StableHLO lowering.
+
+Caveats
+-------
+
+This section mentions known implementation problems.
+
+* Dimension variables obtained from constants never matches dimension variables from regular
+  parameters. Thus, the following program will raise an error:
+
+  ``` python
+  @qjit
+  def circuit(sz:int):
+      a0 = jnp.ones([sz], dtype=float)
+
+      @for_loop(0, 10, 1)
+      def loop(i, a):
+          return a + a0  # a0 is a constant, dimension variable is different
+
+      return loop(a0)
+  ```
+
+
 

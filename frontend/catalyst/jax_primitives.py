@@ -1363,12 +1363,14 @@ def _while_loop_lowering(
 # for loop
 #
 @for_p.def_abstract_eval
-def _for_loop_abstract_eval(*args, body_jaxpr, nimplicit, preserve_dimensions, **kwargs):
+def _for_loop_abstract_eval(
+    *args, body_jaxpr, nimplicit, preserve_dimensions, body_nconsts, **kwargs
+):
     _assert_jaxpr_without_constants(body_jaxpr)
 
     return infer_output_type_jaxpr(
-        [],
-        body_jaxpr.jaxpr.invars,
+        body_jaxpr.jaxpr.invars[:body_nconsts],
+        body_jaxpr.jaxpr.invars[body_nconsts:],
         body_jaxpr.jaxpr.outvars[nimplicit:],
         expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
         num_implicit_inputs=nimplicit,
