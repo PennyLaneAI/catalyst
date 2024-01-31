@@ -1,5 +1,5 @@
-Catalyst frontend architecture
-==============================
+Tracing in Catalyst
+===================
 
 <!--
 ``` python
