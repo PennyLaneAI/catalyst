@@ -61,6 +61,8 @@ class CompileOptions:
             of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
+        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
+            Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
     """
 
@@ -72,7 +74,16 @@ class CompileOptions:
     autograph: Optional[bool] = False
     async_qnodes: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
+    static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+
+    def __post_init__(self):
+        # Make the format of static_argnums easier to handle.
+        static_argnums = self.static_argnums
+        if static_argnums is None:
+            self.static_argnums = ()
+        elif isinstance(static_argnums, int):
+            self.static_argnums = (static_argnums,)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
