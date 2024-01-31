@@ -312,11 +312,11 @@ Below we give the description of one recursion step of the tracing algorithm:
 * $bind(Function, Inputs, S) -> Outputs_s$, where:
   1. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
   2. $OutputType_s \gets AbstractEvaluation(InputType_s)$ where $AbstractEvaluation$ is defined as follows:
-      1. $ExpandedArguments_s \gets initialize(InputType_s)$
-      2. $Arguments \gets collapse(ExpandedArguments_s)$
-      3. $Results \gets traceNested(Function, Arguments)$
-      4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
-      5. $return(OutputType_s)$
+     1. $ExpandedArguments_s \gets initialize(InputType_s)$
+     2. $Arguments \gets collapse(ExpandedArguments_s)$
+     3. $Results \gets traceNested(Function, Arguments)$
+     4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
+     5. $return(OutputType_s)$
   3. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
   4. $Outputs_s \gets collapse(ExpandedOutputs_s)$
   5. $return(Outputs_s)$
@@ -326,7 +326,7 @@ function, examples are `for_loop`, `while_loop`, `cond`, etc. Below we describe 
 details and give source references.
 
 - $read()$ obtains input **Tracers** from the context.
-- $Outputs_s$ represents output **Tracers** of a Python program obtained using the expansion
+- $Outputs_s$ represents output tracers of a Python program obtained using the expansion
   strategy `S`. Any set of tracers might be converted to a Jaxpr program at any time using the core
   Jax IR printer function `to_jaxpr`. Thus, having output tracers is equivalent to having the Jaxpr
   program.
