@@ -108,7 +108,7 @@ The following points are important to note:
     variable `f` in the type of `h`, we pass it an additional argument.
 * Loop argument `b:f64[a]` and loop result `c:f64[a]` have the same types. Jax takes special care of
   propagating type variables across primitives where possible. Jax binary operators like `+`, `*`
-  requires types to be same.
+  requires operand types to be the same.
 * In contrast to the regular Python evaluation, loop body is evaluated only once during the tracing.
   This is because we only want to record the execution path rather then perform the real
   computation.
