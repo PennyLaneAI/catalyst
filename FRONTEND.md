@@ -17,8 +17,7 @@ OK
 <!-- vim-markdown-toc GFM -->
 
 * [Tracing problem overview](#tracing-problem-overview)
-* [Tracing generalization](#tracing-generalization)
-* [Terms and definitions](#terms-and-definitions)
+* [Definitions](#definitions)
   * [Jax](#jax)
   * [Tracer](#tracer)
   * [AbstractValue](#abstractvalue)
@@ -29,6 +28,7 @@ OK
   * [Primitives and binding](#primitives-and-binding)
   * [Explicit/implicit arguments](#explicitimplicit-arguments)
   * [Expanded/collapsed arguments or results](#expandedcollapsed-arguments-or-results)
+* [Tracing problem generalization](#tracing-problem-generalization)
 * [Catalyst implementation details](#catalyst-implementation-details)
 
 <!-- vim-markdown-toc -->
