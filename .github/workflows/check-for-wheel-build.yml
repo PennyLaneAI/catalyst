@@ -1,6 +1,10 @@
 name: Check if Wheels Build Job should run
 on:
   workflow_call:
+    outputs:
+      build-wheels:
+        description: Indicate whether wheels should be built for the current workflow run
+        value: ${{ jobs.check_if_required.outputs.build-wheels }}
 
 
 jobs:
