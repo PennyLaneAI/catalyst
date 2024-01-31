@@ -167,3 +167,15 @@ class TestCuda:
                 return measure(0)
 
             jax.make_jaxpr(catalyst_to_cuda(circuit))()
+
+    def test_pytrees(self):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(a):
+            qml.RX(a, wires=[0])
+            return {"a": qml.state()}
+
+        cuda_compiled = qjit(compiler="cuda-quantum")(circuit)
+        observed = cuda_compiled(3.14)
+        catalyst_compiled = qjit(circuit)
+        expected = catalyst_compiled(3.14)
+        assert_allclose(expected["a"], observed["a"])
