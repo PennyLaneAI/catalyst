@@ -242,7 +242,7 @@ Separating explicit and implicit arguments makes sense when we argue about the P
 **Explicit** arguments/results are those which were explicitly mentioned in the source Python program.
 Implicit arguments are those that are added to the lists in order to meet Jaxpr requirements.
 
-For example, when tracing the following Python program:
+For example, in the following Python program:
 
 ``` python
 def f(sz):
@@ -250,8 +250,8 @@ def f(sz):
   return o
 ```
 
-We might need to map the Python tracer `o` to the two variables `b:i64[], c:f[b]` of the following
-equivalent Jaxpr program
+We map the Python tracer `o` to the two variables `b:i64[], c:f[b]` to get the following equivalent
+Jaxpr program
 
 ```
 { lambda ; a:i64[]. let
@@ -261,9 +261,7 @@ equivalent Jaxpr program
 ```
 
 In Jax this is done by adding together the tuple of **explicit** values with another
-tuple of calculated **implicit** values.
-
-Note that we also link corresponding type signature using the appropriate `*DBIdx` indices.
+tuple of calculated **implicit** values during the parameter expansion.
 
 
 ### Expanded/collapsed arguments or results
@@ -385,14 +383,16 @@ arguments and results of functions must be adjusted in the following ways:
        For example:
        `a:f64[d], b:f64[d]` becomes `d1:i64[], d2:i64[], a:f64[d1], b:f64[d2]`
        This mode is enabled if `experimental_preserve_dimensions` parameter is set to `False`.
-3. Produce the type (`in_type` for arguments, `out_type` for results), describing the result of the
-   expansion.
-   - For arguments, we may use `DBIdx` in types to refer to position in the same list. For example:
-     `d:i64[], a:f64[d], b:f64[d]` will get
-     `[(i64, True), (f64[DBIdx(0)], False), (f64[DBIdx(0)], False)]`
-     where we assume that it is an aguments list.
-   - For results, we may use `InDBIdx` and `OutDBIdx` in type to refer to positions in the argument
-     list and the result list (the current one) correspondingly.
+3. Produce types (`in_type` for arguments, `out_type` for results), describing the expansion
+   results.
+   - For arguments, we use `DBIdx` in types to refer to position in the same list. For example:
+     + Arguments: `d:i64[], a:f64[d], b:f64[d]`
+     + Input type: `[(i64, True), (f64[DBIdx(0)], False), (f64[DBIdx(0)], False)]`
+   - For results, we use `InDBIdx` and `OutDBIdx` in type to refer to positions in the argument list
+     and the result list (the current one) correspondingly. For example:
+     + Arguments: `v:i64[], d:i64[], a:f64[d], b:f64[d]`
+     + Results: `e:i64[], a:f64[e], b:f64[d]`
+     + Output type: `[(i64, True), (f64[OutDBIdx(0)], False), (f64[InDBIdx(1)], False)]`
 
 In Catalyst, we usually record the number of implicit variables added using
 `num_implicit_inputs`/`num_implicit_outputs` attributes.
@@ -441,8 +441,8 @@ We developed the following compromise in order to handle this situation:
   ``` python
   @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
   def loop(i, a, b, b_):
-      return a, b, b_  # CORRECT BUT
-      # `b + b_` is not possible, because `b` and `b_` has now different dimensions
+      return a, b, b_  # CORRECT
+      # BUT `b + b_` is not possible, because `b` and `b_` now has different dimensions
 
   b0 = jnp.ones([sz+1], dtype=float)
   a2, b2, b2_ = loop(a0, b0, b0)
@@ -450,7 +450,18 @@ We developed the following compromise in order to handle this situation:
 
 #### For-loop expansion specifics
 
-TODO
+A special for for-loops: loop index variable could not be referred using `InDBIdx` index in output
+types. For example, in the following program
+
+``` python
+@for_loop(0, 10, 1)
+def loop(i, a):
+    b = jnp.ones([i], dtype=float)
+    return b
+```
+
+Output type will contain `OuDBIdx` in the dimension of `b`.
+
 
 ### Jax constants deduction
 
@@ -470,8 +481,6 @@ information is used during the StableHLO lowering.
 
 Caveats
 -------
-
-This section mentions known implementation problems.
 
 * Dimension variables obtained from constants never matches dimension variables from regular
   parameters. Thus, the following program will raise an error:
