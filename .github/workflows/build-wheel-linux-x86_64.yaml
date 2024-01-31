@@ -1,6 +1,7 @@
 name: Build Catalyst Wheel on Linux (x86_64)
 
 on:
+  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:

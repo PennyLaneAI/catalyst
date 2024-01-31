@@ -1,6 +1,7 @@
 name: Build Catalyst Wheel on macOS (arm64)
 
 on:
+  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:
