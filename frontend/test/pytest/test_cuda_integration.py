@@ -51,7 +51,7 @@ class TestCuda:
 
         opts = CompileOptions()
         expected_jaxpr = QJIT(circuit_foo, opts).jaxpr
-        observed_jaxpr, _ = QJIT_CUDA(circuit_foo, opts).get_jaxpr()
+        observed_jaxpr, _ = QJIT_CUDA(circuit_foo).get_jaxpr()
         assert str(expected_jaxpr) == str(observed_jaxpr)
 
     def test_qjit_cuda_remove_host_context(self):
@@ -62,7 +62,7 @@ class TestCuda:
             return qml.state()
 
         opts = CompileOptions()
-        observed_jaxpr, _ = QJIT_CUDA(circuit_foo, opts).get_jaxpr()
+        observed_jaxpr, _ = QJIT_CUDA(circuit_foo).get_jaxpr()
         jaxpr = remove_host_context(observed_jaxpr)
         assert jaxpr
 

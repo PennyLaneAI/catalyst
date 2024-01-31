@@ -823,62 +823,19 @@ class QJIT_CUDA:
 
     .. note::
 
-        ``QJIT`` objects are created by the :func:`~.qjit` decorator. Please see
+        ``QJIT_CUDA`` objects are created by the :func:`~.qjit` decorator. Please see
         the :func:`~.qjit` documentation for more details.
 
     Args:
         fn (Callable): the quantum or classical function
-        compile_options (Optional[CompileOptions]): common compilation options
     """
 
-    def __init__(self, fn, compile_options):
-        self.compile_options = compile_options
-        self.compiler = Compiler(compile_options)
-        self.compiling_from_textual_ir = isinstance(fn, str)
-        self.original_function = fn
+    def __init__(self, fn):
         self.user_function = fn
-        self.jaxed_function = None
-        self.compiled_function = None
-        self.mlir_module = None
-        self.user_typed = False
-        self.c_sig = None
         self.out_tree = None
         self._jaxpr = None
-        self._mlir = None
-        self._llvmir = None
 
         functools.update_wrapper(self, fn)
-
-        if compile_options.autograph:
-            self.user_function = run_autograph(fn)
-
-        # QJIT is the owner of workspace.
-        # do not move to compiler.
-        preferred_workspace_dir = (
-            pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
-        )
-        # If we are compiling from textual ir, just use this as the name of the function.
-        name = "compiled_function"
-        if not self.compiling_from_textual_ir:
-            # pylint: disable=no-member
-            # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
-            name = self.__name__
-
-        self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
-
-        if self.compiling_from_textual_ir:
-            EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-
-        # TODO(@erick-xanadu): Do tracing if parameters are known.
-        # Originally disabled just to get proof of concept.
-
-    def print_stage(self, stage):
-        """Print one of the recorded stages.
-
-        Args:
-            stage: string corresponding with the name of the stage to be printed
-        """
-        self.compiler.print(stage)  # pragma: nocover
 
     @property
     def jaxpr(self):
@@ -903,7 +860,7 @@ class QJIT_CUDA:
         ):
             func = self.user_function
             sig = self.c_sig
-            abstracted_axes = self.compile_options.abstracted_axes
+            abstracted_axes = {}
             # _jaxpr and _out_tree are used in Catalyst but at the moment
             # they have no use here in CUDA.
             _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *sig)

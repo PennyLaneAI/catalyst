@@ -960,8 +960,7 @@ def catalyst_to_cuda(fun):
 
     @wraps(fun)
     def wrapped(*args, **_kwargs):
-        opts = CompileOptions()
-        catalyst_jaxpr_with_host, out_tree = QJIT_CUDA(fun, opts).get_jaxpr(*args)
+        catalyst_jaxpr_with_host, out_tree = QJIT_CUDA(fun).get_jaxpr(*args)
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
         out = transform_jaxpr_to_cuda_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
