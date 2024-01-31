@@ -98,86 +98,15 @@ The following points are important to note:
     arguments.
   - `f:i64[]`: Requirement saying that Jaxpr variable must be declared before use. Since we use
     variable `f` in the type of `h`, we pass it an additional argument.
-* In contrast to the regular Python evaluation, loop body is evaluated only once during the
-  tracing. This is because we only want to record the execution path.
+* In contrast to the regular Python evaluation, loop body is evaluated only once during the tracing.
+  This is because we only want to record the execution path rather then perform the real
+  computation.
 
 
-Tracing generalization
-----------------------
+Definitions
+-----------
 
-In this section we generalize problem. Consider the following schematic Python program:
-
-``` python
-def nested_function(*ARGS):
-  ... # calculate RESULTS from ARGS
-  return RESULTS
-
-INPUTS = ... # Obtain INPUTS from the context
-OUTPUTS = bind(nested_function, *INPUTS)
-```
-
-Notes:
-- In this example, `nested_function` plays the role of `for_loop` body, `cond` branch or `adjoint`
-  region.
-- `bind` represents the `for_loop` user primitive.
-
-We want to transform this program into the following Jaxpr program (also schematic):
-
-```
-{ lambda ; INPUTS . let
-    OUTPUTS = bind[
-      nested_function = { lambda ; ARGS . let
-        ...  // calculate RESULTS
-      in RESULTS };
-    ] INPUTS;
-  in OUTPUTS }
-```
-
-In order to do so, Jax evaluates the source Python program passing **tracers** objects as INPUTS.
-All operations applied to the tracers, including the nested function call, are recorded into the
-internal Jax equation list, which is then used to print the final Jaxpr program.
-
-In the above example, **bind** in Jax's terms, is the most important operation, joining the outer
-and inner tracing processes into a single recursive tracing algorithm.
-
-Below we give the description of one recursion step of the tracing algorithm:
-
-* $bind(Function, Inputs, S) -> Outputs_s$, where:
-  1. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
-  2. $OutputType_s \gets AbstractEvaluation(InputType_s)$ where $AbstractEvaluation$ is defined as follows:
-      1. $ExpandedArguments_s \gets initialize(InputType_s)$
-      2. $Arguments \gets collapse(ExpandedArguments_s)$
-      3. $Results \gets traceNested(Function, Arguments)$
-      4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
-      5. $return(OutputType_s)$
-  3. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
-  4. $Outputs_s \gets collapse(ExpandedOutputs_s)$
-  5. $return(Outputs_s)$
-
-The variations of this algorithm is implemented in the Catalyst repository for every binding
-function, examples are `for_loop`, `while_loop`, `cond`, etc. Below we describe its steps in more
-details and give source references.
-
-- $read()$ obtains input **Tracers** from the context.
-- $expandArgs()$ determines the **implicit parameters** using the specified expansion strategy $S$
-  and calculates the **input type signature**.
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L800)
-- $expandResults()$ calculates **implicit output variables** and obtains the final **output type
-  signature**.
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L817)
-- $initialize()$  reads the input type information and creates the required tracers in the inner
-  tracing context. Note that the function interprets **de Brjuin indices** which might exist in
-  inputs.
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L625)
-  (inputs)
-  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L640)
-  (outputs)
-- $traceNested()$ runs the next recursion step of the tracing. It takes collapsed (not-expanded)
-  **list of input tracers** and calculates the **list of output tracers**.
-
-
-Terms and definitions
----------------------
+In this section we define terms and concepts required to describe the tracing algorithm.
 
 ### Jax
 
@@ -337,6 +266,85 @@ encode the program transformation, we attribute argument lists as **collapsed** 
 
 We use `expanded_` prefix in Python list name if the implicit arguments are known to be already
 prepended to the list.
+
+
+Tracing problem generalization
+------------------------------
+
+In this section we attempt to generalize the tracing problem. Consider the following schematic
+Python program:
+
+``` python
+def nested_function(*ARGS):
+  ... # calculate RESULTS from ARGS
+  return RESULTS
+
+INPUTS = ... # Obtain INPUTS from the context
+OUTPUTS = bind(nested_function, *INPUTS)
+```
+
+Notes:
+- In this example, `nested_function` plays the role of `for_loop` body, `cond` branch or `adjoint`
+  region.
+- `bind` represents the binding API function, e.g. `for_loop`.
+
+We want to transform this program into the following Jaxpr program (also schematic):
+
+```
+{ lambda ; INPUTS . let
+    OUTPUTS = bind[
+      nested_function = { lambda ; ARGS . let
+        ...  // calculate RESULTS
+      in RESULTS };
+    ] INPUTS;
+  in OUTPUTS }
+```
+
+In order to do so, Jax evaluates the source Python program passing **tracers** objects as INPUTS.
+All operations applied to the tracers, including the nested function call, are recorded into the
+internal Jax equation list, which is then used to print the final Jaxpr program.
+
+In the above example, **bind** in Jax's terms, is the most important operation, joining the outer
+and inner tracing processes into a single recursive tracing algorithm.
+
+Below we give the description of one recursion step of the tracing algorithm:
+
+* $bind(Function, Inputs, S) -> Outputs_s$, where:
+  1. $(ExpandedInputs_s, InputType_s) \gets expandArgs(Inputs, strategy = S)$
+  2. $OutputType_s \gets AbstractEvaluation(InputType_s)$ where $AbstractEvaluation$ is defined as follows:
+      1. $ExpandedArguments_s \gets initialize(InputType_s)$
+      2. $Arguments \gets collapse(ExpandedArguments_s)$
+      3. $Results \gets traceNested(Function, Arguments)$
+      4. $OutputType_s \gets expandResults(ExpandedArguments_s, Results)$
+      5. $return(OutputType_s)$
+  3. $ExpandedOutputs_s \gets initialize(OutputType_s, ExpandedInputs_s)$
+  4. $Outputs_s \gets collapse(ExpandedOutputs_s)$
+  5. $return(Outputs_s)$
+
+The variations of this algorithm is implemented in the Catalyst repository for every binding
+function, examples are `for_loop`, `while_loop`, `cond`, etc. Below we describe its steps in more
+details and give source references.
+
+- $read()$ obtains input **Tracers** from the context.
+- $Outputs_s$ represents output **Tracers** of a Python program obtained using the expansion
+  strategy `S`. Any set of tracers might be converted to a Jaxpr program at any time using the core
+  Jax IR printer function `to_jaxpr`. Thus, having output tracers is equivalent to having the Jaxpr
+  program.
+- $expandArgs()$ determines the **implicit parameters** using the specified expansion strategy $S$
+  and calculates the **input type signature**.
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L800)
+- $expandResults()$ calculates **implicit output variables** and obtains the final **output type
+  signature**.
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L817)
+- $initialize()$  reads the input type information and creates the required tracers in the inner
+  tracing context. Note that the function interprets **de Brjuin indices** which might exist in
+  inputs.
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L625)
+  (inputs)
+  [Source](https://github.com/PennyLaneAI/catalyst/blob/7349a7e05868289142a237f7c62aa6ddc60563ea/frontend/catalyst/utils/jax_extras.py#L640)
+  (outputs)
+- $traceNested()$ runs the next recursion step of the tracing. It takes collapsed (not-expanded)
+  **list of input tracers** and calculates the **list of output tracers**.
 
 
 Catalyst implementation details
