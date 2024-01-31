@@ -338,8 +338,7 @@ cuda_inst, cuda_inst_p = make_primitive_for_gate()
 class SideEffect(jax._src.effects.Effect):
     """Side effect token."""
 
-    # pylint: disable=unnecessary-lambda
-    __str__ = lambda _: "SideEffect"
+    __str__ = lambda _: "SideEffect"  # pylint: disable=unnecessary-lambda
 
 
 def make_primitive_for_m(gate: str):
