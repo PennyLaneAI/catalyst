@@ -57,6 +57,40 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.jax_extras import remove_host_context
 
+import pennylane as qml
+from pathlib import Path
+
+
+class CudaQDevice(qml.QubitDevice):
+
+    name = "CudaQ Device"
+    short_name = "cudaq"
+    pennylane_requires = "0.33.0"
+    version = "1.0"
+    author = "Erick Ochoa"
+
+    operations = [
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "S",
+        "T",
+        "RX",
+        "RY",
+        "RZ",
+    ]
+    observables = []
+    config = Path("/home/ubuntu/code/catalyst/cuda.toml")
+
+    def __init__(self, shots=None, wires=None):
+        super().__init__(wires=wires, shots=shots)
+
+    def apply(self, operations, **kwargs):
+        """Unused"""
+        raise RuntimeError("We are not applying operation by operation.")
+
+
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
 # pylint: disable=protected-access

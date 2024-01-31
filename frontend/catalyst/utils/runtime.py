@@ -239,6 +239,9 @@ def extract_backend_info(device):
     device_lpath = ""
     device_kwargs = {}
 
+    with open(device.config, "rb") as f:
+        config = toml_load(f)
+
     if dname in SUPPORTED_RT_DEVICES:
         # Support backend devices without `get_c_interface`
         device_name = SUPPORTED_RT_DEVICES[dname][0]
@@ -254,6 +257,10 @@ def extract_backend_info(device):
     elif hasattr(device, "get_c_interface"):
         # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
+    elif config["compilation"]["jax_transform_compatible"]:
+        # Device is compatible with JAX transforms...
+        # This is a special case for CUDA quantum device.
+        return config, device_name, None, None
     else:
         raise CompileError(f"The {dname} device is not supported for compilation at the moment.")
 
