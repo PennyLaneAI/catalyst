@@ -4,8 +4,9 @@ Catalyst frontend architecture
 <!--
 ``` python
 import pennylane as qml
-import jax.numpy as jnp
-from catalyst import qjit, for_loop
+from jax import numpy as jnp
+from catalyst import qjit, for_loop, while_loop
+from catalyst.jax_extras import DBIdx, expand_args, while_loop_expansion_strategy
 print("OK")
 ```
 
@@ -32,8 +33,8 @@ OK
 * [Catalyst implementation details](#catalyst-implementation-details)
   * [Arguments and results transformations](#arguments-and-results-transformations)
   * [Dynamic dimension expansion](#dynamic-dimension-expansion)
-    * [While-loop expansion specific](#while-loop-expansion-specific)
-    * [For-loop expansion specific](#for-loop-expansion-specific)
+    * [Loop expansion specifics](#loop-expansion-specifics)
+    * [For-loop expansion specifics](#for-loop-expansion-specifics)
   * [Jax constants deduction](#jax-constants-deduction)
 * [Caveats](#caveats)
 
@@ -105,9 +106,9 @@ The following points are important to note:
     arguments.
   - `f:i64[]`: Requirement saying that Jaxpr variable must be declared before use. Since we use
     variable `f` in the type of `h`, we pass it an additional argument.
-* Loop argument `b:f64[a]` and loop result `c:f64[a]` have same types. According to Jax, same types
-  means that mutual operations are possible. The very last `add` operation is allowed because of
-  this fact.
+* Loop argument `b:f64[a]` and loop result `c:f64[a]` have the same types. Jax takes special care of
+  propagating type variables across primitives where possible. Jax binary operators like `+`, `*`
+  requires types to be same.
 * In contrast to the regular Python evaluation, loop body is evaluated only once during the tracing.
   This is because we only want to record the execution path rather then perform the real
   computation.
@@ -371,16 +372,19 @@ arguments and results of functions must be adjusted in the following ways:
 
 ### Dynamic dimension expansion
 
-1. Arguments/results mentioned in the source Python program are explicit.
-2. The expansion algorithm prepends the dimension variables to the list of explicit arguments.
-   - In the basic case, the variables are added without duplication.
-   - In case when several tensors use same dimension variables, more decisions are possible. In
+1. We start from the state where the explicit arguments/results mentioned in the source Python
+   program are known.
+2. The expansion algorithm scans the explicit dimensions and prepends variables to the list of
+   explicit arguments.
+   - In the basic case, the variables found in the dimensions are added as-is.
+   - In case when several tensors use same dimension variables, different decisions are possible. In
      Catalyst, we support the following two cases:
-     + Add only one implicit argument for shared dimension variable. For example:
+     + (Default) Add only one implicit argument for shared dimension variable. For example:
        `a:f64[d], b:f64[d]` becomes `d:i64[], a:f64[d], b:f64[d]`
      + "Forget" about the sharing and add new variable for every dimension variable separately.
        For example:
        `a:f64[d], b:f64[d]` becomes `d1:i64[], d2:i64[], a:f64[d1], b:f64[d2]`
+       This mode is enabled if `experimental_preserve_dimensions` parameter is set to `False`.
 3. Produce the type (`in_type` for arguments, `out_type` for results), describing the result of the
    expansion.
    - For arguments, we may use `DBIdx` in types to refer to position in the same list. For example:
@@ -393,11 +397,58 @@ arguments and results of functions must be adjusted in the following ways:
 In Catalyst, we usually record the number of implicit variables added using
 `num_implicit_inputs`/`num_implicit_outputs` attributes.
 
-#### While-loop expansion specific
+#### Loop expansion specifics
 
-TODO
+Loop primitives have notable additional requirements. In order to lower loop bodies, types and
+numbers of loop body arguments must match types and numbers of the loop body results.
 
-#### For-loop expansion specific
+In the presence of dynamic dimensions, Jax needs determine which dimensions are going to change
+during the loop iterations and which one remain the same. Unfortunately, in a single-pass tracer it
+is hard to communicate this information to the compiler. We only see iteration-0 arguments and
+results and in general we can not extrapolate this information to later iterations.
+
+We developed the following compromise in order to handle this situation:
+
+* By default, we assume that loop results will keep the same dimension sharing pattern as loop
+  arguments. For example:
+
+  ``` python
+  @for_loop(0, 10, 1)
+  def loop(i, a, a_):
+      return a, a_
+  loop(a0,a0)  # CORRECT: one shared dimension in both inputs and outputs
+  ```
+
+  ``` python
+  @for_loop(0, 10, 1)
+  def loop(i, a, a_):
+      b = jnp.ones([sz+1], dtype=float)
+      return b, b
+  loop(a0,a0)  # CORRECT: still one shared dimension
+  ```
+
+  ``` python
+  @for_loop(0, 10, 1)
+  def loop(i, a, a_):
+      b = jnp.ones([sz+1], dtype=float)
+      return a, b  # ERROR: dimensions are not the same any more
+  loop(a0,a0)
+  ```
+
+* With `experimental_preserve_dimensions=False` flag, we treat every same dimension as a 0-iteration
+  conincidense. We create separate dimension during the argument/result expansion.
+
+  ``` python
+  @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
+  def loop(i, a, b, b_):
+      return a, b, b_  # CORRECT BUT
+      # `b + b_` is not possible, because `b` and `b_` has now different dimensions
+
+  b0 = jnp.ones([sz+1], dtype=float)
+  a2, b2, b2_ = loop(a0, b0, b0)
+  ```
+
+#### For-loop expansion specifics
 
 TODO
 
