@@ -881,25 +881,11 @@ class QJIT_CUDA:
         self.compiler.print(stage)  # pragma: nocover
 
     @property
-    def mlir(self):
-        """str: Returns the MLIR intermediate representation
-        of the quantum program.
-        """
-        return self._mlir
-
-    @property
     def jaxpr(self):
         """str: Returns the JAXPR intermediate representation
         of the quantum program.
         """
         return self._jaxpr
-
-    @property
-    def qir(self):
-        """str: Returns the LLVM and QIR intermediate representation
-        of the quantum program. Only available if the function was compiled to binary.
-        """
-        return self._llvmir
 
     def get_jaxpr(self, *args):
         """Trace :func:`~.user_function`
@@ -927,135 +913,6 @@ class QJIT_CUDA:
         # TODO(@erick-xanadu): Likely we will need more information
         # from the line directly above.
         return jaxpr2, out_tree
-
-    def compile(self):
-        """Compile the current MLIR module."""
-
-        if self.compiled_function and self.compiled_function.shared_object:
-            self.compiled_function.shared_object.close()
-
-        if self.compiling_from_textual_ir:
-            # Module name can be anything.
-            module_name = "catalyst_module"
-            shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
-                self.user_function, module_name, self.workspace
-            )
-            qfunc_name = inferred_func_data[0]
-            # Parse back the return types given as a semicolon-separated string
-            with ir.Context():
-                restype = [ir.RankedTensorType.parse(rt) for rt in inferred_func_data[1].split(",")]
-        else:
-            # This will make a check before sending it to the compiler that the return type
-            # is actually available in most systems. f16 needs a special symbol and linking
-            # will fail if it is not available.
-            #
-            # WARNING: assumption is that the first function
-            # is the entry point to the compiled program.
-            entry_point_func = self.mlir_module.body.operations[0]
-            restype = entry_point_func.type.results
-
-            for res in restype:
-                baseType = ir.RankedTensorType(res).element_type
-                mlir_type_to_numpy_type(baseType)
-
-            # The function name out of MLIR has quotes around it, which we need to remove.
-            # The MLIR function name is actually a derived type from string which has no
-            # `replace` method, so we need to get a regular Python string out of it.
-            qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-
-            shared_object, llvm_ir, inferred_func_data = self.compiler.run(
-                self.mlir_module, self.workspace
-            )
-
-        self._llvmir = llvm_ir
-        options = self.compile_options
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
-        return compiled_function
-
-    def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
-        """Logic to decide whether the function needs to be recompiled
-        given ``*args`` and whether ``*args`` need to be promoted.
-        A function may need to be compiled if:
-            1. It was not compiled before
-            2. The real arguments sent to the function are not promotable to the type of the
-                formal parameters.
-
-        Args:
-          function: an instance of ``CompiledFunction`` that may need recompilation
-          *args: arguments that may be promoted.
-
-        Returns:
-          function: an instance of ``CompiledFunction`` that may have been recompiled
-          *args: arguments that may have been promoted
-        """
-        r_sig = CompiledFunction.get_runtime_signature(*args)
-
-        has_been_compiled = self.compiled_function is not None
-        next_action = TypeCompatibility.UNKNOWN
-        if not has_been_compiled:
-            next_action = TypeCompatibility.NEEDS_COMPILATION
-        else:
-            abstracted_axes = self.compile_options.abstracted_axes
-            next_action = CompiledFunction.typecheck(abstracted_axes, self.c_sig, r_sig)
-
-        if next_action == TypeCompatibility.NEEDS_PROMOTION:
-            args = CompiledFunction.promote_arguments(self.c_sig, *args)
-        elif next_action == TypeCompatibility.NEEDS_COMPILATION:
-            if self.user_typed:
-                msg = "Provided arguments did not match declared signature, recompiling..."
-                warnings.warn(msg, UserWarning)
-            if not self.compiling_from_textual_ir:
-                self.mlir_module = self.get_mlir(*r_sig)
-            function = self.compile()
-        else:
-            assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
-
-        return function, args
-
-    def get_cmain(self, *args):
-        """Return the C interface template for current arguments.
-
-        Args:
-          *args: Arguments to be used in the template.
-        Returns:
-          str: A C program that can be compiled with the current shared object.
-        """
-        msg = "C interface cannot be generated from tracing context."
-        EvaluationContext.check_is_not_tracing(msg)
-        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
-            self.compiled_function, *args
-        )
-        return function.get_cmain(*args)
-
-    def __call__(self, *args, **kwargs):
-        if EvaluationContext.is_tracing():
-            return self.user_function(*args, **kwargs)
-
-        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
-            self.compiled_function, *args
-        )
-        recompilation_needed = function != self.compiled_function
-        self.compiled_function = function
-
-        args_data, _args_shape = tree_flatten(args)
-        if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
-            # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_function is None or recompilation_needed:
-                self.jaxed_function = JAX_QJIT(self)
-
-            return self.jaxed_function(*args, **kwargs)
-
-        data = self.compiled_function(*args, **kwargs)
-
-        # Unflatten the return value w.r.t. the original PyTree definition if available
-        if self.out_tree is not None:
-            data = tree_unflatten(self.out_tree, data)
-
-        # For the classical and pennylane_extensions compilation path,
-        if isinstance(data, (list, tuple)) and len(data) == 1:
-            data = data[0]
-
-        return data
 
 
 class JAX_QJIT:

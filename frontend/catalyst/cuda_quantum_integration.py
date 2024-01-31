@@ -338,6 +338,7 @@ cuda_inst, cuda_inst_p = make_primitive_for_gate()
 class SideEffect(jax._src.effects.Effect):
     """Side effect token."""
 
+    # pylint: disable=unnecessary-lambda
     __str__ = lambda _: "SideEffect"
 
 
@@ -552,7 +553,7 @@ class TranslatorContext:
 
     def read(self, var):
         """Read the value of variable var."""
-        if type(var) is jax.core.Literal:
+        if isinstance(var, jax.core.Literal):
             return var.val
         if self.variable_map.get(var):
             var = self.variable_map[var]
