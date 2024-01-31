@@ -378,7 +378,7 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *args, **kwargs)
+    jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs)
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
     return module, context, jaxpr, out_type2, out_tree
 

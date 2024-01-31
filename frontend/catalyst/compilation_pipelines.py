@@ -863,7 +863,7 @@ class QJIT_CUDA:
             abstracted_axes = {}
             # _jaxpr and _out_tree are used in Catalyst but at the moment
             # they have no use here in CUDA.
-            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, abstracted_axes, *sig)
+            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, None, {}, *sig)
 
         self._jaxpr = jaxpr2
 
@@ -1356,7 +1356,7 @@ def qjit(
                 "verbose" : verbose,
                 "logfile" : logfile,
                 "pipelines" : pipelines,
-                "static_argnums" : argnums.
+                "static_argnums" : argnums,
                 "abstracted_axes" : abstracted_axes,
     }
     if compiler is not None and compiler == "cuda-quantum":
