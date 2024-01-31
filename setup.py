@@ -156,6 +156,7 @@ setup(
     version=version,
     python_requires=">=3.9",
     entry_points={
+        "pennylane.plugins": "cudaq = cuda:CudaQDevice",
         "pennylane.compilers": [
             "context = catalyst.utils.contexts:EvaluationContext",
             "ops = catalyst:pennylane_extensions",
