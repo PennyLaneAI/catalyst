@@ -365,12 +365,12 @@ class TestCustomCall:
     def test_dsyevd(self):
         A = np.array([[4, 9], [9, 4]])
 
-        def circuit(A):
+        def workflow(A):
             B = qml.math.sqrt_matrix(A)
-            return B
+            return B @ A
 
-        qjit_result = qjit(circuit)(A)
-        pl_result = circuit(A)
+        qjit_result = qjit(workflow)(A)
+        pl_result = workflow(A)
         assert np.allclose(qjit_result, pl_result)
 
 
