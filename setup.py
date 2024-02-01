@@ -156,11 +156,14 @@ setup(
     version=version,
     python_requires=">=3.9",
     entry_points={
-        "pennylane.plugins": "cudaq = cuda:CudaQDevice",
+        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
         "pennylane.compilers": [
-            "context = catalyst.utils.contexts:EvaluationContext",
-            "ops = catalyst:pennylane_extensions",
-            "qjit = catalyst:qjit",
+            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
+            "catalyst.ops = catalyst:pennylane_extensions",
+            "catalyst.qjit = catalyst:qjit",
+            "cudaq.context = catalystcuda:EvaluationContext",
+            "cudaq.ops = catalystcuda:pennylane_extensions",
+            "cudaq.qjit = catalystcuda:qjit",
         ],
     },
     install_requires=requirements,

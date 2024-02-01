@@ -181,7 +181,7 @@ class TestCuda:
         assert_allclose(expected["a"], observed["a"])
 
     def test_cuda_device(self):
-        from cuda import CudaQDevice
+        from catalystcuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
@@ -193,7 +193,7 @@ class TestCuda:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = qjit(compiler="cuda-quantum")(circuit)
+        cuda_compiled = qjit(compiler="cudaq")(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -211,8 +211,18 @@ class TestCuda:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = qjit(compiler="cuda-quantum")(circuit)
+        cuda_compiled = qjit(compiler="cudaq")(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
         assert_allclose(expected["a"], observed["a"])
+
+    def test_cuda_device_entry_point_compiler(self):
+
+        @qml.qjit(compiler="cudaq")
+        @qml.qnode(qml.device("cudaq", wires=1))
+        def circuit(a):
+            qml.RX(a, wires=[0])
+            return {"a": qml.state()}
+
+        circuit(3.14)
