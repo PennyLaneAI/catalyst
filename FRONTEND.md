@@ -118,9 +118,10 @@ The following points are important to note:
     arguments.
   - `e:i64[]`: Requirement saying that Jaxpr variable must be declared before use. Since we use
     `e` in the type of `g:f64[e]`, we must pass it as an additional argument before this use.
-* Loop argument `b:f64[a]` and loop result `c:f64[a]` have the same types. Jax takes special care of
-  propagating type variables across primitives where possible. Jax binary operators like `+`, `*`
-  requires operand types to be the same.
+* Loop argument `b:f64[a]` and the loop result `c:f64[a]` have the same type. Jax takes special care
+  of propagating types across operations. Jax binary operators like `add`, `mull` require operand
+  types to be the same. Since the types of `b` and `c` are indeed the same, the very last addition
+  operation is possible.
 * In contrast to the regular Python evaluation, loop body is evaluated only once during the tracing.
   This is because we only want to record the execution path rather then perform the real
   computation.
