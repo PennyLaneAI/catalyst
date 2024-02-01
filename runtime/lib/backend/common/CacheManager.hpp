@@ -36,6 +36,8 @@ class CacheManager {
     std::vector<std::vector<double>> ops_params_{};
     std::vector<std::vector<size_t>> ops_wires_{};
     std::vector<bool> ops_inverses_{};
+    std::vector<std::vector<size_t>> ops_controlled_wires_{};
+    std::vector<std::vector<bool>> ops_controlled_values_{};
 
     // Observables Data
     std::vector<ObsIdType> obs_keys_{};
@@ -62,6 +64,8 @@ class CacheManager {
         this->ops_params_.clear();
         this->ops_wires_.clear();
         this->ops_inverses_.clear();
+        this->ops_controlled_wires_.clear();
+        this->ops_controlled_values_.clear();
 
         this->obs_keys_.clear();
         this->obs_callees_.clear();
@@ -89,6 +93,43 @@ class CacheManager {
                        [](auto w) { return static_cast<size_t>(w); });
 
         this->ops_wires_.push_back(wires_ul);
+        this->ops_inverses_.push_back(inverse);
+
+        this->num_params_ += params.size();
+
+        this->ops_controlled_wires_.push_back({});
+        this->ops_controlled_values_.push_back({});
+    }
+
+    /**
+     * @brief Add a new operation to the list of cached gates.
+     *
+     * @param name Name of the given gate
+     * @param params Parameters of the gate
+     * @param wires Wires the gate acts on
+     * @param inverse If true, inverse of the gate is applied
+     */
+    void addOperation2(const std::string &name, const std::vector<double> &params,
+                       const std::vector<size_t> &dev_wires, bool inverse,
+                       const std::vector<size_t> &dev_controlled_wires,
+                       const std::vector<bool> &controlled_values)
+    {
+        this->ops_names_.push_back(name);
+        this->ops_params_.push_back(params);
+
+        std::vector<size_t> wires_ul;
+        wires_ul.reserve(dev_wires.size());
+        std::transform(dev_wires.begin(), dev_wires.end(), std::back_inserter(wires_ul),
+                       [](auto w) { return static_cast<size_t>(w); });
+        this->ops_wires_.push_back(wires_ul);
+
+        std::vector<size_t> controlled_wires_ul;
+        controlled_wires_ul.reserve(dev_controlled_wires.size());
+        std::transform(dev_controlled_wires.begin(), dev_controlled_wires.end(), std::back_inserter(controlled_wires_ul),
+                       [](auto w) { return static_cast<size_t>(w); });
+        this->ops_controlled_wires_.push_back(controlled_wires_ul);
+        this->ops_controlled_values_.push_back(controlled_values);
+
         this->ops_inverses_.push_back(inverse);
 
         this->num_params_ += params.size();
@@ -138,6 +179,22 @@ class CacheManager {
     auto getOperationsWires() -> const std::vector<std::vector<size_t>> &
     {
         return this->ops_wires_;
+    }
+
+    /**
+     * @brief Get a a reference to operation controlled wires.
+     */
+    auto getOperationsControlledWires() -> const std::vector<std::vector<size_t>> &
+    {
+        return this->ops_controlled_wires_;
+    }
+
+    /**
+     * @brief Get a a reference to operation controlled values.
+     */
+    auto getOperationsControlledValues() -> const std::vector<std::vector<bool>> &
+    {
+        return this->ops_controlled_values_;
     }
 
     /**

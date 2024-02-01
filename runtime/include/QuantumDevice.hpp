@@ -148,6 +148,10 @@ struct QuantumDevice {
      */
     virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
                                 const std::vector<QubitIdType> &wires, bool inverse) = 0;
+    virtual void NamedOperation2(const std::string &name, const std::vector<double> &params,
+                                 const std::vector<QubitIdType> &wires, bool inverse,
+                                 const std::vector<QubitIdType> &controlled_wires,
+                                 const std::vector<bool> &controlled_values) = 0;
 
     /**
      * @brief Apply a given matrix directly to the state vector of a device.

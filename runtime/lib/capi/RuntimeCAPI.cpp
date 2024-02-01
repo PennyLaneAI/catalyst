@@ -347,6 +347,21 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     Catalyst::Runtime::getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
+void __catalyst__qis__Identity2(QUBIT *qubit, Modifiers *modifiers)
+{
+    Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation2(
+        "Identity",
+        {},
+        {reinterpret_cast<QubitIdType>(qubit)},
+        modifiers->adjoint,
+        std::vector<QubitIdType>(
+            reinterpret_cast<QubitIdType*>(modifiers->controlled_wires),
+            reinterpret_cast<QubitIdType*>(modifiers->controlled_wires) + modifiers->num_controlled),
+        std::vector<bool>(modifiers->controlled_values,
+            modifiers->controlled_values + modifiers->num_controlled)
+        );
+}
+
 void __catalyst__qis__Identity(QUBIT *qubit, bool adjoint)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("Identity", {},

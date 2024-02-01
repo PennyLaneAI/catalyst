@@ -135,6 +135,39 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     }
 }
 
+
+void LightningSimulator::NamedOperation2(const std::string &name, const std::vector<double> &params,
+                                         const std::vector<QubitIdType> &wires, bool inverse,
+                                         const std::vector<QubitIdType> &controlled_wires,
+                                         const std::vector<bool> &controlled_values)
+{
+    // First, check if operation `name` is supported by the simulator
+    auto &&[op_num_wires, op_num_params] =
+        Lightning::lookup_gates(Lightning::simulator_gate_info, name);
+
+    // Check the validity of number of qubits and parameters
+    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
+    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
+    RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
+        "Controlled wires/values size mismatch");
+
+    // Convert wires to device wires
+    auto &&dev_wires = getDeviceWires(wires);
+    auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
+
+    // Update the state-vector
+    this->device_sv->applyOperation(name,
+        dev_controlled_wires, controlled_values,
+        dev_wires, inverse, params);
+
+    // Update tape caching if required
+    if (this->tape_recording) {
+        this->cache_manager.addOperation2(name,
+            params, dev_wires, inverse,
+            dev_controlled_wires, controlled_values);
+    }
+}
+
 void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
                                          const std::vector<QubitIdType> &wires, bool inverse)
 {
@@ -473,10 +506,15 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     auto &&ops_names = this->cache_manager.getOperationsNames();
     auto &&ops_params = this->cache_manager.getOperationsParameters();
     auto &&ops_wires = this->cache_manager.getOperationsWires();
+    auto &&ops_controlled_wires = this->cache_manager.getOperationsControlledWires();
+    auto &&ops_controlled_values = this->cache_manager.getOperationsControlledValues();
 
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
     const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
-                                                                    ops_wires, ops_inverses);
+                                                                    ops_wires, ops_inverses,
+                                                                    std::vector<std::vector<StateVectorT::ComplexT>>(ops_names.size()),
+                                                                    ops_controlled_wires,
+                                                                    ops_controlled_values);
 
     // create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();
