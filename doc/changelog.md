@@ -161,7 +161,7 @@ Haochen Paul Wang.
 * Resolve a failure to generate gradient code for specific input circuits.
   [(#439)](https://github.com/PennyLaneAI/catalyst/pull/439)
 
-  In this case, [`jnp.mod`](https://github.com/PennyLaneAI/catalyst/issues/437)
+  In this case, `jnp.mod`
   was used to compute wire values in a for loop, which prevented the gradient
   architecture from fully separating quantum and classical code. The following
   program is now supported:
