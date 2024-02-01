@@ -1348,16 +1348,17 @@ def qjit(
 
     argnums = static_argnums
     compiler = kwargs.get("compiler")
-    fwd_args = {"fn" : fn,
-                "autograph" : autograph,
-                "async_qnodes" : async_qnodes,
-                "target" : target,
-                "keep_intermediate" : keep_intermediate,
-                "verbose" : verbose,
-                "logfile" : logfile,
-                "pipelines" : pipelines,
-                "static_argnums" : argnums,
-                "abstracted_axes" : abstracted_axes,
+    fwd_args = {
+        "fn": fn,
+        "autograph": autograph,
+        "async_qnodes": async_qnodes,
+        "target": target,
+        "keep_intermediate": keep_intermediate,
+        "verbose": verbose,
+        "logfile": logfile,
+        "pipelines": pipelines,
+        "static_argnums": argnums,
+        "abstracted_axes": abstracted_axes,
     }
     if compiler is not None and compiler == "cuda-quantum":
         return qjit_cuda(fn)

@@ -1,6 +1,7 @@
 import pennylane as qml
 from pathlib import Path
 
+
 class CudaQDevice(qml.QubitDevice):
 
     name = "CudaQ Device"
@@ -29,4 +30,3 @@ class CudaQDevice(qml.QubitDevice):
     def apply(self, operations, **kwargs):
         """Unused"""
         raise RuntimeError("We are not applying operation by operation.")
-

@@ -67,6 +67,7 @@ from catalyst.utils.jax_extras import remove_host_context
 # TODO: We can possibly remove the branches with a bit of indirection.
 # pylint: disable=too-many-branches
 
+
 class AbsCudaQState(jax.core.AbstractValue):
     "Abstract CUDA-quantum State."
     hash_value = hash("AbsCudaQState")

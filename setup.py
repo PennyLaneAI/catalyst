@@ -161,7 +161,7 @@ setup(
             "context = catalyst.utils.contexts:EvaluationContext",
             "ops = catalyst:pennylane_extensions",
             "qjit = catalyst:qjit",
-        ]
+        ],
     },
     install_requires=requirements,
     packages=find_namespace_packages(

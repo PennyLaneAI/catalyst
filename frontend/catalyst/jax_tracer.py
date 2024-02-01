@@ -326,6 +326,7 @@ def has_nested_tapes(op: Operation) -> bool:
         and any(r.quantum_tape is not None for r in op.regions)
     )
 
+
 def trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs):
     """Trace a function to JAXPR.
 
@@ -358,6 +359,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs):
 
     return jaxpr, jaxpr2, out_type2, out_tree
 
+
 def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
@@ -378,7 +380,9 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs)
+    jaxpr, jaxpr2, out_type2, out_tree = trace_to_jaxpr(
+        func, static_argnums, abstracted_axes, *args, **kwargs
+    )
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
     return module, context, jaxpr, out_type2, out_tree
 
