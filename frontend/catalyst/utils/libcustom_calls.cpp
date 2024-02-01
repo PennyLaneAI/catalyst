@@ -54,7 +54,8 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
 void dsyevd_(char *jobz, char *uplo, lapack_int *n, double *a, int *lda, double *w, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *liwork, lapack_int *info);
 
-// Wrapper to call the SVD solver dgesdd_ and dsyevd_ from Lapack:
+// Wrapper to call the SVD solver `dgesdd_` and the eigen vectors/values computation `dsyevd_`
+// from Lapack:
 // https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc released under the Apache
 // License, Version 2.0, with the following copyright notice:
 
