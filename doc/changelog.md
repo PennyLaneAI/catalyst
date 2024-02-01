@@ -59,7 +59,7 @@
       return qml.probs()
   ```
 
-would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
+  would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
   [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
 
 * Add support for the `BlockEncode` operator in Catalyst.
