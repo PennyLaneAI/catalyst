@@ -97,8 +97,17 @@ print(circuit.jaxpr)
 
 The following points are important to note:
 
+* Jaxpr program has the following structure:
+  ```
+  { lambda CONSTS ; ARGUMENTS . let
+    A0 A1 ... An = opA[ ATTRIBUTES ] OPERANDS
+    ...
+    Z0 Z1 ... Zn = opZ[ ATTRIBUTES ] OPERANDS
+  in Z }
+  ```
+  where operation attributes might contain nested Jaxpr programs.
 * All Jaxpr variables have types. `x:f64[3,2]` means that `x` is a 2D tensor with dimensions 3 and 2
-  consisting of 64-bit floating point elements.
+  consisting of 64-bit floating point elements. `a:i64[]` means that `a` is a scalar integer tensor.
 * With dynamic API flag set to True (Catalyst sets it by default) Jaxpr types are allowed to
   contain variables. `f:64[d]` means that the single dimension of `f` is not known at compile time.
   What is known is that at runtime the actual dimension will be available as variable `d`.
