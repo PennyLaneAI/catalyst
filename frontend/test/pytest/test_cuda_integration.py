@@ -199,6 +199,7 @@ class TestCuda:
         observed = cuda_compiled(3.14)
         assert_allclose(expected["a"], observed["a"])
 
+    @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point(self):
 
         @qml.qnode(qml.device("cudaq", wires=1))
@@ -217,6 +218,7 @@ class TestCuda:
         observed = cuda_compiled(3.14)
         assert_allclose(expected["a"], observed["a"])
 
+    @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point_compiler(self):
 
         @qml.qjit(compiler="cudaq")
