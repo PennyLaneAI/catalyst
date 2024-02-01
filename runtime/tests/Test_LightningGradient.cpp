@@ -333,7 +333,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
         __quantum__rt__qubit_release(q1);
         __quantum__rt__qubit_release(q0);
-
         __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
