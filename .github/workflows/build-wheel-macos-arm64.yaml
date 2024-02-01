@@ -2,6 +2,11 @@ name: Build Catalyst Wheel on macOS (arm64)
 
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -15,6 +20,12 @@ concurrency:
 
 jobs:
   check_if_wheel_build_required:
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.action != 'labeled' ||
+        github.event.label.name == 'ci:build-wheels'
+      }}
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
