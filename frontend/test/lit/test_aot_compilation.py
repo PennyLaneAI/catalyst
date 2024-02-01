@@ -408,7 +408,7 @@ print(function_tensor_jaxnumpy_int64.mlir)
 # CHECK-LABEL: module @lowering_to_stablehlo_custom_call
 @qjit(target="mlir")
 def lowering_to_stablehlo_custom_call(A: ShapedArray([2, 2], jax.numpy.float64)):
-    """Test lowering to stablehlo.custom_call @lapack_dsyevd"""
+    """Test lowering to `stablehlo.custom_call @lapack_dsyevd`"""
 
     # CHECK: func.func private @eigh
     # CHECK: stablehlo.custom_call @lapack_dsyevd
@@ -417,3 +417,19 @@ def lowering_to_stablehlo_custom_call(A: ShapedArray([2, 2], jax.numpy.float64))
 
 
 print(lowering_to_stablehlo_custom_call.mlir)
+
+
+# CHECK-LABEL: module @multiple_stablehlo_custom_call
+@qjit(target="mlir")
+def multiple_stablehlo_custom_call(A: ShapedArray([2, 2], jax.numpy.float64)):
+    """Test lowering to `stablehlo.custom_call @lapack_dsyevd` of multiple lapack methods"""
+
+    # CHECK: func.func private @eigh
+    # CHECK: stablehlo.custom_call @lapack_dsyevd
+    # CHECK: func.func private @eigh_1
+    # CHECK: stablehlo.custom_call @lapack_dsyevd
+    B = qml.math.sqrt_matrix(A) @ qml.math.sqrt_matrix(A)
+    return B
+
+
+print(multiple_stablehlo_custom_call.mlir)
