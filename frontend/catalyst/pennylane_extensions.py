@@ -234,6 +234,8 @@ class QJITDevice(qml.QubitDevice):
         "Toffoli",
         "MultiRZ",
         "QubitUnitary",
+        "ISWAP",
+        "PSWAP",
     }
 
     @staticmethod

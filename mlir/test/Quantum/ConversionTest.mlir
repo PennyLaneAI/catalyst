@@ -117,18 +117,18 @@ func.func @dealloc(%r : !quantum.reg) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__rt__array_get_element_ptr_1d(!llvm.ptr<struct<"Array", opaque>>, i64) -> !llvm.ptr<i8>
+// CHECK: llvm.func @__catalyst__rt__array_get_element_ptr_1d(!llvm.ptr<struct<"Array", opaque>>, i64) -> !llvm.ptr<i8>
 
 // CHECK-LABEL: @extract
 func.func @extract(%r : !quantum.reg, %c : i64) {
 
-    // CHECK: [[elem_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, %arg1)
+    // CHECK: [[elem_ptr:%.+]] = llvm.call @__catalyst__rt__array_get_element_ptr_1d(%arg0, %arg1)
     // CHECK: [[qb_ptr:%.+]] = llvm.bitcast [[elem_ptr]]
     // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr<ptr<struct<"Qubit", opaque>>>
     quantum.extract %r[%c] : !quantum.reg -> !quantum.bit
 
     // CHECK: [[c5:%.+]] = llvm.mlir.constant(5 : i64)
-    // CHECK: [[elem_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, [[c5]])
+    // CHECK: [[elem_ptr:%.+]] = llvm.call @__catalyst__rt__array_get_element_ptr_1d(%arg0, [[c5]])
     // CHECK: [[qb_ptr:%.+]] = llvm.bitcast [[elem_ptr]]
     // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr<ptr<struct<"Qubit", opaque>>>
     quantum.extract %r[5] : !quantum.reg -> !quantum.bit

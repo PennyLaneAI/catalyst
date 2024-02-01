@@ -23,7 +23,65 @@
   array([1., 1., 1.])
   ```
 
+* Catalyst now supports just-in-time compilation of static arguments.
+  [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
+
+  The ``@qjit`` decorator can now be used to compile functions with static arguments with
+  the ``static_argnums`` keyword argument. ``static_argnums`` can be an integer or an iterable
+  of integers that specify which positional arguments of a compiled function should be treated as
+  static. This feature allows users to pass hashable Python objects to a compiled function (as the
+  static arguments).
+
+  A ``qjit`` object stores the hash value of a compiled function's static arguments. If any static
+  arguments are changed, the ``qjit`` object will check its stored hash values. If no hash value is
+  found, the function will be re-compiled with new static arguments. Otherwise, no re-compilation
+  will be triggered and the previously compiled function will be used.
+
+  ```py
+  from dataclasses import dataclass
+
+  from catalyst import qjit
+
+  @dataclass
+  class MyClass:
+      val: int
+
+      def __hash__(self):
+          return hash(str(self))
+
+  @qjit(static_argnums=(1,))
+  def f(
+      x: int,
+      y: MyClass,
+  ):
+      return x + y.val
+
+  f(1, MyClass(5))
+  f(1, MyClass(6)) # re-compilation
+  f(2, MyClass(5)) # no re-compilation
+  ```
+
 <h3>Improvements</h3>
+
+* Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
+
+  ```py
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("braket.local.qubit", wires=2, shots=100)
+
+  @qjit
+  @qml.qnode(dev)
+  def f(x: float):
+      qml.Hadamard(0)
+      qml.PSWAP(x, wires=[0, 1])
+      qml.ISWAP(wires=[1, 0])
+      return qml.probs()
+  ```
+
+would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
+  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
 
 * Add support for the `BlockEncode` operator in Catalyst.
   [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
@@ -60,6 +118,22 @@
   However, it doesn't solve it completely. Since the `__catalyst__` functions are still exported.
   If another library implemented the same symbols exported by the runtime, the same problem would
   presist.
+
+* The Catalyst runtime no longer depends on QIR runner's stdlib.
+  [(#470)](https://github.com/PennyLaneAI/catalyst/pull/470)
+
+  Similar to changing the runtime API for QIR instructions, we no longer depend nor link against
+  QIR runner's stdlib. With PR #464, most of the symbol conflicts were resolved, but by linking
+  against QIR runner's stdlib, some definitions persisted that may be different than ones
+  used by third party implementors. To prevent symbol conflicts QIR runner's stdlib was removed
+  and is no longer linked against. As a result, the following functions are now defined and
+  implemented in Catalyst's runtime:
+  * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
+  * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
+  
+  and the following functions were removed since the frontend does not generate them
+  * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
+  * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
 
@@ -125,7 +199,9 @@ This release contains contributions from (in alphabetical order):
 Mikhail Andrenkov,
 Ali Asadi,
 David Ittah,
-Erick Ochoa Lopez.
+Tzung-Han Juang,
+Erick Ochoa Lopez,
+Haochen Paul Wang.
 
 # Release 0.4.0
 

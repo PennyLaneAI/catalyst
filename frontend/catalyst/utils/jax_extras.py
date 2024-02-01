@@ -571,6 +571,7 @@ def jaxpr_remove_implicit(
 
 def make_jaxpr2(
     fun: Callable,
+    static_argnums: Any | None = None,
     abstracted_axes: Any | None = None,
 ) -> Callable[..., (tuple[ClosedJaxpr, PyTreeDef])]:
     """A customized version of ``jax.make_jaxpr``, compatible with the JAX dynamic API."""
@@ -601,6 +602,10 @@ def make_jaxpr2(
             (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
             f = wrap_init(fun)
+            if static_argnums:
+                argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
+                dynamic_argnums = [i for i in range(len(args)) if i not in argnums]
+                f, args = jax._src.api_util.argnums_partial(f, dynamic_argnums, args)
             in_type, in_tree = abstractify(args, kwargs)
             f, out_tree_promise = flatten_fun(f, in_tree)
             f = annotate(f, in_type)
