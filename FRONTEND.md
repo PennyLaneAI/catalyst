@@ -1,5 +1,5 @@
-Tracing in Catalyst
-===================
+Tracing and the dynamic dimensions
+==================================
 
 <!--
 ``` python
