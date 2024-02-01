@@ -429,6 +429,8 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
     builder.Gate("SWAP", {}, {}, {0, 1}, false);
     builder.Gate("RZ", {0.12}, {}, {1}, false);
     builder.Gate("RX", {}, {"alpha"}, {0}, false);
+    builder.Gate("ISWAP", {}, {}, {0, 1}, false);
+    builder.Gate("PSWAP", {0.34}, {}, {0, 1}, false);
 
     std::string toqasm;
     if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
@@ -446,6 +448,8 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
                  "swap q[0], q[1];\n"
                  "rz(0.12) q[1];\n"
                  "rx(alpha) q[0];\n"
+                 "iswap q[0], q[1];\n"
+                 "pswap(0.34) q[0], q[1];\n"
                  "b[0] = measure q[0];\n"
                  "b[1] = measure q[1];\n"
                  "reset q;\n";
@@ -460,6 +464,8 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
                  "swap q[0], q[1];\n"
                  "rz(0.12) q[1];\n"
                  "rx(alpha) q[0];\n"
+                 "iswap q[0], q[1];\n"
+                 "pswap(0.34) q[0], q[1];\n"
                  "bits = measure q;\n";
     }
 

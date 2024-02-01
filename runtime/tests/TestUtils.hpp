@@ -38,7 +38,7 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
 
 /**
- * Get available device names in the compatible format for `__quantum__rt__device`
+ * Get available device names in the compatible format for `__catalyst__rt__device`
  *
  * This is a utility function used in Catch2 tests.
  *

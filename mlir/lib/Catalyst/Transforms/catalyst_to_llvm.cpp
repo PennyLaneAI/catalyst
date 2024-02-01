@@ -208,7 +208,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
         if (op.getConstVal().has_value()) {
             ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-            StringRef qirName = "__quantum__rt__print_string";
+            StringRef qirName = "__catalyst__rt__print_string";
 
             Type charPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
@@ -222,7 +222,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             rewriter.eraseOp(op);
         }
         else {
-            StringRef qirName = "__quantum__rt__print_tensor";
+            StringRef qirName = "__catalyst__rt__print_tensor";
 
             // C interface for the print function is an unranked & opaque memref descriptor:
             // {

@@ -497,6 +497,23 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
     }
 }
 
+TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+
+    constexpr size_t n{2};
+    auto wires = device->AllocateQubits(n);
+
+    device->NamedOperation("Hadamard", {}, {wires[0]}, false);
+    device->NamedOperation("ISWAP", {}, {wires[0], wires[1]}, false);
+    device->NamedOperation("PSWAP", {0}, {wires[0], wires[1]}, false);
+
+    auto obs = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{1});
+    auto expval = device->Expval(obs);
+    CHECK(expval == Approx(1).margin(1e-5));
+}
+
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
 {
     auto device = OpenQasmDevice("{shots : 100}");
@@ -512,31 +529,31 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
                         Catch::Contains("Unsupported functionality"));
 }
 
-TEST_CASE("Test __quantum__rt__device_init registering the OpenQasm device", "[CoreQIS]")
+TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
 {
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
 
     char device_aws[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device_init((int8_t *)device_aws, nullptr, nullptr);
+    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)device_aws, nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr),
                         Catch::Contains("cannot open shared object file"));
 #endif
 
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 
-    __quantum__rt__initialize();
+    __catalyst__rt__initialize();
 
     char device_local[30] = "braket.local.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
-    __quantum__rt__device_init((int8_t *)device_local, nullptr, nullptr);
+    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr),
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr),
                         Catch::Contains("cannot open shared object file"));
 #endif
 
-    __quantum__rt__finalize();
+    __catalyst__rt__finalize();
 }
