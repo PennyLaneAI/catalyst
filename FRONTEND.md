@@ -61,16 +61,17 @@ def circuit(sz:int):
 `qjit` decorator at the top means that we are going to *compile* this program rather than interpret
 it directly. In order to do it, Catalyst performs a series of transformations:
 
-1. Trace the Python program in order to obtain Jaxpr program
+1. Trace Python program in order to obtain Jaxpr program
 2. Lower Jaxpr program fither into the StableHLO MLIR dialect
 3. Apply a series of MLIR passes in order to lower the StableHLO into the LLVM MLIR dialect
 4. Emit the LLVM code and compile it into the machine's native binary, rendered as a shared library
 
-This document explains the Tracing step of this workflow, with emphasis on the Jax dynamic API
+This document explains the Tracing step of the workflow, with emphasis on the Jax dynamic API
 support.
 
-Since we specified argument type, Catalyst has already traced the above program. We print its
-equivalent in Jaxpr, the main IR language of the Jax library:
+Since we specified argument type in our program, namely `sz:int`, Catalyst has compiled the program
+already. To revisit tracing results, lets print an equivalent in the Jaxpr language, the main IR
+language of the Jax library:
 
 ``` python
 print(circuit.jaxpr)
