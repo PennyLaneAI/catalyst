@@ -62,10 +62,7 @@ auto LightningKokkosSimulator::AllocateQubits(size_t num_qubits) -> std::vector<
     return result;
 }
 
-void LightningKokkosSimulator::ReleaseQubit([[maybe_unused]] QubitIdType q)
-{
-    RT_FAIL("Unsupported functionality");
-}
+void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { this->qubit_manager.Release(q); }
 
 void LightningKokkosSimulator::ReleaseAllQubits()
 {

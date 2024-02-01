@@ -70,7 +70,7 @@ TEST_CASE("Test Driver", "[Driver]")
     CHECK(driver->getDeviceRecorderStatus() == true);
 }
 
-TEMPLATE_TEST_CASE("lightning Basis vector", "[Driver]", LightningSimulator)
+TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -135,7 +135,7 @@ TEMPLATE_TEST_CASE("Qubit allocatation and deallocation", "[Driver]", LightningS
     }
 }
 
-TEMPLATE_TEST_CASE("test AllocateQubits", "[Driver]", LightningSimulator)
+TEMPLATE_LIST_TEST_CASE("test AllocateQubits", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -163,7 +163,7 @@ TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
     CHECK(sim->GetDeviceShots() == 500);
 }
 
-TEMPLATE_TEST_CASE("compute register tests", "[Driver]", LightningSimulator)
+TEMPLATE_LIST_TEST_CASE("compute register tests", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -275,13 +275,3 @@ TEMPLATE_LIST_TEST_CASE("Check re-AllocateQubit", "[Driver]", SimTypes)
     CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
     CHECK(state[8].real() == Approx(0.707107).epsilon(1e-5));
 }
-
-#ifdef __device_lightning_kokkos
-TEMPLATE_TEST_CASE("Unsupported ReleaseQubit", "[Driver]", LightningKokkosSimulator)
-{
-    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-    auto q = sim->AllocateQubit();
-
-    REQUIRE_THROWS_WITH(sim->ReleaseQubit(q), Catch::Contains("Unsupported functionality"));
-}
-#endif

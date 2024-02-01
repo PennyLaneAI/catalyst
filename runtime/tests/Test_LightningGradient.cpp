@@ -70,9 +70,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient_params(&tp, 0, &results));
 
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q);
-        }
+        __quantum__rt__qubit_release(q);
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
         __quantum__rt__device_release();
     }
@@ -115,9 +113,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q);
-        }
+        __quantum__rt__qubit_release(q);
         __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
@@ -162,9 +158,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(-sin(-M_PI / 7) == Approx(result_tp.data_aligned[0]));
         CHECK(-sin(-M_PI / 7) == Approx(result.data_aligned[0]));
 
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q);
-        }
+        __quantum__rt__qubit_release(q);
         __quantum__rt__device_release();
     }
     __quantum__rt__finalize();
@@ -222,9 +216,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected == Approx(result.data_aligned[0]));
 
         delete h_matrix;
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q);
-        }
+        __quantum__rt__qubit_release(q);
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
@@ -339,10 +331,8 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
         CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
         CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
 
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q1);
-            __quantum__rt__qubit_release(q0);
-        }
+        __quantum__rt__qubit_release(q1);
+        __quantum__rt__qubit_release(q0);
 
         __quantum__rt__device_release();
     }
@@ -746,9 +736,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected == Approx(result.data_aligned[0]));
 
         delete h_matrix;
-        if (rtd_name != "lightning.kokkos") {
-            __quantum__rt__qubit_release(q);
-        }
+        __quantum__rt__qubit_release(q);
         __quantum__rt__device_release();
         __quantum__rt__finalize();
     }
