@@ -1,5 +1,6 @@
-import pennylane as qml
 from pathlib import Path
+
+import pennylane as qml
 
 from catalyst import pennylane_extensions
 from catalyst.utils.contexts import EvaluationContext

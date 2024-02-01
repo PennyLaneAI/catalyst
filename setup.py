@@ -16,7 +16,7 @@ import glob
 import platform
 import subprocess
 from distutils import sysconfig
-from os import path, environ
+from os import environ, path
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
