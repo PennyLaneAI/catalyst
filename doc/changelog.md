@@ -170,6 +170,23 @@ would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and 
   nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
   control flow operations.
 
+* Add support for lowering the eigen vectors/values computation lapack method: `lapack_dsyevd`
+  via `stablehlo.custom_call`. For Catalyst, it means that you now can QJIT compile eigen
+  vector/values operations and any other `qml.math` methods that uses these operations.
+  [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
+
+  For example, you can compile `qml.math.sqrt_matrix`:
+
+  ```python
+  @qml.qjit
+  def workflow(A):
+      B = qml.math.sqrt_matrix(A)
+      return B @ A
+  ```
+
+* Fix the issue with multiple lapack symbol definitions in the compiled program by updating
+  the `stablehlo.custom_call` conversion pass.
+  [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
 
 <h3>Contributors</h3>
 

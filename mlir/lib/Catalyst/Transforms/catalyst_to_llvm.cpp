@@ -319,12 +319,13 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         Type ptr = LLVM::LLVMPointerType::get(ctx);
 
         Type voidType = LLVM::LLVMVoidType::get(ctx);
-        auto type = LLVM::LLVMFunctionType::get(voidType, {/*args=*/ptr, /*rets=*/ptr});
         auto point = rewriter.saveInsertionPoint();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
-        LLVM::LLVMFuncOp customCallFnOp =
-            rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type);
+
+        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
+            mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
+
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
