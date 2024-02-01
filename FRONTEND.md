@@ -113,7 +113,7 @@ The following points are important to note:
   What is known is that at runtime the actual dimension will be available as variable `d`.
 * Loop body of the source Python program has two arguments, while the `body_jaxpr` of the resulting
   Jaxpr program has four arguments. The additional arguments appeared due to different reasons:
-  - `e:i64[]`" Usage of the outer-scope variable in the body loop in the source Python program.
+  - `e:i64[]`: Usage of the outer-scope variable in the body loop in the source Python program.
     Jaxpr program does not allow capturing, so we have to pass captured variables as additional
     arguments.
   - `f:i64[]`: Requirement saying that Jaxpr variable must be declared before use. Since we use
