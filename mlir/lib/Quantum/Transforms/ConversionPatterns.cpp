@@ -265,20 +265,53 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
-        SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
-                                   adaptor.getOperands().getTypes().end());
-        argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
 
-        std::string qirName = "__catalyst__qis__" + op.getGateName().str();
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+        if ( op.getGateName().str() == "Identity" ) {
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            TypeConverter *conv = getTypeConverter();
 
-        SmallVector<Value> args = adaptor.getOperands();
-        args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
-                                    loc, rewriter.getBoolAttr(op.getAdjointFlag())));
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-        rewriter.replaceOp(op, adaptor.getInQubits());
+            auto boolType = IntegerType::get(ctx, 1);
+            auto sizeType = IntegerType::get(ctx, 64);
+            auto qubitType = conv->convertType(QubitType::get(ctx));
+            auto qubitPtrType = LLVM::LLVMPointerType::get(qubitType);
+            auto boolPtrType = LLVM::LLVMPointerType::get(boolType);
+            auto structType = LLVM::LLVMStructType::getLiteral(
+                ctx, {boolType, sizeType, qubitPtrType, boolPtrType}, false);
+
+            std::string qirName = "__catalyst__qis__Identity2";
+            SmallVector<Type> argTypes({qubitType, structType});
+            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+            LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+            Value adjoint = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getBoolAttr(op.getAdjointFlag()));
+            Value num_controlled = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+
+            auto structValue = rewriter.create<LLVM::UndefOp>(loc, structType);
+            auto structValue0 = rewriter.create<LLVM::InsertValueOp>(loc, structValue, adjoint, 0);
+            auto structValue1 = rewriter.create<LLVM::InsertValueOp>(loc, structValue0, num_controlled, 1);
+
+            SmallVector<Value> args = adaptor.getOperands();
+            args.insert(args.end(), structValue1);
+
+            rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+            rewriter.replaceOp(op, adaptor.getInQubits());
+        }
+        else {
+            SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
+                                       adaptor.getOperands().getTypes().end());
+            argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
+
+            std::string qirName = "__catalyst__qis__" + op.getGateName().str();
+            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+
+            LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+            SmallVector<Value> args = adaptor.getOperands();
+            args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
+                                        loc, rewriter.getBoolAttr(op.getAdjointFlag())));
+            rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+            rewriter.replaceOp(op, adaptor.getInQubits());
+        }
 
         return success();
     }
