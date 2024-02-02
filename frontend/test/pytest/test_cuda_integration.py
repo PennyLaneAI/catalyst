@@ -23,6 +23,7 @@ from catalyst import measure, qjit
 from catalyst.compilation_pipelines import QJIT, QJIT_CUDA
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
+from catalyst.compilation_pipelines import qjit_cuda
 
 # This import is here on purpose. We shouldn't ever import CUDA
 # when we are running kokkos. Importing CUDA before running any kokkos
@@ -232,3 +233,13 @@ class TestCuda:
             return {"a": qml.state()}
 
         circuit(3.14)
+
+    def test_cuda_invalid_target(self):
+        """Test invalid target."""
+        with pytest.raises(ValueError, match="Unsupported target foo."):
+            qjit_cuda(fn=None, target="foo")
+
+    def test_cuda_unimplemented_target(self):
+        """Test unimplemented target."""
+        with pytest.raises(NotImplementedError, match="Unimplemented target nvidia."):
+            qjit_cuda(fn=None, target="nvidia")
