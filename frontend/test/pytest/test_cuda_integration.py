@@ -20,10 +20,9 @@ from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
 from catalyst import measure, qjit
-from catalyst.compilation_pipelines import QJIT, QJIT_CUDA
+from catalyst.compilation_pipelines import QJIT, QJIT_CUDA, qjit_cuda
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
-from catalyst.compilation_pipelines import qjit_cuda
 
 # This import is here on purpose. We shouldn't ever import CUDA
 # when we are running kokkos. Importing CUDA before running any kokkos
