@@ -535,7 +535,6 @@ class TranslatorContext:
     It has:
        * jaxpr: A reference to the program
        * env: Dict[jax.core._src.Var, AnyType] A map of variables to values.
-       * inv_env: Dict[AnyType, jax.core._src.Var] A map from values to variables.
        * variable_map: Dict[jax.core._src.Var, jax.core._src.Var]: A map from variables
                in the old program to the new program.
        * count [int]: Keeps track of the last variable used.
@@ -545,7 +544,6 @@ class TranslatorContext:
         self.jaxpr = jaxpr
         self.env = {}
         self.variable_map = {}
-        self.inv_env = {}
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
         self.count = get_minimum_new_variable_count(jaxpr)
@@ -558,15 +556,10 @@ class TranslatorContext:
             var = self.variable_map[var]
         return self.env[var]
 
-    def get_var_for_val(self, val):
-        """Get the variable that holds value val."""
-        return self.inv_env[val]
-
     def write(self, var, val):
         """var = val."""
         if self.variable_map.get(var):
             var = self.variable_map[var]
-        self.inv_env[val] = var
         self.env[var] = val
 
     def replace(self, original, new):
@@ -648,7 +641,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     outvariables = [ctx.new_variable(AbsCudaQReg())]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
-    return register
+    return register, outvariables
 
 
 def change_register_getitem(ctx, eqn):
@@ -673,7 +666,7 @@ def change_register_getitem(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_register_setitem(ctx, eqn):
+def change_register_setitem(ctx, eqn, regvar):
     """Set the correct post-conditions for CUDA-quantum when interpreting qinsert_p primitive
 
     This method is interesting because CUDA-quantum does not use value semantics for their qubits.
@@ -706,9 +699,9 @@ def change_register_setitem(ctx, eqn):
     # Because invals has been replaced with the correct
     # variables, invals[0] now holds a reference to a cuda register
     old_register = invals[0]
-    outvar = ctx.get_var_for_val(old_register)
+    # outvar = ctx.get_var_for_val(old_register)
 
-    safe_map(ctx.replace, eqn.outvars, [outvar])
+    safe_map(ctx.replace, eqn.outvars, [regvar])
     safe_map(ctx.write, eqn.outvars, [old_register])
 
 
@@ -888,7 +881,8 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     kernel, _shots = change_device_to_cuda_device(ctx)
     # TODO: Do we need to keep track of this register.
     # It looks like other operations already come with the register variable.
-    _register = change_alloc_to_cuda_alloc(ctx, kernel)
+    _register, jax_vars = change_alloc_to_cuda_alloc(ctx, kernel)
+    register_var = jax_vars[0]
     measurement_set = set()
 
     # ignore set of instructions we don't care about.
@@ -903,7 +897,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         elif eqn.primitive == qextract_p:
             change_register_getitem(ctx, eqn)
         elif eqn.primitive == qinsert_p:
-            change_register_setitem(ctx, eqn)
+            change_register_setitem(ctx, eqn, register_var)
         elif eqn.primitive == qinst_p:
             change_instruction(ctx, eqn, kernel)
         elif eqn.primitive == compbasis_p:
