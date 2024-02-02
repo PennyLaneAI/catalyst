@@ -1384,7 +1384,6 @@ def qjit(
         "abstracted_axes": abstracted_axes,
     }
     if compiler is not None and compiler == "cuda_quantum":
-        del fwd_args["fn"]
-        return qjit_cuda(fn, **fwd_args)
+        return qjit_cuda(**fwd_args)
     # Assume that we are running Catalyst.
     return qjit_catalyst(**fwd_args)
