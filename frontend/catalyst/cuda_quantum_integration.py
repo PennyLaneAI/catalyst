@@ -40,7 +40,6 @@ from jax._src.util import safe_map
 from jax.tree_util import tree_unflatten
 
 from catalyst.compilation_pipelines import QJIT_CUDA
-from catalyst.compiler import CompileOptions
 from catalyst.jax_primitives import (
     AbstractObs,
     compbasis_p,

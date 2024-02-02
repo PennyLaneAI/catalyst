@@ -817,7 +817,6 @@ class QJIT:
         return data
 
 
-# pylint: disable=too-many-instance-attributes
 class QJIT_CUDA:
     """Class representing a just-in-time compiled hybrid quantum-classical function.
 
@@ -853,17 +852,17 @@ class QJIT_CUDA:
         Returns:
             an MLIR module
         """
-        self.c_sig = CompiledFunction.get_runtime_signature(*args)
+        sig = CompiledFunction.get_runtime_signature(*args)
 
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
-            sig = self.c_sig
-            abstracted_axes = {}
+            abs_axes = {}
+            static_args = None
             # _jaxpr and _out_tree are used in Catalyst but at the moment
             # they have no use here in CUDA.
-            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, None, {}, *sig)
+            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, static_args, abs_axes, *sig)
 
         self._jaxpr = jaxpr2
 
