@@ -77,6 +77,58 @@
 
 <h3>Breaking changes</h3>
 
+* The entry point name convention has changed.
+  [(#493)](https://github.com/PennyLaneAI/catalyst/pull/493)
+
+  From the [documentation](https://packaging.python.org/en/latest/specifications/entry-points/#data-model):
+
+     Within a distribution, entry points should be unique.
+
+  This meant that within a single distribution there cannot be two different `qjit` entry points like so:
+
+  ```py
+  entry_points={"pennylane.compilers": [
+      "qjit = foo:Foo",
+      "qjit = bar:Bar",
+  ]}
+  ```
+
+  Now, entry point's names are preppended with the name of the compiler.
+
+  ```py
+  entry_points={"pennylane.compilers": [
+      "compilerFoo.qjit = foo:Foo",
+      "compilerBar.qjit = bar:Bar",
+  ]}
+  ```
+
+  The behaviour will be reflected when using the `@qml.qjit` decorator.
+  For example,
+
+  ```py
+  @qml.qjit(compiler="compilerFoo")
+  def circuit(): ...
+  ```
+
+  will point call `foo:Foo` in the entry points' distribution.
+  Please note that `compilerFoo` can also be `foo`. The compiler name
+  does not have to be distinct from the object reference path. To keep
+  the previous user facing behaviour, simply define entry points as follows:
+
+  ```py
+  entry_points={"pennylane.compilers": [
+      "foo.qjit = foo:Foo",
+      "bar.qjit = bar:Bar",
+  ]}
+  ```
+
+  and the following example will still work:
+
+  ```py
+  @qml.qjit(compiler="foo")
+  def circuit(): ...
+  ```
+
 * The Catalyst runtime now has a different API from QIR instructions.
   [(#464)](https://github.com/PennyLaneAI/catalyst/pull/464)
 
