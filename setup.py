@@ -35,7 +35,7 @@ with open(path.join("frontend", "catalyst", "_version.py")) as f:
 with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
-pl_version = environ.get("pl_version", ">=0.32,<=0.34")
+pl_version = environ.get("PL_VERSION", ">=0.32,<=0.34")
 requirements = [
     f"pennylane{pl_version}",
     f"jax=={jax_version}",
@@ -44,6 +44,10 @@ requirements = [
     "scipy",
 ]
 
+# TODO: Once PL version 0.35 is released:
+# * remove this special handling
+# * make pennylane>=0.35 a requirement
+# * Close this ticket https://github.com/PennyLaneAI/catalyst/issues/494
 one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
 if one_compiler_per_distribution:
     entry_points = {
