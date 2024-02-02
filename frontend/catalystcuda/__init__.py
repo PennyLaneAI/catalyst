@@ -40,6 +40,7 @@ class CudaQDevice(qml.QubitDevice):
     version = "1.0"
     author = "Catalyst authors wrote this wrapper for CUDA Quantum"
 
+    # pylint: disable=duplicate-code
     operations = [
         "PauliX",
         "PauliY",
