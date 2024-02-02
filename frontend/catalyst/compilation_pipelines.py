@@ -831,17 +831,7 @@ class QJIT_CUDA:
 
     def __init__(self, fn):
         self.user_function = fn
-        self.out_tree = None
-        self._jaxpr = None
-
         functools.update_wrapper(self, fn)
-
-    @property
-    def jaxpr(self):
-        """str: Returns the JAXPR intermediate representation
-        of the quantum program.
-        """
-        return self._jaxpr
 
     def get_jaxpr(self, *args):
         """Trace :func:`~.user_function`
@@ -863,8 +853,6 @@ class QJIT_CUDA:
             # _jaxpr and _out_tree are used in Catalyst but at the moment
             # they have no use here in CUDA.
             _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, static_args, abs_axes, *sig)
-
-        self._jaxpr = jaxpr2
 
         # TODO(@erick-xanadu): Likely we will need more information
         # from the line directly above.
