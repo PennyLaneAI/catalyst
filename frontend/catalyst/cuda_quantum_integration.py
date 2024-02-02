@@ -28,7 +28,6 @@ This module also uses the CUDA-quantum API. Here is the reference:
   https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 """
 
-import dataclasses
 import json
 from functools import wraps
 from typing import List
@@ -65,6 +64,8 @@ from catalyst.utils.jax_extras import remove_host_context
 # This is for the interpreter loop.
 # TODO: We can possibly remove the branches with a bit of indirection.
 # pylint: disable=too-many-branches
+# We also disable line-too-long because of a URL
+# pylint: disable=line-too-long
 
 
 class AbsCudaQState(jax.core.AbstractValue):
