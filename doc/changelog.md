@@ -1,4 +1,4 @@
-# Release 0.4.1-dev
+# Release 0.5.0-dev
 
 <h3>New features</h3>
 
@@ -59,7 +59,7 @@
       return qml.probs()
   ```
 
-would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
+  would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
   [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
 
 * Add support for the `BlockEncode` operator in Catalyst.
@@ -68,11 +68,12 @@ would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and 
 * Remove copies of TOML device configuration files for Lightning device in Catalyst.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
 
-* Build and package Catalyst wheels with OpenMP and ZStd.
-  [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
-
 * Remove `qextract_p` and `qinst_p` from forced-order primitives.
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
+
+* Update `AllocateQubit` and `AllocateQubits` in `LightningKokkosSimulator` to preserve
+  the current state-vector before qubit re-allocations.
+  [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
 
 <h3>Breaking changes</h3>
 
@@ -116,46 +117,6 @@ would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and 
 
 <h3>Bug fixes</h3>
 
-* Resolve a failure to find the SciPy OpenBLAS library when running Catalyst,
-  due to a different SciPy version being used to build Catalyst than to run it.
-  [(#471)](https://github.com/PennyLaneAI/catalyst/pull/471)
-
-* Resolve unpredictable behaviour when importing libraries that share Catalyst's  LLVM dependency
-  (e.g. TensorFlow). In some cases, both packages exporting the same symbols from their shared
-  libraries can lead to process crashes and other unpredictable behaviour, since the wrong functions
-  can be called if both libraries are loaded in the current process.
-  The fix involves building shared libraries with hidden (macOS) or protected (linux) symbol
-  visibility by default, exporting only what is necessary.
-  [(#465)](https://github.com/PennyLaneAI/catalyst/pull/465)
-
-* Resolve an infinite recursion in the decomposition of the `Controlled`
-  operator whenever computing a Unitary matrix for the operator fails.
-  [(#468)](https://github.com/PennyLaneAI/catalyst/pull/468)
-
-* Resolve a failure to generate gradient code for specific input circuits.
-  [(#439)](https://github.com/PennyLaneAI/catalyst/issues/439)
-
-  In this case, [`jnp.mod`](https://github.com/PennyLaneAI/catalyst/issues/437)
-  was used to compute wire values in a for loop, which prevented the gradient
-  architecture from fully separating quantum and classical code. The following
-  program is now supported:
-  ```py
-  @qjit
-  @grad
-  @qml.qnode(dev)
-  def f(x):
-      def cnot_loop(j):
-          qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
-
-      for_loop(0, 4, 1)(cnot_loop)()
-
-      return qml.expval(qml.PauliZ(0))
-  ```
-
-* Resolve a memory leak in the runtime stemming from  missing calls to device destructors
-  at the end of programs.
-  [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
-
 * Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
   qubit re-allocation.
   [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
@@ -170,6 +131,23 @@ would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and 
   nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
   control flow operations.
 
+* Add support for lowering the eigen vectors/values computation lapack method: `lapack_dsyevd`
+  via `stablehlo.custom_call`. For Catalyst, it means that you now can QJIT compile eigen
+  vector/values operations and any other `qml.math` methods that uses these operations.
+  [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
+
+  For example, you can compile `qml.math.sqrt_matrix`:
+
+  ```python
+  @qml.qjit
+  def workflow(A):
+      B = qml.math.sqrt_matrix(A)
+      return B @ A
+  ```
+
+* Fix the issue with multiple lapack symbol definitions in the compiled program by updating
+  the `stablehlo.custom_call` conversion pass.
+  [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
 
 <h3>Contributors</h3>
 
@@ -181,6 +159,68 @@ David Ittah,
 Tzung-Han Juang,
 Erick Ochoa Lopez,
 Haochen Paul Wang.
+
+# Release 0.4.1
+
+<h3>Improvements</h3>
+
+* Catalyst wheels are now packaged with OpenMP and ZStd, which avoids installing additional
+  requirements separately in order to use pre-packaged Catalyst binaries.
+  [(#457)](https://github.com/PennyLaneAI/catalyst/pull/457)
+  [(#478)](https://github.com/PennyLaneAI/catalyst/pull/478)
+
+  Note that OpenMP support for the `lightning.kokkos` backend has been disabled on macOS x86_64, due
+  to memory issues in the computation of Lightning's adjoint-jacobian in the presence of multiple
+  OMP threads.
+
+<h3>Bug fixes</h3>
+
+* Resolve an infinite recursion in the decomposition of the `Controlled`
+  operator whenever computing a Unitary matrix for the operator fails.
+  [(#468)](https://github.com/PennyLaneAI/catalyst/pull/468)
+
+* Resolve a failure to generate gradient code for specific input circuits.
+  [(#439)](https://github.com/PennyLaneAI/catalyst/pull/439)
+
+  In this case, `jnp.mod`
+  was used to compute wire values in a for loop, which prevented the gradient
+  architecture from fully separating quantum and classical code. The following
+  program is now supported:
+  ```py
+  @qjit
+  @grad
+  @qml.qnode(dev)
+  def f(x):
+      def cnot_loop(j):
+          qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
+  
+      for_loop(0, 4, 1)(cnot_loop)()
+  
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+* Resolve unpredictable behaviour when importing libraries that share Catalyst's LLVM dependency
+  (e.g. TensorFlow). In some cases, both packages exporting the same symbols from their shared
+  libraries can lead to process crashes and other unpredictable behaviour, since the wrong functions
+  can be called if both libraries are loaded in the current process.
+  The fix involves building shared libraries with hidden (macOS) or protected (linux) symbol
+  visibility by default, exporting only what is necessary.
+  [(#465)](https://github.com/PennyLaneAI/catalyst/pull/465)
+
+* Resolve a failure to find the SciPy OpenBLAS library when running Catalyst,
+  due to a different SciPy version being used to build Catalyst than to run it.
+  [(#471)](https://github.com/PennyLaneAI/catalyst/pull/471)
+
+* Resolve a memory leak in the runtime stemming from  missing calls to device destructors
+  at the end of programs.
+  [(#446)](https://github.com/PennyLaneAI/catalyst/pull/446)
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Ali Asadi,
+David Ittah.
 
 # Release 0.4.0
 
