@@ -157,9 +157,9 @@ setup(
     python_requires=">=3.9",
     entry_points={
         "pennylane.compilers": [
-            "context = catalyst.utils.contexts:EvaluationContext",
-            "ops = catalyst:pennylane_extensions",
-            "qjit = catalyst:qjit",
+            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
+            "catalyst.ops = catalyst:pennylane_extensions",
+            "catalyst.qjit = catalyst:qjit",
         ]
     },
     install_requires=requirements,
