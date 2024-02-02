@@ -63,9 +63,9 @@ all: runtime
 configure:
 	@echo "Configure Catalyst Runtime"
 
-	# Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
+	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
 	# is always built with proper cmake values. There is currently an issue with caching the
-	# PL_BACKEND variable which can be fixed here:
+	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
 	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
 
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
@@ -90,9 +90,9 @@ configure:
 lq_configure:
 	@echo "Configure Catalyst Runtime"
 
-	# Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
+	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
 	# is always built with proper cmake values. There is currently an issue with caching the
-	# PL_BACKEND variable which can be fixed here:
+	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
 	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
 
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \

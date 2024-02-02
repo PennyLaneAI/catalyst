@@ -27,11 +27,6 @@ The directory is structured as follows:
     This contains the public header files of the runtime including the ``QuantumDevice`` API
     for backend quantum devices and the runtime CAPI.
 
-- `extensions <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions>`_:
-    The `StateVectorLQubitDynamic <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorLQubitDynamic.hpp>`_
-    class extends the state-vector class of `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ providing
-    dynamic allocation and deallocation of qubits.
-
 - `lib <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib>`_:
     The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
     `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the semantics for
@@ -117,7 +112,7 @@ To build the runtime with the ``Kokkos::OpenMP`` backend execution space:
 
 .. code-block:: console
 
-    make runtime ENABLE_LIGHTNING_KOKKOS=ON CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON"
+    make runtime CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON"
 
 You can also use ``ENABLE_OPENQASM=OFF`` to disable building the runtime with `Amazon-Braket-OpenQasm <https://aws.amazon.com/braket/>`_:
 

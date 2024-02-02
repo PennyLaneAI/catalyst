@@ -160,7 +160,7 @@ Runtime
 """""""
 
 By default, the runtime builds and installs all supported backend devices, enabling the execution of
-quantum circuits on CPUs, GPUs, and remote services, such as Amazon Braket.
+quantum circuits on local simulators and remote services, such as Amazon Braket.
 The `PennyLane-Lightning<https://github.com/PennyLaneAI/pennylane-lightning>`_ suite devices require
 C++20 standard library features. Older C++ compilers may not support this, so it is recommended to use a
 modern compiler with these features.
