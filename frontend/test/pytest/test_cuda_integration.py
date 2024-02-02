@@ -169,6 +169,7 @@ class TestCuda:
 
     def test_pytrees(self):
         """Test that we can return a dictionary."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
