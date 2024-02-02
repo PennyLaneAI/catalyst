@@ -61,7 +61,6 @@ class TestCuda:
         def circuit_foo():
             return qml.state()
 
-        opts = CompileOptions()
         observed_jaxpr, _ = QJIT_CUDA(circuit_foo).get_jaxpr()
         jaxpr = remove_host_context(observed_jaxpr)
         assert jaxpr
@@ -169,6 +168,7 @@ class TestCuda:
             jax.make_jaxpr(catalyst_to_cuda(circuit))()
 
     def test_pytrees(self):
+        """Test that we can return a dictionary."""
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
@@ -181,6 +181,7 @@ class TestCuda:
         assert_allclose(expected["a"], observed["a"])
 
     def test_cuda_device(self):
+        """Test CudaQDevice."""
         from catalystcuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
@@ -201,6 +202,7 @@ class TestCuda:
 
     @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point(self):
+        """Test the entry point for CudaQDevice"""
 
         @qml.qnode(qml.device("cudaq", wires=1))
         def circuit(a):
@@ -220,6 +222,7 @@ class TestCuda:
 
     @pytest.mark.skipif("0.35" not in qml.version(), reason="Unsupported in pennylane version")
     def test_cuda_device_entry_point_compiler(self):
+        """Test the entry point for cudaq.qjit"""
 
         @qml.qjit(compiler="cudaq")
         @qml.qnode(qml.device("cudaq", wires=1))
