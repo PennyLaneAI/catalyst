@@ -44,6 +44,10 @@ requirements = [
     "scipy",
 ]
 
+# TODO: Once PL version 0.35 is released:
+# * remove this special handling
+# * make pennylane>=0.35 a requirement
+# * Close this ticket https://github.com/PennyLaneAI/catalyst/issues/494
 one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
 if one_compiler_per_distribution:
     entry_points = {
