@@ -16,7 +16,7 @@ import glob
 import platform
 import subprocess
 from distutils import sysconfig
-from os import path
+from os import environ, path
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
@@ -35,13 +35,34 @@ with open(path.join("frontend", "catalyst", "_version.py")) as f:
 with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
+pl_version = environ.get("pl_version", ">=0.32,<=0.34")
 requirements = [
-    "pennylane>=0.32",
+    f"pennylane{pl_version}",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
     "scipy",
 ]
+
+one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
+if one_compiler_per_distribution:
+    entry_points = {
+        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+        "pennylane.compilers": [
+            "context = catalyst.utils.contexts:EvaluationContext",
+            "ops = catalyst:pennylane_extensions",
+            "qjit = catalyst:qjit",
+        ],
+    }
+else:
+    entry_points = {
+        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+        "pennylane.compilers": [
+            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
+            "catalyst.ops = catalyst:pennylane_extensions",
+            "catalyst.qjit = catalyst:qjit",
+        ],
+    }
 
 classifiers = [
     "Environment :: Console",
@@ -155,13 +176,7 @@ setup(
     provides=["catalyst"],
     version=version,
     python_requires=">=3.9",
-    entry_points={
-        "pennylane.compilers": [
-            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
-            "catalyst.ops = catalyst:pennylane_extensions",
-            "catalyst.qjit = catalyst:qjit",
-        ]
-    },
+    entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
