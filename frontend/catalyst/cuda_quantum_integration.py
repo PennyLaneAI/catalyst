@@ -918,6 +918,8 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
 
         # Do the normal interpretation...
         else:
+            # This little scope was based on eval_jaxpr's implmentation:
+            #    https://github.com/google/jax/blob/16636f9c97414d0c5195c6fd47227756d4754095/jax/_src/core.py#L507-L518
             subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
             ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
             if eqn.primitive.multiple_results:  # pragma: nocover
