@@ -188,18 +188,38 @@ class TestCuda:
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
-            return {"a": qml.state()}
+            return qml.state()
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(a):
             qml.RX(a, wires=[0])
-            return {"a": qml.state()}
+            return qml.state()
 
         cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
-        assert_allclose(expected["a"], observed["a"])
+        assert_allclose(expected, observed)
+
+    def test_qjit_cuda_device(self):
+        """Test CudaQDevice."""
+        from catalystcuda import CudaQDevice
+
+        @qml.qnode(CudaQDevice(wires=1))
+        def circuit(a):
+            qml.RX(a, wires=[0])
+            return qml.state()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_lightning(a):
+            qml.RX(a, wires=[0])
+            return qml.state()
+
+        cuda_compiled = qjit_cuda(fn=circuit, compiler="cuda_quantum")
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(3.14)
+        observed = cuda_compiled(3.14)
+        assert_allclose(expected, observed)
 
     def test_abstract_variable(self):
         """Test abstract variable."""
