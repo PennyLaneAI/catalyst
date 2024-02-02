@@ -775,8 +775,10 @@ def change_get_state(ctx, eqn, kernel):
     invals = safe_map(ctx.read, eqn.invars)
     # Just as state_p, we will only support compbasis.
     obs_catalyst = invals[0]
-    if obs_catalyst.primitive is not compbasis_p:
-        raise TypeError("state only supports computational basis")
+    # This is an assert as opposed to raising an error,
+    # because there appears to be no code that can lead to this
+    # outcome.
+    assert obs_catalyst.primitive == compbasis_p
 
     # We don't really care too much about the shape
     # It is only used for an assertion in Catalyst.
@@ -814,10 +816,10 @@ def change_sample_or_counts(ctx, eqn, kernel):
     # We will deal with compbasis in the same way as
     # when we deal with the state
     obs_catalyst = invals[0]
-    # Technically, we can have other observables,
-    # but at the moment in cuda quantum this is not yet implemented.
-    if obs_catalyst.primitive is not compbasis_p:
-        raise NotImplementedError("sample and counts only supports computational basis")
+    # This is an assert as opposed to raising an error,
+    # because there appears to be no code that can lead to this
+    # outcome.
+    assert obs_catalyst.primitive == compbasis_p
 
     if is_sample:
         shots_result = cudaq_sample(kernel, shots_count=shots)
