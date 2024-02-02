@@ -977,7 +977,7 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
-def qjit_cuda(fn=None):
+def qjit_cuda(fn=None, **kwargs):
     """Wrapper around QJIT for CUDA-quantum."""
 
     # This import is here on purpose. We shouldn't ever import CUDA
@@ -985,6 +985,30 @@ def qjit_cuda(fn=None):
     # kernel polutes the environment and will create a segfault.
     # pylint: disable=import-outside-toplevel
     from catalyst.cuda_quantum_integration import catalyst_to_cuda
+
+    if kwargs.get("target", "binary") == "binary":
+        # Catalyst uses binary as a default.
+        # If use are using catalyst's qjit
+        # then, let's override it with cuda_quantum's default.
+        kwargs["target"] = "qpp-cpu"
+
+    target = kwargs.get("target", "qpp-cpu")
+    if target not in {
+        "qpp-cpu",
+        "nvidia",
+        "tensornet",
+        "nvidia-mgpu",
+        "quantinuum",
+        "ionq",
+        "IQM",
+        "OQC",
+    }:
+        msg = f"Unsupported target {target}."
+        raise ValueError(msg)
+
+    if target != "qpp-cpu":
+        msg = f"Unimplemented target {target}."
+        raise NotImplementedError(msg)
 
     if fn is not None:
         return catalyst_to_cuda(fn)
@@ -1360,6 +1384,7 @@ def qjit(
         "abstracted_axes": abstracted_axes,
     }
     if compiler is not None and compiler == "cuda_quantum":
-        return qjit_cuda(fn)
+        del fwd_args["fn"]
+        return qjit_cuda(fn, **fwd_args)
     # Assume that we are running Catalyst.
     return qjit_catalyst(**fwd_args)

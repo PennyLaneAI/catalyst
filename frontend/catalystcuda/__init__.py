@@ -25,9 +25,9 @@ from catalyst.compilation_pipelines import qjit_cuda
 from catalyst.utils.contexts import EvaluationContext
 
 
-def qjit(fn=None):
+def qjit(fn=None, **kwargs):
     """Entry point to qjit_cuda."""
-    return qjit_cuda(fn)
+    return qjit_cuda(fn, **kwargs)
 
 
 class CudaQDevice(qml.QubitDevice):
