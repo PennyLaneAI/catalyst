@@ -792,13 +792,13 @@ def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qub
 # qmeasure
 #
 @qmeasure_p.def_abstract_eval
-def _qmeasure_abstract_eval(qubit):
+def _qmeasure_abstract_eval(qubit, postselect):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
 
 
 @qmeasure_p.def_impl
-def _qmeasure_def_impl(ctx, qubit):  # pragma: no cover
+def _qmeasure_def_impl(ctx, qubit, postselect):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -811,10 +811,11 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
     assert ir.OpaqueType(qubit.type).data == "bit"
 
     i8_type = ir.IntegerType.get_signless(8, ctx)
-    postselect_attr = ir.IntegerAttr.get(i8_type, postselect) if postselect is not None else None
+    postselect_attr = ir.IntegerAttr.get(i8_type, postselect)
 
     result_type = ir.IntegerType.get_signless(1)
-    result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect_attr).results
+
+    result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect=postselect_attr).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)

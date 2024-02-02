@@ -1102,9 +1102,8 @@ class MidCircuitMeasure(HybridOp):
         qubit = qrp.extract([wire])[0]
 
         # Check if the postselect value was given
-        postselect = op.in_classical_tracers[1] if op.in_classical_tracers.size() == 2 else None
-
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect)
+        postselect = op.in_classical_tracers[1] if len(op.in_classical_tracers) == 2 else -1
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -1957,7 +1956,7 @@ def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
 
-    in_classical_tracers = [wires]
+    in_classical_tracers = wires
 
     # Check the postselect value. If given, add it to the classical tracers list
     if postselect is not None:
