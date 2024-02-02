@@ -35,7 +35,7 @@ with open(path.join("frontend", "catalyst", "_version.py")) as f:
 with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
-pl_version = environ.get("pl_version", ">=0.32,<=0.34")
+pl_version = environ.get("PL_VERSION", ">=0.32,<=0.34")
 requirements = [
     f"pennylane{pl_version}",
     f"jax=={jax_version}",
