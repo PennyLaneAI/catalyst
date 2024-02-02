@@ -163,11 +163,12 @@ class CudaSampleResult(cudaq.SampleResult):
     aval = AbsCudaSampleResult
 
 
-jax.core.pytype_aval_mappings[CudaValue] = lambda x: x.aval
-jax.core.pytype_aval_mappings[CudaQReg] = lambda x: x.aval
-jax.core.pytype_aval_mappings[CudaQbit] = lambda x: x.aval
-jax.core.pytype_aval_mappings[CudaSampleResult] = lambda x: x.aval
-jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval
+jax.core.pytype_aval_mappings[CudaValue] = lambda x: x.aval  # pragma: nocover
+jax.core.pytype_aval_mappings[CudaQReg] = lambda x: x.aval  # pragma: nocover
+jax.core.pytype_aval_mappings[CudaQbit] = lambda x: x.aval  # pragma: nocover
+jax.core.pytype_aval_mappings[CudaSampleResult] = lambda x: x.aval  # pragma: nocover
+jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval  # pargma: nocover
+
 jax.core.raise_to_shaped_mappings[AbsCudaValue] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQReg] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaKernel] = lambda aval, _: aval
@@ -334,13 +335,6 @@ def make_primitive_for_gate():
 cuda_inst, cuda_inst_p = make_primitive_for_gate()
 
 
-@dataclasses.dataclass(frozen=True)
-class SideEffect(jax._src.effects.Effect):
-    """Side effect token."""
-
-    __str__ = lambda _: "SideEffect"  # pylint: disable=unnecessary-lambda-assignment
-
-
 def make_primitive_for_m(gate: str):
     """A single function to make primitives for all measurement basis.
 
@@ -365,12 +359,10 @@ def make_primitive_for_m(gate: str):
         """Concrete implementation."""
         return method(kernel, target)
 
-    @kernel_gate_p.def_effectful_abstract_eval
+    @kernel_gate_p.def_abstract_eval
     def gate_abs(_kernel, _target):
-        """Abstract evaluation with side-effect."""
-        effects = set()
-        effects.add(SideEffect)
-        return AbsCudaValue(), effects
+        """Abstract evaluation."""
+        return AbsCudaValue()
 
     return gate_func, kernel_gate_p
 
@@ -928,7 +920,7 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
         else:
             subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
             ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
-            if eqn.primitive.multiple_results:
+            if eqn.primitive.multiple_results:  # pragma: nocover
                 safe_map(ctx.write, eqn.outvars, ans)
             else:
                 ctx.write(eqn.outvars[0], ans)

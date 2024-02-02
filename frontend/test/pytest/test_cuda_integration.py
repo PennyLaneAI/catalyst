@@ -269,12 +269,14 @@ class TestCuda:
         def circuit(params):
             x, y = jax.numpy.array_split(params, 2)
             qml.RX(x[0], wires=[0])
+            qml.RX(y[0], wires=[0])
             return qml.state()
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(params):
             x, y = jax.numpy.array_split(params, 2)
             qml.RX(x[0], wires=[0])
+            qml.RX(y[0], wires=[0])
             return qml.state()
 
         cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
