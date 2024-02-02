@@ -802,7 +802,7 @@ def _qmeasure_def_impl(ctx, qubit):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
+def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -810,8 +810,11 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
     assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qubit.type).data == "bit"
 
+    i8_type = ir.IntegerType.get_signless(8, ctx)
+    postselect_attr = ir.IntegerAttr.get(i8_type, postselect) if postselect is not None else None
+
     result_type = ir.IntegerType.get_signless(1)
-    result, new_qubit = MeasureOp(result_type, qubit.type, qubit).results
+    result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect_attr).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)
