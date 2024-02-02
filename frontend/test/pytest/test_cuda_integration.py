@@ -35,9 +35,9 @@ class TestCuda:
     """CUDA integration tests. Skip if kokkos."""
 
     def test_argument(self):
-        """Test that we can pass cuda-quantum as a compiler to @qjit decorator."""
+        """Test that we can pass cuda_quantum as a compiler to @qjit decorator."""
 
-        @qjit(compiler="cuda-quantum")
+        @qjit(compiler="cuda_quantum")
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
             return qml.state()
@@ -175,7 +175,7 @@ class TestCuda:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = qjit(compiler="cuda-quantum")(circuit)
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
         observed = cuda_compiled(3.14)
         catalyst_compiled = qjit(circuit)
         expected = catalyst_compiled(3.14)
@@ -195,7 +195,7 @@ class TestCuda:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = qjit(compiler="cudaq")(circuit)
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -215,7 +215,7 @@ class TestCuda:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = qjit(compiler="cudaq")(circuit)
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -225,7 +225,7 @@ class TestCuda:
     def test_cuda_device_entry_point_compiler(self):
         """Test the entry point for cudaq.qjit"""
 
-        @qml.qjit(compiler="cudaq")
+        @qml.qjit(compiler="cuda_quantum")
         @qml.qnode(qml.device("cudaq", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])

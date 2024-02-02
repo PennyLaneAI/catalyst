@@ -1359,7 +1359,7 @@ def qjit(
         "static_argnums": argnums,
         "abstracted_axes": abstracted_axes,
     }
-    if compiler is not None and compiler == "cudaq":
+    if compiler is not None and compiler == "cuda_quantum":
         return qjit_cuda(fn)
     # Assume that we are running Catalyst.
     return qjit_catalyst(**fwd_args)

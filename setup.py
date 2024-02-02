@@ -65,9 +65,9 @@ else:
             "catalyst.context = catalyst.utils.contexts:EvaluationContext",
             "catalyst.ops = catalyst:pennylane_extensions",
             "catalyst.qjit = catalyst:qjit",
-            "cudaq.context = catalystcuda:EvaluationContext",
-            "cudaq.ops = catalystcuda:pennylane_extensions",
-            "cudaq.qjit = catalystcuda:qjit",
+            "cuda_quantum.context = catalystcuda:EvaluationContext",
+            "cuda_quantum.ops = catalystcuda:pennylane_extensions",
+            "cuda_quantum.qjit = catalystcuda:qjit",
         ],
     }
 
