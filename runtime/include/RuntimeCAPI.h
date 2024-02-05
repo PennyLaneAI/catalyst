@@ -47,7 +47,8 @@ RESULT *__catalyst__rt__result_get_one();
 RESULT *__catalyst__rt__result_get_zero();
 
 // Quantum Gate Set Instructions
-void __catalyst__qis__Identity2(QUBIT *, Modifiers *);
+void __catalyst__qis__Identity2(QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliX2(QUBIT *, const Modifiers *);
 
 void __catalyst__qis__Identity(QUBIT *, bool);
 void __catalyst__qis__PauliX(QUBIT *, bool);
