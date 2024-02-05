@@ -33,11 +33,6 @@ def qjit(fn=None, **kwargs):
 def qjit_cuda(fn=None, **kwargs):
     """Wrapper around QJIT for CUDA-quantum."""
 
-    # This import is here on purpose. We shouldn't ever import CUDA
-    # when we are running kokkos. Importing CUDA before running any kokkos
-    # kernel polutes the environment and will create a segfault.
-    # pylint: disable=import-outside-toplevel
-
     if kwargs.get("target", "binary") == "binary":
         # Catalyst uses binary as a default.
         # If use are using catalyst's qjit
