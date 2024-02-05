@@ -27,7 +27,7 @@ from catalyst.utils.contexts import EvaluationContext
 
 def qjit(fn=None, **kwargs):
     """Entry point to qjit_cuda."""
-    return qjit_cuda(fn, **kwargs)
+    return qjit_cuda(fn, **kwargs)  # pragma: no cover
 
 
 def qjit_cuda(fn=None, **kwargs):
@@ -101,4 +101,4 @@ class CudaQDevice(qml.QubitDevice):
 
     def apply(self, operations, **kwargs):
         """Unused"""
-        raise RuntimeError("We are not applying operation by operation.")
+        raise RuntimeError("We are not applying operation by operation.")  # pragma: no cover
