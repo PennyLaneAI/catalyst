@@ -40,8 +40,19 @@ from jax.tree_util import tree_unflatten
 
 from catalyst.jax_primitives import (
     AbstractObs,
+    adjoint_p,
     compbasis_p,
+    cond_p,
     counts_p,
+    expval_p,
+    for_p,
+    func_p,
+    grad_p,
+    hamiltonian_p,
+    hermitian_p,
+    jvp_p,
+    namedobs_p,
+    print_p,
     qalloc_p,
     qdealloc_p,
     qdevice_p,
@@ -49,8 +60,14 @@ from catalyst.jax_primitives import (
     qinsert_p,
     qinst_p,
     qmeasure_p,
+    qunitary_p,
     sample_p,
     state_p,
+    tensorobs_p,
+    var_p,
+    vjp_p,
+    while_p,
+    zne_p,
 )
 from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
@@ -522,8 +539,17 @@ def interpret_impl(jaxpr, consts, *args):
     # not necessary in the CUDA-quantum API.
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
+    # TODO: Let's implement all of these
+    unimplemented = { zne_p, qunitary_p, compbasis_p, namedobs_p, hermitian_p, tensorobs_p, hamiltonian_p, expval_p, var_p, cond_p, while_p, for_p, grad_p, func_p, jvp_p, vjp_p, adjoint_p, print_p }
+
     # Main interpreter loop.
     for eqn in jaxpr.eqns:
+        # Leave this as a "switch-dispatch" and do not yet change to something like direct-call threading.
+        # https://www.cs.toronto.edu/~matz/dissertation/matzDissertation-latex2html/node6.html
+        # Yes, python does not have a switch statement.
+        # Why not change to direct-call threading equivalent in Python yet?
+        # I want to have an interpreter object that has this state.
+        # But first, I want to implement all the requiremed primitives.
         if eqn.primitive == state_p:
             change_get_state(ctx, eqn, kernel)
         elif eqn.primitive == qextract_p:
@@ -551,6 +577,9 @@ def interpret_impl(jaxpr, consts, *args):
             # This will be checked at the end to make sure that we do not return
             # a Quake value.
             measurement_set.add(a_measurement)
+        elif eqn.primitive in unimplemented:
+            msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
+            raise NotImplementedError(msg)
         elif eqn.primitive in ignore:
             continue
 
