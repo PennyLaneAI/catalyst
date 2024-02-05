@@ -22,6 +22,7 @@
 #include <iostream>
 #include <memory>
 #include <ostream>
+#include <iostream>
 #include <string_view>
 
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
@@ -347,13 +348,13 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     Catalyst::Runtime::getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
-void __catalyst__qis__Identity2(QUBIT *qubit, Modifiers *modifiers)
+void __catalyst__qis__Identity2(QUBIT *qubit, const Modifiers *modifiers)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation2(
         "Identity",
         {},
         {reinterpret_cast<QubitIdType>(qubit)},
-        modifiers->adjoint,
+        (modifiers->adjoint != 0),
         std::vector<QubitIdType>(
             reinterpret_cast<QubitIdType*>(modifiers->controlled_wires),
             reinterpret_cast<QubitIdType*>(modifiers->controlled_wires) + modifiers->num_controlled),
@@ -374,6 +375,21 @@ void __catalyst__qis__PauliX(QUBIT *qubit, bool adjoint)
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("PauliX", {},
                                                              {reinterpret_cast<QubitIdType>(qubit)},
                                                              /* inverse = */ adjoint);
+}
+
+void __catalyst__qis__PauliX2(QUBIT *qubit, const Modifiers *modifiers)
+{
+    Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation2(
+        "PauliX",
+        {},
+        {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ modifiers->adjoint != 0,
+        std::vector<QubitIdType>(
+            reinterpret_cast<QubitIdType*>(modifiers->controlled_wires),
+            reinterpret_cast<QubitIdType*>(modifiers->controlled_wires) + modifiers->num_controlled),
+        std::vector<bool>(modifiers->controlled_values,
+            modifiers->controlled_values + modifiers->num_controlled)
+        );
 }
 
 void __catalyst__qis__PauliY(QUBIT *qubit, bool adjoint)
