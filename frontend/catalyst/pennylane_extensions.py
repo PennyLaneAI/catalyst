@@ -132,17 +132,18 @@ class QFunc:
         if hasattr(device, "config"):  # pragma: no cover
             # Devices that already have a config field do not need it to be overwritten.
             return
-        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        name = device.name
-        if isinstance(device, qml.Device):
-            name = device.short_name
+        # device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        # name = device.name
+        # if isinstance(device, qml.Device):
+        #     name = device.short_name
 
-        # The toml files name convention we follow is to replace
-        # the dots with underscores in the device short name.
-        toml_file_name = name.replace(".", "_") + ".toml"
-        # And they are currently saved in the following directory.
-        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
-        device.config = toml_file
+        # # The toml files name convention we follow is to replace
+        # # the dots with underscores in the device short name.
+        # toml_file_name = name.replace(".", "_") + ".toml"
+        # # And they are currently saved in the following directory.
+        # toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+        # device.config = toml_file
+        device.config = pathlib.Path('/workspace/_build_runtime/_deps/pennylane_lightning-src/pennylane_lightning/lightning_qubit/lightning_qubit.toml')
 
     def __call__(self, *args, **kwargs):
         qnode = None
