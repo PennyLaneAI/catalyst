@@ -28,8 +28,8 @@ This module also uses the CUDA-quantum API. Here is the reference:
   https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 """
 
-import json
 import functools
+import json
 from functools import wraps
 from typing import List
 
@@ -56,7 +56,14 @@ from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.jax_extras import remove_host_context
 from catalyst.utils.patching import Patcher
-from .primitives import *
+
+from .primitives import (
+    AbsCudaKernel,
+    AbsCudaQbit,
+    AbsCudaQReg,
+    AbsCudaQState,
+    AbsCudaSampleResult,
+)
 
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
