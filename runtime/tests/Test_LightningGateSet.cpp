@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cmath>
+#include <iostream>
 
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
@@ -830,32 +831,35 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSi
 
 TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    const size_t N = 3;
+    __catalyst__rt__initialize();
 
-    std::vector<QubitIdType> Qs;
-    for (size_t i = 0; i < 3; i++) {
-        Qs.push_back(sim->AllocateQubit());
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        std::vector<QUBIT*> Q;
+        for (size_t i = 0; i < N; i++) {
+            Q.push_back(__catalyst__rt__qubit_allocate());
+        }
+
+        QUBIT* ctrls[] = {Q[1], Q[2]};
+        bool values[] = {true, false};
+        Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+        __catalyst__qis__PauliX2(Q[0], &mod);
+
+        CplxT_double buffer[1<<N];
+        MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {1<<N}, {1}};
+        __catalyst__qis__State(&result, 0);
+
+        // FIXME: Check the results
+
+        for(auto q: Q) {
+            __catalyst__rt__qubit_release(q);
+        }
+        __catalyst__rt__device_release();
     }
-
-    sim->StartTapeRecording();
-    sim->NamedOperation2("PauliX", {}, {Qs[0]}, false, {Qs[1], Qs[2]}, {true, false});
-    sim->StopTapeRecording();
-
-
-    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    {
-        DataView<std::complex<double>, 1> view(state);
-        sim->State(view);
-    }
-
-    /* CHECK(state[0].real() == Approx(0.349135).epsilon(1e-5)); */
-    /* CHECK(state[0].imag() == Approx(0.180548).epsilon(1e-5)); */
-    /* CHECK(state[2].real() == Approx(0.0456405).epsilon(1e-5)); */
-    /* CHECK(state[2].imag() == Approx(0.145498).epsilon(1e-5)); */
-    /* CHECK(state[4].real() == Approx(0.281214).epsilon(1e-5)); */
-    /* CHECK(state[4].imag() == Approx(0.158554).epsilon(1e-5)); */
-    /* CHECK(state[6].real() == Approx(0.376493).epsilon(1e-5)); */
-    /* CHECK(state[6].imag() == Approx(0.162104).epsilon(1e-5)); */
+    __catalyst__rt__finalize();
 }
 
 
