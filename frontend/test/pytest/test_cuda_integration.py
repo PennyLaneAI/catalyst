@@ -67,20 +67,20 @@ class TestCuda:
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
-        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
             return qml.state()
 
-        cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit_foo))
+        cuda_jaxpr = jax.make_jaxpr(interpret(circuit_foo))
         assert cuda_jaxpr
 
     def test_qjit_catalyst_to_cuda_jaxpr_actually_call_ry(self):
         """Assert that catalyst_to_cuda matches the expected results."""
         import cudaq
 
-        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -96,7 +96,7 @@ class TestCuda:
             kernel.rx(jnp.pi, qubit)
             return cudaq.get_state(kernel)
 
-        cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit_foo))()
+        cuda_jaxpr = jax.make_jaxpr(interpret(circuit_foo))()
         assert "ry" in str(cuda_jaxpr)
         assert "rx" in str(cuda_jaxpr)
         expected = jnp.array(cuda_equivalent())
@@ -105,14 +105,14 @@ class TestCuda:
 
     def test_sample_with_shots(self):
         """Assert that catalyst_to_cuda can handle shots."""
-        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
         def circuit_foo():
             qml.RX(jnp.pi, wires=[0])
             return qml.sample()
 
-        cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit_foo))()
+        cuda_jaxpr = jax.make_jaxpr(interpret(circuit_foo))()
         assert "sample" in str(cuda_jaxpr)
         assert "shots_count=30" in str(cuda_jaxpr)
         # Due to non-determinism, let's just check the length of the samples
@@ -123,14 +123,14 @@ class TestCuda:
 
     def test_counts_with_shots(self):
         """Assert that catalyst_to_cuda can handle counts with shots."""
-        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=30))
         def circuit_foo():
             qml.RX(jnp.pi, wires=[0])
             return qml.counts()
 
-        cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit_foo))()
+        cuda_jaxpr = jax.make_jaxpr(interpret(circuit_foo))()
         assert "counts" in str(cuda_jaxpr)
         assert "shots_count=30" in str(cuda_jaxpr)
         expected = qjit(circuit_foo)()
@@ -140,7 +140,7 @@ class TestCuda:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
         def circuit():
@@ -148,7 +148,7 @@ class TestCuda:
             measure(0)
             return qml.state()
 
-        cuda_jaxpr = jax.make_jaxpr(catalyst_to_cuda(circuit))()
+        cuda_jaxpr = jax.make_jaxpr(interpret(circuit))()
         assert "mz" in str(cuda_jaxpr)
         observed = jax.core.eval_jaxpr(cuda_jaxpr.jaxpr, cuda_jaxpr.consts)[0]
         assert abs(observed[0] ** 2) == 1 or abs(observed[1] ** 2) == 1
@@ -156,7 +156,7 @@ class TestCuda:
     def test_measurement_side_return(self):
         """Test the measurement code is added."""
 
-        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
@@ -165,7 +165,7 @@ class TestCuda:
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
 
-            jax.make_jaxpr(catalyst_to_cuda(circuit))()
+            jax.make_jaxpr(interpret(circuit))()
 
     def test_pytrees(self):
         """Test that we can return a dictionary."""

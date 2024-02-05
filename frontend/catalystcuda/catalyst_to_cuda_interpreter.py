@@ -133,7 +133,7 @@ def get_instruction(jaxpr, primitive):
     return None  # pragma: nocover
 
 
-class TranslatorContext:
+class InterpreterContext:
     """This class keeps some state that is useful for interpreting an Catalyst and evaluating it in
     CUDA-quantum primitives.
 
@@ -475,14 +475,24 @@ def change_measure(ctx, eqn, kernel):
     return result
 
 
-def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
+def interpret_impl(jaxpr, consts, *args):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
     CUDA-quantum equivalent instructions. As these operations are
     abstractly evaluated, they will be bound by JAX. The end result
-    is that a new transform function will be traced."""
+    is that a new transform function will be traced. If they are concretely evaluated,
+    then it outputs a result instead of a trace.
 
-    ctx = TranslatorContext(jaxpr, consts, *args)
+    Args:
+       jaxpr: Jaxpr to be interpreted
+       consts: Constant values for this jaxpr
+       *args: Either concrete of abstract values that correspond to arguments to JAXPR.
+
+    Returns:
+       Either concrete values or a trace that corresponds to the computed values.
+    """
+
+    ctx = InterpreterContext(jaxpr, consts, *args)
     # TODO: Do we need these shots?
     # It looks like measurement operations already come with their own shots value.
     kernel, _shots = change_device_to_cuda_device(ctx)
@@ -548,11 +558,12 @@ def transform_jaxpr_to_cuda_jaxpr(jaxpr, consts, *args):
     return retvals
 
 
-def catalyst_to_cuda(fun):
-    """Wrapper function that takes a function that will be compiled to JAXPR.
+def interpret(fun):
+    """Wrapper function that takes a function that will be interpretted with
+    the semantics in interpret_impl.
 
     Args:
-       fun: Function to be traced / converted into CUDA-quantum JAXPR.
+       fun: Function to be interpretted.
 
     Returns:
        wrapped: A wrapped function that will do the tracing.
@@ -562,10 +573,18 @@ def catalyst_to_cuda(fun):
 
     @wraps(fun)
     def wrapped(*args, **_kwargs):
+        # QJIT_CUDA(fun).get_jaxpr
+        # will return the JAXPR of the function fun.
+        # However, notice that *args are still concrete.
+        # This means that when we interpret the JAXPR, it will be a concrete interpretation.
+        # If we wanted an abstract interpretation, we could pass the abstract values that
+        # correspond to the return value of trace_to_jaxpr out_type2.
+        # If we did that, we could cache the result JAXPR from this function
+        # and evaluate it each time the function is called.
         catalyst_jaxpr_with_host, out_tree = QJIT_CUDA(fun).get_jaxpr(*args)
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
-        out = transform_jaxpr_to_cuda_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
+        out = interpret_impl(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
         out = tree_unflatten(out_tree, out)
         return out
 

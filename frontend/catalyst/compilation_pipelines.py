@@ -972,7 +972,7 @@ def qjit_cuda(fn=None, **kwargs):
     # when we are running kokkos. Importing CUDA before running any kokkos
     # kernel polutes the environment and will create a segfault.
     # pylint: disable=import-outside-toplevel
-    from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
+    from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
     if kwargs.get("target", "binary") == "binary":
         # Catalyst uses binary as a default.
@@ -999,10 +999,10 @@ def qjit_cuda(fn=None, **kwargs):
         raise NotImplementedError(msg)
 
     if fn is not None:
-        return catalyst_to_cuda(fn)
+        return interpret(fn)
 
     def wrap_fn(fn):
-        return catalyst_to_cuda(fn)
+        return interpret(fn)
 
     return wrap_fn
 
