@@ -826,3 +826,36 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSi
     CHECK(state[14].real() == Approx(0.0756372).epsilon(1e-5));
     CHECK(state[14].imag() == Approx(-0.226334).epsilon(1e-5));
 }
+
+
+TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    std::vector<QubitIdType> Qs;
+    for (size_t i = 0; i < 3; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->StartTapeRecording();
+    sim->NamedOperation2("PauliX", {}, {Qs[0]}, false, {Qs[1], Qs[2]}, {true, false});
+    sim->StopTapeRecording();
+
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    {
+        DataView<std::complex<double>, 1> view(state);
+        sim->State(view);
+    }
+
+    /* CHECK(state[0].real() == Approx(0.349135).epsilon(1e-5)); */
+    /* CHECK(state[0].imag() == Approx(0.180548).epsilon(1e-5)); */
+    /* CHECK(state[2].real() == Approx(0.0456405).epsilon(1e-5)); */
+    /* CHECK(state[2].imag() == Approx(0.145498).epsilon(1e-5)); */
+    /* CHECK(state[4].real() == Approx(0.281214).epsilon(1e-5)); */
+    /* CHECK(state[4].imag() == Approx(0.158554).epsilon(1e-5)); */
+    /* CHECK(state[6].real() == Approx(0.376493).epsilon(1e-5)); */
+    /* CHECK(state[6].imag() == Approx(0.162104).epsilon(1e-5)); */
+}
+
+

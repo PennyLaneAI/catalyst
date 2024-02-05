@@ -1834,9 +1834,13 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         __catalyst__qis__PauliZ(*q0, false);
         __catalyst__qis__PauliY(*q0, false);
         __catalyst__qis__PauliX(*q0, false);
+        Modifiers mod = { false, 0, NULL, NULL};
+        __catalyst__qis__PauliX2(*q1, &mod);
         __catalyst__qis__Identity(*q0, false);
 
         __catalyst__qis__Identity(*q0, true);
+        Modifiers mod2 = { true, 0, NULL, NULL};
+        __catalyst__qis__PauliX2(*q1, &mod2);
         __catalyst__qis__PauliX(*q0, true);
         __catalyst__qis__PauliY(*q0, true);
         __catalyst__qis__PauliZ(*q0, true);
