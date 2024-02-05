@@ -63,14 +63,20 @@ from .primitives import (
     AbsCudaQReg,
     AbsCudaQState,
     AbsCudaSampleResult,
+    AbsCudaValue,
+    cuda_inst,
+    cudaq_counts,
+    cudaq_getstate,
+    cudaq_make_kernel,
+    cudaq_sample,
+    kernel_qalloc,
+    mz_call,
+    qreg_getitem,
 )
 
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
 # pylint: disable=protected-access
-# And we disable unused-argument to avoid unused arguments in abstract_eval.
-# Particularly those kwargs.
-# pylint: disable=unused-argument
 # This is for the interpreter loop.
 # TODO: We can possibly remove the branches with a bit of indirection.
 # pylint: disable=too-many-branches

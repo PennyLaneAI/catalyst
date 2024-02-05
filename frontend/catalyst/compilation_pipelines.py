@@ -1291,7 +1291,7 @@ def qjit(
         # This is here because we don't want to import CUDA unless
         # explicitly requested. This is to avoid polluting the global
         # environment and creating segfaults when running kokkos kernels.
-        # pylint: disable=import-outside-top-level
+        # pylint: disable=import-outside-toplevel
         from catalyst.cuda import qjit_cuda
 
         return qjit_cuda(**fwd_args)
