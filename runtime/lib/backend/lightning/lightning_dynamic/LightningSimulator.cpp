@@ -392,7 +392,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     }
 }
 
-auto LightningSimulator::Measure(QubitIdType wire) -> Result
+auto LightningSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
 {
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};

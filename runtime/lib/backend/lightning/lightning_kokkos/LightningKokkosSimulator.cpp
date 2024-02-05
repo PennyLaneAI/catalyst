@@ -433,8 +433,10 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     }
 }
 
-auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
+auto LightningKokkosSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
 {
+    RT_FAIL_IF(postselect != -1, "Post-selection is not supported yet");
+
     using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
                                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 

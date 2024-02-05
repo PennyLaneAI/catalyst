@@ -739,9 +739,10 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t num
     return Catalyst::Runtime::getQuantumDevicePtr()->HamiltonianObservable(coeffs_vec, obsKeys);
 }
 
-RESULT *__catalyst__qis__Measure(QUBIT *wire)
+RESULT *__catalyst__qis__Measure(QUBIT *wire, int8_t postselect)
 {
-    return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire));
+    return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire),
+                                                             postselect);
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey)

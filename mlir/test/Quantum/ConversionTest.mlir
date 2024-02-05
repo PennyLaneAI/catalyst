@@ -367,12 +367,12 @@ func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3x
 // Measurements //
 //////////////////
 
-// CHECK: llvm.func @__catalyst__qis__Measure(!llvm.ptr<struct<"Qubit", opaque>>) -> !llvm.ptr<struct<"Result", opaque>>
+// CHECK: llvm.func @__catalyst__qis__Measure(!llvm.ptr<struct<"Qubit", opaque>>, i8) -> !llvm.ptr<struct<"Result", opaque>>
 
 // CHECK-LABEL: @measure
 func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 
-    // CHECK: llvm.call @__catalyst__qis__Measure(%arg0)
+    // CHECK: llvm.call @__catalyst__qis__Measure(%arg0, %0)
     %res, %new_q = quantum.measure %q : i1, !quantum.bit
 
     // CHECK: return %arg0

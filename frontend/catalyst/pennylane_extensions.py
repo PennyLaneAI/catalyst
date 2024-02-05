@@ -1100,7 +1100,11 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+
+        # Check if the postselect value was given
+        postselect = op.in_classical_tracers[1] if op.in_classical_tracers.size() == 2 else None
+
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -1903,7 +1907,7 @@ def while_loop(cond_fn):
     return _body_query
 
 
-def measure(wires) -> DynamicJaxprTracer:
+def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
     """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
 
     .. important::
@@ -1913,6 +1917,7 @@ def measure(wires) -> DynamicJaxprTracer:
 
     Args:
         wires (Wires): The wire of the qubit the measurement process applies to
+        postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
     Returns:
         A JAX tracer for the mid-circuit measurement.
@@ -1951,10 +1956,21 @@ def measure(wires) -> DynamicJaxprTracer:
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+
+    in_classical_tracers = [wires]
+
+    # Check the postselect value. If given, add it to the classical tracers list
+    if postselect is not None:
+        if postselect not in [0, 1]:
+            raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+        in_classical_tracers.append(postselect)
+
     # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
     out_classical_tracer = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
-        in_classical_tracers=wires, out_classical_tracers=[out_classical_tracer], regions=[]
+        in_classical_tracers=in_classical_tracers,
+        out_classical_tracers=[out_classical_tracer],
+        regions=[],
     )
     return out_classical_tracer
 
