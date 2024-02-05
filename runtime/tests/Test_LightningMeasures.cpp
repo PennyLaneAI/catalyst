@@ -79,7 +79,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
-    auto m = sim->Measure(Qs[0]);
+    auto m = sim->Measure(Qs[0], -1);
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
@@ -112,7 +112,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement collapse concrete logical qubit difference"
     Qs = sim->AllocateQubits(n);
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
-    sim->Measure(Qs[0]);
+    sim->Measure(Qs[0], -1);
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     DataView<std::complex<double>, 1> view(state);
     sim->State(view);
@@ -137,7 +137,7 @@ TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", SimT
 
     sim->NamedOperation("PauliX", {}, {q}, false);
 
-    auto m = sim->Measure(q);
+    auto m = sim->Measure(q, -1);
 
     CHECK(*m);
 }
