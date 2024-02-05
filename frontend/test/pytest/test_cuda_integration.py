@@ -334,3 +334,23 @@ class TestCuda:
 
         with pytest.raises(NotImplementedError, match="Unimplemented target nvidia."):
             qjit_cuda(fn=None, target="nvidia")
+
+    def test_expval(self):
+        """Test multiple_values."""
+        from catalyst.cuda import CudaQDevice
+
+        @qml.qnode(CudaQDevice(wires=1))
+        def circuit():
+            qml.RX(jnp.pi / 2, wires=[0])
+            return qml.expval(qml.PauliZ(0))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_catalyst():
+            qml.RX(jnp.pi / 2, wires=[0])
+            return qml.expval(qml.PauliZ(0))
+
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
+        observed = cuda_compiled()
+        catalyst_compiled = qjit(circuit_catalyst)
+        expected = catalyst_compiled()
+        assert_allclose(expected, observed)

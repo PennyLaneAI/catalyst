@@ -124,6 +124,40 @@ class CudaSampleResult(cudaq.SampleResult):
     aval = AbsCudaSampleResult
 
 
+class AbsCudaSpinOperator(jax.core.AbstractValue):
+    "Abstract CUDA-quantum spin operator."
+
+    hash_value = hash("AbsCudaSpinOperator")
+
+    def __eq__(self, other):
+        return isinstance(other, AbsCudaSpinOperator)  # pragma: nocover
+
+    def __hash__(self):
+        return self.hash_value  # pragma: nocover
+
+
+class CudaSpinOperator(cudaq.SpinOperator):
+    "Concrete CUDA-quantum spin operator."
+    aval = AbsCudaSpinOperator
+
+
+class AbsCudaQObserveResult(jax.core.AbstractValue):
+    "Abstract CUDA-quantum observe result."
+
+    hash_value = hash("AbsCudaQObserveResult")
+
+    def __eq__(self, other):
+        return isinstance(other, AbsCudaQObserveResult)  # pragma: nocover
+
+    def __hash__(self):
+        return self.hash_value  # pragma: nocover
+
+
+class CudaQObserveResult(cudaq.ObserveResult):
+    "Concrete CUDA-quantum observe result."
+    aval = AbsCudaQObserveResult
+
+
 # From the documentation
 # https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 # Let's do one by one...
@@ -396,8 +430,89 @@ def cudaq_counts_abs(kernel, shape, shots_count=1000):
     return bitstrings, counts_shape
 
 
+cudaq_spin_p = jax.core.Primitive("spin")
+
+
+def cudaq_spin(target, kind: str, qubits_len: int):
+    """Convenience function for spin."""
+    assert kind in {"i", "x", "y", "z"}
+    return cudaq_spin_p.bind(target, kind, qubits_len)
+
+
+@cudaq_spin_p.def_impl
+def cudaq_spin_impl(target, kind: str, qubits_len: int):
+    identity = "I" * qubits_len
+    obs = list(identity)
+    obs[target] = kind.upper()
+    obs = "".join(obs)
+    return cudaq.SpinOperator.from_word(obs)
+
+
+@cudaq_spin_p.def_abstract_eval
+def cudaq_spin_abs(target, kind, qubits_len):
+    return AbsCudaSpinOperator()
+
+
+cudaq_observe_p = jax.core.Primitive("observe")
+
+
+def cudaq_observe(kernel, spin_operator, shots_count=-1, noise_model=None):
+    """Convenience wrapper around the primitive.
+
+    From the documentation:
+
+        https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html#cudaq.observe
+
+    Compute the expected value of the spin_operator with respect to the kernel.
+    If the input spin_operator is a list of SpinOperator then compute the expected value of every
+    operator in the list and return a list of results. If the kernel accepts arguments, it will
+    be evaluated with respect to kernel(*arguments). Each argument in arguments provided can be a
+    list or ndarray of arguments of the specified kernel argument type, and in this case, the
+    observe functionality will be broadcasted over all argument sets and a list of observe_result
+    instances will be returned. If both the input spin_operator and arguments are broadcast lists,
+    a nested list of results over arguments then spin_operator will be returned.
+
+    Some changes: spin_operator is only a single spin_operator instead of a list.
+    TODO(@erick-xanadu): Can we generalize it to a list?
+
+    The signature in the documentation also specifies an optional execution parameter but it is
+    undocumented.
+
+    The *args, have been ommitted, since we are building fully static circuits for now.
+    """
+    return cudaq_observe_p.bind(
+        kernel, spin_operator, shots_count=shots_count, noise_model=noise_model
+    )
+
+
+@cudaq_observe_p.def_abstract_eval
+def cudaq_observe_abs(kernel, spin_operator, shots_count=-1, noise_model=None):
+    return AbsCudaQObserveResult()
+
+
+@cudaq_observe_p.def_impl
+def cudaq_observe_impl(kernel, spin_operator, shots_count=-1, noise_model=None):
+    return cudaq.observe(kernel, spin_operator, shots_count=shots_count, noise_model=noise_model)
+
+
+cudaq_expectation_p = jax.core.Primitive("expectation")
+
+
+def cudaq_expectation(observe_result):
+    return cudaq_expectation_p.bind(observe_result)
+
+
+@cudaq_expectation_p.def_abstract_eval
+def cudaq_expectation_abs(observe_result):
+    return jax.core.ShapedArray([], float)
+
+
+@cudaq_expectation_p.def_impl
+def cudaq_expectation_impl(observe_result):
+    return observe_result.expectation()
+
+
 # SKIP Async for the time being
-# SKIP observe (spin_operator map is unclear at the moment)
 # SKIP VQE
 # Ignore everything else?
 
@@ -407,6 +522,8 @@ jax.core.pytype_aval_mappings[CudaQReg] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaQbit] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaSampleResult] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval  # pargma: nocover
+jax.core.pytype_aval_mappings[CudaSpinOperator] = lambda x: x.aval  # pargma: nocover
+jax.core.pytype_aval_mappings[CudaQObserveResult] = lambda x: x.aval  # pargma: nocover
 
 jax.core.raise_to_shaped_mappings[AbsCudaValue] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQReg] = lambda aval, _: aval
@@ -414,3 +531,5 @@ jax.core.raise_to_shaped_mappings[AbsCudaKernel] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQbit] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaSampleResult] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQState] = lambda aval, _: aval
+jax.core.raise_to_shaped_mappings[AbsCudaQObserveResult] = lambda aval, _: aval
+jax.core.raise_to_shaped_mappings[AbsCudaSpinOperator] = lambda aval, _: aval

@@ -77,15 +77,20 @@ from catalyst.utils.patching import Patcher
 from .primitives import (
     AbsCudaKernel,
     AbsCudaQbit,
+    AbsCudaQObserveResult,
     AbsCudaQReg,
     AbsCudaQState,
     AbsCudaSampleResult,
+    AbsCudaSpinOperator,
     AbsCudaValue,
     cuda_inst,
     cudaq_counts,
+    cudaq_expectation,
     cudaq_getstate,
     cudaq_make_kernel,
+    cudaq_observe,
     cudaq_sample,
+    cudaq_spin,
     kernel_qalloc,
     mz_call,
     qreg_getitem,
@@ -181,9 +186,16 @@ class InterpreterContext:
         self.jaxpr = jaxpr
         self.env = {}
         self.variable_map = {}
+        self.qubit_to_wire_map = {}
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
         self.count = get_minimum_new_variable_count(jaxpr)
+
+    def set_qubit_to_wire(self, idx, qubit):
+        self.qubit_to_wire_map[qubit] = idx
+
+    def get_wire_for_qubit(self, qubit):
+        return self.qubit_to_wire_map[qubit]
 
     def read(self, var):
         """Read the value of variable var."""
@@ -278,7 +290,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     outvariables = [ctx.new_variable(AbsCudaQReg())]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
-    return register, outvariables
+    return register, outvariables, size
 
 
 def change_register_getitem(ctx, eqn):
@@ -295,6 +307,7 @@ def change_register_getitem(ctx, eqn):
     register = invals[0]
     idx = invals[1]
     cuda_qubit = qreg_getitem(register, idx)
+    ctx.set_qubit_to_wire(idx, cuda_qubit)
 
     outvariables = [ctx.new_variable(AbsCudaQbit())]
     outvals = [cuda_qubit]
@@ -507,6 +520,62 @@ def change_measure(ctx, eqn, kernel):
     return result
 
 
+def change_expval(ctx, eqn, kernel):
+    assert eqn.primitive == expval_p
+
+    # Operands to expval_p
+    # * obs: Observables
+    invals = safe_map(ctx.read, eqn.invars)
+    obs = invals[0]
+
+    # Params:
+    # * shots: Shots
+    shots = eqn.params["shots"]
+    shots = shots if shots != None else -1
+
+    observe_results = cudaq_observe(kernel, obs, shots)
+    result = cudaq_expectation(observe_results)
+    outvariables = [ctx.new_variable(jax.core.ShapedArray([], float))]
+    outvals = [result]
+
+    safe_map(ctx.replace, eqn.outvars, outvariables)
+    safe_map(ctx.write, eqn.outvars, outvals)
+
+
+def change_namedobs(ctx, eqn, qubits_len):
+    assert eqn.primitive == namedobs_p
+
+    # Operands to expval_p
+    # * qubit
+    invals = safe_map(ctx.read, eqn.invars)
+    qubit = invals[0]
+
+    # Since CUDA doesn't use SSA for qubits.
+    # We now need to get an integer from this qubit.
+    # This will be the target to cudaq_spin....
+
+    # How do we get the wire from the SSA value?
+    # We need to keep a map.
+    # Where for every qubit variable, it maps to an integer.
+    # This is not too hard.
+    idx = ctx.get_wire_for_qubit(qubit)
+
+    # Parameters
+    # * kind
+    kind = eqn.params["kind"]
+    catalyst_cuda_map = {"PauliZ": "z", "PauliX": "x", "PauliY": "y"}
+
+    # This is an assert because it is guaranteed by Catalyst.
+    assert kind in catalyst_cuda_map.keys()
+
+    cuda_name = catalyst_cuda_map[kind]
+    outvals = [cudaq_spin(idx, cuda_name, qubits_len)]
+    outvariables = [ctx.new_variable(AbsCudaSpinOperator())]
+
+    safe_map(ctx.replace, eqn.outvars, outvariables)
+    safe_map(ctx.write, eqn.outvars, outvals)
+
+
 def interpret_impl(jaxpr, consts, *args):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
@@ -530,7 +599,7 @@ def interpret_impl(jaxpr, consts, *args):
     kernel, _shots = change_device_to_cuda_device(ctx)
     # TODO: Do we need to keep track of this register.
     # It looks like other operations already come with the register variable.
-    _register, jax_vars = change_alloc_to_cuda_alloc(ctx, kernel)
+    _register, jax_vars, size = change_alloc_to_cuda_alloc(ctx, kernel)
     register_var = jax_vars[0]
     measurement_set = set()
 
@@ -540,9 +609,30 @@ def interpret_impl(jaxpr, consts, *args):
     ignore = {qdealloc_p, qdevice_p, qalloc_p}
 
     # TODO: Let's implement all of these
-    unimplemented = { zne_p, qunitary_p, compbasis_p, namedobs_p, hermitian_p, tensorobs_p, hamiltonian_p, expval_p, var_p, cond_p, while_p, for_p, grad_p, func_p, jvp_p, vjp_p, adjoint_p, print_p }
+    unimplemented = {
+        zne_p,
+        qunitary_p,
+        compbasis_p,
+        hermitian_p,
+        tensorobs_p,
+        hamiltonian_p,
+        expval_p,
+        var_p,
+        cond_p,
+        while_p,
+        for_p,
+        grad_p,
+        func_p,
+        jvp_p,
+        vjp_p,
+        adjoint_p,
+        print_p,
+    }
 
     # Main interpreter loop.
+    # Note the absense of loops here and branches.
+    # Normally in an interpreter loop, we would have
+    # while(True):
     for eqn in jaxpr.eqns:
         # Leave this as a "switch-dispatch" and do not yet change to something like direct-call threading.
         # https://www.cs.toronto.edu/~matz/dissertation/matzDissertation-latex2html/node6.html
@@ -577,6 +667,10 @@ def interpret_impl(jaxpr, consts, *args):
             # This will be checked at the end to make sure that we do not return
             # a Quake value.
             measurement_set.add(a_measurement)
+        elif eqn.primitive == expval_p:
+            change_expval(ctx, eqn, kernel)
+        elif eqn.primitive == namedobs_p:
+            change_namedobs(ctx, eqn, size)
         elif eqn.primitive in unimplemented:
             msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
             raise NotImplementedError(msg)
