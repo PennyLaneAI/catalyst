@@ -67,7 +67,7 @@ class TestCuda:
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
-        from catalyst.cuda_quantum_integration import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -80,7 +80,7 @@ class TestCuda:
         """Assert that catalyst_to_cuda matches the expected results."""
         import cudaq
 
-        from catalyst.cuda_quantum_integration import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -105,7 +105,7 @@ class TestCuda:
 
     def test_sample_with_shots(self):
         """Assert that catalyst_to_cuda can handle shots."""
-        from catalyst.cuda_quantum_integration import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
         def circuit_foo():
@@ -123,7 +123,7 @@ class TestCuda:
 
     def test_counts_with_shots(self):
         """Assert that catalyst_to_cuda can handle counts with shots."""
-        from catalyst.cuda_quantum_integration import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=30))
         def circuit_foo():
@@ -140,7 +140,7 @@ class TestCuda:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda_quantum_integration import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
         def circuit():
@@ -156,7 +156,7 @@ class TestCuda:
     def test_measurement_side_return(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda_quantum_integration import catalyst_to_cuda
+        from catalystcuda.catalyst_to_cuda_interpreter import catalyst_to_cuda
 
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 

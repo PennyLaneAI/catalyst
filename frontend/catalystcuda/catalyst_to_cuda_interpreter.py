@@ -54,7 +54,7 @@ from catalyst.jax_primitives import (
     state_p,
 )
 from catalyst.utils.jax_extras import remove_host_context
-from catalystcuda.jaxpr_cuda_primitives import *
+from .primitives import *
 
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
