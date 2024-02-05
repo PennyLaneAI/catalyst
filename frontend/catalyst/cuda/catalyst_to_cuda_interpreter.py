@@ -581,6 +581,22 @@ def change_namedobs(ctx, eqn, qubits_len):
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
+def change_hamiltonian(ctx, eqn):
+    assert eqn.primitive == hamiltonian_p
+
+    invals = safe_map(ctx.read, eqn.invars)
+    coeffs = invals[0]
+    terms = invals[1:]
+    import operator
+    from functools import reduce
+
+    hamiltonian = reduce(operator.add, map(operator.mul, coeffs, terms))
+
+    outvariables = [ctx.new_variable(AbsCudaSpinOperator())]
+    safe_map(ctx.replace, eqn.outvars, outvariables)
+    safe_map(ctx.write, eqn.outvars, [hamiltonian])
+
+
 def interpret_impl(jaxpr, consts, *args):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
@@ -620,8 +636,6 @@ def interpret_impl(jaxpr, consts, *args):
         compbasis_p,
         hermitian_p,
         tensorobs_p,
-        hamiltonian_p,
-        expval_p,
         var_p,
         cond_p,
         while_p,
@@ -676,6 +690,8 @@ def interpret_impl(jaxpr, consts, *args):
             change_expval(ctx, eqn, kernel)
         elif eqn.primitive == namedobs_p:
             change_namedobs(ctx, eqn, size)
+        elif eqn.primitive == hamiltonian_p:
+            change_hamiltonian(ctx, eqn)
         elif eqn.primitive in unimplemented:
             msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
             raise NotImplementedError(msg)
@@ -772,9 +788,17 @@ def interpret(fun):
         # If we did that, we could cache the result JAXPR from this function
         # and evaluate it each time the function is called.
         catalyst_jaxpr_with_host, out_tree = QJIT_CUDA(fun).get_jaxpr(*args)
+
+        # We need to keep track of the consts...
+        consts = catalyst_jaxpr_with_host.consts
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
+
+        # Because they become args...
+        args = list(args) + consts
+        args = tuple(args)
         out = interpret_impl(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
+
         out = tree_unflatten(out_tree, out)
         return out
 

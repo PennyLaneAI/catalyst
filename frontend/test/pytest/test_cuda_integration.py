@@ -354,3 +354,23 @@ class TestCuda:
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
         assert_allclose(expected, observed)
+
+    def test_expval_2(self):
+        """Test multiple_values."""
+        from catalyst.cuda import CudaQDevice
+
+        @qml.qnode(CudaQDevice(wires=2))
+        def circuit():
+            qml.RY(jnp.pi / 4, wires=[1])
+            return qml.expval(qml.PauliZ(1) + qml.PauliX(1))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit_catalyst():
+            qml.RY(jnp.pi / 4, wires=[1])
+            return qml.expval(qml.PauliZ(1) + qml.PauliX(1))
+
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
+        observed = cuda_compiled()
+        catalyst_compiled = qjit(circuit_catalyst)
+        expected = catalyst_compiled()
+        assert_allclose(expected, observed)

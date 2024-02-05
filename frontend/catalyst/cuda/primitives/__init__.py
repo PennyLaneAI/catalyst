@@ -442,11 +442,8 @@ def cudaq_spin(target, kind: str, qubits_len: int):
 @cudaq_spin_p.def_impl
 def cudaq_spin_impl(target, kind: str, qubits_len: int):
     """The spin operator."""
-    identity = "I" * qubits_len
-    obs = list(identity)
-    obs[target] = kind.upper()
-    obs = "".join(obs)
-    return cudaq.SpinOperator.from_word(obs)
+    method = getattr(cudaq.spin, kind)
+    return method(target)
 
 
 @cudaq_spin_p.def_abstract_eval
