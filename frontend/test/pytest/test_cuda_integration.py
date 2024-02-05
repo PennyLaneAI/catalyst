@@ -20,7 +20,7 @@ from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
 from catalyst import measure, qjit
-from catalyst.compilation_pipelines import QJIT, QJIT_CUDA, qjit_cuda
+from catalyst.compilation_pipelines import QJIT
 from catalyst.compiler import CompileOptions
 from catalyst.utils.jax_extras import remove_host_context
 
@@ -45,6 +45,8 @@ class TestCuda:
     def test_qjit_cuda_generate_jaxpr(self):
         """Test the JAXPR generation."""
 
+        from catalystcuda.catalyst_to_cuda_interpreter import QJIT_CUDA
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
             return qml.state()
@@ -56,6 +58,8 @@ class TestCuda:
 
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
+
+        from catalystcuda.catalyst_to_cuda_interpreter import QJIT_CUDA
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -203,7 +207,7 @@ class TestCuda:
 
     def test_qjit_cuda_device(self):
         """Test CudaQDevice."""
-        from catalystcuda import CudaQDevice
+        from catalystcuda import CudaQDevice, qjit_cuda
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
@@ -319,10 +323,14 @@ class TestCuda:
 
     def test_cuda_invalid_target(self):
         """Test invalid target."""
+        from catalystcuda import CudaQDevice, qjit_cuda
+
         with pytest.raises(ValueError, match="Unsupported target foo."):
             qjit_cuda(fn=None, target="foo")
 
     def test_cuda_unimplemented_target(self):
         """Test unimplemented target."""
+        from catalystcuda import CudaQDevice, qjit_cuda
+
         with pytest.raises(NotImplementedError, match="Unimplemented target nvidia."):
             qjit_cuda(fn=None, target="nvidia")

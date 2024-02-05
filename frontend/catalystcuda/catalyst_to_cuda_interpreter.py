@@ -29,16 +29,17 @@ This module also uses the CUDA-quantum API. Here is the reference:
 """
 
 import json
+import functools
 from functools import wraps
 from typing import List
 
 import cudaq
 import jax
+import pennylane as qml
 from jax import numpy as jnp
 from jax._src.util import safe_map
 from jax.tree_util import tree_unflatten
 
-from catalyst.compilation_pipelines import QJIT_CUDA
 from catalyst.jax_primitives import (
     AbstractObs,
     compbasis_p,
@@ -53,7 +54,10 @@ from catalyst.jax_primitives import (
     sample_p,
     state_p,
 )
+from catalyst.jax_tracer import trace_to_jaxpr
+from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.jax_extras import remove_host_context
+from catalyst.utils.patching import Patcher
 from .primitives import *
 
 # We disable protected access in particular to avoid warnings with
@@ -558,6 +562,53 @@ def interpret_impl(jaxpr, consts, *args):
     return retvals
 
 
+class QJIT_CUDA:
+    """Class representing a just-in-time compiled hybrid quantum-classical function.
+
+    .. note::
+
+        ``QJIT_CUDA`` objects are created by the :func:`~.qjit` decorator. Please see
+        the :func:`~.qjit` documentation for more details.
+
+    Args:
+        fn (Callable): the quantum or classical function
+    """
+
+    def __init__(self, fn):
+        self.user_function = fn
+        functools.update_wrapper(self, fn)
+
+    def get_jaxpr(self, *args):
+        """Trace :func:`~.user_function`
+
+        Args:
+            *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
+
+        Returns:
+            an MLIR module
+        """
+
+        with Patcher(
+            (qml.QNode, "__call__", QFunc.__call__),
+        ):
+            func = self.user_function
+            abs_axes = {}
+            static_args = None
+            # _jaxpr and _out_tree are used in Catalyst but at the moment
+            # they have no use here in CUDA.
+            # We could also pass abstract arguments here in *args
+            # the same way we do so in Catalyst.
+            # But I think that is redundant now given make_jaxpr2
+            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(
+                func, static_args, abs_axes, *args
+            )
+
+        # TODO(@erick-xanadu):
+        # What about static_args?
+        # We could return _out_type2 as well
+        return jaxpr2, out_tree
+
+
 def interpret(fun):
     """Wrapper function that takes a function that will be interpretted with
     the semantics in interpret_impl.
@@ -569,7 +620,7 @@ def interpret(fun):
        wrapped: A wrapped function that will do the tracing.
     """
 
-    # TODO: kwargs?
+    # TODO(@erick-xanadu): kwargs?
 
     @wraps(fun)
     def wrapped(*args, **_kwargs):

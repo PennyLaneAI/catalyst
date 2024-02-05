@@ -817,48 +817,6 @@ class QJIT:
         return data
 
 
-class QJIT_CUDA:
-    """Class representing a just-in-time compiled hybrid quantum-classical function.
-
-    .. note::
-
-        ``QJIT_CUDA`` objects are created by the :func:`~.qjit` decorator. Please see
-        the :func:`~.qjit` documentation for more details.
-
-    Args:
-        fn (Callable): the quantum or classical function
-    """
-
-    def __init__(self, fn):
-        self.user_function = fn
-        functools.update_wrapper(self, fn)
-
-    def get_jaxpr(self, *args):
-        """Trace :func:`~.user_function`
-
-        Args:
-            *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
-
-        Returns:
-            an MLIR module
-        """
-        sig = CompiledFunction.get_runtime_signature(*args)
-
-        with Patcher(
-            (qml.QNode, "__call__", QFunc.__call__),
-        ):
-            func = self.user_function
-            abs_axes = {}
-            static_args = None
-            # _jaxpr and _out_tree are used in Catalyst but at the moment
-            # they have no use here in CUDA.
-            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(func, static_args, abs_axes, *sig)
-
-        # TODO(@erick-xanadu): Likely we will need more information
-        # from the line directly above.
-        return jaxpr2, out_tree
-
-
 class JAX_QJIT:
     """Wrapper class around :class:`~.QJIT` that enables compatibility with JAX transformations.
 
@@ -963,48 +921,6 @@ class JAX_QJIT:
 
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
-
-
-def qjit_cuda(fn=None, **kwargs):
-    """Wrapper around QJIT for CUDA-quantum."""
-
-    # This import is here on purpose. We shouldn't ever import CUDA
-    # when we are running kokkos. Importing CUDA before running any kokkos
-    # kernel polutes the environment and will create a segfault.
-    # pylint: disable=import-outside-toplevel
-    from catalystcuda.catalyst_to_cuda_interpreter import interpret
-
-    if kwargs.get("target", "binary") == "binary":
-        # Catalyst uses binary as a default.
-        # If use are using catalyst's qjit
-        # then, let's override it with cuda_quantum's default.
-        kwargs["target"] = "qpp-cpu"
-
-    target = kwargs.get("target", "qpp-cpu")
-    if target not in {
-        "qpp-cpu",
-        "nvidia",
-        "tensornet",
-        "nvidia-mgpu",
-        "quantinuum",
-        "ionq",
-        "IQM",
-        "OQC",
-    }:
-        msg = f"Unsupported target {target}."
-        raise ValueError(msg)
-
-    if target != "qpp-cpu":
-        msg = f"Unimplemented target {target}."
-        raise NotImplementedError(msg)
-
-    if fn is not None:
-        return interpret(fn)
-
-    def wrap_fn(fn):
-        return interpret(fn)
-
-    return wrap_fn
 
 
 def qjit_catalyst(
@@ -1372,6 +1288,8 @@ def qjit(
         "abstracted_axes": abstracted_axes,
     }
     if compiler is not None and compiler == "cuda_quantum":
+        from catalystcuda import qjit_cuda
+
         return qjit_cuda(**fwd_args)
     # Assume that we are running Catalyst.
     return qjit_catalyst(**fwd_args)

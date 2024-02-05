@@ -21,13 +21,54 @@ from pathlib import Path
 import pennylane as qml
 
 from catalyst import pennylane_extensions
-from catalyst.compilation_pipelines import qjit_cuda
 from catalyst.utils.contexts import EvaluationContext
+from catalystcuda.catalyst_to_cuda_interpreter import interpret
 
 
 def qjit(fn=None, **kwargs):
     """Entry point to qjit_cuda."""
     return qjit_cuda(fn, **kwargs)
+
+
+def qjit_cuda(fn=None, **kwargs):
+    """Wrapper around QJIT for CUDA-quantum."""
+
+    # This import is here on purpose. We shouldn't ever import CUDA
+    # when we are running kokkos. Importing CUDA before running any kokkos
+    # kernel polutes the environment and will create a segfault.
+    # pylint: disable=import-outside-toplevel
+
+    if kwargs.get("target", "binary") == "binary":
+        # Catalyst uses binary as a default.
+        # If use are using catalyst's qjit
+        # then, let's override it with cuda_quantum's default.
+        kwargs["target"] = "qpp-cpu"
+
+    target = kwargs.get("target", "qpp-cpu")
+    if target not in {
+        "qpp-cpu",
+        "nvidia",
+        "tensornet",
+        "nvidia-mgpu",
+        "quantinuum",
+        "ionq",
+        "IQM",
+        "OQC",
+    }:
+        msg = f"Unsupported target {target}."
+        raise ValueError(msg)
+
+    if target != "qpp-cpu":
+        msg = f"Unimplemented target {target}."
+        raise NotImplementedError(msg)
+
+    if fn is not None:
+        return interpret(fn)
+
+    def wrap_fn(fn):
+        return interpret(fn)
+
+    return wrap_fn
 
 
 class CudaQDevice(qml.QubitDevice):
