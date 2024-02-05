@@ -25,6 +25,7 @@ import tempfile
 import warnings
 from os.path import isfile
 
+import numpy as np
 import pennylane as qml
 import pytest
 
@@ -356,6 +357,36 @@ module @workflow {
             qjit(circuit, pipelines=test_pipelines, verbose=True)()
 
         assert "Trace" in e.value.args[0]
+
+
+class TestCustomCall:
+    """Test compilation of `lapack_dsyevd` via lowering to `stablehlo.custom_call`."""
+
+    def test_dsyevd(self):
+        """Test the support of `lapack_dsyevd` in one single `stablehlo.custom_call` call."""
+
+        A = np.array([[4, 9], [9, 4]])
+
+        def workflow(A):
+            B = qml.math.sqrt_matrix(A)
+            return B @ A
+
+        qjit_result = qjit(workflow)(A)
+        pl_result = workflow(A)
+        assert np.allclose(qjit_result, pl_result)
+
+    def test_dsyevd_multiple_calls(self):
+        """Test the support of `lapack_dsyevd` in multiple `stablehlo.custom_call` calls."""
+
+        A = np.array([[4, 9], [9, 4]])
+
+        def workflow(A):
+            B = qml.math.sqrt_matrix(A) @ qml.math.sqrt_matrix(A)
+            return B @ A
+
+        qjit_result = qjit(workflow)(A)
+        pl_result = workflow(A)
+        assert np.allclose(qjit_result, pl_result)
 
 
 if __name__ == "__main__":

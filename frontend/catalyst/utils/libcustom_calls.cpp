@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -50,7 +51,11 @@ void dgesdd_(char *jobz, lapack_int *m, lapack_int *n, double *a, lapack_int *ld
              double *u, lapack_int *ldu, double *vt, lapack_int *ldvt, double *work,
              lapack_int *lwork, lapack_int *iwork, lapack_int *info);
 
-// Wrapper to call the SVD solver dgesdd_ from Lapack:
+void dsyevd_(char *jobz, char *uplo, lapack_int *n, double *a, int *lda, double *w, double *work,
+             lapack_int *lwork, lapack_int *iwork, lapack_int *liwork, lapack_int *info);
+
+// Wrapper to call the SVD solver `dgesdd_` and the eigen vectors/values computation `dsyevd_`
+// from Lapack:
 // https://github.com/google/jax/blob/main/jaxlib/cpu/lapack_kernels.cc released under the Apache
 // License, Version 2.0, with the following copyright notice:
 
@@ -107,6 +112,51 @@ void lapack_dgesdd(void **dataEncoded, void **resultsEncoded)
         u += static_cast<int64_t>(m) * tdu;
         vt += static_cast<int64_t>(ldvt) * n;
         ++info;
+    }
+}
+
+// Copyright 2021 The JAX Authors.
+void lapack_dsyevd(void **dataEncoded, void **resultsEncoded)
+{
+    std::vector<void *> data;
+    for (size_t i = 0; i < 4; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(dataEncoded[i]));
+        data.push_back(encodedMemref.data_aligned);
+    }
+
+    std::vector<void *> out;
+    for (size_t i = 0; i < 5; ++i) {
+        auto encodedMemref = *(reinterpret_cast<EncodedMemref *>(resultsEncoded[i]));
+        out.push_back(encodedMemref.data_aligned);
+    }
+
+    int32_t lower = *(reinterpret_cast<int32_t *>(data[0]));
+    int b = *(reinterpret_cast<int32_t *>(data[1]));
+    int n = *(reinterpret_cast<int32_t *>(data[2]));
+    const double *a_in = reinterpret_cast<double *>(data[3]);
+
+    double *a_out = reinterpret_cast<double *>(out[0]);
+    double *w_out = reinterpret_cast<double *>(out[1]);
+    int *info_out = reinterpret_cast<int *>(out[2]);
+    double *work = reinterpret_cast<double *>(out[3]);
+    int *iwork = reinterpret_cast<int *>(out[4]);
+    if (a_out != a_in) {
+        std::memcpy(a_out, a_in,
+                    static_cast<int64_t>(b) * static_cast<int64_t>(n) * static_cast<int64_t>(n) *
+                        sizeof(double));
+    }
+
+    char jobz = 'V';
+    char uplo = lower ? 'L' : 'U';
+
+    lapack_int lwork =
+        std::min<int64_t>(std::numeric_limits<lapack_int>::max(), 1 + 6 * n + 2 * n * n);
+    lapack_int liwork = std::min<int64_t>(std::numeric_limits<lapack_int>::max(), 3 + 5 * n);
+    for (int i = 0; i < b; ++i) {
+        dsyevd_(&jobz, &uplo, &n, a_out, &n, w_out, work, &lwork, iwork, &liwork, info_out);
+        a_out += static_cast<int64_t>(n) * n;
+        w_out += n;
+        ++info_out;
     }
 }
 }

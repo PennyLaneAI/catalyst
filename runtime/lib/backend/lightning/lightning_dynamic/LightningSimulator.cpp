@@ -29,12 +29,12 @@ auto LightningSimulator::AllocateQubit() -> QubitIdType
 
 auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
     // at the first call when num_qubits == 0
-    if (this->GetNumQubits() == 0U) {
+    if (!this->GetNumQubits()) {
         this->device_sv = std::make_unique<StateVectorT>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }

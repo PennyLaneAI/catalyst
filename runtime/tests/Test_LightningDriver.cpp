@@ -265,3 +265,27 @@ TEMPLATE_TEST_CASE("QuantumDevice object test [lightning.qubit]", "[Driver]", Li
         // 20, 21, ..., 29
     }
 }
+
+TEMPLATE_LIST_TEST_CASE("Check re-AllocateQubit", "[Driver]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    sim->AllocateQubit();
+    sim->NamedOperation("Hadamard", {}, {0}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+    CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(0.707107).epsilon(1e-5));
+
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+
+    state = std::vector<std::complex<double>>(1U << sim->GetNumQubits());
+    view = DataView<std::complex<double>, 1>(state);
+    sim->State(view);
+    CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
+    CHECK(state[8].real() == Approx(0.707107).epsilon(1e-5));
+}
