@@ -45,7 +45,7 @@ class TestCuda:
     def test_qjit_cuda_generate_jaxpr(self):
         """Test the JAXPR generation."""
 
-        from catalystcuda.catalyst_to_cuda_interpreter import QJIT_CUDA
+        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDA
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -59,7 +59,7 @@ class TestCuda:
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 
-        from catalystcuda.catalyst_to_cuda_interpreter import QJIT_CUDA
+        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDA
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -71,7 +71,7 @@ class TestCuda:
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
-        from catalystcuda.catalyst_to_cuda_interpreter import interpret
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -84,7 +84,7 @@ class TestCuda:
         """Assert that catalyst_to_cuda matches the expected results."""
         import cudaq
 
-        from catalystcuda.catalyst_to_cuda_interpreter import interpret
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -109,7 +109,7 @@ class TestCuda:
 
     def test_sample_with_shots(self):
         """Assert that catalyst_to_cuda can handle shots."""
-        from catalystcuda.catalyst_to_cuda_interpreter import interpret
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
         def circuit_foo():
@@ -127,7 +127,7 @@ class TestCuda:
 
     def test_counts_with_shots(self):
         """Assert that catalyst_to_cuda can handle counts with shots."""
-        from catalystcuda.catalyst_to_cuda_interpreter import interpret
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=30))
         def circuit_foo():
@@ -144,7 +144,7 @@ class TestCuda:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalystcuda.catalyst_to_cuda_interpreter import interpret
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         @qml.qnode(qml.device("lightning.qubit", wires=1, shots=30))
         def circuit():
@@ -160,7 +160,7 @@ class TestCuda:
     def test_measurement_side_return(self):
         """Test the measurement code is added."""
 
-        from catalystcuda.catalyst_to_cuda_interpreter import interpret
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
@@ -187,7 +187,7 @@ class TestCuda:
 
     def test_cuda_device(self):
         """Test CudaQDevice."""
-        from catalystcuda import CudaQDevice
+        from catalyst.cuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
@@ -207,7 +207,7 @@ class TestCuda:
 
     def test_qjit_cuda_device(self):
         """Test CudaQDevice."""
-        from catalystcuda import CudaQDevice, qjit_cuda
+        from catalyst.cuda import CudaQDevice, qjit_cuda
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
@@ -227,7 +227,7 @@ class TestCuda:
 
     def test_abstract_variable(self):
         """Test abstract variable."""
-        from catalystcuda import CudaQDevice
+        from catalyst.cuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a: float):
@@ -247,7 +247,7 @@ class TestCuda:
 
     def test_arithmetic(self):
         """Test arithmetic."""
-        from catalystcuda import CudaQDevice
+        from catalyst.cuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
@@ -267,7 +267,7 @@ class TestCuda:
 
     def test_multiple_values(self):
         """Test multiple_values."""
-        from catalystcuda import CudaQDevice
+        from catalyst.cuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(params):
@@ -323,14 +323,14 @@ class TestCuda:
 
     def test_cuda_invalid_target(self):
         """Test invalid target."""
-        from catalystcuda import CudaQDevice, qjit_cuda
+        from catalyst.cuda import qjit_cuda
 
         with pytest.raises(ValueError, match="Unsupported target foo."):
             qjit_cuda(fn=None, target="foo")
 
     def test_cuda_unimplemented_target(self):
         """Test unimplemented target."""
-        from catalystcuda import CudaQDevice, qjit_cuda
+        from catalyst.cuda import qjit_cuda
 
         with pytest.raises(NotImplementedError, match="Unimplemented target nvidia."):
             qjit_cuda(fn=None, target="nvidia")

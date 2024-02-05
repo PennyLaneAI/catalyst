@@ -33,10 +33,8 @@ import functools
 from functools import wraps
 from typing import List
 
-import cudaq
 import jax
 import pennylane as qml
-from jax import numpy as jnp
 from jax._src.util import safe_map
 from jax.tree_util import tree_unflatten
 

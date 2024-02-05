@@ -22,7 +22,7 @@ import pennylane as qml
 
 from catalyst import pennylane_extensions
 from catalyst.utils.contexts import EvaluationContext
-from catalystcuda.catalyst_to_cuda_interpreter import interpret
+from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
 
 def qjit(fn=None, **kwargs):

@@ -44,7 +44,7 @@ from mlir_quantum.runtime import (
 import catalyst
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.jax_tracer import trace_to_jaxpr, trace_to_mlir
+from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
@@ -1288,7 +1288,11 @@ def qjit(
         "abstracted_axes": abstracted_axes,
     }
     if compiler is not None and compiler == "cuda_quantum":
-        from catalystcuda import qjit_cuda
+        # This is here because we don't want to import CUDA unless
+        # explicitly requested. This is to avoid polluting the global
+        # environment and creating segfaults when running kokkos kernels.
+        # pytlint: disable=import-outside-top-level
+        from catalyst.cuda import qjit_cuda
 
         return qjit_cuda(**fwd_args)
     # Assume that we are running Catalyst.

@@ -51,7 +51,7 @@ requirements = [
 one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
 if one_compiler_per_distribution:
     entry_points = {
-        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+        "pennylane.plugins": "cudaq = catalyst.cuda:CudaQDevice",
         "pennylane.compilers": [
             "context = catalyst.utils.contexts:EvaluationContext",
             "ops = catalyst:pennylane_extensions",
@@ -60,14 +60,14 @@ if one_compiler_per_distribution:
     }
 else:
     entry_points = {
-        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+        "pennylane.plugins": "cudaq = catalyst.cuda:CudaQDevice",
         "pennylane.compilers": [
             "catalyst.context = catalyst.utils.contexts:EvaluationContext",
             "catalyst.ops = catalyst:pennylane_extensions",
             "catalyst.qjit = catalyst:qjit",
-            "cuda_quantum.context = catalystcuda:EvaluationContext",
-            "cuda_quantum.ops = catalystcuda:pennylane_extensions",
-            "cuda_quantum.qjit = catalystcuda:qjit",
+            "cuda_quantum.context = catalyst.cuda:EvaluationContext",
+            "cuda_quantum.ops = catalyst.cuda:pennylane_extensions",
+            "cuda_quantum.qjit = catalyst.cuda:qjit",
         ],
     }
 
@@ -188,7 +188,7 @@ setup(
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum", "catalystcuda"],
+        include=["catalyst", "catalyst.*", "mlir_quantum"],
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
