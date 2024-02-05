@@ -162,12 +162,17 @@
   implemented in Catalyst's runtime:
   * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
   * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
-  
+
   and the following functions were removed since the frontend does not generate them
   * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* Fix an issue when no qubit number was specified for the `qinst` primitive. The primitive now
+  correctly deduces the number of qubits when no gate parameters are present. This change is not
+  user facing.
+  [(#496)](https://github.com/PennyLaneAI/catalyst/pull/496)
 
 * Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
   qubit re-allocation.
@@ -245,9 +250,9 @@ Haochen Paul Wang.
   def f(x):
       def cnot_loop(j):
           qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
-  
+
       for_loop(0, 4, 1)(cnot_loop)()
-  
+
       return qml.expval(qml.PauliZ(0))
   ```
 
