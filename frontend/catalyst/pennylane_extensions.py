@@ -1101,9 +1101,10 @@ class MidCircuitMeasure(HybridOp):
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
 
-        # Check if the postselect value was given
-        postselect = op.in_classical_tracers[1] if len(op.in_classical_tracers) == 2 else -1
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
+        # Check if the postselect value was given, otherwise default to -1
+        postselect_attr = op.in_classical_tracers[1] if len(op.in_classical_tracers) == 2 else -1
+
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect_attr)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -1946,6 +1947,22 @@ def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
     [array(1.), array(False)]
     >>> circuit(0.43)
     [array(-1.), array(True)]
+
+    **Example with post-selection**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            m = measure(0, postselect=1)
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit()
+    -1.0
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
