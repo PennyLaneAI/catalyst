@@ -77,7 +77,6 @@ from catalyst.utils.patching import Patcher
 from .primitives import (
     AbsCudaKernel,
     AbsCudaQbit,
-    AbsCudaQObserveResult,
     AbsCudaQReg,
     AbsCudaQState,
     AbsCudaSampleResult,
@@ -192,9 +191,11 @@ class InterpreterContext:
         self.count = get_minimum_new_variable_count(jaxpr)
 
     def set_qubit_to_wire(self, idx, qubit):
+        """Keep track of which wire this qubit variable is."""
         self.qubit_to_wire_map[qubit] = idx
 
     def get_wire_for_qubit(self, qubit):
+        """Get the wire for this qubit."""
         return self.qubit_to_wire_map[qubit]
 
     def read(self, var):
@@ -521,6 +522,7 @@ def change_measure(ctx, eqn, kernel):
 
 
 def change_expval(ctx, eqn, kernel):
+    """Change Catalyst's expval to CUDA-quantum equivalent."""
     assert eqn.primitive == expval_p
 
     # Operands to expval_p
@@ -533,7 +535,9 @@ def change_expval(ctx, eqn, kernel):
     shots = eqn.params["shots"]
     shots = shots if shots != None else -1
 
+    # To obtain expval, we first obtain an observe object.
     observe_results = cudaq_observe(kernel, obs, shots)
+    # And then we call expectation on that object.
     result = cudaq_expectation(observe_results)
     outvariables = [ctx.new_variable(jax.core.ShapedArray([], float))]
     outvals = [result]
@@ -543,6 +547,7 @@ def change_expval(ctx, eqn, kernel):
 
 
 def change_namedobs(ctx, eqn, qubits_len):
+    """Change named observable to CUDA-quantum equivalent."""
     assert eqn.primitive == namedobs_p
 
     # Operands to expval_p

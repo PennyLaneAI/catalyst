@@ -441,6 +441,7 @@ def cudaq_spin(target, kind: str, qubits_len: int):
 
 @cudaq_spin_p.def_impl
 def cudaq_spin_impl(target, kind: str, qubits_len: int):
+    """The spin operator."""
     identity = "I" * qubits_len
     obs = list(identity)
     obs[target] = kind.upper()
@@ -450,6 +451,7 @@ def cudaq_spin_impl(target, kind: str, qubits_len: int):
 
 @cudaq_spin_p.def_abstract_eval
 def cudaq_spin_abs(target, kind, qubits_len):
+    """Abstract spin operator."""
     return AbsCudaSpinOperator()
 
 
@@ -487,11 +489,13 @@ def cudaq_observe(kernel, spin_operator, shots_count=-1, noise_model=None):
 
 @cudaq_observe_p.def_abstract_eval
 def cudaq_observe_abs(kernel, spin_operator, shots_count=-1, noise_model=None):
+    """Abstract observe method."""
     return AbsCudaQObserveResult()
 
 
 @cudaq_observe_p.def_impl
 def cudaq_observe_impl(kernel, spin_operator, shots_count=-1, noise_model=None):
+    """Concrete implementation."""
     return cudaq.observe(kernel, spin_operator, shots_count=shots_count, noise_model=noise_model)
 
 
@@ -499,16 +503,19 @@ cudaq_expectation_p = jax.core.Primitive("expectation")
 
 
 def cudaq_expectation(observe_result):
+    """Convenience."""
     return cudaq_expectation_p.bind(observe_result)
 
 
 @cudaq_expectation_p.def_abstract_eval
 def cudaq_expectation_abs(observe_result):
+    """Abstract."""
     return jax.core.ShapedArray([], float)
 
 
 @cudaq_expectation_p.def_impl
 def cudaq_expectation_impl(observe_result):
+    """Concrete."""
     return observe_result.expectation()
 
 
