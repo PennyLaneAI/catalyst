@@ -450,21 +450,21 @@ def cudaq_counts_abs(kernel, shape, shots_count=1000):
 cudaq_spin_p = jax.core.Primitive("spin")
 
 
-def cudaq_spin(target, kind: str, qubits_len: int):
+def cudaq_spin(target, kind: str):
     """Convenience function for spin."""
     assert kind in {"i", "x", "y", "z"}
-    return cudaq_spin_p.bind(target, kind, qubits_len)
+    return cudaq_spin_p.bind(target, kind)
 
 
 @cudaq_spin_p.def_impl
-def cudaq_spin_impl(target, kind: str, qubits_len: int):
+def cudaq_spin_impl(target, kind: str):
     """The spin operator."""
     method = getattr(cudaq.spin, kind)
     return method(target)
 
 
 @cudaq_spin_p.def_abstract_eval
-def cudaq_spin_abs(target, kind, qubits_len):
+def cudaq_spin_abs(target, kind):
     """Abstract spin operator."""
     return AbsCudaSpinOperator()
 

@@ -181,6 +181,7 @@ class InterpreterContext:
        * variable_map: Dict[jax.core._src.Var, jax.core._src.Var]: A map from variables
                in the old program to the new program.
        * count [int]: Keeps track of the last variable used.
+       * kernel: The main trace of the computation. There can be subkernels (e.g., adjoint)
     """
 
     def __init__(self, jaxpr, consts, *args):
@@ -191,6 +192,9 @@ class InterpreterContext:
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
         self.count = get_minimum_new_variable_count(jaxpr)
+        # TODO: Do we need these shots?
+        # It looks like measurement operations already come with their own shots value.
+        self.kernel, _shots = change_device_to_cuda_device(self)
 
     def set_qubit_to_wire(self, idx, qubit):
         """Keep track of which wire this qubit variable is."""
@@ -295,7 +299,6 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     outvariables = [ctx.new_variable(AbsCudaQReg())]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
-    return register, outvariables, size
 
 
 def change_register_getitem(ctx, eqn):
@@ -321,7 +324,7 @@ def change_register_getitem(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_register_setitem(ctx, eqn, regvar):
+def change_register_setitem(ctx, eqn):
     """Set the correct post-conditions for CUDA-quantum when interpreting qinsert_p primitive
 
     This method is interesting because CUDA-quantum does not use value semantics for their qubits.
@@ -350,13 +353,10 @@ def change_register_setitem(ctx, eqn, regvar):
     # the old register, and I think that will keep
     # the same semantics in place.
     invals = safe_map(ctx.read, eqn.invars)
-
     # Because invals has been replaced with the correct
     # variables, invals[0] now holds a reference to a cuda register
     old_register = invals[0]
-    # outvar = ctx.get_var_for_val(old_register)
-
-    safe_map(ctx.replace, eqn.outvars, [regvar])
+    # This is old we need to do.
     safe_map(ctx.write, eqn.outvars, [old_register])
 
 
@@ -550,7 +550,7 @@ def change_expval(ctx, eqn, kernel):
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_namedobs(ctx, eqn, qubits_len):
+def change_namedobs(ctx, eqn):
     """Change named observable to CUDA-quantum equivalent."""
     assert eqn.primitive == namedobs_p
 
@@ -578,7 +578,7 @@ def change_namedobs(ctx, eqn, qubits_len):
     assert kind in catalyst_cuda_map.keys()
 
     cuda_name = catalyst_cuda_map[kind]
-    outvals = [cudaq_spin(idx, cuda_name, qubits_len)]
+    outvals = [cudaq_spin(idx, cuda_name)]
     outvariables = [ctx.new_variable(AbsCudaSpinOperator())]
 
     safe_map(ctx.replace, eqn.outvars, outvariables)
@@ -644,13 +644,9 @@ def interpret_impl(jaxpr, consts, *args):
     """
 
     ctx = InterpreterContext(jaxpr, consts, *args)
-    # TODO: Do we need these shots?
-    # It looks like measurement operations already come with their own shots value.
-    kernel, _shots = change_device_to_cuda_device(ctx)
     # TODO: Do we need to keep track of this register.
     # It looks like other operations already come with the register variable.
-    _register, jax_vars, size = change_alloc_to_cuda_alloc(ctx, kernel)
-    register_var = jax_vars[0]
+    change_alloc_to_cuda_alloc(ctx, ctx.kernel)
     measurement_set = set()
 
     # ignore set of instructions we don't care about.
@@ -690,19 +686,19 @@ def interpret_impl(jaxpr, consts, *args):
         # I want to have an interpreter object that has this state.
         # But first, I want to implement all the requiremed primitives.
         if eqn.primitive == state_p:
-            change_get_state(ctx, eqn, kernel)
+            change_get_state(ctx, eqn, ctx.kernel)
         elif eqn.primitive == qextract_p:
             change_register_getitem(ctx, eqn)
         elif eqn.primitive == qinsert_p:
-            change_register_setitem(ctx, eqn, register_var)
+            change_register_setitem(ctx, eqn)
         elif eqn.primitive == qinst_p:
-            change_instruction(ctx, eqn, kernel)
+            change_instruction(ctx, eqn, ctx.kernel)
         elif eqn.primitive == compbasis_p:
             change_compbasis(ctx, eqn)
         elif eqn.primitive == sample_p:
-            change_sample(ctx, eqn, kernel)
+            change_sample(ctx, eqn, ctx.kernel)
         elif eqn.primitive == counts_p:
-            change_counts(ctx, eqn, kernel)
+            change_counts(ctx, eqn, ctx.kernel)
         elif eqn.primitive == qmeasure_p:
             # TODO: If we are returning the measurement
             # We must change it to sample with a single shot.
@@ -711,19 +707,19 @@ def interpret_impl(jaxpr, consts, *args):
             # that is opaque and cannot be inspected for a value by the user.
             # For the time being, we can just add an exception if the return of
             # measurement is being returned directly.
-            a_measurement = change_measure(ctx, eqn, kernel)
+            a_measurement = change_measure(ctx, eqn, ctx.kernel)
             # Keep track of measurements in a set.
             # This will be checked at the end to make sure that we do not return
             # a Quake value.
             measurement_set.add(a_measurement)
         elif eqn.primitive == expval_p:
-            change_expval(ctx, eqn, kernel)
+            change_expval(ctx, eqn, ctx.kernel)
         elif eqn.primitive == namedobs_p:
-            change_namedobs(ctx, eqn, size)
+            change_namedobs(ctx, eqn)
         elif eqn.primitive == hamiltonian_p:
             change_hamiltonian(ctx, eqn)
         elif eqn.primitive == adjoint_p:
-            change_adjoint(ctx, eqn, kernel)
+            change_adjoint(ctx, eqn, ctx.kernel)
         elif eqn.primitive in unimplemented:
             msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
             raise NotImplementedError(msg)
