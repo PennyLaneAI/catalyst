@@ -394,10 +394,6 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
 
 auto LightningSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
 {
-    // Check validity of postselect value
-    RT_FAIL_IF(postselect < -1 || postselect > 1, "Invalid postselect value");
-    bool enabledPostselect = postselect == -1 ? false : true;
-
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
 
@@ -405,16 +401,8 @@ auto LightningSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
     DataView<double, 1> buffer_view(probs);
     this->PartialProbs(buffer_view, wires);
 
-    // Check validity of probability for postselect value
-    if (enabledPostselect) {
-        RT_FAIL_IF(probs[postselect] == 0, "Probability of postselect value is 0");
-    }
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0., 1.);
-    float draw = dis(gen);
-    bool mres = draw > probs[0];
+    // It represents the measured result, true for 1, false for 0
+    bool mres = Lightning::simulateDraw(probs, postselect);
 
     const size_t numQubits = this->GetNumQubits();
 
