@@ -16,6 +16,9 @@ observables = [
 # the device considers "supported" through PennyLane's device API.
 [[operators.gates]]
 native = [
+    "CRX",
+    "CRY",
+    "CRZ",
     "PauliX",
     "PauliY",
     "PauliZ",

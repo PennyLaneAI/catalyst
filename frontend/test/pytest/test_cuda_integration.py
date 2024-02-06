@@ -411,3 +411,26 @@ class TestCuda:
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
         assert_allclose(expected, observed)
+
+    def test_control_ry(self):
+        """Test control ry."""
+
+        from catalyst.cuda import CudaQDevice
+
+        @qml.qnode(CudaQDevice(wires=2))
+        def circuit():
+            qml.Hadamard(wires=[0])
+            qml.CRY(jnp.pi / 2, wires=[0, 1])
+            return qml.state()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit_catalyst():
+            qml.Hadamard(wires=[0])
+            qml.CRY(jnp.pi / 2, wires=[0, 1])
+            return qml.state()
+
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
+        observed = cuda_compiled()
+        catalyst_compiled = qjit(circuit_catalyst)
+        expected = catalyst_compiled()
+        assert_allclose(expected, observed)
