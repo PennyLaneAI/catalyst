@@ -25,6 +25,7 @@ from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
+from pennylane.ops import Controlled
 
 import catalyst
 from catalyst.jax_primitives import (
@@ -216,7 +217,7 @@ class QRegPromise:
     def insert(self, wires, qubits) -> None:
         """Insert qubits to the cache."""
         qrp = self
-        assert len(wires) == len(qubits)
+        assert len(wires) == len(qubits), f"len(wires)({len(wires)}) != len(qubits)({len(qubits)})"
         for w, qubit in zip(wires, qubits):
             assert (w not in qrp.cache) or (
                 qrp.cache[w] is None
@@ -402,29 +403,35 @@ def trace_quantum_tape(
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
             else:
-                qubits = qrp.extract(op.wires)
                 if isinstance(op, QubitUnitary):
+                    qubits = qrp.extract(op.wires)
                     qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
+                    qrp.insert(op.wires, qubits2)
 
-                elif isinstance(op, qml.Controlled):
+                elif isinstance(op, Controlled):
+                    qubits = qrp.extract(op.base.wires)
+                    ctrl_qubits = qrp.extract(op.control_wires)
                     qubits2 = qinst_p.bind(
                         *qubits,
                         *op.base.parameters,
-                        *op.control_wires,
+                        *ctrl_qubits,
                         *op.control_values,
-                        op.base.name,
+                        op=op.base.name,
                         qubits_len=len(qubits),
                         params_len=len(op.base.parameters),
-                        ctrl_len=len(op.control_values)
+                        ctrl_len=len(op.control_wires)
                     )
+                    qrp.insert(op.base.wires, qubits2[:len(qubits)])
+                    qrp.insert(op.control_wires, qubits2[len(qubits):])
 
                 else:
+                    qubits = qrp.extract(op.wires)
                     qubits2 = qinst_p.bind(
                         *qubits, *op.parameters, op=op.name,
                         qubits_len=len(qubits),
                         params_len=len(op.parameters)
                     )
-                qrp.insert(op.wires, qubits2)
+                    qrp.insert(op.wires, qubits2)
                 qrp2 = qrp
 
         assert qrp2 is not None

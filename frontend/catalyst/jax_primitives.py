@@ -689,7 +689,7 @@ def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len:int=0, params_le
     for idx in range(qubits_len):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
-    return (AbstractQbit(),) * len(qubits)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
 @qinst_p.def_impl
@@ -736,6 +736,11 @@ def _qinst_lowering(
 
         float_params.append(p)
 
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
@@ -747,12 +752,12 @@ def _qinst_lowering(
 
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
-        out_ctrl_qubits=[],
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         params=float_params,
         in_qubits=qubits,
         gate_name=name_attr,
         in_ctrl_qubits=ctrl_qubits,
-        in_ctrl_values=ctrl_values,
+        in_ctrl_values=ctrl_values_i1,
     ).results
 
 

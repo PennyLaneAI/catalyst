@@ -272,6 +272,8 @@ class QJITDevice(qml.QubitDevice):
             # TODO: Once control is added on the frontend.
             ...
 
+        QJITDevice.operations += ["C(PauliX)"]
+
     @staticmethod
     def _set_supported_observables(config):
         """Override the set of supported observables."""
