@@ -187,20 +187,17 @@ def cudaq_make_kernel_primitive_impl(*args):
     # We need to return an iterable.
     if not args:
         return (cudaq.make_kernel(),)
-    else:
-        return cudaq.make_kernel(*args)
+
+    return cudaq.make_kernel(*args)
 
 
 @cudaq_make_kernel_p.def_abstract_eval
 def cudaq_make_kernel_primitive_abs(*args):
     """Abstract implementation of cudaq.make_kernel."""
     retvals = []
-    for arg in args:
-        # TODO: We need to make sure that this
-        # case actually matches the correct types with the abstract types.
-        raise NotImplementedError("TODO")
-
-    return (AbsCudaKernel(),)
+    retvals.append(AbsCudaKernel())
+    retvals = retvals + list(args)
+    return tuple(retvals)
 
 
 # cudaq.make_kernel(*args) -> tuple
