@@ -28,13 +28,13 @@ This module also uses the CUDA-quantum API. Here is the reference:
   https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 """
 
-import cudaq
 import functools
 import json
 import operator
 from functools import reduce, wraps
 from typing import List
 
+import cudaq
 import jax
 import pennylane as qml
 from jax._src.util import safe_map
