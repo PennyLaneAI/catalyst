@@ -374,3 +374,40 @@ class TestCuda:
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
         assert_allclose(expected, observed)
+
+    def test_adjoint(self):
+        """Test adjoint."""
+
+        from catalyst.cuda import CudaQDevice
+
+        @qml.qnode(CudaQDevice(wires=2))
+        def circuit():
+            def f():
+                qml.RX(jnp.pi / 23, wires=[0])
+                qml.RX(jnp.pi / 17, wires=[1])
+                qml.Hadamard(wires=[0])
+                qml.Hadamard(wires=[1])
+                qml.PauliX(wires=0)
+                qml.PauliY(wires=1)
+
+            qml.adjoint(f)()
+            return qml.state()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit_catalyst():
+            def f():
+                qml.RX(jnp.pi / 23, wires=[0])
+                qml.RX(jnp.pi / 17, wires=[1])
+                qml.Hadamard(wires=[0])
+                qml.Hadamard(wires=[1])
+                qml.PauliX(wires=0)
+                qml.PauliY(wires=1)
+
+            qml.adjoint(f)()
+            return qml.state()
+
+        cuda_compiled = qjit(compiler="cuda_quantum")(circuit)
+        observed = cuda_compiled()
+        catalyst_compiled = qjit(circuit_catalyst)
+        expected = catalyst_compiled()
+        assert_allclose(expected, observed)

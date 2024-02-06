@@ -85,6 +85,7 @@ from .primitives import (
     AbsCudaSpinOperator,
     AbsCudaValue,
     cuda_inst,
+    cudaq_adjoint,
     cudaq_counts,
     cudaq_expectation,
     cudaq_getstate,
@@ -184,7 +185,7 @@ class InterpreterContext:
        * kernel: The main trace of the computation. There can be subkernels (e.g., adjoint)
     """
 
-    def __init__(self, jaxpr, consts, *args):
+    def __init__(self, jaxpr, consts, *args, kernel=None, register=None):
         self.jaxpr = jaxpr
         self.env = {}
         self.variable_map = {}
@@ -192,9 +193,17 @@ class InterpreterContext:
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
         self.count = get_minimum_new_variable_count(jaxpr)
-        # TODO: Do we need these shots?
-        # It looks like measurement operations already come with their own shots value.
-        self.kernel, _shots = change_device_to_cuda_device(self)
+        if kernel is None:
+            # TODO: Do we need these shots?
+            # It looks like measurement operations already come with their own shots value.
+            self.kernel, _shots = change_device_to_cuda_device(self)
+        else:
+            self.kernel = kernel
+
+        if register is None:
+            self.register = change_alloc_to_cuda_alloc(self, self.kernel)
+        else:
+            self.register = register
 
     def set_qubit_to_wire(self, idx, qubit):
         """Keep track of which wire this qubit variable is."""
@@ -299,6 +308,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     outvariables = [ctx.new_variable(AbsCudaQReg())]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
+    return register
 
 
 def change_register_getitem(ctx, eqn):
@@ -600,7 +610,7 @@ def change_hamiltonian(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, [hamiltonian])
 
 
-def change_adjoint(ctx, eqn, kernel):
+def change_adjoint(ctx, eqn):
     """Change Catalyst adjoint to an equivalent expression in CUDA."""
     assert eqn.primitive == adjoint_p
 
@@ -618,15 +628,28 @@ def change_adjoint(ctx, eqn, kernel):
 
     kernel_to_adjoint, abstract_qreg = cudaq_make_kernel(cudaq.qreg)
 
-    interpret_impl(nested_jaxpr.jaxpr, nested_jaxpr.literals, abstract_qreg)
-    # After we make the kernel, we need to register the operations
-    # found in the JAXPR... So, essentially, we are again
-    # going to interpret this jaxpr.
-    # But how is this possible with concrete values?
-    breakpoint()
+    # We need a new interpreter with a new kernel
+    # And the parameter is abstract_qreg.
+    interpreter = InterpreterContext(
+        nested_jaxpr.jaxpr,
+        nested_jaxpr.literals,
+        abstract_qreg,
+        kernel=kernel_to_adjoint,
+        register=abstract_qreg,
+    )
+    # retval... what is retval?
+    # retval... here would be the abstract_qreg we passed as an argument here.
+    # So... now, do we need it?
+    # I don't think so.
+    retval = interpret_impl(interpreter, nested_jaxpr.jaxpr, nested_jaxpr.literals, abstract_qreg)
+    cudaq_adjoint(ctx.kernel, kernel_to_adjoint, ctx.register)
+
+    # Now that we have captured all of the adjoint...
+    # Let's actually create an operation with it.
+    safe_map(ctx.write, eqn.outvars, [ctx.register])
 
 
-def interpret_impl(jaxpr, consts, *args):
+def interpret_impl(ctx, jaxpr, consts, *args):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
     CUDA-quantum equivalent instructions. As these operations are
@@ -635,6 +658,7 @@ def interpret_impl(jaxpr, consts, *args):
     then it outputs a result instead of a trace.
 
     Args:
+       ctx: An interpreter with the correct context
        jaxpr: Jaxpr to be interpreted
        consts: Constant values for this jaxpr
        *args: Either concrete of abstract values that correspond to arguments to JAXPR.
@@ -642,11 +666,6 @@ def interpret_impl(jaxpr, consts, *args):
     Returns:
        Either concrete values or a trace that corresponds to the computed values.
     """
-
-    ctx = InterpreterContext(jaxpr, consts, *args)
-    # TODO: Do we need to keep track of this register.
-    # It looks like other operations already come with the register variable.
-    change_alloc_to_cuda_alloc(ctx, ctx.kernel)
     measurement_set = set()
 
     # ignore set of instructions we don't care about.
@@ -719,7 +738,7 @@ def interpret_impl(jaxpr, consts, *args):
         elif eqn.primitive == hamiltonian_p:
             change_hamiltonian(ctx, eqn)
         elif eqn.primitive == adjoint_p:
-            change_adjoint(ctx, eqn, ctx.kernel)
+            change_adjoint(ctx, eqn)
         elif eqn.primitive in unimplemented:
             msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
             raise NotImplementedError(msg)
@@ -825,7 +844,8 @@ def interpret(fun):
         # Because they become args...
         args = list(args) + consts
         args = tuple(args)
-        out = interpret_impl(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
+        ctx = InterpreterContext(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
+        out = interpret_impl(ctx, closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
 
         out = tree_unflatten(out_tree, out)
         return out

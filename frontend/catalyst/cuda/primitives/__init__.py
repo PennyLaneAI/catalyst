@@ -540,6 +540,7 @@ cudaq_adjoint_p.multiple_results = True
 def cudaq_adjoint(kernel, target, *args):
     """Convenience."""
     cudaq_adjoint_p.bind(kernel, target, *args)
+    return tuple()
 
 
 @cudaq_adjoint_p.def_abstract_eval
@@ -551,6 +552,7 @@ def cudaq_adjoint_abs(kernel, target, *args):
 @cudaq_adjoint_p.def_impl
 def cudaq_adjoint_impl(kernel, target, *args):
     kernel.adjoint(target, *args)
+    return tuple()
 
 
 # SKIP Async for the time being
