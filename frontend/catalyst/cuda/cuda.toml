@@ -28,6 +28,8 @@ native = [
     "RX",
     "RY",
     "RZ",
+    "SWAP",
+    # "CSWAP", # Not exposed in CUDA quantum.
 ]
 
 # Operators that should be decomposed according to the algorithm used

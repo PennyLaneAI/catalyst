@@ -388,6 +388,8 @@ def change_instruction(ctx, eqn, kernel):
         "RX": "rx",
         "RY": "ry",
         "RZ": "rz",
+        "SWAP": "swap",
+        # "CSWAP": "cswap", Bug in CUDA quantum. CSWAP is not exposed.
     }
 
     # From the definition of qinst_p
