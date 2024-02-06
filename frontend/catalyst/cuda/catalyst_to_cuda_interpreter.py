@@ -584,6 +584,7 @@ def change_namedobs(ctx, eqn, qubits_len):
 
 
 def change_hamiltonian(ctx, eqn):
+    """Change catalyst hamiltonian to an equivalent expression in CUDA."""
     assert eqn.primitive == hamiltonian_p
 
     invals = safe_map(ctx.read, eqn.invars)
