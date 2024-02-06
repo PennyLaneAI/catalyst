@@ -66,7 +66,8 @@ def check_qjit_compatibility(device, config):
     Raises:
         CompileError
     """
-    if config["compilation"]["qjit_compatible"]:
+    compilation = config["compilation"]
+    if compilation["qjit_compatible"] or compilation.get("jax_transform_compatible", False):
         return
 
     name = device.name
