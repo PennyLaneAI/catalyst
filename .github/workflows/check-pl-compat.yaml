@@ -110,8 +110,6 @@ jobs:
         ENABLE_LLD=OFF \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=master \
-        ENABLE_LIGHTNING_KOKKOS=ON \
-        ENABLE_OPENQASM=ON \
         make runtime
 
     - name: Build Catalyst Runtime (stable)
@@ -121,8 +119,6 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        ENABLE_LIGHTNING_KOKKOS=ON \
-        ENABLE_OPENQASM=ON \
         make runtime
 
     - name: Install PennyLane-Lightning (latest)
