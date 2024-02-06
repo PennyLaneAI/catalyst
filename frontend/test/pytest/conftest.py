@@ -122,7 +122,9 @@ def pytest_collection_modifyitems(config, items):
         is_apple_silicon = platform.system() == "Darwin" and platform.processor() == "arm"
         # CUDA quantum is not supported in apple silicon.
         run_cuda_tests = "cuda" in item.keywords
-        skip_cuda = run_cuda_tests and (item.get_closest_marker("cuda") == "True" or is_apple_silicon)
+        skip_cuda = run_cuda_tests and (
+            item.get_closest_marker("cuda") == "True" or is_apple_silicon
+        )
         if skip_cuda:
             item.add_marker(skipper)
 
