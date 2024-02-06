@@ -258,11 +258,13 @@ def change_device_to_cuda_device(ctx):
     # and it is the responsibility of the caller to propagate this information.
     shots = parameters.get("shots")
 
+    # cudaq_make_kernel returns a multiple values depending on the arguments.
+    # Here it is returning a single value wrapped in a list.
     kernel = cudaq_make_kernel()
-    outvals = [kernel]
     outvariables = [ctx.new_variable(AbsCudaKernel())]
-    safe_map(ctx.write, outvariables, outvals)
-    return kernel, shots
+    safe_map(ctx.write, outvariables, kernel)
+
+    return kernel[0], shots
 
 
 def change_alloc_to_cuda_alloc(ctx, kernel):
@@ -598,6 +600,32 @@ def change_hamiltonian(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, [hamiltonian])
 
 
+def change_adjoint(ctx, eqn, kernel):
+    """Change Catalyst adjoint to an equivalent expression in CUDA."""
+    assert eqn.primitive == adjoint_p
+
+    # This is the quantum register.
+    invals = safe_map(ctx.read, eqn.invars)
+    register = invals[0]
+
+    args_tree = eqn.params["args_tree"]
+    nested_jaxpr = eqn.params["jaxpr"]
+
+    # So, first we need to make a new kernel.
+    # And we need to pass a register type as an argument
+    # we are working on as an argument.
+    import cudaq
+
+    kernel_to_adjoint, abstract_qreg = cudaq_make_kernel(cudaq.qreg)
+
+    interpret_impl(nested_jaxpr.jaxpr, nested_jaxpr.literals, abstract_qreg)
+    # After we make the kernel, we need to register the operations
+    # found in the JAXPR... So, essentially, we are again
+    # going to interpret this jaxpr.
+    # But how is this possible with concrete values?
+    breakpoint()
+
+
 def interpret_impl(jaxpr, consts, *args):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
@@ -694,6 +722,8 @@ def interpret_impl(jaxpr, consts, *args):
             change_namedobs(ctx, eqn, size)
         elif eqn.primitive == hamiltonian_p:
             change_hamiltonian(ctx, eqn)
+        elif eqn.primitive == adjoint_p:
+            change_adjoint(ctx, eqn, kernel)
         elif eqn.primitive in unimplemented:
             msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
             raise NotImplementedError(msg)

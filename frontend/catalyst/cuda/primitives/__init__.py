@@ -165,23 +165,40 @@ class CudaQObserveResult(cudaq.ObserveResult):
 
 # cudaq.make_kernel() -> cudaq.Kernel
 cudaq_make_kernel_p = jax.core.Primitive("cudaq_make_kernel")
+cudaq_make_kernel_p.multiple_results = True
 
 
-def cudaq_make_kernel():
-    """Just a convenience function to bind the cudaq make kernel primitive."""
-    return cudaq_make_kernel_p.bind()
+def cudaq_make_kernel(*args):
+    """Just a convenience function to bind the cudaq make kernel primitive.
+    From the documentation: https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html#cudaq.make_kernel
+
+    The following types are supported as kernel arguments: int, float, list/List, cudaq.qubit, or cudaq.qreg.
+    """
+    return cudaq_make_kernel_p.bind(*args)
 
 
 @cudaq_make_kernel_p.def_impl
-def cudaq_make_kernel_primitive_impl():
+def cudaq_make_kernel_primitive_impl(*args):
     """Concrete implementation of cudaq.make_kernel is just a call."""
-    return cudaq.make_kernel()
+
+    # This if statement is just to satisfy the multiple return values condition.
+    # We need to return an iterable.
+    if not args:
+        return (cudaq.make_kernel(),)
+    else:
+        return cudaq.make_kernel(*args)
 
 
 @cudaq_make_kernel_p.def_abstract_eval
-def cudaq_make_kernel_primitive_abs():
+def cudaq_make_kernel_primitive_abs(*args):
     """Abstract implementation of cudaq.make_kernel."""
-    return AbsCudaKernel()
+    retvals = []
+    for arg in args:
+        # TODO: We need to make sure that this
+        # case actually matches the correct types with the abstract types.
+        raise NotImplementedError("TODO")
+
+    return (AbsCudaKernel(),)
 
 
 # cudaq.make_kernel(*args) -> tuple
@@ -514,6 +531,26 @@ def cudaq_expectation_abs(observe_result):
 def cudaq_expectation_impl(observe_result):
     """Concrete."""
     return observe_result.expectation()
+
+
+cudaq_adjoint_p = jax.core.Primitive("cudaq_adjoint")
+cudaq_adjoint_p.multiple_results = True
+
+
+def cudaq_adjoint(kernel, target, *args):
+    """Convenience."""
+    cudaq_adjoint_p.bind(kernel, target, *args)
+
+
+@cudaq_adjoint_p.def_abstract_eval
+def cudaq_adjoint_abs(kernel, target, *args):
+    """Abstract."""
+    return tuple()
+
+
+@cudaq_adjoint_p.def_impl
+def cudaq_adjoint_impl(kernel, target, *args):
+    kernel.adjoint(target, *args)
 
 
 # SKIP Async for the time being
