@@ -194,6 +194,7 @@ class InterpreterContext:
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
         self.count = get_minimum_new_variable_count(jaxpr)
+        self.measurements = set()
         if kernel is None:
             # TODO: Do we need these shots?
             # It looks like measurement operations already come with their own shots value.
@@ -203,6 +204,9 @@ class InterpreterContext:
             # This is equivalent to passing a qreg into a function.
             # The kernel comes from outside the scope.
             self.kernel = kernel
+
+    def add_measurement(self, m):
+        self.measurements.add(m)
 
     def set_qubit_to_wire(self, idx, qubit):
         """Keep track of which wire this qubit variable is."""
@@ -536,7 +540,14 @@ def change_measure(ctx, eqn):
     outvals = [result, qubit]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
-    return result
+    # TODO: If we are returning the measurement
+    # We must change it to sample with a single shot.
+
+    # Otherwise, we will be returning a quake value
+    # that is opaque and cannot be inspected for a value by the user.
+    # For the time being, we can just add an exception if the return of
+    # measurement is being returned directly.
+    ctx.add_measurement(result)
 
 
 def change_expval(ctx, eqn):
@@ -718,18 +729,7 @@ def interpret_impl(ctx, jaxpr):
         elif eqn.primitive == counts_p:
             change_counts(ctx, eqn)
         elif eqn.primitive == qmeasure_p:
-            # TODO: If we are returning the measurement
-            # We must change it to sample with a single shot.
-
-            # Otherwise, we will be returning a quake value
-            # that is opaque and cannot be inspected for a value by the user.
-            # For the time being, we can just add an exception if the return of
-            # measurement is being returned directly.
-            a_measurement = change_measure(ctx, eqn)
-            # Keep track of measurements in a set.
-            # This will be checked at the end to make sure that we do not return
-            # a Quake value.
-            measurement_set.add(a_measurement)
+            change_measure(ctx, eqn)
         elif eqn.primitive == expval_p:
             change_expval(ctx, eqn)
         elif eqn.primitive == namedobs_p:
@@ -756,7 +756,7 @@ def interpret_impl(ctx, jaxpr):
                 ctx.write(eqn.outvars[0], ans)
 
     retvals = safe_map(ctx.read, jaxpr.outvars)
-    if set(retvals).issubset(measurement_set):
+    if set(retvals).issubset(ctx.measurements):
         raise NotImplementedError(
             "You cannot return measurements directly from a tape when compiling for cuda quantum."
         )
