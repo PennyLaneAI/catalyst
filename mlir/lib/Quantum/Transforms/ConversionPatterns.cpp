@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -265,7 +265,11 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
+        SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
+                                   adaptor.getOperands().getTypes().end());
+        argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
 
+        /* if ( false ) { */
         if ( op.getGateName().str() == "PauliX" ) {
 
             TypeConverter *conv = getTypeConverter();
@@ -308,28 +312,58 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
                 llvm::ArrayRef<LLVM::GEPArg>{0, 3}
             );
 
-            Value nullQubitPtr = rewriter.create<LLVM::IntToPtrOp>(loc,
+            Value nullPtr = rewriter.create<LLVM::IntToPtrOp>(loc,
                 qubitPtrType,
                 rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64),
                     rewriter.getIntegerAttr(rewriter.getIntegerType(64), 0)));
 
-            Value nullBoolPtr = rewriter.create<LLVM::IntToPtrOp>(loc,
-                boolPtrType,
-                rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64),
-                    rewriter.getIntegerAttr(rewriter.getIntegerType(64), 0)));
+            Value ctrlPtr = nullPtr;
+            Value valuePtr = nullPtr;
+            if (op.getCtrlQubitOperands().size() > 0) {
+                Value c = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(op.getCtrlQubitOperands().size()));
+                ctrlPtr = rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, c).getResult();
+                valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, c).getResult();
+                for (size_t i = 0; i < op.getCtrlQubitOperands().size(); i++) {
+                    {
+                        auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, qubitPtrType, ctrlPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{i}
+                        );
+                        auto qubit = adaptor.getInCtrlQubits()[i];
+                        rewriter.create<LLVM::StoreOp>(loc, qubit, itemPtr);
+                    }
+                    {
+                        auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, boolPtrType, valuePtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{i}
+                        );
+                        auto value = adaptor.getInCtrlValues()[i];
+                        rewriter.create<LLVM::StoreOp>(loc, value, itemPtr);
+                    }
+                }
+            }
+            else {
+                ctrlPtr = nullPtr;
+            }
 
             rewriter.create<LLVM::StoreOp>(loc, adjointVal, adjointPtr);
             rewriter.create<LLVM::StoreOp>(loc, numControlledVal, numControlledPtr);
-            rewriter.create<LLVM::StoreOp>(loc, nullQubitPtr, controlledWiresPtr);
-            rewriter.create<LLVM::StoreOp>(loc, nullBoolPtr, controlledValuesPtr);
+            rewriter.create<LLVM::StoreOp>(loc, ctrlPtr, controlledWiresPtr);
+            rewriter.create<LLVM::StoreOp>(loc, valuePtr, controlledValuesPtr);
 
-            SmallVector<Value> args = adaptor.getOperands();
+            SmallVector<Value> args;
+            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
             args.insert(args.end(), structPtr);
+            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
 
             rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-            rewriter.replaceOp(op, adaptor.getInQubits());
+            SmallVector<Value> values;
+            values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
+            rewriter.replaceOp(op, values);
         }
         else {
+            assert(op.getCtrlQubitOperands().size() == 0 &&
+                   "lowering controlled operation is not implemented");
+
             SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
                                        adaptor.getOperands().getTypes().end());
             argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
@@ -360,6 +394,9 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         MLIRContext *ctx = getContext();
 
         std::string qirName = "__catalyst__qis__MultiRZ";
+        assert(op.getCtrlQubitOperands().size() == 0 &&
+               "lowering controlled operation is not implemented");
+
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx),
             {Float64Type::get(ctx), IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
@@ -390,6 +427,9 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
+
+        assert(op.getCtrlQubitOperands().size() == 0 &&
+               "lowering controlled operation is not implemented");
 
         assert(op.getMatrix().getType().isa<MemRefType>() &&
                "unitary must take in memref before lowering");
