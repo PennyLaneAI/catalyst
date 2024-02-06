@@ -369,7 +369,7 @@ def change_register_setitem(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, [old_register])
 
 
-def change_instruction(ctx, eqn, kernel):
+def change_instruction(ctx, eqn):
     """Change the instruction to one supported in CUDA-quantum."""
 
     assert eqn.primitive == qinst_p
@@ -408,7 +408,7 @@ def change_instruction(ctx, eqn, kernel):
 
     # Now, we can map to the correct op
     # For now just assume rx
-    cuda_inst(kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
+    cuda_inst(ctx.kernel, *qubits_or_params, inst=cuda_inst_name, qubits_len=qubits_len)
 
     # Finally determine how many are qubits.
     qubits = qubits_or_params[:qubits_len]
@@ -434,7 +434,7 @@ def change_compbasis(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_get_state(ctx, eqn, kernel):
+def change_get_state(ctx, eqn):
     """Change Catalyst's state_p to CUDA-quantum's state primitive."""
     assert eqn.primitive == state_p
 
@@ -456,14 +456,14 @@ def change_get_state(ctx, eqn, kernel):
     # To get a state in cuda we need a kernel
     # which does not flow from eqn.invars
     # so we get it from the parameter.
-    cuda_state = cudaq_getstate(kernel)
+    cuda_state = cudaq_getstate(ctx.kernel)
     outvals = [cuda_state]
     outvariables = [ctx.new_variable(AbsCudaQState())]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_sample_or_counts(ctx, eqn, kernel):
+def change_sample_or_counts(ctx, eqn):
     """Change Catalyst's sample_p or counts_p primitive to respective CUDA-quantum primitives."""
 
     is_sample = eqn.primitive == sample_p
@@ -491,14 +491,14 @@ def change_sample_or_counts(ctx, eqn, kernel):
     assert obs_catalyst.primitive == compbasis_p
 
     if is_sample:
-        shots_result = cudaq_sample(kernel, shots_count=shots)
+        shots_result = cudaq_sample(ctx.kernel, shots_count=shots)
         outvals = [shots_result]
         outvariables = [ctx.new_variable(AbsCudaSampleResult())]
         safe_map(ctx.replace, eqn.outvars, outvariables)
         safe_map(ctx.write, eqn.outvars, outvals)
     else:
         shape = 2**obs_catalyst.num_qubits
-        outvals = cudaq_counts(kernel, shape=shape, shots_count=shots)
+        outvals = cudaq_counts(ctx.kernel, shape=shape, shots_count=shots)
         bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
         local_counts = jax.core.ShapedArray([shape], jax.numpy.int64)
         outvariables = [ctx.new_variable(bitstrings), ctx.new_variable(local_counts)]
@@ -506,17 +506,17 @@ def change_sample_or_counts(ctx, eqn, kernel):
         safe_map(ctx.write, eqn.outvars, outvals)
 
 
-def change_sample(ctx, eqn, kernel):
+def change_sample(ctx, eqn):
     """Convenience function. The name is the documentation."""
-    return change_sample_or_counts(ctx, eqn, kernel)
+    return change_sample_or_counts(ctx, eqn)
 
 
-def change_counts(ctx, eqn, kernel):
+def change_counts(ctx, eqn):
     """Convenience function. The name is the documentation."""
-    return change_sample_or_counts(ctx, eqn, kernel)
+    return change_sample_or_counts(ctx, eqn)
 
 
-def change_measure(ctx, eqn, kernel):
+def change_measure(ctx, eqn):
     """Change Catalyst's qmeasure_p to CUDA-quantum measure."""
 
     assert eqn.primitive == qmeasure_p
@@ -531,7 +531,7 @@ def change_measure(ctx, eqn, kernel):
     # Cuda can measure in multiple basis.
     # Catalyst's measure op only measures in the Z basis.
     # So we map this measurement op to mz in cuda.
-    result = mz_call(kernel, qubit)
+    result = mz_call(ctx.kernel, qubit)
     outvariables = [ctx.new_variable(AbsCudaValue()), ctx.new_variable(AbsCudaQbit())]
     outvals = [result, qubit]
     safe_map(ctx.replace, eqn.outvars, outvariables)
@@ -539,7 +539,7 @@ def change_measure(ctx, eqn, kernel):
     return result
 
 
-def change_expval(ctx, eqn, kernel):
+def change_expval(ctx, eqn):
     """Change Catalyst's expval to CUDA-quantum equivalent."""
     assert eqn.primitive == expval_p
 
@@ -554,7 +554,7 @@ def change_expval(ctx, eqn, kernel):
     shots = shots if shots is not None else -1
 
     # To obtain expval, we first obtain an observe object.
-    observe_results = cudaq_observe(kernel, obs, shots)
+    observe_results = cudaq_observe(ctx.kernel, obs, shots)
     # And then we call expectation on that object.
     result = cudaq_expectation(observe_results)
     outvariables = [ctx.new_variable(jax.core.ShapedArray([], float))]
@@ -689,7 +689,6 @@ def interpret_impl(ctx, jaxpr):
         func_p,
         jvp_p,
         vjp_p,
-        adjoint_p,
         print_p,
     }
 
@@ -705,19 +704,19 @@ def interpret_impl(ctx, jaxpr):
         # I want to have an interpreter object that has this state.
         # But first, I want to implement all the requiremed primitives.
         if eqn.primitive == state_p:
-            change_get_state(ctx, eqn, ctx.kernel)
+            change_get_state(ctx, eqn)
         elif eqn.primitive == qextract_p:
             change_register_getitem(ctx, eqn)
         elif eqn.primitive == qinsert_p:
             change_register_setitem(ctx, eqn)
         elif eqn.primitive == qinst_p:
-            change_instruction(ctx, eqn, ctx.kernel)
+            change_instruction(ctx, eqn)
         elif eqn.primitive == compbasis_p:
             change_compbasis(ctx, eqn)
         elif eqn.primitive == sample_p:
-            change_sample(ctx, eqn, ctx.kernel)
+            change_sample(ctx, eqn)
         elif eqn.primitive == counts_p:
-            change_counts(ctx, eqn, ctx.kernel)
+            change_counts(ctx, eqn)
         elif eqn.primitive == qmeasure_p:
             # TODO: If we are returning the measurement
             # We must change it to sample with a single shot.
@@ -726,13 +725,13 @@ def interpret_impl(ctx, jaxpr):
             # that is opaque and cannot be inspected for a value by the user.
             # For the time being, we can just add an exception if the return of
             # measurement is being returned directly.
-            a_measurement = change_measure(ctx, eqn, ctx.kernel)
+            a_measurement = change_measure(ctx, eqn)
             # Keep track of measurements in a set.
             # This will be checked at the end to make sure that we do not return
             # a Quake value.
             measurement_set.add(a_measurement)
         elif eqn.primitive == expval_p:
-            change_expval(ctx, eqn, ctx.kernel)
+            change_expval(ctx, eqn)
         elif eqn.primitive == namedobs_p:
             change_namedobs(ctx, eqn)
         elif eqn.primitive == hamiltonian_p:
