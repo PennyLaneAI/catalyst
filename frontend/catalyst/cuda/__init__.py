@@ -59,11 +59,12 @@ def qjit_cuda(fn=None, **kwargs):
         raise NotImplementedError(msg)
 
     target = kwargs.get("target")
-    if cudaq.has_target(target):
+    if not cudaq.has_target(target):
         msg = f"Unavailable target {target}."  # pragma: no cover
         raise ValueError(msg)
 
-    cudaq.set_target(target)
+    cudaq_target = cudaq.get_target(target)
+    cudaq.set_target(cudaq_target)
 
     if fn is not None:
         return interpret(fn)
