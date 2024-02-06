@@ -231,3 +231,86 @@ class TestVectorizeMap:
         assert jnp.allclose(result[1], excepted)
         assert jnp.allclose(result[2], excepted)
         assert jnp.allclose(result[3], excepted)
+
+    def test_vmap_circuit_return_unsupported_output(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT returning tensors."""
+
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                return qml.probs(0)
+
+            res = vmap(circuit, out_shape=(6,))(x)
+            return res
+
+        x = jnp.array([[0.1], [0.2]])
+
+        with pytest.raises(RuntimeError, match="Incompatible outputs"):
+            qjit(workflow)(x)
+
+    def test_vmap_circuit_return_tensor(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT returning tensors."""
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.state()
+
+            res1 = vmap(circuit, out_shape=(2,))(x)
+            res2 = vmap(circuit, out_axes=0, out_shape=(2,))(x)
+            return res1, res2
+
+        x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
+
+        result = workflow(x)
+        excepted = jnp.array([[0.98235508, 0.0198374], [0.10537427, 0.23239136]])
+        assert jnp.allclose(result[0], excepted)
+        assert jnp.allclose(result[1], excepted)
+
+    def test_vmap_circuit_return_tensor_out_axes(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with out_axes."""
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.state()
+
+            res1 = vmap(circuit, out_shape=(2,))(x)
+            res2 = vmap(circuit, out_axes=1, out_shape=(2,))(x)
+            return res1, res2
+
+        x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
+
+        result = workflow(x)
+        excepted = jnp.array([[0.98235508, 0.0198374], [0.10537427, 0.23239136]])
+        assert jnp.allclose(result[0], excepted)
+        assert jnp.allclose(jnp.transpose(result[1], (1, 0)), excepted)
+
+    @pytest.mark.skip(reason="PyTrees are not supported with catalyst.vmap")
+    def test_vmap_circuit_return_tensor_pytree(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT returning PyTrees."""
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.state(), qml.probs(0)
+
+            res1 = vmap(circuit, out_shape=(2, 2))(x)
+            return res1
+
+        x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
+
+        workflow(x)

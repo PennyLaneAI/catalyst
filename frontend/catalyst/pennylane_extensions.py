@@ -2178,15 +2178,22 @@ def ctrl(
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
 
 
-def vmap(fn: Callable, in_axes: Union[int, Sequence[Any]] = 0, out_axes=0) -> Callable:
+def vmap(
+    fn: Callable,
+    in_axes: Union[int, Sequence[Any]] = 0,
+    out_axes: int = 0,
+    out_shape: Union[int, Sequence[Any]] = 0,
+) -> Callable:
     """A :func:`~.qjit` compatible vectorizing map for PennyLane/Catalyst.
 
     Args:
         f (Callable): A Python function containing PennyLane quantum operations.
-        in_axes (Union[int, Sequence[Any]]): The value(s) over which input array axes to map.
-            Currently, vectorization of only one argument is supported. The default is ``0``.
-        out_axes (Union[int, Sequence[Any]]): It specifies where te mapped axis should appear
-            in the output. The default in ``0``.
+        in_axes (Union[int, Sequence[Any]]): It specifies the value(s) over which input
+            array axes to map. Currently, vectorization of only one argument is supported.
+        out_axes (int): It specifies where te mapped axis should appear in the output.
+        out_shape (Union[int, Sequence[Any]]): It specifies the shape and size of the
+            output of ``fn``. By default, :func:`~.vmap` only supports scalar return
+            data-types. To support tensor values, users should provide ``out_shape``.
 
     Returns:
         (Callable): Vectorized version of ``fn``.
@@ -2194,31 +2201,23 @@ def vmap(fn: Callable, in_axes: Union[int, Sequence[Any]] = 0, out_axes=0) -> Ca
     Raises:
         ValueError: Vectorize with more than one argument.
         RuntimeError: Incompatible length of ``in_axes`` and positional arguments of ``fn``.
-
-    **Example**
-
-
     """
-
     # Dispatch to jax.vmap when it is called outside qjit.
     if not EvaluationContext.is_tracing():
         return jax.vmap(fn, in_axes, out_axes)
 
     if isinstance(in_axes, int):
         in_axes = (in_axes,)
-
     elif not isinstance(in_axes, tuple):
         in_axes = tuple(in_axes)
 
     vm_arg_loc = 0  # vectorize w.r.t. the first arg by default
     if len(in_axes) > 1:
-
         num_vm_args = 0
         for i, e in enumerate(in_axes):
             if e is not None:
                 num_vm_args += 1
                 vm_arg_loc = i
-
         if num_vm_args > 1:
             raise ValueError(
                 f"Vectorization of only one argument is currently supported, requested for {in_axes}"
@@ -2226,17 +2225,23 @@ def vmap(fn: Callable, in_axes: Union[int, Sequence[Any]] = 0, out_axes=0) -> Ca
 
     def wrapper(*args, **kwargs):
         """Vectorization wrapper around the hybrid program using for_loop"""
-
         # Check the validity of in_axes
         if len(in_axes) != len(args):
             raise RuntimeError(
                 f"Incompatible length of in_axes and args, {len(in_axes)} != {len(args)}"
             )
-
         ax = in_axes[vm_arg_loc]
         size = jnp.shape(args[vm_arg_loc])[ax]
 
-        batched_result = jnp.zeros(size)
+        # TODO: Find a better implementation for initializing batched_result
+        vm_out_shape = (
+            [
+                size,
+            ]
+            if not out_shape
+            else [size, *out_shape]
+        )
+        batched_result = jnp.zeros(shape=vm_out_shape)
 
         # Swap axes for ax > 0
         args_pos_0ax = args[vm_arg_loc]
@@ -2248,9 +2253,24 @@ def vmap(fn: Callable, in_axes: Union[int, Sequence[Any]] = 0, out_axes=0) -> Ca
         @for_loop(0, size, 1)
         def loop(i, batched_result):
             res = fn(*args[:vm_arg_loc], args_pos_0ax[i], *args[vm_arg_loc + 1 :], **kwargs)
+
+            if jnp.shape(res)[:] != jnp.shape(batched_result)[1:]:
+                raise RuntimeError(
+                    f"Incompatible outputs, {jnp.shape(res)[:]} != {jnp.shape(batched_result)[1:]}.\n"
+                    "Consider passing out_shape to specify the shape and size of the return value"
+                )
+
             batched_result = batched_result.at[i].set(res)
             return batched_result
 
-        return loop(batched_result)
+        result = loop(batched_result)
+
+        # Support out_axes
+        if out_axes:
+            up_axes = [*range(result.ndim)]
+            up_axes[out_axes], up_axes[0] = up_axes[0], up_axes[out_axes]
+            result = jnp.transpose(result, up_axes)
+
+        return result
 
     return wrapper
