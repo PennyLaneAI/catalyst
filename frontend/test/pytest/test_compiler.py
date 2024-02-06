@@ -287,12 +287,12 @@ module @workflow {
     %2 = stablehlo.constant dense<0> : tensor<i64>
     %extracted = tensor.extract %2[] : tensor<i64>
     %3 = quantum.extract %1[%extracted] : !quantum.reg -> !quantum.bit
-    %4 = quantum.custom "PauliX"() %3 : !quantum.bit
+    %4 = quantum.custom "PauliX"() %3 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
     %5 = stablehlo.constant dense<1> : tensor<i64>
     %extracted_0 = tensor.extract %5[] : tensor<i64>
     %6 = quantum.extract %1[%extracted_0] : !quantum.reg -> !quantum.bit
     %extracted_1 = tensor.extract %arg0[] : tensor<f64>
-    %7 = quantum.custom "RX"(%extracted_1) %6 : !quantum.bit
+    %7 = quantum.custom "RX"(%extracted_1) %6 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
     %8 = quantum.namedobs %4[ PauliZ] : !quantum.obs
     %9 = quantum.expval %8 : f64
     %from_elements = tensor.from_elements %9 : tensor<f64>
