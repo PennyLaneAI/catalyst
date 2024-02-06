@@ -393,6 +393,7 @@ jobs:
         # tensorflow-cpu is not distributed for macOS ARM
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist
         python${{ matrix.python_version }} -m pip install tensorflow  # for autograph tests
+        python${{ matrix.python_version }} -m pip install cuda-quantum # for cudaq tests
 
     - name: Install Catalyst
       run: |
