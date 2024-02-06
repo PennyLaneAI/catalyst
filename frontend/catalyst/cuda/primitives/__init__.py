@@ -26,6 +26,7 @@ from jax import numpy as jnp
 # And we disable unused-argument to avoid unused arguments in abstract_eval.
 # Particularly those kwargs.
 # pylint: disable=unused-argument
+# pylint: disable=line-too-long
 
 
 class AbsCudaQState(jax.core.AbstractValue):
@@ -172,7 +173,8 @@ def cudaq_make_kernel(*args):
     """Just a convenience function to bind the cudaq make kernel primitive.
     From the documentation: https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html#cudaq.make_kernel
 
-    The following types are supported as kernel arguments: int, float, list/List, cudaq.qubit, or cudaq.qreg.
+    The following types are supported as kernel arguments: int, float, list/List, cudaq.qubit,
+    or cudaq.qreg.
     """
     return cudaq_make_kernel_p.bind(*args)
 
@@ -551,6 +553,7 @@ def cudaq_adjoint_abs(kernel, target, *args):
 
 @cudaq_adjoint_p.def_impl
 def cudaq_adjoint_impl(kernel, target, *args):
+    """Concrete."""
     kernel.adjoint(target, *args)
     return tuple()
 

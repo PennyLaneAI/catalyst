@@ -28,6 +28,7 @@ This module also uses the CUDA-quantum API. Here is the reference:
   https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 """
 
+import cudaq
 import functools
 import json
 import operator
@@ -185,7 +186,7 @@ class InterpreterContext:
        * kernel: The main trace of the computation. There can be subkernels (e.g., adjoint)
     """
 
-    def __init__(self, jaxpr, consts, *args, kernel=None, register=None):
+    def __init__(self, jaxpr, consts, *args, kernel=None):
         self.jaxpr = jaxpr
         self.env = {}
         self.variable_map = {}
@@ -197,13 +198,11 @@ class InterpreterContext:
             # TODO: Do we need these shots?
             # It looks like measurement operations already come with their own shots value.
             self.kernel, _shots = change_device_to_cuda_device(self)
+            change_alloc_to_cuda_alloc(self, self.kernel)
         else:
+            # This is equivalent to passing a qreg into a function.
+            # The kernel comes from outside the scope.
             self.kernel = kernel
-
-        if register is None:
-            self.register = change_alloc_to_cuda_alloc(self, self.kernel)
-        else:
-            self.register = register
 
     def set_qubit_to_wire(self, idx, qubit):
         """Keep track of which wire this qubit variable is."""
@@ -547,7 +546,7 @@ def change_expval(ctx, eqn, kernel):
     # Params:
     # * shots: Shots
     shots = eqn.params["shots"]
-    shots = shots if shots != None else -1
+    shots = shots if shots is not None else -1
 
     # To obtain expval, we first obtain an observe object.
     observe_results = cudaq_observe(kernel, obs, shots)
@@ -585,7 +584,7 @@ def change_namedobs(ctx, eqn):
     catalyst_cuda_map = {"PauliZ": "z", "PauliX": "x", "PauliY": "y"}
 
     # This is an assert because it is guaranteed by Catalyst.
-    assert kind in catalyst_cuda_map.keys()
+    assert kind in catalyst_cuda_map
 
     cuda_name = catalyst_cuda_map[kind]
     outvals = [cudaq_spin(idx, cuda_name)]
@@ -618,14 +617,14 @@ def change_adjoint(ctx, eqn):
     invals = safe_map(ctx.read, eqn.invars)
     register = invals[0]
 
-    args_tree = eqn.params["args_tree"]
+    # We might need this for pytrees.
+    _args_tree = eqn.params["args_tree"]
     nested_jaxpr = eqn.params["jaxpr"]
 
     # So, first we need to make a new kernel.
     # And we need to pass a register type as an argument
     # we are working on as an argument.
-    import cudaq
-
+    # cudaq.qreg is essentially an abstract type in cudaq
     kernel_to_adjoint, abstract_qreg = cudaq_make_kernel(cudaq.qreg)
 
     # We need a new interpreter with a new kernel
@@ -635,21 +634,19 @@ def change_adjoint(ctx, eqn):
         nested_jaxpr.literals,
         abstract_qreg,
         kernel=kernel_to_adjoint,
-        register=abstract_qreg,
     )
-    # retval... what is retval?
-    # retval... here would be the abstract_qreg we passed as an argument here.
-    # So... now, do we need it?
-    # I don't think so.
-    retval = interpret_impl(interpreter, nested_jaxpr.jaxpr, nested_jaxpr.literals, abstract_qreg)
-    cudaq_adjoint(ctx.kernel, kernel_to_adjoint, ctx.register)
+    # retval would be the abstract_qreg we passed as an argument here.
+    # We always pass the qreg and return the qreg.
+    # TODO: Do we support returning any other values?
+    _retval = interpret_impl(interpreter, nested_jaxpr.jaxpr)
+    cudaq_adjoint(ctx.kernel, kernel_to_adjoint, register)
 
     # Now that we have captured all of the adjoint...
     # Let's actually create an operation with it.
-    safe_map(ctx.write, eqn.outvars, [ctx.register])
+    safe_map(ctx.write, eqn.outvars, [register])
 
 
-def interpret_impl(ctx, jaxpr, consts, *args):
+def interpret_impl(ctx, jaxpr):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
     CUDA-quantum equivalent instructions. As these operations are
@@ -660,8 +657,6 @@ def interpret_impl(ctx, jaxpr, consts, *args):
     Args:
        ctx: An interpreter with the correct context
        jaxpr: Jaxpr to be interpreted
-       consts: Constant values for this jaxpr
-       *args: Either concrete of abstract values that correspond to arguments to JAXPR.
 
     Returns:
        Either concrete values or a trace that corresponds to the computed values.
@@ -845,7 +840,7 @@ def interpret(fun):
         args = list(args) + consts
         args = tuple(args)
         ctx = InterpreterContext(closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
-        out = interpret_impl(ctx, closed_jaxpr.jaxpr, closed_jaxpr.literals, *args)
+        out = interpret_impl(ctx, closed_jaxpr.jaxpr)
 
         out = tree_unflatten(out_tree, out)
         return out
