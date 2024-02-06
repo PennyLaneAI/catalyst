@@ -18,6 +18,7 @@ entry point.
 
 from pathlib import Path
 
+import cudaq
 import pennylane as qml
 
 from catalyst import pennylane_extensions
@@ -56,6 +57,13 @@ def qjit_cuda(fn=None, **kwargs):
     if target != "qpp-cpu":
         msg = f"Unimplemented target {target}."
         raise NotImplementedError(msg)
+
+    target = kwargs.get("target")
+    if cudaq.has_target(target):
+        msg = f"Unavailable target {target}."  # pragma: no cover
+        raise ValueError(msg)
+
+    cudaq.set_target(target)
 
     if fn is not None:
         return interpret(fn)
