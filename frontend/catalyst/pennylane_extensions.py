@@ -272,6 +272,8 @@ class QJITDevice(qml.QubitDevice):
         if QJITDevice._check_quantum_control(config):  # pragma: nocover
             QJITDevice.operations += ["QCtrl"]
 
+        QJITDevice.operations += ["C(PauliX)"]
+
     @staticmethod
     def _set_supported_observables(config):
         """Override the set of supported observables."""
