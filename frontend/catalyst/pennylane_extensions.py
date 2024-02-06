@@ -21,7 +21,7 @@ while using :func:`~.qjit`.
 import copy
 import numbers
 import pathlib
-from collections.abc import Hashable, Sequence, Sized
+from collections.abc import Sequence, Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -2220,7 +2220,8 @@ def vmap(
                 vm_arg_loc = i
         if num_vm_args > 1:
             raise ValueError(
-                f"Vectorization of only one argument is currently supported, requested for {in_axes}"
+                "Vectorization of only one argument is currently supported,"
+                f" requested for {in_axes}"
             )
 
     def wrapper(*args, **kwargs):
@@ -2256,7 +2257,8 @@ def vmap(
 
             if jnp.shape(res)[:] != jnp.shape(batched_result)[1:]:
                 raise RuntimeError(
-                    f"Incompatible outputs, {jnp.shape(res)[:]} != {jnp.shape(batched_result)[1:]}.\n"
+                    "Incompatible outputs, "
+                    f"{jnp.shape(res)[:]} != {jnp.shape(batched_result)[1:]}.\n"
                     "Consider passing out_shape to specify the shape and size of the return value"
                 )
 
