@@ -662,6 +662,65 @@ def change_adjoint(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, [register])
 
 
+def ignore_impl(ctx, eqn):
+    """No-op"""
+
+
+def unimplemented_impl(ctx, eqn):
+    """Raise an error."""
+    msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
+    raise NotImplementedError(msg)
+
+
+def default_impl(ctx, eqn):
+    """Default implementation for all other non-catalyst primitives. I.e., other JAX primitives."""
+    # This little scope was based on eval_jaxpr's implmentation:
+    #    https://github.com/google/jax/blob/16636f9c97414d0c5195c6fd47227756d4754095/jax/_src/core.py#L507-L518
+    subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
+    ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
+    if eqn.primitive.multiple_results:  # pragma: nocover
+        safe_map(ctx.write, eqn.outvars, ans)
+    else:
+        ctx.write(eqn.outvars[0], ans)
+
+
+INST_IMPL = {
+    state_p: change_get_state,
+    qextract_p: change_register_getitem,
+    qinsert_p: change_register_setitem,
+    qinst_p: change_instruction,
+    compbasis_p: change_compbasis,
+    sample_p: change_sample,
+    counts_p: change_counts,
+    qmeasure_p: change_measure,
+    expval_p: change_expval,
+    namedobs_p: change_namedobs,
+    hamiltonian_p: change_hamiltonian,
+    adjoint_p: change_adjoint,
+    # ignore set of instructions we don't care about.
+    # because they have been handled before or they are just
+    # not necessary in the CUDA-quantum API.
+    qdealloc_p: ignore_impl,
+    qdevice_p: ignore_impl,
+    qalloc_p: ignore_impl,
+    # These are unimplemented at the moment.
+    zne_p: unimplemented_impl,
+    qunitary_p: unimplemented_impl,
+    hermitian_p: unimplemented_impl,
+    tensorobs_p: unimplemented_impl,
+    var_p: unimplemented_impl,
+    probs_p: unimplemented_impl,
+    cond_p: unimplemented_impl,
+    while_p: unimplemented_impl,
+    for_p: unimplemented_impl,
+    grad_p: unimplemented_impl,
+    func_p: unimplemented_impl,
+    jvp_p: unimplemented_impl,
+    vjp_p: unimplemented_impl,
+    print_p: unimplemented_impl,
+}
+
+
 def interpret_impl(ctx, jaxpr):
     """Implement a custom interpreter for Catalyst's JAXPR operands.
     Instead of interpreting Catalyst's JAXPR operands, we will execute
@@ -678,58 +737,6 @@ def interpret_impl(ctx, jaxpr):
        Either concrete values or a trace that corresponds to the computed values.
     """
 
-    def ignore_impl(ctx, eqn): ...
-
-    def unimplemented_impl(ctx, eqn):
-        msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
-        raise NotImplementedError(msg)
-
-    def default_impl(ctx, eqn):
-        # This little scope was based on eval_jaxpr's implmentation:
-        #    https://github.com/google/jax/blob/16636f9c97414d0c5195c6fd47227756d4754095/jax/_src/core.py#L507-L518
-        subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
-        ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
-        if eqn.primitive.multiple_results:  # pragma: nocover
-            safe_map(ctx.write, eqn.outvars, ans)
-        else:
-            ctx.write(eqn.outvars[0], ans)
-
-    instruction_impl = {
-        state_p: change_get_state,
-        qextract_p: change_register_getitem,
-        qinsert_p: change_register_setitem,
-        qinst_p: change_instruction,
-        compbasis_p: change_compbasis,
-        sample_p: change_sample,
-        counts_p: change_counts,
-        qmeasure_p: change_measure,
-        expval_p: change_expval,
-        namedobs_p: change_namedobs,
-        hamiltonian_p: change_hamiltonian,
-        adjoint_p: change_adjoint,
-        # ignore set of instructions we don't care about.
-        # because they have been handled before or they are just
-        # not necessary in the CUDA-quantum API.
-        qdealloc_p: ignore_impl,
-        qdevice_p: ignore_impl,
-        qalloc_p: ignore_impl,
-        # These are unimplemented at the moment.
-        zne_p: unimplemented_impl,
-        qunitary_p: unimplemented_impl,
-        hermitian_p: unimplemented_impl,
-        tensorobs_p: unimplemented_impl,
-        var_p: unimplemented_impl,
-        probs_p: unimplemented_impl,
-        cond_p: unimplemented_impl,
-        while_p: unimplemented_impl,
-        for_p: unimplemented_impl,
-        grad_p: unimplemented_impl,
-        func_p: unimplemented_impl,
-        jvp_p: unimplemented_impl,
-        vjp_p: unimplemented_impl,
-        print_p: unimplemented_impl,
-    }
-
     # Main interpreter loop.
     # Note the absense of loops here and branches.
     # Normally in an interpreter loop, we would have
@@ -737,7 +744,7 @@ def interpret_impl(ctx, jaxpr):
     for eqn in jaxpr.eqns:
         # This is similar to direct-call threading
         # https://www.cs.toronto.edu/~matz/dissertation/matzDissertation-latex2html/node6.html
-        instruction_impl.get(eqn.primitive, default_impl)(ctx, eqn)
+        INST_IMPL.get(eqn.primitive, default_impl)(ctx, eqn)
 
     retvals = safe_map(ctx.read, jaxpr.outvars)
     if set(retvals).issubset(ctx.measurements):
