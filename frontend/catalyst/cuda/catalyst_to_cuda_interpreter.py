@@ -30,7 +30,8 @@ This module also uses the CUDA-quantum API. Here is the reference:
 
 import functools
 import json
-from functools import wraps
+import operator
+from functools import reduce, wraps
 from typing import List
 
 import jax
@@ -53,6 +54,7 @@ from catalyst.jax_primitives import (
     jvp_p,
     namedobs_p,
     print_p,
+    probs_p,
     qalloc_p,
     qdealloc_p,
     qdevice_p,
@@ -587,8 +589,6 @@ def change_hamiltonian(ctx, eqn):
     invals = safe_map(ctx.read, eqn.invars)
     coeffs = invals[0]
     terms = invals[1:]
-    import operator
-    from functools import reduce
 
     hamiltonian = reduce(operator.add, map(operator.mul, coeffs, terms))
 
@@ -637,6 +637,7 @@ def interpret_impl(jaxpr, consts, *args):
         hermitian_p,
         tensorobs_p,
         var_p,
+        probs_p,
         cond_p,
         while_p,
         for_p,
