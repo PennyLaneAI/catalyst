@@ -102,9 +102,6 @@ from .primitives import (
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
 # pylint: disable=protected-access
-# This is for the interpreter loop.
-# TODO: We can possibly remove the branches with a bit of indirection.
-# pylint: disable=too-many-branches
 # We also disable line-too-long because of a URL
 # pylint: disable=line-too-long
 
@@ -206,6 +203,10 @@ class InterpreterContext:
             self.kernel = kernel
 
     def add_measurement(self, m):
+        """Keep track of measurements such that we don't return them.
+        Measurements are quake values that are opaque to the user.
+        They are essentially compile time references to potential values.
+        """
         self.measurements.add(m)
 
     def set_qubit_to_wire(self, idx, qubit):
@@ -662,11 +663,11 @@ def change_adjoint(ctx, eqn):
     safe_map(ctx.write, eqn.outvars, [register])
 
 
-def ignore_impl(ctx, eqn):
+def ignore_impl(_ctx, _eqn):
     """No-op"""
 
 
-def unimplemented_impl(ctx, eqn):
+def unimplemented_impl(_ctx, eqn):
     """Raise an error."""
     msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
     raise NotImplementedError(msg)
