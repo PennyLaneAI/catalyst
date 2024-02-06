@@ -677,30 +677,57 @@ def interpret_impl(ctx, jaxpr):
     Returns:
        Either concrete values or a trace that corresponds to the computed values.
     """
-    measurement_set = set()
 
-    # ignore set of instructions we don't care about.
-    # because they have been handled before or they are just
-    # not necessary in the CUDA-quantum API.
-    ignore = {qdealloc_p, qdevice_p, qalloc_p}
+    def ignore_impl(ctx, eqn): ...
 
-    # TODO: Let's implement all of these
-    unimplemented = {
-        zne_p,
-        qunitary_p,
-        compbasis_p,
-        hermitian_p,
-        tensorobs_p,
-        var_p,
-        probs_p,
-        cond_p,
-        while_p,
-        for_p,
-        grad_p,
-        func_p,
-        jvp_p,
-        vjp_p,
-        print_p,
+    def unimplemented_impl(ctx, eqn):
+        msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
+        raise NotImplementedError(msg)
+
+    def default_impl(ctx, eqn):
+        # This little scope was based on eval_jaxpr's implmentation:
+        #    https://github.com/google/jax/blob/16636f9c97414d0c5195c6fd47227756d4754095/jax/_src/core.py#L507-L518
+        subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
+        ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
+        if eqn.primitive.multiple_results:  # pragma: nocover
+            safe_map(ctx.write, eqn.outvars, ans)
+        else:
+            ctx.write(eqn.outvars[0], ans)
+
+    instruction_impl = {
+        state_p: change_get_state,
+        qextract_p: change_register_getitem,
+        qinsert_p: change_register_setitem,
+        qinst_p: change_instruction,
+        compbasis_p: change_compbasis,
+        sample_p: change_sample,
+        counts_p: change_counts,
+        qmeasure_p: change_measure,
+        expval_p: change_expval,
+        namedobs_p: change_namedobs,
+        hamiltonian_p: change_hamiltonian,
+        adjoint_p: change_adjoint,
+        # ignore set of instructions we don't care about.
+        # because they have been handled before or they are just
+        # not necessary in the CUDA-quantum API.
+        qdealloc_p: ignore_impl,
+        qdevice_p: ignore_impl,
+        qalloc_p: ignore_impl,
+        # These are unimplemented at the moment.
+        zne_p: unimplemented_impl,
+        qunitary_p: unimplemented_impl,
+        hermitian_p: unimplemented_impl,
+        tensorobs_p: unimplemented_impl,
+        var_p: unimplemented_impl,
+        probs_p: unimplemented_impl,
+        cond_p: unimplemented_impl,
+        while_p: unimplemented_impl,
+        for_p: unimplemented_impl,
+        grad_p: unimplemented_impl,
+        func_p: unimplemented_impl,
+        jvp_p: unimplemented_impl,
+        vjp_p: unimplemented_impl,
+        print_p: unimplemented_impl,
     }
 
     # Main interpreter loop.
@@ -708,52 +735,9 @@ def interpret_impl(ctx, jaxpr):
     # Normally in an interpreter loop, we would have
     # while(True):
     for eqn in jaxpr.eqns:
-        # Leave this as a "switch-dispatch" and do not yet change to something like direct-call threading.
+        # This is similar to direct-call threading
         # https://www.cs.toronto.edu/~matz/dissertation/matzDissertation-latex2html/node6.html
-        # Yes, python does not have a switch statement.
-        # Why not change to direct-call threading equivalent in Python yet?
-        # I want to have an interpreter object that has this state.
-        # But first, I want to implement all the requiremed primitives.
-        if eqn.primitive == state_p:
-            change_get_state(ctx, eqn)
-        elif eqn.primitive == qextract_p:
-            change_register_getitem(ctx, eqn)
-        elif eqn.primitive == qinsert_p:
-            change_register_setitem(ctx, eqn)
-        elif eqn.primitive == qinst_p:
-            change_instruction(ctx, eqn)
-        elif eqn.primitive == compbasis_p:
-            change_compbasis(ctx, eqn)
-        elif eqn.primitive == sample_p:
-            change_sample(ctx, eqn)
-        elif eqn.primitive == counts_p:
-            change_counts(ctx, eqn)
-        elif eqn.primitive == qmeasure_p:
-            change_measure(ctx, eqn)
-        elif eqn.primitive == expval_p:
-            change_expval(ctx, eqn)
-        elif eqn.primitive == namedobs_p:
-            change_namedobs(ctx, eqn)
-        elif eqn.primitive == hamiltonian_p:
-            change_hamiltonian(ctx, eqn)
-        elif eqn.primitive == adjoint_p:
-            change_adjoint(ctx, eqn)
-        elif eqn.primitive in unimplemented:
-            msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
-            raise NotImplementedError(msg)
-        elif eqn.primitive in ignore:
-            continue
-
-        # Do the normal interpretation...
-        else:
-            # This little scope was based on eval_jaxpr's implmentation:
-            #    https://github.com/google/jax/blob/16636f9c97414d0c5195c6fd47227756d4754095/jax/_src/core.py#L507-L518
-            subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
-            ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
-            if eqn.primitive.multiple_results:  # pragma: nocover
-                safe_map(ctx.write, eqn.outvars, ans)
-            else:
-                ctx.write(eqn.outvars[0], ans)
+        instruction_impl.get(eqn.primitive, default_impl)(ctx, eqn)
 
     retvals = safe_map(ctx.read, jaxpr.outvars)
     if set(retvals).issubset(ctx.measurements):
