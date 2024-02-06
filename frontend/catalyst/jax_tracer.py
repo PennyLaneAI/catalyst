@@ -405,9 +405,24 @@ def trace_quantum_tape(
                 qubits = qrp.extract(op.wires)
                 if isinstance(op, QubitUnitary):
                     qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
+
+                elif isinstance(op, qml.Controlled):
+                    qubits2 = qinst_p.bind(
+                        *qubits,
+                        *op.base.parameters,
+                        *op.control_wires,
+                        *op.control_values,
+                        op.base.name,
+                        qubits_len=len(qubits),
+                        params_len=len(op.base.parameters),
+                        ctrl_len=len(op.control_values)
+                    )
+
                 else:
                     qubits2 = qinst_p.bind(
-                        *qubits, *op.parameters, op=op.name, qubits_len=len(qubits)
+                        *qubits, *op.parameters, op=op.name,
+                        qubits_len=len(qubits),
+                        params_len=len(op.parameters)
                     )
                 qrp.insert(op.wires, qubits2)
                 qrp2 = qrp

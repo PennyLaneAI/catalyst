@@ -682,7 +682,12 @@ def _qinsert_lowering(
 # qinst
 #
 @qinst_p.def_abstract_eval
-def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
+def _qinst_abstract_eval(
+    *qubits_or_params, op=None,
+    qubits_len=-1,
+    params_len:int=0,
+    ctrl_len:int=0
+):
     for idx in range(qubits_len):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -690,18 +695,23 @@ def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
 
 
 @qinst_p.def_impl
-def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len):  # pragma: no cover
+def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len, params_len, ctrl_len):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _qinst_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params: tuple, op=None, qubits_len=-1
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params: tuple, op=None,
+    qubits_len:int=-1,
+    params_len:int=0,
+    ctrl_len:int=0
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len:]
+    params = qubits_or_params[qubits_len:params_len]
+    ctrl_qubits = qubits_or_params[qubits_len+params_len:qubits_len+params_len+ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len+params_len+ctrl_len:]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -735,7 +745,15 @@ def _qinst_lowering(
         float_param = float_params[0]
         return MultiRZOp([qubit.type for qubit in qubits], float_param, qubits).results
 
-    return CustomOp([qubit.type for qubit in qubits], float_params, qubits, name_attr).results
+    return CustomOp(
+        out_qubits=[qubit.type for qubit in qubits],
+        out_ctrl_qubits=[],
+        params=float_params,
+        in_qubits=qubits,
+        gate_name=name_attr,
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values,
+    ).results
 
 
 #
