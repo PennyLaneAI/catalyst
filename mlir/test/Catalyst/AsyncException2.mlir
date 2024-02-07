@@ -194,3 +194,19 @@ module {
     llvm.return
   }
 }
+
+// -----
+
+// Check that next step is scheduled
+
+module {
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  // CHECK-SAME: catalyst.preHandleError
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return
+  }
+}
