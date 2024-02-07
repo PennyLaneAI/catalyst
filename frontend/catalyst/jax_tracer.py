@@ -106,7 +106,10 @@ class Function:
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
-FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p, qinst_p}
+# Take care when adding primitives to this set in order to avoid introducing a quadratic number of
+# edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
+# is constrained to occur before all subsequent equations in the quantum operations trace.
+FORCED_ORDER_PRIMITIVES = {qdevice_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
@@ -324,11 +327,12 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
-def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
+def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
         func: python function to be lowered
+        static_argnums: indices of static arguments.
         abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
             sizes.
         args: arguments to ``func``
@@ -350,7 +354,7 @@ def trace_to_mlir(func, abstracted_axes, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        make_jaxpr_kwargs = {"abstracted_axes": abstracted_axes}
+        make_jaxpr_kwargs = {"static_argnums": static_argnums, "abstracted_axes": abstracted_axes}
         jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.

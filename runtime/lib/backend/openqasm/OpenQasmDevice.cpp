@@ -24,11 +24,13 @@ auto OpenQasmDevice::AllocateQubit() -> QubitIdType
 
 auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
     const size_t cur_num_qubits = builder->getNumQubits();
+    RT_FAIL_IF(cur_num_qubits, "Partial qubits allocation is not supported by OpenQasmDevice");
+
     const size_t new_num_qubits = cur_num_qubits + num_qubits;
     if (cur_num_qubits) {
         builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
@@ -36,7 +38,7 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
 
     builder->Register(OpenQasm::RegisterType::Qubit, "qubits", new_num_qubits);
 
-    return qubit_manager.AllocateRange(cur_num_qubits, new_num_qubits);
+    return qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
 }
 
 void OpenQasmDevice::ReleaseAllQubits()

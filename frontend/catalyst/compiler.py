@@ -14,6 +14,7 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
+import glob
 import importlib
 import os
 import pathlib
@@ -60,6 +61,8 @@ class CompileOptions:
             of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
+        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
+            Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
     """
 
@@ -71,7 +74,16 @@ class CompileOptions:
     autograph: Optional[bool] = False
     async_qnodes: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
+    static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+
+    def __post_init__(self):
+        # Make the format of static_argnums easier to handle.
+        static_argnums = self.static_argnums
+        if static_argnums is None:
+            self.static_argnums = ()
+        elif isinstance(static_argnums, int):
+            self.static_argnums = (static_argnums,)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -269,20 +281,29 @@ class LinkerDriver:
             f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
         ]
 
-        # Discover the LAPACK library provided by scipy & add it to the rpath.
-        package_name = "scipy"
+        # Discover the LAPACK library provided by scipy & add link against it.
+        # Doing this here ensures we will always have the correct library name.
 
         if platform.system() == "Linux":
             file_path_within_package = "../scipy.libs/"
+            file_extension = ".so"
         elif platform.system() == "Darwin":  # pragma: nocover
             file_path_within_package = ".dylibs/"
+            file_extension = ".dylib"
 
+        package_name = "scipy"
         scipy_package = importlib.util.find_spec(package_name)
         package_directory = path.dirname(scipy_package.origin)
         scipy_lib_path = path.join(package_directory, file_path_within_package)
 
+        file_prefix = "libopenblas"
+        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
+        openblas_so_file = glob.glob(search_pattern)[0]
+        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
+
         lib_path_flags += [
             f"-Wl,-rpath,{scipy_lib_path}",
+            f"-L{scipy_lib_path}",
         ]
 
         system_flags = []
@@ -299,6 +320,7 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
+            f"-l{openblas_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
         ]

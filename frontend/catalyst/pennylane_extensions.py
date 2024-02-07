@@ -227,16 +227,18 @@ class QJITDevice(qml.QubitDevice):
         "Toffoli",
         "MultiRZ",
         "QubitUnitary",
+        "ISWAP",
+        "PSWAP",
     }
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config):
-        # We currently override and only set MultiControlledX to preserve current behaviour.
+        # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
         # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX"}
+        return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
     def _check_mid_circuit_measurement(config):
@@ -323,7 +325,13 @@ class QJITDevice(qml.QubitDevice):
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+            try:
+                mat = self.matrix()
+            except Exception as e:
+                raise CompileError(
+                    f"Operation {self} could not be decomposed, it might be unsupported."
+                ) from e
+            return [qml.QubitUnitary(mat, wires=self.wires)]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
@@ -1198,6 +1206,14 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+    @property
+    def wires(self):
+        """The list of all static wires."""
+
+        assert len(self.regions) == 1, "Adjoint is expected to have one region"
+        total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
+        return total_wires
+
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
 #       to this class whenever a qjit context is active.
@@ -1232,6 +1248,18 @@ class QCtrl(HybridOp):
             self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def wires(self):
+        """The list of all control-wires, work-wires, and active-wires."""
+        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+
+        total_wires = sum(
+            (op.wires for op in self.regions[0].quantum_tape.operations),
+            self._control_wires,
+        )
+        total_wires += self._work_wires
+        return total_wires
 
     @property
     def control_wires(self):

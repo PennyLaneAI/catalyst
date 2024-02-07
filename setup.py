@@ -13,11 +13,10 @@
 # limitations under the License.
 
 import glob
-import importlib.util
 import platform
 import subprocess
 from distutils import sysconfig
-from os import path
+from os import environ, path
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
@@ -36,13 +35,38 @@ with open(path.join("frontend", "catalyst", "_version.py")) as f:
 with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
+pl_version = environ.get("PL_VERSION", ">=0.32,<=0.34")
 requirements = [
-    "pennylane>=0.32",
+    f"pennylane{pl_version}",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
     "scipy",
 ]
+
+# TODO: Once PL version 0.35 is released:
+# * remove this special handling
+# * make pennylane>=0.35 a requirement
+# * Close this ticket https://github.com/PennyLaneAI/catalyst/issues/494
+one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
+if one_compiler_per_distribution:
+    entry_points = {
+        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+        "pennylane.compilers": [
+            "context = catalyst.utils.contexts:EvaluationContext",
+            "ops = catalyst:pennylane_extensions",
+            "qjit = catalyst:qjit",
+        ],
+    }
+else:
+    entry_points = {
+        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+        "pennylane.compilers": [
+            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
+            "catalyst.ops = catalyst:pennylane_extensions",
+            "catalyst.qjit = catalyst:qjit",
+        ],
+    }
 
 classifiers = [
     "Environment :: Console",
@@ -115,25 +139,11 @@ class CustomBuildExtMacos(build_ext):
         )
 
 
-package_name = "scipy"
-
-scipy_package = importlib.util.find_spec(package_name)
-package_directory = path.dirname(scipy_package.origin)
-
 # Compile the library of custom calls in the frontend
 if system_platform == "Linux":
-    file_path_within_package_linux = "../scipy.libs/"
-    scipy_lib_path = path.join(package_directory, file_path_within_package_linux)
-    file_prefix = "libopenblasp"
-    file_extension = ".so"
-    search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-    openblas_so_file = glob.glob(search_pattern)[0]
-    openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
-        libraries=[openblas_lib_name],
-        library_dirs=[scipy_lib_path],
     )
     cmdclass = {"build_ext": CustomBuildExtLinux}
 
@@ -141,19 +151,9 @@ elif system_platform == "Darwin":
     variables = sysconfig.get_config_vars()
     # Here we need to switch the deault to MacOs dynamic lib
     variables["LDSHARED"] = variables["LDSHARED"].replace("-bundle", "-dynamiclib")
-
-    file_path_within_package_macos = ".dylibs/"
-    scipy_lib_path = path.join(package_directory, file_path_within_package_macos)
-    file_prefix = "libopenblas"
-    file_extension = ".dylib"
-    search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-    openblas_dylib_file = glob.glob(search_pattern)[0]
-    openblas_lib_name = path.basename(openblas_dylib_file)[3 : -len(file_extension)]
     custom_calls_extension = Extension(
         "catalyst.utils.libcustom_calls",
         sources=["frontend/catalyst/utils/libcustom_calls.cpp"],
-        libraries=[openblas_lib_name],
-        library_dirs=[scipy_lib_path],
     )
     cmdclass = {"build_ext": CustomBuildExtMacos}
 
@@ -180,13 +180,7 @@ setup(
     provides=["catalyst"],
     version=version,
     python_requires=">=3.9",
-    entry_points={
-        "pennylane.compilers": [
-            "context = catalyst.utils.contexts:EvaluationContext",
-            "ops = catalyst:pennylane_extensions",
-            "qjit = catalyst:qjit",
-        ]
-    },
+    entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
