@@ -23,6 +23,10 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 
+#define GEN_PASS_DECL_DETECTQNODEPASS
+#define GEN_PASS_DEF_DETECTQNODEPASS
+#include "Catalyst/Transforms/Passes.h.inc"
+
 using namespace mlir;
 
 namespace {

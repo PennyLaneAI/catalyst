@@ -96,10 +96,23 @@ def DetectQnodePass : Pass<"detect-qnode"> {
     let summary = "Detect qnodes";
 
     let dependentDialects = [
-        "LLVM::LLVMDialect",
+        "mlir::LLVM::LLVMDialect",
     ];
 
     let constructor = "catalyst::createDetectQnodePass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"stopAfterStep",
+            /*CLI arg name=*/"stop-after-step",
+            /*type=*/"int",
+            /*default=*/"0",
+            /*description=*/
+            "Useful for tests. This will stop the execution of the transformation after a "
+            "N step has been executed. Defaults to 0 which is equivalent to running "
+            "all steps to completion."
+        >
+    ];
 }
 
 #endif // CATALYST_PASSES
