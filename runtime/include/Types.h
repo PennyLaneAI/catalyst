@@ -132,6 +132,7 @@ struct PairT_MemRefT_double_int64_1d {
     struct MemRefT_int64_1d second;
 };
 
+// Quantum operation modifiers
 struct Modifiers {
     bool adjoint;
     size_t num_controlled;

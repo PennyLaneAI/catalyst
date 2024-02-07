@@ -180,13 +180,13 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables", "[CacheManager]")
         QUBIT **ctrls = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __catalyst__qis__Hadamard(target, false);
+        __catalyst__qis__Hadamard(target, NO_MODIFIERS);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __catalyst__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
+        __catalyst__qis__ControlledPhaseShift(0.6, target, *ctrls, NO_MODIFIERS);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __catalyst__qis__IsingYY(0.2, target, *ctrls, false);
+        __catalyst__qis__IsingYY(0.2, target, *ctrls, NO_MODIFIERS);
         // qml.CRX(0.4, wires=[1,0])
-        __catalyst__qis__CRX(0.4, target, *ctrls, false);
+        __catalyst__qis__CRX(0.4, target, *ctrls, NO_MODIFIERS);
 
         size_t buffer_len = 4;
         CplxT_double *buffer = new CplxT_double[buffer_len];
@@ -233,13 +233,13 @@ TEST_CASE("Test __catalyst__qis__ circuit with observables using deactiveCacheMa
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
         // qml.Hadamard(wires=0)
-        __catalyst__qis__Hadamard(target, false);
+        __catalyst__qis__Hadamard(target, NO_MODIFIERS);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __catalyst__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
+        __catalyst__qis__ControlledPhaseShift(0.6, target, *ctrls, NO_MODIFIERS);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __catalyst__qis__IsingYY(0.2, target, *ctrls, false);
+        __catalyst__qis__IsingYY(0.2, target, *ctrls, NO_MODIFIERS);
         // qml.CRX(0.4, wires=[1,0])
-        __catalyst__qis__CRX(0.4, target, *ctrls, false);
+        __catalyst__qis__CRX(0.4, target, *ctrls, NO_MODIFIERS);
 
         size_t buffer_len = 4;
         CplxT_double *buffer = new CplxT_double[buffer_len];

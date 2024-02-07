@@ -84,21 +84,7 @@ class CacheManager {
     void addOperation(const std::string &name, const std::vector<double> &params,
                       const std::vector<size_t> &dev_wires, bool inverse)
     {
-        this->ops_names_.push_back(name);
-        this->ops_params_.push_back(params);
-
-        std::vector<size_t> wires_ul;
-        wires_ul.reserve(dev_wires.size());
-        std::transform(dev_wires.begin(), dev_wires.end(), std::back_inserter(wires_ul),
-                       [](auto w) { return static_cast<size_t>(w); });
-
-        this->ops_wires_.push_back(wires_ul);
-        this->ops_inverses_.push_back(inverse);
-
-        this->num_params_ += params.size();
-
-        this->ops_controlled_wires_.push_back({});
-        this->ops_controlled_values_.push_back({});
+        addOperation(name, params, dev_wires, inverse, {}, {});
     }
 
     /**
@@ -109,10 +95,10 @@ class CacheManager {
      * @param wires Wires the gate acts on
      * @param inverse If true, inverse of the gate is applied
      */
-    void addOperation2(const std::string &name, const std::vector<double> &params,
-                       const std::vector<size_t> &dev_wires, bool inverse,
-                       const std::vector<size_t> &dev_controlled_wires,
-                       const std::vector<bool> &controlled_values)
+    void addOperation(const std::string &name, const std::vector<double> &params,
+                      const std::vector<size_t> &dev_wires, bool inverse,
+                      const std::vector<size_t> &dev_controlled_wires,
+                      const std::vector<bool> &controlled_values)
     {
         this->ops_names_.push_back(name);
         this->ops_params_.push_back(params);

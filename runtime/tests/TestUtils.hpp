@@ -62,3 +62,20 @@ inline auto get_dylib_ext() -> std::string
     return ".dylib";
 #endif
 }
+
+
+#define NO_MODIFIERS ((const Modifiers*)NULL)
+
+static Modifiers adjoint_modifier = { true, 0, nullptr, nullptr };
+#define ADJOINT_MODIFIER (&adjoint_modifier)
+
+static inline MemRefT_CplxT_double_1d getState(size_t buffer_len)
+{
+    CplxT_double *buffer = new CplxT_double[buffer_len];
+    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    return result;
+}
+
+static inline void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
+
+

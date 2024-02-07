@@ -48,8 +48,6 @@
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
     void NamedOperation(const std::string &name, const std::vector<double> &params,                \
-                        const std::vector<QubitIdType> &wires, bool inverse) override;             \
-    void NamedOperation2(const std::string &name, const std::vector<double> &params,                \
                         const std::vector<QubitIdType> &wires, bool inverse,                       \
                         const std::vector<QubitIdType> &controlled_wires,                          \
                         const std::vector<bool> &controlled_values) override;                      \
