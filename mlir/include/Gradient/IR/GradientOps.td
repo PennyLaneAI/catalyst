@@ -135,7 +135,7 @@ def JVPOp : Gradient_Op<"jvp", [
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
-        Variadic<AnyType>:$tangents,
+        Variadic<RankedTensorOf<[AnyFloat]>>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );
@@ -166,7 +166,7 @@ def VJPOp : Gradient_Op<"vjp", [
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
-        Variadic<AnyType>:$cotangents,
+        Variadic<RankedTensorOf<[AnyFloat]>>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );
