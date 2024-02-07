@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --detect-qnode=stop-after-step=1 --verify-diagnostics --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --add-exception-handling=stop-after-step=1 --verify-diagnostics --split-input-file %s | FileCheck %s
 
 // Check to make sure that callers to qnodes
 // are left alone if they are not annotated with "presplitcoroutine".

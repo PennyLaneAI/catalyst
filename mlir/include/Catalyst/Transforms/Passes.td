@@ -92,7 +92,7 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
     let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
 
-def AddExceptionHandlingPass : Pass<"detect-qnode"> {
+def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
     let summary = "Detect qnodes";
 
     let dependentDialects = [
