@@ -16,7 +16,7 @@
 
 import pytest
 
-from catalyst.jax_primitives import *
+from catalyst.jax_primitives import AbstractQbit, qinst_p
 
 
 class TestQinstPrim:
