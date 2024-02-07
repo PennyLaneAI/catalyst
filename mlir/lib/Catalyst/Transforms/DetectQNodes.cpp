@@ -1245,10 +1245,18 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
             signalPassFailure();
         }
 
+        if (stopAfterStep == 1) {
+            return;
+        }
+
         RewritePatternSet patterns2(context);
         patterns2.add<DetectQnodeTransform>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2)))) {
             signalPassFailure();
+        }
+
+        if (stopAfterStep == 2) {
+            return;
         }
 
         RewritePatternSet patterns3(context);
@@ -1257,10 +1265,18 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
             signalPassFailure();
         }
 
+        if (stopAfterStep == 3) {
+            return;
+        }
+
         RewritePatternSet patterns4(context);
         patterns4.add<LivenessAnalysisDropRef>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns4)))) {
             signalPassFailure();
+        }
+
+        if (stopAfterStep == 4) {
+            return;
         }
 
         RewritePatternSet patterns5(context);
