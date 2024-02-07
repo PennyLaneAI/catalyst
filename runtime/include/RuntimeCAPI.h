@@ -78,6 +78,10 @@ void __catalyst__qis__MultiRZ(double, bool /*adjoint*/, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, bool /*adjoint*/);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, bool /*adjoint*/);
 
+// One single isntruction to represent all named quantum gates.
+void __catalyst__qis__NamedGate(const char *name, double *params, int64_t num_params, QUBIT **wires,
+                                int64_t num_wires, bool adjoint);
+
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
 void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *, bool /*adjoint*/, int64_t,

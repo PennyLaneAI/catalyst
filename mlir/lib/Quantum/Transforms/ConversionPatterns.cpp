@@ -265,18 +265,41 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
+        std::string qirName = "__catalyst__qis__NamedGate";
+        // double *params
+        // int64_t num_params
+        // QUBIT **wires
+        // int64_t num_wires
+        // bool adjoint
+
+        // Types
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        Type charPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
+        Type doublePtrType = LLVM::LLVMPointerType::get(Float64Type::get(ctx));
+        Type qubitPtrPtrType =
+            LLVM::LLVMPointerType::get(LLVM::LLVMPointerType::get(QubitType::get(ctx)));
+        Type int64Type = IntegerType::get(ctx, 64);
+        Type boolType = IntegerType::get(ctx, 1);
+
         SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
                                    adaptor.getOperands().getTypes().end());
         argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
 
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
 
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            voidType, charPtrType, doublePtrType, int64Type, qubitPtrPtrType, int64Type, boolType);
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
                                     loc, rewriter.getBoolAttr(op.getAdjointFlag())));
+
+        // Call NamedGate
+        SmallVector<Value> args{
+            nameVal, paramsVal, numParamsVal, wiresVal, numWiresVal, adjointVal,
+        };
+
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         rewriter.replaceOp(op, adaptor.getInQubits());
 

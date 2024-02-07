@@ -347,6 +347,29 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     Catalyst::Runtime::getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
+void __catalyst__qis__NamedGate(const char *name, double *params, int64_t num_params, QUBIT **wires,
+                                int64_t num_wires, bool adjoint)
+{
+    RT_FAIL_IF(!name, "Invalid pointer to the gate name");
+    RT_FAIL_IF(!wires, "Invalid pointer to the list of wires");
+
+    // convert name to name_str
+    std::string name_str{name};
+
+    // convert params to params_vec
+    std::vector<double> params_vec(params, (params + num_params));
+
+    // convert wires to wires_vec
+    std::vector<QubitIdType> wires_vec;
+    wires_vec.reserve(num_wires);
+    for (size_t i = 0; i < num_wires; i++) {
+        wires_vec.push_back(reinterpret_cast<QubitIdType>(*wires++));
+    }
+
+    Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(name_str, params_vec, wires_vec,
+                                                             adjoint);
+}
+
 void __catalyst__qis__Identity(QUBIT *qubit, bool adjoint)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("Identity", {},

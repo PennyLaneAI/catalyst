@@ -243,8 +243,9 @@ TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
         QUBIT *target =
             *reinterpret_cast<QUBIT **>(__catalyst__rt__array_get_element_ptr_1d(reg, 2));
 
-        __catalyst__qis__RY(angle, target, false);
-        __catalyst__qis__RX(angle, target, false);
+        double params[]{angle};
+        __catalyst__qis__NamedGate("RY", params, 1, &target, 1, false);
+        __catalyst__qis__NamedGate("RX", params, 1, &target, 1, false);
 
         // The `ctrls` is a dangling pointer from now on.
         __catalyst__rt__qubit_release_array(reg);
@@ -316,7 +317,7 @@ TEST_CASE("Test __catalyst__qis__Identity", "[CoreQIS]")
 
         QUBIT *wire1 = __catalyst__rt__qubit_allocate();
 
-        __catalyst__qis__Identity(wire0, false);
+        __catalyst__qis__NamedGate("Identity", nullptr, 0, &wire0, 1, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __catalyst__qis__State(&result, 0);
@@ -375,8 +376,9 @@ TEST_CASE("Test __catalyst__qis__ PauliY and Rot", "[CoreQIS]")
         QUBIT *wire0 = __catalyst__rt__qubit_allocate();
         QUBIT *wire1 = __catalyst__rt__qubit_allocate();
 
-        __catalyst__qis__PauliY(wire0, false);
-        __catalyst__qis__Rot(0.4, 0.6, -0.2, wire0, false);
+        double params[]{0.4, 0.6, -0.2};
+        __catalyst__qis__NamedGate("PauliY", nullptr, 0, &wire0, 1, false);
+        __catalyst__qis__NamedGate("Rot", params, 3, &wire0, 1, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __catalyst__qis__State(&result, 0);
@@ -1396,7 +1398,10 @@ TEST_CASE("Test __catalyst__qis__MultiRZ", "[CoreQIS]")
         __catalyst__qis__RX(M_PI, *q0, false);
         __catalyst__qis__Hadamard(*q0, false);
         __catalyst__qis__Hadamard(*q1, false);
-        __catalyst__qis__MultiRZ(M_PI, false, 2, *q0, *q1);
+        // __catalyst__qis__MultiRZ(M_PI, false, 2, *q0, *q1);
+        double params_mrz[]{M_PI};
+        QUBIT *wires_mrz[]{*q0, *q1};
+        __catalyst__qis__NamedGate("MultiRZ", params_mrz, 1, wires_mrz, 2, false);
         __catalyst__qis__Hadamard(*q0, false);
         __catalyst__qis__Hadamard(*q1, false);
 
