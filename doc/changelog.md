@@ -174,6 +174,9 @@
   user facing.
   [(#496)](https://github.com/PennyLaneAI/catalyst/pull/496)
 
+* Fix the scatter operation lowering when `updatedWindowsDim` is empty.
+  [(#475)](https://github.com/PennyLaneAI/catalyst/pull/475)
+
 * Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
   qubit re-allocation.
   [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
@@ -215,6 +218,7 @@ Ali Asadi,
 David Ittah,
 Tzung-Han Juang,
 Erick Ochoa Lopez,
+Romain Moyard,
 Haochen Paul Wang.
 
 # Release 0.4.1
