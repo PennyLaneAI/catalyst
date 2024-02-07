@@ -99,6 +99,8 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *, int64_t, /*qubits*/...);
 void __quantum__qis__Gradient(int64_t, /*results*/...);
 void __quantum__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...);
 
+void __catalyst__host__rt__unrecoverable_error();
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

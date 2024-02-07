@@ -1932,3 +1932,19 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         __quantum__rt__finalize();
     }
 }
+
+TEST_CASE("Test that an exception is raised unconditionally", "[CoreQIS]")
+{
+    auto devices = getDevices();
+    auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
+
+    __quantum__rt__initialize();
+    __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                               (int8_t *)rtd_kwargs.c_str());
+
+    REQUIRE_THROWS_WITH(
+        __catalyst__host__rt__unrecoverable_error(),
+        Catch::Contains("Unrecoverable error."));
+
+    __quantum__rt__finalize();
+}
