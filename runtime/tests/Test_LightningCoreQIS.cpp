@@ -1890,14 +1890,15 @@ TEST_CASE("Test that an exception is raised unconditionally", "[CoreQIS]")
     auto devices = getDevices();
     auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
 
-    __quantum__rt__initialize();
-    __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                               (int8_t *)rtd_kwargs.c_str());
+    __catalyst__rt__initialize();
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str());
 
     REQUIRE_THROWS_WITH(__catalyst__host__rt__unrecoverable_error(),
                         Catch::Contains("Unrecoverable error."));
 
-    __quantum__rt__finalize();
+    __catalyst__rt__device_release();
+    __catalyst__rt__finalize();
 }
 
 TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[CoreQIS]")
@@ -1905,17 +1906,18 @@ TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[
     auto devices = getDevices();
     auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
 
-    __quantum__rt__initialize();
-    __quantum__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
-                               (int8_t *)rtd_kwargs.c_str());
+    __catalyst__rt__initialize();
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str());
 
-    QirArray *qs = __quantum__rt__qubit_allocate_array(1);
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
 
-    QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+    QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
 
-    REQUIRE_THROWS_WITH(__quantum__qis__CNOT(*target, *target, false),
+    REQUIRE_THROWS_WITH(__catalyst__qis__CNOT(*target, *target, false),
                         Catch::Contains("Invalid input for CNOT gate."));
 
-    __quantum__rt__qubit_release_array(qs);
-    __quantum__rt__finalize();
+    __catalyst__rt__qubit_release_array(qs);
+    __catalyst__rt__device_release();
+    __catalyst__rt__finalize();
 }
