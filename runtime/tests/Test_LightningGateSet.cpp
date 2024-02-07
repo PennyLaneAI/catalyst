@@ -829,12 +829,53 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSi
 }
 
 
+/* The equivalent PL program
+
+``` python
+@qml.qnode(qml.device("lightning.qubit", wires=3))
+def circuit():
+  qml.Hadamard(wires=0)
+  qml.Hadamard(wires=1)
+  qml.Hadamard(wires=2)
+  qml.ctrl(qml.PauliX, control=(1,2), control_values=(False, False))(wires=0)
+  qml.ctrl(qml.PauliY, control=(0,1), control_values=(False, False))(wires=2)
+  qml.ctrl(qml.PauliZ, control=(2,0), control_values=(False, False))(wires=1)
+  return qml.state()
+
+ans = circuit()
+for i,x in enumerate((ans)):
+  print(f"CHECK(buffer[{i}].real == Approx({x.real:0.6f}).epsilon(1e-5));")
+  print(f"CHECK(buffer[{i}].imag == Approx({x.imag:0.6f}).epsilon(1e-5));")
+```
+
+``` result
+CHECK(buffer[0].real == Approx(0.000000).epsilon(1e-5));
+CHECK(buffer[0].imag == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[1].imag == Approx(-0.000000).epsilon(1e-5));
+CHECK(buffer[2].real == Approx(0.000000).epsilon(1e-5));
+CHECK(buffer[2].imag == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
+CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
+CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[5].imag == Approx(-0.000000).epsilon(1e-5));
+CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
+CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
+CHECK(buffer[7].imag == Approx(-0.000000).epsilon(1e-5));
+```
+
+*/
 TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
 {
     const size_t N = 3;
     __catalyst__rt__initialize();
 
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+
+        std::cerr << "DEVICE " << rtd_name << "\n";
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
@@ -843,20 +884,145 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
             Q.push_back(__catalyst__rt__qubit_allocate());
         }
 
-        QUBIT* ctrls[] = {Q[1], Q[2]};
-        bool values[] = {true, false};
-        Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
-        __catalyst__qis__PauliX2(Q[0], &mod);
-
-        CplxT_double buffer[1<<N];
-        MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {1<<N}, {1}};
-        __catalyst__qis__State(&result, 0);
-
-        // FIXME: Check the results
-
-        for(auto q: Q) {
-            __catalyst__rt__qubit_release(q);
+        /* qml.Hadamard(wires=0) */
+        /* qml.Hadamard(wires=1) */
+        /* qml.Hadamard(wires=2) */
+        for (size_t i = 0; i < N; i++) {
+            __catalyst__qis__Hadamard(Q[i], NO_MODIFIERS);
         }
+
+        {
+            MemRefT_CplxT_double_1d state = getState(1<<N);
+            __catalyst__qis__State(&state, 0);
+            CplxT_double *buffer = state.data_allocated;
+
+            CHECK(buffer[0].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[0].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[1].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[2].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[2].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[5].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[7].imag == Approx(0.000000).epsilon(1e-5));
+
+            freeState(state);
+        }
+
+        /* qml.ctrl(qml.PauliX, control=(1,2), control_values=(False, False))(wires=0) */
+        {
+            QUBIT* ctrls[] = {Q[1], Q[2]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            __catalyst__qis__PauliX(Q[0], &mod);
+        }
+
+        {
+            MemRefT_CplxT_double_1d state = getState(1<<N);
+            __catalyst__qis__State(&state, 0);
+            CplxT_double *buffer = state.data_allocated;
+
+            CHECK(buffer[0].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[0].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[1].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[2].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[2].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[5].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[7].imag == Approx(0.000000).epsilon(1e-5));
+
+            freeState(state);
+        }
+
+        /* qml.ctrl(qml.PauliY, control=(0,1), control_values=(False, False))(wires=2) */
+        {
+            QUBIT* ctrls[] = {Q[0], Q[1]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            __catalyst__qis__PauliY(Q[2], &mod);
+        }
+
+        {
+            MemRefT_CplxT_double_1d state = getState(1<<N);
+            __catalyst__qis__State(&state, 0);
+            CplxT_double *buffer = state.data_allocated;
+
+            CHECK(buffer[0].real == Approx(-0.353553).epsilon(1e-5)); // FAILS!
+            CHECK(buffer[0].imag == Approx(-0.000000).epsilon(1e-5));
+            CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[1].imag == Approx(-0.000000).epsilon(1e-5));
+            CHECK(buffer[2].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[2].imag == Approx(-0.000000).epsilon(1e-5));
+            CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[5].imag == Approx(-0.000000).epsilon(1e-5));
+            CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[7].imag == Approx(-0.000000).epsilon(1e-5));
+
+            freeState(state);
+        }
+#if 0
+        /* qml.ctrl(qml.PauliZ, control=(2,0), control_values=(False, False))(wires=1) */
+        // Also fails
+        {
+            QUBIT* ctrls[] = {Q[2], Q[0]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            __catalyst__qis__PauliZ(Q[1], &mod);
+        }
+
+        {
+            MemRefT_CplxT_double_1d state = getState(1<<N);
+            __catalyst__qis__State(&state, 0);
+            CplxT_double *buffer = state.data_allocated;
+
+            CHECK(buffer[0].real == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[0].imag == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[1].imag == Approx(-0.000000).epsilon(1e-5));
+            CHECK(buffer[2].real == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[2].imag == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[5].imag == Approx(-0.000000).epsilon(1e-5));
+            CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[7].imag == Approx(-0.000000).epsilon(1e-5));
+
+            freeState(state);
+        }
+#endif
+
+        // FIXME: Learn how to release all wires simultaneously.
+        /* for (size_t i = 0; i < N; i++) { */
+        /*     std::cerr << "Q RELEASE:" << i << "\n"; */
+        /*     __catalyst__rt__qubit_release(Q[i]); */
+        /* } */
+        std::cerr << "DEV RELEASE" << "\n";
         __catalyst__rt__device_release();
     }
     __catalyst__rt__finalize();
