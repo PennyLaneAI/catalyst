@@ -23,9 +23,6 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 
-#define GEN_PASS_DECL_DETECTQNODEPASS
-#define GEN_PASS_DEF_DETECTQNODEPASS
-#include "Catalyst/Transforms/Passes.h.inc"
 
 using namespace mlir;
 
@@ -185,8 +182,8 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
     return success();
 }
 
-/* Next, we run DetectQnodeTransform */
-struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
+/* Next, we run AddExceptionHandlingTransform */
+struct AddExceptionHandlingTransform : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
     LogicalResult match(LLVM::CallOp op) const override;
@@ -197,7 +194,7 @@ struct DetectQnodeTransform : public OpRewritePattern<LLVM::CallOp> {
  * The reason behind this separation between the previous pattern and this one,
  * is that this pattern can potentially be reused as long as this single annotation is present.
  */
-LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
+LogicalResult AddExceptionHandlingTransform::match(LLVM::CallOp callOp) const
 {
     // The following is a valid match
     //     llvm.call @callee() { catalyst.preInvoke }
@@ -205,7 +202,7 @@ LogicalResult DetectQnodeTransform::match(LLVM::CallOp callOp) const
     return validCandidate ? success() : failure();
 }
 
-void DetectQnodeTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
     // Here, we are adding a reference to the personality declaration.
@@ -1229,11 +1226,12 @@ bool isAsync(LLVM::LLVMFuncOp funcOp)
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_DETECTQNODEPASS
+#define GEN_PASS_DEF_ADDEXCEPTIONHANDLINGPASS
+#define GEN_PASS_DECL_ADDEXCEPTIONHANDLINGPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
-    using DetectQnodePassBase::DetectQnodePassBase;
+struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptionHandlingPass> {
+    using AddExceptionHandlingPassBase::AddExceptionHandlingPassBase;
 
     void runOnOperation() final
     {
@@ -1250,7 +1248,7 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
         }
 
         RewritePatternSet patterns2(context);
-        patterns2.add<DetectQnodeTransform>(context);
+        patterns2.add<AddExceptionHandlingTransform>(context);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns2)))) {
             signalPassFailure();
         }
@@ -1287,6 +1285,6 @@ struct DetectQnodePass : impl::DetectQnodePassBase<DetectQnodePass> {
     }
 };
 
-std::unique_ptr<Pass> createDetectQnodePass() { return std::make_unique<DetectQnodePass>(); }
+std::unique_ptr<Pass> createAddExceptionHandlingPass() { return std::make_unique<AddExceptionHandlingPass>(); }
 
 } // namespace catalyst
