@@ -23,7 +23,6 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 
-
 using namespace mlir;
 
 namespace {
@@ -1285,6 +1284,9 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
     }
 };
 
-std::unique_ptr<Pass> createAddExceptionHandlingPass() { return std::make_unique<AddExceptionHandlingPass>(); }
+std::unique_ptr<Pass> createAddExceptionHandlingPass()
+{
+    return std::make_unique<AddExceptionHandlingPass>();
+}
 
 } // namespace catalyst
