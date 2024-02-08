@@ -1895,7 +1895,7 @@ TEST_CASE("Test that an exception is raised unconditionally", "[CoreQIS]")
                                 (int8_t *)rtd_kwargs.c_str());
 
     REQUIRE_THROWS_WITH(__catalyst__host__rt__unrecoverable_error(),
-                        Catch::Contains("Unrecoverable error."));
+                        Catch::Contains("Unrecoverable error"));
 
     __catalyst__rt__device_release();
     __catalyst__rt__finalize();

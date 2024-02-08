@@ -1208,9 +1208,9 @@ void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
 
 bool isAsync(LLVM::LLVMFuncOp funcOp)
 {
-   if (!funcOp->hasAttr(passthroughAttr)) {
-       return false;
-   }
+    if (!funcOp->hasAttr(passthroughAttr)) {
+        return false;
+    }
 
     auto haystack = funcOp->getAttrOfType<ArrayAttr>(passthroughAttr);
     auto needle = StringAttr::get(funcOp.getContext(), "presplitcoroutine");

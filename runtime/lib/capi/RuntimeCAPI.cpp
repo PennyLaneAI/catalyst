@@ -81,7 +81,10 @@ void deactivateDevice()
 
 extern "C" {
 
-void __catalyst__host__rt__unrecoverable_error() { RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs."); }
+void __catalyst__host__rt__unrecoverable_error()
+{
+    RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
+}
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
