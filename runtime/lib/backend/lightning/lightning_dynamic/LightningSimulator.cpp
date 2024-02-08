@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
 #include "LightningSimulator.hpp"
 
 #include "AdjointJacobianLQubit.hpp"
@@ -132,10 +131,6 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
     auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
-
-    std::cerr << "OP " << name << "\n";
-    for (auto w : dev_wires) { std::cerr << "WIRE " << w << "\n"; }
-    for (auto w : dev_controlled_wires) { std::cerr << "CWIRE " << w << "\n"; }
 
     // Update the state-vector
     if (controlled_wires.empty()) {
