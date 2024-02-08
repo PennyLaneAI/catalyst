@@ -153,42 +153,50 @@ func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
 // Quantum Gates //
 ///////////////////
 
-// CHECK-DAG: llvm.func @__catalyst__qis__Identity(!llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__catalyst__qis__SWAP(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__catalyst__qis__CRot(f64, f64, f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, i1)
-// CHECK-DAG: llvm.func @__catalyst__qis__Toffoli(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, i1)
+// CHECK-DAG: llvm.func @__catalyst__qis__Identity(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__SWAP(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__CRot(f64, f64, f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__Toffoli(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
 
 // CHECK-LABEL: @custom_gate
 func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: llvm.call @__catalyst__qis__Identity(%arg0, [[p]])
-    %q1 = quantum.custom "Identity"() %q0 : !quantum.bit
+    %q1 = quantum.custom "Identity"() %q0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[p]])
-    %q2 = quantum.custom "RX"(%p) %q1 : !quantum.bit
+    %q2 = quantum.custom "RX"(%p) %q1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: llvm.call @__catalyst__qis__SWAP(%arg0, %arg0, [[p]])
-    %q3:2 = quantum.custom "SWAP"() %q2, %q2 : !quantum.bit, !quantum.bit
+    %q3:2 = quantum.custom "SWAP"() %q2, %q2 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: llvm.call @__catalyst__qis__CRot(%arg1, %arg1, %arg1, %arg0, %arg0, [[p]])
-    %q4:2 = quantum.custom "CRot"(%p, %p, %p) %q3#0, %q3#1 : !quantum.bit, !quantum.bit
+    %q4:2 = quantum.custom "CRot"(%p, %p, %p) %q3#0, %q3#1 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: llvm.call @__catalyst__qis__Toffoli(%arg0, %arg0, %arg0, [[p]])
-    %q5:3 = quantum.custom "Toffoli"() %q4#0, %q4#1, %q4#1 : !quantum.bit, !quantum.bit, !quantum.bit
+    %q5:3 = quantum.custom "Toffoli"() %q4#0, %q4#1, %q4#1 { result_segment_sizes = array<i32: 3, 0> } : !quantum.bit, !quantum.bit, !quantum.bit
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(true) : i1
-    // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[p]])
-    %q6 = quantum.custom "RX"(%p)  %q5#0 { adjoint } : !quantum.bit
+    // FIXME!
+    // CHECK: [[o:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[a:%.+]] = llvm.alloca [[o]] x !llvm.struct
+    // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[a]])
+    %q6 = quantum.custom "RX"(%p) %q5#0 { adjoint, result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
-    // CHECK: [[p:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[p]])
-    %q7 = quantum.custom "RX"(%p)  %q6#0 : !quantum.bit
+    %q7 = quantum.custom "RX"(%p) %q6#0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
