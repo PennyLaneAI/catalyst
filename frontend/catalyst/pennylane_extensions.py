@@ -536,10 +536,12 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         and num_results != 1
     ):
         results = tuple(r[0] if len(r) == 1 else r for r in results)
+    print(out_tree)
     if out_tree.children() != []:
         results = tree_unflatten(out_tree, results)
     else:
         results = results[0]
+    print(len(results))
     return results
 
 
