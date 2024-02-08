@@ -521,6 +521,25 @@ def _check_grad_params(
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
     return GradParams(method, scalar_out, h, argnum)
 
+def _get_out_tree(fn, args, kwargs):
+    """Get the out tree of the function"""
+    wffa, _, keep_inputs, out_tree_promise = deduce_avals(fn, args, kwargs)
+    with QueuingManager.stop_recording():
+        in_classical_tracers = [t for t, k in zip(args, keep_inputs) if k]
+        r = wffa.call_wrapped(*in_classical_tracers)
+    return out_tree_promise()
+
+def _unflatten_derivatives(results, out_tree, argnum, num_results):
+    """Unflatten the flat list of derivatives results given the out tree."""
+    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    results = tuple(tuple(results[i*num_trainable_params:i*num_trainable_params+num_trainable_params]) for i in range(0, num_results))
+
+    # In jax argnums=[int] wraps single derivatives in a tuple
+    if isinstance(argnum, int) and num_trainable_params == 1:
+        results = tuple(r[0] if len(r)==1 else r for r in results)
+
+    results = tree_unflatten(out_tree, results)
+    return results
 
 class Grad:
     """An object that specifies that a function will be differentiated.
@@ -547,16 +566,19 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
+
         if EvaluationContext.is_tracing():
+            out_tree = _get_out_tree(self.fn, args, kwargs)
+
             fn = _ensure_differentiable(self.fn)
             grad_params = _check_grad_params(*self.grad_params)
-
             jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
             args_data, _ = tree_flatten(args)
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = _unflatten_derivatives(results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals))
         else:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
