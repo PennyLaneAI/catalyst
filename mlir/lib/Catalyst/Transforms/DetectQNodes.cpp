@@ -630,6 +630,7 @@ struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
     LogicalResult matchAndRewrite(LLVM::BrOp op, PatternRewriter &rewriter) const override;
 };
 
+// TODO:
 // This is not over yet though.
 // Because we can have the following situation.
 // Imagine the following call graph.
@@ -649,6 +650,9 @@ struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
 // Due to the invariants we have placed, we must await on D before returning to A.
 // So, if there was an error in D, we actually never returned to A
 // and we never deallocated the memory for return values from C.
+// What we need to do is propagate this analysis up. (Or at least parts of it).
+// We can now say that A calls a function B and B may raise an exception.
+// So A must catch it and decide how to deallocate resources from A, B, and C.
 
 LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
                                                       PatternRewriter &rewriter) const
