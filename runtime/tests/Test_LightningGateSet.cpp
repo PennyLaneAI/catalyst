@@ -924,16 +924,31 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
             __catalyst__qis__PauliX(Q[0], &mod);
         }
 
+        /* qml.ctrl(qml.PauliY, control=(0,1), control_values=(False, False))(wires=2) */
+        {
+            QUBIT* ctrls[] = {Q[0], Q[1]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            __catalyst__qis__PauliY(Q[2], &mod);
+        }
+
+        /* qml.ctrl(qml.PauliZ, control=(2,0), control_values=(False, False))(wires=1) */
+        {
+            QUBIT* ctrls[] = {Q[2], Q[0]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            __catalyst__qis__PauliZ(Q[1], &mod);
+        }
         {
             MemRefT_CplxT_double_1d state = getState(1<<N);
             __catalyst__qis__State(&state, 0);
             CplxT_double *buffer = state.data_allocated;
 
-            CHECK(buffer[0].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[0].imag == Approx(0.000000).epsilon(1e-5));
-            CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[1].imag == Approx(0.000000).epsilon(1e-5));
-            CHECK(buffer[2].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[0].real == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[0].imag == Approx(-0.353553).epsilon(1e-5));
+            CHECK(buffer[1].real == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[1].imag == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[2].real == Approx(-0.353553).epsilon(1e-5));
             CHECK(buffer[2].imag == Approx(0.000000).epsilon(1e-5));
             CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
             CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
@@ -949,48 +964,7 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
             freeState(state);
         }
 
-        /* qml.ctrl(qml.PauliY, control=(0,1), control_values=(False, False))(wires=2) */
-        {
-            QUBIT* ctrls[] = {Q[0], Q[1]};
-            bool values[] = {false, false};
-            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
-            __catalyst__qis__PauliY(Q[2], &mod);
-        }
-
-        {
-            MemRefT_CplxT_double_1d state = getState(1<<N);
-            __catalyst__qis__State(&state, 0);
-            CplxT_double *buffer = state.data_allocated;
-
-            CHECK(buffer[0].real == Approx(-0.353553).epsilon(1e-5)); // FAILS!
-            CHECK(buffer[0].imag == Approx(-0.000000).epsilon(1e-5));
-            CHECK(buffer[1].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[1].imag == Approx(-0.000000).epsilon(1e-5));
-            CHECK(buffer[2].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[2].imag == Approx(-0.000000).epsilon(1e-5));
-            CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
-            CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
-            CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[5].imag == Approx(-0.000000).epsilon(1e-5));
-            CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
-            CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
-            CHECK(buffer[7].imag == Approx(-0.000000).epsilon(1e-5));
-
-            freeState(state);
-        }
 #if 0
-        /* qml.ctrl(qml.PauliZ, control=(2,0), control_values=(False, False))(wires=1) */
-        // Also fails
-        {
-            QUBIT* ctrls[] = {Q[2], Q[0]};
-            bool values[] = {false, false};
-            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
-            __catalyst__qis__PauliZ(Q[1], &mod);
-        }
-
         {
             MemRefT_CplxT_double_1d state = getState(1<<N);
             __catalyst__qis__State(&state, 0);
