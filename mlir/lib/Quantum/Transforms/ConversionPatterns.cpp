@@ -357,14 +357,16 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
             );
 
             std::string qirName = "__catalyst__qis__" + op.getGateName().str();
-            SmallVector<Type> argTypes({qubitType, structPtr.getType()});
+            SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
+                                       adaptor.getOperands().getTypes().end());
+            argTypes.insert(argTypes.end(), structPtr.getType());
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
             LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
             SmallVector<Value> args;
+            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
             args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
             args.insert(args.end(), structPtr);
-            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
 
             rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
             SmallVector<Value> values;
