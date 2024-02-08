@@ -367,7 +367,7 @@ class TestIntegration:
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
-        assert fn(3) == [2.0, 6.0]
+        assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
     def test_vjp_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
