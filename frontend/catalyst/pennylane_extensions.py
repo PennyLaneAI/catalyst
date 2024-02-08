@@ -1101,10 +1101,10 @@ class MidCircuitMeasure(HybridOp):
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
 
-        # Check if the postselect value was given, otherwise default to -1
-        postselect_attr = op.in_classical_tracers[1] if len(op.in_classical_tracers) == 2 else -1
+        # Check if the postselect value was given, otherwise default to None
+        postselect = op.in_classical_tracers[1] if len(op.in_classical_tracers) > 1 else None
 
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect_attr)
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
