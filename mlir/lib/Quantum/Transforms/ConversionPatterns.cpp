@@ -66,9 +66,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
         rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
 }
 
-/* TypedValue<LLVM::LLVMPointerType> */
-Value
-getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv,
+Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv,
                 bool adjoint,
                 ValueRange controlledQubits,
                 ValueRange controlledValues)
@@ -344,55 +342,32 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
-        /* if ( op.getGateName().str() == "PauliX" ) { */
-        if ( true ) {
+        TypeConverter *conv = getTypeConverter();
+        auto qubitType = conv->convertType(QubitType::get(ctx));
 
-            TypeConverter *conv = getTypeConverter();
-            auto qubitType = conv->convertType(QubitType::get(ctx));
+        auto structPtr = getModifiersPtr(loc, rewriter, conv,
+            op.getAdjointFlag(),
+            adaptor.getInCtrlQubits(),
+            adaptor.getInCtrlValues()
+        );
 
-            auto structPtr = getModifiersPtr(loc, rewriter, conv,
-                op.getAdjointFlag(),
-                adaptor.getInCtrlQubits(),
-                adaptor.getInCtrlValues()
-            );
+        std::string qirName = "__catalyst__qis__" + op.getGateName().str();
+        SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
+                                   adaptor.getOperands().getTypes().end());
+        argTypes.insert(argTypes.end(), structPtr.getType());
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-            std::string qirName = "__catalyst__qis__" + op.getGateName().str();
-            SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
-                                       adaptor.getOperands().getTypes().end());
-            argTypes.insert(argTypes.end(), structPtr.getType());
-            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
-            LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        SmallVector<Value> args;
+        args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        args.insert(args.end(), structPtr);
 
-            SmallVector<Value> args;
-            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
-            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-            args.insert(args.end(), structPtr);
-
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-            SmallVector<Value> values;
-            values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-            values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
-            rewriter.replaceOp(op, values);
-        }
-        else {
-            assert(op.getCtrlQubitOperands().size() == 0 &&
-                   "lowering controlled operation is not implemented");
-
-            SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
-                                       adaptor.getOperands().getTypes().end());
-            argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
-
-            std::string qirName = "__catalyst__qis__" + op.getGateName().str();
-            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
-
-            LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
-            SmallVector<Value> args = adaptor.getOperands();
-            args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
-                                        loc, rewriter.getBoolAttr(op.getAdjointFlag())));
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-            rewriter.replaceOp(op, adaptor.getInQubits());
-        }
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op, values);
 
         return success();
     }
