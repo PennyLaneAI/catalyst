@@ -522,7 +522,7 @@ TEST_CASE("Test __catalyst__qis__Measure", "[CoreQIS]")
 
         __catalyst__qis__PauliX(wire0, false);
 
-        Result m = __catalyst__qis__Measure(wire0);
+        Result m = __catalyst__qis__Measure(wire0, -1);
 
         Result one = __catalyst__rt__result_get_one();
         CHECK(*m == *one);
@@ -1347,7 +1347,7 @@ TEST_CASE("Test __catalyst__qis__Measure with false", "[CoreQIS]")
         // qml.Hadamard(wires=0)
         __catalyst__qis__RY(0.0, target, false);
 
-        Result mres = __catalyst__qis__Measure(target);
+        Result mres = __catalyst__qis__Measure(target, -1);
 
         Result zero = __catalyst__rt__result_get_zero();
         CHECK(__catalyst__rt__result_equal(mres, zero));
@@ -1370,7 +1370,7 @@ TEST_CASE("Test __catalyst__qis__Measure with true", "[CoreQIS]")
         // qml.Hadamard(wires=0)
         __catalyst__qis__RY(3.14, target, false);
 
-        Result mres = __catalyst__qis__Measure(target);
+        Result mres = __catalyst__qis__Measure(target, -1);
 
         Result one = __catalyst__rt__result_get_one();
         CHECK(__catalyst__rt__result_equal(mres, one));
@@ -1400,8 +1400,8 @@ TEST_CASE("Test __catalyst__qis__MultiRZ", "[CoreQIS]")
         __catalyst__qis__Hadamard(*q0, false);
         __catalyst__qis__Hadamard(*q1, false);
 
-        Result q0_m = __catalyst__qis__Measure(*q0);
-        Result q1_m = __catalyst__qis__Measure(*q1);
+        Result q0_m = __catalyst__qis__Measure(*q0, -1);
+        Result q1_m = __catalyst__qis__Measure(*q1, -1);
 
         Result zero = __catalyst__rt__result_get_zero();
         Result one = __catalyst__rt__result_get_one();
@@ -1431,8 +1431,8 @@ TEST_CASE("Test __catalyst__qis__CSWAP ", "[CoreQIS]")
         __catalyst__qis__RX(M_PI, *q1, false);
         __catalyst__qis__CSWAP(*q0, *q1, *q2, false);
 
-        Result q1_m = __catalyst__qis__Measure(*q1);
-        Result q2_m = __catalyst__qis__Measure(*q2);
+        Result q1_m = __catalyst__qis__Measure(*q1, -1);
+        Result q2_m = __catalyst__qis__Measure(*q2, -1);
 
         Result zero = __catalyst__rt__result_get_zero();
         Result one = __catalyst__rt__result_get_one();

@@ -75,6 +75,25 @@
   the current state-vector before qubit re-allocations.
   [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
 
+* Add support for post-selection in mid-circuit measurements. This is currently supported only on Lightning simulators.
+  [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
+
+  This is an example of post-selection usage:
+
+  ```py
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def f():
+      qml.Hadamard(0)
+      m = measure(0, postselect=1)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Breaking changes</h3>
 
 * The entry point name convention has changed.
@@ -219,6 +238,7 @@ David Ittah,
 Tzung-Han Juang,
 Erick Ochoa Lopez,
 Romain Moyard,
+Raul Torres,
 Haochen Paul Wang.
 
 # Release 0.4.1
