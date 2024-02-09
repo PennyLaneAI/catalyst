@@ -44,7 +44,7 @@ static constexpr llvm::StringRef mlirAsyncRuntimeDropRefName = "mlirAsyncRuntime
 
 }; // namespace AsyncUtilsConstants
 
-namespace AsyncUtilsAttributeFns {
+namespace AsyncUtils {
 
 // Helper function for attributes
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp);
@@ -64,10 +64,6 @@ void cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter);
 void cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter);
 void cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter);
 void annotateBrToUnreachable(LLVM::BrOp op, PatternRewriter &rewriter);
-
-}; // namespace AsyncUtilsAttributeFns
-
-namespace AsyncUtils {
 
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
@@ -103,32 +99,28 @@ LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp);
 
 }; // namespace AsyncUtils
 
-bool AsyncUtilsAttributeFns::hasChangeToUnreachableAttr(mlir::Operation *op)
+bool AsyncUtils::hasChangeToUnreachableAttr(mlir::Operation *op)
 {
     return op->hasAttr(AsyncUtilsConstants::changeToUnreachable);
 }
 
-bool AsyncUtilsAttributeFns::isSink(mlir::Operation *op)
-{
-    return op->hasAttr(AsyncUtilsConstants::sinkAttr);
-}
+bool AsyncUtils::isSink(mlir::Operation *op) { return op->hasAttr(AsyncUtilsConstants::sinkAttr); }
 
-void AsyncUtilsAttributeFns::cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
+void AsyncUtils::cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(op, [&] { op->removeAttr(AsyncUtilsConstants::sinkAttr); });
 }
 
-void AsyncUtilsAttributeFns::cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter)
+void AsyncUtils::cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(source,
                                [&] { source->removeAttr(AsyncUtilsConstants::sourceOfRefCounts); });
 }
 
-void AsyncUtilsAttributeFns::cleanupSource(SmallVector<LLVM::CallOp> &sources,
-                                           PatternRewriter &rewriter)
+void AsyncUtils::cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter)
 {
     for (auto source : sources) {
-        AsyncUtilsAttributeFns::cleanupSource(source, rewriter);
+        AsyncUtils::cleanupSource(source, rewriter);
     }
 }
 
@@ -139,39 +131,38 @@ bool AsyncUtils::hasAbortInBlock(Block *block)
     return returnVal;
 }
 
-void AsyncUtilsAttributeFns::annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter)
+void AsyncUtils::annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(callOp, [&] {
         callOp->setAttr(AsyncUtilsConstants::sourceOfRefCounts, rewriter.getUnitAttr());
     });
 }
 
-void AsyncUtilsAttributeFns::annotateBrToUnreachable(LLVM::BrOp brOp, PatternRewriter &rewriter)
+void AsyncUtils::annotateBrToUnreachable(LLVM::BrOp brOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(brOp, [&] {
         brOp->setAttr(AsyncUtilsConstants::changeToUnreachable, rewriter.getUnitAttr());
     });
 }
 
-void AsyncUtilsAttributeFns::annotateCallsForSink(SmallVector<LLVM::CallOp> &calls,
-                                                  PatternRewriter &rewriter)
+void AsyncUtils::annotateCallsForSink(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter)
 {
     for (auto call : calls) {
-        AsyncUtilsAttributeFns::scheduleLivenessAnalysis(call, rewriter);
+        AsyncUtils::scheduleLivenessAnalysis(call, rewriter);
     }
 }
 
-bool AsyncUtilsAttributeFns::hasQnodeAttribute(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::hasQnodeAttribute(LLVM::LLVMFuncOp funcOp)
 {
     return funcOp->hasAttr(AsyncUtilsConstants::qnodeAttr);
 }
 
-bool AsyncUtilsAttributeFns::hasPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::hasPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp)
 {
     return funcOp->hasAttr(AsyncUtilsConstants::preHandleErrorAttrValue);
 }
 
-bool AsyncUtilsAttributeFns::isScheduledForTransformation(LLVM::CallOp callOp)
+bool AsyncUtils::isScheduledForTransformation(LLVM::CallOp callOp)
 {
     return callOp->hasAttr(AsyncUtilsConstants::scheduleInvokeAttr);
 }
@@ -295,7 +286,7 @@ bool AsyncUtils::isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
                                        AsyncUtilsConstants::mlirAsyncRuntimeIsValueErrorName);
 }
 
-bool AsyncUtilsAttributeFns::callsSource(LLVM::CallOp callOp)
+bool AsyncUtils::callsSource(LLVM::CallOp callOp)
 {
     return callOp->hasAttr(AsyncUtilsConstants::sourceOfRefCounts);
 }
@@ -391,36 +382,34 @@ bool AsyncUtils::callsAbort(Operation *possibleCall)
     return callsAbort(callOp);
 }
 
-void AsyncUtilsAttributeFns::cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp,
-                                                       PatternRewriter &rewriter)
+void AsyncUtils::cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(
         funcOp, [&] { funcOp->removeAttr(AsyncUtilsConstants::preHandleErrorAttrValue); });
 }
 
-void AsyncUtilsAttributeFns::scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp,
-                                                              PatternRewriter &rewriter)
+void AsyncUtils::scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp,
+                                                  PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(funcOp, [&] {
         funcOp->setAttr(AsyncUtilsConstants::preHandleErrorAttrValue, rewriter.getUnitAttr());
     });
 }
 
-void AsyncUtilsAttributeFns::scheduleLivenessAnalysis(LLVM::CallOp callOp,
-                                                      PatternRewriter &rewriter)
+void AsyncUtils::scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(
         callOp, [&] { callOp->setAttr(AsyncUtilsConstants::sinkAttr, rewriter.getUnitAttr()); });
 }
 
-void AsyncUtilsAttributeFns::scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
+void AsyncUtils::scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
 {
     rewriter.updateRootInPlace(callOp, [&] {
         callOp->setAttr(AsyncUtilsConstants::scheduleInvokeAttr, rewriter.getUnitAttr());
     });
 }
 
-bool AsyncUtilsAttributeFns::isAsync(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::isAsync(LLVM::LLVMFuncOp funcOp)
 {
     if (!funcOp->hasAttr(AsyncUtilsConstants::passthroughAttr)) {
         return false;

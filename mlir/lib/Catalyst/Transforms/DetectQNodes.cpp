@@ -84,7 +84,7 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
     LLVM::LLVMFuncOp callee = candidate.value();
     // Where the callee is annotated with the qnode attribute
     //    llvm.func @callee() attributes { qnode }
-    bool isQnode = AsyncUtilsAttributeFns::hasQnodeAttribute(callee);
+    bool isQnode = AsyncUtils::hasQnodeAttribute(callee);
 
     /* And are called from an presplitcoroutine context
      *
@@ -93,19 +93,19 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
      *     }
      */
     auto caller = AsyncUtils::getCaller(callOp);
-    bool validCandidate = isQnode && AsyncUtilsAttributeFns::isAsync(caller);
+    bool validCandidate = isQnode && AsyncUtils::isAsync(caller);
 
     if (!validCandidate)
         return failure();
 
-    bool hasBeenTransformed = AsyncUtilsAttributeFns::isScheduledForTransformation(callOp);
+    bool hasBeenTransformed = AsyncUtils::isScheduledForTransformation(callOp);
     if (hasBeenTransformed)
         return failure();
 
     /* Will be transformed to add the attribute catalyst.preInvoke
      *     llvm.call @callee() { catalyst.preInvoke }
      */
-    AsyncUtilsAttributeFns::scheduleCallToInvoke(callOp, rewriter);
+    AsyncUtils::scheduleCallToInvoke(callOp, rewriter);
     return success();
 }
 
@@ -125,7 +125,7 @@ LogicalResult AddExceptionHandlingTransform::match(LLVM::CallOp callOp) const
 {
     // The following is a valid match
     //     llvm.call @callee() { catalyst.preInvoke }
-    bool validCandidate = AsyncUtilsAttributeFns::isScheduledForTransformation(callOp);
+    bool validCandidate = AsyncUtils::isScheduledForTransformation(callOp);
     return validCandidate ? success() : failure();
 }
 
@@ -254,7 +254,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
     // We will now annotate caller for the next stage.
     //
     //     llvm.func caller() attributes { catalyst.preHandleError }
-    AsyncUtilsAttributeFns::scheduleAnalysisForErrorHandling(caller, rewriter);
+    AsyncUtils::scheduleAnalysisForErrorHandling(caller, rewriter);
 }
 
 /* The next step is to inspect callers of the previous caller.
@@ -284,7 +284,7 @@ LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 
     // llvm.func @callee() attributes { catalyst.preHandleError }
     auto calleeFuncOp = maybeCallee.value();
-    bool hasAttr = AsyncUtilsAttributeFns::hasPreHandleErrorAttr(calleeFuncOp);
+    bool hasAttr = AsyncUtils::hasPreHandleErrorAttr(calleeFuncOp);
     if (!hasAttr)
         return failure();
 
@@ -415,10 +415,10 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     // We annotate this call as a source
     //
     //     %2 = llvm.call @async_execute_fn() { catalyst.sourceOfRefCounts }
-    AsyncUtilsAttributeFns::annotateCallForSource(callOp, rewriter);
+    AsyncUtils::annotateCallForSource(callOp, rewriter);
     // We annotate all of the unrecoverable errors as sinks.
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
-    AsyncUtilsAttributeFns::annotateCallsForSink(newCalls, rewriter);
+    AsyncUtils::annotateCallsForSink(newCalls, rewriter);
 
     // We can make a note here, that we will be interested in the flow of sources to the current
     // sink. And values that are alive in the sink, must then be deallocated.
@@ -428,7 +428,7 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     //    llvm.func @async_execute_fn() attributes { catalyst.preHandleError }
     // to
     //    llvm.func @async_execute_fn()
-    AsyncUtilsAttributeFns::cleanupPreHandleErrorAttr(callee, rewriter);
+    AsyncUtils::cleanupPreHandleErrorAttr(callee, rewriter);
 }
 
 // We come to the liveness analysis, which will find out values that flow from multiple
@@ -444,7 +444,7 @@ LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
 {
     // We match on function calls that have the sink attribute.
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
-    return AsyncUtilsAttributeFns::isSink(op) ? success() : failure();
+    return AsyncUtils::isSink(op) ? success() : failure();
 }
 
 void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewriter) const
@@ -463,7 +463,7 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     // subtletly: they don't necessarily need to be deallocated at this sink.
     // but at another sink in this same function. This depends on the liveness analysis.
     caller->walk([&](LLVM::CallOp callOp) {
-        bool isInteresting = AsyncUtilsAttributeFns::callsSource(callOp);
+        bool isInteresting = AsyncUtils::callsSource(callOp);
         if (!isInteresting)
             return;
 
@@ -543,7 +543,7 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     // need this information. It will be cleaned up at a later stage.
     // NEVER CALL:
     //    cleanupSource(annotatedCalls, rewriter);
-    AsyncUtilsAttributeFns::cleanupSink(sink, rewriter);
+    AsyncUtils::cleanupSink(sink, rewriter);
 }
 
 // We now can cleanup the source
@@ -586,17 +586,17 @@ struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
 LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
                                                       PatternRewriter &rewriter) const
 {
-    if (!AsyncUtilsAttributeFns::callsSource(candidate))
+    if (!AsyncUtils::callsSource(candidate))
         return failure();
 
-    AsyncUtilsAttributeFns::cleanupSource(candidate, rewriter);
+    AsyncUtils::cleanupSource(candidate, rewriter);
     return success();
 }
 
 LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
                                                             PatternRewriter &rewriter) const
 {
-    bool hasAttr = AsyncUtilsAttributeFns::hasChangeToUnreachableAttr(candidate);
+    bool hasAttr = AsyncUtils::hasChangeToUnreachableAttr(candidate);
     if (!hasAttr)
         return failure();
 
@@ -735,7 +735,7 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
         assert(isa<LLVM::UnreachableOp>(terminator));
         auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
         // Make sure we clean it up later.
-        AsyncUtilsAttributeFns::annotateBrToUnreachable(brOp, rewriter);
+        AsyncUtils::annotateBrToUnreachable(brOp, rewriter);
         rewriter.replaceOp(terminator, brOp);
     }
 }
