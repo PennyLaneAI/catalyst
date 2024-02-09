@@ -52,8 +52,11 @@
                         const std::vector<QubitIdType> &wires, bool inverse,                       \
                         const std::vector<QubitIdType> &controlled_wires,                          \
                         const std::vector<bool> &controlled_values) override;                      \
+    using Catalyst::Runtime::QuantumDevice::MatrixOperation;                                       \
     void MatrixOperation(const std::vector<std::complex<double>> &matrix,                          \
-                         const std::vector<QubitIdType> &wires, bool inverse) override;            \
+                         const std::vector<QubitIdType> &wires, bool inverse,                      \
+                         const std::vector<QubitIdType> &controlled_wires,                         \
+                         const std::vector<bool> &controlled_values) override;                     \
     auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,                     \
                     const std::vector<QubitIdType> &wires)                                         \
         ->ObsIdType override;                                                                      \

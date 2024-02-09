@@ -51,7 +51,9 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
     void MatrixOperation(const std::vector<std::complex<double>> &,
-                         const std::vector<QubitIdType> &, bool) override
+                         const std::vector<QubitIdType> &, bool,
+                         const std::vector<QubitIdType> &controlled_wires,
+                         const std::vector<bool> &controlled_values) override
     {
     }
 

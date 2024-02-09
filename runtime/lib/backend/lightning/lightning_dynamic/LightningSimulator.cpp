@@ -148,14 +148,26 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
 }
 
 void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                         const std::vector<QubitIdType> &wires, bool inverse)
+                                         const std::vector<QubitIdType> &wires, bool inverse,
+                                         const std::vector<QubitIdType> &controlled_wires,
+                                         const std::vector<bool> &controlled_values)
 {
+    RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
+               "Controlled wires/values size mismatch");
+
     // Convert wires to device wires
     // with checking validity of wires
     auto &&dev_wires = getDeviceWires(wires);
+    auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
 
     // Update the state-vector
-    this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
+    if (controlled_wires.empty()) {
+        this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
+    }
+    else {
+        this->device_sv->applyControlledMatrix(matrix.data(), dev_controlled_wires,
+                                               controlled_values, dev_wires, inverse);
+    }
 }
 
 auto LightningSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,

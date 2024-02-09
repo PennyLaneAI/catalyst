@@ -149,7 +149,7 @@ struct QuantumDevice {
     virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
                                 const std::vector<QubitIdType> &wires, bool inverse)
     {
-        return NamedOperation(name, params, wires, inverse, {}, {});
+        NamedOperation(name, params, wires, inverse, {}, {});
     }
 
     /**
@@ -176,7 +176,24 @@ struct QuantumDevice {
      * @param inverse Indicates whether to use inverse of gate
      */
     virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                 const std::vector<QubitIdType> &wires, bool inverse) = 0;
+                                 const std::vector<QubitIdType> &wires, bool inverse)
+    {
+        MatrixOperation(matrix, wires, inverse, {}, {});
+    }
+
+    /**
+     * @brief Apply a given matrix directly to the state vector of a device.
+     *
+     * @param matrix The matrix of data in row-major format
+     * @param wires Wires to apply gate to
+     * @param inverse Indicates whether to use inverse of gate
+     * @param controlled_wires Controlled wires applied to the operation
+     * @param controlled_values Controlled values applied to the operation
+     */
+    virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
+                                 const std::vector<QubitIdType> &wires, bool inverse,
+                                 const std::vector<QubitIdType> &controlled_wires,
+                                 const std::vector<bool> &controlled_values) = 0;
 
     /**
      * @brief Construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
