@@ -744,7 +744,7 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int8_t postselect)
     std::optional postselectOpt = postselect;
 
     // Absence of postselect is denoted now by a nullopt
-    if (postselect != 0 || postselect != 1) {
+    if (postselect != 0 && postselect != 1) {
         postselectOpt = std::nullopt;
     }
     return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire),
