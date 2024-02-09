@@ -75,6 +75,8 @@ void annotateBrToUnreachable(LLVM::BrOp op, PatternRewriter &rewriter);
 
 }; // namespace AsyncUtilsAttributeFns
 
+namespace AsyncUtils {
+
 // Helper function for caller/callees
 LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
 std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp);
@@ -106,6 +108,8 @@ LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
 LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp);
 LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp);
 LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp);
+
+}; // namespace AsyncUtils
 
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &valuesToLookFor);
 void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &tokens,
@@ -156,7 +160,7 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
 {
     // Calls to direct functions
     //    llvm.call @callee() : () -> ()
-    std::optional<LLVM::LLVMFuncOp> candidate = getCalleeSafe(callOp);
+    std::optional<LLVM::LLVMFuncOp> candidate = AsyncUtils::getCalleeSafe(callOp);
     if (!candidate)
         return failure();
 
@@ -171,7 +175,7 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
      *         llvm.call @callee()
      *     }
      */
-    auto caller = getCaller(callOp);
+    auto caller = AsyncUtils::getCaller(callOp);
     bool validCandidate = isQnode && AsyncUtilsAttributeFns::isAsync(caller);
 
     if (!validCandidate)
@@ -213,7 +217,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
     // Here, we are adding a reference to the personality declaration.
     // From the documentation: https://llvm.org/docs/ExceptionHandling.html#exception-tables
-    auto personality = lookupOrCreatePersonality(moduleOp);
+    auto personality = AsyncUtils::lookupOrCreatePersonality(moduleOp);
 
     // We annotate the body of the function containing the callop to have a reference
     // to the personality.
@@ -222,7 +226,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
     //         llvm.call @callee() { catalyst.preInvoke } : () -> ()
     //         llvm.return
     //     }
-    auto caller = getCaller(callOp);
+    auto caller = AsyncUtils::getCaller(callOp);
     setPersonalityAttribute(caller, personality, rewriter);
 
     // Then, the basic block where the call is located is separated into three.
@@ -357,7 +361,7 @@ struct RemoveAbortInsertCallTransform : public OpRewritePattern<LLVM::CallOp> {
 // These functions return async values or tokens.
 LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return failure();
 
@@ -371,14 +375,14 @@ LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 
 void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return;
 
     // Here, we are declaring an external function which is available in the Catalyst runtime.
     //     llvm.func @__catalyst__host__rt__unrecoverable_error()
     auto moduleOp = callOp->getParentOfType<ModuleOp>();
-    auto unrecoverableError = lookupOrCreateUnrecoverableError(moduleOp);
+    auto unrecoverableError = AsyncUtils::lookupOrCreateUnrecoverableError(moduleOp);
 
     auto callee = maybeCallee.value();
     rewriter.updateRootInPlace(callee, [&] { callee.setLinkage(LLVM::Linkage::Internal); });
@@ -527,7 +531,7 @@ LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
 
 void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewriter) const
 {
-    auto caller = getCaller(sink);
+    auto caller = AsyncUtils::getCaller(sink);
 
     SmallVector<LLVM::CallOp> sources;
     SmallVector<Value> tokens;
@@ -587,9 +591,9 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     //     llvm.func @mlirAsyncRuntimeAwaitValue(!llvm.ptr)
     //     llvm.func @mlirAsyncRuntimeAwaitToken(!llvm.ptr)
     //     llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64)
-    auto awaitFnDecl = lookupOrCreateAwaitTokenName(moduleOp);
-    auto awaitValFnDecl = lookupOrCreateAwaitValueName(moduleOp);
-    auto dropRefFnDecl = lookupOrCreateDropRef(moduleOp);
+    auto awaitFnDecl = AsyncUtils::lookupOrCreateAwaitTokenName(moduleOp);
+    auto awaitValFnDecl = AsyncUtils::lookupOrCreateAwaitValueName(moduleOp);
+    auto dropRefFnDecl = AsyncUtils::lookupOrCreateDropRef(moduleOp);
 
     Type llvmInt64Type = IntegerType::get(sink->getContext(), 64);
     auto one = rewriter.getIntegerAttr(llvmInt64Type, 1);
@@ -701,10 +705,10 @@ void AsyncUtilsAttributeFns::cleanupSource(SmallVector<LLVM::CallOp> &sources,
     }
 }
 
-bool hasAbortInBlock(Block *block)
+bool AsyncUtils::hasAbortInBlock(Block *block)
 {
     bool returnVal = false;
-    block->walk([&](LLVM::CallOp op) { returnVal |= callsAbort(op); });
+    block->walk([&](LLVM::CallOp op) { returnVal |= AsyncUtils::callsAbort(op); });
     return returnVal;
 }
 
@@ -712,7 +716,7 @@ void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM:
 {
     for (Block *block : blocks) {
         block->walk([&](LLVM::CallOp op) {
-            if (callsAbort(op)) {
+            if (AsyncUtils::callsAbort(op)) {
                 LLVM::CallOp abortCall = cast<LLVM::CallOp>(op);
                 calls.push_back(abortCall);
             }
@@ -742,7 +746,7 @@ void collectSuccessorBlocks(SmallVector<Value> &conditions, SmallVector<Block *>
                 LLVM::CondBrOp brOp = cast<LLVM::CondBrOp>(user);
                 Block *trueDest = brOp.getTrueDest();
                 Block *falseDest = brOp.getFalseDest();
-                if (hasAbortInBlock(trueDest)) {
+                if (AsyncUtils::hasAbortInBlock(trueDest)) {
                     aborts.push_back(trueDest);
                     success.push_back(falseDest);
                 }
@@ -761,8 +765,8 @@ void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
     for (Value value : values) {
         for (Operation *user : value.getUsers()) {
             // Use forward slices to prevent checking individual llvm.extract operations
-            bool isCallToIsErrorToken = callsMlirAsyncRuntimeIsTokenError(user);
-            bool isCallToIsValueToken = callsMlirAsyncRuntimeIsValueError(user);
+            bool isCallToIsErrorToken = AsyncUtils::callsMlirAsyncRuntimeIsTokenError(user);
+            bool isCallToIsValueToken = AsyncUtils::callsMlirAsyncRuntimeIsValueError(user);
             bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
             if (!isValid)
                 continue;
@@ -875,12 +879,12 @@ bool AsyncUtilsAttributeFns::isScheduledForTransformation(LLVM::CallOp callOp)
     return callOp->hasAttr(AsyncUtilsConstants::scheduleInvokeAttr);
 }
 
-LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp)
+LLVM::LLVMFuncOp AsyncUtils::getCaller(LLVM::CallOp callOp)
 {
     return callOp->getParentOfType<LLVM::LLVMFuncOp>();
 }
 
-LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreatePersonality(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     auto i32Ty = IntegerType::get(ctx, 32);
@@ -889,14 +893,14 @@ LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp)
                                         isVarArg);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAbort(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
     return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::abortName, {}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
@@ -905,7 +909,7 @@ LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
         moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitTokenName, {ptrTy}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitValueName(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
@@ -914,7 +918,7 @@ LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp moduleOp)
         moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitValueName, {ptrTy}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateDropRef(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
@@ -924,7 +928,7 @@ LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp moduleOp)
                                         {ptrTy, llvmInt64Type}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
@@ -933,7 +937,7 @@ LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
         moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetValueErrorName, {ptrTy}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
@@ -942,7 +946,7 @@ LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
         moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetTokenErrorName, {ptrTy}, voidTy);
 }
 
-LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
 {
     MLIRContext *ctx = moduleOp.getContext();
     auto voidTy = LLVM::LLVMVoidType::get(ctx);
@@ -950,11 +954,11 @@ LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
                                         voidTy);
 }
 
-std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp)
+std::optional<LLVM::LLVMFuncOp> AsyncUtils::getCalleeSafe(LLVM::CallOp callOp)
 {
     std::optional<LLVM::LLVMFuncOp> callee;
     auto calleeAttr = callOp.getCalleeAttr();
-    auto caller = getCaller(callOp);
+    auto caller = AsyncUtils::getCaller(callOp);
     if (!calleeAttr) {
         callee = std::nullopt;
     }
@@ -1007,30 +1011,34 @@ void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *fail
     rewriter.replaceOp(callOp, invokeOp);
 }
 
-bool isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName)
+bool AsyncUtils::isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName)
 {
     llvm::StringRef observedName = funcOp.getSymName();
     return observedName.equals(expectedName);
 }
 
-bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp)
 {
-    return isFunctionNamed(funcOp, AsyncUtilsConstants::mlirAsyncRuntimeCreateValueName);
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeCreateValueName);
 }
 
-bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
 {
-    return isFunctionNamed(funcOp, AsyncUtilsConstants::mlirAsyncRuntimeCreateTokenName);
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeCreateTokenName);
 }
 
-bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp)
 {
-    return isFunctionNamed(funcOp, AsyncUtilsConstants::mlirAsyncRuntimeIsTokenErrorName);
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeIsTokenErrorName);
 }
 
-bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
 {
-    return isFunctionNamed(funcOp, AsyncUtilsConstants::mlirAsyncRuntimeIsValueErrorName);
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeIsValueErrorName);
 }
 
 bool AsyncUtilsAttributeFns::callsSource(LLVM::CallOp callOp)
@@ -1038,89 +1046,89 @@ bool AsyncUtilsAttributeFns::callsSource(LLVM::CallOp callOp)
     return callOp->hasAttr(AsyncUtilsConstants::sourceOfRefCounts);
 }
 
-bool callsMlirAsyncRuntimeCreateToken(Operation *possibleCall)
+bool AsyncUtils::callsMlirAsyncRuntimeCreateToken(Operation *possibleCall)
 {
     if (!isa<LLVM::CallOp>(possibleCall))
         return false;
 
     LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
-    return callsMlirAsyncRuntimeCreateToken(callOp);
+    return AsyncUtils::callsMlirAsyncRuntimeCreateToken(callOp);
 }
 
-bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp)
+bool AsyncUtils::callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp)
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return false;
 
     auto callee = maybeCallee.value();
-    return isMlirAsyncRuntimeCreateToken(callee);
+    return AsyncUtils::isMlirAsyncRuntimeCreateToken(callee);
 }
 
-bool callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp)
+bool AsyncUtils::callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp)
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return false;
 
     auto callee = maybeCallee.value();
-    return isMlirAsyncRuntimeCreateValue(callee);
+    return AsyncUtils::isMlirAsyncRuntimeCreateValue(callee);
 }
 
-bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp)
+bool AsyncUtils::callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp)
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return false;
 
     auto callee = maybeCallee.value();
-    return isMlirAsyncRuntimeIsTokenError(callee);
+    return AsyncUtils::isMlirAsyncRuntimeIsTokenError(callee);
 }
 
-bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp)
+bool AsyncUtils::callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp)
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return false;
 
     auto callee = maybeCallee.value();
-    return isMlirAsyncRuntimeIsValueError(callee);
+    return AsyncUtils::isMlirAsyncRuntimeIsValueError(callee);
 }
 
-bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall)
+bool AsyncUtils::callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall)
 {
     if (!isa<LLVM::CallOp>(possibleCall))
         return false;
 
     LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
-    return callsMlirAsyncRuntimeIsTokenError(callOp);
+    return AsyncUtils::callsMlirAsyncRuntimeIsTokenError(callOp);
 }
 
-bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall)
+bool AsyncUtils::callsMlirAsyncRuntimeIsValueError(Operation *possibleCall)
 {
     if (!isa<LLVM::CallOp>(possibleCall))
         return false;
 
     LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
-    return callsMlirAsyncRuntimeIsValueError(callOp);
+    return AsyncUtils::callsMlirAsyncRuntimeIsValueError(callOp);
 }
 
-bool isAbort(LLVM::LLVMFuncOp funcOp)
+bool AsyncUtils::isAbort(LLVM::LLVMFuncOp funcOp)
 {
-    return isFunctionNamed(funcOp, AsyncUtilsConstants::abortName);
+    return AsyncUtils::isFunctionNamed(funcOp, AsyncUtilsConstants::abortName);
 }
 
-bool callsAbort(LLVM::CallOp callOp)
+bool AsyncUtils::callsAbort(LLVM::CallOp callOp)
 {
-    auto maybeCallee = getCalleeSafe(callOp);
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
     if (!maybeCallee)
         return false;
 
     auto callee = maybeCallee.value();
-    return isAbort(callee);
+    return AsyncUtils::isAbort(callee);
 }
 
-bool callsAbort(Operation *possibleCall)
+bool AsyncUtils::callsAbort(Operation *possibleCall)
 {
     if (!isa<LLVM::CallOp>(possibleCall))
         return false;
@@ -1140,13 +1148,13 @@ collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp)
     std::vector<Value> collectedValues;
 
     funcOp.walk([&](LLVM::CallOp call) {
-        auto calleeMaybeIndirect = getCalleeSafe(call);
+        auto calleeMaybeIndirect = AsyncUtils::getCalleeSafe(call);
         if (!calleeMaybeIndirect)
             return;
 
         auto callee = calleeMaybeIndirect.value();
-        bool tokens = isMlirAsyncRuntimeCreateToken(callee);
-        bool values = isMlirAsyncRuntimeCreateValue(callee);
+        bool tokens = AsyncUtils::isMlirAsyncRuntimeCreateToken(callee);
+        bool values = AsyncUtils::isMlirAsyncRuntimeCreateValue(callee);
         bool skip = !tokens && !values;
         if (skip)
             return;
@@ -1185,8 +1193,10 @@ void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Bloc
     auto landingPad = failBlock->begin();
     auto moduleOp = landingPad->getParentOfType<ModuleOp>();
 
-    LLVM::LLVMFuncOp setTokenError = lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
-    LLVM::LLVMFuncOp setValueError = lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
+    LLVM::LLVMFuncOp setTokenError =
+        AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(moduleOp);
+    LLVM::LLVMFuncOp setValueError =
+        AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(moduleOp);
     for (auto token : tokens) {
         insertCallToMlirAsyncRuntimeErrorFunction(token, setTokenError, failBlock, rewriter);
     }
