@@ -47,6 +47,7 @@
     [[nodiscard]] auto One() const->Result override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
+    using Catalyst::Runtime::QuantumDevice::NamedOperation;                                        \
     void NamedOperation(const std::string &name, const std::vector<double> &params,                \
                         const std::vector<QubitIdType> &wires, bool inverse,                       \
                         const std::vector<QubitIdType> &controlled_wires,                          \

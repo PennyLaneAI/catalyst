@@ -86,8 +86,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    using Catalyst::Runtime::QuantumDevice::NamedOperation;
-
     explicit LightningSimulator(const std::string &kwargs = "{}")
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
