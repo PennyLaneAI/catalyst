@@ -214,11 +214,12 @@ def test_multi_arg_multi_result(backend, diff_method):
 
     @qjit
     def jac_postprocess(x, y):
-        return jacobian(postprocess, argnum=(0, 1), method="auto")(x, y)
+        return jacobian(postprocess, argnum=[0, 1], method="auto")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
-    jax_jacobian = jax.jacobian(postprocess, argnums=(0, 1))(*args)
+    jax_jacobian = jax.jacobian(postprocess, argnums=[0, 1])(*args)
     catalyst_jacobian = jac_postprocess(*args)
+
     for i in range(2):
         for j in range(2):
             assert jax_jacobian[i][j] == pytest.approx(catalyst_jacobian[i][j])
