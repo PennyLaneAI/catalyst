@@ -154,7 +154,8 @@ void LightningKokkosSimulator::NamedOperation(const std::string &name,
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation(name, params, dev_wires, inverse);
+        this->cache_manager.addOperation(name, params, dev_wires, inverse, {},
+                                         {/*controlled_wires*/}, {/*controlled_values*/});
     }
 }
 
@@ -183,7 +184,8 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix_kok);
+        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix_kok,
+                                         {/*controlled_wires*/}, {/*controlled_values*/});
     }
 }
 

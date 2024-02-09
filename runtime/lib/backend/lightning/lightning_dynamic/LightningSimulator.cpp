@@ -131,7 +131,8 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation(name, params, dev_wires, inverse);
+        this->cache_manager.addOperation(name, params, dev_wires, inverse, {},
+                                         {/*controlled_wires*/}, {/*controlled_values*/});
     }
 }
 
@@ -149,7 +150,8 @@ void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>>
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix);
+        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix,
+                                         {/*controlled_wires*/}, {/*controlled_values*/});
     }
 }
 
