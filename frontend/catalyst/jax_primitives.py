@@ -392,7 +392,6 @@ def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 def _jvp_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=unused-argument
     """This function is called with abstract arguments for tracing.
     Note: argument names must match these of `_jvp_lowering`."""
-    print(jaxpr.out_avals + jaxpr.out_avals)
     return jaxpr.out_avals + jaxpr.out_avals
 
 
