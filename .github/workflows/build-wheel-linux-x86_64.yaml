@@ -1,6 +1,12 @@
 name: Build Catalyst Wheel on Linux (x86_64)
 
 on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -10,12 +16,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_if_wheel_build_required:
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.action != 'labeled' ||
+        github.event.label.name == 'ci:build-wheels'
+      }}
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
   constants:
+    needs: [check_if_wheel_build_required]
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
   build-dependencies:
-    needs: [constants]
+    needs: [constants, check_if_wheel_build_required]
 
     strategy:
       fail-fast: false
@@ -28,6 +45,8 @@ jobs:
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ubuntu-latest
     container: ${{ matrix.container_img }}
+
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
     - name: Checkout Catalyst repo

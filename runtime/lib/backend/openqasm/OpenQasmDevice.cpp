@@ -24,7 +24,7 @@ auto OpenQasmDevice::AllocateQubit() -> QubitIdType
 
 auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
