@@ -18,7 +18,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import cond, for_loop, grad, measure, qjit, while_loop
+from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
 
 # We are explicitly testing that when something is not assigned
 # the use is awaited.
@@ -157,6 +157,34 @@ def test_exception4(backend):
     def circuit2(x: int):
         qml.Hadamard(wires=[0])
         qml.CNOT(wires=[x, 0])
+        return qml.probs()
+
+    @qjit(async_qnodes=True)
+    def wrapper():
+        circuit(0) + circuit2(0)
+        return None
+
+    # TODO: Better error messages.
+    msg = "Unrecoverable error"
+    with pytest.raises(RuntimeError, match=msg):
+        wrapper()
+
+
+def test_exception_adjoint(backend):
+    "Test exception happening on two different circuits both adjointed."
+
+    def bad_cnot(x):
+        qml.CNOT(wires=[x, 0])
+
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: int):
+        adjoint(bad_cnot)(x)
+        return qml.probs()
+
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit2(x: int):
+        qml.Hadamard(wires=[0])
+        adjoint(bad_cnot)(x)
         return qml.probs()
 
     @qjit(async_qnodes=True)
