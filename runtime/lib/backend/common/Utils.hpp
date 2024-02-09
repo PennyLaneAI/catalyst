@@ -268,15 +268,10 @@ static inline auto simulateDraw(const std::vector<double> &probs, std::optional<
     -> bool
 {
     if (postselect) {
-        // Check validity of postselect value
-        RT_FAIL_IF(std::abs(*postselect) > 1, "Invalid postselect value");
+        RT_FAIL_IF(*postselect < 0 || *postselect > 1, "Invalid postselect value");
+        RT_FAIL_IF(probs[*postselect] == 0, "Probability of postselect value is 0");
 
-        // Return the postselect value, do not draw
-        if (*postselect != -1) {
-            RT_FAIL_IF(probs[*postselect] == 0, "Probability of postselect value is 0");
-
-            return *postselect == 1 ? true : false;
-        }
+        return *postselect == 1 ? true : false;
     }
 
     // Normal flow, no post-selection
