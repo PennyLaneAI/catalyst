@@ -833,7 +833,6 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
     __catalyst__rt__initialize();
 
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
-
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
