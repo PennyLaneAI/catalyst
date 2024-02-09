@@ -72,6 +72,18 @@ def QuantumGate : OpInterface<"QuantumGate"> {
             "mlir::ValueRange", "getQubitResults"
         >,
         InterfaceMethod<
+            "Return all operands which are considered controlling input qubit values.",
+            "mlir::ValueRange", "getCtrlQubitOperands"
+        >,
+        InterfaceMethod<
+            "Return all operands which are considered controlling input boolean values.",
+            "mlir::ValueRange", "getCtrlValueOperands"
+        >,
+        InterfaceMethod<
+            "Return all operands which are considered controlling output qubit values.",
+            "mlir::ValueRange", "getCtrlQubitResults"
+        >,
+        InterfaceMethod<
             "Return adjoint flag.",
             "bool", "getAdjointFlag"
         >,
@@ -87,8 +99,29 @@ def QuantumGate : OpInterface<"QuantumGate"> {
         if (gate.getQubitOperands().size() < 1)
             return $_op->emitOpError("must have at least 1 qubit");
 
+        if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size())
+            return $_op->emitError() <<
+                "'" << $_op->getName() << "' op " <<
+                "number of controlling qubits in input (" <<
+                gate.getCtrlQubitOperands().size() << ") " <<
+                "and controlling values (" <<
+                gate.getCtrlValueOperands().size() <<
+                ") must be the same";
+
+        if (gate.getCtrlQubitOperands().size() != gate.getCtrlQubitResults().size())
+            return $_op->emitError() <<
+                "'" << $_op->getName() << "' op " <<
+                "number of controlling qubits in input (" <<
+                gate.getCtrlQubitOperands().size() << ") " <<
+                "and output (" <<
+                gate.getCtrlQubitResults().size() <<
+                ") must be the same";
+
         if (gate.getQubitOperands().size() != gate.getQubitResults().size())
-            return $_op->emitOpError("number of qubits in input and output must be the same");
+            return $_op->emitError() <<
+                "'" << $_op->getName() << "' op " <<
+                "number of qubits in input (" << gate.getQubitOperands().size() << ") " <<
+                "and output (" << gate.getQubitResults().size() << ") must be the same";
 
         return mlir::success();
     }];

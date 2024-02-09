@@ -215,7 +215,8 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]> {
+def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate,
+                                  AttrSizedOperandSegments, AttrSizedResultSegments, ]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -224,20 +225,32 @@ def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]>
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
+        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrl` $in_ctrl_qubits^ )?  ( `ctrlval` $in_ctrl_values^ )? `:` type($out_qubits) (`ctrl` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getParams();
+        }
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
         }
     }];
 }
@@ -266,6 +279,15 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getODSOperands(getParamOperandIdx());
+        }
+        mlir::ValueRange getCtrlValueOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return {};
         }
     }];
 }
@@ -297,6 +319,15 @@ def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getODSOperands(getParamOperandIdx());
+        }
+        mlir::ValueRange getCtrlValueOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return {};
         }
     }];
 
