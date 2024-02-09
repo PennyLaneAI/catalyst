@@ -84,6 +84,8 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
      * @param wires Wires the gate acts on
      * @param inverse If true, inverse of the gate is applied
      * @param matrix Unitary matrix for the 'MatrixOp' operations
+     * @param controlled_wires Control wires
+     * @param controlled_values Control values
      */
     void addOperation(const std::string &name, const std::vector<double> &params,
                       const std::vector<size_t> &dev_wires, bool inverse,

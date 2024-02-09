@@ -999,7 +999,7 @@ def test_loop_with_dyn_wires(backend):
     assert np.allclose(result, expected)
 
 
-@pytest.mark.xfail("QubitUnitrary is not support with catalyst.grad")
+@pytest.mark.xfail(reason="QubitUnitrary is not support with catalyst.grad")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
     """Test the adjoint method."""

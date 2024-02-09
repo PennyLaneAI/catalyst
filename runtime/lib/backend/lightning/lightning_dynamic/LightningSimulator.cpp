@@ -138,7 +138,6 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
 void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
                                          const std::vector<QubitIdType> &wires, bool inverse)
 {
-    // Check the validity of number of qubits and parameters
     RT_FAIL_IF(!wires.size(), "Invalid number of qubits");
 
     // Convert wires to device wires
