@@ -43,7 +43,6 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
                                                           SmallVector<Block *> successBlocks,
                                                           PatternRewriter &rewriter);
 
-// Actual content
 std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
                              PatternRewriter &rewriter);
