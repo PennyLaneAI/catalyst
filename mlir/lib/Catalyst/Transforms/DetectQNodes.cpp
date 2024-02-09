@@ -59,8 +59,11 @@ namespace AsyncUtilsAttributeFns {
 
 // Helper function for attributes
 bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp);
+bool hasPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp);
 bool isScheduledForTransformation(LLVM::CallOp callOp);
+bool isSink(mlir::Operation *op);
 bool isAsync(LLVM::LLVMFuncOp funcOp);
+bool hasChangeToUnreachableAttr(mlir::Operation *op);
 void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
 void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
@@ -167,7 +170,7 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
     LLVM::LLVMFuncOp callee = candidate.value();
     // Where the callee is annotated with the qnode attribute
     //    llvm.func @callee() attributes { qnode }
-    bool isQnode = callee->hasAttr(AsyncUtilsConstants::qnodeAttr);
+    bool isQnode = AsyncUtilsAttributeFns::hasQnodeAttribute(callee);
 
     /* And are called from an presplitcoroutine context
      *
@@ -181,7 +184,7 @@ LogicalResult DetectCallsInAsyncRegionsTransform::matchAndRewrite(LLVM::CallOp c
     if (!validCandidate)
         return failure();
 
-    bool hasBeenTransformed = callOp->hasAttr(AsyncUtilsConstants::scheduleInvokeAttr);
+    bool hasBeenTransformed = AsyncUtilsAttributeFns::isScheduledForTransformation(callOp);
     if (hasBeenTransformed)
         return failure();
 
@@ -367,7 +370,8 @@ LogicalResult RemoveAbortInsertCallTransform::match(LLVM::CallOp callOp) const
 
     // llvm.func @callee() attributes { catalyst.preHandleError }
     auto calleeFuncOp = maybeCallee.value();
-    if (!calleeFuncOp->hasAttr(AsyncUtilsConstants::preHandleErrorAttrValue))
+    bool hasAttr = AsyncUtilsAttributeFns::hasPreHandleErrorAttr(calleeFuncOp);
+    if (!hasAttr)
         return failure();
 
     return success();
@@ -526,7 +530,7 @@ LogicalResult LivenessAnalysisDropRef::match(LLVM::CallOp op) const
 {
     // We match on function calls that have the sink attribute.
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
-    return op->hasAttr(AsyncUtilsConstants::sinkAttr) ? success() : failure();
+    return AsyncUtilsAttributeFns::isSink(op) ? success() : failure();
 }
 
 void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewriter) const
@@ -678,12 +682,23 @@ LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
 LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
                                                             PatternRewriter &rewriter) const
 {
-    if (!candidate->hasAttr(AsyncUtilsConstants::changeToUnreachable))
+    bool hasAttr = AsyncUtilsAttributeFns::hasChangeToUnreachableAttr(candidate);
+    if (!hasAttr)
         return failure();
 
     auto unreachable = rewriter.create<LLVM::UnreachableOp>(candidate.getLoc());
     rewriter.replaceOp(candidate, unreachable);
     return success();
+}
+
+bool AsyncUtilsAttributeFns::hasChangeToUnreachableAttr(mlir::Operation *op)
+{
+    return op->hasAttr(AsyncUtilsConstants::changeToUnreachable);
+}
+
+bool AsyncUtilsAttributeFns::isSink(mlir::Operation *op)
+{
+    return op->hasAttr(AsyncUtilsConstants::sinkAttr);
 }
 
 void AsyncUtilsAttributeFns::cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
@@ -872,6 +887,11 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
 bool AsyncUtilsAttributeFns::hasQnodeAttribute(LLVM::LLVMFuncOp funcOp)
 {
     return funcOp->hasAttr(AsyncUtilsConstants::qnodeAttr);
+}
+
+bool AsyncUtilsAttributeFns::hasPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp)
+{
+    return funcOp->hasAttr(AsyncUtilsConstants::preHandleErrorAttrValue);
 }
 
 bool AsyncUtilsAttributeFns::isScheduledForTransformation(LLVM::CallOp callOp)
