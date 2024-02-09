@@ -112,7 +112,6 @@ auto LightningSimulator::One() const -> Result
     return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
 }
 
-
 void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
                                         const std::vector<QubitIdType> &wires, bool inverse,
                                         const std::vector<QubitIdType> &controlled_wires,
@@ -126,7 +125,7 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
     RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
     RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
-        "Controlled wires/values size mismatch");
+               "Controlled wires/values size mismatch");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -134,20 +133,17 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
 
     // Update the state-vector
     if (controlled_wires.empty()) {
-        this->device_sv->applyOperation(name,
-            dev_wires, inverse, params);
+        this->device_sv->applyOperation(name, dev_wires, inverse, params);
     }
     else {
-        this->device_sv->applyOperation(name,
-            dev_controlled_wires, controlled_values,
-            dev_wires, inverse, params);
+        this->device_sv->applyOperation(name, dev_controlled_wires, controlled_values, dev_wires,
+                                        inverse, params);
     }
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation(name,
-            params, dev_wires, inverse,
-            dev_controlled_wires, controlled_values);
+        this->cache_manager.addOperation(name, params, dev_wires, inverse, dev_controlled_wires,
+                                         controlled_values);
     }
 }
 
@@ -493,11 +489,10 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     auto &&ops_controlled_values = this->cache_manager.getOperationsControlledValues();
 
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
-                                                                    ops_wires, ops_inverses,
-                                                                    std::vector<std::vector<StateVectorT::ComplexT>>(ops_names.size()),
-                                                                    ops_controlled_wires,
-                                                                    ops_controlled_values);
+    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(
+        ops_names, ops_params, ops_wires, ops_inverses,
+        std::vector<std::vector<StateVectorT::ComplexT>>(ops_names.size()), ops_controlled_wires,
+        ops_controlled_values);
 
     // create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();

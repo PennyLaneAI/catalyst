@@ -827,7 +827,6 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSi
     CHECK(state[14].imag() == Approx(-0.226334).epsilon(1e-5));
 }
 
-
 TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
 {
     const size_t N = 3;
@@ -838,7 +837,7 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
 
-        std::vector<QUBIT*> Q;
+        std::vector<QUBIT *> Q;
         for (size_t i = 0; i < N; i++) {
             Q.push_back(__catalyst__rt__qubit_allocate());
         }
@@ -852,29 +851,29 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
 
         /* qml.ctrl(qml.PauliX, control=(1,2), control_values=(False, False))(wires=0) */
         {
-            QUBIT* ctrls[] = {Q[1], Q[2]};
+            QUBIT *ctrls[] = {Q[1], Q[2]};
             bool values[] = {false, false};
-            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
             __catalyst__qis__PauliX(Q[0], &mod);
         }
 
         /* qml.ctrl(qml.PauliY, control=(0,1), control_values=(False, False))(wires=2) */
         {
-            QUBIT* ctrls[] = {Q[0], Q[1]};
+            QUBIT *ctrls[] = {Q[0], Q[1]};
             bool values[] = {false, false};
-            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
             __catalyst__qis__PauliY(Q[2], &mod);
         }
 
         /* qml.ctrl(qml.PauliZ, control=(2,0), control_values=(False, False))(wires=1) */
         {
-            QUBIT* ctrls[] = {Q[2], Q[0]};
+            QUBIT *ctrls[] = {Q[2], Q[0]};
             bool values[] = {false, false};
-            Modifiers mod = {false, 2, (QUBIT*)ctrls, (bool*)values};
+            Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
             __catalyst__qis__PauliZ(Q[1], &mod);
         }
         {
-            MemRefT_CplxT_double_1d state = getState(1<<N);
+            MemRefT_CplxT_double_1d state = getState(1 << N);
             __catalyst__qis__State(&state, 0);
             CplxT_double *buffer = state.data_allocated;
 
@@ -903,5 +902,3 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
     }
     __catalyst__rt__finalize();
 }
-
-

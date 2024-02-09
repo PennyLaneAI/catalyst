@@ -111,7 +111,8 @@ class CacheManager {
 
         std::vector<size_t> controlled_wires_ul;
         controlled_wires_ul.reserve(dev_controlled_wires.size());
-        std::transform(dev_controlled_wires.begin(), dev_controlled_wires.end(), std::back_inserter(controlled_wires_ul),
+        std::transform(dev_controlled_wires.begin(), dev_controlled_wires.end(),
+                       std::back_inserter(controlled_wires_ul),
                        [](auto w) { return static_cast<size_t>(w); });
         this->ops_controlled_wires_.push_back(controlled_wires_ul);
         this->ops_controlled_values_.push_back(controlled_values);
