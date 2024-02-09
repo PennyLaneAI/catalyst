@@ -109,8 +109,13 @@ auto LightningKokkosSimulator::One() const -> Result
 
 void LightningKokkosSimulator::NamedOperation(const std::string &name,
                                               const std::vector<double> &params,
-                                              const std::vector<QubitIdType> &wires, bool inverse)
+                                              const std::vector<QubitIdType> &wires, bool inverse,
+                                              const std::vector<QubitIdType> &controlled_wires,
+                                              const std::vector<bool> &controlled_values)
 {
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "LightningKokkos does not support native quantum control.");
+
     // First, check if operation `name` is supported by the simulator
     auto &&[op_num_wires, op_num_params] =
         Lightning::lookup_gates(Lightning::simulator_gate_info, name);
