@@ -366,11 +366,13 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
+        TypeConverter *conv = getTypeConverter();
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
 
         std::string qirName = "__catalyst__qis__MultiRZ";
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx),
-            {Float64Type::get(ctx), IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+            {Float64Type::get(ctx), modifiersPtr.getType(), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -379,8 +381,7 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
-        args.insert(args.begin() + 1, rewriter.create<LLVM::ConstantOp>(
-                                          loc, rewriter.getBoolAttr(op.getAdjointFlag())));
+        args.insert(args.begin() + 1, modifiersPtr);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         rewriter.replaceOp(op, adaptor.getInQubits());
