@@ -1,0 +1,433 @@
+// Copyright 2024 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+
+using namespace mlir;
+
+// Constants
+namespace AsyncUtilsConstants {
+
+static constexpr llvm::StringRef qnodeAttr = "qnode";
+static constexpr llvm::StringRef abortName = "abort";
+static constexpr llvm::StringRef unrecoverableErrorName =
+    "__catalyst__host__rt__unrecoverable_error";
+static constexpr llvm::StringRef scheduleInvokeAttr = "catalyst.preInvoke";
+static constexpr llvm::StringRef changeToUnreachable = "catalyst.unreachable";
+static constexpr llvm::StringRef personalityName = "__gxx_personality_v0";
+static constexpr llvm::StringRef passthroughAttr = "passthrough";
+static constexpr llvm::StringRef sinkAttr = "catalyst.sink";
+static constexpr llvm::StringRef preHandleErrorAttrValue = "catalyst.preHandleError";
+static constexpr llvm::StringRef sourceOfRefCounts = "catalyst.sourceOfRefCounts";
+static constexpr llvm::StringRef mlirAsyncRuntimeCreateValueName = "mlirAsyncRuntimeCreateValue";
+static constexpr llvm::StringRef mlirAsyncRuntimeCreateTokenName = "mlirAsyncRuntimeCreateToken";
+static constexpr llvm::StringRef mlirAsyncRuntimeSetValueErrorName =
+    "mlirAsyncRuntimeSetValueError";
+static constexpr llvm::StringRef mlirAsyncRuntimeSetTokenErrorName =
+    "mlirAsyncRuntimeSetTokenError";
+static constexpr llvm::StringRef mlirAsyncRuntimeIsTokenErrorName = "mlirAsyncRuntimeIsTokenError";
+static constexpr llvm::StringRef mlirAsyncRuntimeIsValueErrorName = "mlirAsyncRuntimeIsValueError";
+static constexpr llvm::StringRef mlirAsyncRuntimeAwaitTokenName = "mlirAsyncRuntimeAwaitToken";
+static constexpr llvm::StringRef mlirAsyncRuntimeAwaitValueName = "mlirAsyncRuntimeAwaitValue";
+static constexpr llvm::StringRef mlirAsyncRuntimeDropRefName = "mlirAsyncRuntimeDropRef";
+
+}; // namespace AsyncUtilsConstants
+
+namespace AsyncUtilsAttributeFns {
+
+// Helper function for attributes
+bool hasQnodeAttribute(LLVM::LLVMFuncOp funcOp);
+bool hasPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp);
+bool isScheduledForTransformation(LLVM::CallOp callOp);
+bool isSink(mlir::Operation *op);
+bool isAsync(LLVM::LLVMFuncOp funcOp);
+bool hasChangeToUnreachableAttr(mlir::Operation *op);
+void scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
+void cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp, PatternRewriter &rewriter);
+void scheduleLivenessAnalysis(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void annotateCallsForSink(SmallVector<LLVM::CallOp> &calls, PatternRewriter &rewriter);
+bool callsSource(LLVM::CallOp callOp);
+void annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter);
+void cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter);
+void cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter);
+void cleanupSource(SmallVector<LLVM::CallOp> &sources, PatternRewriter &rewriter);
+void annotateBrToUnreachable(LLVM::BrOp op, PatternRewriter &rewriter);
+
+}; // namespace AsyncUtilsAttributeFns
+
+namespace AsyncUtils {
+
+// Helper function for caller/callees
+LLVM::LLVMFuncOp getCaller(LLVM::CallOp callOp);
+std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp);
+
+// Helper functions for matching function names
+bool isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName);
+bool isAbort(LLVM::LLVMFuncOp funcOp);
+bool callsAbort(LLVM::CallOp callOp);
+bool callsAbort(Operation *possibleCall);
+bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp);
+bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp);
+bool isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp);
+bool isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp);
+bool callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeCreateToken(Operation *possibleCall);
+bool callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
+bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
+bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall);
+bool hasAbortInBlock(Block *block);
+
+// Helper function for creating function declarations
+LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp);
+LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp);
+LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp);
+
+}; // namespace AsyncUtils
+
+bool AsyncUtilsAttributeFns::hasChangeToUnreachableAttr(mlir::Operation *op)
+{
+    return op->hasAttr(AsyncUtilsConstants::changeToUnreachable);
+}
+
+bool AsyncUtilsAttributeFns::isSink(mlir::Operation *op)
+{
+    return op->hasAttr(AsyncUtilsConstants::sinkAttr);
+}
+
+void AsyncUtilsAttributeFns::cleanupSink(LLVM::CallOp op, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(op, [&] { op->removeAttr(AsyncUtilsConstants::sinkAttr); });
+}
+
+void AsyncUtilsAttributeFns::cleanupSource(LLVM::CallOp source, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(source,
+                               [&] { source->removeAttr(AsyncUtilsConstants::sourceOfRefCounts); });
+}
+
+void AsyncUtilsAttributeFns::cleanupSource(SmallVector<LLVM::CallOp> &sources,
+                                           PatternRewriter &rewriter)
+{
+    for (auto source : sources) {
+        AsyncUtilsAttributeFns::cleanupSource(source, rewriter);
+    }
+}
+
+bool AsyncUtils::hasAbortInBlock(Block *block)
+{
+    bool returnVal = false;
+    block->walk([&](LLVM::CallOp op) { returnVal |= AsyncUtils::callsAbort(op); });
+    return returnVal;
+}
+
+void AsyncUtilsAttributeFns::annotateCallForSource(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(callOp, [&] {
+        callOp->setAttr(AsyncUtilsConstants::sourceOfRefCounts, rewriter.getUnitAttr());
+    });
+}
+
+void AsyncUtilsAttributeFns::annotateBrToUnreachable(LLVM::BrOp brOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(brOp, [&] {
+        brOp->setAttr(AsyncUtilsConstants::changeToUnreachable, rewriter.getUnitAttr());
+    });
+}
+
+void AsyncUtilsAttributeFns::annotateCallsForSink(SmallVector<LLVM::CallOp> &calls,
+                                                  PatternRewriter &rewriter)
+{
+    for (auto call : calls) {
+        AsyncUtilsAttributeFns::scheduleLivenessAnalysis(call, rewriter);
+    }
+}
+
+bool AsyncUtilsAttributeFns::hasQnodeAttribute(LLVM::LLVMFuncOp funcOp)
+{
+    return funcOp->hasAttr(AsyncUtilsConstants::qnodeAttr);
+}
+
+bool AsyncUtilsAttributeFns::hasPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp)
+{
+    return funcOp->hasAttr(AsyncUtilsConstants::preHandleErrorAttrValue);
+}
+
+bool AsyncUtilsAttributeFns::isScheduledForTransformation(LLVM::CallOp callOp)
+{
+    return callOp->hasAttr(AsyncUtilsConstants::scheduleInvokeAttr);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::getCaller(LLVM::CallOp callOp)
+{
+    return callOp->getParentOfType<LLVM::LLVMFuncOp>();
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreatePersonality(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    auto i32Ty = IntegerType::get(ctx, 32);
+    bool isVarArg = true;
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::personalityName, {}, i32Ty,
+                                        isVarArg);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAbort(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::abortName, {}, voidTy);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitTokenName(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(
+        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitTokenName, {ptrTy}, voidTy);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateAwaitValueName(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(
+        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeAwaitValueName, {ptrTy}, voidTy);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateDropRef(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    Type llvmInt64Type = IntegerType::get(moduleOp.getContext(), 64);
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeDropRefName,
+                                        {ptrTy, llvmInt64Type}, voidTy);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(
+        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetValueErrorName, {ptrTy}, voidTy);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    Type ptrTy = LLVM::LLVMPointerType::get(moduleOp.getContext());
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(
+        moduleOp, AsyncUtilsConstants::mlirAsyncRuntimeSetTokenErrorName, {ptrTy}, voidTy);
+}
+
+LLVM::LLVMFuncOp AsyncUtils::lookupOrCreateUnrecoverableError(ModuleOp moduleOp)
+{
+    MLIRContext *ctx = moduleOp.getContext();
+    auto voidTy = LLVM::LLVMVoidType::get(ctx);
+    return mlir::LLVM::lookupOrCreateFn(moduleOp, AsyncUtilsConstants::unrecoverableErrorName, {},
+                                        voidTy);
+}
+
+std::optional<LLVM::LLVMFuncOp> AsyncUtils::getCalleeSafe(LLVM::CallOp callOp)
+{
+    std::optional<LLVM::LLVMFuncOp> callee;
+    auto calleeAttr = callOp.getCalleeAttr();
+    auto caller = AsyncUtils::getCaller(callOp);
+    if (!calleeAttr) {
+        callee = std::nullopt;
+    }
+    else {
+        callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(caller, calleeAttr);
+    }
+    return callee;
+}
+
+bool AsyncUtils::isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName)
+{
+    llvm::StringRef observedName = funcOp.getSymName();
+    return observedName.equals(expectedName);
+}
+
+bool AsyncUtils::isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp)
+{
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeCreateValueName);
+}
+
+bool AsyncUtils::isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp)
+{
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeCreateTokenName);
+}
+
+bool AsyncUtils::isMlirAsyncRuntimeIsTokenError(LLVM::LLVMFuncOp funcOp)
+{
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeIsTokenErrorName);
+}
+
+bool AsyncUtils::isMlirAsyncRuntimeIsValueError(LLVM::LLVMFuncOp funcOp)
+{
+    return AsyncUtils::isFunctionNamed(funcOp,
+                                       AsyncUtilsConstants::mlirAsyncRuntimeIsValueErrorName);
+}
+
+bool AsyncUtilsAttributeFns::callsSource(LLVM::CallOp callOp)
+{
+    return callOp->hasAttr(AsyncUtilsConstants::sourceOfRefCounts);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeCreateToken(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return AsyncUtils::callsMlirAsyncRuntimeCreateToken(callOp);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeCreateToken(LLVM::CallOp callOp)
+{
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return AsyncUtils::isMlirAsyncRuntimeCreateToken(callee);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeCreateValue(LLVM::CallOp callOp)
+{
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return AsyncUtils::isMlirAsyncRuntimeCreateValue(callee);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeIsTokenError(LLVM::CallOp callOp)
+{
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return AsyncUtils::isMlirAsyncRuntimeIsTokenError(callee);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp)
+{
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return AsyncUtils::isMlirAsyncRuntimeIsValueError(callee);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return AsyncUtils::callsMlirAsyncRuntimeIsTokenError(callOp);
+}
+
+bool AsyncUtils::callsMlirAsyncRuntimeIsValueError(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return AsyncUtils::callsMlirAsyncRuntimeIsValueError(callOp);
+}
+
+bool AsyncUtils::isAbort(LLVM::LLVMFuncOp funcOp)
+{
+    return AsyncUtils::isFunctionNamed(funcOp, AsyncUtilsConstants::abortName);
+}
+
+bool AsyncUtils::callsAbort(LLVM::CallOp callOp)
+{
+    auto maybeCallee = AsyncUtils::getCalleeSafe(callOp);
+    if (!maybeCallee)
+        return false;
+
+    auto callee = maybeCallee.value();
+    return AsyncUtils::isAbort(callee);
+}
+
+bool AsyncUtils::callsAbort(Operation *possibleCall)
+{
+    if (!isa<LLVM::CallOp>(possibleCall))
+        return false;
+
+    LLVM::CallOp callOp = cast<LLVM::CallOp>(possibleCall);
+    return callsAbort(callOp);
+}
+
+void AsyncUtilsAttributeFns::cleanupPreHandleErrorAttr(LLVM::LLVMFuncOp funcOp,
+                                                       PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(
+        funcOp, [&] { funcOp->removeAttr(AsyncUtilsConstants::preHandleErrorAttrValue); });
+}
+
+void AsyncUtilsAttributeFns::scheduleAnalysisForErrorHandling(LLVM::LLVMFuncOp funcOp,
+                                                              PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(funcOp, [&] {
+        funcOp->setAttr(AsyncUtilsConstants::preHandleErrorAttrValue, rewriter.getUnitAttr());
+    });
+}
+
+void AsyncUtilsAttributeFns::scheduleLivenessAnalysis(LLVM::CallOp callOp,
+                                                      PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(
+        callOp, [&] { callOp->setAttr(AsyncUtilsConstants::sinkAttr, rewriter.getUnitAttr()); });
+}
+
+void AsyncUtilsAttributeFns::scheduleCallToInvoke(LLVM::CallOp callOp, PatternRewriter &rewriter)
+{
+    rewriter.updateRootInPlace(callOp, [&] {
+        callOp->setAttr(AsyncUtilsConstants::scheduleInvokeAttr, rewriter.getUnitAttr());
+    });
+}
+
+bool AsyncUtilsAttributeFns::isAsync(LLVM::LLVMFuncOp funcOp)
+{
+    if (!funcOp->hasAttr(AsyncUtilsConstants::passthroughAttr)) {
+        return false;
+    }
+
+    auto haystack = funcOp->getAttrOfType<ArrayAttr>(AsyncUtilsConstants::passthroughAttr);
+    auto needle = StringAttr::get(funcOp.getContext(), "presplitcoroutine");
+    auto it = std::find(haystack.begin(), haystack.end(), needle);
+    return (it != haystack.end()) ? true : false;
+}
