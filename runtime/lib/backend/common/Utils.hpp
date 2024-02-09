@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cmath>
+
 #include <algorithm>
 #include <array>
 #include <random>
@@ -71,7 +73,7 @@
         override;                                                                                  \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
                        const std::vector<QubitIdType> &wires, size_t shots) override;              \
-    auto Measure(QubitIdType wire, int8_t postselect)->Result override;                            \
+    auto Measure(QubitIdType wire, int8_t postselect = -1)->Result override;                       \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
                   const std::vector<size_t> &trainParams) override;
 
