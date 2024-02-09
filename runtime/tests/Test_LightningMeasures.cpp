@@ -183,7 +183,7 @@ TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with invalid postselect va
 
     sim->NamedOperation("Hadamard", {}, {q}, false);
 
-    REQUIRE_THROWS_WITH(sim->Measure(q, 2), Catch::Contains("Invalid postselect value"));
+    REQUIRE_THROWS_WITH(sim->Measure(q, 2), Catch::Contains("Invalid postselect value, got 2"));
 }
 
 TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with postselect value at zero probability",

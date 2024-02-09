@@ -267,7 +267,8 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
 static inline auto simulateDraw(const std::vector<double> &probs, int8_t postselect) -> bool
 {
     // Check validity of postselect value
-    RT_FAIL_IF(std::abs(postselect) > 1, "Invalid postselect value");
+    std::string msg = "Invalid postselect value, got " + std::to_string(static_cast<int>(postselect));
+    RT_FAIL_IF(std::abs(postselect) > 1, msg.c_str());
 
     // Return the postselect value, do not draw
     if (postselect != -1) {
