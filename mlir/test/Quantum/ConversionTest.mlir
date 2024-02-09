@@ -207,24 +207,27 @@ func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, i1, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>, i64, ...)
 
 // CHECK-LABEL: @multirz
 func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
 
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[a:%.+]] = llvm.mlir.constant(false) : i1
-    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[a]], [[c1]], %arg0)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c1]], %arg0)
     %q1 = quantum.multirz(%p) %q0 : !quantum.bit
 
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: [[a:%.+]] = llvm.mlir.constant(false) : i1
-    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[a]], [[c2]], %arg0, %arg0)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c2]], %arg0, %arg0)
     %q2:2 = quantum.multirz(%p) %q1, %q1 : !quantum.bit, !quantum.bit
 
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
-    // CHECK: [[a:%.+]] = llvm.mlir.constant(false) : i1
-    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[a]], [[c3]], %arg0, %arg0, %arg0)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c3]], %arg0, %arg0, %arg0)
     %q3:3 = quantum.multirz(%p) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
@@ -236,7 +239,7 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, i1, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>, i64, ...)
 
 // CHECK-LABEL: @qubit_unitary
 func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p2 : memref<4x4xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
@@ -244,16 +247,19 @@ func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p
     // CHECK: [[m1:%.+]] = llvm.insertvalue %arg7
     // CHECK: [[m2:%.+]] = llvm.insertvalue %arg14
 
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[a:%.+]] = llvm.mlir.constant(false) : i1
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK: [[a:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: llvm.store [[m1]], [[buf1]]
-    // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[buf1]], [[a]], [[c1]], %arg0)
+    // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[buf1]], [[a]], [[c1_1]], %arg0)
     %q1 = quantum.unitary(%p1 : memref<2x2xcomplex<f64>>) %q0 : !quantum.bit
 
+    // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK: [[a:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: [[a:%.+]] = llvm.mlir.constant(false) : i1
     // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[buf2:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: llvm.store [[m2]], [[buf2]]
