@@ -13,6 +13,7 @@ file(GLOB SRC
     hlo_custom_call_lowering.cpp
     HloCustomCallPatterns.cpp
     DetectQNodes.cpp
+    AsyncUtils.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

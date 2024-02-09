@@ -16,7 +16,6 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 
-#include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
