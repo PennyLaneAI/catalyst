@@ -21,21 +21,27 @@ while using :func:`~.qjit`.
 import copy
 import numbers
 import pathlib
+import inspect
 from collections.abc import Sequence, Sized
+from collections import Counter
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import (
     PyTreeDef,
     flatten_one_level,
+    tree_leaves,
     tree_flatten,
     tree_unflatten,
     treedef_is_leaf,
+    keystr,
+    generate_key_paths,
 )
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
@@ -2177,6 +2183,7 @@ def ctrl(
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
 
+AxisSizeType = Union[int, jax.core.Tracer, jax.core.Var]
 
 def vmap(
     fn: Callable,
@@ -2199,80 +2206,183 @@ def vmap(
         (Callable): Vectorized version of ``fn``.
 
     Raises:
+        TypeError: Invalid `in_axes` and `out_axes` values.
         ValueError: Vectorize with more than one argument.
         RuntimeError: Incompatible length of ``in_axes`` and positional arguments of ``fn``.
     """
     # Dispatch to jax.vmap when it is called outside qjit.
-    if not EvaluationContext.is_tracing():
-        return jax.vmap(fn, in_axes, out_axes)
+    # if not EvaluationContext.is_tracing():
+    #     return jax.vmap(fn, in_axes, out_axes)
 
-    if isinstance(in_axes, int):
-        in_axes = (in_axes,)
-    elif not isinstance(in_axes, tuple):
+    # Check the validity of the input arguments
+    if isinstance(in_axes, list):
         in_axes = tuple(in_axes)
 
-    vm_arg_loc = 0  # vectorize w.r.t. the first arg by default
-    if len(in_axes) > 1:
-        num_vm_args = 0
-        for i, e in enumerate(in_axes):
-            if e is not None:
-                num_vm_args += 1
-                vm_arg_loc = i
-        if num_vm_args > 1:
-            raise ValueError(
-                "Vectorization of only one argument is currently supported,"
-                f" requested for {in_axes}"
-            )
+    if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
+        raise TypeError("'in_axes' must be an int or a tuple of PyTrees with integer leaves,"
+                        f" but got {in_axes}")
+    if not all(isinstance(l, int) for l in tree_leaves(out_axes)):
+        raise TypeError("'out_axes' must be an any PyTree with integer leaves,"
+                        f" but got {in_axes}")
 
-    def wrapper(*args, **kwargs):
-        """Vectorization wrapper around the hybrid program using for_loop"""
-        # Check the validity of in_axes
-        if len(in_axes) != len(args):
-            raise RuntimeError(
-                f"Incompatible length of in_axes and args, {len(in_axes)} != {len(args)}"
-            )
-        ax = in_axes[vm_arg_loc]
-        size = jnp.shape(args[vm_arg_loc])[ax]
+    def batched_fn(*args, **kwargs):
+        """Vectorization wrapper around the hybrid program using catalyst.for_loop"""
 
-        # TODO: Find a better implementation for initializing batched_result
-        vm_out_shape = (
-            [
-                size,
-            ]
-            if not out_shape
-            else [size, *out_shape]
-        )
-        batched_result = jnp.zeros(shape=vm_out_shape)
-
-        # Swap axes for ax > 0
-        args_pos_0ax = args[vm_arg_loc]
-        if ax:
-            up_axes = [*range(args[vm_arg_loc].ndim)]
-            up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
-            args_pos_0ax = jnp.transpose(args[vm_arg_loc], up_axes)
-
-        @for_loop(0, size, 1)
-        def loop(i, batched_result):
-            res = fn(*args[:vm_arg_loc], args_pos_0ax[i], *args[vm_arg_loc + 1 :], **kwargs)
-
-            if jnp.shape(res)[:] != jnp.shape(batched_result)[1:]:
-                raise RuntimeError(
-                    "Incompatible outputs, "
-                    f"{jnp.shape(res)[:]} != {jnp.shape(batched_result)[1:]}.\n"
-                    "Consider passing out_shape to specify the shape and size of the return value"
+        # Copyright 2021 The JAX Authors.
+        def _mapped_axis_size(fn, tree, vals, dims):
+            if not vals:
+                args, kwargs = tree_unflatten(tree, vals)
+                raise ValueError(
+                    f"wrapped function must be passed at least one argument "
+                    f"containing an array, got empty *args={args} and **kwargs={kwargs}"
                 )
 
-            batched_result = batched_result.at[i].set(res)
-            return batched_result
+            def _get_axis_size(shape: tuple[AxisSizeType, ...], axis: int) -> AxisSizeType:
+                try:
+                    return shape[axis]
+                except (IndexError, TypeError) as e:
+                    min_rank = axis + 1 if axis >= 0 else -axis
+                    raise ValueError(
+                        f"vmap was requested to map its argument along axis {axis}, "
+                        f"which implies that its rank should be at least {min_rank}, "
+                        f"but is only {len(shape)} (its shape is {shape})") from e
 
-        result = loop(batched_result)
+            sizes = jax.core.dedup_referents(_get_axis_size(np.shape(x), d)
+                                        for x, d in zip(vals, dims) if d is not None)
+            if len(sizes) == 1:
+                sz, = sizes
+                return sz
+            if not sizes:
+                raise ValueError("vmap must have at least one non-None value in in_axes")
 
-        # Support out_axes
-        if out_axes:
-            up_axes = [*range(result.ndim)]
-            up_axes[out_axes], up_axes[0] = up_axes[0], up_axes[out_axes]
-            result = jnp.transpose(result, up_axes)
+            def _get_argument_type(x):
+                try:
+                    return shaped_abstractify(x).str_short()
+                except TypeError:
+                    return "unknown"
+            msg = ["vmap got inconsistent sizes for array axes to be mapped:\n"]
+            args, kwargs = tree_unflatten(tree, vals)
+            try:
+                ba = inspect.signature(fn).bind(*args, **kwargs)
+            except (TypeError, ValueError):
+                ba = None
+            if ba is None:
+                args_paths = [f'args{keystr(p)} '
+                            f'of type {_get_argument_type(x)}'
+                            for p, x in generate_key_paths(args)]
+                kwargs_paths = [f'kwargs{keystr(p)} '
+                                f'of type {_get_argument_type(x)}'
+                                for p, x in generate_key_paths(kwargs)]
+                key_paths = [*args_paths, *kwargs_paths]
+            else:
+                key_paths = [f'argument vmap{keystr(p)} '
+                            f'of type {_get_argument_type(x)}'
+                            for name, arg in ba.arguments.items()
+                            for p, x in generate_key_paths(arg)]
+            all_sizes = [_get_axis_size(np.shape(x), d) if d is not None else None
+                        for x, d in zip(vals, dims)]
+            size_counts = Counter(s for s in all_sizes if s is not None)
+            (sz, ct), *other_counts = counts = size_counts.most_common()
+            def _all_sizes_index(sz):
+                for i, isz in enumerate(all_sizes):
+                    if jax.core.definitely_equal(isz, sz):
+                        return i
+                assert False, (sz, all_sizes)
 
-        return result
+            ex, *examples = (key_paths[_all_sizes_index(sz)] for sz, _ in counts)
+            ax, *axs = (dims[_all_sizes_index(sz)] for sz, _ in counts)
+            if ct == 1:
+                msg.append(f"  * one axis had size {sz}: axis {ax} of {ex};\n")
+            else:
+                msg.append(f"  * most axes ({ct} of them) had size {sz}, e.g. axis {ax} of {ex};\n")
+            for ex, ax, (sz, ct) in zip(examples, axs, other_counts):
+                if ct == 1:
+                    msg.append(f"  * one axis had size {sz}: axis {ax} of {ex};\n")
+                else:
+                    msg.append(f"  * some axes ({ct} of them) had size {sz}, e.g. axis {ax} of {ex};\n")
+            raise ValueError(''.join(msg)[:-2])  # remove last semicolon and newline
 
-    return wrapper
+        # Check the validity of the input arguments
+        if isinstance(in_axes, tuple) and len(in_axes) != len(args):
+            raise ValueError("'in_axes' must be an int or a tuple of PyTrees corresponding "
+                            f"to the arguments, but got {len(in_axes)=}, {len(args)=}")
+
+        args_data, args_tree  = tree_flatten((args, kwargs))
+        print(args_data)
+        print(args_tree)
+        in_axes_flat = jax.api_util.flatten_axes("vmap in_axes", args_tree, (in_axes, 0), kws=True)
+        print(in_axes_flat)
+        axis_size = _mapped_axis_size(fn, args_tree, args_data, in_axes_flat)
+        print(axis_size)
+        
+        
+        return True
+
+
+    # if len(in_axes) != len(out_axes):
+    #     raise ValueError("'in_axes' and 'out_axes' must have the same length")
+
+    # vm_arg_loc = 0  # vectorize w.r.t. the first arg by default
+    # if len(in_axes) > 1:
+    #     num_vm_args = 0
+    #     for i, e in enumerate(in_axes):
+    #         if e is not None:
+    #             num_vm_args += 1
+    #             vm_arg_loc = i
+    #     if num_vm_args > 1:
+    #         raise ValueError(
+    #             "Vectorization of only one argument is currently supported,"
+    #             f" requested for {in_axes}"
+    #         )
+
+        # # Check the validity of in_axes
+        # if len(in_axes) != len(args):
+        #     raise RuntimeError(
+        #         f"Incompatible length of in_axes and args, {len(in_axes)} != {len(args)}"
+        #     )
+        # ax = in_axes[vm_arg_loc]
+        # size = jnp.shape(args[vm_arg_loc])[ax]
+
+        # # TODO: Find a better implementation for initializing batched_result
+        # vm_out_shape = (
+        #     [
+        #         size,
+        #     ]
+        #     if not out_shape
+        #     else [size, *out_shape]
+        # )
+        # batched_result = jnp.zeros(shape=vm_out_shape)
+
+        # # Swap axes for ax > 0
+        # args_pos_0ax = args[vm_arg_loc]
+        # if ax:
+        #     up_axes = [*range(args[vm_arg_loc].ndim)]
+        #     up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
+        #     args_pos_0ax = jnp.transpose(args[vm_arg_loc], up_axes)
+
+        # @for_loop(0, size, 1)
+        # def loop(i, batched_result):
+        #     res = fn(*args[:vm_arg_loc], args_pos_0ax[i], *args[vm_arg_loc + 1 :], **kwargs)
+
+        #     if jnp.shape(res)[:] != jnp.shape(batched_result)[1:]:
+        #         raise RuntimeError(
+        #             "Incompatible outputs, "
+        #             f"{jnp.shape(res)[:]} != {jnp.shape(batched_result)[1:]}.\n"
+        #             "Consider passing out_shape to specify the shape and size of the return value"
+        #         )
+
+        #     batched_result = batched_result.at[i].set(res)
+        #     return batched_result
+
+        # result = loop(batched_result)
+
+        # # Support out_axes
+        # if out_axes:
+        #     up_axes = [*range(result.ndim)]
+        #     up_axes[out_axes], up_axes[0] = up_axes[0], up_axes[out_axes]
+        #     result = jnp.transpose(result, up_axes)
+
+        # return result
+
+    return batched_fn
+    
