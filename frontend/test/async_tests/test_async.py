@@ -18,7 +18,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import cond, grad, measure, qjit, while_loop
+from catalyst import cond, for_loop, grad, measure, qjit, while_loop
 
 # We are explicitly testing that when something is not assigned
 # the use is awaited.
@@ -338,6 +338,24 @@ def test_exception_in_loop(backend):
     # Exception in end
     with pytest.raises(RuntimeError, match=msg):
         circuit(2)
+
+
+def test_exception_in_for_loop(backend):
+    "Test exception happening in a loop."
+
+    @qjit(async_qnodes=True)
+    @qml.qnode(qml.device(backend, wires=1))
+    def circuit(n):
+        @for_loop(0, 1, n)
+        def loop(i):
+            qml.CNOT(wires=[0, i])
+
+        return loop()
+
+    msg = "Unrecoverable error"
+    # Exception in beginning
+    with pytest.raises(RuntimeError, match=msg):
+        circuit(1)
 
 
 def test_exception_in_loop2(backend):
