@@ -1023,7 +1023,7 @@ def test_pytrees_return_qnode(backend):
     assert len(result[1]) == 2
 
 
-def test_pytrees_return_qnode(backend):
+def test_pytrees_return_classical_function(backend):
     """Test the jacobian on a qnode with a return including list and dictionnaries."""
     num_wires = 1
     dev = qml.device(backend, wires=num_wires)
