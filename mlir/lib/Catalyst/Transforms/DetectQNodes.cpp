@@ -19,9 +19,9 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/Transforms/AsyncUtils.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
-#include "Catalyst/Transforms/AsyncUtils.h"
 
 using namespace mlir;
 
