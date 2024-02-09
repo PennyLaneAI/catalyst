@@ -394,7 +394,8 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
-    """Gets the jaxpr of a differentiable function. Perform the required additional checks and returnt the output tree."""
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks and
+    return the output tree."""
     method = grad_params.method
     jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
     _, out_tree = tree_flatten(shape)
@@ -536,12 +537,10 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         and num_results != 1
     ):
         results = tuple(r[0] if len(r) == 1 else r for r in results)
-    print(out_tree)
     if out_tree.children() != []:
         results = tree_unflatten(out_tree, results)
     else:
         results = results[0]
-    print(len(results))
     return results
 
 
