@@ -15,7 +15,7 @@
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
-#include "AsyncUtils.h"
+#include "Catalyst/Transforms/AsyncUtils.h"
 
 using namespace mlir;
 
