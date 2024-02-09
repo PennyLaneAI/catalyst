@@ -408,6 +408,12 @@ void RemoveAbortInsertCallTransform::rewrite(LLVM::CallOp callOp, PatternRewrite
     //     llvm.br ^6 // Now values %3 and %4 are alive in block ^5
     //     ^6:
     //     // %3, %4 are used in either ^6 or successor blocks
+    //
+    // TODO:
+    // Alternatively instead of changing the failure block, you can just calculate the live values
+    // of the success block and use them in the sink.
+    // This would allow you to reuse liveness analysis results between each of these
+    // transformations and avoid changing this operation back.
     replaceTerminatorWithUnconditionalJumpToSuccessBlock(abortBlocks, successBlocks, rewriter);
 
     // We annotate this call as a source
@@ -557,6 +563,28 @@ struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
     LogicalResult matchAndRewrite(LLVM::BrOp op, PatternRewriter &rewriter) const override;
 };
 
+LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
+                                                      PatternRewriter &rewriter) const
+{
+    if (!AsyncUtils::callsSource(candidate))
+        return failure();
+
+    AsyncUtils::cleanupSource(candidate, rewriter);
+    return success();
+}
+
+LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
+                                                            PatternRewriter &rewriter) const
+{
+    bool hasAttr = AsyncUtils::hasChangeToUnreachableAttr(candidate);
+    if (!hasAttr)
+        return failure();
+
+    auto unreachable = rewriter.create<LLVM::UnreachableOp>(candidate.getLoc());
+    rewriter.replaceOp(candidate, unreachable);
+    return success();
+}
+
 // TODO:
 // This is not over yet though.
 // Because we can have the following situation.
@@ -580,28 +608,6 @@ struct BranchToUnreachableTransform : public OpRewritePattern<LLVM::BrOp> {
 // What we need to do is propagate this analysis up. (Or at least parts of it).
 // We can now say that A calls a function B and B may raise an exception.
 // So A must catch it and decide how to deallocate resources from A, B, and C.
-
-LogicalResult CleanUpSourceTransform::matchAndRewrite(LLVM::CallOp candidate,
-                                                      PatternRewriter &rewriter) const
-{
-    if (!AsyncUtils::callsSource(candidate))
-        return failure();
-
-    AsyncUtils::cleanupSource(candidate, rewriter);
-    return success();
-}
-
-LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate,
-                                                            PatternRewriter &rewriter) const
-{
-    bool hasAttr = AsyncUtils::hasChangeToUnreachableAttr(candidate);
-    if (!hasAttr)
-        return failure();
-
-    auto unreachable = rewriter.create<LLVM::UnreachableOp>(candidate.getLoc());
-    rewriter.replaceOp(candidate, unreachable);
-    return success();
-}
 
 void collectCallsToAbortInBlocks(SmallVector<Block *> &blocks, SmallVector<LLVM::CallOp> &calls)
 {
@@ -655,7 +661,6 @@ void collectResultsForMlirAsyncRuntimeErrorFunctions(SmallVector<Value> &values,
 {
     for (Value value : values) {
         for (Operation *user : value.getUsers()) {
-            // Use forward slices to prevent checking individual llvm.extract operations
             bool isCallToIsErrorToken = AsyncUtils::callsMlirAsyncRuntimeIsTokenError(user);
             bool isCallToIsValueToken = AsyncUtils::callsMlirAsyncRuntimeIsValueError(user);
             bool isValid = isCallToIsErrorToken || isCallToIsValueToken;
@@ -690,7 +695,6 @@ void collectValuesToLookFor(ResultRange &results, SmallVector<Value> &tokens,
         tokens.push_back(result);
     }
     else if (isa<LLVM::LLVMStructType>(resultTy)) {
-        // How to refer to a value without using llvm.extract
         for (Operation *user : result.getUsers()) {
             if (isa<LLVM::ExtractValueOp>(user)) {
                 LLVM::ExtractValueOp extract = cast<LLVM::ExtractValueOp>(user);
