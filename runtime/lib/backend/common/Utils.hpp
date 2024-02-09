@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <string>
@@ -71,7 +72,8 @@
         override;                                                                                  \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
                        const std::vector<QubitIdType> &wires, size_t shots) override;              \
-    auto Measure(QubitIdType wire, int8_t postselect)->Result override;                            \
+    auto Measure(QubitIdType wire, std::optional<int8_t> postselect = std::nullopt)                \
+        ->Result override;                                                                         \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
                   const std::vector<size_t> &trainParams) override;
 
@@ -262,16 +264,19 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
     return false;
 }
 
-static inline auto simulateDraw(const std::vector<double> &probs, int8_t postselect) -> bool
+static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int8_t> postselect)
+    -> bool
 {
-    // Check validity of postselect value
-    RT_FAIL_IF(std::abs(postselect) > 1, "Invalid postselect value");
+    if (postselect) {
+        // Check validity of postselect value
+        RT_FAIL_IF(std::abs(*postselect) > 1, "Invalid postselect value");
 
-    // Return the postselect value, do not draw
-    if (postselect != -1) {
-        RT_FAIL_IF(probs[postselect] == 0, "Probability of postselect value is 0");
+        // Return the postselect value, do not draw
+        if (*postselect != -1) {
+            RT_FAIL_IF(probs[*postselect] == 0, "Probability of postselect value is 0");
 
-        return postselect == 1 ? true : false;
+            return *postselect == 1 ? true : false;
+        }
     }
 
     // Normal flow, no post-selection
