@@ -435,7 +435,7 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     }
 }
 
-auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
+auto LightningKokkosSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
 {
     using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
                                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
@@ -447,11 +447,8 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     DataView<double, 1> buffer_view(probs);
     this->PartialProbs(buffer_view, wires);
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0., 1.);
-    float draw = dis(gen);
-    bool mres = draw > probs[0];
+    // It represents the measured result, true for 1, false for 0
+    bool mres = Lightning::simulateDraw(probs, postselect);
 
     const size_t num_qubits = this->GetNumQubits();
 

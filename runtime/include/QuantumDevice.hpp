@@ -284,10 +284,12 @@ struct QuantumDevice {
      * @brief A general measurement method that acts on a single wire.
      *
      * @param wire The wire to compute Measure on
+     * @param postselect Which basis state to postselect after a mid-circuit measurement (-1 denotes
+     no post-selection)
 
      * @return `Result` The measurement result
      */
-    virtual auto Measure(QubitIdType wire) -> Result = 0;
+    virtual auto Measure(QubitIdType wire, int8_t postselect) -> Result = 0;
 
     /**
      * @brief Compute the gradient of a quantum tape, that is cached using
