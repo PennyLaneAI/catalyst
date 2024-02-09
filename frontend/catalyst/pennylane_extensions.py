@@ -536,12 +536,10 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         and num_results != 1
     ):
         results = tuple(r[0] if len(r) == 1 else r for r in results)
-    print(out_tree)
     if out_tree.children() != []:
         results = tree_unflatten(out_tree, results)
     else:
         results = results[0]
-    print(len(results))
     return results
 
 
@@ -870,9 +868,12 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         fn = _ensure_differentiable(f)
         grad_params = _check_grad_params(method, scalar_out, h, argnum)
 
-        jaxpr, _ = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
-        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        func_res, jvp = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        func_res = tree_unflatten(out_tree, func_res)
+        jvp = _unflatten_derivatives(jvp, out_tree, argnum, len(jaxpr.out_avals))
+        results = tuple([func_res, jvp])
     else:
         results = jax.jvp(f, params, tangents)
 
@@ -936,9 +937,12 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         fn = _ensure_differentiable(f)
         grad_params = _check_grad_params(method, scalar_out, h, argnum)
 
-        jaxpr, _ = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
-        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        func_res, vjp = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        func_res = tree_unflatten(out_tree, func_res)
+        vjp = _unflatten_derivatives(vjp, out_tree, argnum, len(jaxpr.out_avals))
+        results = tuple([func_res, vjp])
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
