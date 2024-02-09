@@ -183,7 +183,7 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation("MatrixOp", {}, dev_wires, inverse);
+        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix_kok);
     }
 }
 
@@ -521,9 +521,13 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
     auto &&ops_params = this->cache_manager.getOperationsParameters();
     auto &&ops_wires = this->cache_manager.getOperationsWires();
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
+    auto &&ops_matrices = this->cache_manager.getOperationsMatrices();
+    auto &&ops_controlled_wires = this->cache_manager.getOperationsControlledWires();
+    auto &&ops_controlled_values = this->cache_manager.getOperationsControlledValues();
 
-    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
-                                                                    ops_wires, ops_inverses);
+    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(
+        ops_names, ops_params, ops_wires, ops_inverses, ops_matrices, ops_controlled_wires,
+        ops_controlled_values);
 
     // Create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();

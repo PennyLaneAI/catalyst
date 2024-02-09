@@ -48,7 +48,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         "Local"}; // tidy: readability-magic-numbers
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
-    Catalyst::Runtime::CacheManager cache_manager{};
+    Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
 
