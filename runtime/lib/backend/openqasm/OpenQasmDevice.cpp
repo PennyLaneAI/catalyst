@@ -473,7 +473,7 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     }
 }
 
-auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int8_t> postselect)
+auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int32_t> postselect)
     -> Result
 {
     RT_FAIL_IF(postselect, "Post-selection is not supported yet");

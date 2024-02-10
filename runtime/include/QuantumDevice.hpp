@@ -290,7 +290,7 @@ struct QuantumDevice {
 
      * @return `Result` The measurement result
      */
-    virtual auto Measure(QubitIdType wire, std::optional<int8_t> postselect) -> Result = 0;
+    virtual auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result = 0;
 
     /**
      * @brief Compute the gradient of a quantum tape, that is cached using

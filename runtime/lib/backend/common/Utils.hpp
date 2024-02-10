@@ -72,7 +72,7 @@
         override;                                                                                  \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
                        const std::vector<QubitIdType> &wires, size_t shots) override;              \
-    auto Measure(QubitIdType wire, std::optional<int8_t> postselect = std::nullopt)                \
+    auto Measure(QubitIdType wire, std::optional<int32_t> postselect = std::nullopt)               \
         ->Result override;                                                                         \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
                   const std::vector<size_t> &trainParams) override;
@@ -264,7 +264,7 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
     return false;
 }
 
-static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int8_t> postselect)
+static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect)
     -> bool
 {
     if (postselect) {
