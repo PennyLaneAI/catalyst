@@ -134,6 +134,28 @@ module {
 
 // -----
 
+// Check that tokens are set to errors
+
+module {
+
+  llvm.func @callee()
+  llvm.func @mlirAsyncRuntimeCreateToken() -> !llvm.ptr
+  llvm.func @mlirAsyncRuntimeSetTokenError(!llvm.ptr) -> ()
+
+  // CHECK: llvm.func @caller
+  llvm.func @caller() {
+    // CHECK: [[token:%.+]] = llvm.call @mlirAsyncRuntimeCreateToken
+    %0 = llvm.call @mlirAsyncRuntimeCreateToken() : () -> !llvm.ptr
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: ^bb1:
+    // CHECK: llvm.call @mlirAsyncRuntimeSetTokenError([[token]])
+    // CHECK: ^bb2:
+    llvm.return
+  }
+}
+
+// -----
+
 // Check that annotation has been deleted.
 
 module {
