@@ -21,9 +21,6 @@ from catalyst.jax_extras.patches import (
 )
 from catalyst.jax_extras.tracing import (
     ClosedJaxpr,
-    ConcreteArray,
-    DBIdx,
-    DShapedArray,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     Jaxpr,
@@ -41,6 +38,8 @@ from catalyst.jax_extras.tracing import (
     eval_jaxpr,
     get_implicit_and_explicit_flat_args,
     infer_lambda_input_type,
+    initial_style_jaxprs_with_common_consts1,
+    initial_style_jaxprs_with_common_consts2,
     jaxpr_remove_implicit,
     make_jaxpr2,
     make_jaxpr_effects,
@@ -53,6 +52,4 @@ from catalyst.jax_extras.tracing import (
     treedef_is_leaf,
     unzip2,
     wrap_init,
-    initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
 )
