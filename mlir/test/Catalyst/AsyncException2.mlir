@@ -30,3 +30,18 @@ module {
   }
 }
 
+// -----
+
+module {
+
+  // Check that personality does get added
+  // CHECK: @__gxx_personality_v0
+
+  llvm.func @callee()
+
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return
+  }
+}
+
