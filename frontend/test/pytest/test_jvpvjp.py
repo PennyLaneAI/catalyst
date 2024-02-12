@@ -13,7 +13,7 @@
 # limitations under the License.
 """ Test JVP/VJP operation lowering """
 
-from typing import Iterable, Tuple, TypeVar, Union
+from typing import TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -641,6 +641,8 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
 
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_vjp_pytrees(diff_method):
+    """Test VJP with pytree return."""
+
     def f(x, y):
         return [x, {"res": y}, x + y]
 

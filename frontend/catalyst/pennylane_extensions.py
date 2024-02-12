@@ -876,10 +876,10 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         if out_tree.children() != []:
             midpoint = len(results) // 2
             func_res = results[:midpoint]
-            jvp = results[midpoint:]
+            jvps = results[midpoint:]
             func_res = tree_unflatten(out_tree, func_res)
-            jvp = tree_unflatten(out_tree, jvp)
-            results = tuple([func_res, jvp])
+            jvps = tree_unflatten(out_tree, jvps)
+            results = tuple([func_res, jvps])
         else:
             results = tuple(results)
     else:
@@ -951,15 +951,15 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
         if out_tree.children() != []:
             func_res = results[: len(jaxpr.out_avals)]
-            vjp = results[len(jaxpr.out_avals) :]
+            vjps = results[len(jaxpr.out_avals) :]
             func_res = tree_unflatten(out_tree, func_res)
             # We do not change the shape of the VJP as it is the same as the parameters not
             # as the output
-            results = tuple([func_res, tuple(vjp)])
+            results = tuple([func_res, tuple(vjps)])
         else:
             func_res = results[: len(jaxpr.out_avals)]
-            vjp = results[len(jaxpr.out_avals) :]
-            results = tuple([*func_res, tuple(vjp)])
+            vjps = results[len(jaxpr.out_avals) :]
+            results = tuple([*func_res, tuple(vjps)])
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
