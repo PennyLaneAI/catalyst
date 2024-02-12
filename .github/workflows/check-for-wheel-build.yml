@@ -32,7 +32,8 @@ jobs:
       # And since this job is required to pass on all jobs, it will cause the merging of the pull request to be blocked.
       - name: Fail for Pull Request that needs wheels built but does not have build-wheels label
         if: steps.is_pr.outputs.is_pr == 'true' && steps.needs_wheel_builds.outputs.needs_wheel_builds == 'true' && steps.build_wheels.outputs.build_wheels == 'false'
-        run: echo ::error title=Failing for Pull Request that needs wheel builds with build-wheels label missing::This pull request requires the wheels to build successfully against it. Add the build-wheels label. && exit 1
+        run: |
+          echo ::error title=Failing for Pull Request that needs wheel builds with build-wheels label missing::This pull request requires the wheels to build successfully against it. Add the `ci:build-wheels` label. && exit 1
 
     outputs:
       build-wheels: >-
