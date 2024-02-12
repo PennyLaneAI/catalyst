@@ -19,8 +19,8 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from jax import vjp as J_vjp
 from jax import jvp as J_jvp
+from jax import vjp as J_vjp
 from jax.tree_util import tree_flatten, tree_unflatten
 from numpy.testing import assert_allclose
 
