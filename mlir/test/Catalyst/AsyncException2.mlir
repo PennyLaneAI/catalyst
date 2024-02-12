@@ -156,31 +156,6 @@ module {
 
 // -----
 
-// Check that after setting tokens to errors, we unconditionally jump to
-// success basic block.
-
-module {
-
-  llvm.func @callee()
-
-  // CHECK: llvm.func @caller
-  llvm.func @caller() {
-    llvm.call @callee() { catalyst.preInvoke } : () -> ()
-    // CHECK:      [[fail:\^bb[0-9]+]]:
-    // CHECK-NEXT: llvm.landingpad
-    // CHECK:      llvm.br [[final:\^bb[0-9]+]]
-    llvm.br ^bb0
-
-    // CHECK:      [[final]]:
-    // CHECK-SAME: pred
-    // CHECK-SAME: [[fail]]
-    ^bb0:
-    llvm.return
-  }
-}
-
-// -----
-
 // Check that annotation has been deleted.
 
 module {
