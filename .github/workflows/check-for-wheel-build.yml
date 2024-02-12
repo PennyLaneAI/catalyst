@@ -21,10 +21,17 @@ jobs:
         if: steps.is_pr.outputs.is_pr == 'true'
         run: echo "needs_wheel_builds=${{ contains(github.event.pull_request.labels.*.name, 'requires-wheel-builds') }}" >>$GITHUB_OUTPUT
 
+      # If the trigger for this workflow (on pull_request) is not a labelling event, then only build the wheels if the
+      # label being added is `ci:build-wheels`. If the pull_request event is not a labelling event (eg: new commit is pushed)
+      # then build wheels as long as the `ci:build-wheels` lable is present
       - name: Build Wheels for Pull Request
         id: build_wheels
         if: steps.is_pr.outputs.is_pr == 'true'
-        run: echo "build_wheels=${{ contains(github.event.pull_request.labels.*.name, 'ci:build-wheels') }}" >> $GITHUB_OUTPUT
+        run: |
+          echo "build_wheels=${{
+           (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'ci:build-wheels')) ||
+           github.event.label.name == 'ci:build-wheels'
+          }}" >> $GITHUB_OUTPUT
 
       # If a pr has the `requires-wheel-builds` label, that means that the Workflows which build wheels need to successfully run against it
       # However, the PR does not have the `ci:build-wheels` label, meaning it is not ready for the wheel workflows to run against it yet.
