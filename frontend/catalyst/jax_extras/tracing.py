@@ -22,7 +22,6 @@ import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
 from jax._src.core import _update_thread_local_jit_state
-from jax._src.dispatch import jaxpr_replicas
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -30,11 +29,12 @@ from jax._src.interpreters.partial_eval import (
     trace_to_jaxpr_dynamic2,
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
-from jax._src.lax.lax import _abstractify, xla
+from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import (
     _argnum_weak_type,
     _gather_dtype_rule,
     _gather_lower,
+    _gather_shape_computation,
     _is_sorted,
     _no_duplicate_dims,
     _rank,
