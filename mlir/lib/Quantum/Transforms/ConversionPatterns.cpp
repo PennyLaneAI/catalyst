@@ -598,14 +598,25 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
+        // Add postselect and qubit types to the function signature
+        Type qubitTy = conv->convertType(QubitType::get(ctx));
+        Type postselectTy = IntegerType::get(ctx, 8);
+        SmallVector<Type> argSignatures = {qubitTy, postselectTy};
+
         StringRef qirName = "__catalyst__qis__Measure";
-        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)),
-                                                        conv->convertType(QubitType::get(ctx)));
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)), argSignatures);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        Value resultPtr =
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, adaptor.getInQubit()).getResult();
+        // Create the postselect value. If not given, it defaults to -1
+        LLVM::ConstantOp postselect = rewriter.create<LLVM::ConstantOp>(
+            loc, op.getPostselect() ? op.getPostselectAttr() : rewriter.getI8IntegerAttr(-1));
+
+        // Add qubit and postselect values as arguments of the CallOp
+        SmallVector<Value> args = {adaptor.getInQubit(), postselect};
+
+        Value resultPtr = rewriter.create<LLVM::CallOp>(loc, fnDecl, args).getResult();
         Value boolPtr = rewriter.create<LLVM::BitcastOp>(
             loc, LLVM::LLVMPointerType::get(IntegerType::get(ctx, 1)), resultPtr);
         Value mres = rewriter.create<LLVM::LoadOp>(loc, boolPtr);
