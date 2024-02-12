@@ -812,8 +812,8 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, posts
 
     # Prepare postselect attribute
     if postselect is not None:
-        i8_type = ir.IntegerType.get_signless(8, ctx)
-        postselect = ir.IntegerAttr.get(i8_type, postselect)
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
 
     result_type = ir.IntegerType.get_signless(1)
 
