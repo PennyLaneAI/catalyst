@@ -21,9 +21,8 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 import jax
 from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.core import DBIdx, _update_thread_local_jit_state
+from jax._src.core import _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
-from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
     _input_type_to_tracers,
@@ -45,20 +44,11 @@ from jax._src.lax.slicing import (
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as jax_current
-from jax._src.source_info_util import new_name_stack
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name, wraps
+from jax._src.util import partition_list, safe_map, unzip2, unzip3, wraps
 from jax.api_util import flatten_fun
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import (
-    ShapedArray,
-    Trace,
-    Tracer,
-    concrete_aval,
-    eval_jaxpr,
-    gensym,
-    thread_local_state,
-)
+from jax.core import ShapedArray, Trace, eval_jaxpr, gensym, thread_local_state
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
