@@ -378,7 +378,7 @@ def test_qjit_forloop_indbidx_const():
         a0 = jnp.ones([sz], dtype=float)
 
         @for_loop(0, 3, 1)
-        def loop(i, a):
+        def loop(_i, a):
             return a * sz
 
         a2 = loop(a0)
