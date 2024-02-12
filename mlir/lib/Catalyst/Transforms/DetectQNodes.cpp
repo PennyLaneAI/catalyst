@@ -45,8 +45,8 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
 std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewriter &rewriter);
 void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp personality,
                              PatternRewriter &rewriter);
-void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
-                           PatternRewriter &rewriter);
+LLVM::InvokeOp transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
+                                     PatternRewriter &rewriter);
 std::tuple<std::vector<Value>, std::vector<Value>>
 collectRefCountedTokensAndValues(LLVM::LLVMFuncOp funcOp);
 void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnDecl,
@@ -185,7 +185,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
     //     ^bbsuccess:
     //         llvm.return
     //     }
-    transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
+    auto invokeOp = transformCallToInvoke(callOp, successBlock, failBlock, rewriter);
 
     // Here we collect all values from functions that create runtime token or values.
     // These function calls are made in the same function.
@@ -224,7 +224,7 @@ void AddExceptionHandlingTransform::rewrite(LLVM::CallOp callOp, PatternRewriter
     if (successBlock->hasNoSuccessors()) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToEnd(failBlock);
-        rewriter.create<LLVM::UnreachableOp>(callOp->getLoc());
+        rewriter.create<LLVM::UnreachableOp>(invokeOp->getLoc());
     }
     else {
         auto successor = successBlock->getSuccessor(0);
@@ -774,8 +774,8 @@ void setPersonalityAttribute(LLVM::LLVMFuncOp callerOp, LLVM::LLVMFuncOp persona
     });
 }
 
-void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
-                           PatternRewriter &rewriter)
+LLVM::InvokeOp transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *failBlock,
+                                     PatternRewriter &rewriter)
 {
     auto calleeAttr = callOp.getCalleeAttr();
     SmallVector<Value> unwindArgs;
@@ -783,6 +783,7 @@ void transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, Block *fail
                                                     calleeAttr, callOp.getOperands(), successBlock,
                                                     ValueRange(), failBlock, unwindArgs);
     rewriter.replaceOp(callOp, invokeOp);
+    return invokeOp;
 }
 
 std::tuple<std::vector<Value>, std::vector<Value>>
