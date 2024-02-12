@@ -45,3 +45,121 @@ module {
   }
 }
 
+// -----
+
+module {
+
+
+  llvm.func @callee()
+
+  // Check that caller has been annotated with personality
+  // CHECK: llvm.func @caller
+  // CHECK-SAME: personality = @__gxx_personality_v0
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return
+  }
+}
+
+// -----
+
+// Check for three basic blocks in caller.
+
+module {
+
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  llvm.func @caller() {
+    // The first one is the entry block.
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: ^bb1:
+    // CHECK: ^bb2:
+    llvm.return
+  }
+}
+
+// -----
+
+// Check that the first instruction to ^bb1 is a landingpad
+
+module {
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: ^bb1:
+    // CHECK-NEXT: llvm.landingpad
+    llvm.return
+  }
+}
+
+// -----
+
+
+// Check that the success is the return.
+
+module {
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    // CHECK: ^bb2:
+    // CHECK-NEXT: llvm.return
+    llvm.return
+  }
+}
+
+// -----
+
+// Check that the llvm.call has been transformed to llvm.invoke
+// with correct basic blocks.
+
+module {
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  llvm.func @caller() {
+    // CHECK: llvm.invoke @callee() to ^bb2 unwind ^bb1
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return
+  }
+}
+
+// -----
+
+// Check that annotation has been deleted.
+
+module {
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  // CHECK-NOT: catalyst.preInvoke
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return
+  }
+}
+
+// -----
+
+// Check that next step is scheduled
+
+module {
+
+  llvm.func @callee()
+
+  // CHECK: llvm.func @caller
+  // CHECK-SAME: catalyst.preHandleError
+  llvm.func @caller() {
+    llvm.call @callee() { catalyst.preInvoke } : () -> ()
+    llvm.return
+  }
+}
