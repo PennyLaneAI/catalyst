@@ -757,7 +757,7 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
 
     rewriter.setInsertionPointToEnd(unwindBlock);
     bool isCleanUp = true;
-    SmallVector<Value> operands{nullOp.getResult()};
+    std::vector<Value> operands = {nullOp.getResult()};
     auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
     auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
     rewriter.create<LLVM::LandingpadOp>(callOp.getLoc(), structTy, isCleanUp, operands);
