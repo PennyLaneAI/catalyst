@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <Kokkos_Complex.hpp>
+#include <Kokkos_Core.hpp>
+
 #include "LightningKokkosSimulator.hpp"
 
 namespace Catalyst::Runtime::Simulator {
@@ -19,7 +22,26 @@ namespace Catalyst::Runtime::Simulator {
 auto LightningKokkosSimulator::AllocateQubit() -> QubitIdType
 {
     const size_t num_qubits = this->device_sv->getNumQubits();
-    this->device_sv = std::make_unique<StateVectorT>(num_qubits + 1);
+
+    if (!num_qubits) {
+        this->device_sv = std::make_unique<StateVectorT>(1);
+        return this->qubit_manager.Allocate(num_qubits);
+    }
+
+    std::vector<Kokkos::complex<double>> data = this->device_sv->getDataVector();
+    const size_t dsize = data.size();
+    data.resize(dsize << 1UL);
+
+    auto src = data.begin();
+    std::advance(src, dsize - 1);
+
+    for (auto dst = data.end() - 2; src != data.begin();
+         std::advance(src, -1), std::advance(dst, -2)) {
+        *dst = std::move(*src);
+        *src = Kokkos::complex<double>(.0, .0);
+    }
+
+    this->device_sv = std::make_unique<StateVectorT>(data);
     return this->qubit_manager.Allocate(num_qubits);
 }
 
@@ -29,10 +51,15 @@ auto LightningKokkosSimulator::AllocateQubits(size_t num_qubits) -> std::vector<
         return {};
     }
 
-    const size_t cur_num_qubits = this->device_sv->getNumQubits();
-    const size_t new_num_qubits = cur_num_qubits + num_qubits;
-    this->device_sv = std::make_unique<StateVectorT>(new_num_qubits);
-    return this->qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
+    // at the first call when num_qubits == 0
+    if (!this->GetNumQubits()) {
+        this->device_sv = std::make_unique<StateVectorT>(num_qubits);
+        return this->qubit_manager.AllocateRange(0, num_qubits);
+    }
+
+    std::vector<QubitIdType> result(num_qubits);
+    std::generate_n(result.begin(), num_qubits, [this]() { return AllocateQubit(); });
+    return result;
 }
 
 void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { this->qubit_manager.Release(q); }
@@ -406,7 +433,7 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     }
 }
 
-auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
+auto LightningKokkosSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
 {
     using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
                                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
@@ -418,11 +445,8 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     DataView<double, 1> buffer_view(probs);
     this->PartialProbs(buffer_view, wires);
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0., 1.);
-    float draw = dis(gen);
-    bool mres = draw > probs[0];
+    // It represents the measured result, true for 1, false for 0
+    bool mres = Lightning::simulateDraw(probs, postselect);
 
     const size_t num_qubits = this->GetNumQubits();
 

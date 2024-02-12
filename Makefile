@@ -13,6 +13,7 @@ DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
+ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -103,9 +104,6 @@ dialects:
 runtime:
 	$(MAKE) -C runtime runtime
 
-runtime-all:
-	$(MAKE) -C runtime runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
-
 dummy_device:
 	$(MAKE) -C runtime dummy_device
 
@@ -114,9 +112,6 @@ test: test-runtime test-frontend test-demos
 
 test-runtime:
 	$(MAKE) -C runtime test
-
-test-runtime-all:
-	$(MAKE) -C runtime test ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
 test-mlir:
 	$(MAKE) -C mlir test

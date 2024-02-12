@@ -29,12 +29,12 @@ auto LightningSimulator::AllocateQubit() -> QubitIdType
 
 auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
     // at the first call when num_qubits == 0
-    if (this->GetNumQubits() == 0U) {
+    if (!this->GetNumQubits()) {
         this->device_sv = std::make_unique<StateVectorT>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
@@ -392,7 +392,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     }
 }
 
-auto LightningSimulator::Measure(QubitIdType wire) -> Result
+auto LightningSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
 {
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
@@ -401,11 +401,8 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
     DataView<double, 1> buffer_view(probs);
     this->PartialProbs(buffer_view, wires);
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0., 1.);
-    float draw = dis(gen);
-    bool mres = draw > probs[0];
+    // It represents the measured result, true for 1, false for 0
+    bool mres = Lightning::simulateDraw(probs, postselect);
 
     const size_t numQubits = this->GetNumQubits();
 
