@@ -13,4 +13,4 @@
 # limitations under the License.
 
 """Configuration."""
-from .conftest import *
+from .conftest import *  # pylint: disable=relative-beyond-top-level
