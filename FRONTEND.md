@@ -261,12 +261,12 @@ Output type indices are:
 
 ### Primitives and binding
 
-Primitives are like functions in Jaxpr. If the primitive has a body, then binding is associated with
-tracing of the program representing primitive’s body. The binding of such a primitive includes:
-  - Calculation of the input type based on the input arguments
+Binding, in Jax terms, is the process where a primitive applies itself to the interpreter stack. The
+binding includes:
+  - Calculation of the input type from the primitive's input arguments.
   - Creation of the inner tracing scope and the corresponding tracers.
   - Calculation of the output type based on the results of the nested program.
-  - Creation of the resulting tracers in the caller's tracing scope.
+  - Creation of the resulting tracers in the caller's tracing context.
 
 ### Explicit/implicit arguments
 
