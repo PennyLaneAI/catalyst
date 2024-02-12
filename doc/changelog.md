@@ -42,8 +42,9 @@
 
 <h3>Improvements</h3>
 
-* Keep the structure of the function return when taking the derivatives (pytrees support).
+* Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
 
   ```py
   dev = qml.device("lightning.qubit", wires=1)
