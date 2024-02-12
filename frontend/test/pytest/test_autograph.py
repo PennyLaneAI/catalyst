@@ -381,7 +381,8 @@ class TestIntegration:
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
-        assert fn(3) == [6.0, 9.0, 8.0]  # unusual vjp return structure, vjp result is 3rd elem
+        assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
+        assert np.allclose(fn(3)[1], jnp.array(8.0))
 
     def test_jvp_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
@@ -395,7 +396,9 @@ class TestIntegration:
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
-        assert fn(3) == [6.0, 9.0, 2.0, 6.0]  # unusual jvp return structure, jvp results start 3rd
+
+        assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
+        assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
 
 @pytest.mark.tf
