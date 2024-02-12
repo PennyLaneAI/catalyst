@@ -22,7 +22,7 @@ module {
 
   // CHECK-NOT: @__gxx_personality_v0
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   llvm.func @caller() {
     llvm.call @callee() : () -> ()
@@ -37,7 +37,7 @@ module {
   // Check that personality does get added
   // CHECK: @__gxx_personality_v0
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   llvm.func @caller() {
     llvm.call @callee() { catalyst.preInvoke } : () -> ()
@@ -50,7 +50,7 @@ module {
 module {
 
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   // Check that caller has been annotated with personality
   // CHECK: llvm.func @caller
@@ -68,7 +68,7 @@ module {
 module {
 
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   // CHECK: llvm.func @caller
   llvm.func @caller() {
@@ -86,7 +86,7 @@ module {
 
 module {
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   // CHECK: llvm.func @caller
   llvm.func @caller() {
@@ -104,7 +104,7 @@ module {
 
 module {
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   // CHECK: llvm.func @caller
   llvm.func @caller() {
@@ -122,7 +122,7 @@ module {
 
 module {
 
-  llvm.func @callee() {}
+  llvm.func @callee()
 
   // CHECK: llvm.func @caller
   llvm.func @caller() {
