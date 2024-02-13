@@ -149,9 +149,8 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(std::make_pair(std::make_shared<TensorProdObs<VectorStateT>>(
-                                                  TensorProdObs<VectorStateT>::create(obs_vec)),
-                                              ObsType::TensorProd));
+        observables_.push_back(
+            std::make_pair(TensorProdObs<VectorStateT>::create(obs_vec), ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
     }

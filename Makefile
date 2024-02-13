@@ -13,6 +13,7 @@ DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
+ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -39,6 +40,13 @@ endif
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"
 
+ifeq ($(ENABLE_OPENQASM), ON)
+# A global 'mutex' is added to protect `pybind11::exec` calls concurrently in `OpenQasmRunner`.
+# TODO: Remove this global 'mutex' to enable concurrent execution of remote calls.
+# This 'mutex' leads to an ODR violation when using ASAN
+ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0,detect_odr_violation=0"
+endif
+
 ifeq ($(ENABLE_ASAN),ON)
 ASAN_COMMAND := $(ASAN_OPTIONS) $(ASAN_FLAGS)
 else
@@ -54,11 +62,13 @@ help:
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
-	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
+	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
+	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
+	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
@@ -73,7 +83,7 @@ all: runtime mlir frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	$(PYTHON) -m pip install -e .
-	rm -r frontend/pennylane_catalyst.egg-info
+	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime
 mlir:
@@ -94,9 +104,6 @@ dialects:
 runtime:
 	$(MAKE) -C runtime runtime
 
-runtime-all:
-	$(MAKE) -C runtime runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
-
 dummy_device:
 	$(MAKE) -C runtime dummy_device
 
@@ -105,9 +112,6 @@ test: test-runtime test-frontend test-demos
 
 test-runtime:
 	$(MAKE) -C runtime test
-
-test-runtime-all:
-	$(MAKE) -C runtime test ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
 test-mlir:
 	$(MAKE) -C mlir test
@@ -133,6 +137,9 @@ endif
 endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
+ifeq ($(TEST_BRAKET), NONE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
+endif
 
 test-demos:
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
@@ -141,22 +148,24 @@ ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(ASAN_COMMAND) $(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PARALLELIZE)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
 
 	# Copy libs to frontend/catalyst/lib
-	mkdir -p $(MK_DIR)/frontend/catalyst/lib
+	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	for file in gradient quantum _ods_common catalyst ; do \
+	for file in gradient quantum _ods_common catalyst mitigation ; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver.so $(MK_DIR)/frontend/mlir_quantum/
@@ -166,7 +175,7 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-all
+.PHONY: clean clean-mlir clean-runtime clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -174,13 +183,17 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-all:
-	@echo "uninstall catalyst and delete all temporary, cache files"
+clean-mlir:
+	$(MAKE) -C mlir clean
+
+clean-runtime:
+	$(MAKE) -C runtime clean
+
+clean-all: clean-mlir clean-runtime
+	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
-	$(MAKE) -C mlir clean
-	$(MAKE) -C runtime clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
@@ -188,6 +201,9 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+ifeq ($(TEST_BRAKET), NONE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native 
+endif
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
@@ -207,11 +223,11 @@ endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
 ifdef check
-	python3 ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
 	isort --check --diff .
 else
-	python3 ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
 	isort .
 endif

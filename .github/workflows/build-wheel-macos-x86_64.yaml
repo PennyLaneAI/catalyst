@@ -1,6 +1,12 @@
 name: Build Catalyst Wheel on macOS (x86_64)
 
 on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -13,12 +19,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_if_wheel_build_required:
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.action != 'labeled' ||
+        github.event.label.name == 'ci:build-wheels'
+      }}
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
   constants:
+    needs: [check_if_wheel_build_required]
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
   build-dependencies:
-    needs: [constants]
+    needs: [constants, check_if_wheel_build_required]
 
     strategy:
       fail-fast: false
@@ -29,6 +46,8 @@ jobs:
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-12
+
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
     - name: Checkout Catalyst repo
@@ -125,11 +144,12 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DLLVM_ENABLE_LLD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -146,7 +166,8 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -156,7 +177,8 @@ jobs:
         cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
-              -DENZYME_STATIC_LIB=ON
+              -DENZYME_STATIC_LIB=ON \
+              -DCMAKE_CXX_VISIBILITY_PRESET=hidden
 
         cmake --build enzyme-build --target EnzymeStatic-18
 
@@ -183,7 +205,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -236,14 +258,16 @@ jobs:
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
+    # TODO: Update git tag to v0.35.0 after the next lightning release.
     - name: Build Catalyst-Runtime
       run: |
+        # Segfaults in computing Lightning's adjoint-jacobian when building with OMP
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG="latest_release" \
+              -DLIGHTNING_GIT_TAG="2716864521c539429bd382b92151a918d1a076ce" \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=OFF \
@@ -251,7 +275,8 @@ jobs:
               -DKokkos_ENABLE_DEPRECATION_WARNINGS=OFF \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
-              -DENABLE_OPENMP=OFF
+              -DENABLE_OPENMP=OFF \
+              -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
 
@@ -277,7 +302,7 @@ jobs:
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF \
+              -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DLLVM_ENABLE_LLD=OFF
 
         cmake --build quantum-build --target check-dialects compiler_driver
@@ -292,11 +317,16 @@ jobs:
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
+    - name: Repair wheel using delocate-wheel
+      run: |
+        # ignore-missing-dependencies only ignores libopenblas.dylib
+        delocate-wheel --require-archs=x86_64 -w ./wheel -v dist/*.whl --ignore-missing-dependencies -vv
+
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
         name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: dist/
+        path: wheel/
         retention-days: 14
 
   test-wheels:

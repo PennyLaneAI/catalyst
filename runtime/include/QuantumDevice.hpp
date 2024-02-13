@@ -16,10 +16,20 @@
 
 #include <complex>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "DataView.hpp"
 #include "Types.h"
+
+// A helper template macro to generate the <IDENTIFIER>Factory method by
+// calling <CONSTRUCTOR>(kwargs). Check the Custom Devices guideline for details:
+// https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html
+#define GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)                                           \
+    extern "C" Catalyst::Runtime::QuantumDevice *IDENTIFIER##Factory(const char *kwargs)           \
+    {                                                                                              \
+        return new CONSTRUCTOR(std::string(kwargs));                                               \
+    }
 
 namespace Catalyst::Runtime {
 
@@ -275,10 +285,12 @@ struct QuantumDevice {
      * @brief A general measurement method that acts on a single wire.
      *
      * @param wire The wire to compute Measure on
+     * @param postselect Which basis state to postselect after a mid-circuit measurement (-1 denotes
+     no post-selection)
 
      * @return `Result` The measurement result
      */
-    virtual auto Measure(QubitIdType wire) -> Result = 0;
+    virtual auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result = 0;
 
     /**
      * @brief Compute the gradient of a quantum tape, that is cached using

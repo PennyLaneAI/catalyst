@@ -225,3 +225,36 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   quantum.dealloc %0 : !quantum.reg
   return %10 : tensor<4xcomplex<f64>>
 }
+
+// -----
+
+// CHECK-LABEL: @param_ordering
+func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
+  // CHECK-DAG: [[C1:%.+]] = arith.constant 1.000000e-01
+  // CHECK-DAG: [[C2:%.+]] = arith.constant 2.000000e-01
+  // CHECK-DAG: [[C3:%.+]] = arith.constant 3.000000e-01
+  %c1 = arith.constant 0.1 : f64
+  %c2 = arith.constant 0.2 : f64
+  %c3 = arith.constant 0.3 : f64
+
+  // CHECK:     catalyst.list_push [[C1]]
+  // CHECK:     catalyst.list_push [[C2]]
+  // CHECK:     catalyst.list_push [[C3]]
+
+  // CHECK-NOT: quantum.adjoint
+  %1 = quantum.adjoint(%0) : !quantum.reg {
+  ^bb0(%r0: !quantum.reg):
+    %q0 = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK:   [[A3:%.+]] = catalyst.list_pop
+    // CHECK:   [[A2:%.+]] = catalyst.list_pop
+    // CHECK:   [[A1:%.+]] = catalyst.list_pop
+    // CHECK:   quantum.custom "Rot"([[A1]], [[A2]], [[A3]])
+    %q1 = quantum.custom "Rot"(%c1, %c2, %c3) %q0 : !quantum.bit
+
+    %r1 = quantum.insert %r0[ 0], %q1 : !quantum.reg, !quantum.bit
+    quantum.yield %r1 : !quantum.reg
+  }
+
+  return %1 : !quantum.reg
+}

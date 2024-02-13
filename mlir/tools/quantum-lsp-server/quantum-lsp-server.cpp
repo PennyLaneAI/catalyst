@@ -18,6 +18,7 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
+#include "Mitigation/IR/MitigationDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 #include "mhlo/IR/register.h"
@@ -30,6 +31,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
+    registry.insert<catalyst::mitigation::MitigationDialect>();
 
     mlir::mhlo::registerAllMhloDialects(registry);
     mlir::stablehlo::registerAllDialects(registry);

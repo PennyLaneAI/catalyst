@@ -14,7 +14,8 @@
 """This module contains functions for lowering, compiling, and linking
 MLIR/LLVM representations.
 """
-
+import glob
+import importlib
 import os
 import pathlib
 import platform
@@ -25,6 +26,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
+from os import path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
@@ -32,6 +34,10 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
+
+package_root = os.path.dirname(__file__)
+
+DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
 
 
 # pylint: disable=too-many-instance-attributes
@@ -51,8 +57,12 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
+        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
+            of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
+        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
+            Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
     """
 
@@ -62,8 +72,18 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
+    async_qnodes: Optional[bool] = False
     lower_to_llvm: Optional[bool] = True
+    static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+
+    def __post_init__(self):
+        # Make the format of static_argnums easier to handle.
+        static_argnums = self.static_argnums
+        if static_argnums is None:
+            self.static_argnums = ()
+        elif isinstance(static_argnums, int):
+            self.static_argnums = (static_argnums,)
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -78,7 +98,11 @@ class CompileOptions:
 
     def get_pipelines(self) -> List[Tuple[str, List[str]]]:
         """Get effective pipelines"""
-        return self.pipelines if self.pipelines is not None else DEFAULT_PIPELINES
+        if self.pipelines:
+            return self.pipelines
+        elif self.async_qnodes:
+            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
+        return DEFAULT_PIPELINES
 
 
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
@@ -94,90 +118,119 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
+HLO_LOWERING_PASS = (
+    "HLOLoweringPass",
+    [
+        "canonicalize",
+        "func.func(chlo-legalize-to-hlo)",
+        "stablehlo-legalize-to-hlo",
+        "func.func(mhlo-legalize-control-flow)",
+        "func.func(hlo-legalize-to-linalg)",
+        "func.func(mhlo-legalize-to-std)",
+        "convert-to-signless",
+        "func.func(scalarize)",
+        "canonicalize",
+        "scatter-lowering",
+        "hlo-custom-call-lowering",
+        "cse",
+    ],
+)
+
+QUANTUM_COMPILATION_PASS = (
+    "QuantumCompilationPass",
+    [
+        "lower-mitigation",
+        "lower-gradients",
+        "adjoint-lowering",
+    ],
+)
+
+BUFFERIZATION_PASS = (
+    "BufferizationPass",
+    [
+        "one-shot-bufferize{dialect-filter=memref}",
+        "inline",
+        "gradient-bufferize",
+        "scf-bufferize",
+        "convert-tensor-to-linalg",  # tensor.pad
+        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+        "arith-bufferize",
+        "empty-tensor-to-alloc-tensor",
+        "func.func(bufferization-bufferize)",
+        "func.func(tensor-bufferize)",
+        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
+        "func.func(linalg-bufferize)",
+        "func.func(tensor-bufferize)",
+        "quantum-bufferize",
+        "func-bufferize",
+        "func.func(finalizing-bufferize)",
+        "func.func(buffer-hoisting)",
+        "func.func(buffer-loop-hoisting)",
+        "func.func(buffer-deallocation)",
+        "convert-arraylist-to-memref",
+        "convert-bufferization-to-memref",
+        "canonicalize",
+        # "cse",
+        "cp-global-memref",
+    ],
+)
+
+
+MLIR_TO_LLVM_PASS = (
+    "MLIRToLLVMDialect",
+    [
+        "convert-gradient-to-llvm",
+        "func.func(convert-linalg-to-loops)",
+        "convert-scf-to-cf",
+        # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
+        # strides) into a sequence of easier to analyze constructs. In particular, this pass
+        # transforms ops into explicit sequence of operations that model the effect of this
+        # operation on the different metadata. This pass uses affine constructs to materialize
+        # these effects. Concretely, expanded-strided-metadata is used to decompose
+        # memref.subview as it has no lowering in -finalize-memref-to-llvm.
+        "expand-strided-metadata",
+        "lower-affine",
+        "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
+        "convert-complex-to-standard",  # added for complex.exp lowering
+        "convert-complex-to-llvm",
+        "convert-math-to-llvm",
+        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
+        "convert-math-to-libm",
+        "convert-arith-to-llvm",
+        "finalize-memref-to-llvm{use-generic-functions}",
+        "convert-index-to-llvm",
+        "convert-catalyst-to-llvm",
+        "convert-quantum-to-llvm",
+        "emit-catalyst-py-interface",
+        # Remove any dead casts as the final pass expects to remove all existing casts,
+        # but only those that form a loop back to the original type.
+        "canonicalize",
+        "reconcile-unrealized-casts",
+        "add-exception-handling",
+    ],
+)
+
+
 DEFAULT_PIPELINES = [
-    (
-        "HLOLoweringPass",
-        [
-            "canonicalize",
-            "func.func(chlo-legalize-to-hlo)",
-            "stablehlo-legalize-to-hlo",
-            "func.func(mhlo-legalize-control-flow)",
-            "func.func(hlo-legalize-to-linalg)",
-            "func.func(mhlo-legalize-to-std)",
-            "convert-to-signless",
-            "func.func(scalarize)",
-            "canonicalize",
-            "scatter-lowering",
-        ],
-    ),
-    (
-        "QuantumCompilationPass",
-        [
-            "lower-gradients",
-            "adjoint-lowering",
-        ],
-    ),
-    (
-        "BufferizationPass",
-        [
-            "one-shot-bufferize{dialect-filter=memref}",
-            "inline",
-            "gradient-bufferize",
-            "scf-bufferize",
-            "convert-tensor-to-linalg",  # tensor.pad
-            "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-            "arith-bufferize",
-            "empty-tensor-to-alloc-tensor",
-            "func.func(bufferization-bufferize)",
-            "func.func(tensor-bufferize)",
-            "func.func(linalg-bufferize)",
-            "func.func(tensor-bufferize)",
-            "catalyst-bufferize",
-            "quantum-bufferize",
-            "func-bufferize",
-            "func.func(finalizing-bufferize)",
-            "func.func(buffer-hoisting)",
-            "func.func(buffer-loop-hoisting)",
-            "func.func(buffer-deallocation)",
-            "convert-arraylist-to-memref",
-            "convert-bufferization-to-memref",
-            "canonicalize",
-            # "cse",
-            "cp-global-memref",
-        ],
-    ),
-    (
-        "MLIRToLLVMDialect",
-        [
-            "convert-gradient-to-llvm",
-            "func.func(convert-linalg-to-loops)",
-            "convert-scf-to-cf",
-            # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
-            # strides) into a sequence of easier to analyze constructs. In particular, this pass
-            # transforms ops into explicit sequence of operations that model the effect of this
-            # operation on the different metadata. This pass uses affine constructs to materialize
-            # these effects. Concretely, expanded-strided-metadata is used to decompose
-            # memref.subview as it has no lowering in -finalize-memref-to-llvm.
-            "expand-strided-metadata",
-            "lower-affine",
-            "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-            "convert-complex-to-standard",  # added for complex.exp lowering
-            "convert-complex-to-llvm",
-            "convert-math-to-llvm",
-            # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-            "convert-math-to-libm",
-            "convert-arith-to-llvm",
-            "finalize-memref-to-llvm{use-generic-functions}",
-            "convert-index-to-llvm",
-            "convert-catalyst-to-llvm",
-            "convert-quantum-to-llvm",
-            "emit-catalyst-py-interface",
-            # Remove any dead casts as the final pass expects to remove all existing casts,
-            # but only those that form a loop back to the original type.
-            "canonicalize",
-            "reconcile-unrealized-casts",
-        ],
-    ),
+    HLO_LOWERING_PASS,
+    QUANTUM_COMPILATION_PASS,
+    BUFFERIZATION_PASS,
+    MLIR_TO_LLVM_PASS,
+]
+
+MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
+MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
+    "qnode-to-async-lowering",
+    "async-func-to-async-runtime",
+    "async-to-async-runtime",
+    "convert-async-to-llvm",
+]
+
+DEFAULT_ASYNC_PIPELINES = [
+    HLO_LOWERING_PASS,
+    QUANTUM_COMPILATION_PASS,
+    BUFFERIZATION_PASS,
+    MLIR_TO_LLVM_ASYNC_PASS,
 ]
 
 
@@ -222,6 +275,37 @@ class LinkerDriver:
         else:
             pass  # pragma: nocover
 
+        # Discover the custom call library provided by the frontend & add it to the rpath and -L.
+        lib_path_flags += [
+            f"-Wl,-rpath,{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+            f"-L{DEFAULT_CUSTOM_CALLS_LIB_PATH}",
+        ]
+
+        # Discover the LAPACK library provided by scipy & add link against it.
+        # Doing this here ensures we will always have the correct library name.
+
+        if platform.system() == "Linux":
+            file_path_within_package = "../scipy.libs/"
+            file_extension = ".so"
+        elif platform.system() == "Darwin":  # pragma: nocover
+            file_path_within_package = ".dylibs/"
+            file_extension = ".dylib"
+
+        package_name = "scipy"
+        scipy_package = importlib.util.find_spec(package_name)
+        package_directory = path.dirname(scipy_package.origin)
+        scipy_lib_path = path.join(package_directory, file_path_within_package)
+
+        file_prefix = "libopenblas"
+        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
+        openblas_so_file = glob.glob(search_pattern)[0]
+        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
+
+        lib_path_flags += [
+            f"-Wl,-rpath,{scipy_lib_path}",
+            f"-L{scipy_lib_path}",
+        ]
+
         system_flags = []
         if platform.system() == "Linux":
             system_flags += ["-Wl,-no-as-needed"]
@@ -236,8 +320,10 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
+            f"-l{openblas_lib_name}",  # required for custom_calls lib
+            "-lcustom_calls",
+            "-lmlir_async_runtime",
         ]
-
         return default_flags
 
     @staticmethod
@@ -288,10 +374,10 @@ class LinkerDriver:
             infile (str): input file name
             outfile (str): output file name
         """
-        path = pathlib.Path(infile)
-        if not path.exists():
+        infile_path = pathlib.Path(infile)
+        if not infile_path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
-        return str(path.with_suffix(".so"))
+        return str(infile_path.with_suffix(".so"))
 
     @staticmethod
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):

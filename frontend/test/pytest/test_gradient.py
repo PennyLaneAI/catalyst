@@ -21,8 +21,10 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import CompileError, cond, for_loop, grad, jacobian, qjit
+from catalyst import cond, for_loop, grad, jacobian, qjit
 from catalyst.pennylane_extensions import DifferentiableCompileError
+
+# pylint: disable=too-many-lines
 
 
 class TestGradShape:
@@ -52,11 +54,65 @@ class TestGradShape:
 
 
 def test_grad_outside_qjit():
-    def f(x: float):
-        return x
+    """Test that grad can be used outside of a jitting context."""
 
-    with pytest.raises(CompileError, match="can only be used from within @qjit"):
-        grad(f)(1.0)
+    def f(x):
+        return x**2
+
+    x = 4.0
+
+    expected = jax.grad(f)(x)
+    result = grad(f)(x)
+
+    assert np.allclose(expected, result)
+
+
+@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
+def test_grad_outside_qjit_argnum(argnum):
+    """Test that argnums work correctly outside of a jitting context."""
+
+    def f(x, y):
+        return x**2 + y**2
+
+    x, y = 4.0, 4.0
+
+    expected = jax.grad(f, argnums=argnum if argnum is not None else 0)(x, y)
+    result = grad(f, argnum=argnum)(x, y)
+
+    assert np.allclose(expected, result)
+
+
+def test_jacobian_outside_qjit():
+    """Test that jacobian can be used outside of a jitting context."""
+
+    def f(x):
+        return x**2, 2 * x
+
+    x = jnp.array([4.0, 5.0])
+
+    expected = jax.jacobian(f)(x)
+    result = jacobian(f)(x)
+
+    assert len(expected) == len(result) == 2
+    assert np.allclose(expected[0], result[0])
+    assert np.allclose(expected[1], result[1])
+
+
+@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
+def test_jacobian_outside_qjit_argnum(argnum):
+    """Test that argnums work correctly outside of a jitting context."""
+
+    def f(x, y):
+        return x**2 + y**2, 2 * x + 2 * y
+
+    x, y = jnp.array([4.0, 5.0]), jnp.array([4.0, 5.0])
+
+    expected = jax.jacobian(f, argnums=argnum if argnum is not None else 0)(x, y)
+    result = jacobian(f, argnum=argnum)(x, y)
+
+    assert len(expected) == len(result) == 2
+    assert np.allclose(expected[0], result[0])
+    assert np.allclose(expected[1], result[1])
 
 
 def test_non_differentiable_qnode():
@@ -909,6 +965,105 @@ def test_multiple_grad_invocations(backend):
     expected = jax.jacobian(f, argnums=(0, 1))(0.1, 0.2)
     for actual_entry, expected_entry in zip(actual, expected):
         assert actual_entry == pytest.approx(expected_entry)
+
+
+def test_loop_with_dyn_wires(backend):
+    """Test the gradient on a function with a loop and modular wire arithmetic."""
+    num_wires = 4
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def cat(phi):
+        @for_loop(0, 3, 1)
+        def loop(i):
+            qml.RY(phi, wires=jnp.mod(i, num_wires))
+
+        loop()
+
+        return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
+
+    @qml.qnode(dev)
+    def pl(phi):
+        @for_loop(0, 3, 1)
+        def loop(i):
+            qml.RY(phi, wires=i % num_wires)
+
+        loop()
+
+        return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
+
+    arg = 0.75
+    result = qjit(grad(cat))(arg)
+    expected = qml.grad(pl, argnum=0)(arg)
+
+    assert np.allclose(result, expected)
+
+
+def test_pytrees_return_qnode(backend):
+    """Test the gradient on a function with a return including list and dictionnaries"""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    psi = 0.1
+    phi = 0.2
+    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[0]["expval0"], tuple)
+    assert len(result[0]["expval0"]) == 2
+    assert isinstance(result[1], tuple)
+    assert len(result[1]) == 2
+
+
+def test_pytrees_return_classical_function(backend):
+    """Test the jacobian on a qnode with a return including list and dictionnaries."""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    psi = 0.1
+    phi = 0.2
+    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[0]["expval0"], tuple)
+    assert len(result[0]["expval0"]) == 2
+    assert isinstance(result[1], tuple)
+    assert len(result[1]) == 2
+
+
+def test_pytrees_return_classical():
+    """Test the jacobian on a function with a return including list and dictionnaries."""
+
+    def f(x, y):
+        return [x, {"a": x**2}, x + y]
+
+    x = 0.4
+    y = 0.2
+
+    jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+
+    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+
+    assert tree_jax == tree_catalyst
+    assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
 if __name__ == "__main__":

@@ -192,6 +192,25 @@ rather than runtime.
 
     For more details, see the :doc:`AutoGraph guide <autograph>`.
 
+Printing at runtime
+-------------------
+
+In the previous section, we saw that the Python ``print`` statement will only
+be executed during tracing/compilation, and in particular, will not print
+out the value of dynamic variables (since their values are only known at *runtime*).
+
+If we wish to print the value of variables at *runtime*, we can instead use the
+:func:`catalyst.debug.print` function:
+
+
+>>> from catalyst import debug
+>>> @qjit
+... def g(x):
+...     debug.print(x)
+...     return x ** 2
+>>> g(2.)
+[2.]
+array(4.)
 
 Avoiding recompilation
 ----------------------
@@ -333,7 +352,7 @@ circuit, are measuring an expectation value, and are optimizing the result:
     weights = jnp.array(2 * np.random.random([5, 4]) - 1)
     data = jnp.array(np.random.random([4]))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+    opt = jaxopt.GradientDescent(cost, stepsize=0.4, jit=False)
 
     params = weights
     state = opt.init_state(params)
@@ -344,7 +363,8 @@ circuit, are measuring an expectation value, and are optimizing the result:
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
 
-Let's switch over to [Lightning](https://docs.pennylane.ai/projects/lightning/en/stable/), our high-performance statevector simulator,
+Let's switch over to `Lightning <https://docs.pennylane.ai/projects/lightning>`__,
+our high-performance statevector simulator,
 alongside the adjoint differentiation method. To do so, we change the first
 two lines of the above code-block to set the device as ``"lightning.qubit"``,
 and specify ``diff_method="adjoint"`` in the QNode decorator. With this
@@ -661,13 +681,20 @@ PennyLane provides a wide variety of
 :doc:`transforms <code/qml_transforms>` that
 convert a circuit to one or more circuits.
 
-As a general rule of thumb, transforms that result in a single circuit are
-generally applied before/outside the QNode decorator, while transforms that result in
-multiple circuits to be executed (**batch transforms**, such as
-:func:`~pennylane.transforms.split_non_commuting`) are applied after/inside the QNode decorator.
+Currently, most PennyLane transforms will work with Catalyst
+as long as:
 
-Currently, batch transforms and transforms that apply *inside* or *within* the QNode decorator will
-not work with Catalyst:
+- The circuit does not include any Catalyst-specific features, such
+  as Catalyst control flow or measurement,
+
+- The QNode returns only lists of measurement processes,
+
+- AutoGraph is disabled, and
+
+- The transformation does not require or depend on the numeric value of
+  dynamic variables.
+
+This includes transforms that generate many circuits,
 
 .. code-block:: python
 
@@ -679,26 +706,15 @@ not work with Catalyst:
         return [qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))]
 
 >>> circuit(0.4)
-CompileError: QuantumCompilationPass failed.
+[array(-0.51413599), array(0.85770868)]
 
-However, transforms that are applied *before* the QNode decorator will work with
-Catalyst, as long as:
-
-- The circuit does not include any Catalyst-specific features, such
-  as Catalyst control flow or measurement,
-
-- AutoGraph is disabled, and
-
-- The transformation does not require or depend on the numeric value of
-  dynamic variables.
-
-For example:
+as well as transforms that simply map the circuit to another:
 
 .. code-block:: python
 
     @qjit
-    @qml.qnode(dev)
     @qml.transforms.merge_rotations()
+    @qml.qnode(dev)
     def circuit(x):
         qml.RX(x, wires=0)
         qml.RX(x ** 2, wires=0)
@@ -714,25 +730,132 @@ a single RX gate is being applied due to the rotation gate merger:
 { lambda ; a:f64[]. let
     b:f64[] = func[
       call_jaxpr={ lambda ; c:f64[]. let
-           = qdevice[spec=kwargs val={'shots': 0}]
-           = qdevice[spec=backend val=lightning.qubit]
-          d:AbstractQreg() = qalloc 1
+          d:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] c
           e:f64[] = integer_pow[y=2] c
-          f:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] c
-          g:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] e
-          h:f64[1] = add f g
-          i:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] h
-          j:f64[] = squeeze[dimensions=(0,)] i
-          k:AbstractQbit() = qextract d 0
-          l:AbstractQbit() = qinst[op=RX qubits_len=1] k j
+          f:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] e
+          g:f64[1] = add d f
+          h:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] g
+          i:f64[] = squeeze[dimensions=(0,)] h
+           = qdevice[
+            rtd_kwargs={'shots': 0, 'mcmc': False}
+            rtd_lib=/usr/local/lib/python3.10/dist-packages/catalyst/utils/../lib/librtd_lightning.so
+            rtd_name=LightningSimulator
+          ]
+          j:AbstractQreg() = qalloc 2
+          k:AbstractQbit() = qextract j 0
+          l:AbstractQbit() = qinst[op=RX qubits_len=1] k i
           m:AbstractObs(num_qubits=None,primitive=None) = namedobs[kind=PauliZ] l
           n:f64[] = expval[shots=None] m
-           = qdealloc d
+          o:AbstractQreg() = qinsert j 0 l
+           = qdealloc o
         in (n,) }
-      fn=<QNode: wires=1, device='lightning.qubit', interface='auto', diff_method='best'>
+      fn=<QNode: wires=2, device='lightning.qubit', interface='auto', diff_method='best'>
     ] a
   in (b,) }
 
+Note that currently PennyLane transforms **cannot** be applied when ``autograph=True``.
+
+Compatibility with PennyLane decompositions
+-------------------------------------------
+
+When defining decompositions of PennyLane operations, any control flow depending on dynamic
+variables will fail, since decompositions are applied at compile time:
+
+.. code-block:: python
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+            ops = []
+
+            if theta == 0.3:
+                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+            else:
+                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+
+            return ops
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(theta):
+        RXX(theta, wires=[0, 1])
+        qml.Hadamard(1)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.3)
+TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
+See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+
+Instead, Catalyst control flow (such as :func:`~.cond` and :func:`.for_loop`) must be used in order to support control flow on dynamic variables:
+
+.. code-block:: python
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+
+            with qml.tape.QuantumTape() as tape:
+
+                @cond(params[0] == 0.3)
+                def branch_fn():
+                    qml.PauliRot(theta, 'XX', wires=wires)
+
+                @branch_fn.otherwise
+                def branch_fn():
+                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+
+                branch_fn()
+
+            return tape.operations
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(theta):
+        RXX(theta, wires=[0, 1])
+        qml.Hadamard(1)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.3)
+array(0.95533649)
+
+Note that here we make sure to include the Catalyst control flow within a ``QuantumTape`` context.
+This is because :func:`~.cond` cannot return operations, only capture queued/instantiated
+operations, but the ``Operation.compute_decomposition`` API requires that a list of operations is
+returned.
+
+If preferred, AutoGraph can be experimentally enabled on a subset of code within
+the decomposition as follows:
+
+.. code-block:: python
+
+    from catalyst.autograph import autograph
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+
+            @autograph
+            def f(params):
+                if params[0] == 0.3:
+                    qml.PauliRot(theta, 'XX', wires=wires)
+                else:
+                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+
+            with qml.tape.QuantumTape() as tape:
+                f(params)
+
+            return tape.operations
 
 Function argument restrictions
 ------------------------------
@@ -810,6 +933,74 @@ array(0.2)
 
     The Catalyst ``@qjit`` decorator doesn't yet support this functionality.
 
+Dynamically-shaped arrays
+-------------------------
+
+Catalyst provides experimental support for compiling functions that accept
+or contain tensors whose dimensions are not know at compile time, without
+needing to recompile the function when tensor shapes change.
+
+For example, one might consider a case where a dynamic variable specifies the shape
+of a tensor created within (or returned by) the compiled function:
+
+>>> @qjit
+... def func(size: int):
+...     print("Compiling")
+...     return jax.numpy.ones([size, size], dtype=float)
+>>> func(3)
+Compiling
+array([[1., 1., 1.],
+       [1., 1., 1.],
+       [1., 1., 1.]])
+>>> func(4)
+array([[1., 1., 1., 1.],
+       [1., 1., 1., 1.],
+       [1., 1., 1., 1.],
+       [1., 1., 1., 1.]])
+
+We can also pass tensors of variable shape directly as arguments to compiled
+functions, however we need to provide the ``abstracted_axes`` argument,
+to specify which axes of the tensors should be considered dynamic during compilation.
+
+>>> @qjit(abstracted_axes={0: "n"})
+... def sum_fn(x):
+...     print("Compiling")
+...     return jnp.sum(x)
+>>> sum_fn(jnp.array([1., 0.5]))
+Compiling
+array(1.5)
+>>> sum_fn(jnp.array([1., 0.5, 0.6]))
+array(2.1)
+
+Note that failure to specify this argument will cause re-compilation each time
+input tensor arguments change shape:
+
+>>> @qjit
+... def sum_fn(x):
+...     print("Compiling")
+...     return jnp.sum(x)
+>>> sum_fn(jnp.array([1., 0.5]))
+Compiling
+array(1.5)
+>>> sum_fn(jnp.array([1., 0.5, 0.6]))
+Compiling
+array(2.1)
+
+For more details on using ``abstracted_axes``, please see the :func:`~.qjit` documentation.
+
+Note that using dynamically-shaped arrays within for loops, while loops, and
+conditional statements, is not currently supported:
+
+>>> @qjit
+... def f(size):
+...     a = jnp.ones([size], dtype=float)
+...     for i in range(10):
+...         a = a
+...     @for_loop(0, 10, 2)
+...     def loop(_, a):
+...         return a
+...     return loop(a)
+KeyError: 137774138140016
 
 Returning multiple measurements
 -------------------------------
@@ -954,22 +1145,7 @@ in Python with PennyLane, and easily scale up prototypes by simply adding ``@qji
 This will require that all PennyLane functionality behaves identically whether or not
 the ``@qjit`` decorator is applied.
 
-Currently, however, this is not the case in two places.
-
-- **Finite-shot measurement statistics**. The Catalyst-Lightning runtime does not
-  at the moment have support for finite-shot measurement statistics. As a result,
-  measurement statistics will always be exact within a ``@qjit``, even when Lightning
-  is configured with finite-shots.
-
-  >>> dev = qml.device("lightning.qubit", wires=1, shots=10)
-  ... @qml.qnode(dev)
-  ... def circuit(x):
-  ...     qml.RX(x, wires=0)
-  ...     return qml.expval(qml.PauliZ(0))
-  >>> circuit(0.4)
-  array(0.8)
-  >>> qjit(circuit)(0.4)
-  array(0.92106099)
+Currently, however, this is not the case for measurements.
 
 - **Measurement behaviour**. :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.

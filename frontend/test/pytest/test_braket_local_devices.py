@@ -113,30 +113,6 @@ class TestBraketGates:
             ),
         ],
     )
-    def test_unsupported_gate_braket(self, device):
-        """Test an unsupported gate on braket devices."""
-
-        def circuit():
-            qml.MultiRZ(np.pi / 2, wires=[0, 1, 2])
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
-
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
-
-        with pytest.raises(
-            RuntimeError, match="The given QIR gate name is not supported by the OpenQASM builder."
-        ):
-            qjit_fn()
-
-    @pytest.mark.parametrize(
-        "device",
-        [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=3,
-            ),
-        ],
-    )
     def test_param_braket(self, device):
         """Test param operations on braket devices."""
 
@@ -153,6 +129,8 @@ class TestBraketGates:
 
             qml.PhaseShift(x, wires=0)
             qml.PhaseShift(y, wires=1)
+
+            qml.PSWAP(x, wires=[0, 2])
 
             return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 

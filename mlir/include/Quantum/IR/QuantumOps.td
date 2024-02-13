@@ -79,8 +79,8 @@ def FinalizeOp : Quantum_Op<"finalize"> {
     }];
 }
 
-def DeviceOp : Quantum_Op<"device"> {
-    let summary = "Initialize a quantum device or set some device configuration options.";
+def DeviceInitOp : Quantum_Op<"device"> {
+    let summary = "Initialize a quantum device.";
 
     let arguments = (ins
         StrAttr:$lib,
@@ -90,6 +90,14 @@ def DeviceOp : Quantum_Op<"device"> {
 
     let assemblyFormat = [{
       `[` $lib `,` $name `,` $kwargs `]` attr-dict
+    }];
+}
+
+def DeviceReleaseOp : Quantum_Op<"device_release"> {
+    let summary = "Release the active quantum device.";
+
+    let assemblyFormat = [{
+        attr-dict
     }];
 }
 
@@ -514,7 +522,8 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 
     let arguments = (ins
-        QubitType:$in_qubit
+        QubitType:$in_qubit,
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );
 
     let results = (outs

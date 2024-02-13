@@ -290,7 +290,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
 
         // Finally erase all quantum operations.
         gradientFn.walk([&](Operation *op) {
-            if (isa<quantum::DeviceOp>(op)) {
+            if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
@@ -302,6 +302,9 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 rewriter.replaceOp(op, region.getRegisterOperand());
             }
             else if (isa<quantum::DeallocOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (isa<quantum::DeviceReleaseOp>(op)) {
                 rewriter.eraseOp(op);
             }
         });

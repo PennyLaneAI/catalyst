@@ -22,7 +22,6 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
-#include <random>
 #include <span>
 
 #include "StateVectorLQubitDynamic.hpp"
@@ -43,12 +42,18 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
-    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+    static constexpr size_t default_num_burnin{100}; // tidy: readability-magic-numbers
+    static constexpr std::string_view default_kernel_name{
+        "Local"}; // tidy: readability-magic-numbers
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     Catalyst::Runtime::CacheManager cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
+
+    bool mcmc{false};
+    size_t num_burnin{0};
+    std::string kernel_name;
 
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
     LightningObsManager<double> obs_manager{};
@@ -83,56 +88,23 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     explicit LightningSimulator(const std::string &kwargs = "{}")
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
-        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
-                                              : default_device_shots;
+        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
+        mcmc = args.contains("mcmc") ? args["mcmc"] == "True" : false;
+        num_burnin = args.contains("num_burnin")
+                         ? static_cast<size_t>(std::stoll(args["num_burnin"]))
+                         : default_num_burnin;
+        kernel_name = args.contains("kernel_name") ? args["kernel_name"] : default_kernel_name;
     }
     ~LightningSimulator() override = default;
 
-    LightningSimulator(const LightningSimulator &) = delete;
-    LightningSimulator &operator=(const LightningSimulator &) = delete;
-    LightningSimulator(LightningSimulator &&) = delete;
-    LightningSimulator &operator=(LightningSimulator &&) = delete;
+    QUANTUM_DEVICE_DEL_DECLARATIONS(LightningSimulator);
 
-    // RT
-    auto AllocateQubit() -> QubitIdType override;
-    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;
-    void ReleaseQubit(QubitIdType q) override;
-    void ReleaseAllQubits() override;
-    [[nodiscard]] auto GetNumQubits() const -> size_t override;
-    void StartTapeRecording() override;
-    void StopTapeRecording() override;
-    void SetDeviceShots(size_t shots) override;
-    [[nodiscard]] auto GetDeviceShots() const -> size_t override;
-    void PrintState() override;
-    [[nodiscard]] auto Zero() const -> Result override;
-    [[nodiscard]] auto One() const -> Result override;
+    QUANTUM_DEVICE_RT_DECLARATIONS;
+    QUANTUM_DEVICE_QIS_DECLARATIONS;
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
-
-    // QIS
-    void NamedOperation(const std::string &name, const std::vector<double> &params,
-                        const std::vector<QubitIdType> &wires, bool inverse) override;
-    void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                         const std::vector<QubitIdType> &wires, bool inverse) override;
-    auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                    const std::vector<QubitIdType> &wires) -> ObsIdType override;
-    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;
-    auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
-        -> ObsIdType override;
-    auto Expval(ObsIdType obsKey) -> double override;
-    auto Var(ObsIdType obsKey) -> double override;
-    void State(DataView<std::complex<double>, 1> &state) override;
-    void Probs(DataView<double, 1> &probs) override;
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override;
-    void Sample(DataView<double, 2> &samples, size_t shots) override;
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
-                       size_t shots) override;
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots) override;
-    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires, size_t shots) override;
-    auto Measure(QubitIdType wire) -> Result override;
-    void Gradient(std::vector<DataView<double, 1>> &gradients,
-                  const std::vector<size_t> &trainParams) override;
+    auto GenerateSamplesMetropolis(size_t shots) -> std::vector<size_t>;
+    auto GenerateSamples(size_t shots) -> std::vector<size_t>;
 };
 } // namespace Catalyst::Runtime::Simulator

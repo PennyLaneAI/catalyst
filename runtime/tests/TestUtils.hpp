@@ -38,7 +38,7 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
 
 /**
- * Get available device names in the compatible format for `__quantum__rt__device`
+ * Get available device names in the compatible format for `__catalyst__rt__device`
  *
  * This is a utility function used in Catch2 tests.
  *
@@ -52,4 +52,13 @@ static inline auto getDevices() -> std::vector<std::tuple<std::string, std::stri
     devices.emplace_back("lightning.kokkos", "lightning.kokkos", "{shots: 0}");
 #endif
     return devices;
+}
+
+inline auto get_dylib_ext() -> std::string
+{
+#ifdef __linux__
+    return ".so";
+#elif defined(__APPLE__)
+    return ".dylib";
+#endif
 }

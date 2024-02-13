@@ -22,7 +22,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, for_loop, grad, measure, qjit
+from catalyst import adjoint, cond, for_loop, grad, measure, qjit
 
 
 class TestPyTreesReturnValues:
@@ -83,7 +83,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], jnp.pi)
         assert jnp.allclose(result[1], ip_result)
 
-    def test_return_value_tuples(self, backend):
+    def test_return_value_tuples(self, backend, tol_stochastic):
         """Test tuples."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -115,7 +115,7 @@ class TestPyTreesReturnValues:
         assert result[0][0][0] + result[0][0][1] == result[0][1]
         assert result[0][0][0] * result[0][0][1] == result[1]
 
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
         def circuit3(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -133,7 +133,7 @@ class TestPyTreesReturnValues:
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
         assert len(result[1]) == 4
-        assert jnp.allclose(result[2], expected_expval)
+        assert jnp.allclose(result[2], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
 
         @qjit
         def workflow(x):
@@ -216,7 +216,7 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
-    def test_return_value_dict(self, backend):
+    def test_return_value_dict(self, backend, tol_stochastic):
         """Test dictionaries."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -237,7 +237,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result["w0"], expected["w0"])
         assert jnp.allclose(result["w1"], expected["w1"])
 
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
         def circuit2(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
@@ -257,7 +257,9 @@ class TestPyTreesReturnValues:
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
         assert len(result["state"]) == 4
-        assert jnp.allclose(result["expval"]["z0"], expected_expval)
+        assert jnp.allclose(
+            result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
+        )
 
         @qjit
         def workflow1(param):
@@ -487,6 +489,23 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(result, False)
         result = circuit({"wire": 1})
         assert jnp.allclose(result, True)
+
+    def test_dev_wires_have_pytree(self, backend):
+        """Device wires are pytree-compatible."""
+
+        def subroutine(wires):
+            for wire in wires:
+                qml.PauliX(wire)
+
+        dev = qml.device(backend, wires=3)
+
+        @qjit
+        @qml.qnode(dev)
+        def test_function():
+            adjoint(subroutine)(dev.wires)
+            return qml.probs()
+
+        test_function()
 
 
 class TestAuxiliaryData:

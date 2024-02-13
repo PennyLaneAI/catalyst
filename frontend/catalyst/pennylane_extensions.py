@@ -18,7 +18,10 @@ while using :func:`~.qjit`.
 
 # pylint: disable=too-many-lines
 
+import copy
 import numbers
+import pathlib
+from collections.abc import Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
@@ -27,7 +30,13 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
-from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax._src.tree_util import (
+    PyTreeDef,
+    flatten_one_level,
+    tree_flatten,
+    tree_unflatten,
+    treedef_is_leaf,
+)
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
@@ -50,6 +59,7 @@ from catalyst.jax_primitives import (
     qmeasure_p,
     vjp_p,
     while_p,
+    zne_p,
 )
 from catalyst.jax_tracer import (
     Function,
@@ -79,7 +89,7 @@ from catalyst.utils.jax_extras import (
     unzip2,
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.runtime import extract_backend_info, get_lib_path
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -109,19 +119,40 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device):
+    def __init__(self, fn, device):  # pragma: nocover
         self.func = fn
         self.device = device
         update_wrapper(self, fn)
 
+    @staticmethod
+    def _add_toml_file(device):
+        """Temporary function. This function adds the config field to devices.
+        TODO: Remove this function when `qml.Device`s are guaranteed to have their own
+        config file field."""
+        if hasattr(device, "config"):  # pragma: no cover
+            # Devices that already have a config field do not need it to be overwritten.
+            return
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        name = device.name
+        if isinstance(device, qml.Device):
+            name = device.short_name
+
+        # The toml files name convention we follow is to replace
+        # the dots with underscores in the device short name.
+        toml_file_name = name.replace(".", "_") + ".toml"
+        # And they are currently saved in the following directory.
+        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+        device.config = toml_file
+
     def __call__(self, *args, **kwargs):
         qnode = None
-        if isinstance(self, QNode):
+        if isinstance(self, qml.QNode):
             qnode = self
-            device = QJITDevice(
-                self.device.shots, self.device.wires, *extract_backend_info(self.device)
-            )
-        else:
+            QFunc._add_toml_file(self.device)
+            dev_args = extract_backend_info(self.device)
+            config, rest = dev_args[0], dev_args[1:]
+            device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
+        else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
@@ -162,22 +193,24 @@ class QJITDevice(qml.QubitDevice):
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
-    operations = [
-        "MidCircuitMeasure",
-        "Cond",
-        "WhileLoop",
-        "ForLoop",
+
+    # These must be present even if empty.
+    operations = []
+    observables = []
+
+    operations_supported_by_QIR_runtime = {
+        "Identity",
         "PauliX",
         "PauliY",
         "PauliZ",
         "Hadamard",
-        "Identity",
         "S",
         "T",
         "PhaseShift",
         "RX",
         "RY",
         "RZ",
+        "Rot",
         "CNOT",
         "CY",
         "CZ",
@@ -185,31 +218,78 @@ class QJITDevice(qml.QubitDevice):
         "IsingXX",
         "IsingYY",
         "IsingXY",
-        "IsingZZ",
         "ControlledPhaseShift",
         "CRX",
         "CRY",
         "CRZ",
         "CRot",
         "CSWAP",
+        "Toffoli",
         "MultiRZ",
         "QubitUnitary",
-        "Adjoint",
-    ]
-    observables = [
-        "Identity",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "Hadamard",
-        "Hermitian",
-        "Hamiltonian",
-    ]
+        "ISWAP",
+        "PSWAP",
+    }
+
+    @staticmethod
+    def _get_operations_to_convert_to_matrix(_config):
+        # We currently override and only set a few gates to preserve existing behaviour.
+        # We could choose to read from config and use the "matrix" gates.
+        # However, that affects differentiability.
+        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
+        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
+        return {"MultiControlledX", "BlockEncode"}
+
+    @staticmethod
+    def _check_mid_circuit_measurement(config):
+        return config["compilation"]["mid_circuit_measurement"]
+
+    @staticmethod
+    def _check_adjoint(config):
+        return config["compilation"]["quantum_adjoint"]
+
+    @staticmethod
+    def _check_quantum_control(config):
+        return config["compilation"]["quantum_control"]
+
+    @staticmethod
+    def _set_supported_operations(config):
+        """Override the set of supported operations."""
+        native_gates = set(config["operators"]["gates"][0]["native"])
+        qir_gates = QJITDevice.operations_supported_by_QIR_runtime
+        QJITDevice.operations = list(native_gates.intersection(qir_gates))
+
+        # These are added unconditionally.
+        QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
+
+        if QJITDevice._check_mid_circuit_measurement(config):  # pragma: no branch
+            QJITDevice.operations += ["MidCircuitMeasure"]
+
+        if QJITDevice._check_adjoint(config):
+            QJITDevice.operations += ["Adjoint"]
+
+        if QJITDevice._check_quantum_control(config):  # pragma: nocover
+            QJITDevice.operations += ["QCtrl"]
+
+    @staticmethod
+    def _set_supported_observables(config):
+        """Override the set of supported observables."""
+        QJITDevice.observables = config["operators"]["observables"]
 
     # pylint: disable=too-many-arguments
     def __init__(
-        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+        self,
+        config,
+        shots=None,
+        wires=None,
+        backend_name=None,
+        backend_lib=None,
+        backend_kwargs=None,
     ):
+        QJITDevice._set_supported_operations(config)
+        QJITDevice._set_supported_observables(config)
+
+        self.config = config
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
@@ -242,22 +322,31 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
+        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
+
+        def _decomp_to_unitary(self, *_args, **_kwargs):
+            try:
+                mat = self.matrix()
+            except Exception as e:
+                raise CompileError(
+                    f"Operation {self} could not be decomposed, it might be unsupported."
+                ) from e
+            return [qml.QubitUnitary(mat, wires=self.wires)]
+
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
         # numbers of qubits, a unitary gate might be faster, while for large qubit numbers prior
         # decomposition is generally faster.
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-
-        def _decomp_controlled(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
-
-        with Patcher(
+        overriden_methods = [  # pragma: no cover
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
-            (qml.ops.Controlled, "decomposition", _decomp_controlled),
-            # TODO: Remove once work_wires is no longer needed for decomposition.
-            (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
-        ):
+            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
+        ]
+        for gate in decompose_to_qubit_unitary:
+            overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
+
+        with Patcher(*overriden_methods):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
         self.check_validity(expanded_tape.operations, [])
@@ -305,10 +394,11 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
-    """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks and
+    return the output tree."""
     method = grad_params.method
-    jaxpr = jax.make_jaxpr(f)(*args)
-
+    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
@@ -334,7 +424,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
-    return jaxpr
+    return jaxpr, out_tree
 
 
 def _verify_differentiable_child_qnodes(jaxpr, method):
@@ -419,7 +509,7 @@ def _check_grad_params(
     if method == "fd" and h is None:
         h = 1e-7
     if not (h is None or isinstance(h, numbers.Number)):
-        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
+        raise ValueError(f"Invalid h value ({h}). None or number was expected.")
     if argnum is None:
         argnum = [0]
     elif isinstance(argnum, int):
@@ -431,6 +521,27 @@ def _check_grad_params(
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
     return GradParams(method, scalar_out, h, argnum)
+
+
+def _unflatten_derivatives(results, out_tree, argnum, num_results):
+    """Unflatten the flat list of derivatives results given the out tree."""
+    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    results = tuple(
+        tuple(results[i * num_trainable_params : i * num_trainable_params + num_trainable_params])
+        for i in range(0, num_results)
+    )
+    # In jax,  argnums=[int] wraps single derivatives in a tuple
+    if (
+        (isinstance(argnum, int) or argnum is None)
+        and num_trainable_params == 1
+        and num_results != 1
+    ):
+        results = tuple(r[0] if len(r) == 1 else r for r in results)
+    if out_tree.children() != []:
+        results = tree_unflatten(out_tree, results)
+    else:
+        results = results[0]
+    return results
 
 
 class Grad:
@@ -448,9 +559,9 @@ class Grad:
         TypeError: Non-differentiable object was passed as `fn` argument.
     """
 
-    def __init__(self, fn: Differentiable, *, grad_params: GradParams):
+    def __init__(self, fn: Differentiable, grad_params: GradParams):
         self.fn = fn
-        self.__name__ = f"grad.{fn.__name__}"
+        self.__name__ = f"grad.{getattr(fn, '__name__', 'unknown')}"
         self.grad_params = grad_params
 
     def __call__(self, *args, **kwargs):
@@ -458,22 +569,36 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
-        EvaluationContext.check_is_tracing(
-            "catalyst.grad can only be used from within @qjit decorated code."
-        )
-        jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
 
-        args_data, _ = tree_flatten(args)
+        if EvaluationContext.is_tracing():
+            fn = _ensure_differentiable(self.fn)
+            grad_params = _check_grad_params(*self.grad_params)
+            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
-        # It always returns list as required by catalyst control-flows
-        return grad_p.bind(*args_data, jaxpr=jaxpr, fn=self.fn, grad_params=self.grad_params)
+            args_data, _ = tree_flatten(args)
+
+            # It always returns list as required by catalyst control-flows
+            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = _unflatten_derivatives(
+                results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
+            )
+        else:
+            if argnums := self.grad_params.argnum is None:
+                argnums = 0
+            if self.grad_params.scalar_out:
+                results = jax.grad(self.fn, argnums=argnums)(*args)
+            else:
+                results = jax.jacobian(self.fn, argnums=argnums)(*args)
+
+        return results
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
-    This function allows the gradient of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the gradient of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.grad``.
 
     .. warning::
 
@@ -595,16 +720,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     array(4.6)
     """
     scalar_out = True
-    return Grad(
-        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
-    )
+    return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
-    This function allows the Jacobian of a hybrid quantum-classical function
-    to be computed within the compiled program.
+    This function allows the Jacobian of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.jacobian``.
 
     Args:
         f (Callable): a function or a function object to differentiate
@@ -661,9 +785,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
            [-4.20735506e-01,  4.20735506e-01]])
     """
     scalar_out = False
-    return Grad(
-        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
-    )
+    return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
 # pylint: disable=too-many-arguments
@@ -671,7 +793,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.jvp``.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -733,22 +856,36 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> workflow(params, dy)
     [array(0.78766064), array(-0.7011436)]
     """
-    EvaluationContext.check_is_tracing(
-        "catalyst.jvp can only be used from within @qjit decorated code."
-    )
 
-    def _check(x, hint):
+    def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-        return x
 
-    params = _check(params, "params")
-    tangents = _check(tangents, "tangents")
-    fn: Differentiable = _ensure_differentiable(f)
-    scalar_out = False
-    grad_params = _check_grad_params(method, scalar_out, h, argnum)
-    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    check_is_iterable(params, "params")
+    check_is_iterable(tangents, "tangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+        if out_tree.children() != []:
+            midpoint = len(results) // 2
+            func_res = results[:midpoint]
+            jvps = results[midpoint:]
+            func_res = tree_unflatten(out_tree, func_res)
+            jvps = tree_unflatten(out_tree, jvps)
+            results = tuple([func_res, jvps])
+        else:
+            results = tuple(results)
+    else:
+        results = jax.jvp(f, params, tangents)
+
+    return results
 
 
 # pylint: disable=too-many-arguments
@@ -756,7 +893,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
-    computed within the compiled program.
+    computed within the compiled program. Outside of a compiled function, this function will simply
+    dispatch to its JAX counterpart ``jax.vjp``.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
@@ -794,22 +932,146 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     [array([0.09983342, 0.04      , 0.02      ]),
     array([-0.43750208,  0.07000001])]
     """
-    EvaluationContext.check_is_tracing(
-        "catalyst.vjp can only be used from within @qjit decorated code."
-    )
 
-    def _check(x, hint):
+    def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-        return x
 
-    params = _check(params, "params")
-    cotangents = _check(cotangents, "cotangents")
-    fn: Differentiable = _ensure_differentiable(f)
-    scalar_out = False
-    grad_params = _check_grad_params(method, scalar_out, h, argnum)
-    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    check_is_iterable(params, "params")
+    check_is_iterable(cotangents, "cotangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+        if out_tree.children() != []:
+            func_res = results[: len(jaxpr.out_avals)]
+            vjps = results[len(jaxpr.out_avals) :]
+            func_res = tree_unflatten(out_tree, func_res)
+            # We do not change the shape of the VJP as it is the same as the parameters not
+            # as the output
+            results = tuple([func_res, tuple(vjps)])
+        else:
+            func_res = results[: len(jaxpr.out_avals)]
+            vjps = results[len(jaxpr.out_avals) :]
+            results = tuple([*func_res, tuple(vjps)])
+    else:
+        primal_outputs, vjp_fn = jax.vjp(f, *params)
+
+        # JAX requires that the PyTree shape of cotangents matches that of the function results.
+        # Generally, the user is responsible for this, except when the function returns a "bare"
+        # array, since we do force users to provide cotangents as an iterable.
+        # TODO: Add support for PyTrees in the compiled branch, then we can remove this special
+        # handling here by relaxing the input type restriction.
+        if len(cotangents) == 1 and isinstance(primal_outputs, jax.Array):
+            children, _ = flatten_one_level(cotangents)
+            cotangents = children[0]
+
+        results = vjp_fn(cotangents)
+
+    return results
+
+
+class ZNE:
+    """An object that specifies how a circuit is mitigated with ZNE.
+
+    Args:
+        fn (Callable): the circuit to be mitigated with ZNE.
+        scale_factors (array[int]): the range of noise scale factors used.
+        deg (int): the degree of the polymonial used for fitting.
+
+    Raises:
+        TypeError: Non-QNode object was passed as `fn`.
+    """
+
+    def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
+        if not isinstance(fn, qml.QNode):
+            raise TypeError(f"A QNode is expected, got the classical function {fn}")
+        self.fn = fn
+        self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
+        self.scale_factors = scale_factors
+        self.deg = deg
+
+    def __call__(self, *args, **kwargs):
+        """Specifies the an actual call to the folded circuit."""
+        jaxpr = jaxpr = jax.make_jaxpr(self.fn)(*args)
+        shapes = [out_val.shape for out_val in jaxpr.out_avals]
+        dtypes = [out_val.dtype for out_val in jaxpr.out_avals]
+        set_dtypes = set(dtypes)
+        if any(shapes):
+            raise TypeError("Only expectations values and classical scalar values can be returned.")
+        if len(set_dtypes) != 1 or set_dtypes.pop().kind != "f":
+            raise TypeError("All expectation and classical values dtypes must match and be float.")
+        args_data, _ = tree_flatten(args)
+        results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
+        float_scale_factors = jnp.array(self.scale_factors, dtype=float)
+        results = jax.numpy.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        # Single measurement
+        if results.shape == ():
+            return results
+        # Multiple measurements
+        return tuple(res for res in results)
+
+
+def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
+    """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
+    extrapolation.
+
+    Error mitigation is a precursor to error correction and is compatible with near-term quantum
+    devices. It aims to lower the impact of noise when evaluating a circuit on a quantum device by
+    evaluating multiple variations of the circuit and post-processing the results into a
+    noise-reduced estimate. This transform implements the zero-noise extrapolation (ZNE) method
+    originally introduced by
+    `Temme et al. <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.119.180509>`__ and
+    `Li et al. <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.7.021050>`__.
+
+    Args:
+        f (qml.QNode): the circuit to be mitigated.
+        scale_factors (array[int]): the range of noise scale factors used.
+        deg (int): the degree of the polymonial used for fitting.
+
+    Returns:
+        Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
+        for the given arguments.
+
+    **Example:**
+
+    For example, given a noisy device (such as noisy hardware available through Amazon Braket):
+
+    .. code-block:: python
+
+        # replace "noisy.device" with your noisy device
+        dev = qml.device("noisy.device", wires=2)
+
+        @qml.qnode(device=dev)
+        def circuit(x, n):
+            @for_loop(0, n, 1)
+            def loop_rx(i):
+                qml.RX(x, wires=0)
+
+            loop_rx()
+
+            qml.Hadamard(wires=0)
+            qml.RZ(x, wires=0)
+            loop_rx()
+            qml.RZ(x, wires=0)
+            qml.CNOT(wires=[1, 0])
+            qml.Hadamard(wires=1)
+            return qml.expval(qml.PauliY(wires=0))
+
+        @qjit
+        def mitigated_circuit(args, n):
+            s = jax.numpy.array([1, 2, 3])
+            return mitigate_with_zne(circuit, scale_factors=s)(args, n)
+    """
+    if deg is None:
+        deg = len(scale_factors) - 1
+    return ZNE(f, scale_factors, deg)
 
 
 def _aval_to_primitive_type(aval):
@@ -885,7 +1147,11 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+
+        # Check if the postselect value was given, otherwise default to None
+        postselect = op.in_classical_tracers[1] if len(op.in_classical_tracers) > 1 else None
+
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -991,16 +1257,30 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+    @property
+    def wires(self):
+        """The list of all static wires."""
 
+        assert len(self.regions) == 1, "Adjoint is expected to have one region"
+        total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
+        return total_wires
+
+
+# TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
+#       to this class whenever a qjit context is active.
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def __init__(
-        self, *args, control_wire_tracers, control_value_tracers, work_wire_tracers, **kwargs
-    ):
-        self.control_wire_tracers: List[Any] = control_wire_tracers
-        self.control_value_tracers: List[Any] = control_value_tracers
-        self.work_wire_tracers: Optional[List[Any]] = work_wire_tracers
+    def __init__(self, *args, control_wires, control_values=None, work_wires=None, **kwargs):
+        self._control_wires = qml.wires.Wires(control_wires)
+        self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
+        if control_values is None:
+            self._control_values = [True] * len(self._control_wires)
+        elif isinstance(control_values, (int, bool)):
+            self._control_values = [control_values]
+        else:
+            self._control_values = control_values
+
         super().__init__(*args, **kwargs)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
@@ -1014,11 +1294,38 @@ class QCtrl(HybridOp):
         _check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
             self.regions[0].quantum_tape,
-            self.control_wire_tracers,
-            self.control_value_tracers,
-            self.work_wire_tracers,
+            self._control_wires,
+            self._control_values,
+            self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def wires(self):
+        """The list of all control-wires, work-wires, and active-wires."""
+        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+
+        total_wires = sum(
+            (op.wires for op in self.regions[0].quantum_tape.operations),
+            self._control_wires,
+        )
+        total_wires += self._work_wires
+        return total_wires
+
+    @property
+    def control_wires(self):
+        """Wires used in quantum conditioning."""
+        return self._control_wires
+
+    @property
+    def control_values(self):
+        """(Boolean) Values upon which to condition on."""
+        return self._control_values
+
+    @property
+    def work_wires(self):
+        """Optional wires that can be used in the expansion of this op."""
+        return self._work_wires
 
 
 def qctrl_distribute(
@@ -1045,11 +1352,9 @@ def qctrl_distribute(
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     tape2 = qctrl_distribute(
                         region.quantum_tape,
-                        control_wires + op.control_wire_tracers,
-                        control_values + op.control_value_tracers,
-                        ((work_wires or []) + (op.work_wire_tracers or []))
-                        if (work_wires is not None or op.work_wire_tracers is not None)
-                        else None,
+                        control_wires + op.control_wires,
+                        control_values + op.control_values,
+                        work_wires + op.work_wires,
                     )
                     ops2.extend(tape2.operations)
             else:
@@ -1062,8 +1367,8 @@ def qctrl_distribute(
         else:
             ops2.append(
                 Controlled(
-                    type(op)(*op.parameters, wires=op.wires),
-                    control_wires=qml.wires.Wires(control_wires),
+                    copy.copy(op),
+                    control_wires=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
                 )
@@ -1649,7 +1954,7 @@ def while_loop(cond_fn):
     return _body_query
 
 
-def measure(wires) -> DynamicJaxprTracer:
+def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
     """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
 
     .. important::
@@ -1659,6 +1964,7 @@ def measure(wires) -> DynamicJaxprTracer:
 
     Args:
         wires (Wires): The wire of the qubit the measurement process applies to
+        postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
     Returns:
         A JAX tracer for the mid-circuit measurement.
@@ -1688,6 +1994,22 @@ def measure(wires) -> DynamicJaxprTracer:
     [array(1.), array(False)]
     >>> circuit(0.43)
     [array(-1.), array(True)]
+
+    **Example with post-selection**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            m = measure(0, postselect=1)
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit()
+    -1.0
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
@@ -1697,10 +2019,21 @@ def measure(wires) -> DynamicJaxprTracer:
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+
+    in_classical_tracers = wires
+
+    # Check the postselect value. If given, add it to the classical tracers list
+    if postselect is not None:
+        if postselect not in [0, 1]:
+            raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+        in_classical_tracers.append(postselect)
+
     # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
     out_classical_tracer = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
-        in_classical_tracers=wires, out_classical_tracers=[out_classical_tracer], regions=[]
+        in_classical_tracers=in_classical_tracers,
+        out_classical_tracers=[out_classical_tracer],
+        regions=[],
     )
     return out_classical_tracer
 
@@ -1766,6 +2099,9 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
+    if not EvaluationContext.is_tracing():
+        return qml.adjoint(f)
+
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."
@@ -1790,7 +2126,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
 
-        Adjoint(
+        return Adjoint(
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=[],
             regions=[adjoint_region],
@@ -1866,17 +2202,17 @@ def ctrl(
     array([0.25, 0.25, 0.03661165, 0.46338835])
     """
 
-    def _tolist(x):
-        return [x] if not isinstance(x, list) else x
+    if not EvaluationContext.is_tracing():
+        return qml.ctrl(f, control, control_values, work_wires)
 
-    control = _tolist(control)
-    control_values = _tolist(control_values) if control_values is not None else [1] * len(control)
-    if len(control) != len(control_values):
+    if control_values is not None and (
+        (len(control) if isinstance(control, Sized) else 1)
+        != (len(control_values) if isinstance(control_values, Sized) else 1)
+    ):
         raise ValueError(
             f"Length of the control_values ({len(control_values)}) must be None or equal "
             f"to the lenght of control ({len(control)})"
         )
-    work_wires = _tolist(work_wires) if work_wires is not None else None
 
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
@@ -1892,10 +2228,11 @@ def ctrl(
 
         region = HybridOpRegion(None, quantum_tape, [], [])
 
-        QCtrl(
-            control_wire_tracers=control,
-            control_value_tracers=control_values,
-            work_wire_tracers=work_wires,
+        # Return the operation instance since PL expects this for qml.ctrl(op).
+        return QCtrl(
+            control_wires=control,
+            control_values=control_values,
+            work_wires=work_wires,
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=out_classical_tracers,
             regions=[region],
@@ -1907,6 +2244,7 @@ def ctrl(
             return _call_handler(*args, _callee=f, **kwargs)
 
         return _callable
+
     elif isinstance(f, Operator):
         QueuingManager.remove(f)
 
@@ -1914,5 +2252,6 @@ def ctrl(
             QueuingManager.append(f)
 
         return _call_handler(_callee=_callee)
+
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover

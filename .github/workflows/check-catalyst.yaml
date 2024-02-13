@@ -39,8 +39,6 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          ENABLE_LIGHTNING_KOKKOS=ON \
-          ENABLE_OPENQASM=ON \
           ENABLE_ASAN=OFF \
           make runtime
 
@@ -51,8 +49,6 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          ENABLE_LIGHTNING_KOKKOS=ON \
-          ENABLE_OPENQASM=ON \
           make dummy_device
 
 
@@ -62,6 +58,7 @@ jobs:
           name: runtime-build-${{ matrix.compiler }}
           path: |
             runtime-build/lib/*.so
+            runtime-build/lib/backend/*.toml
           retention-days: 1
 
   llvm:
@@ -565,6 +562,8 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
+          ENABLE_LIGHTNING_KOKKOS=OFF \
+          ENABLE_OPENQASM=OFF \
           ENABLE_ASAN=ON \
           make test-runtime
 
@@ -575,7 +574,7 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_LIGHTNING_KOKKOS=ON \
+          ENABLE_OPENQASM=OFF \
           ENABLE_ASAN=OFF \
           make test-runtime
 
@@ -585,7 +584,7 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
-          ENABLE_OPENQASM=ON \
+          ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_ASAN=ON \
           make test-runtime
 

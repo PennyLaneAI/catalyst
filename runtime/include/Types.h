@@ -30,6 +30,7 @@ typedef intptr_t QubitIdType;
 
 typedef bool RESULT;
 typedef RESULT *Result;
+typedef void *QirArray;
 
 typedef intptr_t ObsIdType;
 

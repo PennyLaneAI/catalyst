@@ -27,7 +27,7 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     {
         return 0;
     }
-    auto Measure(QubitIdType) -> Result override
+    auto Measure(QubitIdType, std::optional<int32_t>) -> Result override
     {
         bool *ret = (bool *)malloc(sizeof(bool));
         *ret = true;
@@ -69,7 +69,4 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     void Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &) override {}
 };
 
-extern "C" Catalyst::Runtime::QuantumDevice *DummyDeviceFactory(const std::string &kwargs)
-{
-    return new DummyDevice(kwargs);
-}
+GENERATE_DEVICE_FACTORY(DummyDevice, DummyDevice);

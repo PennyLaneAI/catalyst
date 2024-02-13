@@ -89,9 +89,15 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         // Let's capture the qreg.
         quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
 
-        // Let's return the qreg.
-        unallocFn.walk(
-            [&](func::ReturnOp returnOp) { returnOp->setOperands(localDealloc.getOperand()); });
+        // Let's return the qreg and erase the device release.
+        unallocFn.walk([&](Operation *op) {
+            if (isa<quantum::DeviceReleaseOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (isa<func::ReturnOp>(op)) {
+                op->setOperands(localDealloc.getOperand());
+            }
+        });
 
         // Let's erase the deallocation.
         rewriter.eraseOp(localDealloc);

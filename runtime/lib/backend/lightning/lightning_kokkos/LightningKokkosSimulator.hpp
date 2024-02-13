@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <random>
 #include <span>
 #include <stdexcept>
 
@@ -44,8 +43,6 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
-
-    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     Catalyst::Runtime::CacheManager cache_manager{};
@@ -86,56 +83,16 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     explicit LightningKokkosSimulator(const std::string &kwargs = "{}")
     {
         auto &&args = Catalyst::Runtime::parse_kwargs(kwargs);
-        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
-                                              : default_device_shots;
+        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"])) : 0;
     }
     ~LightningKokkosSimulator() = default;
 
-    LightningKokkosSimulator(const LightningKokkosSimulator &) = delete;
-    LightningKokkosSimulator &operator=(const LightningKokkosSimulator &) = delete;
-    LightningKokkosSimulator(LightningKokkosSimulator &&) = delete;
-    LightningKokkosSimulator &operator=(LightningKokkosSimulator &&) = delete;
+    QUANTUM_DEVICE_DEL_DECLARATIONS(LightningKokkosSimulator);
 
-    // RT
-    auto AllocateQubit() -> QubitIdType override;
-    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;
-    void ReleaseQubit(QubitIdType q) override;
-    void ReleaseAllQubits() override;
-    [[nodiscard]] auto GetNumQubits() const -> size_t override;
-    void StartTapeRecording() override;
-    void StopTapeRecording() override;
-    void SetDeviceShots(size_t shots) override;
-    [[nodiscard]] auto GetDeviceShots() const -> size_t override;
-    void PrintState() override;
-    [[nodiscard]] auto Zero() const -> Result override;
-    [[nodiscard]] auto One() const -> Result override;
+    QUANTUM_DEVICE_RT_DECLARATIONS;
+    QUANTUM_DEVICE_QIS_DECLARATIONS;
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
-
-    // QIS
-    void NamedOperation(const std::string &name, const std::vector<double> &params,
-                        const std::vector<QubitIdType> &wires, bool inverse) override;
-    void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                         const std::vector<QubitIdType> &wires, bool inverse) override;
-    auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                    const std::vector<QubitIdType> &wires) -> ObsIdType override;
-    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;
-    auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
-        -> ObsIdType override;
-    auto Expval(ObsIdType obsKey) -> double override;
-    auto Var(ObsIdType obsKey) -> double override;
-    void State(DataView<std::complex<double>, 1> &state) override;
-    void Probs(DataView<double, 1> &probs) override;
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override;
-    void Sample(DataView<double, 2> &samples, size_t shots) override;
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
-                       size_t shots) override;
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots) override;
-    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires, size_t shots) override;
-    auto Measure(QubitIdType wire) -> Result override;
-    void Gradient(std::vector<DataView<double, 1>> &gradients,
-                  const std::vector<size_t> &trainParams) override;
 };
 } // namespace Catalyst::Runtime::Simulator

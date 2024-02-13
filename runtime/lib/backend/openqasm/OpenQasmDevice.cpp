@@ -24,11 +24,13 @@ auto OpenQasmDevice::AllocateQubit() -> QubitIdType
 
 auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
     const size_t cur_num_qubits = builder->getNumQubits();
+    RT_FAIL_IF(cur_num_qubits, "Partial qubits allocation is not supported by OpenQasmDevice");
+
     const size_t new_num_qubits = cur_num_qubits + num_qubits;
     if (cur_num_qubits) {
         builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
@@ -36,12 +38,18 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
 
     builder->Register(OpenQasm::RegisterType::Qubit, "qubits", new_num_qubits);
 
-    return qubit_manager.AllocateRange(cur_num_qubits, new_num_qubits);
+    return qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
 }
 
 void OpenQasmDevice::ReleaseAllQubits()
 {
-    // do nothing
+    // refresh the builder for device re-use.
+    if (builder_type != OpenQasm::BuilderType::Common) {
+        builder = std::make_unique<OpenQasm::BraketBuilder>();
+    }
+    else {
+        builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
+    }
 }
 
 void OpenQasmDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
@@ -465,8 +473,11 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     }
 }
 
-auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire) -> Result
+auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int32_t> postselect)
+    -> Result
 {
+    RT_FAIL_IF(postselect, "Post-selection is not supported yet");
+
     if (builder_type != OpenQasm::BuilderType::Common) {
         RT_FAIL("Unsupported functionality");
         return Result{};
@@ -494,7 +505,4 @@ void OpenQasmDevice::Gradient([[maybe_unused]] std::vector<DataView<double, 1>> 
 
 } // namespace Catalyst::Runtime::Device
 
-extern "C" Catalyst::Runtime::QuantumDevice *OpenQasmDeviceFactory(const std::string &kwargs)
-{
-    return new Catalyst::Runtime::Device::OpenQasmDevice(kwargs);
-}
+GENERATE_DEVICE_FACTORY(OpenQasmDevice, Catalyst::Runtime::Device::OpenQasmDevice);
