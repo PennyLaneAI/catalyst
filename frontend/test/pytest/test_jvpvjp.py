@@ -648,7 +648,8 @@ def test_vjp_pytrees(diff_method):
 
     @qjit
     def C_workflowA():
-        return C_vjp(f, [0.1, 0.2], [1.0, 1.0, 1.0], method=diff_method, argnum=[0, 1])
+        ct2 = tree_unflatten(tree_flatten(f(0.1, 0.2))[1], [1.0, 1.0, 1.0])
+        return C_vjp(f, [0.1, 0.2], ct2, method=diff_method, argnum=[0, 1])
 
     @jax.jit
     def J_workflow():
