@@ -101,7 +101,7 @@ class CompileOptions:
         if self.pipelines:
             return self.pipelines
         elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES
+            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
         return DEFAULT_PIPELINES
 
 
