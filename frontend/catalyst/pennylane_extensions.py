@@ -967,7 +967,9 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
                 func_res = func_res[0]
             else:
                 func_res = tuple(func_res)
-            results = tuple([func_res, tuple(vjps)])
+
+            vjps = tuple(vjps)
+            results = tuple([func_res, vjps])
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
