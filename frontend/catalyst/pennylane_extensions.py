@@ -946,8 +946,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
-        if out_tree.children != []:
-            cotangents, _ = tree_flatten(cotangents)
+        cotangents, _ = tree_flatten(cotangents)
 
         results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
