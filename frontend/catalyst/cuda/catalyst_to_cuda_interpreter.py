@@ -106,58 +106,6 @@ from .primitives import (
 # pylint: disable=line-too-long
 
 
-def count(var: jax._src.core.Var):
-    """Small function to get the identifier of a variable.
-
-    In JAX, variables have a "count" attribute that is used to identify them.
-    This corresponds to their name. 0 starts with the name a and as the count
-    increases, the name also increases alphabetically.
-
-    This function is safe and uses getattr because `eqn.invars` might return
-    a `jax._src.core.Literal` which is not a `jax._src.core.Var` and has no count.
-    """
-    return getattr(var, "count", 0)
-
-
-def counts(_vars: List[jax._src.core.Var]):
-    """Get counts for all elements in _vars."""
-    return map(count, _vars)
-
-
-def invars(eqn: jax._src.core.JaxprEqn):
-    """Make invars look like a function instead of an attribute.."""
-    return eqn.invars
-
-
-def outvars(eqn: jax._src.core.JaxprEqn):
-    """Make outvars look like a function instead of an attribute.."""
-    return eqn.outvars
-
-
-def allvars(eqn: jax._src.core.JaxprEqn):
-    """Create a list of all invars and outvars in an eqn."""
-    return invars(eqn) + outvars(eqn)
-
-
-def get_maximum_variable(jaxpr):
-    """This function returns the maximum number of variables for the given jaxpr function.
-    The count is an internal JAX detail that roughly corresponds to the variable name.
-
-    We want the maximum name to avoid name collisions. I don't think anything happened
-    when I didn't set max_count, but it is probably best to avoid collisions.
-    """
-    max_count = 1
-    for eqn in jaxpr.eqns:
-        max_count = max(0, max_count, *counts(allvars(eqn)))
-    return max_count
-
-
-def get_minimum_new_variable_count(jaxpr):
-    """To make sure we avoid duplicating variable names, just find the maximum variable and add
-    one."""
-    return get_maximum_variable(jaxpr) + 1
-
-
 def get_instruction(jaxpr, primitive):
     """We iterate through the JAXPR and find the first device instruction.
 
@@ -184,13 +132,13 @@ class InterpreterContext:
     """
 
     def __init__(self, jaxpr, consts, *args, kernel=None):
+        self.count = 0
         self.jaxpr = jaxpr
         self.env = {}
         self.variable_map = {}
         self.qubit_to_wire_map = {}
         safe_map(self.write, jaxpr.invars, args)
         safe_map(self.write, jaxpr.constvars, consts)
-        self.count = get_minimum_new_variable_count(jaxpr)
         self.measurements = set()
         if kernel is None:
             # TODO: Do we need these shots?
@@ -240,10 +188,22 @@ class InterpreterContext:
         self.count += 1
         return self.count
 
-    def new_variable(self, _type):
-        """Convenience to get a new variable of a given type."""
-        local_count = self.get_new_count()
-        return jax._src.core.Var(local_count, "", _type)
+    def new_variable(self):
+        """Convenience to get a new variable of a given type.
+
+        These are not JAX variables. This can be any hashable.
+        We are using integers as a small level of indirection.
+        Each new variable is a new integer.
+
+        This is pretty much what JAX does since each variable gets
+        assigned a count and a type. But it is also what anyone else does.
+        (Like LLVM/MLIR %0, %1, ...)
+
+        TODO(@erick-xanadu): I think the type information
+        would also be good to have here, but it is unnecessary at the
+        moment.
+        """
+        return self.get_new_count()
 
 
 def change_device_to_cuda_device(ctx):
@@ -278,7 +238,7 @@ def change_device_to_cuda_device(ctx):
     # cudaq_make_kernel returns a multiple values depending on the arguments.
     # Here it is returning a single value wrapped in a list.
     kernel = cudaq_make_kernel()
-    outvariables = [ctx.new_variable(AbsCudaKernel())]
+    outvariables = [ctx.new_variable()]
     safe_map(ctx.write, outvariables, kernel)
 
     return kernel[0], shots
@@ -309,7 +269,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
 
     # We are creating a new variable that will replace the old
     # variable.
-    outvariables = [ctx.new_variable(AbsCudaQReg())]
+    outvariables = [ctx.new_variable()]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
     return register
@@ -331,7 +291,7 @@ def change_register_getitem(ctx, eqn):
     cuda_qubit = qreg_getitem(register, idx)
     ctx.set_qubit_to_wire(idx, cuda_qubit)
 
-    outvariables = [ctx.new_variable(AbsCudaQbit())]
+    outvariables = [ctx.new_variable()]
     outvals = [cuda_qubit]
 
     safe_map(ctx.replace, eqn.outvars, outvariables)
@@ -470,7 +430,7 @@ def change_get_state(ctx, eqn):
     # so we get it from the parameter.
     cuda_state = cudaq_getstate(ctx.kernel)
     outvals = [cuda_state]
-    outvariables = [ctx.new_variable(AbsCudaQState())]
+    outvariables = [ctx.new_variable()]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
 
@@ -505,7 +465,7 @@ def change_sample_or_counts(ctx, eqn):
     if is_sample:
         shots_result = cudaq_sample(ctx.kernel, shots_count=shots)
         outvals = [shots_result]
-        outvariables = [ctx.new_variable(AbsCudaSampleResult())]
+        outvariables = [ctx.new_variable()]
         safe_map(ctx.replace, eqn.outvars, outvariables)
         safe_map(ctx.write, eqn.outvars, outvals)
     else:
@@ -513,7 +473,7 @@ def change_sample_or_counts(ctx, eqn):
         outvals = cudaq_counts(ctx.kernel, shape=shape, shots_count=shots)
         bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
         local_counts = jax.core.ShapedArray([shape], jax.numpy.int64)
-        outvariables = [ctx.new_variable(bitstrings), ctx.new_variable(local_counts)]
+        outvariables = [ctx.new_variable(), ctx.new_variable()]
         safe_map(ctx.replace, eqn.outvars, outvariables)
         safe_map(ctx.write, eqn.outvars, outvals)
 
@@ -544,7 +504,7 @@ def change_measure(ctx, eqn):
     # Catalyst's measure op only measures in the Z basis.
     # So we map this measurement op to mz in cuda.
     result = mz_call(ctx.kernel, qubit)
-    outvariables = [ctx.new_variable(AbsCudaValue()), ctx.new_variable(AbsCudaQbit())]
+    outvariables = [ctx.new_variable(), ctx.new_variable()]
     outvals = [result, qubit]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
@@ -576,7 +536,7 @@ def change_expval(ctx, eqn):
     observe_results = cudaq_observe(ctx.kernel, obs, shots)
     # And then we call expectation on that object.
     result = cudaq_expectation(observe_results)
-    outvariables = [ctx.new_variable(jax.core.ShapedArray([], float))]
+    outvariables = [ctx.new_variable()]
     outvals = [result]
 
     safe_map(ctx.replace, eqn.outvars, outvariables)
@@ -612,7 +572,7 @@ def change_namedobs(ctx, eqn):
 
     cuda_name = catalyst_cuda_map[kind]
     outvals = [cudaq_spin(idx, cuda_name)]
-    outvariables = [ctx.new_variable(AbsCudaSpinOperator())]
+    outvariables = [ctx.new_variable()]
 
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, outvals)
@@ -628,7 +588,7 @@ def change_hamiltonian(ctx, eqn):
 
     hamiltonian = reduce(operator.add, map(operator.mul, coeffs, terms))
 
-    outvariables = [ctx.new_variable(AbsCudaSpinOperator())]
+    outvariables = [ctx.new_variable()]
     safe_map(ctx.replace, eqn.outvars, outvariables)
     safe_map(ctx.write, eqn.outvars, [hamiltonian])
 
