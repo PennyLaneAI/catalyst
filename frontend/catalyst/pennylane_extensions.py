@@ -877,15 +877,10 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         func_res = results[:midpoint]
         jvps = results[midpoint:]
 
-        if out_tree.children() != []:
-            func_res = tree_unflatten(out_tree, func_res)
-            jvps = tree_unflatten(out_tree, jvps)
-            results = tuple([func_res, jvps])
-        else:
-            if midpoint == 1:
-                results = tuple([*func_res, *jvps])
-            else:
-                results = tuple([tuple(func_res), tuple(jvps)])
+        func_res = tree_unflatten(out_tree, func_res)
+        jvps = tree_unflatten(out_tree, jvps)
+        results = tuple([func_res, jvps])
+
     else:
         results = jax.jvp(f, params, tangents)
 
@@ -956,23 +951,13 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
         results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
-        if out_tree.children() != []:
-            func_res = results[: len(jaxpr.out_avals)]
-            vjps = results[len(jaxpr.out_avals) :]
-            func_res = tree_unflatten(out_tree, func_res)
-            # We do not change the shape of the VJP as it is the same as the parameters not
-            # as the output
-            results = tuple([func_res, tuple(vjps)])
-        else:
-            func_res = results[: len(jaxpr.out_avals)]
-            vjps = results[len(jaxpr.out_avals) :]
-            if len(func_res) == 1:
-                func_res = func_res[0]
-            else:
-                func_res = tuple(func_res)
+        func_res = results[: len(jaxpr.out_avals)]
+        vjps = results[len(jaxpr.out_avals) :]
+        func_res = tree_unflatten(out_tree, func_res)
+        # We do not change the shape of the VJP as it is the same as the parameters not
+        # as the output
+        results = tuple([func_res, tuple(vjps)])
 
-            vjps = tuple(vjps)
-            results = tuple([func_res, vjps])
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
