@@ -328,15 +328,8 @@ class TestCuda:
         """Test invalid target."""
         from catalyst.cuda import qjit_cuda
 
-        with pytest.raises(ValueError, match="Unsupported target foo."):
+        with pytest.raises(ValueError, match="Unavailable target foo."):
             qjit_cuda(fn=None, target="foo")
-
-    def test_cuda_unimplemented_target(self):
-        """Test unimplemented target."""
-        from catalyst.cuda import qjit_cuda
-
-        with pytest.raises(NotImplementedError, match="Unimplemented target nvidia."):
-            qjit_cuda(fn=None, target="nvidia")
 
     def test_expval(self):
         """Test multiple_values."""

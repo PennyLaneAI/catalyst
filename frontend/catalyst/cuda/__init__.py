@@ -41,24 +41,7 @@ def qjit_cuda(fn=None, **kwargs):
         kwargs["target"] = "qpp-cpu"
 
     target = kwargs.get("target", "qpp-cpu")
-    if target not in {
-        "qpp-cpu",
-        "nvidia",
-        "tensornet",
-        "nvidia-mgpu",
-        "quantinuum",
-        "ionq",
-        "IQM",
-        "OQC",
-    }:
-        msg = f"Unsupported target {target}."
-        raise ValueError(msg)
 
-    if target != "qpp-cpu":
-        msg = f"Unimplemented target {target}."
-        raise NotImplementedError(msg)
-
-    target = kwargs.get("target")
     if not cudaq.has_target(target):
         msg = f"Unavailable target {target}."  # pragma: no cover
         raise ValueError(msg)
