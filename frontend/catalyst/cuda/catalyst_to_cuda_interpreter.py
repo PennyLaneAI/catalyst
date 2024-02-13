@@ -797,6 +797,19 @@ def interpret(fun):
         # We need to keep track of the consts...
         consts = catalyst_jaxpr_with_host.consts
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
+        # TODO(@erick-xanadu): There was a discussion about removing as much as possible the reliance on unstable APIs.
+        # Here is jax._src.core.ClosedJaxpr which is another function in the unstable API.
+        # Its only use here is to create a new ClosedJaxpr from the variable catalyst_jaxpr typed Jaxpr.
+        # Please note that catalyst_jaxpr_with_host is a ClosedJaxpr.
+        # But to get it without the host context we need to "open" it up again.
+        # And then close it again.
+        # From the [documentation (paraphrased)](https://jax.readthedocs.io/en/latest/jaxpr.html#understanding-jaxprs)
+        #
+        #    a closed jaxpr is has two fields the jaxpr and a list of constants.
+        #
+        # So, a good solution to get rid of this call here is to just interpret the host context.
+        # This is not too difficult to do. The only changes would be that we now need to provide
+        # semantics for func_p.
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
 
         # Because they become args...
