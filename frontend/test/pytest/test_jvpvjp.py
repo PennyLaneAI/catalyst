@@ -307,6 +307,7 @@ def test_jvp_pytrees(diff_method):
     assert tree_cat == tree_jax
     assert_allclose(catalyst_res_flatten, jax_res_flatten)
 
+
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_jvp_multi_returns(diff_method):
     """Test that a JVP with multiple arg as return."""
@@ -682,6 +683,7 @@ def test_vjp_pytrees(diff_method):
     for r_j, r_c in zip(res_jax, res_cat):
         assert_allclose(r_j, r_c)
 
+
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_vjp_multi_return(diff_method):
     """Test VJP with multiple returns."""
@@ -705,6 +707,7 @@ def test_vjp_multi_return(diff_method):
     assert tree_jax == tree_cat
     for r_j, r_c in zip(res_jax, res_cat):
         assert_allclose(r_j, r_c)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
