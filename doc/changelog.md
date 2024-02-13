@@ -209,6 +209,14 @@
 
 <h3>Bug fixes</h3>
 
+* Handle run time exception in async qnodes.
+  [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
+
+  This is done by:
+  * changeing `llvm.call` to `llvm.invoke`
+  * setting async runtime tokens and values to be errors
+  * deallocating live tokens and values
+
 * Fix an issue when no qubit number was specified for the `qinst` primitive. The primitive now
   correctly deduces the number of qubits when no gate parameters are present. This change is not
   user facing.
