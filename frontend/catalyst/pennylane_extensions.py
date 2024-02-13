@@ -526,22 +526,20 @@ def _check_grad_params(
 def _unflatten_derivatives(results, out_tree, argnum, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
     num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
-    results = tuple(
-        tuple(results[i * num_trainable_params : i * num_trainable_params + num_trainable_params])
-        for i in range(0, num_results)
-    )
-    # In jax,  argnums=[int] wraps single derivatives in a tuple
-    if (
-        (isinstance(argnum, int) or argnum is None)
-        and num_trainable_params == 1
-        and num_results != 1
-    ):
-        results = tuple(r[0] if len(r) == 1 else r for r in results)
-    if out_tree.children() != []:
-        results = tree_unflatten(out_tree, results)
-    else:
-        results = results[0]
-    return results
+    results_final = []
+    for i in range(0, num_results):
+        intermediate_results = results[
+            i * num_trainable_params : i * num_trainable_params + num_trainable_params
+        ]
+        print(intermediate_results, argnum, num_results)
+        if not (isinstance(argnum, int) or argnum is None):
+            intermediate_results = tuple(intermediate_results)
+        else:
+            intermediate_results = intermediate_results[0]
+        results_final.append(intermediate_results)
+    results_final = tuple(results_final)
+    results_final = tree_unflatten(out_tree, results_final)
+    return results_final
 
 
 class Grad:

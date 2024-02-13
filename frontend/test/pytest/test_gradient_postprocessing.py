@@ -327,3 +327,7 @@ def test_nested_qnode(backend):
     # The runtime doesn't support actually executing nested QNodes, so we just make sure they
     # compile without issues.
     # assert _grad_qnode_direct(1.0) == pytest.approx(jax.grad(post)(1.0))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
