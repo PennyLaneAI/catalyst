@@ -58,11 +58,9 @@ def qjit_cuda(fn=None, **kwargs):
     return wrap_fn
 
 
-class CudaQDevice(qml.QubitDevice):
-    """CudaQ Device."""
+class BaseCudaInstructionSet(qml.QubitDevice):
+    """Base instruction set for CUDA-Quantum devices"""
 
-    name = "CudaQ Device"
-    short_name = "cudaq"
     # TODO: Once 0.35 is released, remove -dev suffix.
     pennylane_requires = "0.35.0-dev"
     version = "0.1.0"
@@ -97,3 +95,8 @@ class CudaQDevice(qml.QubitDevice):
     def apply(self, operations, **kwargs):
         """Unused"""
         raise RuntimeError("We are not applying operation by operation.")  # pragma: no cover
+
+
+class CudaQDevice(BaseCudaInstructionSet):
+    name = "CudaQ Device"
+    short_name = "cudaq"
