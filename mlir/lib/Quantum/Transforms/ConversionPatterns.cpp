@@ -74,7 +74,7 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
 
     auto boolType = IntegerType::get(ctx, 1);
     auto sizeType = IntegerType::get(ctx, 64);
-    auto sizePtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 64));
+    auto sizePtrType = LLVM::LLVMPointerType::get(sizeType);
     auto qubitType = conv->convertType(QubitType::get(ctx));
     auto qubitPtrType = LLVM::LLVMPointerType::get(qubitType);
     auto qubitPtrPtrType = LLVM::LLVMPointerType::get(qubitPtrType);
