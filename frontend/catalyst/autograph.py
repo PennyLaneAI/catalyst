@@ -21,8 +21,8 @@ by Catalyst."""
 import inspect
 
 import pennylane as qml
-from autograph.core import converter
-from autograph.impl.api import PyToPy
+from malt.core import converter
+from malt.impl.api import PyToPy
 
 import catalyst
 from catalyst import ag_primitives

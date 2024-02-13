@@ -22,12 +22,12 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from autograph.core import config as ag_config
-from autograph.impl import api as ag_api
-from autograph.impl.api import converted_call as ag_converted_call
-from autograph.operators import py_builtins as ag_py_builtins
-from autograph.operators.variables import Undefined
-from autograph.pyct.origin_info import LineLocation
+from malt.core import config as ag_config
+from malt.impl import api as ag_api
+from malt.impl.api import converted_call as ag_converted_call
+from malt.operators import py_builtins as ag_py_builtins
+from malt.operators.variables import Undefined
+from malt.pyct.origin_info import LineLocation
 from pennylane.queuing import AnnotatedQueue
 
 import catalyst
