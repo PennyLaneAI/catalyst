@@ -873,17 +873,15 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
         results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
+        midpoint = len(results) // 2
+        func_res = results[:midpoint]
+        jvps = results[midpoint:]
+
         if out_tree.children() != []:
-            midpoint = len(results) // 2
-            func_res = results[:midpoint]
-            jvps = results[midpoint:]
             func_res = tree_unflatten(out_tree, func_res)
             jvps = tree_unflatten(out_tree, jvps)
             results = tuple([func_res, jvps])
         else:
-            midpoint = len(results) // 2
-            func_res = results[:midpoint]
-            jvps = results[midpoint:]
             if midpoint == 1:
                 results = tuple([*func_res, *jvps])
             else:
