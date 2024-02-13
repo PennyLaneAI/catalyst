@@ -124,7 +124,7 @@ TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
     device->NamedOperation("Hadamard", {}, {wires[0]}, false);
     device->NamedOperation("CNOT", {}, {wires[0], wires[1]}, false);
 
-    device->Measure(wires[1], -1);
+    device->Measure(wires[1]);
 
     std::string toqasm = "OPENQASM 3.0;\n"
                          "qubit[2] qubits;\n"

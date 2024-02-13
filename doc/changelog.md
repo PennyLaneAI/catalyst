@@ -42,6 +42,27 @@
 
 <h3>Improvements</h3>
 
+* Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
+  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qml.qnode(dev)
+  def circuit(phi, psi):
+      qml.RY(phi, wires=0)
+      qml.RX(psi, wires=0)
+      return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+  psi = 0.1
+  phi = 0.2
+  ```
+  ```pycon
+  >>> qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+  [{'expval0': (array(-0.0978434), array(-0.19767681))}, (array(-0.0978434), array(-0.19767681))]
+  ```
+
 * Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
 
   ```py

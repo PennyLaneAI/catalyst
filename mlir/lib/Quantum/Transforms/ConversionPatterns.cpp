@@ -26,6 +26,7 @@ using namespace catalyst::quantum;
 namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
+constexpr int32_t NO_POSTSELECT = -1;
 
 LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
                                            StringRef fnSymbol, Type fnType)
@@ -600,7 +601,7 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
 
         // Add postselect and qubit types to the function signature
         Type qubitTy = conv->convertType(QubitType::get(ctx));
-        Type postselectTy = IntegerType::get(ctx, 8);
+        Type postselectTy = IntegerType::get(ctx, 32);
         SmallVector<Type> argSignatures = {qubitTy, postselectTy};
 
         StringRef qirName = "__catalyst__qis__Measure";
@@ -609,9 +610,10 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        // Create the postselect value. If not given, it defaults to -1
+        // Create the postselect value. If not given, it defaults to NO_POSTSELECT
         LLVM::ConstantOp postselect = rewriter.create<LLVM::ConstantOp>(
-            loc, op.getPostselect() ? op.getPostselectAttr() : rewriter.getI8IntegerAttr(-1));
+            loc, op.getPostselect() ? op.getPostselectAttr()
+                                    : rewriter.getI32IntegerAttr(NO_POSTSELECT));
 
         // Add qubit and postselect values as arguments of the CallOp
         SmallVector<Value> args = {adaptor.getInQubit(), postselect};

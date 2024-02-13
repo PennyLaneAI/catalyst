@@ -444,7 +444,8 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     }
 }
 
-auto LightningKokkosSimulator::Measure(QubitIdType wire, int8_t postselect) -> Result
+auto LightningKokkosSimulator::Measure(QubitIdType wire, std::optional<int32_t> postselect)
+    -> Result
 {
     using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
                                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>;

@@ -394,10 +394,11 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
-    """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks and
+    return the output tree."""
     method = grad_params.method
-    jaxpr = jax.make_jaxpr(f)(*args)
-
+    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
@@ -423,7 +424,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
-    return jaxpr
+    return jaxpr, out_tree
 
 
 def _verify_differentiable_child_qnodes(jaxpr, method):
@@ -522,6 +523,27 @@ def _check_grad_params(
     return GradParams(method, scalar_out, h, argnum)
 
 
+def _unflatten_derivatives(results, out_tree, argnum, num_results):
+    """Unflatten the flat list of derivatives results given the out tree."""
+    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    results = tuple(
+        tuple(results[i * num_trainable_params : i * num_trainable_params + num_trainable_params])
+        for i in range(0, num_results)
+    )
+    # In jax,  argnums=[int] wraps single derivatives in a tuple
+    if (
+        (isinstance(argnum, int) or argnum is None)
+        and num_trainable_params == 1
+        and num_results != 1
+    ):
+        results = tuple(r[0] if len(r) == 1 else r for r in results)
+    if out_tree.children() != []:
+        results = tree_unflatten(out_tree, results)
+    else:
+        results = results[0]
+    return results
+
+
 class Grad:
     """An object that specifies that a function will be differentiated.
 
@@ -547,16 +569,19 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
+
         if EvaluationContext.is_tracing():
             fn = _ensure_differentiable(self.fn)
             grad_params = _check_grad_params(*self.grad_params)
-
-            jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
             args_data, _ = tree_flatten(args)
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = _unflatten_derivatives(
+                results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
+            )
         else:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
@@ -844,9 +869,19 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         fn = _ensure_differentiable(f)
         grad_params = _check_grad_params(method, scalar_out, h, argnum)
 
-        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+        if out_tree.children() != []:
+            midpoint = len(results) // 2
+            func_res = results[:midpoint]
+            jvps = results[midpoint:]
+            func_res = tree_unflatten(out_tree, func_res)
+            jvps = tree_unflatten(out_tree, jvps)
+            results = tuple([func_res, jvps])
+        else:
+            results = tuple(results)
     else:
         results = jax.jvp(f, params, tangents)
 
@@ -910,9 +945,21 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         fn = _ensure_differentiable(f)
         grad_params = _check_grad_params(method, scalar_out, h, argnum)
 
-        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+        if out_tree.children() != []:
+            func_res = results[: len(jaxpr.out_avals)]
+            vjps = results[len(jaxpr.out_avals) :]
+            func_res = tree_unflatten(out_tree, func_res)
+            # We do not change the shape of the VJP as it is the same as the parameters not
+            # as the output
+            results = tuple([func_res, tuple(vjps)])
+        else:
+            func_res = results[: len(jaxpr.out_avals)]
+            vjps = results[len(jaxpr.out_avals) :]
+            results = tuple([*func_res, tuple(vjps)])
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
