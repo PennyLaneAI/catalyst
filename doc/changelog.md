@@ -42,6 +42,27 @@
 
 <h3>Improvements</h3>
 
+* Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
+  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qml.qnode(dev)
+  def circuit(phi, psi):
+      qml.RY(phi, wires=0)
+      qml.RX(psi, wires=0)
+      return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+  psi = 0.1
+  phi = 0.2
+  ```
+  ```pycon
+  >>> qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+  [{'expval0': (array(-0.0978434), array(-0.19767681))}, (array(-0.0978434), array(-0.19767681))]
+  ```
+
 * Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
 
   ```py
@@ -74,6 +95,25 @@
 * Update `AllocateQubit` and `AllocateQubits` in `LightningKokkosSimulator` to preserve
   the current state-vector before qubit re-allocations.
   [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
+
+* Add support for post-selection in mid-circuit measurements. This is currently supported only on Lightning simulators.
+  [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
+
+  This is an example of post-selection usage:
+
+  ```py
+  import pennylane as qml
+  from catalyst import qjit
+
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def f():
+      qml.Hadamard(0)
+      m = measure(0, postselect=1)
+      return qml.expval(qml.PauliZ(0))
+  ```
 
 <h3>Breaking changes</h3>
 
@@ -162,12 +202,28 @@
   implemented in Catalyst's runtime:
   * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
   * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
-  
+
   and the following functions were removed since the frontend does not generate them
   * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* Handle run time exception in async qnodes.
+  [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
+
+  This is done by:
+  * changeing `llvm.call` to `llvm.invoke`
+  * setting async runtime tokens and values to be errors
+  * deallocating live tokens and values
+
+* Fix an issue when no qubit number was specified for the `qinst` primitive. The primitive now
+  correctly deduces the number of qubits when no gate parameters are present. This change is not
+  user facing.
+  [(#496)](https://github.com/PennyLaneAI/catalyst/pull/496)
+
+* Fix the scatter operation lowering when `updatedWindowsDim` is empty.
+  [(#475)](https://github.com/PennyLaneAI/catalyst/pull/475)
 
 * Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
   qubit re-allocation.
@@ -210,6 +266,8 @@ Ali Asadi,
 David Ittah,
 Tzung-Han Juang,
 Erick Ochoa Lopez,
+Romain Moyard,
+Raul Torres,
 Haochen Paul Wang.
 
 # Release 0.4.1
@@ -245,9 +303,9 @@ Haochen Paul Wang.
   def f(x):
       def cnot_loop(j):
           qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
-  
+
       for_loop(0, 4, 1)(cnot_loop)()
-  
+
       return qml.expval(qml.PauliZ(0))
   ```
 

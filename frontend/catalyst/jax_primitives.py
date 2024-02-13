@@ -682,11 +682,11 @@ def _qinsert_lowering(
 # qinst
 #
 @qinst_p.def_abstract_eval
-def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
-    for idx in range(qubits_len):
-        qubit = qubits_or_params[idx]
+def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=None):
+    qubits = qubits_or_params[:qubits_len]
+    for qubit in qubits:
         assert isinstance(qubit, AbstractQbit)
-    return (AbstractQbit(),) * qubits_len
+    return (AbstractQbit(),) * len(qubits)
 
 
 @qinst_p.def_impl
@@ -695,7 +695,7 @@ def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len):  # pragma: no cover
 
 
 def _qinst_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params: tuple, op=None, qubits_len=-1
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params: tuple, op=None, qubits_len=None
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -792,17 +792,17 @@ def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qub
 # qmeasure
 #
 @qmeasure_p.def_abstract_eval
-def _qmeasure_abstract_eval(qubit):
+def _qmeasure_abstract_eval(qubit, postselect: int = None):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
 
 
 @qmeasure_p.def_impl
-def _qmeasure_def_impl(ctx, qubit):  # pragma: no cover
+def _qmeasure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
+def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, postselect: int = None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -810,8 +810,14 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
     assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qubit.type).data == "bit"
 
+    # Prepare postselect attribute
+    if postselect is not None:
+        i32_type = ir.IntegerType.get_signless(32, ctx)
+        postselect = ir.IntegerAttr.get(i32_type, postselect)
+
     result_type = ir.IntegerType.get_signless(1)
-    result, new_qubit = MeasureOp(result_type, qubit.type, qubit).results
+
+    result, new_qubit = MeasureOp(result_type, qubit.type, qubit, postselect=postselect).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)

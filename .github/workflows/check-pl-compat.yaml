@@ -128,13 +128,12 @@ jobs:
         ENABLE_LLD=OFF \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
         LIGHTNING_GIT_TAG_VALUE=master \
-        ENABLE_LIGHTNING_KOKKOS=ON \
-        ENABLE_OPENQASM=ON \
         make runtime
 
     - name: Build Catalyst Runtime (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
+        # TODO: remove ENABLE_{BACKEND}=ON after the next release
         COMPILER_LAUNCHER="" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
