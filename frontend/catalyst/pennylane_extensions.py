@@ -531,7 +531,6 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         intermediate_results = results[
             i * num_trainable_params : i * num_trainable_params + num_trainable_params
         ]
-        print(intermediate_results, argnum, num_results)
         if not (isinstance(argnum, int) or argnum is None):
             intermediate_results = tuple(intermediate_results)
         else:

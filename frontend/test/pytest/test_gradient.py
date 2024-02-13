@@ -907,7 +907,6 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
 
         d1 = for_loop(0, ntrials, 1)(fn_f)(params)
         d2 = for_loop(0, ntrials, 1)(fn_g)(params)
-        print(d1, d2)
         return d1, d2
 
     result = compiled_grad_default(inp, 5)
