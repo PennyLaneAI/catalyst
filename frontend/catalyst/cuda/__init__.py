@@ -83,7 +83,7 @@ class CudaQDevice(qml.QubitDevice):
     # TODO: Once 0.35 is released, remove -dev suffix.
     pennylane_requires = "0.35.0-dev"
     version = "1.0"
-    author = "Catalyst authors wrote this wrapper for CUDA Quantum"
+    author = "Xanadu, Inc."
 
     # pylint: disable=duplicate-code
     operations = [
