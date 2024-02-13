@@ -77,13 +77,6 @@ from catalyst.utils.jax_extras import remove_host_context
 from catalyst.utils.patching import Patcher
 
 from .primitives import (
-    AbsCudaKernel,
-    AbsCudaQbit,
-    AbsCudaQReg,
-    AbsCudaQState,
-    AbsCudaSampleResult,
-    AbsCudaSpinOperator,
-    AbsCudaValue,
     cuda_inst,
     cudaq_adjoint,
     cudaq_counts,
