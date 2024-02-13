@@ -65,7 +65,7 @@ class CudaQDevice(qml.QubitDevice):
     short_name = "cudaq"
     # TODO: Once 0.35 is released, remove -dev suffix.
     pennylane_requires = "0.35.0-dev"
-    version = "1.0"
+    version = "0.1.0"
     author = "Xanadu, Inc."
 
     # pylint: disable=duplicate-code
