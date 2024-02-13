@@ -37,7 +37,6 @@ from typing import List
 import cudaq
 import jax
 import pennylane as qml
-from jax._src.util import safe_map
 from jax.tree_util import tree_unflatten
 
 from catalyst.jax_primitives import (
@@ -106,6 +105,11 @@ from .primitives import (
 # pylint: disable=line-too-long
 
 
+def _map(f, *collections):
+    """Eager implementation of map."""
+    return list(map(f, *collections))
+
+
 def get_instruction(jaxpr, primitive):
     """We iterate through the JAXPR and find the first device instruction.
 
@@ -137,8 +141,8 @@ class InterpreterContext:
         self.env = {}
         self.variable_map = {}
         self.qubit_to_wire_map = {}
-        safe_map(self.write, jaxpr.invars, args)
-        safe_map(self.write, jaxpr.constvars, consts)
+        _map(self.write, jaxpr.invars, args)
+        _map(self.write, jaxpr.constvars, consts)
         self.measurements = set()
         if kernel is None:
             # TODO: Do we need these shots?
@@ -239,7 +243,7 @@ def change_device_to_cuda_device(ctx):
     # Here it is returning a single value wrapped in a list.
     kernel = cudaq_make_kernel()
     outvariables = [ctx.new_variable()]
-    safe_map(ctx.write, outvariables, kernel)
+    _map(ctx.write, outvariables, kernel)
 
     return kernel[0], shots
 
@@ -259,7 +263,7 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     # Do not check for all of them indiscriminately since it would take
     # too much compile time.
     eqn = get_instruction(ctx.jaxpr, qalloc_p)
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     # We know from the definition of qalloc_p
     # that there is only one operand
     # and the operand is the size of the register.
@@ -270,8 +274,8 @@ def change_alloc_to_cuda_alloc(ctx, kernel):
     # We are creating a new variable that will replace the old
     # variable.
     outvariables = [ctx.new_variable()]
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, outvals)
     return register
 
 
@@ -279,7 +283,7 @@ def change_register_getitem(ctx, eqn):
     """Change catalyst's qextract_p primitive to a CUDA-quantum primitive."""
 
     assert eqn.primitive == qextract_p
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     # We know from the definition of qextract_p
     # that it takes two operands.
     # The first one is the qreg and the second one is the
@@ -294,8 +298,8 @@ def change_register_getitem(ctx, eqn):
     outvariables = [ctx.new_variable()]
     outvals = [cuda_qubit]
 
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, outvals)
 
 
 def change_register_setitem(ctx, eqn):
@@ -326,12 +330,12 @@ def change_register_setitem(ctx, eqn):
     # We are just going to map the new register to
     # the old register, and I think that will keep
     # the same semantics in place.
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     # Because invals has been replaced with the correct
     # variables, invals[0] now holds a reference to a cuda register
     old_register = invals[0]
     # This is old we need to do.
-    safe_map(ctx.write, eqn.outvars, [old_register])
+    _map(ctx.write, eqn.outvars, [old_register])
 
 
 def change_instruction(ctx, eqn):
@@ -370,7 +374,7 @@ def change_instruction(ctx, eqn):
     # From the definition of qinst_p
     # Operands:
     # * qubits_or_params
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     qubits_or_params = invals
 
     # And two parameters:
@@ -392,7 +396,7 @@ def change_instruction(ctx, eqn):
     # that handle_rx is not in SSA and will not return qubits
     # And so the eqn.outvars should be replaced with something.
     # Let's just replace them with the input values.
-    safe_map(ctx.write, eqn.outvars, qubits)
+    _map(ctx.write, eqn.outvars, qubits)
 
 
 def change_compbasis(ctx, eqn):
@@ -401,12 +405,12 @@ def change_compbasis(ctx, eqn):
 
     # From compbasis_p's definition, its operands are:
     # * qubits
-    qubits = safe_map(ctx.read, eqn.invars)
+    qubits = _map(ctx.read, eqn.invars)
 
     # We dont have a use for compbasis yet.
     # So, the evaluation of it might as well just be the same.
     outvals = [AbstractObs(len(qubits), compbasis_p)]
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.write, eqn.outvars, outvals)
 
 
 def change_get_state(ctx, eqn):
@@ -416,7 +420,7 @@ def change_get_state(ctx, eqn):
     # From state_p's definition, its operands are:
     # * an observable
     # * a shape
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     # Just as state_p, we will only support compbasis.
     obs_catalyst = invals[0]
     # This is an assert as opposed to raising an error,
@@ -434,8 +438,8 @@ def change_get_state(ctx, eqn):
     cuda_state = cudaq_getstate(ctx.kernel)
     outvals = [cuda_state]
     outvariables = [ctx.new_variable()]
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, outvals)
 
 
 def change_sample_or_counts(ctx, eqn):
@@ -449,7 +453,7 @@ def change_sample_or_counts(ctx, eqn):
     # Sample and counts look the same in terms of
     # operands
     # * obs
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
 
     # And parameters...
     # * shots
@@ -469,16 +473,16 @@ def change_sample_or_counts(ctx, eqn):
         shots_result = cudaq_sample(ctx.kernel, shots_count=shots)
         outvals = [shots_result]
         outvariables = [ctx.new_variable()]
-        safe_map(ctx.replace, eqn.outvars, outvariables)
-        safe_map(ctx.write, eqn.outvars, outvals)
+        _map(ctx.replace, eqn.outvars, outvariables)
+        _map(ctx.write, eqn.outvars, outvals)
     else:
         shape = 2**obs_catalyst.num_qubits
         outvals = cudaq_counts(ctx.kernel, shape=shape, shots_count=shots)
         bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
         local_counts = jax.core.ShapedArray([shape], jax.numpy.int64)
         outvariables = [ctx.new_variable(), ctx.new_variable()]
-        safe_map(ctx.replace, eqn.outvars, outvariables)
-        safe_map(ctx.write, eqn.outvars, outvals)
+        _map(ctx.replace, eqn.outvars, outvariables)
+        _map(ctx.write, eqn.outvars, outvals)
 
 
 def change_sample(ctx, eqn):
@@ -498,7 +502,7 @@ def change_measure(ctx, eqn):
 
     # Operands to measure_p
     # *qubit
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     # Since we've already replaced it
     # this qubit refers to one in the cuda program.
     qubit = invals[0]
@@ -509,8 +513,8 @@ def change_measure(ctx, eqn):
     result = mz_call(ctx.kernel, qubit)
     outvariables = [ctx.new_variable(), ctx.new_variable()]
     outvals = [result, qubit]
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, outvals)
     # TODO: If we are returning the measurement
     # We must change it to sample with a single shot.
 
@@ -527,7 +531,7 @@ def change_expval(ctx, eqn):
 
     # Operands to expval_p
     # * obs: Observables
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     obs = invals[0]
 
     # Params:
@@ -542,8 +546,8 @@ def change_expval(ctx, eqn):
     outvariables = [ctx.new_variable()]
     outvals = [result]
 
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, outvals)
 
 
 def change_namedobs(ctx, eqn):
@@ -552,7 +556,7 @@ def change_namedobs(ctx, eqn):
 
     # Operands to expval_p
     # * qubit
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     qubit = invals[0]
 
     # Since CUDA doesn't use SSA for qubits.
@@ -577,23 +581,23 @@ def change_namedobs(ctx, eqn):
     outvals = [cudaq_spin(idx, cuda_name)]
     outvariables = [ctx.new_variable()]
 
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, outvals)
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, outvals)
 
 
 def change_hamiltonian(ctx, eqn):
     """Change catalyst hamiltonian to an equivalent expression in CUDA."""
     assert eqn.primitive == hamiltonian_p
 
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     coeffs = invals[0]
     terms = invals[1:]
 
     hamiltonian = reduce(operator.add, map(operator.mul, coeffs, terms))
 
     outvariables = [ctx.new_variable()]
-    safe_map(ctx.replace, eqn.outvars, outvariables)
-    safe_map(ctx.write, eqn.outvars, [hamiltonian])
+    _map(ctx.replace, eqn.outvars, outvariables)
+    _map(ctx.write, eqn.outvars, [hamiltonian])
 
 
 def change_adjoint(ctx, eqn):
@@ -601,7 +605,7 @@ def change_adjoint(ctx, eqn):
     assert eqn.primitive == adjoint_p
 
     # This is the quantum register.
-    invals = safe_map(ctx.read, eqn.invars)
+    invals = _map(ctx.read, eqn.invars)
     register = invals[0]
 
     # We might need this for pytrees.
@@ -630,7 +634,7 @@ def change_adjoint(ctx, eqn):
 
     # Now that we have captured all of the adjoint...
     # Let's actually create an operation with it.
-    safe_map(ctx.write, eqn.outvars, [register])
+    _map(ctx.write, eqn.outvars, [register])
 
 
 def ignore_impl(_ctx, _eqn):
@@ -650,7 +654,7 @@ def default_impl(ctx, eqn):
     subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
     ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
     if eqn.primitive.multiple_results:  # pragma: nocover
-        safe_map(ctx.write, eqn.outvars, ans)
+        _map(ctx.write, eqn.outvars, ans)
     else:
         ctx.write(eqn.outvars[0], ans)
 
@@ -717,7 +721,7 @@ def interpret_impl(ctx, jaxpr):
         # https://www.cs.toronto.edu/~matz/dissertation/matzDissertation-latex2html/node6.html
         INST_IMPL.get(eqn.primitive, default_impl)(ctx, eqn)
 
-    retvals = safe_map(ctx.read, jaxpr.outvars)
+    retvals = _map(ctx.read, jaxpr.outvars)
     if set(retvals).issubset(ctx.measurements):
         raise NotImplementedError(
             "You cannot return measurements directly from a tape when compiling for cuda quantum."
