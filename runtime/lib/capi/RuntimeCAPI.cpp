@@ -746,9 +746,18 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t num
     return Catalyst::Runtime::getQuantumDevicePtr()->HamiltonianObservable(coeffs_vec, obsKeys);
 }
 
-RESULT *__catalyst__qis__Measure(QUBIT *wire)
+RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
 {
-    return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire));
+    std::optional<int32_t> postselectOpt{postselect};
+
+    // Any value different to 0 or 1 denotes absence of postselect, and it is hence turned into
+    // std::nullopt at the C++ interface
+    if (postselect != 0 && postselect != 1) {
+        postselectOpt = std::nullopt;
+    }
+
+    return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire),
+                                                             postselectOpt);
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey)

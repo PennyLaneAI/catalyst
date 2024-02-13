@@ -89,7 +89,7 @@ ObsIdType __catalyst__qis__TensorObs(int64_t, /*obsKeys*/...);
 ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKeys*/...);
 
 // Struct pointers arguments here represent return values.
-RESULT *__catalyst__qis__Measure(QUBIT *);
+RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);

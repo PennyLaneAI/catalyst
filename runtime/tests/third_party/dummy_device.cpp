@@ -27,7 +27,7 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     {
         return 0;
     }
-    auto Measure(QubitIdType) -> Result override
+    auto Measure(QubitIdType, std::optional<int32_t>) -> Result override
     {
         bool *ret = (bool *)malloc(sizeof(bool));
         *ret = true;
