@@ -70,6 +70,9 @@ class CudaQDevice(qml.QubitDevice):
 
     # pylint: disable=duplicate-code
     operations = [
+        "CNOT",
+        "CY",
+        "CZ",
         "CRX",
         "CRY",
         "CRZ",

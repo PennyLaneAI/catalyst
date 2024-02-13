@@ -341,6 +341,9 @@ def change_instruction(ctx, eqn):
 
     # This is the map of instruction names.
     from_catalyst_to_cuda = {
+        "CNOT": "cx",
+        "CY": "cy",
+        "CZ": "cz",
         "CRX": "crx",
         "CRY": "cry",
         "CRZ": "crz",
