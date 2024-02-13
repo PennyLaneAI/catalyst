@@ -923,57 +923,6 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
-def qjit_catalyst(
-    fn=None,
-    *,
-    autograph=False,
-    async_qnodes=False,
-    target="binary",
-    keep_intermediate=False,
-    verbose=False,
-    logfile=None,
-    pipelines=None,
-    static_argnums=None,
-    abstracted_axes=None,
-):  # pylint: disable=too-many-arguments
-    """Wrapper around QJIT for Catalyst."""
-    argnums = static_argnums
-    axes = abstracted_axes
-    if fn is not None:
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
-
-    def wrap_fn(fn):
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
-
-    return wrap_fn
-
-
 def qjit(
     fn=None,
     *,
@@ -986,7 +935,6 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
-    **kwargs,
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -1272,28 +1220,38 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
     """
-
     argnums = static_argnums
-    compiler = kwargs.get("compiler")
-    fwd_args = {
-        "fn": fn,
-        "autograph": autograph,
-        "async_qnodes": async_qnodes,
-        "target": target,
-        "keep_intermediate": keep_intermediate,
-        "verbose": verbose,
-        "logfile": logfile,
-        "pipelines": pipelines,
-        "static_argnums": argnums,
-        "abstracted_axes": abstracted_axes,
-    }
-    if compiler is not None and compiler == "cuda_quantum":
-        # This is here because we don't want to import CUDA unless
-        # explicitly requested. This is to avoid polluting the global
-        # environment and creating segfaults when running kokkos kernels.
-        # pylint: disable=import-outside-toplevel
-        from catalyst.cuda import qjit_cuda
+    axes = abstracted_axes
+    if fn is not None:
+        return QJIT(
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                async_qnodes,
+                static_argnums=argnums,
+                abstracted_axes=axes,
+            ),
+        )
 
-        return qjit_cuda(**fwd_args)
-    # Assume that we are running Catalyst.
-    return qjit_catalyst(**fwd_args)
+    def wrap_fn(fn):
+        return QJIT(
+            fn,
+            CompileOptions(
+                verbose,
+                logfile,
+                target,
+                keep_intermediate,
+                pipelines,
+                autograph,
+                async_qnodes,
+                static_argnums=argnums,
+                abstracted_axes=axes,
+            ),
+        )
+
+    return wrap_fn
