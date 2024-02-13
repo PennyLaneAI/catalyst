@@ -709,7 +709,7 @@ def _qinst_lowering(
     if qubits_len == 0:
         qubits_len = len(qubits_or_params)
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len:params_len]
+    params = qubits_or_params[qubits_len:qubits_len+params_len]
     ctrl_qubits = qubits_or_params[qubits_len+params_len:qubits_len+params_len+ctrl_len]
     ctrl_values = qubits_or_params[qubits_len+params_len+ctrl_len:]
 
