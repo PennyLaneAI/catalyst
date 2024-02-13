@@ -23,7 +23,7 @@ jobs:
 
       # If the trigger for this workflow (on pull_request) is not a labelling event, then only build the wheels if the
       # label being added is `ci:build-wheels`. If the pull_request event is not a labelling event (eg: new commit is pushed)
-      # then build wheels as long as the `ci:build-wheels` lable is present
+      # then build wheels as long as the `ci:build-wheels` label is present
       - name: Build Wheels for Pull Request
         id: build_wheels
         if: steps.is_pr.outputs.is_pr == 'true'
