@@ -881,7 +881,13 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
             jvps = tree_unflatten(out_tree, jvps)
             results = tuple([func_res, jvps])
         else:
-            results = tuple(results)
+            midpoint = len(results) // 2
+            func_res = results[:midpoint]
+            jvps = results[midpoint:]
+            if midpoint == 1:
+                results = tuple([*func_res, *jvps])
+            else:
+                results = tuple([tuple(func_res), tuple(jvps)])
     else:
         results = jax.jvp(f, params, tangents)
 
@@ -959,7 +965,11 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         else:
             func_res = results[: len(jaxpr.out_avals)]
             vjps = results[len(jaxpr.out_avals) :]
-            results = tuple([*func_res, tuple(vjps)])
+            if len(func_res) == 1:
+                func_res = func_res[0]
+            else:
+                func_res = tuple(func_res)
+            results = tuple([func_res, tuple(vjps)])
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
