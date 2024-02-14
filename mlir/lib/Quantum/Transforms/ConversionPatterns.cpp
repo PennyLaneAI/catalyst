@@ -123,8 +123,10 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
     Value valuePtr = nullPtr;
     if (controlledQubits.size() > 0) {
         ctrlPtr =
-            rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, numControlledVal).getResult();
-        valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, numControlledVal).getResult();
+            rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, numControlledVal.getResult())
+                .getResult();
+        valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, numControlledVal.getResult())
+                       .getResult();
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, qubitPtrType, ctrlPtr,
