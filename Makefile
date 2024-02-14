@@ -18,6 +18,11 @@ TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 ifeq ($(TEST_BACKEND),"lightning.kokkos")
+# CUDAQ tests cannot run with the lightning.kokkos backend
+# due to the following issue:
+# https://github.com/PennyLaneAI/catalyst/issues/513
+# TODO(@erick-xanadu): Remove special handling
+# once issue is fixed.
 CUDA = --cuda=False
 endif
 
