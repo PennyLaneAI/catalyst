@@ -67,7 +67,9 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     observables = []
     config = Path(__file__).parent / "cuda_quantum.toml"
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, mps=False, multi_gpu=False):
+        self.mps = mps
+        self.multi_gpu = multi_gpu
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
@@ -82,3 +84,23 @@ class CudaQDevice(BaseCudaInstructionSet):
 
     name = "CudaQ Device"
     short_name = "softwareq.qpp"
+
+
+class NvidiaCuStateVec(BaseCudaInstructionSet):
+    """Concrete device class for CuStateVec"""
+
+    name = "CuStateVec"
+    short_name = "nvidia.custatevec"
+
+    def __init__(self, shots=None, wires=None, multi_gpu=False):  # pragma: no cover
+        super().__init__(wires=wires, shots=shots, multi_gpu=multi_gpu)
+
+
+class NvidiaCuTensorNet(BaseCudaInstructionSet):
+    """Concrete device class for CuTensorNet"""
+
+    name = "CuTensorNet"
+    short_name = "nvidia.cutensornet"
+
+    def __init__(self, shots=None, wires=None, mps=False):  # pragma: no cover
+        super().__init__(wires=wires, shots=shots, mps=mps)
