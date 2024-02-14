@@ -835,7 +835,7 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
     for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
         // TODO: remove when other devices support controlled gates
         if (rtd_name != "lightning.qubit")
-            continue;
+            continue; // pragma: no cover
 
         __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
                                     (int8_t *)rtd_kwargs.c_str());
