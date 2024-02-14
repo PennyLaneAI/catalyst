@@ -107,7 +107,8 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
 
     auto adjointVal = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getBoolAttr(adjoint));
     auto numControlledVal =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()))
+            .getResult();
 
     auto modifiersPtr = rewriter.create<LLVM::AllocaOp>(loc, modifiersPtrType, c1).getResult();
     auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, boolPtrType, modifiersPtr,
@@ -123,10 +124,8 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
     Value valuePtr = nullPtr;
     if (controlledQubits.size() > 0) {
         ctrlPtr =
-            rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, numControlledVal.getResult())
-                .getResult();
-        valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, numControlledVal.getResult())
-                       .getResult();
+            rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, numControlledVal).getResult();
+        valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, numControlledVal).getResult();
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, qubitPtrType, ctrlPtr,
