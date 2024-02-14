@@ -999,6 +999,73 @@ def test_loop_with_dyn_wires(backend):
     assert np.allclose(result, expected)
 
 
+def test_pytrees_return_qnode(backend):
+    """Test the gradient on a function with a return including list and dictionnaries"""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    psi = 0.1
+    phi = 0.2
+    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[0]["expval0"], tuple)
+    assert len(result[0]["expval0"]) == 2
+    assert isinstance(result[1], tuple)
+    assert len(result[1]) == 2
+
+
+def test_pytrees_return_classical_function(backend):
+    """Test the jacobian on a qnode with a return including list and dictionnaries."""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    psi = 0.1
+    phi = 0.2
+    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[0]["expval0"], tuple)
+    assert len(result[0]["expval0"]) == 2
+    assert isinstance(result[1], tuple)
+    assert len(result[1]) == 2
+
+
+def test_pytrees_return_classical():
+    """Test the jacobian on a function with a return including list and dictionnaries."""
+
+    def f(x, y):
+        return [x, {"a": x**2}, x + y]
+
+    x = 0.4
+    y = 0.2
+
+    jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+
+    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+
+    assert tree_jax == tree_catalyst
+    assert np.allclose(flatten_res_jax, flatten_res_catalyst)
+
+
 @pytest.mark.xfail(reason="QubitUnitrary is not support with catalyst.grad")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):

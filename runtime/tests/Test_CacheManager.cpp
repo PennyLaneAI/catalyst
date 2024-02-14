@@ -48,8 +48,9 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
     cm.addOperation("H", {0}, {0}, false);
     cm.addOperation("H", {0}, {0}, false);
     cm.addOperation("H", {0}, {0}, false);
+    cm.addOperation("QubitUnitary", {}, {0}, false, {});
 
-    CHECK(cm.getNumOperations() == 4);
+    CHECK(cm.getNumOperations() == 5);
     CHECK(cm.getNumObservables() == 0);
 }
 
