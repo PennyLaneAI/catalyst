@@ -107,6 +107,11 @@ void deactivateDevice()
 
 extern "C" {
 
+void __catalyst__host__rt__unrecoverable_error()
+{
+    RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
+}
+
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
     void *ptr = malloc(size);
@@ -449,6 +454,8 @@ void __catalyst__qis__Rot(double phi, double theta, double omega, QUBIT *qubit,
 
 void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, const Modifiers *modifiers)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CNOT gate. Control and target qubit operands must be distinct.");
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "CNOT", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
