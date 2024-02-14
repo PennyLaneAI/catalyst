@@ -159,7 +159,26 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], excepted)
         assert jnp.allclose(result[1], excepted)
 
-    def test_vmap_failed_runtime_len_check(self, backend):
+    def test_vmap_failed_nonint_check(self, backend):
+        """Test catalyst.vmap with invalid type of in_axes."""
+
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            res = vmap(circuit, in_axes=(0.1, None))(x)
+            return res
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'in_axes'; it can be an int or a tuple of "
+            "PyTrees with integer leaves",
+        ):
+            qjit(workflow)(0.1)
+
+    def test_vmap_failed_len_check(self, backend):
         """Test catalyst.vmap with invalid length of in_axes and args."""
 
         def workflow(x):
@@ -172,11 +191,39 @@ class TestVectorizeMap:
             return res
 
         with pytest.raises(
-            TypeError,
+            ValueError,
             match="Invalid 'in_axes'; it can be an int or a tuple "
             "of PyTrees corresponding to the arguments",
         ):
             qjit(workflow)(0.1)
+
+    def test_vmap_failed_invalid_out_axes(self, backend):
+        """Test catalyst.vmap with invalid out_axes."""
+
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return vmap(circuit, out_axes=(0, 1))(x)
+
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'out_axes'; it can be an int or a tuple "
+            "of PyTrees corresponding to the ",
+        ):
+            qjit(workflow)(x)
 
     def test_vmap_tuple_in_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a tuple in_axes."""
@@ -231,6 +278,7 @@ class TestVectorizeMap:
             @qml.qnode(qml.device(backend, wires=1))
             def circuit(x, y):
                 qml.Identity(wires=0)
+                return x + y
 
             return vmap(circuit, in_axes=(0, 0))(x, y)
 
@@ -276,7 +324,7 @@ class TestVectorizeMap:
                 return circuit(x, y)
 
             def workflow4(y, x, z):
-                return circuit(x, y)
+                return circuit(x, y) * z
 
             res1 = vmap(workflow2, in_axes=(0, 0))(x, y)
             res2 = vmap(workflow2, in_axes=[0, 0])(x, y)

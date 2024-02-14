@@ -2292,13 +2292,13 @@ def vmap(
         in_axes = tuple(in_axes)
 
     if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
-        raise TypeError(
-            "Invalid 'in_axes'; it can be an int or a tuple of "
-            f"PyTrees with integer leaves, but got {in_axes}"
+        raise ValueError(
+            "Invalid 'in_axes'; it can be an int or a tuple of PyTrees with integer leaves,"
+            f"but got {in_axes}"
         )
 
     if not all(isinstance(l, int) for l in tree_leaves(out_axes)):
-        raise TypeError(
+        raise ValueError(
             f"Invalid 'out_axes'' it can be a PyTree with integer leaves, but got {out_axes}"
         )
 
@@ -2307,16 +2307,13 @@ def vmap(
 
         # Check the validity of the input arguments
         if isinstance(in_axes, tuple) and len(in_axes) != len(args):
-            raise TypeError(
-                "Invalid 'in_axes'; it can be an int or a tuple of PyTrees "
-                f"corresponding to the arguments, but got {len(in_axes)} and {len(args)}"
+            raise ValueError(
+                "Invalid 'in_axes'; it can be an int or a tuple of PyTrees corresponding to "
+                f"the arguments, but got {len(in_axes)} and {len(args)}"
             )
 
         args_flat, args_tree = tree_flatten(args)
         in_axes_flat = _vmap_tree_flatten(in_axes)
-
-        # import pdb
-        # pdb.set_trace()
 
         batch_size = _get_batch_size(args_flat, in_axes_flat, axis_size)
         batch_loc = _get_batch_loc(in_axes_flat)
@@ -2366,9 +2363,8 @@ def vmap(
 
         if isinstance(out_axes, tuple) and len(out_axes) != len(out_shape):
             raise ValueError(
-                "Invalid 'out_axes'; it can be an int or "
-                "a tuple of PyTrees corresponding to the "
-                f"arguments, but got {len(in_axes)} and {len(args)}"
+                "Invalid 'out_axes'; it can be an int or a tuple of PyTrees corresponding to the "
+                f"arguments, but got out_axes={out_axes} and out_shape={out_shape}"
             )
 
         # TODO: replace for_loop with parallelfor_loop
