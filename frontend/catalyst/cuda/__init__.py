@@ -21,9 +21,7 @@ from pathlib import Path
 import cudaq
 import pennylane as qml
 
-from catalyst import pennylane_extensions
 from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
-from catalyst.utils.contexts import EvaluationContext
 
 
 def qjit(fn=None, **kwargs):
@@ -82,14 +80,14 @@ class BaseCudaInstructionSet(qml.QubitDevice):
         # "CSWAP", This is a bug in cuda-quantum. CSWAP is not exposed.
     ]
     observables = []
-    config = Path(__file__).parent / "cuda.toml"
+    config = Path(__file__).parent / "cuda_quantum.toml"
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
         """Unused"""
-        raise RuntimeError("We are not applying operation by operation.")  # pragma: no cover
+        raise NotImplementedError("CudaQDevice must be used with `catalyst.qjit`")  # pragma: no cover
 
 
 class CudaQDevice(BaseCudaInstructionSet):

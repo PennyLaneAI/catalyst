@@ -330,7 +330,7 @@ def make_primitive_for_gate():
     return gate_func, kernel_gate_p
 
 
-cuda_inst, cuda_inst_p = make_primitive_for_gate()
+cuda_inst, _ = make_primitive_for_gate()
 
 
 def make_primitive_for_m(gate: str):
@@ -424,8 +424,7 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
     denoting the integers that can be computed from the bitstrings.
     """
 
-    strings = list(range(shape))
-    res = {str(s): 0 for s in strings}
+    res = {str(s): 0 for s in range(shape)}
 
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
     # It looks like cuda uses a different endianness than catalyst.

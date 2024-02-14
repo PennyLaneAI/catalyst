@@ -1,7 +1,7 @@
 schema = 1
 
 [device]
-name = "lightning.kokkos"
+name = "cuda_quantum"
 
 [operators]
 # Observables supported by the device

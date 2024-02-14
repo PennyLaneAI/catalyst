@@ -105,11 +105,7 @@ def get_instruction(jaxpr, primitive):
 
     A well formed JAXPR should only have a single device instruction for a quantum function.
     """
-    for eqn in jaxpr.eqns:
-        if eqn.primitive == primitive:
-            return eqn
-
-    return None  # pragma: nocover
+    return next((eqn for eqn in jaxpr.eqns if eqn.primitive == primitive), None)
 
 
 class InterpreterContext:
@@ -718,7 +714,7 @@ def interpret_impl(ctx, jaxpr):
     return retvals
 
 
-class QJIT_CUDA:
+class QJIT_CUDAQ:
     """Class representing a just-in-time compiled hybrid quantum-classical function.
 
     .. note::
@@ -788,7 +784,7 @@ def interpret(fun):
         # correspond to the return value of trace_to_jaxpr out_type2.
         # If we did that, we could cache the result JAXPR from this function
         # and evaluate it each time the function is called.
-        catalyst_jaxpr_with_host, out_tree = QJIT_CUDA(fun).get_jaxpr(*args)
+        catalyst_jaxpr_with_host, out_tree = QJIT_CUDAQ(fun).get_jaxpr(*args)
 
         # We need to keep track of the consts...
         consts = catalyst_jaxpr_with_host.consts

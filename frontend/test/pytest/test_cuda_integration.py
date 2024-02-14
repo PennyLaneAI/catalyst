@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,8 +32,8 @@ from catalyst.utils.jax_extras import remove_host_context
 
 
 @pytest.mark.cuda
-class TestCuda:
-    """CUDA integration tests. Skip if kokkos."""
+class TestCudaQ:
+    """CUDA Quantum integration tests. Skip if kokkos."""
 
     def test_argument(self):
         """Test that we can pass cuda_quantum as a compiler to @qjit decorator."""

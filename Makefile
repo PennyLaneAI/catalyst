@@ -17,6 +17,7 @@ ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
+CUDA ?= "--cuda=True"
 ifeq ($(TEST_BACKEND),"lightning.kokkos")
 # CUDAQ tests cannot run with the lightning.kokkos backend
 # due to the following issue:
