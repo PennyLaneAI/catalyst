@@ -32,7 +32,6 @@ import functools
 import json
 import operator
 from functools import reduce, wraps
-from typing import List
 
 import cudaq
 import jax
