@@ -818,7 +818,8 @@ def interpret(fun):
         # TODO(@erick-xanadu): There was a discussion about removing as much as possible the
         # reliance on unstable APIs.
         # Here is jax._src.core.ClosedJaxpr which is another function in the unstable API.
-        # Its only use here is to create a new ClosedJaxpr from the variable catalyst_jaxpr typed Jaxpr.
+        # Its only use here is to create a new ClosedJaxpr from the variable catalyst_jaxpr typed
+        # Jaxpr.
         # Please note that catalyst_jaxpr_with_host is a ClosedJaxpr.
         # But to get it without the host context we need to "open" it up again.
         # And then close it again.
