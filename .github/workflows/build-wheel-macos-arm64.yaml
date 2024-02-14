@@ -293,7 +293,6 @@ jobs:
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
-              -DOpenMP_ROOT=$(brew --prefix libomp) \
               -DENABLE_WARNINGS=OFF \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OPENMP=OFF \
