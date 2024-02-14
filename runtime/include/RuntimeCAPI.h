@@ -89,7 +89,7 @@ ObsIdType __catalyst__qis__TensorObs(int64_t, /*obsKeys*/...);
 ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKeys*/...);
 
 // Struct pointers arguments here represent return values.
-RESULT *__catalyst__qis__Measure(QUBIT *);
+RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
@@ -98,6 +98,8 @@ void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, int64_t, 
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__Gradient(int64_t, /*results*/...);
 void __catalyst__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...);
+
+void __catalyst__host__rt__unrecoverable_error();
 
 #ifdef __cplusplus
 } // extern "C"

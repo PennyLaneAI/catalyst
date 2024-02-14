@@ -522,7 +522,8 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 
     let arguments = (ins
-        QubitType:$in_qubit
+        QubitType:$in_qubit,
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );
 
     let results = (outs

@@ -22,7 +22,6 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
-#include <random>
 #include <span>
 
 #include "StateVectorLQubitDynamic.hpp"

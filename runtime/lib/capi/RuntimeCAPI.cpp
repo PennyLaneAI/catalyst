@@ -81,6 +81,11 @@ void deactivateDevice()
 
 extern "C" {
 
+void __catalyst__host__rt__unrecoverable_error()
+{
+    RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
+}
+
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
     void *ptr = malloc(size);
@@ -433,6 +438,8 @@ void __catalyst__qis__Rot(double phi, double theta, double omega, QUBIT *qubit, 
 
 void __catalyst__qis__CNOT(QUBIT *control, QUBIT *target, bool adjoint)
 {
+    RT_FAIL_IF(control == target,
+               "Invalid input for CNOT gate. Control and target qubit operands must be distinct.");
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
         "CNOT", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
@@ -739,9 +746,18 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t num
     return Catalyst::Runtime::getQuantumDevicePtr()->HamiltonianObservable(coeffs_vec, obsKeys);
 }
 
-RESULT *__catalyst__qis__Measure(QUBIT *wire)
+RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
 {
-    return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire));
+    std::optional<int32_t> postselectOpt{postselect};
+
+    // Any value different to 0 or 1 denotes absence of postselect, and it is hence turned into
+    // std::nullopt at the C++ interface
+    if (postselect != 0 && postselect != 1) {
+        postselectOpt = std::nullopt;
+    }
+
+    return Catalyst::Runtime::getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire),
+                                                             postselectOpt);
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey)

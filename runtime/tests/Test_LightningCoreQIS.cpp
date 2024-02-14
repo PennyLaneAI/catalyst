@@ -522,7 +522,7 @@ TEST_CASE("Test __catalyst__qis__Measure", "[CoreQIS]")
 
         __catalyst__qis__PauliX(wire0, false);
 
-        Result m = __catalyst__qis__Measure(wire0);
+        Result m = __catalyst__qis__Measure(wire0, -1);
 
         Result one = __catalyst__rt__result_get_one();
         CHECK(*m == *one);
@@ -1347,7 +1347,7 @@ TEST_CASE("Test __catalyst__qis__Measure with false", "[CoreQIS]")
         // qml.Hadamard(wires=0)
         __catalyst__qis__RY(0.0, target, false);
 
-        Result mres = __catalyst__qis__Measure(target);
+        Result mres = __catalyst__qis__Measure(target, -1);
 
         Result zero = __catalyst__rt__result_get_zero();
         CHECK(__catalyst__rt__result_equal(mres, zero));
@@ -1370,7 +1370,7 @@ TEST_CASE("Test __catalyst__qis__Measure with true", "[CoreQIS]")
         // qml.Hadamard(wires=0)
         __catalyst__qis__RY(3.14, target, false);
 
-        Result mres = __catalyst__qis__Measure(target);
+        Result mres = __catalyst__qis__Measure(target, -1);
 
         Result one = __catalyst__rt__result_get_one();
         CHECK(__catalyst__rt__result_equal(mres, one));
@@ -1400,8 +1400,8 @@ TEST_CASE("Test __catalyst__qis__MultiRZ", "[CoreQIS]")
         __catalyst__qis__Hadamard(*q0, false);
         __catalyst__qis__Hadamard(*q1, false);
 
-        Result q0_m = __catalyst__qis__Measure(*q0);
-        Result q1_m = __catalyst__qis__Measure(*q1);
+        Result q0_m = __catalyst__qis__Measure(*q0, -1);
+        Result q1_m = __catalyst__qis__Measure(*q1, -1);
 
         Result zero = __catalyst__rt__result_get_zero();
         Result one = __catalyst__rt__result_get_one();
@@ -1431,8 +1431,8 @@ TEST_CASE("Test __catalyst__qis__CSWAP ", "[CoreQIS]")
         __catalyst__qis__RX(M_PI, *q1, false);
         __catalyst__qis__CSWAP(*q0, *q1, *q2, false);
 
-        Result q1_m = __catalyst__qis__Measure(*q1);
-        Result q2_m = __catalyst__qis__Measure(*q2);
+        Result q1_m = __catalyst__qis__Measure(*q1, -1);
+        Result q2_m = __catalyst__qis__Measure(*q2, -1);
 
         Result zero = __catalyst__rt__result_get_zero();
         Result one = __catalyst__rt__result_get_one();
@@ -1883,4 +1883,41 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         __catalyst__rt__device_release();
         __catalyst__rt__finalize();
     }
+}
+
+TEST_CASE("Test that an exception is raised unconditionally", "[CoreQIS]")
+{
+    auto devices = getDevices();
+    auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
+
+    __catalyst__rt__initialize();
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str());
+
+    REQUIRE_THROWS_WITH(__catalyst__host__rt__unrecoverable_error(),
+                        Catch::Contains("Unrecoverable error"));
+
+    __catalyst__rt__device_release();
+    __catalyst__rt__finalize();
+}
+
+TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[CoreQIS]")
+{
+    auto devices = getDevices();
+    auto &[rtd_lib, rtd_name, rtd_kwargs] = devices[0];
+
+    __catalyst__rt__initialize();
+    __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                (int8_t *)rtd_kwargs.c_str());
+
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+
+    QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+
+    REQUIRE_THROWS_WITH(__catalyst__qis__CNOT(*target, *target, false),
+                        Catch::Contains("Invalid input for CNOT gate."));
+
+    __catalyst__rt__qubit_release_array(qs);
+    __catalyst__rt__device_release();
+    __catalyst__rt__finalize();
 }
