@@ -845,6 +845,8 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
             Q.push_back(__catalyst__rt__qubit_allocate());
         }
 
+        __catalyst__rt__toggle_recorder(/* activate_cm */ true);
+
         /* qml.Hadamard(wires=0) */
         /* qml.Hadamard(wires=1) */
         /* qml.Hadamard(wires=2) */
@@ -875,6 +877,8 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
             Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
             __catalyst__qis__PauliZ(Q[1], &mod);
         }
+        __catalyst__rt__toggle_recorder(/* activate_cm */ false);
+
         {
             MemRefT_CplxT_double_1d state = getState(1 << N);
             __catalyst__qis__State(&state, 0);
