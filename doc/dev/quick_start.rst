@@ -636,8 +636,8 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
         return g(x)
 
 >>> workflow(jnp.array([2.0, 1.0]))
-array([[ 1.74393425e-16  4.54648713e-01]
-       [-1.74393425e-16 -4.54648713e-01]])
+array([[ 3.48786850e-16 -4.20735492e-01]
+       [-8.71967125e-17  4.20735492e-01]])
 
 This decorator has the same methods and API as `grad`. See the documentation for more details.
 
