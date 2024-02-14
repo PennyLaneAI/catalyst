@@ -153,11 +153,11 @@ func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
 // Quantum Gates //
 ///////////////////
 
-// CHECK-DAG: llvm.func @__catalyst__qis__Identity(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
-// CHECK-DAG: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
-// CHECK-DAG: llvm.func @__catalyst__qis__SWAP(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
-// CHECK-DAG: llvm.func @__catalyst__qis__CRot(f64, f64, f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
-// CHECK-DAG: llvm.func @__catalyst__qis__Toffoli(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__Identity(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__SWAP(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__CRot(f64, f64, f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
+// CHECK-DAG: llvm.func @__catalyst__qis__Toffoli(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>)
 
 // CHECK-LABEL: @custom_gate
 func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
@@ -207,7 +207,7 @@ func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>, i64, ...)
 
 // CHECK-LABEL: @multirz
 func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
@@ -239,7 +239,7 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, !llvm.ptr<struct<packed (i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr<struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>>, !llvm.ptr<struct<(i1, i64, ptr<ptr<struct<"Qubit", opaque>>>, ptr<i1>)>>, i64, ...)
 
 // CHECK-LABEL: @qubit_unitary
 func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p2 : memref<4x4xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {

@@ -337,8 +337,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         MLIRContext *ctx = getContext();
 
         TypeConverter *conv = getTypeConverter();
-        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
-                                            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
 
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
@@ -358,7 +357,8 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
+        // TODO: pass the quantum control part when the IR part is ready
+        // values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
         rewriter.replaceOp(op, values);
 
         return success();
