@@ -536,7 +536,6 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         else:
             intermediate_results = intermediate_results[0]
         results_final.append(intermediate_results)
-    results_final = tuple(results_final)
     results_final = tree_unflatten(out_tree, results_final)
     return results_final
 
@@ -805,8 +804,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
-    Returns (Tuple[Array]):
-        Return values of ``f`` paired with the JVP values.
+    Returns 
+        Tuple[Any]: Return values of ``f`` paired with the JVP values.
 
     Raises:
         TypeError: invalid parameter types
@@ -904,8 +903,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
-    Returns (Tuple[Array]):
-        Return values of ``f`` paired with the JVP values.
+    Returns
+        Tuple[Any]): Return values of ``f`` paired with the VJP values.
 
     Raises:
         TypeError: invalid parameter types
