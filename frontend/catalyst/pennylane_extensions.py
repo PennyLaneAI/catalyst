@@ -595,7 +595,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     This function allows the gradient of a hybrid quantum-classical function to be computed within
     the compiled program. Outside of a compiled function, this function will simply dispatch to its
-    JAX counterpart ``jax.grad``.
+    JAX counterpart ``jax.grad``. The function ``f`` can return any pytree-like shape.
 
     .. warning::
 
@@ -725,7 +725,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     This function allows the Jacobian of a hybrid quantum-classical function to be computed within
     the compiled program. Outside of a compiled function, this function will simply dispatch to its
-    JAX counterpart ``jax.jacobian``.
+    JAX counterpart ``jax.jacobian``. The function ``f`` can return any pytree-like shape.
 
     Args:
         f (Callable): a function or a function object to differentiate
@@ -778,8 +778,8 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
             return g(x)
 
     >>> workflow(jnp.array([2.0, 1.0]))
-    array([[-1.32116540e-07,  1.33781874e-07],
-           [-4.20735506e-01,  4.20735506e-01]])
+    array([[ 3.48786850e-16 -4.20735492e-01]
+           [-8.71967125e-17  4.20735492e-01]])
     """
     scalar_out = False
     return Grad(f, GradParams(method, scalar_out, h, argnum))
@@ -791,7 +791,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will simply
-    dispatch to its JAX counterpart ``jax.jvp``.
+    dispatch to its JAX counterpart ``jax.jvp``. The function ``f`` can return any pytree-like shape.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -826,8 +826,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> x = jnp.array([0.1, 0.2])
     >>> tangent = jnp.array([0.3, 0.6])
     >>> jvp(x, tangent)
-    [array([0.09983342, 0.04      , 0.02      ]),
-    array([0.29850125, 0.24000006, 0.12      ])]
+    (array([0.09983342, 0.04      , 0.02      ]), array([0.29850125, 0.24      , 0.12      ]))
 
     **Example 2 (argnum usage)**
 
@@ -851,7 +850,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> params = jnp.array([[0.54, 0.3154], [0.654, 0.123]])
     >>> dy = jnp.array([[1.0, 1.0], [1.0, 1.0]])
     >>> workflow(params, dy)
-    [array(0.78766064), array(-0.7011436)]
+    (array(0.78766064), array(-0.7011436))
     """
 
     def check_is_iterable(x, hint):
@@ -890,7 +889,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will simply
-    dispatch to its JAX counterpart ``jax.vjp``.
+    dispatch to its JAX counterpart ``jax.vjp``. The function ``f`` can return any pytree-like shape.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
@@ -925,8 +924,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     >>> x = jnp.array([0.1, 0.2])
     >>> dy = jnp.array([-0.5, 0.1, 0.3])
     >>> vjp(x, dy)
-    [array([0.09983342, 0.04      , 0.02      ]),
-    array([-0.43750208,  0.07000001])]
+    (array([0.09983342, 0.04      , 0.02      ]), (array([-0.43750208,  0.07      ]),))
     """
 
     def check_is_iterable(x, hint):
@@ -952,6 +950,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         func_res = tree_unflatten(out_tree, func_res)
         # We do not change the shape of the VJP as it is the same as the parameters not
         # as the output
+        # TODO: update when we add support for pytrees params
+
         results = tuple([func_res, tuple(vjps)])
 
     else:
