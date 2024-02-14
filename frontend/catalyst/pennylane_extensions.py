@@ -2273,7 +2273,7 @@ def vmap(
     Args:
         f (Callable): A Python function containing PennyLane quantum operations.
         in_axes (Union[int, Sequence[Any]]): It specifies the value(s) over which input
-            array axes to map. Currently, vectorization of only one argument is supported.
+            array axes to map.
         out_axes (int): It specifies where te mapped axis should appear in the output.
         axis_size (int): An integer can be optionally provided to indicate the size of the
             axis to be mapped. If omitted, the size of the mapped axis will be inferred from
@@ -2320,30 +2320,34 @@ def vmap(
         args_flat, args_tree = tree_flatten(args)
         in_axes_flat = _vmap_tree_flatten(in_axes)
 
-        batch_sizes = _get_batch_size(args_flat, in_axes_flat, axis_size)
-        batch_pos = _get_batch_loc(in_axes_flat)
+        # import pdb
+        # pdb.set_trace()
 
-        # TODO: support vectorization of multiple axes
-        if len(batch_sizes) != 1:
-            raise ValueError(
-                "Invalid number of batch arguments; "
-                "vectorization of only one argument is "
-                f"currently support, but got batch_sizes={batch_sizes}"
-            )
-        batch_size = batch_sizes[0]
-        batch_pos = batch_pos[0]
+        batch_size = _get_batch_size(args_flat, in_axes_flat, axis_size)
+        batch_loc = _get_batch_loc(in_axes_flat)
 
-        # Support vectorization on dim > 0
-        args_flat_at_pos = args_flat[batch_pos]
-        if ax := in_axes_flat[batch_pos]:
-            up_axes = [*range(args_flat[batch_pos].ndim)]
-            up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
-            args_flat_at_pos = jnp.transpose(args_flat_at_pos, up_axes)
+        # If vmap is requested on any axes
+        if len(batch_loc):
+            for loc in batch_loc:
+                # Support vectorization on dim > 0
+                if ax := in_axes_flat[loc]:
+                    up_axes = [*range(args_flat[loc].ndim)]
+                    up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
+                    args_flat[loc] = jnp.transpose(args_flat[loc], up_axes)
 
-        # Execute one time to get the output-shape
-        args_flat[batch_pos] = args_flat_at_pos[0]
-        new_args = tree_unflatten(args_tree, args_flat)
-        init_result = fn(*new_args, **kwargs)
+        # Prepare args_flat to run 'fn' one time and get the output-shape
+        fn_args_flat = args_flat.copy()
+        for loc in batch_loc:
+            fn_args_flat[loc] = args_flat[loc][0]
+
+        fn_args = tree_unflatten(args_tree, fn_args_flat)
+
+        # Run 'fn' one time to get output-shape
+        init_result = fn(*fn_args, **kwargs)
+
+        # Return 'init_result' if none is requested
+        if not batch_size:
+            return init_result
 
         init_result_flat, init_result_tree = tree_flatten(init_result)
 
@@ -2354,7 +2358,7 @@ def vmap(
         num_axes_out = len(init_result_flat)
 
         # Store batched results of all leaves
-        # in the flatten format of 'init_result'
+        # in the flatten format with respect to the 'init_result' shape
         batched_result_list = []
         for j in range(num_axes_out):
             out_shape = (
@@ -2372,15 +2376,20 @@ def vmap(
                 f"arguments, but got {len(in_axes)} and {len(args)}"
             )
 
-        # TODO: replace it with parallelfor_loop
+        # TODO: replace for_loop with parallelfor_loop
+        # Apply mapping batched_args[1:] ---> fn(args)'
         @for_loop(1, batch_size, 1)
         def loop_fn(i, batched_result_list):
-            args_flat[batch_pos] = args_flat_at_pos[i]
-            new_args = tree_unflatten(args_tree, args_flat)
-            res = fn(*new_args, **kwargs)
+            fn_args_flat = args_flat
+            for loc in batch_loc:
+                fn_args_flat[loc] = args_flat[loc][i]
+
+            fn_args = tree_unflatten(args_tree, fn_args_flat)
+            res = fn(*fn_args, **kwargs)
 
             res_flat, _ = tree_flatten(res)
 
+            # Update the list of results
             for j in range(num_axes_out):
                 batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
 
@@ -2393,6 +2402,8 @@ def vmap(
             return batched_result_list
 
         batched_result_list = loop_fn(batched_result_list)
+
+        # Unflatten batched_result before return
         return tree_unflatten(init_result_tree, batched_result_list)
 
     return batched_fn
@@ -2429,22 +2440,28 @@ def _vmap_tree_flatten(args):
     return flatten_tree_with_nones
 
 
-def _get_batch_loc(in_axes_flat):
-    """Get the batch loc"""
+def _get_batch_loc(axes_flat):
+    """Get the list of mapping locations in the flatten list of in- or out- axes"""
 
-    return [i for i, d in enumerate(in_axes_flat) if d is not None]
+    return [i for i, d in enumerate(axes_flat) if d is not None]
 
 
-def _get_batch_size(args_flat, in_axes_flat, axis_size):
+def _get_batch_size(args_flat, axes_flat, axis_size):
     """Get the batch size."""
 
     if axis_size is not None:
-        return [axis_size]
+        return axis_size
 
     batch_sizes = []
-    for arg, d in zip(args_flat, in_axes_flat):
+    for arg, d in zip(args_flat, axes_flat):
         shape = np.shape(arg) if arg.shape else (1,)
         if d is not None and len(shape) > d:
             batch_sizes.append(shape[d])
 
-    return batch_sizes
+    if any(size != batch_sizes[0] for size in batch_sizes[1:]):
+        raise ValueError(
+            "Invalid batch sizes; expected to get a uniform batch sizes, "
+            f"but got batch_sizes={batch_sizes} from args_flat={args_flat}"
+        )
+
+    return batch_sizes[0] if batch_sizes else 0

@@ -112,7 +112,8 @@ class TestVectorizeMap:
             res1 = vmap(circuit)(x)
             res2 = vmap(circuit, in_axes=0)(x)
             res3 = vmap(circuit, in_axes=(0,))(x)
-            return res1, res2, res3
+            res4 = vmap(circuit, in_axes=None)(x[0])
+            return res1, res2, res3, res4
 
         x = jnp.array(
             [
@@ -127,6 +128,7 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], excepted)
         assert jnp.allclose(result[1], excepted)
         assert jnp.allclose(result[2], excepted)
+        assert jnp.allclose(result[3], excepted[0])
 
     def test_vmap_nonzero_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with axes > 0."""
@@ -156,25 +158,6 @@ class TestVectorizeMap:
         excepted = jnp.array([0.93005586, 0.00498127])
         assert jnp.allclose(result[0], excepted)
         assert jnp.allclose(result[1], excepted)
-
-    def test_vmap_args_unsupported(self, backend):
-        """Test catalyst.vmap with respect to multiple arguments."""
-
-        def workflow(x, y):
-            @qml.qnode(qml.device(backend, wires=1))
-            def circuit(x, y):
-                qml.RX(jnp.pi * x + y, wires=0)
-                return qml.expval(qml.PauliZ(0))
-
-            res = vmap(circuit, in_axes=(0, 0))(x, y)
-            return res
-
-        with pytest.raises(
-            ValueError,
-            match="Invalid number of batch arguments; "
-            "vectorization of only one argument is currently support",
-        ):
-            qjit(workflow)(0.1, 0.1)
 
     def test_vmap_failed_runtime_len_check(self, backend):
         """Test catalyst.vmap with invalid length of in_axes and args."""
@@ -234,6 +217,85 @@ class TestVectorizeMap:
 
         result = workflow(x, y, 1)
         excepted = jnp.array([0.93005586, 0.00498127, -0.88789978]) * y
+        assert jnp.allclose(result[0], excepted)
+        assert jnp.allclose(result[1], excepted)
+        assert jnp.allclose(result[2], excepted)
+        assert jnp.allclose(result[3], excepted)
+        assert jnp.allclose(result[4], excepted[:2])
+
+    def test_vmap_tuple_in_axes_multiple_nonuniform(self, backend):
+        """Test expected ValueError with non-uniform batch sizes."""
+
+        @qjit
+        def workflow(x, y):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x, y):
+                qml.Identity(wires=0)
+
+            return vmap(circuit, in_axes=(0, 0))(x, y)
+
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+            ]
+        )
+
+        y1 = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+        y2 = [jnp.pi, jnp.pi / 2]  # TODO: support Python lists in vmap.
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid batch sizes; expected to get a uniform batch sizes",
+        ):
+            qjit(workflow)(x, y1)
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid batch sizes; expected to get a uniform batch sizes",
+        ):
+            qjit(workflow)(x, y2)
+
+    def test_vmap_tuple_in_axes_multiple(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with a tuple in_axes
+        and multiple non-zero axes."""
+
+        @qjit
+        def workflow(x, y, z):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x, y):
+                qml.RX(jnp.pi * x[0] + y, wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            def workflow2(x, y):
+                return circuit(x, y)
+
+            def workflow3(y, x):
+                return circuit(x, y)
+
+            def workflow4(y, x, z):
+                return circuit(x, y)
+
+            res1 = vmap(workflow2, in_axes=(0, 0))(x, y)
+            res2 = vmap(workflow2, in_axes=[0, 0])(x, y)
+            res3 = vmap(workflow3, in_axes=(0, 0))(y, x)
+            res4 = vmap(workflow4, in_axes=(0, 0, None))(y, x, z)
+            res5 = vmap(workflow4, in_axes=(0, 0, None), axis_size=2)(y, x, z)
+            return res1, res2, res3, res4, res5
+
+        y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+        result = workflow(x, y, 1)
+        excepted = jnp.array([-0.93005586, -0.97165424, -0.6987465])
         assert jnp.allclose(result[0], excepted)
         assert jnp.allclose(result[1], excepted)
         assert jnp.allclose(result[2], excepted)
