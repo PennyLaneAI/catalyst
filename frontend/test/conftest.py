@@ -132,14 +132,17 @@ def pytest_collection_modifyitems(config, items):
     is_kokkos = config.getoption("backend") == "lightning.kokkos"
     no_cuda = config.getoption("cuda") != "True"
     yes_cuda = config.getoption("cuda") == "True"
-    skip_cuda_tests = no_cuda or is_kokkos
-    if yes_cuda and not is_cuda_available():
+    is_apple = platform.system() == "Darwin"
+    # CUDA quantum is not supported in apple silicon.
+    # CUDA quantum cannot run with kokkos
+    skip_cuda_tests = no_cuda or is_kokkos or is_apple
+    if not skip_cuda_tests and is_cuda_available():
+        # Only check this conditionally as it imports cudaq.
+        # And we don't even want to succeed with kokkos.
         skip_cuda_tests = True
     for item in items:
-        is_apple = platform.system() == "Darwin"
-        # CUDA quantum is not supported in apple silicon.
         is_cuda_test = "cuda" in item.keywords
-        skip_cuda = is_cuda_test and (skip_cuda_tests or is_apple)
+        skip_cuda = is_cuda_test and skip_cuda_tests
         if skip_cuda:
             item.add_marker(skipper)
 
