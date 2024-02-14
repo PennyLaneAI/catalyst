@@ -67,7 +67,7 @@ def check_qjit_compatibility(device, config):
         CompileError
     """
     compilation = config["compilation"]
-    if compilation["qjit_compatible"] or compilation.get("jax_transform_compatible", False):
+    if compilation["qjit_compatible"]:
         return
 
     name = device.name
@@ -239,14 +239,6 @@ def extract_backend_info(device):
     device_name = ""
     device_lpath = ""
     device_kwargs = {}
-
-    with open(device.config, "rb") as f:
-        config = toml_load(f)
-
-    if config["compilation"].get("jax_transform_compatible"):
-        # Device is compatible with JAX transforms...
-        # This is a special case for CUDA quantum device.
-        return config, device_name, None, None
 
     if dname in SUPPORTED_RT_DEVICES:
         # Support backend devices without `get_c_interface`

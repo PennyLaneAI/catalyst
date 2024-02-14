@@ -38,6 +38,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
+import catalyst
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
@@ -74,6 +75,7 @@ from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.jax_extras import remove_host_context
 from catalyst.utils.patching import Patcher
+from catalyst.utils.toml import toml_load
 
 from .primitives import (
     cuda_inst,
@@ -754,7 +756,17 @@ class QJIT_CUDAQ:
             an MLIR module
         """
 
+        def cudaq_backend_info(device):
+            """The extract_backend_info should not be run by the cuda compiler as it is
+            catalyst-specific. We need to make this API a bit nicer for third-party compilers.
+            """
+            with open(device.config, "rb") as f:
+                config = toml_load(f)
+
+            return config, device.name, None, None
+
         with Patcher(
+            (catalyst.pennylane_extensions.QFunc, "extract_backend_info", cudaq_backend_info),
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function

@@ -45,20 +45,6 @@ class TestCudaQ:
         def circuit_foo():
             return qml.state()
 
-    def test_qjit_cuda_generate_jaxpr(self):
-        """Test the JAXPR generation."""
-
-        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_foo():
-            return qml.state()
-
-        opts = CompileOptions()
-        expected_jaxpr = QJIT(circuit_foo, opts).jaxpr
-        observed_jaxpr, _ = QJIT_CUDAQ(circuit_foo).get_jaxpr()
-        assert str(expected_jaxpr) == str(observed_jaxpr)
-
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 

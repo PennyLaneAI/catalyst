@@ -52,11 +52,7 @@ finiteshots = []
 
 [compilation]
 # If the device is compatible with qjit
-# TODO(@erick-xanadu): What exactly is the meaning here?
-# Because we are using the `qjit` interface,
-# but I believe that `qjit_compatible` means that we interface with it using the runtime.
-qjit_compatible = false
-jax_transform_compatible = true
+qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
 # If the device supports adjoint
