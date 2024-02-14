@@ -804,7 +804,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
-    Returns 
+    Returns:
         Tuple[Any]: Return values of ``f`` paired with the JVP values.
 
     Raises:
@@ -903,7 +903,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
-    Returns
+    Returns:
         Tuple[Any]): Return values of ``f`` paired with the VJP values.
 
     Raises:
