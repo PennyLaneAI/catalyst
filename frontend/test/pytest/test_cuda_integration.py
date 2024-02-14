@@ -210,7 +210,6 @@ class TestCuda:
 
     def test_qjit_cuda_device(self):
         """Test CudaQDevice."""
-        from catalyst.cuda import CudaQDevice, qjit as qjit_cuda
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
