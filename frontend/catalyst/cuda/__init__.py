@@ -27,21 +27,6 @@ from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 def qjit(fn=None, **kwargs):
     """Wrapper around QJIT for CUDA-quantum."""
 
-    if kwargs.get("target", "binary") == "binary":
-        # Catalyst uses binary as a default.
-        # If use are using catalyst's qjit
-        # then, let's override it with cuda_quantum's default.
-        kwargs["target"] = "qpp-cpu"
-
-    target = kwargs.get("target", "qpp-cpu")
-
-    if not cudaq.has_target(target):
-        msg = f"Unavailable target {target}."  # pragma: no cover
-        raise ValueError(msg)
-
-    cudaq_target = cudaq.get_target(target)
-    cudaq.set_target(cudaq_target)
-
     if fn is not None:
         return interpret(fn)
 
@@ -87,10 +72,13 @@ class BaseCudaInstructionSet(qml.QubitDevice):
 
     def apply(self, operations, **kwargs):
         """Unused"""
-        raise NotImplementedError("CudaQDevice must be used with `catalyst.qjit`")  # pragma: no cover
+        raise NotImplementedError(
+            "CudaQDevice must be used with `catalyst.qjit`"
+        )  # pragma: no cover
 
 
 class CudaQDevice(BaseCudaInstructionSet):
     """Concrete device class for qpp-cpu"""
+
     name = "CudaQ Device"
-    short_name = "cudaq"
+    short_name = "softwareq.qpp"

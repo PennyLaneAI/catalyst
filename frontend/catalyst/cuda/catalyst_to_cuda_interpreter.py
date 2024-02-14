@@ -225,6 +225,18 @@ def change_device_to_cuda_device(ctx):
     # and it is the responsibility of the caller to propagate this information.
     shots = parameters.get("shots")
 
+    device_name = parameters.get("rtd_name", "softwareq.qpp")
+
+    target_map = {"softwareq.qpp": "qpp-cpu"}
+    target = target_map.get(device_name)
+
+    if not target or not cudaq.has_target(target):
+        msg = f"Unavailable target {target}."  # pragma: no cover
+        raise ValueError(msg)
+
+    cudaq_target = cudaq.get_target(target)
+    cudaq.set_target(cudaq_target)
+
     # cudaq_make_kernel returns a multiple values depending on the arguments.
     # Here it is returning a single value wrapped in a list.
     kernel = cudaq_make_kernel()

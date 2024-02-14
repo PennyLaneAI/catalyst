@@ -324,13 +324,6 @@ class TestCudaQ:
 
         circuit(3.14)
 
-    def test_cuda_invalid_target(self):
-        """Test invalid target."""
-        from catalyst.cuda import qjit as qjit_cuda
-
-        with pytest.raises(ValueError, match="Unavailable target foo."):
-            qjit_cuda(fn=None, target="foo")
-
     def test_expval(self):
         """Test multiple_values."""
         from catalyst.cuda import CudaQDevice
