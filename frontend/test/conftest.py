@@ -19,19 +19,23 @@ import platform
 import pytest
 
 try:
-    import cudaq
-except (ImportError, ModuleNotFoundError) as e:
-    cudaq_available = False
-else:
-    cudaq_available = True
-
-try:
     import catalyst
     import tensorflow as tf
 except (ImportError, ModuleNotFoundError) as e:
     tf_available = False
 else:
     tf_available = True
+
+
+def is_cuda_available():
+    try:
+        import cudaq
+    except (ImportError, ModuleNotFoundError) as e:
+        cudaq_available = False
+    else:
+        cudaq_available = True
+    return cudaq_available
+
 
 # Default from PennyLane
 TOL_STOCHASTIC = 0.05
@@ -56,7 +60,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--cuda",
         action="store",
-        default=True,
+        default="True",
         help="Run cuda tests.",
     )
 
@@ -97,10 +101,9 @@ def pytest_configure(config):
 
 def pytest_runtest_setup(item):
     """Automatically skip tests if interfaces are not installed"""
-    interfaces = {"tf", "cuda"}
+    interfaces = {"tf"}
     available_interfaces = {
         "tf": tf_available,
-        "cuda": cudaq_available,
     }
 
     allowed_interfaces = [
@@ -110,7 +113,7 @@ def pytest_runtest_setup(item):
     ]
 
     # load the marker specifying what the interface is
-    all_interfaces = {"tf", "cuda"}
+    all_interfaces = {"tf"}
     marks = {mark.name for mark in item.iter_markers() if mark.name in all_interfaces}
 
     for b in marks:
@@ -126,11 +129,17 @@ def pytest_collection_modifyitems(config, items):
 
     # skip braket tests
     skipper = pytest.mark.skip()
+    is_kokkos = config.getoption("backend") == "lightning.kokkos"
+    no_cuda = config.getoption("cuda") != "True"
+    yes_cuda = config.getoption("cuda") == "True"
+    skip_cuda_tests = no_cuda or is_kokkos
+    if yes_cuda and not is_cuda_available():
+        skip_cuda_tests = True
     for item in items:
         is_apple = platform.system() == "Darwin"
         # CUDA quantum is not supported in apple silicon.
-        run_cuda_tests = "cuda" in item.keywords
-        skip_cuda = run_cuda_tests and (item.get_closest_marker("cuda") == "True" or is_apple)
+        is_cuda_test = "cuda" in item.keywords
+        skip_cuda = is_cuda_test and (skip_cuda_tests or is_apple)
         if skip_cuda:
             item.add_marker(skipper)
 
