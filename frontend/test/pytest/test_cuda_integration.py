@@ -476,3 +476,7 @@ class TestCuda:
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
         assert_allclose(expected, observed)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

@@ -19,6 +19,13 @@ import platform
 import pytest
 
 try:
+    import cudaq
+except (ImportError, ModuleNotFoundError) as e:
+    cudaq_available = False
+else:
+    cudaq_available = True
+
+try:
     import catalyst
     import tensorflow as tf
 except (ImportError, ModuleNotFoundError) as e:
@@ -90,9 +97,10 @@ def pytest_configure(config):
 
 def pytest_runtest_setup(item):
     """Automatically skip tests if interfaces are not installed"""
-    interfaces = {"tf"}
+    interfaces = {"tf", "cuda"}
     available_interfaces = {
         "tf": tf_available,
+        "cuda": cudaq_available,
     }
 
     allowed_interfaces = [
@@ -102,7 +110,7 @@ def pytest_runtest_setup(item):
     ]
 
     # load the marker specifying what the interface is
-    all_interfaces = {"tf"}
+    all_interfaces = {"tf", "cuda"}
     marks = {mark.name for mark in item.iter_markers() if mark.name in all_interfaces}
 
     for b in marks:
