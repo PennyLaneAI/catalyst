@@ -308,9 +308,12 @@ class LinkerDriver:
 
         system_flags = []
         if platform.system() == "Linux":
-            system_flags += ["-Wl,-no-as-needed"]
+            # The exception handling mechanism requires linking against
+            # __gxx_personality_v0 which is either on -lstdc++ in
+            # or -lc++. We choose based on the operating system.
+            system_flags += ["-Wl,-no-as-needed", "-lstdc++"]
         elif platform.system() == "Darwin":  # pragma: nocover
-            system_flags += ["-Wl,-arch_errors_fatal"]
+            system_flags += ["-Wl,-arch_errors_fatal", "-lc++"]
 
         default_flags = [
             "-shared",
