@@ -227,6 +227,8 @@ def change_device_to_cuda_device(ctx):
 
     device_name = parameters.get("rtd_name", "softwareq.qpp")
 
+    # TODO(@erick-xanadu) as more devices become available
+    # map the names here.
     target_map = {"softwareq.qpp": "qpp-cpu"}
     target = target_map.get(device_name)
 
