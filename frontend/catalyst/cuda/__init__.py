@@ -27,11 +27,6 @@ from catalyst.utils.contexts import EvaluationContext
 
 
 def qjit(fn=None, **kwargs):
-    """Entry point to qjit_cuda."""
-    return qjit_cuda(fn, **kwargs)  # pragma: no cover
-
-
-def qjit_cuda(fn=None, **kwargs):
     """Wrapper around QJIT for CUDA-quantum."""
 
     if kwargs.get("target", "binary") == "binary":
@@ -98,5 +93,6 @@ class BaseCudaInstructionSet(qml.QubitDevice):
 
 
 class CudaQDevice(BaseCudaInstructionSet):
+    """Concrete device class for qpp-cpu"""
     name = "CudaQ Device"
     short_name = "cudaq"

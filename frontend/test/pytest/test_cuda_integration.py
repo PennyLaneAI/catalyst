@@ -210,7 +210,7 @@ class TestCuda:
 
     def test_qjit_cuda_device(self):
         """Test CudaQDevice."""
-        from catalyst.cuda import CudaQDevice, qjit_cuda
+        from catalyst.cuda import CudaQDevice, qjit as qjit_cuda
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
@@ -326,7 +326,7 @@ class TestCuda:
 
     def test_cuda_invalid_target(self):
         """Test invalid target."""
-        from catalyst.cuda import qjit_cuda
+        from catalyst.cuda import qjit as qjit_cuda
 
         with pytest.raises(ValueError, match="Unavailable target foo."):
             qjit_cuda(fn=None, target="foo")
