@@ -876,7 +876,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
         func_res = tree_unflatten(out_tree, func_res)
         jvps = tree_unflatten(out_tree, jvps)
-        results = tuple([func_res, jvps])
+        results = (func_res, jvps)
 
     else:
         results = jax.jvp(f, params, tangents)
