@@ -1220,6 +1220,7 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
     """
+
     argnums = static_argnums
     axes = abstracted_axes
     if fn is not None:
