@@ -719,7 +719,7 @@ class QJIT_CUDAQ:
 
     .. note::
 
-        ``QJIT_CUDA`` objects are created by the :func:`~.qjit` decorator. Please see
+        ``QJIT_CUDAQ`` objects are created by the :func:`~.qjit` decorator. Please see
         the :func:`~.qjit` documentation for more details.
 
     Args:
@@ -776,7 +776,7 @@ def interpret(fun):
 
     @wraps(fun)
     def wrapped(*args, **_kwargs):
-        # QJIT_CUDA(fun).get_jaxpr
+        # QJIT_CUDAQ(fun).get_jaxpr
         # will return the JAXPR of the function fun.
         # However, notice that *args are still concrete.
         # This means that when we interpret the JAXPR, it will be a concrete interpretation.

@@ -48,7 +48,7 @@ class TestCudaQ:
     def test_qjit_cuda_generate_jaxpr(self):
         """Test the JAXPR generation."""
 
-        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDA
+        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
@@ -56,19 +56,19 @@ class TestCudaQ:
 
         opts = CompileOptions()
         expected_jaxpr = QJIT(circuit_foo, opts).jaxpr
-        observed_jaxpr, _ = QJIT_CUDA(circuit_foo).get_jaxpr()
+        observed_jaxpr, _ = QJIT_CUDAQ(circuit_foo).get_jaxpr()
         assert str(expected_jaxpr) == str(observed_jaxpr)
 
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 
-        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDA
+        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
             return qml.state()
 
-        observed_jaxpr, _ = QJIT_CUDA(circuit_foo).get_jaxpr()
+        observed_jaxpr, _ = QJIT_CUDAQ(circuit_foo).get_jaxpr()
         jaxpr = remove_host_context(observed_jaxpr)
         assert jaxpr
 
@@ -210,6 +210,7 @@ class TestCudaQ:
 
     def test_qjit_cuda_device(self):
         """Test CudaQDevice."""
+        from catalyst.cuda import CudaQDevice
 
         @qml.qnode(CudaQDevice(wires=1))
         def circuit(a):
