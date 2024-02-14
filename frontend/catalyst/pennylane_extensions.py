@@ -536,7 +536,6 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         else:
             intermediate_results = intermediate_results[0]
         results_final.append(intermediate_results)
-    results_final = tuple(results_final)
     results_final = tree_unflatten(out_tree, results_final)
     return results_final
 
