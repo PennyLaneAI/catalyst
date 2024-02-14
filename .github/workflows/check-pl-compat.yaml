@@ -87,21 +87,6 @@ jobs:
         ref: ${{ needs.constants.outputs.enzyme_version }}
         path: mlir/Enzyme
 
-    - name: Install PennyLane (latest)
-      if: ${{ inputs.pennylane == 'latest' }}
-      run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
-
-    - name: Install PennyLane (stable)
-      if: ${{ inputs.pennylane == 'stable' }}
-      run: |
-        pip install --upgrade pennylane
-
-    - name: Install PennyLane (release-candidate)
-      if: ${{ inputs.pennylane == 'release-candidate' }}
-      run: |
-        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.34.0-rc0
-
     - name: Install Catalyst (latest/stable)
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
@@ -154,6 +139,20 @@ jobs:
         pip install --upgrade pennylane-lightning
         pip install --upgrade pennyLane-lightning-kokkos
 
+    - name: Install PennyLane (latest)
+      if: ${{ inputs.pennylane == 'latest' }}
+      run: |
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
+
+    - name: Install PennyLane (stable)
+      if: ${{ inputs.pennylane == 'stable' }}
+      run: |
+        pip install --upgrade pennylane
+
+    - name: Install PennyLane (release-candidate)
+      if: ${{ inputs.pennylane == 'release-candidate' }}
+      run: |
+        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.34.0-rc0
 
 
     - name: Add Frontend Dependencies to PATH
