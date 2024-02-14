@@ -468,8 +468,6 @@ def change_sample_or_counts(ctx, eqn):
     else:
         shape = 2**obs_catalyst.num_qubits
         outvals = cudaq_counts(ctx.kernel, shape=shape, shots_count=shots)
-        bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
-        local_counts = jax.core.ShapedArray([shape], jax.numpy.int64)
         outvariables = [ctx.new_variable(), ctx.new_variable()]
         _map(ctx.replace, eqn.outvars, outvariables)
         _map(ctx.write, eqn.outvars, outvals)
