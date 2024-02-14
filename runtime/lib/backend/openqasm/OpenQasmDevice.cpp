@@ -122,6 +122,8 @@ auto OpenQasmDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_R
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
                                     const std::vector<QubitIdType> &wires, bool inverse)
 {
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
+
     using namespace Catalyst::Runtime::Simulator::Lightning;
 
     // First, check operation specifications
