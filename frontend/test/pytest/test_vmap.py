@@ -171,7 +171,8 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid number of batch arguments; vectorization of only one argument is currently support",
+            match="Invalid number of batch arguments; "
+            "vectorization of only one argument is currently support",
         ):
             qjit(workflow)(0.1, 0.1)
 
@@ -189,7 +190,8 @@ class TestVectorizeMap:
 
         with pytest.raises(
             TypeError,
-            match="Invalid 'in_axes'; it can be an int or a tuple of PyTrees corresponding to the arguments",
+            match="Invalid 'in_axes'; it can be an int or a tuple "
+            "of PyTrees corresponding to the arguments",
         ):
             qjit(workflow)(0.1)
 

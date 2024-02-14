@@ -19,10 +19,8 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
-import inspect
 import numbers
 import pathlib
-from collections import Counter
 from collections.abc import Sequence, Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
@@ -31,13 +29,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-from jax._src.api_util import flatten_axes, shaped_abstractify
+from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import (
     PyTreeDef,
     flatten_one_level,
-    generate_key_paths,
-    keystr,
     tree_flatten,
     tree_leaves,
     tree_unflatten,
