@@ -68,6 +68,7 @@
 * Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+  [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
 
   ```py
   dev = qml.device("lightning.qubit", wires=1)
@@ -139,6 +140,12 @@
   ```
 
 <h3>Breaking changes</h3>
+
+* We match better the Jax convention for returning gradient, jacobian, vjp and jvp. Therefore some breaking
+  changes about the return shapes of those functions were introduced.
+  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+  [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
 
 * The entry point name convention has changed.
   [(#493)](https://github.com/PennyLaneAI/catalyst/pull/493)
