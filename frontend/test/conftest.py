@@ -131,7 +131,6 @@ def pytest_collection_modifyitems(config, items):
     skipper = pytest.mark.skip()
     is_kokkos = config.getoption("backend") == "lightning.kokkos"
     no_cuda = config.getoption("cuda") != "True"
-    yes_cuda = config.getoption("cuda") == "True"
     is_apple = platform.system() == "Darwin"
     # CUDA quantum is not supported in apple silicon.
     # CUDA quantum cannot run with kokkos
