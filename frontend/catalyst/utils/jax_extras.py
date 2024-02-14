@@ -647,7 +647,8 @@ def remove_host_context(jaxpr):
 
     Later iterations **might** have a host context. This is something not currently planned.
 
-    The host context is the wrapper function that calls a qnode. When applying a `@qjit` decorator immediately on a qnode like:
+    The host context is the wrapper function that calls a qnode. When applying a `@qjit`
+    decorator immediately on a qnode like:
 
     ```python
     @qjit
@@ -656,14 +657,15 @@ def remove_host_context(jaxpr):
       return x
     ```
 
-    Notice that in the JAXPR (and all subsequent IRs), we have this wrapper context that only performs a function call.
+    Notice that in the JAXPR (and all subsequent IRs), we have this wrapper context that only
+    performs a function call.
 
     { lambda ; a:i64[]. let
       b:i64[] = func[
         call_jaxpr={ lambda ; c:i64[]. let
              = qdevice[
               rtd_kwargs={'shots': 0, 'mcmc': False}
-              rtd_lib=/home/ubuntu/code/catalyst/frontend/catalyst/utils/../../../runtime/build/lib/librtd_lightning.so
+              rtd_lib=path/to/runtime...
               rtd_name=LightningSimulator
             ]
             d:AbstractQreg() = qalloc 1
