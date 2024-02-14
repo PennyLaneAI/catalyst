@@ -67,9 +67,22 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
         rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
 }
 
+/**
+ * @brief Initialize and fill the  `struct Modifiers` on stack return a pointer to it.
+ *
+ * @param loc MLIR Location object
+ * @param rewriter MLIR OpBuilder object
+ * @param conv MLIR TypeConverter object
+ * @param adjoint The value of adjoint flag of the resulting structure
+ * @param controlledQubits list of controlled qubits
+ * @param controlledValues list of controlled values
+ */
 Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bool adjoint,
                       ValueRange controlledQubits, ValueRange controlledValues)
 {
+    assert(controlledQubits.size() == controlledValues.size() &&
+           "controlled qubits and controlled values have different lenghts");
+
     MLIRContext *ctx = rewriter.getContext();
 
     auto boolType = IntegerType::get(ctx, 1);
@@ -80,8 +93,8 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
     auto qubitPtrPtrType = LLVM::LLVMPointerType::get(qubitPtrType);
     auto boolPtrType = LLVM::LLVMPointerType::get(boolType);
     auto boolPtrPtrType = LLVM::LLVMPointerType::get(boolPtrType);
-    auto structType = LLVM::LLVMStructType::getLiteral(
-        ctx, {boolType, sizeType, qubitPtrType, boolPtrType});
+    auto structType =
+        LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, qubitPtrType, boolPtrType});
     auto modifiersPtrType = LLVM::LLVMPointerType::get(structType);
 
     Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
@@ -93,8 +106,8 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
     }
 
     auto adjointVal = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getBoolAttr(adjoint));
-    auto numControlledVal = rewriter.create<LLVM::ConstantOp>(loc,
-        rewriter.getI64IntegerAttr(controlledValues.size()));
+    auto numControlledVal =
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
 
     auto modifiersPtr = rewriter.create<LLVM::AllocaOp>(loc, modifiersPtrType, c1).getResult();
     auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, boolPtrType, modifiersPtr,
@@ -109,10 +122,9 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
     if (controlledQubits.size() > 0) {
-        Value c = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
-        ctrlPtr = rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, c).getResult();
-        valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, c).getResult();
+        ctrlPtr =
+            rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, numControlledVal).getResult();
+        valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, numControlledVal).getResult();
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, qubitPtrType, ctrlPtr,
@@ -342,9 +354,9 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
         argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
-                                        adaptor.getParams().getTypes().end());
+                        adaptor.getParams().getTypes().end());
         argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                                        adaptor.getInQubits().getTypes().end());
+                        adaptor.getInQubits().getTypes().end());
         argTypes.insert(argTypes.end(), modifiersPtr.getType());
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -358,7 +370,8 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         // TODO: pass the quantum control part when the IR part is ready
-        // values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
+        // values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
+        // adaptor.getInCtrlQubits().end());
         rewriter.replaceOp(op, values);
 
         return success();
