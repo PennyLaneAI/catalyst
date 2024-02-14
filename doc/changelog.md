@@ -40,6 +40,30 @@
   f(2, MyClass(5)) # no re-compilation
   ```
 
+* Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
+  `catalyst.vmap` offers the vectorization map of one single parameter backed
+  by `catalyst.for_loop`. In terms of feature parity with `jax.vmap`, one can use
+  - `in_axes` to specify the value(s) over which input array axes to map.
+  - `out_axes` to specify where te mapped axis should appear in the output.
+  - `axis_size` to optionally indicate the size of the axis to be mapped.
+  In addition, `catalyst.vmap` supports mapping of any arbitrary PyTrees as input
+  parameters or return values.
+
+  For example,
+
+  ``` py
+  @qjit
+  def workflow(x, y):
+      @qml.qnode(qml.device('lightning.qubit, wires=1))
+      def circuit(x, y):
+          qml.RX(jnp.pi * x['a'][0], wires=0)
+          qml.RY(x['a'][1] ** 2, wires=0)
+          qml.RX(x['b'][1] * x['b'][2] + y, wires=0)
+          return qml.state(), qml.probs(0)
+
+      return vmap(circuit, in_axes=(1, None), axis_size=5)(x, y)
+  ```
+
 <h3>Improvements</h3>
 
 * Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
