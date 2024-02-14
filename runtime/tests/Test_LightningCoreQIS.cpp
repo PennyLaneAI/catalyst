@@ -1907,7 +1907,7 @@ TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[
 
     QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
 
-    REQUIRE_THROWS_WITH(__catalyst__qis__CNOT(*target, *target, false),
+    REQUIRE_THROWS_WITH(__catalyst__qis__CNOT(*target, *target, NO_MODIFIERS),
                         Catch::Contains("Invalid input for CNOT gate."));
 
     __catalyst__rt__qubit_release_array(qs);
