@@ -101,6 +101,8 @@ jobs:
         if [ ${{ inputs.pennylane }} = "stable" ]; then
             pip install --upgrade .
         else
+            # TODO(@erick-xanadu): Remove after release. See issue
+            # https://github.com/PennyLaneAI/catalyst/issues/494
             pl_version="==0.35.0.dev0" pip install --upgrade .
         fi
 
