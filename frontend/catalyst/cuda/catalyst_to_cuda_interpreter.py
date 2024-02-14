@@ -93,8 +93,6 @@ from .primitives import (
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
 # pylint: disable=protected-access
-# We also disable line-too-long because of a URL
-# pylint: disable=line-too-long
 
 
 def _map(f, *collections):
@@ -115,8 +113,8 @@ def get_instruction(jaxpr, primitive):
 
 
 class InterpreterContext:
-    """This class keeps some state that is useful for interpreting an Catalyst and evaluating it in
-    CUDA-quantum primitives.
+    """This class keeps some state that is useful for interpreting Catalyst's JAXPR and evaluating
+    it in CUDA-quantum primitives.
 
     It has:
        * jaxpr: A reference to the program
@@ -642,6 +640,7 @@ def unimplemented_impl(_ctx, eqn):
 def default_impl(ctx, eqn):
     """Default implementation for all other non-catalyst primitives. I.e., other JAX primitives."""
     # This little scope was based on eval_jaxpr's implmentation:
+    # pylint: disable-next=line-too-long
     #    https://github.com/google/jax/blob/16636f9c97414d0c5195c6fd47227756d4754095/jax/_src/core.py#L507-L518
     subfuns, bind_params = eqn.primitive.get_bind_params(eqn.params)
     ans = eqn.primitive.bind(*subfuns, *map(ctx.read, eqn.invars), **bind_params)
@@ -796,12 +795,14 @@ def interpret(fun):
         # We need to keep track of the consts...
         consts = catalyst_jaxpr_with_host.consts
         catalyst_jaxpr = remove_host_context(catalyst_jaxpr_with_host)
-        # TODO(@erick-xanadu): There was a discussion about removing as much as possible the reliance on unstable APIs.
+        # TODO(@erick-xanadu): There was a discussion about removing as much as possible the
+        # reliance on unstable APIs.
         # Here is jax._src.core.ClosedJaxpr which is another function in the unstable API.
         # Its only use here is to create a new ClosedJaxpr from the variable catalyst_jaxpr typed Jaxpr.
         # Please note that catalyst_jaxpr_with_host is a ClosedJaxpr.
         # But to get it without the host context we need to "open" it up again.
         # And then close it again.
+        # pylint: disable-next=line-too-long
         # From the [documentation (paraphrased)](https://jax.readthedocs.io/en/latest/jaxpr.html#understanding-jaxprs)
         #
         #    a closed jaxpr is has two fields the jaxpr and a list of constants.
