@@ -315,7 +315,7 @@ class LinkerDriver:
         # The exception handling mechanism requires linking against
         # __gxx_personality_v0 which is either on -lstdc++ in
         # or -lc++. We choose based on the operating system.
-        if options.async_qnodes and platform.system() == "Linux":
+        if options.async_qnodes and platform.system() == "Linux":  # pragma: nocover
             system_flags += ["-lstdc++"]
         elif options.async_qnodes and platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-lc++"]
