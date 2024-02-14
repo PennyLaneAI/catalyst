@@ -687,7 +687,6 @@ def _qinst_abstract_eval(
 ):
     if qubits_len is None:
         qubits_len = len(qubits_or_params)
-    qubits = qubits_or_params[:qubits_len]
     for idx in range(qubits_len):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
