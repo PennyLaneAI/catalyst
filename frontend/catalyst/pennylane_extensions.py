@@ -791,7 +791,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will simply
-    dispatch to its JAX counterpart ``jax.jvp``. The function ``f`` can return any pytree-like shape.
+    dispatch to its JAX counterpart ``jax.jvp``. The function ``f`` can return any pytree-like
+    shape.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -889,7 +890,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will simply
-    dispatch to its JAX counterpart ``jax.vjp``. The function ``f`` can return any pytree-like shape.
+    dispatch to its JAX counterpart ``jax.vjp``. The function ``f`` can return any pytree-like
+    shape.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
