@@ -24,8 +24,8 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
-from pennylane.tape import QuantumTape
 from pennylane.ops import Controlled
+from pennylane.tape import QuantumTape
 
 import catalyst
 from catalyst.jax_primitives import (
@@ -418,17 +418,19 @@ def trace_quantum_tape(
                         op=op.base.name,
                         qubits_len=len(qubits),
                         params_len=len(op.base.parameters),
-                        ctrl_len=len(op.control_wires)
+                        ctrl_len=len(op.control_wires),
                     )
-                    qrp.insert(op.base.wires, qubits2[:len(qubits)])
-                    qrp.insert(op.control_wires, qubits2[len(qubits):])
+                    qrp.insert(op.base.wires, qubits2[: len(qubits)])
+                    qrp.insert(op.control_wires, qubits2[len(qubits) :])
 
                 else:
                     qubits = qrp.extract(op.wires)
                     qubits2 = qinst_p.bind(
-                        *qubits, *op.parameters, op=op.name,
+                        *qubits,
+                        *op.parameters,
+                        op=op.name,
                         qubits_len=len(qubits),
-                        params_len=len(op.parameters)
+                        params_len=len(op.parameters),
                     )
                     qrp.insert(op.wires, qubits2)
                 qrp2 = qrp
