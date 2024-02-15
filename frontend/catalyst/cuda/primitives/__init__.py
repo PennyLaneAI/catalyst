@@ -272,7 +272,7 @@ def cudaq_getstate_primitive_impl(kernel):
 
 
 @cudaq_getstate_p.def_abstract_eval
-def cudaq_getstate_primitive_abs(_kernel):
+def cudaq_getstate_primitive_abs(_kernel):  # pragma: nocover
     """Abstract evaluation."""
     return AbsCudaQState()
 
@@ -355,7 +355,8 @@ def make_primitive_for_m(gate: str):
     @kernel_gate_p.def_impl
     def gate_impl(kernel, target):
         """Concrete implementation."""
-        return method(kernel, target)
+        # TODO(@erick-xanadu): investigate why nocover here.
+        return method(kernel, target)  # pragma: nocover
 
     @kernel_gate_p.def_abstract_eval
     def gate_abs(_kernel, _target):
@@ -399,7 +400,7 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
 
 
 @cudaq_sample_p.def_abstract_eval
-def cudaq_sample_abs(_kernel, *_args, shots_count=1000):
+def cudaq_sample_abs(_kernel, *_args, shots_count=1000):  # pragma: nocover
     """Abstract evaluation."""
     return AbsCudaSampleResult()
 
@@ -439,7 +440,7 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
 
 
 @cudaq_counts_p.def_abstract_eval
-def cudaq_counts_abs(kernel, shape, shots_count=1000):
+def cudaq_counts_abs(kernel, shape, shots_count=1000):  # pragma: nocover
     """Abstract evaluation."""
     bitstrings = jax.core.ShapedArray([shape], jax.numpy.float64)
     counts_shape = jax.core.ShapedArray([shape], jax.numpy.int64)
@@ -463,7 +464,7 @@ def cudaq_spin_impl(target, kind: str):
 
 
 @cudaq_spin_p.def_abstract_eval
-def cudaq_spin_abs(target, kind):
+def cudaq_spin_abs(target, kind):  # pragma: nocover
     """Abstract spin operator."""
     return AbsCudaSpinOperator()
 
@@ -501,7 +502,7 @@ def cudaq_observe(kernel, spin_operator, shots_count=-1, noise_model=None):
 
 
 @cudaq_observe_p.def_abstract_eval
-def cudaq_observe_abs(kernel, spin_operator, shots_count=-1, noise_model=None):
+def cudaq_observe_abs(kernel, spin_operator, shots_count=-1, noise_model=None):  # pragma: nocover
     """Abstract observe method."""
     return AbsCudaQObserveResult()
 
@@ -521,7 +522,7 @@ def cudaq_expectation(observe_result):
 
 
 @cudaq_expectation_p.def_abstract_eval
-def cudaq_expectation_abs(observe_result):
+def cudaq_expectation_abs(observe_result):  # pragma: nocover
     """Abstract."""
     return jax.core.ShapedArray([], float)
 
@@ -543,7 +544,7 @@ def cudaq_adjoint(kernel, target, *args):
 
 
 @cudaq_adjoint_p.def_abstract_eval
-def cudaq_adjoint_abs(kernel, target, *args):
+def cudaq_adjoint_abs(kernel, target, *args):  # pragma: nocover
     """Abstract."""
     return tuple()
 
@@ -564,9 +565,9 @@ jax.core.pytype_aval_mappings[CudaValue] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaQReg] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaQbit] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaSampleResult] = lambda x: x.aval  # pragma: nocover
-jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval  # pargma: nocover
-jax.core.pytype_aval_mappings[CudaSpinOperator] = lambda x: x.aval  # pargma: nocover
-jax.core.pytype_aval_mappings[CudaQObserveResult] = lambda x: x.aval  # pargma: nocover
+jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval  # pragma: nocover
+jax.core.pytype_aval_mappings[CudaSpinOperator] = lambda x: x.aval  # pragma: nocover
+jax.core.pytype_aval_mappings[CudaQObserveResult] = lambda x: x.aval  # pragma: nocover
 
 jax.core.raise_to_shaped_mappings[AbsCudaValue] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQReg] = lambda aval, _: aval
