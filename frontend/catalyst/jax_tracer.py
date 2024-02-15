@@ -383,7 +383,7 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     jaxpr, postprocessed_jaxpr, out_type, out_tree = trace_to_jaxpr(
         func, static_argnums, abstracted_axes, *args, **kwargs
     )
-    module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
+    module, context = jaxpr_to_mlir(func.__name__, postprocessed_jaxpr)
     return module, context, jaxpr, out_type, out_tree
 
 
