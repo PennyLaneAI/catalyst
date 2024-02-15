@@ -50,7 +50,10 @@ class TestCudaQ:
         """Test removing the host context."""
 
         from catalyst.cuda import SoftwareQQPP
-        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ, remove_host_context
+        from catalyst.cuda.catalyst_to_cuda_interpreter import (
+            QJIT_CUDAQ,
+            remove_host_context,
+        )
 
         @qml.qnode(SoftwareQQPP(wires=1))
         def circuit_foo():
