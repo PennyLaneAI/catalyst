@@ -48,7 +48,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
     std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
 
-    Catalyst::Runtime::CacheManager cache_manager{};
+    Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
 
