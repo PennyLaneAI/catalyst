@@ -870,6 +870,9 @@ def interpret(fun):
 
     @wraps(fun)
     def wrapped(*args, **_kwargs):
+        if _kwargs:
+            # TODO(@erick-xanadu):
+            raise NotImplemented("CUDA tapes do not yet have kwargs.")  # pragma: no cover
         # QJIT_CUDAQ(fun).get_jaxpr
         # will return the JAXPR of the function fun.
         # However, notice that *args are still concrete.
