@@ -135,7 +135,7 @@ def pytest_collection_modifyitems(config, items):
     # CUDA quantum is not supported in apple silicon.
     # CUDA quantum cannot run with kokkos
     skip_cuda_tests = no_cuda or is_kokkos or is_apple
-    if not skip_cuda_tests and is_cuda_available():
+    if not skip_cuda_tests and not is_cuda_available():
         # Only check this conditionally as it imports cudaq.
         # And we don't even want to succeed with kokkos.
         skip_cuda_tests = True
