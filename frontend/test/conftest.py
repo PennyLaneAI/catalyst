@@ -58,13 +58,6 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--cuda",
-        action="store",
-        default="True",
-        help="Run cuda tests.",
-    )
-
-    parser.addoption(
         "--runbraket",
         action="store",
         default="NONE",
@@ -130,11 +123,10 @@ def pytest_collection_modifyitems(config, items):
     # skip braket tests
     skipper = pytest.mark.skip()
     is_kokkos = config.getoption("backend") == "lightning.kokkos"
-    no_cuda = config.getoption("cuda") != "True"
     is_apple = platform.system() == "Darwin"
     # CUDA quantum is not supported in apple silicon.
     # CUDA quantum cannot run with kokkos
-    skip_cuda_tests = no_cuda or is_kokkos or is_apple
+    skip_cuda_tests = is_kokkos or is_apple
     if not skip_cuda_tests and not is_cuda_available():
         # Only check this conditionally as it imports cudaq.
         # And we don't even want to succeed with kokkos.

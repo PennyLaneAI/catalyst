@@ -17,15 +17,6 @@ ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
-CUDA ?= "--cuda=True"
-ifeq ($(TEST_BACKEND),"lightning.kokkos")
-# CUDAQ tests cannot run with the lightning.kokkos backend
-# due to the following issue:
-# https://github.com/PennyLaneAI/catalyst/issues/513
-# TODO(@erick-xanadu): Remove special handling
-# once issue is fixed.
-CUDA = --cuda=False
-endif
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -145,7 +136,7 @@ ifneq ($(findstring clang,$(C_COMPILER)),clang)
 endif
 endif
 	@echo "check the Catalyst PyTest suite"
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE) $(CUDA)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
 endif
