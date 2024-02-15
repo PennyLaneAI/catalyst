@@ -606,7 +606,8 @@ def change_adjoint(ctx, eqn):
 
     # This is the quantum register.
     invals = _map(ctx.read, eqn.invars)
-    register = invals[0]
+    # By convention this qreg is the last one.
+    register = invals[-1]
 
     # We might need this for pytrees.
     _args_tree = eqn.params["args_tree"]
@@ -620,10 +621,11 @@ def change_adjoint(ctx, eqn):
 
     # We need a new interpreter with a new kernel
     # And the parameter is abstract_qreg.
+    concrete_args = invals[0:-1] + [abstract_qreg]
     interpreter = InterpreterContext(
         nested_jaxpr.jaxpr,
         nested_jaxpr.literals,
-        abstract_qreg,
+        *concrete_args,
         kernel=kernel_to_adjoint,
     )
     # retval would be the abstract_qreg we passed as an argument here.

@@ -357,28 +357,28 @@ class TestCudaQ:
 
         @qml.qnode(CudaQDevice(wires=2))
         def circuit():
-            def f():
-                qml.RX(jnp.pi / 23, wires=[0])
-                qml.RX(jnp.pi / 17, wires=[1])
+            def f(theta):
+                qml.RX(theta / 23, wires=[0])
+                qml.RX(theta / 17, wires=[1])
                 qml.Hadamard(wires=[0])
                 qml.Hadamard(wires=[1])
                 qml.PauliX(wires=0)
                 qml.PauliY(wires=1)
 
-            qml.adjoint(f)()
+            qml.adjoint(f)(jnp.pi)
             return qml.state()
 
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit_catalyst():
-            def f():
-                qml.RX(jnp.pi / 23, wires=[0])
-                qml.RX(jnp.pi / 17, wires=[1])
+            def f(theta):
+                qml.RX(theta / 23, wires=[0])
+                qml.RX(theta / 17, wires=[1])
                 qml.Hadamard(wires=[0])
                 qml.Hadamard(wires=[1])
                 qml.PauliX(wires=0)
                 qml.PauliY(wires=1)
 
-            qml.adjoint(f)()
+            qml.adjoint(f)(jnp.pi)
             return qml.state()
 
         cuda_compiled = catalyst.cuda.qjit(circuit)
