@@ -28,14 +28,16 @@ def qjit(fn=None, **kwargs):
     """Wrapper around QJIT for CUDA-quantum."""
 
     if fn is not None:
-        return interpret(fn)
+        return interpret(fn, **kwargs)
 
     def wrap_fn(fn):
-        return interpret(fn)
+        return interpret(fn, **kwargs)
 
     return wrap_fn
 
 
+# Do we need to reimplement apply for every child?
+# pylint: disable=abstract-method
 class BaseCudaInstructionSet(qml.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 
@@ -44,7 +46,6 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     version = "0.1.0"
     author = "Xanadu, Inc."
 
-    # pylint: disable=duplicate-code
     operations = [
         "CNOT",
         "CY",
