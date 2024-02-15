@@ -51,7 +51,7 @@ requirements = [
 one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
 if one_compiler_per_distribution:
     entry_points = {
-        "pennylane.plugins": "softwareq.qpp = catalyst.cuda:CudaQDevice",
+        "pennylane.plugins": "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
         "pennylane.compilers": [
             "context = catalyst.utils.contexts:EvaluationContext",
             "ops = catalyst:pennylane_extensions",
@@ -60,7 +60,7 @@ if one_compiler_per_distribution:
     }
 else:
     entry_points = {
-        "pennylane.plugins": "softwareq.qpp = catalyst.cuda:CudaQDevice",
+        "pennylane.plugins": "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
         "pennylane.compilers": [
             "catalyst.context = catalyst.utils.contexts:EvaluationContext",
             "catalyst.ops = catalyst:pennylane_extensions",
