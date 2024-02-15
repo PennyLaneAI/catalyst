@@ -23,6 +23,7 @@ import catalyst
 from catalyst import measure, qjit
 from catalyst.compilation_pipelines import QJIT
 from catalyst.compiler import CompileOptions
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import remove_host_context
 
 # This import is here on purpose. We shouldn't ever import CUDA
@@ -455,6 +456,23 @@ class TestCudaQ:
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
         assert_allclose(expected, observed)
+
+    def test_error_message_using_host_context(self):
+        """Test error message"""
+        from catalyst.cuda import CudaQDevice
+
+        @qml.qnode(CudaQDevice(wires=2))
+        def circuit(x):
+            qml.Hadamard(wires=[0])
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        def wrapper(y):
+            x = y + 1
+            return circuit(x)
+
+        with pytest.raises(CompileError, match="Cannot translate tapes with context"):
+            catalyst.cuda.qjit(wrapper)(1)
 
 
 if __name__ == "__main__":

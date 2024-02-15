@@ -676,4 +676,12 @@ def remove_host_context(jaxpr):
     in (b,) }
     """
     # Is this always the case, let's try with different parameters.
-    return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
+    is_one_equation = len(jaxpr.jaxpr.eqns) == 1
+    from catalyst.jax_primitives import func_p
+    from catalyst.utils.exceptions import CompileError
+
+    is_single_equation_call = jaxpr.jaxpr.eqns[0].primitive == func_p
+    is_valid = is_one_equation and is_single_equation_call
+    if is_valid:
+        return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
+    raise CompileError("Cannot translate tapes with context.")
