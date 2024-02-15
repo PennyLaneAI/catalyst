@@ -115,6 +115,8 @@ auto LightningSimulator::One() const -> Result
 void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
                                         const std::vector<QubitIdType> &wires, bool inverse)
 {
+    // Check the validity of qubits
+    RT_FAIL_IF(wires.empty(), "Invalid number of qubits");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
 
     // First, check if operation `name` is supported by the simulator
@@ -141,6 +143,8 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
 void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
                                          const std::vector<QubitIdType> &wires, bool inverse)
 {
+    // Check the validity of qubits
+    RT_FAIL_IF(wires.empty(), "Invalid number of qubits");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
 
     // Convert wires to device wires
