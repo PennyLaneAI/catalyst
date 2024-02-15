@@ -276,7 +276,9 @@ def change_device_to_cuda_device(ctx):
 
     # TODO(@erick-xanadu) as more devices become available
     # map the names here.
-    target_map = {"softwareq.qpp": "qpp-cpu"}
+    # TODO(@erick-xanadu) why does the device instruction lists the whole
+    # name instead of a short name?
+    target_map = {"SoftwareQ q++ simulator": "qpp-cpu"}
     target = target_map.get(device_name, device_name)
 
     if not target or not cudaq.has_target(target):

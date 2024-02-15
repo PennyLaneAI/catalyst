@@ -36,6 +36,7 @@ def is_cuda_available():
     See https://github.com/PennyLaneAI/catalyst/issues/513
     """
     try:
+        # pylint: disable=import-outside-toplevel
         import cudaq
     except (ImportError, ModuleNotFoundError):
         cudaq_available = False
@@ -124,6 +125,7 @@ def pytest_runtest_setup(item):
             )
 
 
+# pylint: disable=complex-method
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
 

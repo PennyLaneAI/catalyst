@@ -59,9 +59,8 @@ runtime_code_generation = false
 quantum_adjoint = true
 # If the device supports quantum control instructions natively
 quantum_control = false
-# TODO(@erick-xanadu): CUDA Quantum technically does support mid-circuit measurements.
-# But at the moment there is limited support.
-mid_circuit_measurement = false
+# Technically limited support
+mid_circuit_measurement = true
 
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
