@@ -66,8 +66,7 @@ def check_qjit_compatibility(device, config):
     Raises:
         CompileError
     """
-    compilation = config["compilation"]
-    if compilation["qjit_compatible"]:
+    if config["compilation"]["qjit_compatible"]:
         return
 
     name = device.name
