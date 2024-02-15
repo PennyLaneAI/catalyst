@@ -39,6 +39,7 @@ import pennylane as qml
 from jax.tree_util import tree_unflatten
 
 import catalyst
+from catalyst.utils.exceptions import CompileError
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
@@ -73,7 +74,6 @@ from catalyst.jax_primitives import (
 )
 from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
-from catalyst.utils.jax_extras import remove_host_context
 from catalyst.utils.patching import Patcher
 from catalyst.utils.toml import toml_load
 
@@ -95,6 +95,51 @@ from .primitives import (
 # We disable protected access in particular to avoid warnings with
 # cudaq._pycuda.
 # pylint: disable=protected-access
+
+
+def remove_host_context(jaxpr):
+    """This function will remove the host context.
+
+    It is expected that callers to this function do not use the host context
+    and instead forward the arguments directly to the qnode.
+    This is useful for example in the proof-of-concept for cuda integration.
+
+    Later iterations **might** have a host context. This is something not currently planned.
+
+    The host context is the wrapper function that calls a qnode. When applying a `@qjit`
+    decorator immediately on a qnode like:
+
+    ```python
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def identity(x):
+      return x
+    ```
+
+    Notice that in the JAXPR (and all subsequent IRs), we have this wrapper context that only
+    performs a function call.
+
+    { lambda ; a:i64[]. let
+      b:i64[] = func[
+        call_jaxpr={ lambda ; c:i64[]. let
+             = qdevice[
+              rtd_kwargs={'shots': 0, 'mcmc': False}
+              rtd_lib=path/to/runtime...
+              rtd_name=LightningSimulator
+            ]
+            d:AbstractQreg() = qalloc 1
+             = qdealloc d
+          in (c,) }
+        fn=<QNode: wires=1, device='lightning.qubit', interface='auto', diff_method='best'>
+      ] a
+    in (b,) }
+    """
+    is_one_equation = len(jaxpr.jaxpr.eqns) == 1
+    is_single_equation_call = jaxpr.jaxpr.eqns[0].primitive == func_p
+    is_valid = is_one_equation and is_single_equation_call
+    if is_valid:
+        return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
+    raise CompileError("Cannot translate tapes with context.")
 
 
 def _map(f, *collections):

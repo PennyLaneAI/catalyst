@@ -24,7 +24,6 @@ from catalyst import measure, qjit
 from catalyst.compilation_pipelines import QJIT
 from catalyst.compiler import CompileOptions
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import remove_host_context
 
 # This import is here on purpose. We shouldn't ever import CUDA
 # when we are running kokkos. Importing CUDA before running any kokkos
@@ -49,7 +48,7 @@ class TestCudaQ:
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 
-        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
+        from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ, remove_host_context
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_foo():
