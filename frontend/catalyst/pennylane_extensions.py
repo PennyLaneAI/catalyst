@@ -2254,9 +2254,6 @@ def ctrl(
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
 
 
-AxisSizeType = Union[int, jax.core.Tracer, jax.core.Var]
-
-
 def vmap(
     fn: Callable,
     in_axes: Union[int, Sequence[Any]] = 0,
@@ -2269,7 +2266,7 @@ def vmap(
         f (Callable): A Python function containing PennyLane quantum operations.
         in_axes (Union[int, Sequence[Any]]): It specifies the value(s) over which input
             array axes to map.
-        out_axes (int): It specifies where te mapped axis should appear in the output.
+        out_axes (int): It specifies where the mapped axis should appear in the output.
         axis_size (int): An integer can be optionally provided to indicate the size of the
             axis to be mapped. If omitted, the size of the mapped axis will be inferred from
             the provided arguments.
@@ -2438,7 +2435,8 @@ def _get_batch_loc(axes_flat):
 
 
 def _get_batch_size(args_flat, axes_flat, axis_size):
-    """Get the batch size."""
+    """Get the batch size based on the provided arguments and axes specifiers, or the manually
+       specified batch size. The batch size must be the same for all arguments."""
 
     if axis_size is not None:
         return axis_size
