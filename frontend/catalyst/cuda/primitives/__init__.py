@@ -394,7 +394,8 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
     """
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
     lls = [[k] * v for k, v in a_dict.items()]
-    return jax.numpy.array([int(l) for ls in lls for l in ls])
+    # Weirdly enough Catalyst returns this transposed.
+    return jax.numpy.atleast_2d(jax.numpy.array([int(l) for ls in lls for l in ls])).T
 
 
 @cudaq_sample_p.def_abstract_eval

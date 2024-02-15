@@ -32,6 +32,7 @@ import functools
 import json
 import operator
 from functools import reduce, wraps
+from typing import Hashable
 
 import cudaq
 import jax
@@ -152,7 +153,7 @@ def get_instruction(jaxpr, primitive):
 
     A well formed JAXPR should only have a single device instruction for a quantum function.
     """
-    return next((eqn for eqn in jaxpr.eqns if eqn.primitive == primitive), None)
+    return next((eqn for eqn in jaxpr.eqns if eqn.primitive == primitive), None)  # pragma: no cover
 
 
 class InterpreterContext:
@@ -793,10 +794,10 @@ def interpret_impl(ctx, jaxpr):
         INST_IMPL.get(eqn.primitive, default_impl)(ctx, eqn)
 
     retvals = _map(ctx.read, jaxpr.outvars)
-    if set(retvals).issubset(ctx.measurements):
-        raise NotImplementedError(
-            "You cannot return measurements directly from a tape when compiling for cuda quantum."
-        )
+    for retval in retvals:
+        if isinstance(retval, Hashable) and retval in ctx.measurements:
+            m = "You cannot return measurements directly from a tape when compiling for cuda quantum."
+            raise NotImplementedError(m)
     return retvals
 
 
@@ -842,19 +843,15 @@ class QJIT_CUDAQ:
             func = self.user_function
             abs_axes = {}
             static_args = None
-            # _jaxpr and _out_tree are used in Catalyst but at the moment
-            # they have no use here in CUDA.
             # We could also pass abstract arguments here in *args
             # the same way we do so in Catalyst.
             # But I think that is redundant now given make_jaxpr2
-            _jaxpr, jaxpr2, _out_type2, out_tree = trace_to_jaxpr(
-                func, static_args, abs_axes, *args
-            )
+            _, jaxpr, _, out_tree = trace_to_jaxpr(func, static_args, abs_axes, *args)
 
         # TODO(@erick-xanadu):
         # What about static_args?
         # We could return _out_type2 as well
-        return jaxpr2, out_tree
+        return jaxpr, out_tree
 
 
 def interpret(fun):

@@ -130,6 +130,46 @@ class TestCudaQ:
         observed = cuda_compiled(3.14)
         assert_allclose(expected, observed)
 
+    def test_samples(self):
+        """Test SoftwareQQPP."""
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=1, shots=100))
+        def circuit(a):
+            qml.RX(a, wires=[0])
+            return qml.sample()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=100))
+        def circuit_lightning(a):
+            qml.RX(a, wires=[0])
+            return qml.sample()
+
+        cuda_compiled = catalyst.cuda.qjit()(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(3.14)
+        observed = cuda_compiled(3.14)
+        assert_allclose(expected, observed)
+
+    def test_counts(self):
+        """Test SoftwareQQPP."""
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=1, shots=100))
+        def circuit(a):
+            qml.RX(a, wires=[0])
+            return qml.counts()
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1, shots=100))
+        def circuit_lightning(a):
+            qml.RX(a, wires=[0])
+            return qml.counts()
+
+        cuda_compiled = catalyst.cuda.qjit()(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(3.14)
+        observed = cuda_compiled(3.14)
+        assert_allclose(expected, observed)
+
     def test_qjit_cuda_device(self):
         """Test SoftwareQQPP."""
         from catalyst.cuda import SoftwareQQPP
