@@ -125,11 +125,17 @@ def pytest_runtest_setup(item):
             )
 
 
-# pylint: disable=complex-method
-def pytest_collection_modifyitems(config, items):
-    """A pytest items modifier method"""
+def skip_cuda_tests(config, items):
+    """Skip cuda tests according to the following logic:
+    By default: RUN
+      except: if apple
+      except: if kokkos
+      except: is cuda-quantum not installed
 
-    # skip braket tests
+    Important! We should only check if cuda-quantum is installed
+    as a last resort. We don't want to check if cuda-quantum is
+    installed at all when we are running kokkos.
+    """
     skipper = pytest.mark.skip()
     is_kokkos = config.getoption("backend") == "lightning.kokkos"
     is_apple = platform.system() == "Darwin"
@@ -146,6 +152,14 @@ def pytest_collection_modifyitems(config, items):
         if skip_cuda:
             item.add_marker(skipper)
 
+
+def pytest_collection_modifyitems(config, items):
+    """A pytest items modifier method"""
+
+    skip_cuda_tests(config)
+
+    # skip braket tests
+    skipper = pytest.mark.skip()
     braket_val = config.getoption("--runbraket")
     if braket_val in ["ALL", "LOCAL", "REMOTE"]:
         # only runs test with the braket marker
