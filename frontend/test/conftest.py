@@ -28,9 +28,16 @@ else:
 
 
 def is_cuda_available():
+    """Checks if cuda is available by trying an import.
+
+    Do not run from top level!
+    We do not want to import cudaq unless we absolutely need to.
+    This is because cudaq prevents kokkos kernels from executing properly.
+    See https://github.com/PennyLaneAI/catalyst/issues/513
+    """
     try:
         import cudaq
-    except (ImportError, ModuleNotFoundError) as e:
+    except (ImportError, ModuleNotFoundError):
         cudaq_available = False
     else:
         cudaq_available = True

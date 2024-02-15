@@ -272,12 +272,12 @@ def change_device_to_cuda_device(ctx):
     # and it is the responsibility of the caller to propagate this information.
     shots = parameters.get("shots")
 
-    device_name = parameters.get("rtd_name", "softwareq.qpp")
+    device_name = qdevice_eqn.params.get("rtd_name")
 
     # TODO(@erick-xanadu) as more devices become available
     # map the names here.
     target_map = {"softwareq.qpp": "qpp-cpu"}
-    target = target_map.get(device_name)
+    target = target_map.get(device_name, device_name)
 
     if not target or not cudaq.has_target(target):
         msg = f"Unavailable target {target}."  # pragma: no cover
@@ -872,7 +872,7 @@ def interpret(fun):
     def wrapped(*args, **_kwargs):
         if _kwargs:
             # TODO(@erick-xanadu):
-            raise NotImplemented("CUDA tapes do not yet have kwargs.")  # pragma: no cover
+            raise NotImplementedError("CUDA tapes do not yet have kwargs.")  # pragma: no cover
         # QJIT_CUDAQ(fun).get_jaxpr
         # will return the JAXPR of the function fun.
         # However, notice that *args are still concrete.
