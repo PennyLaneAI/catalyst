@@ -75,7 +75,7 @@ class TestCudaQ:
         cuda_jaxpr = jax.make_jaxpr(interpret(circuit_foo))
         assert cuda_jaxpr
 
-    def test_measurement_side_return(self):
+    def test_measurement_return(self):
         """Test the measurement code is added."""
 
         from catalyst.cuda import SoftwareQQPP
@@ -89,6 +89,20 @@ class TestCudaQ:
                 return measure(0)
 
             jax.make_jaxpr(interpret(circuit))()
+
+    def test_measurement_side_effect(self):
+        """Test the measurement code is added."""
+
+        from catalyst.cuda import SoftwareQQPP
+        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
+
+        @qml.qnode(SoftwareQQPP(wires=1, shots=30))
+        def circuit():
+            qml.RX(jnp.pi / 4, wires=[0])
+            measure(0)
+            return qml.state()
+
+        jax.make_jaxpr(interpret(circuit))()
 
     def test_pytrees(self):
         """Test that we can return a dictionary."""
