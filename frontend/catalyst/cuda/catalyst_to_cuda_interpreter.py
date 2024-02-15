@@ -601,7 +601,27 @@ def change_hamiltonian(ctx, eqn):
 
 
 def change_adjoint(ctx, eqn):
-    """Change Catalyst adjoint to an equivalent expression in CUDA."""
+    """Change Catalyst adjoint to an equivalent expression in CUDA.
+
+    Do note that this uses concrete evaluation.
+    There might be a way to do this with abstract evaluation.
+    What do I mean by this?
+    Notice that cudaq_make_kernel's API can take types as inputs.
+    E.g., (int, float, List, cudaq.qreg)
+
+    These are abstract types or parameters.
+
+    We are currently not passing these inputs to cudaq_make_kernel.
+
+    Instead we are passing only cudaq.qreg and all these inputs are concretely
+    known in the adjointed kernel.
+
+    This is not ideal, as for gradients this approach wouldn't work.
+    But at the moment we do not support gradients, so we can leave this as future work.
+    Let's add this as a TODO.
+    TODO(@erick-xanadu): Please add support for abstract types / parameters
+    in cudaq.make_kernel.
+    """
     assert eqn.primitive == adjoint_p
 
     # This is the quantum register.
@@ -621,6 +641,7 @@ def change_adjoint(ctx, eqn):
 
     # We need a new interpreter with a new kernel
     # And the parameter is abstract_qreg.
+    # invals[0:-1] also includes the consts.
     concrete_args = invals[0:-1] + [abstract_qreg]
     interpreter = InterpreterContext(
         nested_jaxpr.jaxpr,
