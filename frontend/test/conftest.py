@@ -156,7 +156,7 @@ def skip_cuda_tests(config, items):
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
 
-    skip_cuda_tests(config)
+    skip_cuda_tests(config, items)
 
     # skip braket tests
     skipper = pytest.mark.skip()
