@@ -75,14 +75,14 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     def apply(self, operations, **kwargs):
         """Unused"""
         raise NotImplementedError(
-            "CudaQDevice must be used with `catalyst.qjit`"
+            "This device is only supported with `qml.qjit`."
         )  # pragma: no cover
 
 
-class CudaQDevice(BaseCudaInstructionSet):
+class SoftwareQQPP(BaseCudaInstructionSet):
     """Concrete device class for qpp-cpu"""
 
-    name = "CudaQ Device"
+    name = "SoftwareQ q++ simulator"
     short_name = "softwareq.qpp"
 
 
