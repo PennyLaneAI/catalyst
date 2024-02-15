@@ -753,7 +753,14 @@ def _qinst_lowering(
     if name_str == "MultiRZ":
         assert len(float_params) == 1, "MultiRZ takes one float parameter"
         float_param = float_params[0]
-        return MultiRZOp([qubit.type for qubit in qubits], float_param, qubits).results
+        return MultiRZOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+        ).results
 
     return CustomOp(
         out_qubits=[qubit.type for qubit in qubits],
@@ -770,18 +777,29 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits):
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len:int = None, ctrl_len:int = 0):
+    if qubits_len is None:
+        qubits_len = len(qubits)
     for q in qubits:
         assert isinstance(q, AbstractQbit)
-    return (AbstractQbit(),) * len(qubits)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(ctx, matrix, qubits):  # pragma: no cover
+def _qunitary_def_impl(ctx, matrix, qubits, qubits_len:int = None, ctrl_len:int = 0):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value,
+                       *qubits_or_controlled: tuple,
+                       qubits_len:int = None, ctrl_len:int = 0):
+    if qubits_len is None:
+        qubits_len = len(qubits_or_controlled)
+
+    qubits = qubits_or_controlled[:qubits_len]
+    ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
+    ctrl_values = qubits_or_controlled[qubits_len + ctrl_len :]
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -813,7 +831,19 @@ def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qub
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
         matrix = ConvertOp(tensor_complex_f64_type, matrix).results
 
-    return QubitUnitaryOp([q.type for q in qubits], matrix, qubits).results
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    return QubitUnitaryOp(
+        out_qubits=[q.type for q in qubits],
+        out_ctrl_qubits=[q.type for q in ctrl_qubits],
+        matrix=matrix,
+        in_qubits=qubits,
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+    ).results
 
 
 #

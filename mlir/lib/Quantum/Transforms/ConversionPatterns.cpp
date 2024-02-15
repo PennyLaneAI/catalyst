@@ -351,7 +351,8 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         MLIRContext *ctx = getContext();
 
         TypeConverter *conv = getTypeConverter();
-        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
@@ -371,9 +372,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        // TODO: pass the quantum control part when the IR part is ready
-        // values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
-        // adaptor.getInCtrlQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
         rewriter.replaceOp(op, values);
 
         return success();
@@ -389,7 +388,8 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
-        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
         std::string qirName = "__catalyst__qis__MultiRZ";
         Type qirSignature = LLVM::LLVMFunctionType::get(
@@ -406,7 +406,11 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         args.insert(args.begin() + 1, modifiersPtr);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-        rewriter.replaceOp(op, adaptor.getInQubits());
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op, values);
 
         return success();
     }
@@ -421,7 +425,8 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
-        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
         assert(op.getMatrix().getType().isa<MemRefType>() &&
                "unitary must take in memref before lowering");
@@ -449,7 +454,11 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         rewriter.create<LLVM::StoreOp>(loc, adaptor.getMatrix(), args[0]);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-        rewriter.replaceOp(op, adaptor.getInQubits());
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(), adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op, values);
 
         return success();
     }

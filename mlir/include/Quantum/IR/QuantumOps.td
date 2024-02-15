@@ -215,7 +215,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate,
+def CustomOp : Gate_Op<"custom", [DifferentiableGate,
                                   AttrSizedOperandSegments, AttrSizedResultSegments, ]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
@@ -255,7 +255,7 @@ def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate,
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
+def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments, ]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -265,15 +265,18 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+        `(` $theta `)` $in_qubits attr-dict ( `ctrl` $in_ctrl_qubits^ )?  ( `ctrlval` $in_ctrl_values^ )? `:` type($out_qubits) (`ctrl` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -281,18 +284,18 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
             return getODSOperands(getParamOperandIdx());
         }
         mlir::ValueRange getCtrlValueOperands() {
-            return {};
+            return getInCtrlValues();
         }
         mlir::ValueRange getCtrlQubitOperands() {
-            return {};
+            return getInCtrlQubits();
         }
         mlir::ValueRange getCtrlQubitResults() {
-            return {};
+            return getOutCtrlQubits();
         }
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments, AttrSizedResultSegments, ]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -305,15 +308,18 @@ def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
+        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict ( `ctrl` $in_ctrl_qubits^ )?  ( `ctrlval` $in_ctrl_values^ )? `:` type($out_qubits) (`ctrl` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -321,13 +327,13 @@ def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
             return getODSOperands(getParamOperandIdx());
         }
         mlir::ValueRange getCtrlValueOperands() {
-            return {};
+            return getInCtrlValues();
         }
         mlir::ValueRange getCtrlQubitOperands() {
-            return {};
+            return getInCtrlQubits();
         }
         mlir::ValueRange getCtrlQubitResults() {
-            return {};
+            return getOutCtrlQubits();
         }
     }];
 
