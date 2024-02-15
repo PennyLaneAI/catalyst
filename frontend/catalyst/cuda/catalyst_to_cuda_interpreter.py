@@ -796,6 +796,7 @@ def interpret_impl(ctx, jaxpr):
     retvals = _map(ctx.read, jaxpr.outvars)
     for retval in retvals:
         if isinstance(retval, Hashable) and retval in ctx.measurements:
+            # pylint: disable-next=line-too-long
             m = "You cannot return measurements directly from a tape when compiling for cuda quantum."
             raise NotImplementedError(m)
     return retvals
