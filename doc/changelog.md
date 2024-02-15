@@ -42,6 +42,28 @@
 
 <h3>Improvements</h3>
 
+* Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
+  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+  [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qml.qnode(dev)
+  def circuit(phi, psi):
+      qml.RY(phi, wires=0)
+      qml.RX(psi, wires=0)
+      return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+  psi = 0.1
+  phi = 0.2
+  ```
+  ```pycon
+  >>> qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+  [{'expval0': (array(-0.0978434), array(-0.19767681))}, (array(-0.0978434), array(-0.19767681))]
+  ```
+
 * Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
 
   ```py
@@ -95,6 +117,12 @@
   ```
 
 <h3>Breaking changes</h3>
+
+* We match better the Jax convention for returning gradient, jacobian, vjp and jvp. Therefore some breaking
+  changes about the return shapes of those functions were introduced.
+  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+  [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
 
 * The entry point name convention has changed.
   [(#493)](https://github.com/PennyLaneAI/catalyst/pull/493)
@@ -187,6 +215,14 @@
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* Handle run time exception in async qnodes.
+  [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
+
+  This is done by:
+  * changeing `llvm.call` to `llvm.invoke`
+  * setting async runtime tokens and values to be errors
+  * deallocating live tokens and values
 
 * Fix an issue when no qubit number was specified for the `qinst` primitive. The primitive now
   correctly deduces the number of qubits when no gate parameters are present. This change is not

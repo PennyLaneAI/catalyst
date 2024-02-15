@@ -101,7 +101,7 @@ class CompileOptions:
         if self.pipelines:
             return self.pipelines
         elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES
+            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
         return DEFAULT_PIPELINES
 
 
@@ -206,6 +206,7 @@ MLIR_TO_LLVM_PASS = (
         # but only those that form a loop back to the original type.
         "canonicalize",
         "reconcile-unrealized-casts",
+        "add-exception-handling",
     ],
 )
 
