@@ -569,11 +569,12 @@ jax.core.pytype_aval_mappings[CudaQState] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaSpinOperator] = lambda x: x.aval  # pragma: nocover
 jax.core.pytype_aval_mappings[CudaQObserveResult] = lambda x: x.aval  # pragma: nocover
 
+# TODO: Investigate nocover in this ones.
 jax.core.raise_to_shaped_mappings[AbsCudaValue] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQReg] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaKernel] = lambda aval, _: aval
 jax.core.raise_to_shaped_mappings[AbsCudaQbit] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaSampleResult] = lambda aval, _: aval
+jax.core.raise_to_shaped_mappings[AbsCudaSampleResult] = lambda aval, _: aval  # pragma: nocover
 jax.core.raise_to_shaped_mappings[AbsCudaQState] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaQObserveResult] = lambda aval, _: aval
-jax.core.raise_to_shaped_mappings[AbsCudaSpinOperator] = lambda aval, _: aval
+jax.core.raise_to_shaped_mappings[AbsCudaQObserveResult] = lambda aval, _: aval  # pragma: nocover
+jax.core.raise_to_shaped_mappings[AbsCudaSpinOperator] = lambda aval, _: aval  # pragma: nocover

@@ -712,7 +712,7 @@ def ignore_impl(_ctx, _eqn):
     """No-op"""
 
 
-def unimplemented_impl(_ctx, eqn):
+def unimplemented_impl(_ctx, eqn):  # pragma: nocover
     """Raise an error."""
     msg = f"{eqn.primitive} is not yet implemented in Catalyst's CUDA-Quantum support."
     raise NotImplementedError(msg)
