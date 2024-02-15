@@ -35,6 +35,16 @@ from catalyst.utils.exceptions import CompileError
 class TestCudaQ:
     """CUDA Quantum integration tests. Skip if kokkos."""
 
+    def test_argument(self):
+        """Test that we can pass cuda_quantum as a compiler to @qjit decorator."""
+
+        from catalyst.cuda import qjit as cjit
+
+        @cjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_foo():
+            return qml.state()
+
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 
