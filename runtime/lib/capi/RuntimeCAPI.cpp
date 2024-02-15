@@ -672,8 +672,8 @@ void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, const Modifi
     va_start(args, numQubits);
     _qubitUnitary_impl(matrix, numQubits, coeffs, wires, &args);
     va_end(args);
-    return Catalyst::Runtime::getQuantumDevicePtr()->MatrixOperation(
-        coeffs, wires, MODIFIERS_ARGS(modifiers));
+    return Catalyst::Runtime::getQuantumDevicePtr()->MatrixOperation(coeffs, wires,
+                                                                     MODIFIERS_ARGS(modifiers));
 }
 
 ObsIdType __catalyst__qis__NamedObs(int64_t obsId, QUBIT *wire)
