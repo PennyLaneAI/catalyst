@@ -138,7 +138,7 @@ func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor
       // CHECK:     catalyst.list_push [[real]]
       // CHECK:     catalyst.list_push [[imag]]
 
-      %8:2 = quantum.unitary(%arg0 : tensor<4x4xcomplex<f64>>) %6, %7 : !quantum.bit, !quantum.bit
+      %8:2 = quantum.unitary(%arg0 : tensor<4x4xcomplex<f64>>) %6, %7 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
 
       // CHECK-DAG: [[result:%.+]] = tensor.empty
       // CHECK: scf.for [[k:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_k:%.+]] = [[result]])

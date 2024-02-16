@@ -216,19 +216,19 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
     // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c1]], %arg0)
-    %q1 = quantum.multirz(%p) %q0 : !quantum.bit
+    %q1 = quantum.multirz(%p) %q0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
     // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c2]], %arg0, %arg0)
-    %q2:2 = quantum.multirz(%p) %q1, %q1 : !quantum.bit, !quantum.bit
+    %q2:2 = quantum.multirz(%p) %q1, %q1 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
 
     // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK: [[p:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
     // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
     // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg1, [[p]], [[c3]], %arg0, %arg0, %arg0)
-    %q3:3 = quantum.multirz(%p) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+    %q3:3 = quantum.multirz(%p) %q2#0, %q2#1, %q2#1 { result_segment_sizes = array<i32: 3, 0> } : !quantum.bit, !quantum.bit, !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
@@ -255,7 +255,7 @@ func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p
     // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: llvm.store [[m1]], [[buf1]]
     // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[buf1]], [[a]], [[c1_1]], %arg0)
-    %q1 = quantum.unitary(%p1 : memref<2x2xcomplex<f64>>) %q0 : !quantum.bit
+    %q1 = quantum.unitary(%p1 : memref<2x2xcomplex<f64>>) %q0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK: [[a:%.+]] = llvm.inttoptr [[z]] : i64 to !llvm.ptr<struct
@@ -264,7 +264,7 @@ func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p
     // CHECK: [[buf2:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: llvm.store [[m2]], [[buf2]]
     // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[buf2]], [[a]], [[c2]], %arg0, %arg0)
-    %q2:2 = quantum.unitary(%p2 : memref<4x4xcomplex<f64>>) %q1, %q1 : !quantum.bit, !quantum.bit
+    %q2:2 = quantum.unitary(%p2 : memref<4x4xcomplex<f64>>) %q1, %q1 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]

@@ -69,7 +69,7 @@ func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
 
 func.func @multirz1(%theta : f64) {
     // expected-error@+1 {{must have at least 1 qubit}}
-    %err = quantum.multirz(%theta) : !quantum.bit
+    %err = quantum.multirz(%theta) { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     return
 }
@@ -78,7 +78,7 @@ func.func @multirz1(%theta : f64) {
 
 func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
     // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
-    %err = quantum.multirz(%theta) %q0, %q1 : !quantum.bit
+    %err = quantum.multirz(%theta) %q0, %q1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     return
 }
@@ -87,7 +87,7 @@ func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
 
 func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
     // expected-error@+1 {{number of qubits in input (1) and output (2) must be the same}}
-    %err:2 = quantum.multirz(%theta) %q0 : !quantum.bit, !quantum.bit
+    %err:2 = quantum.multirz(%theta) %q0 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
 
     return
 }
@@ -96,7 +96,7 @@ func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
 
 func.func @unitary1(%m : tensor<4x4xcomplex<f64>>) {
     // expected-error@+1 {{'quantum.unitary' op must have at least 1 qubit}}
-    %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) : !quantum.bit
+    %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     return
 }
@@ -105,7 +105,7 @@ func.func @unitary1(%m : tensor<4x4xcomplex<f64>>) {
 
 func.func @unitary2(%q0 : !quantum.bit, %q1 : !quantum.bit,  %m : tensor<4x4xcomplex<f64>>) {
     // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
-    %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 : !quantum.bit
+    %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     return
 }
@@ -114,9 +114,9 @@ func.func @unitary2(%q0 : !quantum.bit, %q1 : !quantum.bit,  %m : tensor<4x4xcom
 
 func.func @unitary3(%q0 : !quantum.bit, %q1 : !quantum.bit, %m : tensor<4x4xcomplex<f64>>) {
     // expected-error@+1 {{'quantum.unitary' op The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)}}
-    quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0 : !quantum.bit
+    quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
-    quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 : !quantum.bit, !quantum.bit
+    quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit, !quantum.bit
 
     return
 }
