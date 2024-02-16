@@ -295,7 +295,10 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments, AttrSizedResultSegments, ]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate
+        , AttrSizedOperandSegments
+        , AttrSizedResultSegments
+        ]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -319,7 +322,7 @@ def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegme
     );
 
     let assemblyFormat = [{
-        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict ( `ctrl` $in_ctrl_qubits^ )?  ( `ctrlval` $in_ctrl_values^ )? `:` type($out_qubits) (`ctrl` type($out_ctrl_qubits)^ )?
+        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict ( `ctrl` $in_ctrl_qubits^ )? ( `ctrlval` $in_ctrl_values^ )? `:` type($out_qubits) (`ctrl` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
