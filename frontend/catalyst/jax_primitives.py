@@ -777,7 +777,7 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len:int = None, ctrl_len:int = 0):
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = None, ctrl_len: int = 0):
     if qubits_len is None:
         qubits_len = len(qubits)
     for q in qubits:
@@ -786,13 +786,19 @@ def _qunitary_abstract_eval(matrix, *qubits, qubits_len:int = None, ctrl_len:int
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(ctx, matrix, qubits, qubits_len:int = None, ctrl_len:int = 0):  # pragma: no cover
+def _qunitary_def_impl(
+    ctx, matrix, qubits, qubits_len: int = None, ctrl_len: int = 0
+):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value,
-                       *qubits_or_controlled: tuple,
-                       qubits_len:int = None, ctrl_len:int = 0):
+def _qunitary_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    matrix: ir.Value,
+    *qubits_or_controlled: tuple,
+    qubits_len: int = None,
+    ctrl_len: int = 0,
+):
     if qubits_len is None:
         qubits_len = len(qubits_or_controlled)
 
