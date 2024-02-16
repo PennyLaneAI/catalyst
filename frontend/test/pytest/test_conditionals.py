@@ -30,8 +30,10 @@ class TestCondToJaxpr:
         expected = """{ lambda ; a:i64[]. let
     b:bool[] = eq a 5
     c:i64[] = cond[
-      branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                     { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+      branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                     { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+      nimplicit_inputs=0
+      nimplicit_outputs=0
     ] b a a
   in (c,) }"""
 
@@ -199,6 +201,11 @@ class TestCond:
             TypeError, match="Conditional requires consistent return types across all branches"
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+        with pytest.raises(
+            TypeError, match="Conditional requires consistent return types across all branches"
+        ):
+            qjit(circuit)
 
     def test_branch_return_mismatch(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else

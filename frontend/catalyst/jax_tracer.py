@@ -27,6 +27,33 @@ from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (
+    ClosedJaxpr,
+    DynamicJaxprTrace,
+    DynamicJaxprTracer,
+    ExpansionStrategy,
+    InputSignature,
+    OutputSignature,
+    PyTreeDef,
+    PyTreeRegistry,
+    ShapedArray,
+    _abstractify,
+    _input_type_to_tracers,
+    cond_expansion_strategy,
+    convert_element_type,
+    deduce_avals,
+    deduce_signatures,
+    eval_jaxpr,
+    input_type_to_tracers,
+    jaxpr_remove_implicit,
+    jaxpr_to_mlir,
+    make_jaxpr2,
+    sort_eqns,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+    wrap_init,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -54,27 +81,6 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import (
-    ClosedJaxpr,
-    DynamicJaxprTrace,
-    DynamicJaxprTracer,
-    PyTreeDef,
-    PyTreeRegistry,
-    ShapedArray,
-    _abstractify,
-    _input_type_to_tracers,
-    convert_element_type,
-    deduce_avals,
-    eval_jaxpr,
-    jaxpr_remove_implicit,
-    jaxpr_to_mlir,
-    make_jaxpr2,
-    sort_eqns,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    wrap_init,
-)
 
 
 class Function:
@@ -130,8 +136,8 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
         return [t.shape for t in ts if isinstance(t, ShapedArray)]
 
     assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
-    all_ends_with_qreg = all(isinstance(t[-1], AbstractQreg) for t in types)
-    all_not_ends_with_qreg = all(not isinstance(t[-1], AbstractQreg) for t in types)
+    all_ends_with_qreg = all(len(t) > 0 and isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(len(t) == 0 or not isinstance(t[-1], AbstractQreg) for t in types)
     assert (
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
@@ -142,32 +148,55 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 
 
 def _apply_result_type_conversion(
-    jaxpr: ClosedJaxpr, target_types: List[ShapedArray]
-) -> ClosedJaxpr:
-    with_qreg = isinstance(target_types[-1], AbstractQreg)
-    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
-        with EvaluationContext.frame_tracing_context(ctx) as trace:
-            in_tracers = _input_type_to_tracers(trace.new_arg, jaxpr.in_avals)
-            out_tracers = [
-                trace.full_raise(t) for t in eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *in_tracers)
-            ]
-            out_tracers_, target_types_ = (
-                (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
-            )
-            out_promoted_tracers = [
-                (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
-                for tr, ty in zip(out_tracers_, target_types_)
-            ]
-            jaxpr2, _, consts = ctx.frames[trace].to_jaxpr2(
-                out_promoted_tracers + ([out_tracers[-1]] if with_qreg else [])
-            )
-    return ClosedJaxpr(jaxpr2, consts)
+    ctx: JaxTracingContext,
+    jaxpr: ClosedJaxpr,
+    consts: List[Any],
+    target_types: List[ShapedArray],
+    num_implicit_outputs: int,
+) -> Tuple[InputSignature, OutputSignature]:
+    """Apply type conversion to the results of a Jaxpr program. Return full information about the
+    modified Jaxpr program.
 
-
-def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
-    """Unify result types of the jaxpr equations given.
     Args:
-        jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
+        ctx: Jax tracing context object.
+        jaxpr: The Jaxpr program to apply the conversion to. As any Jaxpr program, it might contain
+               both implicit and explicit arguments and results.
+        consts: List of constant values we need to know to trace this program.
+        target_types: List of types we want to convert the outputs of the program to. The list must
+                      match the number of outputs, except maybe the very last output if it is Qreg.
+        num_implicit_outputs: Number of implicit outputs found in the Jaxpr program.
+
+    Returns:
+        InputSignature: new input signature of the function
+        OutputSignature: new output signature of the function
+    """
+    with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
+    args = [AbstractQreg()] if with_qreg else []
+
+    def _fun(*in_tracers):
+        out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
+        out_tracers_, target_types_ = (
+            (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
+        )
+        out_promoted_tracers = [
+            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            for tr, ty in zip(out_tracers_, target_types_)
+        ]
+        return out_promoted_tracers[num_implicit_outputs:] + (
+            [out_tracers[-1]] if with_qreg else []
+        )
+
+    _, in_sig, out_sig = trace_function(
+        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+    )
+
+    return in_sig, out_sig
+
+
+def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
+    """Unify result types of the jaxpr programs given.
+    Args:
+        jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
                                       matching sizes and numpy array shapes but dtypes might be
                                       different.
 
@@ -178,8 +207,13 @@ def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
         TypePromotionError: Unification is not possible.
 
     """
-    promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs])
-    return [_apply_result_type_conversion(j, promoted_types) for j in jaxprs]
+    promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
+    jaxpr_acc, consts2 = [], []
+    for j, a in zip(jaxprs, consts):
+        _, out_sig = _apply_result_type_conversion(ctx, j, a, promoted_types, num_implicit_outputs)
+        jaxpr_acc.append(out_sig.out_initial_jaxpr())
+        consts2.append(out_sig.out_consts())
+    return jaxpr_acc, out_sig.out_type(), consts2
 
 
 class QRegPromise:
@@ -278,10 +312,17 @@ class HybridOp(Operation):
     num_wires = AnyWires
     binder: Callable = _no_binder
 
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        expansion_strategy=None,
+    ):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
+        self.expansion_strategy = expansion_strategy
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):
@@ -290,20 +331,31 @@ class HybridOp(Operation):
         return f"{self.name}(tapes={nested_ops})"
 
     def bind_overwrite_classical_tracers(
-        self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+        self,
+        ctx: JaxTracingContext,
+        trace: DynamicJaxprTrace,
+        in_expanded_tracers,
+        out_expanded_tracers,
+        **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations."""
-        # Notes:
-        # [1] - We are interested in a new quantum tracer only, so we ignore all other (classical)
-        #       tracers returned by JAX.
-        # [2] - We add the already existing classical tracers into the last JAX equation created by
-        #       JAX bind handler of the ``trace`` object.
         assert self.binder is not None, "HybridOp should set a binder"
-        out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
+        out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
+        assert len(eqn.outvars[:-1]) == len(
+            out_expanded_tracers
+        ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
+        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
+            if trace.getvar(t) in set(
+                [
+                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
+                    *ctx.frames[trace].invars,
+                    *ctx.frames[trace].constvar_to_val.keys(),
+                ]
+            ):
+                # Do not re-assign vars from other equations
+                continue
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 
@@ -325,6 +377,37 @@ def has_nested_tapes(op: Operation) -> bool:
         and len(op.regions) > 0
         and any(r.quantum_tape is not None for r in op.regions)
     )
+
+
+def trace_function(
+    ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Trace classical Python function containing no quantum computations. Arguments and results of
+    the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
+    resulting Jaxpr program might or might not preserve sharing among the dynamic dimension
+    variables. The support for expansion options makes this function different from
+    `jax_extras.make_jaxpr2`.
+
+    Args:
+        ctx: Jax tracing context helper.
+        fun: Callable python function.
+        expansion_strategy: dynamic dimension expansion options.
+        *args: Sample positional arguments of the function.
+        **kwargs: Sample keyword arguments of the function.
+
+    Result:
+        List of output Jax tracers
+        InputSignature of the resulting Jaxpr program
+        OutputSignature of the resulting Jaxpr program
+    """
+    wfun, in_sig, out_sig = deduce_signatures(
+        fun, args, kwargs, expansion_strategy=expansion_strategy
+    )
+    with EvaluationContext.frame_tracing_context(ctx) as trace:
+        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
+
+        return res_expanded_tracers, in_sig, out_sig
 
 
 def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
@@ -731,7 +814,13 @@ def reset_qubit(qreg_in, w):
 
     jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
     jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
+    qreg_out = cond_p.bind(
+        m,
+        qreg_mid,
+        branch_jaxprs=[jaxpr_true, jaxpr_false],
+        nimplicit_inputs=0,
+        nimplicit_outputs=0,
+    )[0]
 
     return qreg_out
 

@@ -22,59 +22,6 @@ from catalyst import for_loop, measure, qjit, while_loop
 # pylint: disable=no-value-for-parameter
 
 
-class TestLoopToJaxpr:
-    """Collection of tests that examine the generated JAXPR of loops."""
-
-    def test_while_loop(self):
-        """Check the while loop JAXPR."""
-
-        expected = """\
-{ lambda ; a:f64[]. let
-    b:i64[] c:f64[] = while_loop[
-      body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
-      body_nconsts=0
-      cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
-      cond_nconsts=0
-    ] 0 a
-  in (b, c) }\
-"""
-
-        @qjit
-        def circuit(x: float):
-            @while_loop(lambda v: v[0] < 10)
-            def loop(v):
-                return v[0] + 1, v[1]
-
-            return loop((0, x))
-
-        assert expected == str(circuit.jaxpr)
-
-    def test_for_loop(self):
-        """Check the for loop JAXPR."""
-
-        expected = """\
-{ lambda ; a:f64[] b:i64[]. let
-    c:i64[] d:f64[] = for_loop[
-      apply_reverse_transform=False
-      body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
-          h:i64[] = add f 1
-        in (h, g) }
-      body_nconsts=0
-    ] 0 b 1 0 0 a
-  in (c, d) }\
-"""
-
-        @qjit
-        def circuit(x: float, n: int):
-            @for_loop(0, n, 1)
-            def loop(_, v):
-                return v[0] + 1, v[1]
-
-            return loop((0, x))
-
-        assert expected == str(circuit.jaxpr)
-
-
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 
@@ -529,7 +476,22 @@ class TestInterpretationControlFlow:
         mulc = qjit(muli)
         assert mulc(1, 2) == muli(1, 2)
 
-    def test_for_loop(self):
+    def test_for_loop_identity(self, backend):
+        """Test simple for loop."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def fun(x):
+            @for_loop(0, 10, 1)
+            def loop(_, agg):
+                return agg
+
+            res = loop(x)
+            return res
+
+        assert fun(0) == 0
+
+    def test_for_loop_acc(self):
         """Test simple for loop."""
 
         def muli(x: int, n: int):

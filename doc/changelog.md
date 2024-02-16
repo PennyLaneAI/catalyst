@@ -2,6 +2,27 @@
 
 <h3>New features</h3>
 
+* Catalyst control-flow primitives are now compatible with dynamic arrays. For-loops, while-loops
+  and conditionals can now accept and return tensors with dynamic dimensions.
+  [(#370)](https://github.com/PennyLaneAI/catalyst/pull/370)
+
+  ``` python
+  @qjit
+  def circuit(sz):
+      a = jnp.ones([sz], dtype=float)
+
+      @for_loop(0, 10, 2)
+      def loop(_, a):
+          return a
+
+      return loop(a)
+  ```
+
+  ``` pycon
+  >>> circuit(3)
+  array([1., 1., 1.])
+  ```
+
 * Catalyst now supports just-in-time compilation of static arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
 
@@ -696,9 +717,9 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Erick Ochoa Lopez,
 Romain Moyard,
 Sergei Mironov,
-Erick Ochoa Lopez,
 Shuli Shu.
 
 # Release 0.3.2
