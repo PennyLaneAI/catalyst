@@ -81,7 +81,7 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
                       ValueRange controlledQubits, ValueRange controlledValues)
 {
     assert(controlledQubits.size() == controlledValues.size() &&
-           "controlled qubits and controlled values have different lenghts");
+           "controlled qubits and controlled values have different lengths");
 
     MLIRContext *ctx = rewriter.getContext();
 
@@ -123,7 +123,7 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, TypeConverter *conv, bo
 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
-    if (controlledQubits.size() > 0) {
+    if (!controlledQubits.empty()) {
         ctrlPtr =
             rewriter.create<LLVM::AllocaOp>(loc, qubitPtrPtrType, numControlledVal).getResult();
         valuePtr = rewriter.create<LLVM::AllocaOp>(loc, boolPtrType, numControlledVal).getResult();

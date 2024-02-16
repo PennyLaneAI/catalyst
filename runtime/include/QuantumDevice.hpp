@@ -161,8 +161,8 @@ struct QuantumDevice {
      * @param params Optional parameter list for parametric gates
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
-     * @param controlled_wires Controlled wires applied to the operation
-     * @param controlled_values Controlled values applied to the operation
+     * @param controlled_wires Optional controlled wires applied to the operation
+     * @param controlled_values Optional controlled values applied to the operation
      */
     virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
                                 const std::vector<QubitIdType> &wires, bool inverse,

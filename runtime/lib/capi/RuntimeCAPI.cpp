@@ -47,12 +47,12 @@ thread_local static RTDevice *RTD_PTR = nullptr;
 
 bool getModifiersAdjoint(const Modifiers *modifiers)
 {
-    return modifiers == nullptr ? false : modifiers->adjoint;
+    return modifiers ? false : modifiers->adjoint;
 }
 
 std::vector<QubitIdType> getModifiersControlledWires(const Modifiers *modifiers)
 {
-    return modifiers == nullptr ? std::vector<QubitIdType>()
+    return modifiers ? std::vector<QubitIdType>()
                                 : std::vector<QubitIdType>(
                                       reinterpret_cast<QubitIdType *>(modifiers->controlled_wires),
                                       reinterpret_cast<QubitIdType *>(modifiers->controlled_wires) +
@@ -61,7 +61,7 @@ std::vector<QubitIdType> getModifiersControlledWires(const Modifiers *modifiers)
 
 std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
 {
-    return modifiers == nullptr
+    return modifiers
                ? std::vector<bool>()
                : std::vector<bool>(modifiers->controlled_values,
                                    modifiers->controlled_values + modifiers->num_controlled);
