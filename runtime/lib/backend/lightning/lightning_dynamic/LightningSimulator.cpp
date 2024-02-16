@@ -117,19 +117,11 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
                                         const std::vector<QubitIdType> &controlled_wires,
                                         const std::vector<bool> &controlled_values)
 {
-    // Check the validity of qubits
-    RT_FAIL_IF(wires.empty(), "Invalid number of qubits");
-    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
-
-    // First, check if operation `name` is supported by the simulator
-    auto &&[op_num_wires, op_num_params] =
-        Lightning::lookup_gates(Lightning::simulator_gate_info, name);
-
     // Check the validity of number of qubits and parameters
-    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
-    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
     RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
                "Controlled wires/values size mismatch");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -158,6 +150,8 @@ void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>>
 {
     RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
                "Controlled wires/values size mismatch");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     // with checking validity of wires
