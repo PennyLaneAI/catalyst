@@ -132,7 +132,7 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     auto getOperationsNames() -> const std::vector<std::string> & { return ops_names_; }
 
     /**
-     * @brief Get a a reference to operations parameters.
+     * @brief Get a reference to operations parameters.
      */
     auto getOperationsParameters() -> const std::vector<std::vector<double>> &
     {
@@ -140,12 +140,12 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     }
 
     /**
-     * @brief Get a a reference to operations wires.
+     * @brief Get a reference to operations wires.
      */
     auto getOperationsWires() -> const std::vector<std::vector<size_t>> & { return ops_wires_; }
 
     /**
-     * @brief Get a a reference to operation controlled wires.
+     * @brief Get a reference to operation controlled wires.
      */
     auto getOperationsControlledWires() -> const std::vector<std::vector<size_t>> &
     {
@@ -153,7 +153,7 @@ template <typename ComplexT = std::complex<double>> class CacheManager {
     }
 
     /**
-     * @brief Get a a reference to operation controlled values.
+     * @brief Get a reference to operation controlled values.
      */
     auto getOperationsControlledValues() -> const std::vector<std::vector<bool>> &
     {
