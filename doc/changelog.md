@@ -116,6 +116,22 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+* Add support for reset option in mid-circuit measurements.
+  [(#507)](https://github.com/PennyLaneAI/catalyst/pull/507)
+
+  This is an example of reset usage:
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def f():
+      qml.Hadamard(0)
+      m = measure(0, reset=True)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Breaking changes</h3>
 
 * We match better the Jax convention for returning gradient, jacobian, vjp and jvp. Therefore some breaking

@@ -113,6 +113,32 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True
 
+    def test_with_reset_false(self, backend):
+        """Test measure (reset = False)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            qml.Hadamard(wires=0)
+            m1 = measure(wires=0, reset=False, postselect=1)
+            m2 = measure(wires=0)
+            return m1 == m2
+
+        assert circuit()  # both measures are the same
+
+    def test_with_reset_true(self, backend):
+        """Test measure (reset = True)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            qml.Hadamard(wires=0)
+            m1 = measure(wires=0, reset=True, postselect=1)
+            m2 = measure(wires=0)
+            return m1 != m2
+
+        assert circuit()  # measures are different
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
