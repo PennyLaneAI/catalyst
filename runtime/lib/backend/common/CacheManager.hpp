@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <complex>
 #include <string>
 #include <vector>
 
@@ -29,13 +30,14 @@ namespace Catalyst::Runtime {
  * of a circuit with taking advantage of gradient methods provided by
  * simulators.
  */
-class CacheManager {
+template <typename ComplexT = std::complex<double>> class CacheManager {
   protected:
     // Operations Data
     std::vector<std::string> ops_names_{};
     std::vector<std::vector<double>> ops_params_{};
     std::vector<std::vector<size_t>> ops_wires_{};
     std::vector<bool> ops_inverses_{};
+    std::vector<std::vector<ComplexT>> ops_matrixs_{};
     std::vector<std::vector<size_t>> ops_controlled_wires_{};
     std::vector<std::vector<bool>> ops_controlled_values_{};
 
@@ -60,17 +62,18 @@ class CacheManager {
      */
     void Reset()
     {
-        this->ops_names_.clear();
-        this->ops_params_.clear();
-        this->ops_wires_.clear();
-        this->ops_inverses_.clear();
-        this->ops_controlled_wires_.clear();
-        this->ops_controlled_values_.clear();
+        ops_names_.clear();
+        ops_params_.clear();
+        ops_wires_.clear();
+        ops_inverses_.clear();
+        ops_matrixs_.clear();
+        ops_controlled_wires_.clear();
+        ops_controlled_values_.clear();
 
-        this->obs_keys_.clear();
-        this->obs_callees_.clear();
+        obs_keys_.clear();
+        obs_callees_.clear();
 
-        this->num_params_ = 0;
+        num_params_ = 0;
     }
 
     /**
@@ -80,46 +83,25 @@ class CacheManager {
      * @param params Parameters of the gate
      * @param wires Wires the gate acts on
      * @param inverse If true, inverse of the gate is applied
+     * @param matrix Unitary matrix for the 'MatrixOp' operations
+     * @param controlled_wires Control wires
+     * @param controlled_values Control values
      */
     void addOperation(const std::string &name, const std::vector<double> &params,
-                      const std::vector<size_t> &dev_wires, bool inverse)
+                      const std::vector<size_t> &wires, bool inverse,
+                      const std::vector<ComplexT> &matrix = {},
+                      const std::vector<size_t> &controlled_wires = {},
+                      const std::vector<bool> &controlled_values = {})
     {
-        addOperation(name, params, dev_wires, inverse, {}, {});
-    }
+        ops_names_.push_back(name);
+        ops_params_.push_back(params);
+        ops_wires_.push_back(wires);
+        ops_inverses_.push_back(inverse);
+        ops_matrixs_.push_back(matrix);
+        ops_controlled_wires_.push_back(controlled_wires);
+        ops_controlled_values_.push_back(controlled_values);
 
-    /**
-     * @brief Add a new operation to the list of cached gates.
-     *
-     * @param name Name of the given gate
-     * @param params Parameters of the gate
-     * @param wires Wires the gate acts on
-     * @param inverse If true, inverse of the gate is applied
-     */
-    void addOperation(const std::string &name, const std::vector<double> &params,
-                      const std::vector<size_t> &dev_wires, bool inverse,
-                      const std::vector<size_t> &dev_controlled_wires,
-                      const std::vector<bool> &controlled_values)
-    {
-        this->ops_names_.push_back(name);
-        this->ops_params_.push_back(params);
-
-        std::vector<size_t> wires_ul;
-        wires_ul.reserve(dev_wires.size());
-        std::transform(dev_wires.begin(), dev_wires.end(), std::back_inserter(wires_ul),
-                       [](auto w) { return static_cast<size_t>(w); });
-        this->ops_wires_.push_back(wires_ul);
-
-        std::vector<size_t> controlled_wires_ul;
-        controlled_wires_ul.reserve(dev_controlled_wires.size());
-        std::transform(dev_controlled_wires.begin(), dev_controlled_wires.end(),
-                       std::back_inserter(controlled_wires_ul),
-                       [](auto w) { return static_cast<size_t>(w); });
-        this->ops_controlled_wires_.push_back(controlled_wires_ul);
-        this->ops_controlled_values_.push_back(controlled_values);
-
-        this->ops_inverses_.push_back(inverse);
-
-        this->num_params_ += params.size();
+        num_params_ += params.size();
     }
 
     /**
@@ -130,43 +112,37 @@ class CacheManager {
      */
     void addObservable(const ObsIdType id, const MeasurementsT &callee = MeasurementsT::None)
     {
-        this->obs_keys_.push_back(id);
-        this->obs_callees_.push_back(callee);
+        obs_keys_.push_back(id);
+        obs_callees_.push_back(callee);
     }
 
     /**
      * @brief Get a reference to observables keys.
      */
-    auto getObservablesKeys() -> const std::vector<ObsIdType> & { return this->obs_keys_; }
+    auto getObservablesKeys() -> const std::vector<ObsIdType> & { return obs_keys_; }
 
     /**
      * @brief Get a reference to observables callees.
      */
-    auto getObservablesCallees() -> const std::vector<MeasurementsT> &
-    {
-        return this->obs_callees_;
-    }
+    auto getObservablesCallees() -> const std::vector<MeasurementsT> & { return obs_callees_; }
 
     /**
      * @brief Get a reference to operations names.
      */
-    auto getOperationsNames() -> const std::vector<std::string> & { return this->ops_names_; }
+    auto getOperationsNames() -> const std::vector<std::string> & { return ops_names_; }
 
     /**
      * @brief Get a a reference to operations parameters.
      */
     auto getOperationsParameters() -> const std::vector<std::vector<double>> &
     {
-        return this->ops_params_;
+        return ops_params_;
     }
 
     /**
      * @brief Get a a reference to operations wires.
      */
-    auto getOperationsWires() -> const std::vector<std::vector<size_t>> &
-    {
-        return this->ops_wires_;
-    }
+    auto getOperationsWires() -> const std::vector<std::vector<size_t>> & { return ops_wires_; }
 
     /**
      * @brief Get a a reference to operation controlled wires.
@@ -187,29 +163,37 @@ class CacheManager {
     /**
      * @brief Get a reference to operations inverses.
      */
-    auto getOperationsInverses() -> const std::vector<bool> & { return this->ops_inverses_; }
+    auto getOperationsInverses() -> const std::vector<bool> & { return ops_inverses_; }
+
+    /**
+     * @brief Get a reference to operations matrices.
+     */
+    auto getOperationsMatrices() -> const std::vector<std::vector<ComplexT>> &
+    {
+        return ops_matrixs_;
+    }
 
     /**
      * @brief Get total number of cached gates.
      */
     [[nodiscard]] auto getNumGates() const -> size_t
     {
-        return this->ops_names_.size() + this->obs_keys_.size();
+        return ops_names_.size() + obs_keys_.size();
     }
 
     /**
      * @brief Get number of operations.
      */
-    [[nodiscard]] auto getNumOperations() const -> size_t { return this->ops_names_.size(); }
+    [[nodiscard]] auto getNumOperations() const -> size_t { return ops_names_.size(); }
 
     /**
      * @brief Get number of observables.
      */
-    [[nodiscard]] auto getNumObservables() const -> size_t { return this->obs_keys_.size(); }
+    [[nodiscard]] auto getNumObservables() const -> size_t { return obs_keys_.size(); }
 
     /**
      * @brief Get total number of cached gates.
      */
-    [[nodiscard]] auto getNumParams() const -> size_t { return this->num_params_; }
+    [[nodiscard]] auto getNumParams() const -> size_t { return num_params_; }
 };
 } // namespace Catalyst::Runtime
