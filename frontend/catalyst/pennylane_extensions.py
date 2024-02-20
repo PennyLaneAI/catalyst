@@ -269,7 +269,8 @@ class QJITDevice(qml.QubitDevice):
             QJITDevice.operations += ["Adjoint"]
 
         if QJITDevice._check_quantum_control(config):  # pragma: nocover
-            QJITDevice.operations += ["QCtrl"]
+            # TODO: Once control is added on the frontend.
+            ...
 
     @staticmethod
     def _set_supported_observables(config):
