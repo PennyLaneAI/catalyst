@@ -35,7 +35,7 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import check_adjoint_flag, read_toml_file
 
 
-class DummyDevice(qml.QubitDevice):
+class DeviceTest(qml.QubitDevice):
     """Test device"""
 
     name = "Dummy Device"
@@ -72,13 +72,12 @@ def test_validate_config_with_device(schema):
             )
 
         config = read_toml_file(toml_file)
-
-        device = DummyDevice()
+        name = DeviceTest.name
         with pytest.raises(
             CompileError,
-            match=f"Attempting to compile program for incompatible device '{device.name}'",
+            match=f"Attempting to compile program for incompatible device '{name}'",
         ):
-            validate_config_with_device(device, config)
+            validate_config_with_device(DeviceTest(), config)
 
 
 def test_get_observables_schema1():

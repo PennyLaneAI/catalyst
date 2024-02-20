@@ -536,7 +536,7 @@ class Compiler:
             (Optional[str]): output IR
         """
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
-            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
+            raise CompileError("Requesting the output of an empty pipeline")
 
         if not self.last_compiler_output:
             return None
