@@ -400,12 +400,13 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        int64_t numQubits = op.getNumResults();
-        SmallVector<Value> args = adaptor.getOperands();
-        args.insert(args.begin() + 1,
+        int64_t numQubits = op.getOutQubits().size();
+        SmallVector<Value> args;
+        args.insert(args.end(), adaptor.getTheta());
+        args.insert(args.end(), modifiersPtr);
+        args.insert(args.end(),
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
-        args.insert(args.begin() + 1, modifiersPtr);
-
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 
         SmallVector<Value> values;
