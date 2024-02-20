@@ -229,7 +229,8 @@ class QRegPromise:
         qrp = self
         qreg = qrp.base
         for w, qubit in qrp.cache.items():
-            qreg = qinsert_p.bind(qreg, w, qubit)
+            if qubit is not None:
+                qreg = qinsert_p.bind(qreg, w, qubit)
         qrp.cache = {}
         qrp.base = qreg
         return qreg
