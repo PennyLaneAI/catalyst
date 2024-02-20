@@ -430,7 +430,7 @@ optimization to take place within Catalyst:
     @qjit
     def optimize(init_weights, data, steps):
         def loss(x):
-            dy = grad(cost, argnum=0)(x, data)[0]
+            dy = grad(cost, argnum=0)(x, data)
             return (cost(x, data), dy)
 
         opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
@@ -439,7 +439,7 @@ optimization to take place within Catalyst:
         params = init_weights
         state = opt.init_state(params)
 
-        return for_loop(0, steps, 1)(update_step)(params, state)[0]
+        return for_loop(0, steps, 1)(update_step)(params, state)
 
 The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
 Note that, to compute hybrid quantum-classical gradients within a qjit-compiled function,

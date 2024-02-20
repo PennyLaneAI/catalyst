@@ -636,8 +636,8 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
         return g(x)
 
 >>> workflow(jnp.array([2.0, 1.0]))
-array([[-1.32116540e-07,  1.33781874e-07],
-       [-4.20735506e-01,  4.20735506e-01]])
+array([[ 3.48786850e-16 -4.20735492e-01]
+       [-8.71967125e-17  4.20735492e-01]])
 
 This decorator has the same methods and API as `grad`. See the documentation for more details.
 
@@ -678,7 +678,7 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
     def workflow():
         def gd_fun(param):
             diff = grad(circuit, argnum=0)
-            return circuit(param), diff(param)[0]
+            return circuit(param), diff(param)
 
         opt = jaxopt.GradientDescent(gd_fun, stepsize=0.4, value_and_grad=True)
 

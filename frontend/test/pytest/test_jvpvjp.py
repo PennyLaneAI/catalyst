@@ -309,6 +309,26 @@ def test_jvp_pytrees(diff_method):
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_multi_returns(diff_method):
+    """Test that a JVP with multiple arg as return."""
+
+    def f(x):
+        return x, x**2, x**4
+
+    @qjit
+    def workflow():
+        return C_jvp(f, [0.3], [1.1], method=diff_method, argnum=[0])
+
+    catalyst_res = workflow()
+    jax_res = J_jvp(f, [0.3], [1.1])
+
+    catalyst_res_flatten, tree_cat = jax.tree_util.tree_flatten(catalyst_res)
+    jax_res_flatten, tree_jax = jax.tree_util.tree_flatten(jax_res)
+    assert tree_cat == tree_jax
+    assert_allclose(catalyst_res_flatten, jax_res_flatten, rtol=1e-6)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
 def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
@@ -547,8 +567,6 @@ def test_jvp_against_jax_argnum0_case_TT_TT(diff_method):
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
-    print(x)
-    print(t[0:1])
 
     @qjit
     def C_workflowA():
@@ -648,13 +666,39 @@ def test_vjp_pytrees(diff_method):
 
     @qjit
     def C_workflowA():
-        return C_vjp(f, [0.1, 0.2], [1.0, 1.0, 1.0], method=diff_method, argnum=[0, 1])
+        ct2 = tree_unflatten(tree_flatten(f(0.1, 0.2))[1], [1.0, 1.0, 1.0])
+        return C_vjp(f, [0.1, 0.2], ct2, method=diff_method, argnum=[0, 1])
 
     @jax.jit
     def J_workflow():
         y, ft = J_vjp(f, *[0.1, 0.2])
         ct2 = tree_unflatten(tree_flatten(y)[1], [1.0, 1.0, 1.0])
         return (y, ft(ct2))
+
+    r1 = C_workflowA()
+    r2 = J_workflow()
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_multi_return(diff_method):
+    """Test VJP with multiple returns."""
+
+    def f(x):
+        return x, x**2
+
+    @qjit
+    def C_workflowA():
+        return C_vjp(f, [0.1], [1.0, 1.0], method=diff_method, argnum=[0])
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(f, *[0.1])
+        return (y, ft(tuple([1.0, 1.0])))
 
     r1 = C_workflowA()
     r2 = J_workflow()

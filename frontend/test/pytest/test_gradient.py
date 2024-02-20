@@ -231,7 +231,7 @@ def test_finite_diff_mul(inp, backend):
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
 
 
-@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.parametrize("inp", [1.0, 2.0, 3.0, 4.0])
 def test_finite_diff_in_loop(inp, backend):
     """Test finite diff in loop."""
 
@@ -240,14 +240,14 @@ def test_finite_diff_in_loop(inp, backend):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_default(params, ntrials):
         diff = grad(f, argnum=0, method="fd")
 
         def fn(i, g):
             return diff(params)
 
-        return for_loop(0, ntrials, 1)(fn)(params)[0]
+        return for_loop(0, ntrials, 1)(fn)(params)
 
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
@@ -304,7 +304,7 @@ def test_adj_mult(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.parametrize("inp", [1.0, 2.0, 3.0, 4.0])
 def test_adj_in_loop(inp, backend):
     """Test the adjoint method in loop."""
 
@@ -320,7 +320,7 @@ def test_adj_in_loop(inp, backend):
         def fn(i, g):
             return diff(params)
 
-        return for_loop(0, ntrials, 1)(fn)(params)[0]
+        return for_loop(0, ntrials, 1)(fn)(params)
 
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
@@ -905,9 +905,8 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
         def fn_g(_i, _g):
             return d_g(params)
 
-        d1 = for_loop(0, ntrials, 1)(fn_f)(params)[0]
-        d2 = for_loop(0, ntrials, 1)(fn_g)(params)[0]
-
+        d1 = for_loop(0, ntrials, 1)(fn_f)(params)
+        d2 = for_loop(0, ntrials, 1)(fn_g)(params)
         return d1, d2
 
     result = compiled_grad_default(inp, 5)
@@ -957,8 +956,8 @@ def test_multiple_grad_invocations(backend):
 
     @qjit
     def compiled(x: float, y: float):
-        g1 = grad(f, argnum=0, method="auto")(x, y)[0]
-        g2 = grad(f, argnum=1, method="auto")(x, y)[0]
+        g1 = grad(f, argnum=0, method="auto")(x, y)
+        g2 = grad(f, argnum=1, method="auto")(x, y)
         return jnp.array([g1, g2])
 
     actual = compiled(0.1, 0.2)
@@ -1064,6 +1063,32 @@ def test_pytrees_return_classical():
 
     assert tree_jax == tree_catalyst
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
+
+
+@pytest.mark.xfail(reason="QubitUnitrary is not support with catalyst.grad")
+@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+def test_adj_qubitunitary(inp, backend):
+    """Test the adjoint method."""
+
+    def f(x):
+        qml.RX(x, wires=0)
+        U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
+        qml.QubitUnitary(U1, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    @qjit()
+    def compiled(x: float):
+        g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
+        h = grad(g, method="auto")
+        return h(x)
+
+    def interpreted(x):
+        device = qml.device("default.qubit", wires=1)
+        g = qml.QNode(f, device, diff_method="backprop")
+        h = qml.grad(g, argnum=0)
+        return h(x)
+
+    assert np.allclose(compiled(inp), interpreted(inp))
 
 
 if __name__ == "__main__":
