@@ -134,6 +134,12 @@
 
 <h3>Breaking changes</h3>
 
+* `QCtrl` is overriden and never used.
+  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/522)
+
+  This is not so much a breaking change, it was just never used in the past.
+  This will be set back to its original behaviour once it is implemented in the frontend.
+
 * We match better the Jax convention for returning gradient, jacobian, vjp and jvp. Therefore some breaking
   changes about the return shapes of those functions were introduced.
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
