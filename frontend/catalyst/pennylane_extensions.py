@@ -273,6 +273,8 @@ class QJITDevice(qml.QubitDevice):
             ...
 
         QJITDevice.operations += ["C(PauliX)"]
+        QJITDevice.operations += ["C(MultiRZ)"]
+        QJITDevice.operations += ["C(Rot)"]
 
     @staticmethod
     def _set_supported_observables(config):
