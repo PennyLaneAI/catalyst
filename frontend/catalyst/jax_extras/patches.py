@@ -47,7 +47,8 @@ def get_aval2(x):
 
 def _no_clean_up_dead_vars(_eqn, _env, _last_used):
     """A stub to workaround the Jax ``KeyError 'a'`` bug during the lowering of Jaxpr programs to
-    MLIR with the dynamic API enabled."""
+    MLIR with the dynamic API enabled.
+    Relevant upstream ticket: https://github.com/google/jax/issues/18936"""
     return None
 
 
