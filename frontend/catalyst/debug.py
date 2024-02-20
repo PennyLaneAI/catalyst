@@ -21,7 +21,7 @@ import builtins
 import jax
 
 from catalyst.jax_primitives import print_p
-from catalyst.utils.contexts import EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext
 
 
 # pylint: disable=redefined-builtin
