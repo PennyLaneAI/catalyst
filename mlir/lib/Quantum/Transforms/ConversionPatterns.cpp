@@ -446,7 +446,7 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        int64_t numQubits = op.getNumResults();
+        int64_t numQubits = adaptor.getInQubits().size();
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
