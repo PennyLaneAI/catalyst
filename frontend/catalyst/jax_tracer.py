@@ -52,7 +52,11 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,

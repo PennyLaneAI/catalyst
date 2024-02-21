@@ -18,7 +18,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import cond, measure, qjit, while_loop
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 
 class TestEvaluationModes:
