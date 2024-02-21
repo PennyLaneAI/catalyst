@@ -30,9 +30,8 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compilation_pipelines import WorkspaceManager
 from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
-from catalyst.jax_tracer import trace_to_mlir
+from catalyst.debug import compile_from_mlir
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime import get_lib_path
@@ -312,8 +311,8 @@ module @workflow {
 }
 """
         )
-        compiled_function = qjit(ir)
-        assert compiled_function(0.1) == -1
+        compiled_function = compile_from_mlir(ir)
+        assert compiled_function(0.1) == [-1]
 
     def test_parsing_errors(self):
         """Test parsing error handling."""
@@ -327,7 +326,7 @@ module @workflow {
 }
 """
         with pytest.raises(CompileError) as e:
-            qjit(ir)(0.1)
+            compile_from_mlir(ir)(0.1)
 
         assert "Failed to parse module as MLIR source" in e.value.args[0]
         assert "Failed to parse module as LLVM source" in e.value.args[0]

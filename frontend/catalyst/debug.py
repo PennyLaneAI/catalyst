@@ -1,4 +1,4 @@
-# Copyright 2023 Xanadu Quantum Technologies Inc.
+# Copyright 2023-2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Catalyst's debug module contains functions useful for user program debugging, such as
-runtime printing.
-"""
+"""Catalyst's debug module contains functions useful for user program debugging."""
 
 import builtins
+import os
 
 import jax
+from jax.interpreters import mlir
 
+import catalyst
+from catalyst.compilation_pipelines import CompiledFunction
+from catalyst.compiler import Compiler
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
+from catalyst.utils.filesystem import WorkspaceManager
 
 
 # pylint: disable=redefined-builtin
@@ -68,3 +73,53 @@ def print(x, memref=False):
     else:
         # Dispatch to Python print outside a qjit context.
         builtins.print(x)
+
+
+def get_cmain(fn, *args):
+    """Return a C program that calls a jitted function with the provided arguments.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        *args: argument values to use in the C program when invoking ``fn``
+
+    Returns:
+        str: A C program that can be compiled and linked with the current shared object.
+    """
+    EvaluationContext.check_is_not_tracing("C interface cannot be generated from tracing context.")
+
+    if not isinstance(fn, catalyst.QJIT):
+        raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
+
+    complied_function, args = fn._ensure_real_arguments_and_formal_parameters_are_compatible(
+        fn.compiled_function, *args
+    )
+
+    return complied_function.get_cmain(*args)
+
+
+def compile_from_mlir(ir, compiler=None, compile_options=None):
+    """Compile a Catalyst function to binary code from the provided MLIR.
+
+    Args:
+        ir (str): the MLIR to compile in string form
+        compile_options: options to use during compilation
+
+    Returns:
+        CompiledFunction: A callable that manages the compiled shared library and its invocation.
+    """
+    EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
+
+    if compiler is None:
+        compiler = Compiler(compile_options)
+
+    module_name = "debug_module"
+    workspace_dir = os.getcwd() if compiler.options.keep_intermediate else None
+    workspace = WorkspaceManager.get_or_create_workspace("debug_workspace", workspace_dir)
+    shared_object, _llvm_ir, func_data = compiler.run_from_ir(ir, module_name, workspace)
+
+    # Parse inferred function data, like name and return types.
+    qfunc_name = func_data[0]
+    with mlir.ir.Context():
+        result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
+
+    return CompiledFunction(shared_object, qfunc_name, result_types, compiler.options)

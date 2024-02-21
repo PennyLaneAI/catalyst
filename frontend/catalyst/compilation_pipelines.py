@@ -387,7 +387,6 @@ class QJIT:
     def __init__(self, fn, compile_options):
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
-        self.compiling_from_textual_ir = isinstance(fn, str)
         self.original_function = fn
         self.user_function = fn
         self.jaxed_function = None
@@ -416,19 +415,13 @@ class QJIT:
         )
         self.preferred_workspace_dir = preferred_workspace_dir
 
-        # If we are compiling from textual ir, just use this as the name of the function.
-        name = "compiled_function"
-        if not self.compiling_from_textual_ir:
-            # pylint: disable=no-member
-            # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
-            name = self.__name__
-        self.function_name = name
+        # pylint: disable=no-member
+        # Guaranteed to exist after functools.update_wrapper
+        self.function_name = self.__name__
 
-        self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
-
-        if self.compiling_from_textual_ir:
-            EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-            return
+        self.workspace = WorkspaceManager.get_or_create_workspace(
+            self.function_name, preferred_workspace_dir
+        )
 
         parameter_types = get_type_annotations(self.user_function)
 
@@ -524,38 +517,27 @@ class QJIT:
         if self.compiled_function and self.compiled_function.shared_object:
             self.compiled_function.shared_object.close()
 
-        if self.compiling_from_textual_ir:
-            # Module name can be anything.
-            module_name = "catalyst_module"
-            shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
-                self.user_function, module_name, self.workspace
-            )
-            qfunc_name = inferred_func_data[0]
-            # Parse back the return types given as a semicolon-separated string
-            with ir.Context():
-                restype = [ir.RankedTensorType.parse(rt) for rt in inferred_func_data[1].split(",")]
-        else:
-            # This will make a check before sending it to the compiler that the return type
-            # is actually available in most systems. f16 needs a special symbol and linking
-            # will fail if it is not available.
-            #
-            # WARNING: assumption is that the first function
-            # is the entry point to the compiled program.
-            entry_point_func = self.mlir_module.body.operations[0]
-            restype = entry_point_func.type.results
+        # This will make a check before sending it to the compiler that the return type
+        # is actually available in most systems. f16 needs a special symbol and linking
+        # will fail if it is not available.
+        #
+        # WARNING: assumption is that the first function
+        # is the entry point to the compiled program.
+        entry_point_func = self.mlir_module.body.operations[0]
+        restype = entry_point_func.type.results
 
-            for res in restype:
-                baseType = ir.RankedTensorType(res).element_type
-                mlir_type_to_numpy_type(baseType)
+        for res in restype:
+            baseType = ir.RankedTensorType(res).element_type
+            mlir_type_to_numpy_type(baseType)
 
-            # The function name out of MLIR has quotes around it, which we need to remove.
-            # The MLIR function name is actually a derived type from string which has no
-            # `replace` method, so we need to get a regular Python string out of it.
-            qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
+        # The function name out of MLIR has quotes around it, which we need to remove.
+        # The MLIR function name is actually a derived type from string which has no
+        # `replace` method, so we need to get a regular Python string out of it.
+        qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
-            shared_object, llvm_ir, inferred_func_data = self.compiler.run(
-                self.mlir_module, self.workspace
-            )
+        shared_object, llvm_ir, inferred_func_data = self.compiler.run(
+            self.mlir_module, self.workspace
+        )
 
         self._llvmir = llvm_ir
         options = self.compile_options
@@ -614,29 +596,13 @@ class QJIT:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
-            if not self.compiling_from_textual_ir:
-                sig = merge_static_args(r_sig, args, static_argnums)
-                self.mlir_module = self.get_mlir(*sig)
+            sig = merge_static_args(r_sig, args, static_argnums)
+            self.mlir_module = self.get_mlir(*sig)
             function = self.compile()
         else:
             assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
 
         return function, args
-
-    def get_cmain(self, *args):
-        """Return the C interface template for current arguments.
-
-        Args:
-          *args: Arguments to be used in the template.
-        Returns:
-          str: A C program that can be compiled with the current shared object.
-        """
-        msg = "C interface cannot be generated from tracing context."
-        EvaluationContext.check_is_not_tracing(msg)
-        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
-            self.compiled_function, *args
-        )
-        return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
         static_argnums = self.compile_options.static_argnums

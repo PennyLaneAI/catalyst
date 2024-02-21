@@ -19,6 +19,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
+from catalyst.debug import get_cmain
 from catalyst.utils.c_template import CType, CVariable
 from catalyst.utils.exceptions import CompileError
 
@@ -129,7 +130,7 @@ class TestCProgramGeneration:
             qml.RX(x, wires=1)
             return qml.state(), qml.state()
 
-        template = f.get_cmain(4.0)
+        template = get_cmain(f, 4.0)
         assert "main" in template
         assert "struct result_t result_val;" in template
         assert "buff_0 = 4.0" in template
@@ -144,7 +145,7 @@ class TestCProgramGeneration:
             """No-op function."""
             return None
 
-        template = f.get_cmain()
+        template = get_cmain(f)
         assert "struct result_t result_val;" not in template
         assert "buff_0" not in template
         assert "arg_0" not in template
@@ -166,4 +167,4 @@ class TestCProgramGenerationErrors:
             @qjit
             def error_fn(x: float):
                 """Should raise an error as we try to generate the C template during tracing."""
-                return f.get_cmain(x)
+                return get_cmain(f, x)
