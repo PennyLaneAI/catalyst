@@ -1,3 +1,4 @@
+# Always update the version check in catalyst.__init__ when changing the JAX version.
 jax=0.4.23
 mhlo=4611968a5f6818e6bdfb82217b9e836e0400bba9
 llvm=cd9a641613eddf25d4b25eaa96b2c393d401d42c
