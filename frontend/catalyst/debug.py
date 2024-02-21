@@ -98,6 +98,7 @@ def get_cmain(fn, *args):
     return complied_function.get_cmain(*args)
 
 
+# pylint: disable=line-too-long
 def compile_from_mlir(ir, compiler=None, compile_options=None):
     """Compile a Catalyst function to binary code from the provided MLIR.
 
@@ -107,6 +108,34 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
 
     Returns:
         CompiledFunction: A callable that manages the compiled shared library and its invocation.
+
+    **Example**
+
+    The main entry point of the program is required to start with ``catalyst.entry_point``, and
+    the program is required to contain ``setup`` and ``teardown`` functions.
+
+    .. code-block:: python
+
+        ir = r\"""
+            module @workflow {
+                func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+                    return %arg0 : tensor<f64>
+                }
+                func.func @setup() {
+                    quantum.init
+                    return
+                }
+                func.func @teardown() {
+                    quantum.finalize
+                    return
+                }
+            }
+        \"""
+
+        compiled_function = compile_from_mlir(ir)
+
+    >>> compiled_function(0.1)
+    [0.1]
     """
     EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
 
