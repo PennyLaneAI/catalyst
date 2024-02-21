@@ -238,6 +238,9 @@
 
 <h3>Bug fixes</h3>
 
+* Only set `JAX_DYNAMIC_SHAPES` configuration option during `trace_to_mlir()`.
+  [(#526)](https://github.com/PennyLaneAI/catalyst/pull/526)
+
 * Handle run time exception in async qnodes.
   [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
 
