@@ -34,7 +34,7 @@ import catalyst
 from catalyst.ag_utils import run_autograph
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.jax_tracer import trace_to_mlir
+from catalyst.jax_tracer import trace_to_jaxpr, lower_jaxpr_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -189,9 +189,8 @@ class QJIT:
             func = self.user_function
             sig = merge_static_args(self.c_sig, args, static_argnums)
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(
-                func, static_argnums, abstracted_axes, *sig
-            )
+            jaxpr, self.out_tree = trace_to_jaxpr(func, static_argnums, abstracted_axes, sig, {})
+            mlir_module, ctx = lower_jaxpr_to_mlir(jaxpr, func.__name__)
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
