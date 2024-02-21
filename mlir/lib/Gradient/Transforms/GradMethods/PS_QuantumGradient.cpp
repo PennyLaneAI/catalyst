@@ -157,7 +157,6 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
                 rewriter.create<memref::SubViewOp>(loc, resultType, gradientBuffer, dynOffsets,
                                                    dynSizes, dynStrides, offsets, sizes, strides);
 
-            gradientSubview.getType().dump();
             auto materializeOp = rewriter.create<bufferization::MaterializeInDestinationOp>(
                 loc, derivative, gradientSubview);
             materializeOp.setWritable(true);
