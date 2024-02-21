@@ -500,6 +500,12 @@ class TestShots:
 class TestPromotionRules:
     """Class to test different promotion rules."""
 
+    def test_against_none_target(self):
+        """Test type check result when the target is None."""
+
+        retval = typecheck_signatures(None, [1])
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
     def test_incompatible_compiled_vs_runtime_different_lengths(self):
         """Test incompatible compiled vs runtime."""
 

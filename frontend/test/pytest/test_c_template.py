@@ -168,3 +168,13 @@ class TestCProgramGenerationErrors:
             def error_fn(x: float):
                 """Should raise an error as we try to generate the C template during tracing."""
                 return get_cmain(f, x)
+
+    def test_error_non_qjit_object(self):
+        """An error should be raised if the object supplied to the debug function is not a QJIT."""
+
+        def f(x: float):
+            """Identity function."""
+            return x
+
+        with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
+            get_cmain(f, 0.5)
