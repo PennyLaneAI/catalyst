@@ -401,7 +401,6 @@ def trace_quantum_tape(
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            controlled_values = controlled_values
             qubits2 = qunitary_p.bind(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
@@ -412,7 +411,6 @@ def trace_quantum_tape(
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
-            controlled_values = controlled_values
             qubits2 = qinst_p.bind(
                 *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
                 op=op.name,
