@@ -25,7 +25,7 @@ from catalyst.utils.exceptions import CompileError
 class TestStaticArguments:
     """Test QJIT with static arguments."""
 
-    @pytest.mark.parametrize("argnums", [(()), (None)])
+    @pytest.mark.parametrize("argnums", [(), None])
     def test_zero_static_argument(self, argnums):
         """Test QJIT with zero static argument."""
 
@@ -37,7 +37,7 @@ class TestStaticArguments:
 
         assert f(1) == 1
 
-    @pytest.mark.parametrize("argnums", [(-1), (100)])
+    @pytest.mark.parametrize("argnums", [-1, 100])
     def test_out_of_bounds_static_argument(self, argnums):
         """Test QJIT with invalid static argument index."""
 

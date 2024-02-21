@@ -160,13 +160,13 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
 
-        @qjit(target="fake_binary")
+        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=1))
         def cpp_exception_test():
             return None
 
         cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
-        compiled_function = cpp_exception_test.compile()
+        compiled_function, _ = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
             compiled_function()

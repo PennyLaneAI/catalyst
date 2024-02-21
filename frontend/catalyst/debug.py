@@ -25,6 +25,7 @@ from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.filesystem import WorkspaceManager
 
 
@@ -89,13 +90,13 @@ def get_cmain(fn, *args):
     if not isinstance(fn, catalyst.QJIT):
         raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
 
-    # TODO: will be removed in part 2 of the refactor
-    # pylint: disable=protected-access
-    complied_function, args = fn._ensure_real_arguments_and_formal_parameters_are_compatible(
-        fn.compiled_function, *args
-    )
+    requires_promotion = fn.jit_compile(args)
 
-    return complied_function.get_cmain(*args)
+    if requires_promotion:
+        dynamic_args = filter_static_args(args, fn.compiled_function.static_argnums)
+        args = promote_arguments(fn.c_sig, dynamic_args)
+
+    return fn.compiled_function.get_cmain(*args)
 
 
 # pylint: disable=line-too-long
