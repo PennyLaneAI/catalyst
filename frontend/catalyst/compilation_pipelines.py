@@ -263,7 +263,7 @@ class QJIT:
             if prev_function:
                 function = prev_function
                 has_been_compiled = True
-                function.shared_object.open(function.shared_object_file, function.func_name)
+                function.shared_object.open()
             elif self.workspace_used:
                 # Create a new space for the new function if the workspace is used.
                 self.workspace = WorkspaceManager.get_or_create_workspace(

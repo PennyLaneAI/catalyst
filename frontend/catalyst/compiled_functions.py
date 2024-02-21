@@ -51,17 +51,19 @@ class SharedObjectManager:
     """
 
     def __init__(self, shared_object_file, func_name):
+        self.shared_object_file = shared_object_file
         self.shared_object = None
+        self.func_name = func_name
         self.function = None
         self.setup = None
         self.teardown = None
         self.mem_transfer = None
-        self.open(shared_object_file, func_name)
+        self.open()
 
-    def open(self, shared_object_file, func_name):
+    def open(self):
         """Open the sharead object and load symbols."""
-        self.shared_object = ctypes.CDLL(shared_object_file)
-        self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
+        self.shared_object = ctypes.CDLL(self.shared_object_file)
+        self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols()
 
     def close(self):
         """Close the shared object"""
@@ -74,11 +76,8 @@ class SharedObjectManager:
         # pylint: disable=protected-access
         dlclose(self.shared_object._handle)
 
-    def load_symbols(self, func_name):
+    def load_symbols(self):
         """Load symbols necessary for for execution of the compiled function.
-
-        Args:
-            func_name: name of compiled function to be executed
 
         Returns:
             function: function handle
@@ -96,7 +95,7 @@ class SharedObjectManager:
         teardown.restypes = None
 
         # We are calling the c-interface
-        function = self.shared_object["_catalyst_pyface_" + func_name]
+        function = self.shared_object["_catalyst_pyface_" + self.func_name]
         # Guaranteed from _mlir_ciface specification
         function.restypes = None
         # Not needed, computed from the arguments.
@@ -130,7 +129,6 @@ class CompiledFunction:
     """
 
     def __init__(self, shared_object_file, func_name, restype, compile_options):
-        self.shared_object_file = shared_object_file
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.compile_options = compile_options
         self.return_type_c_abi = None
