@@ -21,7 +21,7 @@ import jax
 from jax.interpreters import mlir
 
 import catalyst
-from catalyst.compilation_pipelines import CompiledFunction
+from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
