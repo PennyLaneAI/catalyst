@@ -780,8 +780,9 @@ def _qinst_lowering(
 def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = None, ctrl_len: int = 0):
     if qubits_len is None:
         qubits_len = len(qubits)
-    for q in qubits:
-        assert isinstance(q, AbstractQbit)
+    for idx in range(qubits_len):
+        qubit = qubits[idx]
+        assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 

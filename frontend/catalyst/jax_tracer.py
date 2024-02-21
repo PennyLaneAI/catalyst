@@ -395,6 +395,35 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
+    def _bind_op(qrp, op, controlled_wires, controlled_values):
+        if isinstance(op, Controlled):
+            return _bind_op(qrp, op.base, op.control_wires, op.control_values)
+        elif isinstance(op, QubitUnitary):
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            controlled_values = controlled_values
+            qubits2 = qunitary_p.bind(
+                *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
+                qubits_len=len(qubits),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        else:
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            controlled_values = controlled_values
+            qubits2 = qinst_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                op=op.name,
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        return qrp
+
     qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
         qrp2 = None
@@ -404,37 +433,7 @@ def trace_quantum_tape(
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
             else:
-                if isinstance(op, QubitUnitary):
-                    qubits = qrp.extract(op.wires)
-                    qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
-                    qrp.insert(op.wires, qubits2)
-
-                elif isinstance(op, Controlled):
-                    qubits = qrp.extract(op.base.wires)
-                    qubits2 = qinst_p.bind(
-                        *qubits,
-                        *op.base.parameters,
-                        *qrp.extract(op.control_wires),
-                        *op.control_values,
-                        op=op.base.name,
-                        qubits_len=len(qubits),
-                        params_len=len(op.base.parameters),
-                        ctrl_len=len(op.control_wires),
-                    )
-                    qrp.insert(op.base.wires, qubits2[: len(qubits)])
-                    qrp.insert(op.control_wires, qubits2[len(qubits) :])
-
-                else:
-                    qubits = qrp.extract(op.wires)
-                    qubits2 = qinst_p.bind(
-                        *qubits,
-                        *op.parameters,
-                        op=op.name,
-                        qubits_len=len(qubits),
-                        params_len=len(op.parameters),
-                    )
-                    qrp.insert(op.wires, qubits2)
-                qrp2 = qrp
+                qrp2 = _bind_op(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
