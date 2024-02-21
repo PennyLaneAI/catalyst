@@ -88,7 +88,6 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     CatalystPassInstrumentation(Callback afterPassCallback, Callback afterPassFailedCallback)
         : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback)
     {
-        // std::cerr << "\ncerr: " << __func__ << std::endl;
     }
 
     void runAfterPass(Pass *pass, Operation *operation) override
@@ -318,8 +317,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 {
     auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
-    // pm.enableTiming();
-    // std::cerr << "\ncerr: " << __func__ << std::endl;
 
     // Maps a pass to zero or one pipelines ended by this pass
     // Maps a pass to its owning pipeline
