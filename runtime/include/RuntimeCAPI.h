@@ -47,40 +47,40 @@ RESULT *__catalyst__rt__result_get_one();
 RESULT *__catalyst__rt__result_get_zero();
 
 // Quantum Gate Set Instructions
-void __catalyst__qis__Identity(QUBIT *, bool);
-void __catalyst__qis__PauliX(QUBIT *, bool);
-void __catalyst__qis__PauliY(QUBIT *, bool);
-void __catalyst__qis__PauliZ(QUBIT *, bool);
-void __catalyst__qis__Hadamard(QUBIT *, bool);
-void __catalyst__qis__S(QUBIT *, bool);
-void __catalyst__qis__T(QUBIT *, bool);
-void __catalyst__qis__PhaseShift(double, QUBIT *, bool);
-void __catalyst__qis__RX(double, QUBIT *, bool);
-void __catalyst__qis__RY(double, QUBIT *, bool);
-void __catalyst__qis__RZ(double, QUBIT *, bool);
-void __catalyst__qis__Rot(double, double, double, QUBIT *, bool);
-void __catalyst__qis__CNOT(QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CY(QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CZ(QUBIT *, QUBIT *, bool);
-void __catalyst__qis__SWAP(QUBIT *, QUBIT *, bool);
-void __catalyst__qis__IsingXX(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__IsingYY(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__IsingXY(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__IsingZZ(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CRZ(double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, bool);
-void __catalyst__qis__MultiRZ(double, bool /*adjoint*/, int64_t, /*qubits*/...);
-void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, bool /*adjoint*/);
-void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, bool /*adjoint*/);
+void __catalyst__qis__Identity(QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliX(QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliY(QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliZ(QUBIT *, const Modifiers *);
+void __catalyst__qis__Hadamard(QUBIT *, const Modifiers *);
+void __catalyst__qis__S(QUBIT *, const Modifiers *);
+void __catalyst__qis__T(QUBIT *, const Modifiers *);
+void __catalyst__qis__PhaseShift(double, QUBIT *, const Modifiers *);
+void __catalyst__qis__RX(double, QUBIT *, const Modifiers *);
+void __catalyst__qis__RY(double, QUBIT *, const Modifiers *);
+void __catalyst__qis__RZ(double, QUBIT *, const Modifiers *);
+void __catalyst__qis__Rot(double, double, double, QUBIT *, const Modifiers *);
+void __catalyst__qis__CNOT(QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CY(QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CZ(QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__SWAP(QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__IsingXX(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__IsingYY(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__IsingXY(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__IsingZZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CRZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
+void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
-void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *, bool /*adjoint*/, int64_t,
+void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *, const Modifiers *, int64_t,
                                    /*qubits*/...);
 
 ObsIdType __catalyst__qis__NamedObs(int64_t, QUBIT *);

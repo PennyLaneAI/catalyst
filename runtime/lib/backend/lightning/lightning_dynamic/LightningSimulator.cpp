@@ -113,51 +113,64 @@ auto LightningSimulator::One() const -> Result
 }
 
 void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                        const std::vector<QubitIdType> &wires, bool inverse)
+                                        const std::vector<QubitIdType> &wires, bool inverse,
+                                        const std::vector<QubitIdType> &controlled_wires,
+                                        const std::vector<bool> &controlled_values)
 {
-    // Check the validity of qubits
-    RT_FAIL_IF(wires.empty(), "Invalid number of qubits");
-    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
-
-    // First, check if operation `name` is supported by the simulator
-    auto &&[op_num_wires, op_num_params] =
-        Lightning::lookup_gates(Lightning::simulator_gate_info, name);
-
     // Check the validity of number of qubits and parameters
-    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
-    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
+    RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
+               "Controlled wires/values size mismatch");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
+    auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
 
     // Update the state-vector
-    this->device_sv->applyOperation(name, dev_wires, inverse, params);
+    if (controlled_wires.empty()) {
+        this->device_sv->applyOperation(name, dev_wires, inverse, params);
+    }
+    else {
+        this->device_sv->applyOperation(name, dev_controlled_wires, controlled_values, dev_wires,
+                                        inverse, params);
+    }
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation(name, params, dev_wires, inverse, {},
-                                         {/*controlled_wires*/}, {/*controlled_values*/});
+        this->cache_manager.addOperation(name, params, dev_wires, inverse, {}, dev_controlled_wires,
+                                         controlled_values);
     }
 }
 
 void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                         const std::vector<QubitIdType> &wires, bool inverse)
+                                         const std::vector<QubitIdType> &wires, bool inverse,
+                                         const std::vector<QubitIdType> &controlled_wires,
+                                         const std::vector<bool> &controlled_values)
 {
-    // Check the validity of qubits
-    RT_FAIL_IF(wires.empty(), "Invalid number of qubits");
-    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
+    RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
+               "Controlled wires/values size mismatch");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     // with checking validity of wires
     auto &&dev_wires = getDeviceWires(wires);
+    auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
 
     // Update the state-vector
-    this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
+    if (controlled_wires.empty()) {
+        this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
+    }
+    else {
+        this->device_sv->applyControlledMatrix(matrix.data(), dev_controlled_wires,
+                                               controlled_values, dev_wires, inverse);
+    }
 
     // Update tape caching if required
     if (this->tape_recording) {
         this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix,
-                                         {/*controlled_wires*/}, {/*controlled_values*/});
+                                         dev_controlled_wires, controlled_values);
     }
 }
 
