@@ -314,6 +314,7 @@ class GradParams:
     scalar_out: bool
     h: float
     argnum: List[int]
+    with_value: bool  # if true it calls value and grad instead
 
     def __iter__(self):
         return iter(astuple(self))
