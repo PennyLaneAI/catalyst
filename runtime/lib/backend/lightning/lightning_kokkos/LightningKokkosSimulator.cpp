@@ -136,15 +136,16 @@ auto LightningKokkosSimulator::One() const -> Result
 
 void LightningKokkosSimulator::NamedOperation(const std::string &name,
                                               const std::vector<double> &params,
-                                              const std::vector<QubitIdType> &wires, bool inverse)
+                                              const std::vector<QubitIdType> &wires, bool inverse,
+                                              const std::vector<QubitIdType> &controlled_wires,
+                                              const std::vector<bool> &controlled_values)
 {
-    // First, check if operation `name` is supported by the simulator
-    auto &&[op_num_wires, op_num_params] =
-        Lightning::lookup_gates(Lightning::simulator_gate_info, name);
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "LightningKokkos does not support native quantum control.");
 
     // Check the validity of number of qubits and parameters
-    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
-    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -154,18 +155,24 @@ void LightningKokkosSimulator::NamedOperation(const std::string &name,
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation(name, params, dev_wires, inverse);
+        this->cache_manager.addOperation(name, params, dev_wires, inverse, {},
+                                         {/*controlled_wires*/}, {/*controlled_values*/});
     }
 }
 
 void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                               const std::vector<QubitIdType> &wires, bool inverse)
+                                               const std::vector<QubitIdType> &wires, bool inverse,
+                                               const std::vector<QubitIdType> &controlled_wires,
+                                               const std::vector<bool> &controlled_values)
 {
     using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
                                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 
-    // Check the validity of number of qubits and parameters
-    RT_FAIL_IF(!wires.size(), "Invalid number of qubits");
+    // TODO: Remove when controlled wires API is supported
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "LightningKokkos device does not support native quantum control.");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -183,7 +190,8 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation("MatrixOp", {}, dev_wires, inverse);
+        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix_kok,
+                                         {/*controlled_wires*/}, {/*controlled_values*/});
     }
 }
 
@@ -519,9 +527,13 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
     auto &&ops_params = this->cache_manager.getOperationsParameters();
     auto &&ops_wires = this->cache_manager.getOperationsWires();
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
+    auto &&ops_matrices = this->cache_manager.getOperationsMatrices();
+    auto &&ops_controlled_wires = this->cache_manager.getOperationsControlledWires();
+    auto &&ops_controlled_values = this->cache_manager.getOperationsControlledValues();
 
-    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
-                                                                    ops_wires, ops_inverses);
+    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(
+        ops_names, ops_params, ops_wires, ops_inverses, ops_matrices, ops_controlled_wires,
+        ops_controlled_values);
 
     // Create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();

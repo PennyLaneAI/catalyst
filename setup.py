@@ -54,7 +54,7 @@ if one_compiler_per_distribution:
     entry_points = {
         "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
         "pennylane.compilers": [
-            "context = catalyst.utils.contexts:EvaluationContext",
+            "context = catalyst.tracing.contexts:EvaluationContext",
             "ops = catalyst:pennylane_extensions",
             "qjit = catalyst:qjit",
         ],
@@ -63,7 +63,7 @@ else:
     entry_points = {
         "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
         "pennylane.compilers": [
-            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
+            "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
             "catalyst.ops = catalyst:pennylane_extensions",
             "catalyst.qjit = catalyst:qjit",
         ],

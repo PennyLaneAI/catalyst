@@ -31,8 +31,8 @@ from malt.pyct.origin_info import LineLocation
 from pennylane.queuing import AnnotatedQueue
 
 import catalyst
-from catalyst.utils.contexts import EvaluationContext
-from catalyst.utils.exceptions import AutoGraphError
+from catalyst.ag_utils import AutoGraphError
+from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.jax_extras import DynamicJaxprTracer, ShapedArray
 from catalyst.utils.patching import Patcher
 
