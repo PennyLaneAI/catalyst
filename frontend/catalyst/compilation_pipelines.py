@@ -21,17 +21,13 @@ import ctypes
 import functools
 import inspect
 import pathlib
-import typing
 import warnings
 from copy import deepcopy
-from enum import Enum
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-from jax._src.interpreters.partial_eval import infer_lambda_input_type
-from jax._src.pjit import _flat_axes_specs
 from jax.interpreters.mlir import ir
 from jax.tree_util import tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
@@ -47,12 +43,21 @@ from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.type_signatures import (
+    TypeCompatibility,
+    get_abstract_signature,
+    get_type_annotations,
+    merge_static_args,
+    promote_arguments,
+    filter_static_args,
+    typecheck_signatures,
+)
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
+from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -62,22 +67,6 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_dynamic_shapes", True)
-
-
-def are_params_annotated(f: typing.Callable):
-    """Return true if all parameters are typed-annotated."""
-    signature = inspect.signature(f)
-    parameters = signature.parameters
-    return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
-
-
-def get_type_annotations(func: typing.Callable):
-    """Get all type annotations if all parameters are typed-annotated."""
-    params_are_annotated = are_params_annotated(func)
-    if params_are_annotated:
-        return getattr(func, "__annotations__", {}).values()
-
-    return None
 
 
 class SharedObjectManager:
@@ -158,18 +147,6 @@ class SharedObjectManager:
         self.teardown()
 
 
-class TypeCompatibility(Enum):
-    """Enum class for state machine.
-
-    The state represent the transition between states.
-    """
-
-    UNKNOWN = 0
-    CAN_SKIP_PROMOTION = 1
-    NEEDS_PROMOTION = 2
-    NEEDS_COMPILATION = 3
-
-
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
 
@@ -192,100 +169,6 @@ class CompiledFunction:
         self.func_name = func_name
         self.restype = restype
         self.compile_options = compile_options
-
-    @staticmethod
-    def typecheck(abstracted_axes, compiled_signature, runtime_signature):
-        """Whether arguments can be promoted.
-
-        Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled implementation of the compiled function
-            runtime_signature: runtime signature
-
-        Returns:
-            bool.
-        """
-        compiled_data, compiled_shape = tree_flatten(compiled_signature)
-        runtime_data, runtime_shape = tree_flatten(runtime_signature)
-        with Patcher(
-            # pylint: disable=protected-access
-            (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
-        ):
-            axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature, {})
-            axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature, {})
-            in_type_compiled = infer_lambda_input_type(axes_specs_compile, compiled_data)
-            in_type_runtime = infer_lambda_input_type(axes_specs_runtime, runtime_data)
-
-            if in_type_compiled == in_type_runtime:
-                return TypeCompatibility.CAN_SKIP_PROMOTION
-
-        if compiled_shape != runtime_shape:
-            return TypeCompatibility.NEEDS_COMPILATION
-
-        best_case = TypeCompatibility.CAN_SKIP_PROMOTION
-        for c_param, r_param in zip(compiled_data, runtime_data):
-            if c_param.dtype != r_param.dtype:
-                best_case = TypeCompatibility.NEEDS_PROMOTION
-
-            if c_param.shape != r_param.shape:
-                return TypeCompatibility.NEEDS_COMPILATION
-
-            promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
-            if c_param.dtype != promote_to:
-                return TypeCompatibility.NEEDS_COMPILATION
-
-        return best_case
-
-    @staticmethod
-    def promote_arguments(compiled_signature, *args):
-        """Promote arguments from the type specified in args to the type specified by
-           compiled_signature.
-
-        Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled implementation of the compiled function
-            *args: actual arguments to the function
-
-        Returns:
-            promoted_args: Arguments after promotion.
-        """
-        compiled_data, compiled_shape = tree_flatten(compiled_signature)
-        runtime_data, runtime_shape = tree_flatten(args)
-        assert (
-            compiled_shape == runtime_shape
-        ), "Compiled function incompatible runtime arguments' shape"
-
-        promoted_args = []
-        for c_param, r_param in zip(compiled_data, runtime_data):
-            assert isinstance(c_param, jax.core.ShapedArray)
-            r_param = jax.numpy.asarray(r_param)
-            arg_dtype = r_param.dtype
-            promote_to = jax.numpy.promote_types(arg_dtype, c_param.dtype)
-            promoted_arg = jax.numpy.asarray(r_param, dtype=promote_to)
-            promoted_args.append(promoted_arg)
-        return tree_unflatten(compiled_shape, promoted_args)
-
-    @staticmethod
-    def get_runtime_signature(*args):
-        """Get signature from arguments.
-
-        Args:
-            *args: arguments to the compiled function
-
-        Returns:
-            a list of JAX shaped arrays
-        """
-        args_data, args_shape = tree_flatten(args)
-
-        try:
-            r_sig = []
-            for arg in args_data:
-                r_sig.append(jax.api_util.shaped_abstractify(arg))
-            # Unflatten JAX abstracted args to preserve the shape
-            return tree_unflatten(args_shape, r_sig)
-        except Exception as exc:
-            arg_type = type(arg)
-            raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
     def _exec(shared_object, has_return, numpy_dict, *args):
@@ -465,7 +348,7 @@ class CompiledFunction:
 
     def __call__(self, *args, **kwargs):
         static_argnums = self.compile_options.static_argnums
-        dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
+        dynamic_args = filter_static_args(args, static_argnums)
 
         if self.compile_options.abstracted_axes is not None:
             abstracted_axes = self.compile_options.abstracted_axes
@@ -603,25 +486,6 @@ class QJIT:
         )
         return static_args_hash
 
-    def merge_sig_into_args(self, args_list, *sig):
-        """Merge runtime signature back to argument list.
-
-        Args:
-            args: arguments to the compiled function.
-            *sig: runtime signature.
-        Returns:
-            a list of dynamic arguments.
-        """
-        static_argnums = self.compile_options.static_argnums
-        # Combine dynamic_args (in args) and sig (and keep the original order).
-        new_sig = sig
-        if static_argnums:
-            new_sig = args_list
-            dynamic_indices = [idx for idx in range(len(args_list)) if idx not in static_argnums]
-            for i, idx in enumerate(dynamic_indices):
-                new_sig[idx] = sig[i]
-        return new_sig
-
     def get_mlir(self, *args):
         """Trace :func:`~.user_function`
 
@@ -632,14 +496,14 @@ class QJIT:
             an MLIR module
         """
         static_argnums = self.compile_options.static_argnums
-        dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
-        self.c_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
+        dynamic_args = filter_static_args(args, static_argnums)
+        self.c_sig = get_abstract_signature(dynamic_args)
 
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
-            sig = self.merge_sig_into_args(list(args), *self.c_sig)
+            sig = merge_static_args(self.c_sig, args, static_argnums)
             abstracted_axes = self.compile_options.abstracted_axes
             mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(
                 func, static_argnums, abstracted_axes, *sig
@@ -717,8 +581,8 @@ class QJIT:
           *args: arguments that may have been promoted
         """
         static_argnums = self.compile_options.static_argnums
-        dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
-        r_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
+        dynamic_args = filter_static_args(args, static_argnums)
+        r_sig = get_abstract_signature(dynamic_args)
 
         has_been_compiled = self.compiled_function is not None
         if static_argnums:
@@ -742,16 +606,16 @@ class QJIT:
             next_action = TypeCompatibility.NEEDS_COMPILATION
         else:
             abstracted_axes = self.compile_options.abstracted_axes
-            next_action = CompiledFunction.typecheck(abstracted_axes, self.c_sig, r_sig)
+            next_action = typecheck_signatures(self.c_sig, r_sig, abstracted_axes)
 
         if next_action == TypeCompatibility.NEEDS_PROMOTION:
-            args = CompiledFunction.promote_arguments(self.c_sig, *dynamic_args)
+            args = promote_arguments(self.c_sig, dynamic_args)
         elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             if not self.compiling_from_textual_ir:
-                sig = self.merge_sig_into_args(list(args), *r_sig)
+                sig = merge_static_args(r_sig, args, static_argnums)
                 self.mlir_module = self.get_mlir(*sig)
             function = self.compile()
         else:
