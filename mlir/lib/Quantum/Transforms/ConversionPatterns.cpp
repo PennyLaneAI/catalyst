@@ -99,8 +99,7 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *co
     auto numControlledVal =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()))
             .getResult();
-    auto structType =
-        LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
+    auto structType = LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
     auto modifiersPtr = rewriter.create<LLVM::AllocaOp>(loc, ptrType, structType, c1).getResult();
     auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
                                                    llvm::ArrayRef<LLVM::GEPArg>{0, 0});
