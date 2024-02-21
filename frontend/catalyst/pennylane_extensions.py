@@ -496,7 +496,11 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
 
 
 def _check_grad_params(
-    method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+    method: str,
+    scalar_out: bool,
+    h: Optional[float],
+    argnum: Optional[Union[int, List[int]]],
+    with_value: Optional[bool] = False,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -521,7 +525,7 @@ def _check_grad_params(
         pass
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
-    return GradParams(method, scalar_out, h, argnum)
+    return GradParams(method, scalar_out, h, argnum, with_value)
 
 
 def _unflatten_derivatives(results, out_tree, argnum, num_results):
@@ -583,8 +587,13 @@ class Grad:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
             if self.grad_params.scalar_out:
-                results = jax.grad(self.fn, argnums=argnums)(*args)
+                if self.grad_params.with_value:
+                    results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
+                else:
+                    results = jax.grad(self.fn, argnums=argnums)(*args)
             else:
+                if with_value := self.grad_params.with_value:
+                    raise ValueError(f"with_value must be False , got {with_value}")
                 results = jax.jacobian(self.fn, argnums=argnums)(*args)
 
         return results
@@ -717,7 +726,137 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     array(4.6)
     """
     scalar_out = True
-    return Grad(f, GradParams(method, scalar_out, h, argnum))
+    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=False))
+
+
+def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+    """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
+
+    This function allows the gradient of a hybrid quantum-classical function to be computed within
+    the compiled program. Outside of a compiled function, this function will simply dispatch to its
+    JAX counterpart ``jax.grad``. The function ``f`` can return any pytree-like shape.
+
+    .. warning::
+
+        Currently, higher-order differentiation is only supported by the finite-difference
+        method.
+
+    Args:
+        f (Callable): a function or a function object to differentiate
+        method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
+                      where:
+
+                      - ``"auto"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff. Catalyst supports ``"parameter-shift"`` and
+                        ``"adjoint"`` on internal QNodes. Notably, QNodes with
+                        ``diff_method="finite-diff"`` is not supported with ``"auto"``.
+
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        function.
+
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+
+    Returns:
+        Callable: A callable object that computes the gradient of the wrapped function for the given
+                  arguments.
+
+    Raises:
+        ValueError: Invalid method or step size parameters.
+        DifferentiableCompilerError: Called on a function that doesn't return a single scalar.
+
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``grad`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
+
+    .. seealso:: :func:`~.jacobian`
+
+    **Example 1 (Classical preprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(jnp.pi * x, wires=0)
+                return qml.expval(qml.PauliY(0))
+
+            g = grad(circuit)
+            return g(x)
+
+    >>> workflow(2.0)
+    array(-3.14159265)
+
+    **Example 2 (Classical preprocessing and postprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit(theta):
+                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(theta):
+                return jnp.pi / jnp.tanh(circuit(theta))
+
+            return catalyst.grad(loss, method="auto")(theta)
+
+    >>> grad_loss(1.0)
+    array(-1.90958669)
+
+    **Example 3 (Multiple QNodes with their own differentiation methods)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="parameter-shift")
+            def circuit_A(params):
+                qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+                return qml.probs()
+
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit_B(params):
+                qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(params):
+                return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+            return catalyst.grad(loss)(theta)
+
+    >>> grad_loss(jnp.array([1.0, 2.0]))
+    array([ 0.57367285, 44.4911605 ])
+
+    **Example 4 (Purely classical functions)**
+
+    .. code-block:: python
+
+        def square(x: float):
+            return x ** 2
+
+        @qjit
+        def dsquare(x: float):
+            return catalyst.grad(square)(x)
+
+    >>> dsquare(2.3)
+    array(4.6)
+    """
+    scalar_out = True
+    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
@@ -782,7 +921,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
            [-8.71967125e-17  4.20735492e-01]])
     """
     scalar_out = False
-    return Grad(f, GradParams(method, scalar_out, h, argnum))
+    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=False))
 
 
 # pylint: disable=too-many-arguments
