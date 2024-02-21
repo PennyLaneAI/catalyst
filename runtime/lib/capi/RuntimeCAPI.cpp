@@ -31,6 +31,7 @@
 
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
+#include "Timer.hpp"
 
 #include "RuntimeCAPI.h"
 
@@ -45,6 +46,8 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  * @brief Thread local device pointer with internal linkage.
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
+
+thread_local static Utils::Timer capi_timer{};
 
 /**
  * @brief Initialize the device instance and update the value of RTD_PTR
@@ -178,29 +181,33 @@ void __catalyst__rt__finalize()
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
 {
+    using namespace Catalyst::Runtime;
+    capi_timer.start();
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
-    RT_FAIL_IF(!Catalyst::Runtime::CTX, "Invalid use of the global driver before initialization");
-    RT_FAIL_IF(Catalyst::Runtime::RTD_PTR,
-               "Cannot re-initialize an ACTIVE device: Consider using "
-               "__catalyst__rt__device_release before __catalyst__rt__device_init");
+    RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
+    RT_FAIL_IF(RTD_PTR, "Cannot re-initialize an ACTIVE device: Consider using "
+                        "__catalyst__rt__device_release before __catalyst__rt__device_init");
 
     const std::vector<std::string_view> args{
         reinterpret_cast<char *>(rtd_lib), (rtd_name ? reinterpret_cast<char *>(rtd_name) : ""),
         (rtd_kwargs ? reinterpret_cast<char *>(rtd_kwargs) : "")};
-    RT_FAIL_IF(!Catalyst::Runtime::initRTDevicePtr(args[0], args[1], args[2]),
+    RT_FAIL_IF(!initRTDevicePtr(args[0], args[1], args[2]),
                "Failed initialization of the backend device");
-    if (Catalyst::Runtime::CTX->getDeviceRecorderStatus()) {
-        Catalyst::Runtime::getQuantumDevicePtr()->StartTapeRecording();
+    if (CTX->getDeviceRecorderStatus()) {
+        getQuantumDevicePtr()->StartTapeRecording();
     }
+    capi_timer.dump("__catalyst__rt__device_init");
 }
 
 void __catalyst__rt__device_release()
 {
-    RT_FAIL_IF(!Catalyst::Runtime::CTX,
-               "Cannot release an ACTIVE device out of scope of the global driver");
+    using namespace Catalyst::Runtime;
+    capi_timer.start();
+    RT_FAIL_IF(!CTX, "Cannot release an ACTIVE device out of scope of the global driver");
     // TODO: This will be used for the async support
-    Catalyst::Runtime::deactivateDevice();
+    deactivateDevice();
+    capi_timer.dump("__catalyst__rt__device_release");
 }
 
 void __catalyst__rt__print_state() { Catalyst::Runtime::getQuantumDevicePtr()->PrintState(); }
@@ -222,28 +229,33 @@ void __catalyst__rt__toggle_recorder(bool status)
 
 QUBIT *__catalyst__rt__qubit_allocate()
 {
-    RT_ASSERT(Catalyst::Runtime::getQuantumDevicePtr() != nullptr);
-    RT_ASSERT(Catalyst::Runtime::CTX->getMemoryManager() != nullptr);
+    using namespace Catalyst::Runtime;
+    capi_timer.start();
+    RT_ASSERT(getQuantumDevicePtr() != nullptr);
+    RT_ASSERT(CTX->getMemoryManager() != nullptr);
 
-    return reinterpret_cast<QUBIT *>(Catalyst::Runtime::getQuantumDevicePtr()->AllocateQubit());
+    capi_timer.dump("__catalyst__rt__qubit_allocate");
+    return reinterpret_cast<QUBIT *>(getQuantumDevicePtr()->AllocateQubit());
 }
 
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
 {
-    RT_ASSERT(Catalyst::Runtime::getQuantumDevicePtr() != nullptr);
-    RT_ASSERT(Catalyst::Runtime::CTX->getMemoryManager() != nullptr);
+    using namespace Catalyst::Runtime;
+    capi_timer.start();
+    RT_ASSERT(getQuantumDevicePtr() != nullptr);
+    RT_ASSERT(CTX->getMemoryManager() != nullptr);
     RT_ASSERT(num_qubits >= 0);
 
     // For first prototype, we just want to make this work.
     // But ideally, I think the device should determine the representation.
     // Essentially just forward this to the device library.
     // And the device library can choose how to handle everything.
-    std::vector<QubitIdType> qubit_vector =
-        Catalyst::Runtime::getQuantumDevicePtr()->AllocateQubits(num_qubits);
+    std::vector<QubitIdType> qubit_vector = getQuantumDevicePtr()->AllocateQubits(num_qubits);
 
     // I don't like this copying.
     std::vector<QubitIdType> *qubit_vector_ptr =
         new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.end());
+    capi_timer.dump("__catalyst__rt__qubit_allocate_array");
 
     // Because this function is interfacing with C
     // I think we should return a trivial-type
@@ -261,16 +273,21 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
 
 void __catalyst__rt__qubit_release(QUBIT *qubit)
 {
-    return Catalyst::Runtime::getQuantumDevicePtr()->ReleaseQubit(
-        reinterpret_cast<QubitIdType>(qubit));
+    using namespace Catalyst::Runtime;
+    capi_timer.start();
+    return getQuantumDevicePtr()->ReleaseQubit(reinterpret_cast<QubitIdType>(qubit));
+    capi_timer.dump("__catalyst__rt__qubit_release");
 }
 
 void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
 {
-    Catalyst::Runtime::getQuantumDevicePtr()->ReleaseAllQubits();
+    using namespace Catalyst::Runtime;
+    capi_timer.start();
+    getQuantumDevicePtr()->ReleaseAllQubits();
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
     delete qubit_array_ptr;
+    capi_timer.dump("__catalyst__rt__qubit_release_array");
 }
 
 int64_t __catalyst__rt__num_qubits()

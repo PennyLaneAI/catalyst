@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <list>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 #include "gml_st/transforms/passes.h"
@@ -53,6 +57,100 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
 
+namespace catalyst::utils {
+
+class Timer {
+  private:
+    // Toggle the support w.r.t. the value of `ENABLE_DEBUG_TIMER`
+    bool debug_timer;
+
+    // Manage the call order of `start` and `stop` methods
+    bool running;
+
+    // Start and stop time points using steady_clock
+    std::chrono::time_point<std::chrono::steady_clock> start_time_;
+    std::chrono::time_point<std::chrono::steady_clock> stop_time_;
+
+  public:
+    explicit Timer() : running(false)
+    {
+        char *value = getenv("ENABLE_DEBUG_TIMER");
+        if (!value || std::string(value) != "ON") {
+            debug_timer = false;
+        }
+        else {
+            debug_timer = true;
+        }
+    }
+
+    void start() noexcept
+    {
+        if (debug_timer) {
+            start_time_ = std::chrono::steady_clock::now();
+            running = true;
+        }
+    }
+
+    void stop() noexcept
+    {
+        if (debug_timer && running) {
+            stop_time_ = std::chrono::steady_clock::now();
+            running = false;
+        }
+    }
+
+    auto elapsed() noexcept
+    {
+        if (debug_timer) {
+            if (running)
+                stop();
+            return std::chrono::duration_cast<std::chrono::milliseconds>(stop_time_ - start_time_);
+        }
+        else {
+            return std::chrono::milliseconds(0);
+        }
+    }
+
+    void print(const std::string &name) noexcept
+    {
+        if (!debug_timer)
+            return;
+        std::cerr << "[TIMER] Running " << name << " in " << elapsed().count() << "ms";
+        std::cerr << " (thread_id = " << std::this_thread::get_id() << ")" << std::endl;
+    }
+
+    void dump(const std::string &name, const std::string &key) noexcept
+    {
+        if (!debug_timer)
+            return;
+
+        char *file = getenv("DEBUG_TIMER_RESULT_PATH");
+        if (!file) {
+            print(name);
+            return;
+        }
+
+        // Path to where the results should be stored
+        // If not provided, results will be dumped (stderr)
+        std::filesystem::path file_ = std::filesystem::path{file};
+        if (!std::filesystem::exists(file_)) {
+            std::ofstream ofile(file_);
+            assert(ofile.is_open() && "Invalid file to store timer results");
+            ofile << key << ":" << std::endl;
+            ofile << "  - " << name << ": " << elapsed().count() << "ms" << std::endl;
+            ofile.close();
+        }
+        else {
+            std::ofstream ofile(file_, std::ios::app); // Open file_ in 'append' mode
+            assert(ofile.is_open() && "Invalid file to store timer results");
+            ofile << "  - " << name << ": " << elapsed().count() << "ms" << std::endl;
+            ofile.close();
+        }
+    }
+};
+
+} // namespace catalyst::utils
+
 namespace {
 
 std::string joinPasses(const Pipeline::PassList &passes)
@@ -88,6 +186,7 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     CatalystPassInstrumentation(Callback afterPassCallback, Callback afterPassFailedCallback)
         : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback)
     {
+        // std::cerr << "\ncerr: " << __func__ << std::endl;
     }
 
     void runAfterPass(Pass *pass, Operation *operation) override
@@ -317,6 +416,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 {
     auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
+    // pm.enableTiming();
+    // std::cerr << "\ncerr: " << __func__ << std::endl;
 
     // Maps a pass to zero or one pipelines ended by this pass
     // Maps a pass to its owning pipeline
@@ -422,19 +523,28 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
+    catalyst::utils::Timer driver_timer{};
+
     // First attempt to parse the input as an MLIR module.
+    driver_timer.start();
     OwningOpRef<ModuleOp> op = parseMLIRSource(&ctx, *sourceMgr);
+    driver_timer.dump("parseMLIRSource", "CompilerDriver");
+
     if (op) {
+        driver_timer.start();
         if (failed(runLowering(options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
+        driver_timer.dump("runLowering", "CompilerDriver");
 
         output.outIR.clear();
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
+            driver_timer.start();
             llvmModule = translateModuleToLLVMIR(*op, llvmContext);
+            driver_timer.dump("translateModuleToLLVMIR", "CompilerDriver");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
@@ -449,7 +559,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent,
                "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
+        driver_timer.start();
         llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
+        driver_timer.dump("parseLLVMSource", "CompilerDriver");
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
@@ -459,13 +571,17 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
+        driver_timer.start();
         if (failed(runLLVMPasses(options, llvmModule, output))) {
             return failure();
         }
+        driver_timer.dump("runLLVMPasses", "CompilerDriver");
 
+        driver_timer.start();
         if (failed(runEnzymePasses(options, llvmModule, output))) {
             return failure();
         }
+        driver_timer.dump("runEnzymePasses", "CompilerDriver");
 
         output.outIR.clear();
         outIRStream << *llvmModule;
