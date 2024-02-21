@@ -13,6 +13,7 @@ DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
+ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
@@ -103,9 +104,6 @@ dialects:
 runtime:
 	$(MAKE) -C runtime runtime
 
-runtime-all:
-	$(MAKE) -C runtime runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
-
 dummy_device:
 	$(MAKE) -C runtime dummy_device
 
@@ -114,9 +112,6 @@ test: test-runtime test-frontend test-demos
 
 test-runtime:
 	$(MAKE) -C runtime test
-
-test-runtime-all:
-	$(MAKE) -C runtime test ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
 test-mlir:
 	$(MAKE) -C mlir test
@@ -142,6 +137,9 @@ endif
 endif
 	@echo "check the Catalyst PyTest suite"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) $(PARALLELIZE)
+ifeq ($(TEST_BRAKET), NONE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND)
+endif
 
 test-demos:
 ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
@@ -150,7 +148,7 @@ ifeq ($(ENABLE_ASAN) $(PLATFORM),ON Darwin)
 endif
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(ASAN_COMMAND) $(PYTHON) -m pytest demos/*.ipynb --nbmake $(PARALLELIZE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest demos --nbmake $(PARALLELIZE)
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
@@ -203,6 +201,9 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+ifeq ($(TEST_BRAKET), NONE)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native 
+endif
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
@@ -222,11 +223,11 @@ endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
 ifdef check
-	python3 ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
 	isort --check --diff .
 else
-	python3 ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
+	$(PYTHON) ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
 	isort .
 endif

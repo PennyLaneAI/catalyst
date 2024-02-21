@@ -876,7 +876,7 @@ class TestDefaultAvailableIR:
             return f(x)
 
         assert g.qir
-        assert "__quantum__qis" in g.qir
+        assert "__catalyst__qis" in g.qir
 
 
 class TestAvoidVerification:

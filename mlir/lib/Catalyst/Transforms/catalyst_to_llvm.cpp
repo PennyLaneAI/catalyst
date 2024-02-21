@@ -202,7 +202,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
         if (op.getConstVal().has_value()) {
             ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-            StringRef qirName = "__quantum__rt__print_string";
+            StringRef qirName = "__catalyst__rt__print_string";
 
             Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
@@ -216,7 +216,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             rewriter.eraseOp(op);
         }
         else {
-            StringRef qirName = "__quantum__rt__print_tensor";
+            StringRef qirName = "__catalyst__rt__print_tensor";
 
             // C interface for the print function is an unranked & opaque memref descriptor:
             // {
@@ -313,12 +313,13 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         Type ptr = LLVM::LLVMPointerType::get(ctx);
 
         Type voidType = LLVM::LLVMVoidType::get(ctx);
-        auto type = LLVM::LLVMFunctionType::get(voidType, {/*args=*/ptr, /*rets=*/ptr});
         auto point = rewriter.saveInsertionPoint();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
-        LLVM::LLVMFuncOp customCallFnOp =
-            rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type);
+
+        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
+            mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
+
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 

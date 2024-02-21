@@ -214,18 +214,15 @@ def test_multi_arg_multi_result(backend, diff_method):
 
     @qjit
     def jac_postprocess(x, y):
-        return jacobian(postprocess, argnum=(0, 1), method="auto")(x, y)
+        return jacobian(postprocess, argnum=[0, 1], method="auto")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
-    jax_jacobian = jax.jacobian(postprocess, argnums=(0, 1))(*args)
+    jax_jacobian = jax.jacobian(postprocess, argnums=[0, 1])(*args)
     catalyst_jacobian = jac_postprocess(*args)
-    # Catalyst returns a list of 4 values while JAX returns a 2x2 list of lists
-    for i, row in enumerate(jax_jacobian):
-        for j, jax_entry in enumerate(row):
-            # With multiple arguments and results, the Catalyst jacobians are transposed
-            # w.r.t. the JAX jacobian. This is why the i and j are switched.
-            catalyst_entry = catalyst_jacobian[j + i * len(row)]
-            assert catalyst_entry == pytest.approx(jax_entry)
+
+    for i in range(2):
+        for j in range(2):
+            assert jax_jacobian[i][j] == pytest.approx(catalyst_jacobian[i][j])
 
 
 def test_multi_qnode(backend):
@@ -330,3 +327,7 @@ def test_nested_qnode(backend):
     # The runtime doesn't support actually executing nested QNodes, so we just make sure they
     # compile without issues.
     # assert _grad_qnode_direct(1.0) == pytest.approx(jax.grad(post)(1.0))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

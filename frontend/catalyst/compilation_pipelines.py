@@ -49,6 +49,7 @@ from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
@@ -90,6 +91,15 @@ class SharedObjectManager:
     """
 
     def __init__(self, shared_object_file, func_name):
+        self.shared_object = None
+        self.function = None
+        self.setup = None
+        self.teardown = None
+        self.mem_transfer = None
+        self.open(shared_object_file, func_name)
+
+    def open(self, shared_object_file, func_name):
+        """Open the sharead object and load symbols."""
         self.shared_object = ctypes.CDLL(shared_object_file)
         self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
 
@@ -176,6 +186,7 @@ class CompiledFunction:
         restype,
         compile_options,
     ):
+        self.shared_object_file = shared_object_file
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.return_type_c_abi = None
         self.func_name = func_name
@@ -453,11 +464,16 @@ class CompiledFunction:
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
+        static_argnums = self.compile_options.static_argnums
+        dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
+
         if self.compile_options.abstracted_axes is not None:
             abstracted_axes = self.compile_options.abstracted_axes
-            args = get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs)
+            dynamic_args = get_implicit_and_explicit_flat_args(
+                abstracted_axes, *dynamic_args, **kwargs
+            )
 
-        abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
+        abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
@@ -500,6 +516,10 @@ class QJIT:
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
+        self.function_name = None
+        self.preferred_workspace_dir = None
+        self.stored_compiled_functions = {}
+        self.workspace_used = False
 
         functools.update_wrapper(self, fn)
 
@@ -511,12 +531,15 @@ class QJIT:
         preferred_workspace_dir = (
             pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
         )
+        self.preferred_workspace_dir = preferred_workspace_dir
+
         # If we are compiling from textual ir, just use this as the name of the function.
         name = "compiled_function"
         if not self.compiling_from_textual_ir:
             # pylint: disable=no-member
             # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
             name = self.__name__
+        self.function_name = name
 
         self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
 
@@ -525,7 +548,13 @@ class QJIT:
             return
 
         parameter_types = get_type_annotations(self.user_function)
-        if parameter_types is not None:
+
+        for argnum in self.compile_options.static_argnums:
+            if argnum < 0 or argnum >= len(parameter_types):
+                msg = f"argnum {argnum} is beyond the valid range of [0, {len(parameter_types)})."
+                raise CompileError(msg)
+
+        if parameter_types is not None and not self.compile_options.static_argnums:
             self.user_typed = True
             self.mlir_module = self.get_mlir(*parameter_types)
             if self.compile_options.target == "binary":
@@ -560,6 +589,39 @@ class QJIT:
         """
         return self._llvmir
 
+    def get_static_args_hash(self, *args):
+        """Get hash values of all static arguments.
+
+        Args:
+            args: arguments to the compiled function.
+        Returns:
+            a tuple of hash values of all static arguments.
+        """
+        static_argnums = self.compile_options.static_argnums
+        static_args_hash = tuple(
+            hash(args[idx]) for idx in range(len(args)) if idx in static_argnums
+        )
+        return static_args_hash
+
+    def merge_sig_into_args(self, args_list, *sig):
+        """Merge runtime signature back to argument list.
+
+        Args:
+            args: arguments to the compiled function.
+            *sig: runtime signature.
+        Returns:
+            a list of dynamic arguments.
+        """
+        static_argnums = self.compile_options.static_argnums
+        # Combine dynamic_args (in args) and sig (and keep the original order).
+        new_sig = sig
+        if static_argnums:
+            new_sig = args_list
+            dynamic_indices = [idx for idx in range(len(args_list)) if idx not in static_argnums]
+            for i, idx in enumerate(dynamic_indices):
+                new_sig[idx] = sig[i]
+        return new_sig
+
     def get_mlir(self, *args):
         """Trace :func:`~.user_function`
 
@@ -569,20 +631,24 @@ class QJIT:
         Returns:
             an MLIR module
         """
-        self.c_sig = CompiledFunction.get_runtime_signature(*args)
+        static_argnums = self.compile_options.static_argnums
+        dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
+        self.c_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
 
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
-            sig = self.c_sig
+            sig = self.merge_sig_into_args(list(args), *self.c_sig)
             abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(func, abstracted_axes, *sig)
+            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(
+                func, static_argnums, abstracted_axes, *sig
+            )
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
         canonicalizer_options = deepcopy(self.compile_options)
-        canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
+        canonicalizer_options.pipelines = [("0_canonicalize", ["canonicalize"])]
         canonicalizer_options.lower_to_llvm = False
         canonicalizer = Compiler(canonicalizer_options)
         _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
@@ -636,7 +702,9 @@ class QJIT:
         """Logic to decide whether the function needs to be recompiled
         given ``*args`` and whether ``*args`` need to be promoted.
         A function may need to be compiled if:
-            1. It was not compiled before
+            1. It was not compiled before. Without static arguments, the compiled function
+                should be stored in ``self.compiled_function``. With static arguments,
+                ``self.compile_options.static_argnums`` stores all previous compiled ones.
             2. The real arguments sent to the function are not promotable to the type of the
                 formal parameters.
 
@@ -648,9 +716,27 @@ class QJIT:
           function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
-        r_sig = CompiledFunction.get_runtime_signature(*args)
+        static_argnums = self.compile_options.static_argnums
+        dynamic_args = [args[idx] for idx in range(len(args)) if idx not in static_argnums]
+        r_sig = CompiledFunction.get_runtime_signature(*dynamic_args)
 
         has_been_compiled = self.compiled_function is not None
+        if static_argnums:
+            static_args_hash = self.get_static_args_hash(*args)
+            prev_function, _ = self.stored_compiled_functions.get(static_args_hash, (None, None))
+            has_been_compiled = False
+            if prev_function:
+                function = prev_function
+                has_been_compiled = True
+                function.shared_object.open(function.shared_object_file, function.func_name)
+            elif self.workspace_used:
+                # Create a new space for the new function if the workspace is used.
+                self.workspace = WorkspaceManager.get_or_create_workspace(
+                    self.function_name, self.preferred_workspace_dir
+                )
+            # The workspace is unused only for first compilation with static arguments.
+            self.workspace_used = True
+
         next_action = TypeCompatibility.UNKNOWN
         if not has_been_compiled:
             next_action = TypeCompatibility.NEEDS_COMPILATION
@@ -659,13 +745,14 @@ class QJIT:
             next_action = CompiledFunction.typecheck(abstracted_axes, self.c_sig, r_sig)
 
         if next_action == TypeCompatibility.NEEDS_PROMOTION:
-            args = CompiledFunction.promote_arguments(self.c_sig, *args)
+            args = CompiledFunction.promote_arguments(self.c_sig, *dynamic_args)
         elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             if not self.compiling_from_textual_ir:
-                self.mlir_module = self.get_mlir(*r_sig)
+                sig = self.merge_sig_into_args(list(args), *r_sig)
+                self.mlir_module = self.get_mlir(*sig)
             function = self.compile()
         else:
             assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
@@ -688,19 +775,31 @@ class QJIT:
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
+        static_argnums = self.compile_options.static_argnums
+
         if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
 
         function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
             self.compiled_function, *args
         )
-        recompilation_needed = function != self.compiled_function
+
+        recompilation_happened = (
+            function != self.compiled_function
+        ) and function not in self.stored_compiled_functions.values()
+
+        # Check if a function is created and add newly created ones into the hash table.
+        if static_argnums and recompilation_happened:
+            static_args_hash = self.get_static_args_hash(*args)
+            workspace = self.workspace
+            self.stored_compiled_functions[static_args_hash] = (function, workspace)
+
         self.compiled_function = function
 
         args_data, _args_shape = tree_flatten(args)
         if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
             # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_function is None or recompilation_needed:
+            if self.jaxed_function is None or recompilation_happened:
                 self.jaxed_function = JAX_QJIT(self)
 
             return self.jaxed_function(*args, **kwargs)
@@ -834,6 +933,7 @@ def qjit(
     verbose=False,
     logfile=None,
     pipelines=None,
+    static_argnums=None,
     abstracted_axes=None,
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
@@ -869,6 +969,8 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
+        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+            positions of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
             This option affects the compilation of the annotated function.
@@ -979,6 +1081,70 @@ def qjit(
         appearing as is.
 
     .. details::
+        :title: Static arguments
+
+        ``static_argnums`` defines which elements should be treated as static. If it takes an
+        integer, it means the argument whose index is equal to the integer is static. If it takes
+        an iterable of integers, arguments whose index is contained in the iterable are static.
+        Changing static arguments will introduce re-compilation.
+
+        A valid static argument must be hashable and its ``__hash__`` method must be able to
+        reflect any changes of its attributes.
+
+        .. code-block:: python
+
+            @dataclass
+            class MyClass:
+                val: int
+
+                def __hash__(self):
+                    return hash(str(self))
+
+            @qjit(static_argnums=1)
+            def f(
+                x: int,
+                y: MyClass,
+            ):
+                return x + y.val
+
+            f(1, MyClass(5))
+            f(1, MyClass(6)) # re-compilation
+            f(2, MyClass(5)) # no re-compilation
+
+        In the example above, ``y`` is static. Note that the second function call triggers
+        re-compilation since the input object is different from the previous one. However,
+        the third function call direcly uses the previous compiled one and does not introduce
+        re-compilation.
+
+        .. code-block:: python
+
+            @dataclass
+            class MyClass:
+                val: int
+
+                def __hash__(self):
+                    return hash(str(self))
+
+            @qjit(static_argnums=(1, 2))
+            def f(
+                x: int,
+                y: MyClass,
+                z: MyClass,
+            ):
+                return x + y.val + z.val
+
+            my_obj_1 = MyClass(5)
+            my_obj_2 = MyClass(6)
+            f(1, my_obj_1, my_obj_2)
+            my_obj_1.val = 7
+            f(1, my_obj_1, my_obj_2) # re-compilation
+
+        In the example above, ``y`` and ``z`` are static. The second function should make
+        function ``f`` be re-compiled because ``my_obj_1`` is changed. This requires that
+        the mutation is properly reflected in the hash value.
+
+
+    .. details::
         :title: Dynamically-shaped arrays
 
         There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
@@ -1055,6 +1221,7 @@ def qjit(
         reused for subsequent function calls.
     """
 
+    argnums = static_argnums
     axes = abstracted_axes
     if fn is not None:
         return QJIT(
@@ -1067,6 +1234,7 @@ def qjit(
                 pipelines,
                 autograph,
                 async_qnodes,
+                static_argnums=argnums,
                 abstracted_axes=axes,
             ),
         )
@@ -1082,6 +1250,7 @@ def qjit(
                 pipelines,
                 autograph,
                 async_qnodes,
+                static_argnums=argnums,
                 abstracted_axes=axes,
             ),
         )

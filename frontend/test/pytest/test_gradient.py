@@ -21,8 +21,10 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import CompileError, cond, for_loop, grad, jacobian, qjit
+from catalyst import cond, for_loop, grad, jacobian, qjit
 from catalyst.pennylane_extensions import DifferentiableCompileError
+
+# pylint: disable=too-many-lines
 
 
 class TestGradShape:
@@ -229,7 +231,7 @@ def test_finite_diff_mul(inp, backend):
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
 
 
-@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.parametrize("inp", [1.0, 2.0, 3.0, 4.0])
 def test_finite_diff_in_loop(inp, backend):
     """Test finite diff in loop."""
 
@@ -238,14 +240,14 @@ def test_finite_diff_in_loop(inp, backend):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qjit()
+    @qjit
     def compiled_grad_default(params, ntrials):
         diff = grad(f, argnum=0, method="fd")
 
         def fn(i, g):
             return diff(params)
 
-        return for_loop(0, ntrials, 1)(fn)(params)[0]
+        return for_loop(0, ntrials, 1)(fn)(params)
 
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
@@ -302,7 +304,7 @@ def test_adj_mult(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.parametrize("inp", [1.0, 2.0, 3.0, 4.0])
 def test_adj_in_loop(inp, backend):
     """Test the adjoint method in loop."""
 
@@ -318,7 +320,7 @@ def test_adj_in_loop(inp, backend):
         def fn(i, g):
             return diff(params)
 
-        return for_loop(0, ntrials, 1)(fn)(params)[0]
+        return for_loop(0, ntrials, 1)(fn)(params)
 
     def interpretted_grad_default(x):
         device = qml.device("default.qubit", wires=1)
@@ -903,9 +905,8 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
         def fn_g(_i, _g):
             return d_g(params)
 
-        d1 = for_loop(0, ntrials, 1)(fn_f)(params)[0]
-        d2 = for_loop(0, ntrials, 1)(fn_g)(params)[0]
-
+        d1 = for_loop(0, ntrials, 1)(fn_f)(params)
+        d2 = for_loop(0, ntrials, 1)(fn_g)(params)
         return d1, d2
 
     result = compiled_grad_default(inp, 5)
@@ -955,14 +956,139 @@ def test_multiple_grad_invocations(backend):
 
     @qjit
     def compiled(x: float, y: float):
-        g1 = grad(f, argnum=0, method="auto")(x, y)[0]
-        g2 = grad(f, argnum=1, method="auto")(x, y)[0]
+        g1 = grad(f, argnum=0, method="auto")(x, y)
+        g2 = grad(f, argnum=1, method="auto")(x, y)
         return jnp.array([g1, g2])
 
     actual = compiled(0.1, 0.2)
     expected = jax.jacobian(f, argnums=(0, 1))(0.1, 0.2)
     for actual_entry, expected_entry in zip(actual, expected):
         assert actual_entry == pytest.approx(expected_entry)
+
+
+def test_loop_with_dyn_wires(backend):
+    """Test the gradient on a function with a loop and modular wire arithmetic."""
+    num_wires = 4
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def cat(phi):
+        @for_loop(0, 3, 1)
+        def loop(i):
+            qml.RY(phi, wires=jnp.mod(i, num_wires))
+
+        loop()
+
+        return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
+
+    @qml.qnode(dev)
+    def pl(phi):
+        @for_loop(0, 3, 1)
+        def loop(i):
+            qml.RY(phi, wires=i % num_wires)
+
+        loop()
+
+        return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
+
+    arg = 0.75
+    result = qjit(grad(cat))(arg)
+    expected = qml.grad(pl, argnum=0)(arg)
+
+    assert np.allclose(result, expected)
+
+
+def test_pytrees_return_qnode(backend):
+    """Test the gradient on a function with a return including list and dictionnaries"""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    psi = 0.1
+    phi = 0.2
+    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[0]["expval0"], tuple)
+    assert len(result[0]["expval0"]) == 2
+    assert isinstance(result[1], tuple)
+    assert len(result[1]) == 2
+
+
+def test_pytrees_return_classical_function(backend):
+    """Test the jacobian on a qnode with a return including list and dictionnaries."""
+    num_wires = 1
+    dev = qml.device(backend, wires=num_wires)
+
+    @qml.qnode(dev)
+    def circuit(phi, psi):
+        qml.RY(phi, wires=0)
+        qml.RX(psi, wires=0)
+        return [{"expval0": qml.expval(qml.PauliZ(0))}, qml.expval(qml.PauliZ(0))]
+
+    psi = 0.1
+    phi = 0.2
+    result = qjit(jacobian(circuit, argnum=[0, 1]))(psi, phi)
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert isinstance(result[0], dict)
+    assert isinstance(result[0]["expval0"], tuple)
+    assert len(result[0]["expval0"]) == 2
+    assert isinstance(result[1], tuple)
+    assert len(result[1]) == 2
+
+
+def test_pytrees_return_classical():
+    """Test the jacobian on a function with a return including list and dictionnaries."""
+
+    def f(x, y):
+        return [x, {"a": x**2}, x + y]
+
+    x = 0.4
+    y = 0.2
+
+    jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+
+    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+
+    assert tree_jax == tree_catalyst
+    assert np.allclose(flatten_res_jax, flatten_res_catalyst)
+
+
+@pytest.mark.xfail(reason="QubitUnitrary is not support with catalyst.grad")
+@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+def test_adj_qubitunitary(inp, backend):
+    """Test the adjoint method."""
+
+    def f(x):
+        qml.RX(x, wires=0)
+        U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
+        qml.QubitUnitary(U1, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    @qjit()
+    def compiled(x: float):
+        g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
+        h = grad(g, method="auto")
+        return h(x)
+
+    def interpreted(x):
+        device = qml.device("default.qubit", wires=1)
+        g = qml.QNode(f, device, diff_method="backprop")
+        h = qml.grad(g, argnum=0)
+        return h(x)
+
+    assert np.allclose(compiled(inp), interpreted(inp))
 
 
 if __name__ == "__main__":

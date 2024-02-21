@@ -13,13 +13,13 @@
 # limitations under the License.
 """ Test JVP/VJP operation lowering """
 
-from typing import Iterable, Tuple, TypeVar, Union
+from typing import TypeVar
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from jax import linearize as J_linearize
+from jax import jvp as J_jvp
 from jax import vjp as J_vjp
 from jax.tree_util import tree_flatten, tree_unflatten
 from numpy.testing import assert_allclose
@@ -32,28 +32,11 @@ X = TypeVar("X")
 T = TypeVar("T")
 
 
-def flatten_if_tuples(x: Union[X, Tuple[Union[T, Tuple[T]]]]) -> Union[X, Tuple[T]]:
-    """Flatten first layer of Python tuples."""
-    return (
-        sum(((i if isinstance(i, tuple) else (i,)) for i in x), ()) if isinstance(x, tuple) else x
-    )
-
-
 def circuit_rx(x1, x2):
     """A test quantum function"""
     qml.RX(x1, wires=0)
     qml.RX(x2, wires=0)
     return qml.expval(qml.PauliY(0))
-
-
-def assert_elements_allclose(a, b, **kwargs):
-    """Checks all elements of tuples, one by one, for approximate equality"""
-    assert all(
-        isinstance(i, Iterable) for i in [a, b]
-    ), f"Some of {[type(a),type(b)]} is not a tuple"
-    assert len(a) == len(b), f"len(a) ({len(a)}) != len(b) ({type(b)})"
-    for i, j in zip(a, b):
-        assert_allclose(i, j, **kwargs)
 
 
 diff_methods = ["auto", "fd"]
@@ -166,12 +149,14 @@ def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
     @jax.jit
     def J_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("default.qubit.jax", wires=1), interface="jax")
-        y, ft = J_linearize(f, *x)
-        return flatten_if_tuples((y, ft(*t)))
+        return J_jvp(f, x, t)
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    assert_allclose(res_jax, res_cat)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -192,12 +177,14 @@ def test_jvp_against_jax_full_argnum_case_T_T(diff_method):
 
     @jax.jit
     def J_workflow():
-        y, ft = J_linearize(f, *x)
-        return flatten_if_tuples((y, ft(*t)))
+        return J_jvp(f, x, t)
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    assert_allclose(res_jax, res_cat)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -223,12 +210,14 @@ def test_jvp_against_jax_full_argnum_case_TT_T(diff_method):
 
     @jax.jit
     def J_workflow():
-        y, ft = J_linearize(f, *x)
-        return flatten_if_tuples((y, ft(*t)))
+        return J_jvp(f, x, t)
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    assert_allclose(res_jax, res_cat)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -249,12 +238,16 @@ def test_jvp_against_jax_full_argnum_case_T_TT(diff_method):
 
     @jax.jit
     def J_workflow():
-        y, ft = J_linearize(f, *x)
-        return flatten_if_tuples((y, ft(*t)))
+        return J_jvp(f, x, t)
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -283,12 +276,56 @@ def test_jvp_against_jax_full_argnum_case_TT_TT(diff_method):
 
     @jax.jit
     def J_workflow():
-        y, ft = J_linearize(f, *x)
-        return flatten_if_tuples((y, ft(*t)))
+        return J_jvp(f, x, t)
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_pytrees(diff_method):
+    """Test that a JVP with pytrees as return."""
+
+    def f(x, y):
+        return [x, {"res": y}, x + y]
+
+    @qjit
+    def workflow():
+        return C_jvp(f, [0.1, 0.2], [1.0, 1.0], method=diff_method, argnum=[0, 1])
+
+    catalyst_res = workflow()
+    jax_res = J_jvp(f, [0.1, 0.2], [1.0, 1.0])
+
+    catalyst_res_flatten, tree_cat = jax.tree_util.tree_flatten(catalyst_res)
+    jax_res_flatten, tree_jax = jax.tree_util.tree_flatten(jax_res)
+    assert tree_cat == tree_jax
+    assert_allclose(catalyst_res_flatten, jax_res_flatten)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_multi_returns(diff_method):
+    """Test that a JVP with multiple arg as return."""
+
+    def f(x):
+        return x, x**2, x**4
+
+    @qjit
+    def workflow():
+        return C_jvp(f, [0.3], [1.1], method=diff_method, argnum=[0])
+
+    catalyst_res = workflow()
+    jax_res = J_jvp(f, [0.3], [1.1])
+
+    catalyst_res_flatten, tree_cat = jax.tree_util.tree_flatten(catalyst_res)
+    jax_res_flatten, tree_jax = jax.tree_util.tree_flatten(jax_res)
+    assert tree_cat == tree_jax
+    assert_allclose(catalyst_res_flatten, jax_res_flatten, rtol=1e-6)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -310,11 +347,14 @@ def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
         f = qml.QNode(circuit_rx, device=qml.device("default.qubit.jax", wires=1), interface="jax")
         y, ft = J_vjp(f, *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return flatten_if_tuples((y, ft(ct2)))
+        return (y, ft(ct2))
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    assert_allclose(res_jax, res_cat)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -337,11 +377,15 @@ def test_vjp_against_jax_full_argnum_case_T_T(diff_method):
     def J_workflow():
         y, ft = J_vjp(f, *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return flatten_if_tuples((y, ft(ct2)))
+        return (y, ft(ct2))
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -369,11 +413,15 @@ def test_vjp_against_jax_full_argnum_case_TT_T(diff_method):
     def J_workflow():
         y, ft = J_vjp(f, *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return flatten_if_tuples((y, ft(ct2)))
+        return (y, ft(ct2))
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -396,11 +444,15 @@ def test_vjp_against_jax_full_argnum_case_T_TT(diff_method):
     def J_workflow():
         y, ft = J_vjp(f, *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return flatten_if_tuples((y, ft(ct2)))
+        return (y, ft(ct2))
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -431,12 +483,15 @@ def test_vjp_against_jax_full_argnum_case_TT_TT(diff_method):
     def J_workflow():
         y, ft = J_vjp(f, *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return flatten_if_tuples((y, ft(ct2)))
+        return (y, ft(ct2))
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -465,7 +520,13 @@ def test_jvpvjp_argument_checks(diff_method):
     def C_workflow2():
         return C_jvp(f, tuple(x), t, method=diff_method, argnum=tuple(range(len(x))))
 
-    assert_elements_allclose(C_workflow1(), C_workflow2(), rtol=1e-6, atol=1e-6)
+    r1 = C_workflow1()
+    r2 = C_workflow2()
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
     with pytest.raises(ValueError, match="argument must be an iterable"):
 
@@ -521,14 +582,23 @@ def test_jvp_against_jax_argnum0_case_TT_TT(diff_method):
         def _f(a):
             return f(a, *x[1:])
 
-        y, ft = J_linearize(_f, *x[0:1])
-        return flatten_if_tuples((y, ft(*t[0:1])))
+        return J_jvp(_f, x[0:1], t[0:1])
 
-    r1a = C_workflowA()
-    r1b = C_workflowB()
-    r2 = J_workflow()
-    assert_elements_allclose(r1a, r1b, rtol=1e-6, atol=1e-6)
-    assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
+    ra = C_workflowA()
+    rb = C_workflowB()
+    rj = J_workflow()
+
+    res_cat_a, tree_cat_a = jax.tree_util.tree_flatten(ra)
+    res_cat_b, tree_cat_b = jax.tree_util.tree_flatten(rb)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(rj)
+
+    assert tree_cat_a == tree_jax
+    assert tree_cat_a == tree_cat_b
+
+    for r_j, r_c in zip(res_cat_a, res_cat_b):
+        assert_allclose(r_j, r_c)
+    for r_j, r_c in zip(res_cat_a, res_jax):
+        assert_allclose(r_j, r_c)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -568,13 +638,75 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
 
         y, ft = J_vjp(_f, *x[0:1])
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return flatten_if_tuples((y, ft(ct2)))
+        return (y, ft(ct2))
 
-    r1a = C_workflowA()
-    r1b = C_workflowB()
+    ra = C_workflowA()
+    rb = C_workflowB()
+    rj = J_workflow()
+
+    res_cat_a, tree_cat_a = jax.tree_util.tree_flatten(ra)
+    res_cat_b, tree_cat_b = jax.tree_util.tree_flatten(rb)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(rj)
+
+    assert tree_cat_a == tree_jax
+    assert tree_cat_a == tree_cat_b
+
+    for r_j, r_c in zip(res_cat_a, res_cat_b):
+        assert_allclose(r_j, r_c)
+    for r_j, r_c in zip(res_cat_a, res_jax):
+        assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_pytrees(diff_method):
+    """Test VJP with pytree return."""
+
+    def f(x, y):
+        return [x, {"res": y}, x + y]
+
+    @qjit
+    def C_workflowA():
+        ct2 = tree_unflatten(tree_flatten(f(0.1, 0.2))[1], [1.0, 1.0, 1.0])
+        return C_vjp(f, [0.1, 0.2], ct2, method=diff_method, argnum=[0, 1])
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(f, *[0.1, 0.2])
+        ct2 = tree_unflatten(tree_flatten(y)[1], [1.0, 1.0, 1.0])
+        return (y, ft(ct2))
+
+    r1 = C_workflowA()
     r2 = J_workflow()
-    assert_elements_allclose(r1a, r1b, rtol=1e-6, atol=1e-6)
-    assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_multi_return(diff_method):
+    """Test VJP with multiple returns."""
+
+    def f(x):
+        return x, x**2
+
+    @qjit
+    def C_workflowA():
+        return C_vjp(f, [0.1], [1.0, 1.0], method=diff_method, argnum=[0])
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(f, *[0.1])
+        return (y, ft(tuple([1.0, 1.0])))
+
+    r1 = C_workflowA()
+    r2 = J_workflow()
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 if __name__ == "__main__":

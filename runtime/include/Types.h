@@ -30,6 +30,7 @@ typedef intptr_t QubitIdType;
 
 typedef bool RESULT;
 typedef RESULT *Result;
+typedef void *QirArray;
 
 typedef intptr_t ObsIdType;
 
@@ -131,6 +132,14 @@ struct PairT_MemRefT_double_int64_1d {
     struct MemRefT_int64_1d second;
 };
 
+// Quantum operation modifiers
+struct Modifiers {
+    bool adjoint;
+    size_t num_controlled;
+    QUBIT *controlled_wires;
+    bool *controlled_values;
+};
+
 typedef struct CplxT_double CplxT_double;
 typedef struct MemRefT_CplxT_double_1d MemRefT_CplxT_double_1d;
 typedef struct MemRefT_CplxT_double_2d MemRefT_CplxT_double_2d;
@@ -138,6 +147,7 @@ typedef struct MemRefT_double_1d MemRefT_double_1d;
 typedef struct MemRefT_double_2d MemRefT_double_2d;
 typedef struct MemRefT_int64_1d MemRefT_int64_1d;
 typedef struct PairT_MemRefT_double_int64_1d PairT_MemRefT_double_int64_1d;
+typedef struct Modifiers Modifiers;
 
 #ifdef __cplusplus
 } // extern "C"

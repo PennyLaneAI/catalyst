@@ -56,10 +56,17 @@ Additionally, all measurements will always return ``true``.
             void StopTapeRecording() override {}
             void PrintState() override {}
             void NamedOperation(const std::string &, const std::vector<double> &,
-                                        const std::vector<QubitIdType> &, bool) override {}
+                                        const std::vector<QubitIdType> &,
+                                        bool,
+                                        const std::vector<QubitIdType> &,
+                                        const std::vector<bool> &
+                                        ) override {}
             void MatrixOperation(const std::vector<std::complex<double>> &,
-                                        const std::vector<QubitIdType> &, bool) override{}
-
+                                        const std::vector<QubitIdType> &,
+                                        bool,
+                                        const std::vector<QubitIdType> &,
+                                        const std::vector<bool> &
+                                        ) override{}
             auto Expval(ObsIdType) -> double override { return 0.0; }
             auto Var(ObsIdType) -> double override { return 0.0; }
             void State(DataView<std::complex<double>, 1> &) override {}
@@ -101,7 +108,7 @@ multiple devices into the same library. However, it is important that the device
 be unique, as best as possible, to avoid clashes with other plugins.
 
 Importantly, the ``<DeviceIdentifier>`` string in the entry point function needs to match
-exactly what is supplied to the ``__quantum__rt__device("rtd_name", "<DeviceIdentifier>")``
+exactly what is supplied to the ``__catalyst__rt__device("rtd_name", "<DeviceIdentifier>")``
 runtime instruction in compiled user programs, or what is returned from the ``get_c_interface``
 function when integrating the device into a PennyLane plugin. Please see the "Integration with
 Python devices" section further down for details.

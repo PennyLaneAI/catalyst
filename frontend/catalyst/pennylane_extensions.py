@@ -227,16 +227,18 @@ class QJITDevice(qml.QubitDevice):
         "Toffoli",
         "MultiRZ",
         "QubitUnitary",
+        "ISWAP",
+        "PSWAP",
     }
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config):
-        # We currently override and only set MultiControlledX to preserve current behaviour.
+        # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
         # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX"}
+        return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
     def _check_mid_circuit_measurement(config):
@@ -267,7 +269,8 @@ class QJITDevice(qml.QubitDevice):
             QJITDevice.operations += ["Adjoint"]
 
         if QJITDevice._check_quantum_control(config):  # pragma: nocover
-            QJITDevice.operations += ["QCtrl"]
+            # TODO: Once control is added on the frontend.
+            ...
 
     @staticmethod
     def _set_supported_observables(config):
@@ -323,7 +326,13 @@ class QJITDevice(qml.QubitDevice):
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
-            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+            try:
+                mat = self.matrix()
+            except Exception as e:
+                raise CompileError(
+                    f"Operation {self} could not be decomposed, it might be unsupported."
+                ) from e
+            return [qml.QubitUnitary(mat, wires=self.wires)]
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
@@ -386,10 +395,11 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
-    """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks and
+    return the output tree."""
     method = grad_params.method
-    jaxpr = jax.make_jaxpr(f)(*args)
-
+    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
@@ -415,7 +425,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
-    return jaxpr
+    return jaxpr, out_tree
 
 
 def _verify_differentiable_child_qnodes(jaxpr, method):
@@ -514,6 +524,23 @@ def _check_grad_params(
     return GradParams(method, scalar_out, h, argnum)
 
 
+def _unflatten_derivatives(results, out_tree, argnum, num_results):
+    """Unflatten the flat list of derivatives results given the out tree."""
+    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    results_final = []
+    for i in range(0, num_results):
+        intermediate_results = results[
+            i * num_trainable_params : i * num_trainable_params + num_trainable_params
+        ]
+        if not (isinstance(argnum, int) or argnum is None):
+            intermediate_results = tuple(intermediate_results)
+        else:
+            intermediate_results = intermediate_results[0]
+        results_final.append(intermediate_results)
+    results_final = tree_unflatten(out_tree, results_final)
+    return results_final
+
+
 class Grad:
     """An object that specifies that a function will be differentiated.
 
@@ -539,16 +566,19 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
+
         if EvaluationContext.is_tracing():
             fn = _ensure_differentiable(self.fn)
             grad_params = _check_grad_params(*self.grad_params)
-
-            jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
             args_data, _ = tree_flatten(args)
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = _unflatten_derivatives(
+                results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
+            )
         else:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
@@ -565,7 +595,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     This function allows the gradient of a hybrid quantum-classical function to be computed within
     the compiled program. Outside of a compiled function, this function will simply dispatch to its
-    JAX counterpart ``jax.grad``.
+    JAX counterpart ``jax.grad``. The function ``f`` can return any pytree-like shape.
 
     .. warning::
 
@@ -695,7 +725,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     This function allows the Jacobian of a hybrid quantum-classical function to be computed within
     the compiled program. Outside of a compiled function, this function will simply dispatch to its
-    JAX counterpart ``jax.jacobian``.
+    JAX counterpart ``jax.jacobian``. The function ``f`` can return any pytree-like shape.
 
     Args:
         f (Callable): a function or a function object to differentiate
@@ -748,8 +778,8 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
             return g(x)
 
     >>> workflow(jnp.array([2.0, 1.0]))
-    array([[-1.32116540e-07,  1.33781874e-07],
-           [-4.20735506e-01,  4.20735506e-01]])
+    array([[ 3.48786850e-16 -4.20735492e-01]
+           [-8.71967125e-17  4.20735492e-01]])
     """
     scalar_out = False
     return Grad(f, GradParams(method, scalar_out, h, argnum))
@@ -761,7 +791,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will simply
-    dispatch to its JAX counterpart ``jax.jvp``.
+    dispatch to its JAX counterpart ``jax.jvp``. The function ``f`` can return any pytree-like
+    shape.
 
     Args:
         f (Callable): Function-like object to calculate JVP for
@@ -774,8 +805,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
-    Returns (Tuple[Array]):
-        Return values of ``f`` paired with the JVP values.
+    Returns:
+        Tuple[Any]: Return values of ``f`` paired with the JVP values.
 
     Raises:
         TypeError: invalid parameter types
@@ -796,8 +827,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> x = jnp.array([0.1, 0.2])
     >>> tangent = jnp.array([0.3, 0.6])
     >>> jvp(x, tangent)
-    [array([0.09983342, 0.04      , 0.02      ]),
-    array([0.29850125, 0.24000006, 0.12      ])]
+    (array([0.09983342, 0.04      , 0.02      ]), array([0.29850125, 0.24      , 0.12      ]))
 
     **Example 2 (argnum usage)**
 
@@ -821,7 +851,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> params = jnp.array([[0.54, 0.3154], [0.654, 0.123]])
     >>> dy = jnp.array([[1.0, 1.0], [1.0, 1.0]])
     >>> workflow(params, dy)
-    [array(0.78766064), array(-0.7011436)]
+    (array(0.78766064), array(-0.7011436))
     """
 
     def check_is_iterable(x, hint):
@@ -836,9 +866,18 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         fn = _ensure_differentiable(f)
         grad_params = _check_grad_params(method, scalar_out, h, argnum)
 
-        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+        midpoint = len(results) // 2
+        func_res = results[:midpoint]
+        jvps = results[midpoint:]
+
+        func_res = tree_unflatten(out_tree, func_res)
+        jvps = tree_unflatten(out_tree, jvps)
+        results = (func_res, jvps)
+
     else:
         results = jax.jvp(f, params, tangents)
 
@@ -851,7 +890,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
     computed within the compiled program. Outside of a compiled function, this function will simply
-    dispatch to its JAX counterpart ``jax.vjp``.
+    dispatch to its JAX counterpart ``jax.vjp``. The function ``f`` can return any pytree-like
+    shape.
 
     Args:
         f(Callable): Function-like object to calculate JVP for
@@ -864,8 +904,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
-    Returns (Tuple[Array]):
-        Return values of ``f`` paired with the JVP values.
+    Returns:
+        Tuple[Any]): Return values of ``f`` paired with the VJP values.
 
     Raises:
         TypeError: invalid parameter types
@@ -886,8 +926,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     >>> x = jnp.array([0.1, 0.2])
     >>> dy = jnp.array([-0.5, 0.1, 0.3])
     >>> vjp(x, dy)
-    [array([0.09983342, 0.04      , 0.02      ]),
-    array([-0.43750208,  0.07000001])]
+    (array([0.09983342, 0.04      , 0.02      ]), (array([-0.43750208,  0.07      ]),))
     """
 
     def check_is_iterable(x, hint):
@@ -902,9 +941,21 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         fn = _ensure_differentiable(f)
         grad_params = _check_grad_params(method, scalar_out, h, argnum)
 
-        jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        cotangents, _ = tree_flatten(cotangents)
 
         results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+        func_res = results[: len(jaxpr.out_avals)]
+        vjps = results[len(jaxpr.out_avals) :]
+        func_res = tree_unflatten(out_tree, func_res)
+        # We do not change the shape of the VJP as it is the same as the parameters not
+        # as the output
+        # TODO: update when we add support for pytrees params
+
+        results = tuple([func_res, tuple(vjps)])
+
     else:
         primal_outputs, vjp_fn = jax.vjp(f, *params)
 
@@ -1092,7 +1143,9 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+        postselect = op.in_classical_tracers[1]
+
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -1198,6 +1251,14 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+    @property
+    def wires(self):
+        """The list of all static wires."""
+
+        assert len(self.regions) == 1, "Adjoint is expected to have one region"
+        total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
+        return total_wires
+
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
 #       to this class whenever a qjit context is active.
@@ -1232,6 +1293,18 @@ class QCtrl(HybridOp):
             self._work_wires,
         )
         return new_tape.operations
+
+    @property
+    def wires(self):
+        """The list of all control-wires, work-wires, and active-wires."""
+        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+
+        total_wires = sum(
+            (op.wires for op in self.regions[0].quantum_tape.operations),
+            self._control_wires,
+        )
+        total_wires += self._work_wires
+        return total_wires
 
     @property
     def control_wires(self):
@@ -1875,7 +1948,9 @@ def while_loop(cond_fn):
     return _body_query
 
 
-def measure(wires) -> DynamicJaxprTracer:
+def measure(
+    wires, reset: Optional[bool] = False, postselect: Optional[int] = None
+) -> DynamicJaxprTracer:
     """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
 
     .. important::
@@ -1885,6 +1960,8 @@ def measure(wires) -> DynamicJaxprTracer:
 
     Args:
         wires (Wires): The wire of the qubit the measurement process applies to
+        reset (Optional[bool]): Whether to reset the wire to the |0⟩ state after measurement.
+        postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
     Returns:
         A JAX tracer for the mid-circuit measurement.
@@ -1914,6 +1991,38 @@ def measure(wires) -> DynamicJaxprTracer:
     [array(1.), array(False)]
     >>> circuit(0.43)
     [array(-1.), array(True)]
+
+    **Example with post-selection**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            m = measure(0, postselect=1)
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit()
+    -1.0
+
+    **Example with reset**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            m = measure(0, reset=True)
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit()
+    1.0
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
@@ -1923,12 +2032,32 @@ def measure(wires) -> DynamicJaxprTracer:
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+
+    # Copy, so wires remain unmodified
+    in_classical_tracers = wires.copy()
+
+    if postselect is not None and postselect not in [0, 1]:
+        raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+    in_classical_tracers.append(postselect)
+
     # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
-    out_classical_tracer = new_inner_tracer(ctx.trace, get_aval(True))
+    m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
-        in_classical_tracers=wires, out_classical_tracers=[out_classical_tracer], regions=[]
+        in_classical_tracers=in_classical_tracers,
+        out_classical_tracers=[m],
+        regions=[],
     )
-    return out_classical_tracer
+
+    # If reset was requested, reset qubit only if the measurement result was 1
+    if reset:
+
+        @cond(m)
+        def reset_fn():
+            qml.PauliX(wires=wires)
+
+        reset_fn()
+
+    return m
 
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
