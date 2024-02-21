@@ -23,7 +23,7 @@
 #include <string>
 #include <thread>
 
-namespace Catalyst::Runtime::Utils {
+namespace catalyst::utils {
 
 class Timer {
   private:
@@ -127,7 +127,7 @@ class Timer {
         ofile.close();
     }
 
-    void dump(const std::string &name, const std::string &key = "Runtime")
+    void dump(const std::string &name, const std::string &key)
     {
         if (!debug_timer) {
             return;
@@ -142,4 +142,4 @@ class Timer {
         store(name, key, std::filesystem::path{file});
     }
 };
-} // namespace Catalyst::Runtime::Utils
+} // namespace catalyst::utils

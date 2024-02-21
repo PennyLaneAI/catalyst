@@ -47,6 +47,10 @@ static std::unique_ptr<ExecutionContext> CTX = nullptr;
  */
 thread_local static RTDevice *RTD_PTR = nullptr;
 
+/**
+ * @brief Thread local timer to measure the execution time of the runtime
+ * instructions.
+ */
 thread_local static Utils::Timer capi_timer{};
 
 /**
