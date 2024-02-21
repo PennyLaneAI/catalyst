@@ -330,7 +330,7 @@ def test_invalid_shapes(bad_shape):
         return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(
-        TypeError, match=f"Shapes must be 1D sequences of integer scalars"
+        TypeError, match="Shapes must be 1D sequences of integer scalars"
     ):
         qjit(f)
 
