@@ -250,6 +250,11 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _check_quantum_control(config):
+        # TODO: Remove the special case when the
+        # https://github.com/PennyLaneAI/pennylane-lightning/pull/615
+        # is merged.
+        if config["device"]["name"] == "lightning.qubit":
+            return True
         return config["compilation"]["quantum_control"]
 
     @staticmethod
@@ -257,7 +262,8 @@ class QJITDevice(qml.QubitDevice):
         """Override the set of supported operations."""
         native_gates = set(config["operators"]["gates"][0]["native"])
         qir_gates = QJITDevice.operations_supported_by_QIR_runtime
-        QJITDevice.operations = list(native_gates.intersection(qir_gates))
+        supported_native_gates = list(set.intersection(native_gates, qir_gates))
+        QJITDevice.operations = supported_native_gates
 
         # These are added unconditionally.
         QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
@@ -270,11 +276,21 @@ class QJITDevice(qml.QubitDevice):
 
         if QJITDevice._check_quantum_control(config):  # pragma: nocover
             # TODO: Once control is added on the frontend.
-            ...
-
-        QJITDevice.operations += ["C(PauliX)"]
-        QJITDevice.operations += ["C(MultiRZ)"]
-        QJITDevice.operations += ["C(Rot)"]
+            gates_to_be_decomposed = [
+                "Identity",
+                "CNOT",
+                "CY",
+                "CZ",
+                "CSWAP",
+                "CRX",
+                "CRY",
+                "CRZ",
+                "CRot",
+            ]
+            native_controlled_gates = [
+                f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed
+            ]
+            QJITDevice.operations += native_controlled_gates
 
     @staticmethod
     def _set_supported_observables(config):
