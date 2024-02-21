@@ -208,10 +208,6 @@ class QJIT:
         if self.compiled_function and self.compiled_function.shared_object:
             self.compiled_function.shared_object.close()
 
-        # This will make a check before sending it to the compiler that the return type
-        # is actually available in most systems. f16 needs a special symbol and linking
-        # will fail if it is not available.
-        #
         # WARNING: assumption is that the first function
         # is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -219,6 +215,9 @@ class QJIT:
 
         for res in restype:
             baseType = ir.RankedTensorType(res).element_type
+            # This will make a check before sending it to the compiler that the return type
+            # is actually available in most systems. f16 needs a special symbol and linking
+            # will fail if it is not available.
             mlir_type_to_numpy_type(baseType)
 
         # The function name out of MLIR has quotes around it, which we need to remove.
@@ -226,7 +225,7 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
-        shared_object, llvm_ir, inferred_func_data = self.compiler.run(
+        shared_object, llvm_ir, _inferred_func_data = self.compiler.run(
             self.mlir_module, self.workspace
         )
 

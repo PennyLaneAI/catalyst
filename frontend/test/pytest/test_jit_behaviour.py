@@ -572,7 +572,7 @@ class TestSignatureErrors:
         """Test incompatible argument."""
 
         string = "hello world"
-        with pytest.raises(TypeError, match=f"<class 'str'> is not a valid JAX type"):
+        with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
             get_abstract_signature([string])
 
     def test_incompatible_type_reachable_from_user_code(self):
