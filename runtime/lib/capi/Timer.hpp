@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,22 +66,57 @@ class Timer {
         if (debug_timer) {
             if (running)
                 stop();
-            return std::chrono::duration_cast<std::chrono::milliseconds>(stop_time_ - start_time_);
+            return std::chrono::duration_cast<std::chrono::nanoseconds>(stop_time_ - start_time_);
         }
         else {
-            return std::chrono::milliseconds(0);
+            return std::chrono::nanoseconds(0);
         }
     }
 
     void print(const std::string &name) noexcept
     {
-        if (!debug_timer)
-            return;
-        std::cerr << "[TIMER] Running " << name << " in " << elapsed().count() << "ms";
+        const auto ms = static_cast<double>(elapsed().count()) / 1e6;
+        std::cerr << "[TIMER] Running " << name << " in " << ms << "ms";
         std::cerr << " (thread_id = " << std::this_thread::get_id() << ")" << std::endl;
     }
 
-    void dump(const std::string &name, const std::string &key = "Runtime") noexcept
+    void store(const std::string &name, const std::string &key,
+               const std::filesystem::path &file_path)
+    {
+        const auto ms = static_cast<double>(elapsed().count()) / 1e6;
+
+        if (!std::filesystem::exists(file_path)) {
+            std::ofstream ofile(file_path);
+            assert(ofile.is_open() && "Invalid file to store timer results");
+            ofile << key << ":" << std::endl;
+            ofile << "  - " << name << ": " << ms << "ms" << std::endl;
+            ofile.close();
+            return;
+        }
+        // else
+        // First, check if the key is in the file
+        std::ifstream ifile(file_path);
+        assert(ifile.is_open() && "Invalid file to store timer results");
+        std::string line;
+        bool add_header = true;
+        while (add_header && std::getline(ifile, line)) {
+            if (line.find(key) != std::string::npos) {
+                add_header = false;
+            }
+        }
+        ifile.close();
+
+        // Second, update the file
+        std::ofstream ofile(file_path, std::ios::app);
+        assert(ofile.is_open() && "Invalid file to store timer results");
+        if (add_header) {
+            ofile << key << ":" << std::endl;
+        }
+        ofile << "  - " << name << ": " << ms << "ms" << std::endl;
+        ofile.close();
+    }
+
+    void dump(const std::string &name, const std::string &key = "Runtime")
     {
         if (!debug_timer)
             return;
@@ -91,23 +126,8 @@ class Timer {
             print(name);
             return;
         }
-
-        // Path to where the results should be stored
-        // If not provided, results will be dumped (stderr)
-        std::filesystem::path file_ = std::filesystem::path{file};
-        if (!std::filesystem::exists(file_)) {
-            std::ofstream ofile(file_);
-            RT_FAIL_IF(!ofile.is_open(), "Invalid file to store timer results");
-            ofile << key << ":" << std::endl;
-            ofile << "  - " << name << ": " << elapsed().count() << "ms" << std::endl;
-            ofile.close();
-        }
-        else {
-            std::ofstream ofile(file_, std::ios::app); // Open file_ in 'append' mode
-            RT_FAIL_IF(!ofile.is_open(), "Invalid file to store timer results");
-            ofile << "  - " << name << ": " << elapsed().count() << "ms" << std::endl;
-            ofile.close();
-        }
+        // else
+        store(name, key, std::filesystem::path{file});
     }
 };
 } // namespace Catalyst::Runtime::Utils
