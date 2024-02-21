@@ -15,10 +15,12 @@
 """This module contains classes to manage compiled functions and their underlying resources."""
 
 import ctypes
+from dataclasses import dataclass
+from typing import Tuple
 
 import numpy as np
 from jax.interpreters import mlir
-from jax.tree_util import tree_flatten, tree_unflatten
+from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
@@ -26,9 +28,15 @@ from mlir_quantum.runtime import (
     make_zero_d_memref_descriptor,
 )
 
-from catalyst.tracing.type_signatures import filter_static_args
+from catalyst.tracing.type_signatures import (
+    TypeCompatibility,
+    filter_static_args,
+    get_decomposed_signature,
+    typecheck_signatures,
+)
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
+from catalyst.utils.filesystem import Directory
 from catalyst.utils.jax_extras import get_implicit_and_explicit_flat_args
 
 
@@ -327,3 +335,120 @@ class CompiledFunction:
         )
 
         return result
+
+
+@dataclass
+class CacheKey:
+    """A key by which to identify entries in the compiled function cache.
+
+    The cache only rembers one compiled function for each possible combination of:
+     - dynamic argument PyTree metadata
+     - static argument values
+    """
+
+    treedef: PyTreeDef
+    static_args: Tuple
+
+    def __hash__(self) -> int:
+        if not hasattr(self, "_hash"):
+            # pylint: disable=attribute-defined-outside-init
+            self._hash = hash((self.treedef, self.static_args))
+        return self._hash
+
+
+@dataclass
+class CacheEntry:
+    """An entry in the compiled function cache.
+
+    For each compiled function, the cache stores the dynamic argument signature, the output PyTree
+    definition, as well as the workspace in which compilation takes place.
+    """
+
+    compiled_fn: CompiledFunction
+    signature: Tuple
+    out_treedef: PyTreeDef
+    workspace: Directory
+
+
+class CompilationCache:
+    """Class to manage CompiledFunction instances and retrieving previously compiled versions of
+    a function.
+
+    A full match requires the following properties to match:
+     - dynamic argument signature (the shape and dtype of flattened arrays)
+     - dynamic argument PyTree definitions
+     - static argument values
+
+    In order to allow some flexibility in the type of arguments provided by the user, a match is
+    also produced if the dtype of dynamic arguments can be promoted to the dtype of an existing
+    signature via JAX type promotion rules. Additional leniency is provided in the shape of
+    dynamic arguments in accordance with the abstracted axis specification.
+
+    To avoid excess promotion checks, only one function version is stored at a time for a given
+    combination of PyTreeDefs and static arguments.
+    """
+
+    def __init__(self, static_argnums, abstracted_axes):
+        self.static_argnums = static_argnums
+        self.abstracted_axes = abstracted_axes
+        self.cache = {}
+
+    def get_function_status_and_key(self, args):
+        """Check if the provided arguments match an existing function in the cache.
+
+        Args:
+            args: arguments to match to existing functions
+
+        Returns:
+            Tuple[TypeCompatibility, CacheKey | None]
+        """
+        if not self.cache:
+            return TypeCompatibility.NEEDS_COMPILATION, None
+
+        flat_runtime_sig, treedef, static_args = get_decomposed_signature(args, self.static_argnums)
+        key = CacheKey(treedef, static_args)
+        if key not in self.cache:
+            return TypeCompatibility.NEEDS_COMPILATION, None
+
+        entry = self.cache[key]
+        runtime_signature = tree_unflatten(treedef, flat_runtime_sig)
+        action = typecheck_signatures(entry.signature, runtime_signature, self.abstracted_axes)
+        return action, key
+
+    def lookup(self, args):
+        """Get a function (if present) that matches the provided argument signature. Also computes
+        whether promotion is necessary.
+
+        Args:
+            args (Iterable): the arguments to match to existing functions
+
+        Returns:
+            Tuple[CacheEntry | None, bool]
+        """
+        action, key = self.get_function_status_and_key(args)
+
+        if action == TypeCompatibility.NEEDS_COMPILATION:
+            return None, None
+        elif action == TypeCompatibility.NEEDS_PROMOTION:
+            return self.cache[key], True
+        else:
+            assert action == TypeCompatibility.CAN_SKIP_PROMOTION
+            return self.cache[key], False
+
+    def insert(self, fn, args, out_treedef, workspace):
+        """Inserts the provided function into the cache.
+
+        Args:
+            fn (CompiledFunction): compilation result
+            args (Iterable): arguments to determine cache key and additional metadata from
+            out_treedef (PyTreeDef): the output shape of the function
+            workspace (Directory): directory where compilation artifacts are stored
+        """
+        assert isinstance(fn, CompiledFunction)
+
+        flat_signature, treedef, static_args = get_decomposed_signature(args, self.static_argnums)
+        signature = tree_unflatten(treedef, flat_signature)
+
+        key = CacheKey(treedef, static_args)
+        entry = CacheEntry(fn, signature, out_treedef, workspace)
+        self.cache[key] = entry
