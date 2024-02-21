@@ -114,6 +114,7 @@ __all__ = (
     "new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
+    "transient_jax_config",
     "treedef_is_leaf",
     "tree_flatten",
     "tree_structure",
@@ -123,6 +124,26 @@ __all__ = (
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
+
+
+@contextmanager
+def transient_jax_config() -> Generator[None, None, None]:
+    """Context manager which updates transient JAX configuration options,
+    yields, and then restores the original configuration values.
+    """
+    want_vals = {"jax_dynamic_shapes": True}
+    prev_vals = {}
+
+    for name, val in want_vals.items():
+        # Using ``read()`` to retrieve the value of an option is not permitted
+        # for JAX context manager flags.
+        prev_vals[name] = jax.config.values[name]
+        jax.config.update(name, val)
+
+    yield
+
+    for name, val in prev_vals.items():
+        jax.config.update(name, val)
 
 
 @contextmanager
