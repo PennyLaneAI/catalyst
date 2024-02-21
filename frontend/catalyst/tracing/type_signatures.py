@@ -85,7 +85,8 @@ def split_static_args(args, static_argnums):
         static_argnums (Iterable[int]): indices to split on
 
     Returns:
-        Tuple[Tuple, Tuple]: a pair of dynamic arguments and static arguments
+        Tuple: dynamic arguments
+        Tuple: static arguments
     """
     dynamic_args, static_args = [], []
     for i, arg in enumerate(args):
@@ -105,7 +106,7 @@ def merge_static_args(signature, args, static_argnums):
         static_argnums (Iterable[int]): indices to merge on
 
     Returns:
-        Tuple: a mix of ShapedArrays and static arguments
+        Tuple[ShapedArray | Any]: a mixture of ShapedArrays and static argument values
     """
     if not static_argnums:
         return signature
@@ -129,7 +130,9 @@ def get_decomposed_signature(args, static_argnums):
         static_argnums (Iterable[int]): indices to split on
 
     Returns:
-        Tuple[Tuple, PyTreeDef, Tuple]: a triple of ShapedArrays, PyTreeDefs, and static arguments
+        Tuple[ShapedArray]: dynamic argument shape and dtype information
+        PyTreeDef: dynamic argument PyTree metadata
+        Tuple[Any]: static argument values
     """
     dynamic_args, static_args = split_static_args(args, static_argnums)
     flat_dynamic_args, treedef = tree_flatten(dynamic_args)
