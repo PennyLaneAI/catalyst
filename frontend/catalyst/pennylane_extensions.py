@@ -276,7 +276,7 @@ class QJITDevice(qml.QubitDevice):
 
         if QJITDevice._check_quantum_control(config):  # pragma: nocover
             # TODO: Once control is added on the frontend.
-            gates_to_be_decomposed = [
+            gates_to_be_decomposed_if_controlled = [
                 "Identity",
                 "CNOT",
                 "CY",
@@ -288,7 +288,9 @@ class QJITDevice(qml.QubitDevice):
                 "CRot",
             ]
             native_controlled_gates = [
-                f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed
+                f"C({gate})"
+                for gate in native_gates
+                if gate not in gates_to_be_decomposed_if_controlled
             ]
             QJITDevice.operations += native_controlled_gates
 
