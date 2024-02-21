@@ -72,13 +72,10 @@ class Timer {
     std::chrono::time_point<std::chrono::steady_clock> stop_time_;
 
   public:
-    explicit Timer() : running(false)
+    explicit Timer() : debug_timer(false), running(false)
     {
         char *value = getenv("ENABLE_DEBUG_TIMER");
-        if (!value || std::string(value) != "ON") {
-            debug_timer = false;
-        }
-        else {
+        if (value && std::string(value) == "ON") {
             debug_timer = true;
         }
     }
@@ -113,32 +110,41 @@ class Timer {
 
     void print(const std::string &name) noexcept
     {
+        // Convert nanoseconds (long) to milliseconds (double)
         const auto ms = static_cast<double>(elapsed().count()) / 1e6;
+        // Get the hash of id as there is no conversion from id to size_t (or string)
+        const auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
         std::cerr << "[TIMER] Running " << name << " in " << ms << "ms";
-        std::cerr << " (thread_id = " << std::this_thread::get_id() << ")" << std::endl;
+        std::cerr << " (thread_id = " << std::to_string(id) << ")" << std::endl;
     }
 
     void store(const std::string &name, const std::string &key,
                const std::filesystem::path &file_path)
     {
+        // Convert nanoseconds (long) to milliseconds (double)
         const auto ms = static_cast<double>(elapsed().count()) / 1e6;
+        // Get the hash of id as there is no conversion from id to size_t (or string)
+        const auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+        // Create YAML headers with key and thread-id conditionally
+        const auto header = key + " (thread_id=" + std::to_string(id) + ")";
 
         if (!std::filesystem::exists(file_path)) {
             std::ofstream ofile(file_path);
             assert(ofile.is_open() && "Invalid file to store timer results");
-            ofile << key << ":" << std::endl;
+            ofile << header << ":" << std::endl;
             ofile << "  - " << name << ": " << ms << "ms" << std::endl;
             ofile.close();
             return;
         }
         // else
-        // First, check if the key is in the file
+        // First, check if the header is in the file
         std::ifstream ifile(file_path);
         assert(ifile.is_open() && "Invalid file to store timer results");
         std::string line;
         bool add_header = true;
         while (add_header && std::getline(ifile, line)) {
-            if (line.find(key) != std::string::npos) {
+            if (line.find(header) != std::string::npos) {
                 add_header = false;
             }
         }
@@ -148,7 +154,7 @@ class Timer {
         std::ofstream ofile(file_path, std::ios::app);
         assert(ofile.is_open() && "Invalid file to store timer results");
         if (add_header) {
-            ofile << key << ":" << std::endl;
+            ofile << header << ":" << std::endl;
         }
         ofile << "  - " << name << ": " << ms << "ms" << std::endl;
         ofile.close();
@@ -156,8 +162,9 @@ class Timer {
 
     void dump(const std::string &name, const std::string &key)
     {
-        if (!debug_timer)
+        if (!debug_timer) {
             return;
+        }
 
         char *file = getenv("DEBUG_TIMER_RESULT_PATH");
         if (!file) {
