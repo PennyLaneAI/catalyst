@@ -42,7 +42,7 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 
     # TODO: Once 0.35 is released, remove -dev suffix.
-    pennylane_requires = "0.35.0-dev"
+    pennylane_requires = "0.34"
     version = "0.1.0"
     author = "Xanadu, Inc."
 

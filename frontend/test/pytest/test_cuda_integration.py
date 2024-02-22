@@ -49,13 +49,12 @@ class TestCudaQ:
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 
-        from catalyst.cuda import SoftwareQQPP
         from catalyst.cuda.catalyst_to_cuda_interpreter import (
             QJIT_CUDAQ,
             remove_host_context,
         )
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit_foo():
             return qml.state()
 
@@ -65,10 +64,9 @@ class TestCudaQ:
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
-        from catalyst.cuda import SoftwareQQPP
         from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit_foo():
             return qml.state()
 
@@ -78,12 +76,11 @@ class TestCudaQ:
     def test_measurement_return(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda import SoftwareQQPP
         from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
-            @qml.qnode(SoftwareQQPP(wires=1, shots=30))
+            @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
@@ -93,10 +90,9 @@ class TestCudaQ:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda import SoftwareQQPP
         from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
-        @qml.qnode(SoftwareQQPP(wires=1, shots=30))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
             measure(0)
@@ -106,9 +102,8 @@ class TestCudaQ:
 
     def test_pytrees(self):
         """Test that we can return a dictionary."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit_a(a):
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
@@ -126,9 +121,8 @@ class TestCudaQ:
 
     def test_cuda_device(self):
         """Test SoftwareQQPP."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.state()
@@ -146,9 +140,8 @@ class TestCudaQ:
 
     def test_samples(self):
         """Test SoftwareQQPP."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1, shots=100))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=100))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.sample()
@@ -166,9 +159,8 @@ class TestCudaQ:
 
     def test_counts(self):
         """Test SoftwareQQPP."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1, shots=100))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=100))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.counts()
@@ -186,9 +178,8 @@ class TestCudaQ:
 
     def test_qjit_cuda_device(self):
         """Test SoftwareQQPP."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return qml.state()
@@ -206,9 +197,8 @@ class TestCudaQ:
 
     def test_abstract_variable(self):
         """Test abstract variable."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a: float):
             qml.RX(a, wires=[0])
             return qml.state()
@@ -226,9 +216,8 @@ class TestCudaQ:
 
     def test_arithmetic(self):
         """Test arithmetic."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a / 2, wires=[0])
             return qml.state()
@@ -246,9 +235,8 @@ class TestCudaQ:
 
     def test_multiple_values(self):
         """Test multiple_values."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(params):
             x, y = jax.numpy.array_split(params, 2)
             qml.RX(x[0], wires=[0])
@@ -272,7 +260,7 @@ class TestCudaQ:
     def test_cuda_device_entry_point(self):
         """Test the entry point for SoftwareQQPP"""
 
-        @qml.qnode(qml.device("software.qpp", wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
@@ -293,7 +281,7 @@ class TestCudaQ:
         """Test the entry point for cudaq.qjit"""
 
         @qml.qjit(compiler="cuda_quantum")
-        @qml.qnode(qml.device("cudaq", wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(a):
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
@@ -302,9 +290,8 @@ class TestCudaQ:
 
     def test_expval(self):
         """Test multiple_values."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=1))
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit():
             qml.RX(jnp.pi / 2, wires=[0])
             return qml.expval(qml.PauliZ(0))
@@ -322,9 +309,8 @@ class TestCudaQ:
 
     def test_expval_2(self):
         """Test multiple_values."""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=2))
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit():
             qml.RY(jnp.pi / 4, wires=[1])
             return qml.expval(qml.PauliZ(1) + qml.PauliX(1))
@@ -343,9 +329,7 @@ class TestCudaQ:
     def test_adjoint(self):
         """Test adjoint."""
 
-        from catalyst.cuda import SoftwareQQPP
-
-        @qml.qnode(SoftwareQQPP(wires=2))
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit():
             def f(theta):
                 qml.RX(theta / 23, wires=[0])
@@ -380,9 +364,7 @@ class TestCudaQ:
     def test_control_ry(self):
         """Test control ry."""
 
-        from catalyst.cuda import SoftwareQQPP
-
-        @qml.qnode(SoftwareQQPP(wires=2))
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit():
             qml.Hadamard(wires=[0])
             qml.CRY(jnp.pi / 2, wires=[0, 1])
@@ -403,9 +385,7 @@ class TestCudaQ:
     def test_swap(self):
         """Test swap."""
 
-        from catalyst.cuda import SoftwareQQPP
-
-        @qml.qnode(SoftwareQQPP(wires=2))
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit():
             qml.RX(jnp.pi / 3, wires=[0])
             qml.SWAP(wires=[0, 1])
@@ -426,9 +406,7 @@ class TestCudaQ:
     def test_entanglement(self):
         """Test swap."""
 
-        from catalyst.cuda import SoftwareQQPP
-
-        @qml.qnode(SoftwareQQPP(wires=2))
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit():
             qml.Hadamard(wires=[0])
             qml.CNOT(wires=[0, 1])
@@ -449,9 +427,7 @@ class TestCudaQ:
     def test_cswap(self):
         """Test cswap."""
 
-        from catalyst.cuda import SoftwareQQPP
-
-        @qml.qnode(SoftwareQQPP(wires=3))
+        @qml.qnode(qml.device("softwareq.qpp", wires=3))
         def circuit():
             qml.Hadamard(wires=[0])
             qml.RX(jnp.pi / 7, wires=[1])
@@ -474,9 +450,7 @@ class TestCudaQ:
     def test_state_is_jax_array(self):
         """Test return type for state."""
 
-        from catalyst.cuda import SoftwareQQPP
-
-        @qml.qnode(SoftwareQQPP(wires=3))
+        @qml.qnode(qml.device("softwareq.qpp", wires=3))
         def circuit():
             qml.Hadamard(wires=[0])
             qml.RX(jnp.pi / 7, wires=[1])
@@ -489,9 +463,8 @@ class TestCudaQ:
 
     def test_error_message_using_host_context(self):
         """Test error message"""
-        from catalyst.cuda import SoftwareQQPP
 
-        @qml.qnode(SoftwareQQPP(wires=2))
+        @qml.qnode(qml.device("softwareq.qpp", wires=2))
         def circuit(x):
             qml.Hadamard(wires=[0])
             qml.CNOT(wires=[0, 1])
