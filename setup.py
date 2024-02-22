@@ -40,7 +40,7 @@ with open(".dep-versions") as f:
     pl_version = [line[pl_str_length:].strip() for line in lines if pl_str in line][0]
 
 requirements = [
-    f"pennylane@git+https://github.com/pennylaneai/pennylane#{pl_version}",
+    f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
