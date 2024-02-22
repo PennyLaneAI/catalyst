@@ -72,7 +72,11 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
     unify_result_types,
 )
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
+)
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
@@ -144,12 +148,17 @@ class QFunc:
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
         device.config = toml_file
 
+    @staticmethod
+    def extract_backend_info(device):
+        """Wrapper around extract_backend_info in the runtime module."""
+        return extract_backend_info(device)
+
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
             QFunc._add_toml_file(self.device)
-            dev_args = extract_backend_info(self.device)
+            dev_args = QFunc.extract_backend_info(self.device)
             config, rest = dev_args[0], dev_args[1:]
             device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
         else:  # pragma: nocover

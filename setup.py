@@ -48,11 +48,14 @@ requirements = [
 ]
 
 entry_points = {
-    "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
+    "pennylane.plugins": "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
     "pennylane.compilers": [
-        "catalyst.context = catalyst.utils.contexts:EvaluationContext",
+        "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
         "catalyst.ops = catalyst:pennylane_extensions",
         "catalyst.qjit = catalyst:qjit",
+        "cuda_quantum.context = catalyst.cuda:EvaluationContext",
+        "cuda_quantum.ops = catalyst.cuda:pennylane_extensions",
+        "cuda_quantum.qjit = catalyst.cuda:qjit",
     ],
 }
 
@@ -162,6 +165,7 @@ ext_modules.extend(intree_extension_list)
 # - `context`: Path to the compilation evaluation context manager.
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
+
 setup(
     classifiers=classifiers,
     name="PennyLane-Catalyst",

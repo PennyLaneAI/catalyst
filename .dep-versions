@@ -1,6 +1,6 @@
-# Update the version check in catalyst.__init__ when changing the JAX version.
-jax=0.4.14
-mhlo=00be4a6ce2c4d464e07d10eae51918a86f8df7b4
-llvm=4706251a3186c34da0ee8fd894f7e6b095da8fdc
-enzyme=8d22ed1b8c424a061ed9d6d0baf0cc0d2d6842e2
+# Always update the version check in catalyst.__init__ when changing the JAX version.
+jax=0.4.23
+mhlo=4611968a5f6818e6bdfb82217b9e836e0400bba9
+llvm=cd9a641613eddf25d4b25eaa96b2c393d401d42c
+enzyme=1beb98b51442d50652eaa3ffb9574f4720d611f1
 pennylane=a8be574c120169e261287d53fb0f33eabff079f3
