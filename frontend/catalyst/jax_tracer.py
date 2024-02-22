@@ -390,10 +390,10 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
 
     with transient_jax_config():
         jaxpr, postprocessed_jaxpr, out_type, out_tree = trace_to_jaxpr(
-           func, static_argnums, abstracted_axes, *args, **kwargs
+            func, static_argnums, abstracted_axes, *args, **kwargs
         )
         module, context = jaxpr_to_mlir(func.__name__, postprocessed_jaxpr)
-        
+
     return module, context, jaxpr, out_type, out_tree
 
 
