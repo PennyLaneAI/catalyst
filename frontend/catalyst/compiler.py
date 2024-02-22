@@ -512,9 +512,6 @@ class Compiler:
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
             raise CompileError("Requesting the output of an empty pipeline")
 
-        if not self.last_compiler_output:
-            return None
-
         return self.last_compiler_output.get_pipeline_output(pipeline)
 
     def print(self, pipeline):
