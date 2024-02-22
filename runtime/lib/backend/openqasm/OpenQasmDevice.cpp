@@ -120,8 +120,13 @@ auto OpenQasmDevice::Zero() const -> Result
 auto OpenQasmDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
 
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                    const std::vector<QubitIdType> &wires, bool inverse)
+                                    const std::vector<QubitIdType> &wires, bool inverse,
+                                    const std::vector<QubitIdType> &controlled_wires,
+                                    const std::vector<bool> &controlled_values)
 {
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "OpenQasm device does not support native quantum control.");
+
     using namespace Catalyst::Runtime::Simulator::Lightning;
 
     // First, check operation specifications
@@ -139,9 +144,14 @@ void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<d
 
 void OpenQasmDevice::MatrixOperation(
     [[maybe_unused]] const std::vector<std::complex<double>> &matrix,
-    [[maybe_unused]] const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse)
+    [[maybe_unused]] const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse,
+    [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires,
+    [[maybe_unused]] const std::vector<bool> &controlled_values)
 {
     RT_FAIL_IF(builder_type == OpenQasm::BuilderType::Common, "Unsupported functionality");
+    // TODO: Remove when controlled wires API is supported
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "OpenQasm device does not support native quantum control.");
 
     // Convert wires to device wires
     // with checking validity of wires

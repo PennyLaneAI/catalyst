@@ -18,7 +18,7 @@
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>, i1)
+// CHECK-DAG: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr, i1)
 
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {
@@ -31,12 +31,11 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 
     // CHECK: [[memref_ptr:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: llvm.store [[memref]], [[memref_ptr]]
-    // CHECK: [[memref_ptr_cast:%.+]] = llvm.bitcast [[memref_ptr]] : {{.*}} to !llvm.ptr
-    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr_cast]], [[struct0]][1]
+    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr]], [[struct0]][1]
 
     // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
 
-    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>
+    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} : (i64) -> !llvm.ptr
     // CHECK: llvm.store [[struct2]], [[struct_ptr]]
     // CHECK: [[memref_flag:%.+]] = llvm.mlir.constant(false)
     // CHECK: llvm.call @__catalyst__rt__print_tensor([[struct_ptr]], [[memref_flag]])
@@ -52,14 +51,13 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 // -----
 
 // CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Hello, Catalyst")
-// CHECK-DAG: llvm.func @__catalyst__rt__print_string(!llvm.ptr<i8>)
+// CHECK-DAG: llvm.func @__catalyst__rt__print_string(!llvm.ptr)
 
 // CHECK-LABEL: @dbprint_str
 func.func @dbprint_str() {
 
-    // CHECK: [[C0:%.+]] = llvm.mlir.constant(0 : index)
-    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr<array<15 x i8>>
-    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr [[array_ptr]][[[C0]], [[C0]]] : {{.*}} -> !llvm.ptr<i8>
+    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
+    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<15 x i8>
     // CHECK: llvm.call @__catalyst__rt__print_string([[char_ptr]])
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 

@@ -63,6 +63,7 @@ from jax.core import (
 )
 from jax.interpreters.mlir import (
     AxisContext,
+    LoweringParameters,
     ModuleContext,
     ir,
     lower_jaxpr_to_fun,
@@ -113,6 +114,7 @@ __all__ = (
     "new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
+    "transient_jax_config",
     "treedef_is_leaf",
     "tree_flatten",
     "tree_structure",
@@ -122,6 +124,26 @@ __all__ = (
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
+
+
+@contextmanager
+def transient_jax_config() -> Generator[None, None, None]:
+    """Context manager which updates transient JAX configuration options,
+    yields, and then restores the original configuration values.
+    """
+    want_vals = {"jax_dynamic_shapes": True}
+    prev_vals = {}
+
+    for name, val in want_vals.items():
+        # Using ``read()`` to retrieve the value of an option is not permitted
+        # for JAX context manager flags.
+        prev_vals[name] = jax.config.values[name]
+        jax.config.update(name, val)
+
+    yield
+
+    for name, val in prev_vals.items():
+        jax.config.update(name, val)
 
 
 @contextmanager
@@ -394,8 +416,16 @@ def custom_lower_jaxpr_to_module(
     # Create a keepalives list that will be mutated during the lowering.
     keepalives = []
     host_callbacks = []
+    lowering_params = LoweringParameters()
     ctx = ModuleContext(
-        None, platform, axis_context, name_stack, keepalives, channel_iter, host_callbacks
+        backend_or_name=None,
+        platforms=[platform],
+        axis_context=axis_context,
+        name_stack=name_stack,
+        keepalives=keepalives,
+        channel_iterator=channel_iter,
+        host_callbacks=host_callbacks,
+        lowering_parameters=lowering_params,
     )
     ctx.context.allow_unregistered_dialects = True
     with ctx.context, ir.Location.unknown(ctx.context):

@@ -329,9 +329,7 @@ def test_invalid_shapes(bad_shape):
     def f():
         return jnp.empty(shape=bad_shape, dtype=int)
 
-    with pytest.raises(
-        TypeError, match="Shapes must be 1D sequences of concrete values of integer type"
-    ):
+    with pytest.raises(TypeError, match="Shapes must be 1D sequences of integer scalars"):
         qjit(f)
 
 
@@ -345,19 +343,6 @@ def test_invalid_shapes_2():
 
     with pytest.raises(TypeError):
         qjit(f)
-
-
-def test_shapes_type_conversion():
-    """We allow floats to be passed as dynamic shapes. This test fixes the current behavior of this
-    mechanism.
-    Note: Jax seems to call `canonicalize_shape` function on every input. Probably we should follow
-    this approach in future."""
-
-    def f(x):
-        return jnp.empty(shape=[2, x], dtype=int)
-
-    assert qjit(f)(3.1).shape == (2, 3)
-    assert qjit(f)(4.9).shape == (2, 4)
 
 
 def test_accessing_shapes():

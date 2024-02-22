@@ -65,8 +65,8 @@ TEST_CASE("Test __catalyst__qis__Gradient_params for zero number of obs", "[Grad
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__S(q, false);
-        __catalyst__qis__T(q, false);
+        __catalyst__qis__S(q, NO_MODIFIERS);
+        __catalyst__qis__T(q, NO_MODIFIERS);
 
         REQUIRE_NOTHROW(__catalyst__qis__Gradient_params(&tp, 0, &results));
 
@@ -99,7 +99,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         QUBIT *q = __catalyst__rt__qubit_allocate();
 
-        __catalyst__qis__RX(-M_PI / 7, q, false);
+        __catalyst__qis__RX(-M_PI / 7, q, NO_MODIFIERS);
 
         auto obs = __catalyst__qis__NamedObs(ObsId::PauliZ, q);
 
@@ -143,7 +143,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RX(-M_PI / 7, q, false);
+        __catalyst__qis__RX(-M_PI / 7, q, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliZ, q);
 
@@ -189,7 +189,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RX(-M_PI / 7, q, false);
+        __catalyst__qis__RX(-M_PI / 7, q, NO_MODIFIERS);
 
         CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
@@ -251,7 +251,7 @@ TEST_CASE("Test __catalyst__qis__Gradient_params and __catalyst__qis__Gradient "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RY(p, q, false);
+        __catalyst__qis__RY(p, q, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliX, q);
 
@@ -306,12 +306,12 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,Param
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__Hadamard(q0, false);
-        __catalyst__qis__RZ(param[0], q0, false);
-        __catalyst__qis__RY(param[1], q0, false);
-        __catalyst__qis__RZ(param[2], q0, false);
-        __catalyst__qis__S(q0, false);
-        __catalyst__qis__T(q0, false);
+        __catalyst__qis__Hadamard(q0, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[0], q0, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], q0, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], q0, NO_MODIFIERS);
+        __catalyst__qis__S(q0, NO_MODIFIERS);
+        __catalyst__qis__T(q0, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliX, q0);
 
@@ -362,8 +362,8 @@ TEST_CASE("Test __catalyst__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RX(-M_PI / 7, *q0, false);
-        __catalyst__qis__CY(*q0, *q1, false);
+        __catalyst__qis__RX(-M_PI / 7, *q0, NO_MODIFIERS);
+        __catalyst__qis__CY(*q0, *q1, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliZ, *q0);
         auto obs_idx_1 = __catalyst__qis__NamedObs(ObsId::PauliZ, *q1);
@@ -415,10 +415,10 @@ TEST_CASE("Test __catalyst__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]",
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RX(param[0], *q0, false);
-        __catalyst__qis__RX(param[1], *q1, false);
-        __catalyst__qis__RX(param[2], *q2, false);
-        __catalyst__qis__CZ(*q0, *q2, false);
+        __catalyst__qis__RX(param[0], *q0, NO_MODIFIERS);
+        __catalyst__qis__RX(param[1], *q1, NO_MODIFIERS);
+        __catalyst__qis__RX(param[2], *q2, NO_MODIFIERS);
+        __catalyst__qis__CZ(*q0, *q2, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliZ, *q0);
         auto obs_idx_1 = __catalyst__qis__NamedObs(ObsId::PauliZ, *q1);
@@ -475,14 +475,14 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RZ(param[0], *q0, false);
-        __catalyst__qis__RY(param[1], *q0, false);
-        __catalyst__qis__RZ(param[2], *q0, false);
-        __catalyst__qis__CNOT(*q0, *q1, false);
-        __catalyst__qis__CNOT(*q1, *q2, false);
-        __catalyst__qis__RZ(param[0], *q1, false);
-        __catalyst__qis__RY(param[1], *q1, false);
-        __catalyst__qis__RZ(param[2], *q1, false);
+        __catalyst__qis__RZ(param[0], *q0, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], *q0, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], *q0, NO_MODIFIERS);
+        __catalyst__qis__CNOT(*q0, *q1, NO_MODIFIERS);
+        __catalyst__qis__CNOT(*q1, *q2, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[0], *q1, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], *q1, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], *q1, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliX, *q0);
         auto obs_idx_1 = __catalyst__qis__NamedObs(ObsId::PauliX, *q1);
@@ -549,16 +549,16 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RZ(param[0], *q0, false);
-        __catalyst__qis__RY(param[1], *q0, false);
-        __catalyst__qis__RZ(param[2], *q0, false);
-        __catalyst__qis__CNOT(*q0, *q1, false);
-        __catalyst__qis__CNOT(*q1, *q2, false);
-        __catalyst__qis__RZ(param[0], *q1, false);
-        __catalyst__qis__RY(param[1], *q1, false);
-        __catalyst__qis__RZ(param[2], *q1, false);
-        __catalyst__qis__CRY(param[0], *q0, *q1, false);
-        __catalyst__qis__CRZ(param[1], *q0, *q2, false);
+        __catalyst__qis__RZ(param[0], *q0, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], *q0, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], *q0, NO_MODIFIERS);
+        __catalyst__qis__CNOT(*q0, *q1, NO_MODIFIERS);
+        __catalyst__qis__CNOT(*q1, *q2, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[0], *q1, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], *q1, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], *q1, NO_MODIFIERS);
+        __catalyst__qis__CRY(param[0], *q0, *q1, NO_MODIFIERS);
+        __catalyst__qis__CRZ(param[1], *q0, *q2, NO_MODIFIERS);
 
         auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliZ, *q0);
         auto obs_idx_1 = __catalyst__qis__NamedObs(ObsId::PauliZ, *q1);
@@ -625,14 +625,14 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RZ(param[0], *q0, false);
-        __catalyst__qis__RY(param[1], *q0, false);
-        __catalyst__qis__RZ(param[2], *q0, false);
-        __catalyst__qis__CNOT(*q0, *q1, false);
-        __catalyst__qis__CNOT(*q1, *q2, false);
-        __catalyst__qis__RZ(param[0], *q1, false);
-        __catalyst__qis__RY(param[1], *q1, false);
-        __catalyst__qis__RZ(param[2], *q1, false);
+        __catalyst__qis__RZ(param[0], *q0, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], *q0, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], *q0, NO_MODIFIERS);
+        __catalyst__qis__CNOT(*q0, *q1, NO_MODIFIERS);
+        __catalyst__qis__CNOT(*q1, *q2, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[0], *q1, NO_MODIFIERS);
+        __catalyst__qis__RY(param[1], *q1, NO_MODIFIERS);
+        __catalyst__qis__RZ(param[2], *q1, NO_MODIFIERS);
 
         double coeffs_data[2] = {0.2, 0.6};
         MemRefT_double_1d coeffs = {coeffs_data, coeffs_data, 0, {2}, {1}};
@@ -700,7 +700,7 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
 
         __catalyst__rt__toggle_recorder(/* activate_cm */ true);
 
-        __catalyst__qis__RX(-M_PI / 7, q, false);
+        __catalyst__qis__RX(-M_PI / 7, q, NO_MODIFIERS);
 
         CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
@@ -731,6 +731,70 @@ TEST_CASE("Test __catalyst__qis__Gradient and __catalyst__qis__Gradient_params "
         __catalyst__rt__device_release();
         __catalyst__rt__finalize();
     }
+
+    delete[] buffer;
+    delete[] buffer_tp;
+}
+
+TEST_CASE("Test __catalyst__qis__Gradient with QubitUnitary", "[Gradient]")
+{
+    std::vector<int64_t> trainParams{0};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
+
+    CplxT_double matrix_data[4] = {
+        {-0.6709485262524046, -0.6304426335363695},
+        {-0.14885403153998722, 0.3608498832392019},
+        {-0.2376311670004963, 0.3096798175687841},
+        {-0.8818365947322423, -0.26456390390903695},
+    };
+
+    const double expected{-0.8611041863};
+
+    __catalyst__rt__initialize();
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        QUBIT *q = __catalyst__rt__qubit_allocate();
+
+        __catalyst__rt__toggle_recorder(/* activate_cm */ true);
+
+        __catalyst__qis__RX(-M_PI / 7, q, NO_MODIFIERS);
+
+        MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
+        matrix->data_allocated = matrix_data;
+        matrix->data_aligned = matrix_data;
+        matrix->offset = 0;
+        matrix->sizes[0] = 2;
+        matrix->sizes[1] = 2;
+        matrix->strides[0] = 1;
+
+        __catalyst__qis__QubitUnitary(matrix, NO_MODIFIERS, 1, q);
+
+        auto obs_idx_0 = __catalyst__qis__NamedObs(ObsId::PauliY, q);
+
+        __catalyst__qis__Expval(obs_idx_0);
+
+        __catalyst__qis__Gradient_params(&tp_memref, 1, &result_tp);
+
+        __catalyst__qis__Gradient(1, &result);
+
+        __catalyst__rt__toggle_recorder(/* activate_cm */ false);
+
+        CHECK(expected == Approx(result_tp.data_aligned[0]));
+        CHECK(expected == Approx(result.data_aligned[0]));
+
+        delete matrix;
+        __catalyst__rt__qubit_release(q);
+        __catalyst__rt__device_release();
+    }
+    __catalyst__rt__finalize();
 
     delete[] buffer;
     delete[] buffer_tp;
