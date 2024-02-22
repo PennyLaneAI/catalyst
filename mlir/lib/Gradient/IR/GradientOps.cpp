@@ -151,6 +151,8 @@ LogicalResult GradOp::verify()
     return success();
 }
 
+MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
+
 //===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -231,6 +233,8 @@ LogicalResult JVPOp::verify()
     return success();
 }
 
+MutableOperandRange JVPOp::getArgOperandsMutable() { return getParamsMutable(); }
+
 //===----------------------------------------------------------------------===//
 // VJPOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -310,6 +314,8 @@ LogicalResult VJPOp::verify()
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
+
+MutableOperandRange VJPOp::getArgOperandsMutable() { return getParamsMutable(); }
 
 //===----------------------------------------------------------------------===//
 // Backprop SymbolUserOpInterface
