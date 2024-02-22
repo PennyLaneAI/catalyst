@@ -73,9 +73,7 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     observables = []
     config = Path(__file__).parent / "cuda_quantum.toml"
 
-    def __init__(self, shots=None, wires=None, mps=False, multi_gpu=False):
-        self.mps = mps
-        self.multi_gpu = multi_gpu
+    def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
@@ -91,6 +89,10 @@ class SoftwareQQPP(BaseCudaInstructionSet):
     name = "SoftwareQ q++ simulator"
     short_name = "softwareq.qpp"
 
+    @property
+    def name(self):
+        return "qpp-cpu"
+
 
 class NvidiaCuStateVec(BaseCudaInstructionSet):
     """Concrete device class for CuStateVec"""
@@ -99,7 +101,13 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
     short_name = "nvidia.custatevec"
 
     def __init__(self, shots=None, wires=None, multi_gpu=False):  # pragma: no cover
-        super().__init__(wires=wires, shots=shots, multi_gpu=multi_gpu)
+        self.multi_gpu = multi_gpu
+        super().__init__(wires=wires, shots=shots)
+
+    @property
+    def name(self):
+        option = "-mgpu" if self.multi_gpu else ""
+        return f"nvidia{option}"
 
 
 class NvidiaCuTensorNet(BaseCudaInstructionSet):
@@ -109,4 +117,10 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
     short_name = "nvidia.cutensornet"
 
     def __init__(self, shots=None, wires=None, mps=False):  # pragma: no cover
-        super().__init__(wires=wires, shots=shots, mps=mps)
+        self.mps = mps
+        super().__init__(wires=wires, shots=shots)
+
+    @property
+    def name(self):
+        option = "-mps" if self.mps else ""
+        return f"tensornet{option}"
