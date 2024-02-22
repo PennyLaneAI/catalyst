@@ -68,7 +68,7 @@ class BaseCudaInstructionSet(qml.QubitDevice):
         "RY",
         "RZ",
         "SWAP",
-        # "CSWAP", This is a bug in cuda-quantum. CSWAP is not exposed.
+        "CSWAP",
     ]
     observables = []
     config = Path(__file__).parent / "cuda_quantum.toml"
