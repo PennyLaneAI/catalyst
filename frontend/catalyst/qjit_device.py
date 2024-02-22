@@ -200,3 +200,128 @@ class QJITDevice(qml.QubitDevice):
 
         self.check_validity(expanded_tape.operations, [])
         return expanded_tape
+
+
+class QJITDeviceNewAPI(qml.devices.Device):
+    """QJIT device.
+
+    A device that interfaces the compilation pipeline of Pennylane programs.
+
+    Args:
+        wires (int): the number of wires to initialize the device with
+        shots (int): How many times the circuit should be evaluated (or sampled) to estimate
+            the expectation values. Defaults to ``None`` if not specified. Setting
+            to ``None`` results in computing statistics like expectation values and
+            variances analytically
+        backend_name (str): name of the device from the list of supported and compiled backend
+            devices by the runtime
+        backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
+    """
+
+    # These must be present even if empty.
+    operations = []
+    observables = []
+
+    operations_supported_by_QIR_runtime = {
+        "Identity",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "S",
+        "T",
+        "PhaseShift",
+        "RX",
+        "RY",
+        "RZ",
+        "Rot",
+        "CNOT",
+        "CY",
+        "CZ",
+        "SWAP",
+        "IsingXX",
+        "IsingYY",
+        "IsingXY",
+        "ControlledPhaseShift",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "CSWAP",
+        "Toffoli",
+        "MultiRZ",
+        "QubitUnitary",
+        "ISWAP",
+        "PSWAP",
+    }
+
+    @staticmethod
+    def _get_operations_to_convert_to_matrix(_config):
+        # We currently override and only set a few gates to preserve existing behaviour.
+        # We could choose to read from config and use the "matrix" gates.
+        # However, that affects differentiability.
+        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
+        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
+        return {"MultiControlledX", "BlockEncode"}
+
+    @staticmethod
+    def _check_mid_circuit_measurement(config):
+        return config["compilation"]["mid_circuit_measurement"]
+
+    @staticmethod
+    def _check_adjoint(config):
+        return config["compilation"]["quantum_adjoint"]
+
+    @staticmethod
+    def _check_quantum_control(config):
+        return config["compilation"]["quantum_control"]
+
+    @staticmethod
+    def _set_supported_operations(config):
+        """Override the set of supported operations."""
+        native_gates = set(config["operators"]["gates"][0]["native"])
+        qir_gates = QJITDeviceNewAPI.operations_supported_by_QIR_runtime
+        QJITDeviceNewAPI.operations = list(native_gates.intersection(qir_gates))
+
+        # These are added unconditionally.
+        QJITDeviceNewAPI.operations += ["Cond", "WhileLoop", "ForLoop"]
+
+        if QJITDeviceNewAPI._check_mid_circuit_measurement(config):  # pragma: no branch
+            QJITDeviceNewAPI.operations += ["MidCircuitMeasure"]
+
+        if QJITDeviceNewAPI._check_adjoint(config):
+            QJITDeviceNewAPI.operations += ["Adjoint"]
+
+        if QJITDeviceNewAPI._check_quantum_control(config):  # pragma: nocover
+            # TODO: Once control is added on the frontend.
+            ...
+
+    @staticmethod
+    def _set_supported_observables(config):
+        """Override the set of supported observables."""
+        QJITDeviceNewAPI.observables = config["operators"]["observables"]
+
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        config,
+        shots=None,
+        wires=None,
+        backend_name=None,
+        backend_lib=None,
+        backend_kwargs=None,
+    ):
+        QJITDeviceNewAPI._set_supported_operations(config)
+        QJITDeviceNewAPI._set_supported_observables(config)
+
+        self.config = config
+        self.backend_name = backend_name if backend_name else "default"
+        self.backend_lib = backend_lib if backend_lib else ""
+        self.backend_kwargs = backend_kwargs if backend_kwargs else {}
+        super().__init__(wires=wires, shots=shots)
+
+    def execute(self, circuits, execution_config):
+        """
+        Raises: RuntimeError
+        """
+        raise RuntimeError("QJIT devices cannot execute tapes.")  # pragma: no cover

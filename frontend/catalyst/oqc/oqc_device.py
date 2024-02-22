@@ -5,7 +5,7 @@ import pathlib
 
 
 class OQCDevice(Device):
-    
+
     config = pathlib.Path("/home/romain/Catalyst/catalyst/frontend/catalyst/oqc/oqc.toml")
 
     def __init__(self, wires, backend, shots=1024, options=None, **kwargs):
@@ -18,10 +18,10 @@ class OQCDevice(Device):
     @property
     def backend(self):
         return self._backend
-    
+
     @staticmethod
     def get_c_interface():
-        """ Returns a tuple consisting of the device name, and
+        """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
 
