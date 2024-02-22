@@ -1356,7 +1356,7 @@ class QCtrl(HybridOp):
 
 
 def _apply_pennylane_ctrl(op, control_wires, control_values, work_wires):
-    """ Apply the default ctrl algorithm """
+    """Apply the default ctrl algorithm"""
     try:
         from pennylane.ops.op_math.controlled import _ctrl as ctrl
     except ImportError as _:
