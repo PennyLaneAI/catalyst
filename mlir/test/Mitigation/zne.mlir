@@ -62,17 +62,17 @@ func.func @simpleCircuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode} {
 
 // CHECK:    func.func private @simpleCircuit.withoutMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> !quantum.reg {
     // CHECK:    [[q_0:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
+    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
+    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
+    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
     // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
     // CHECK:    return [[q_4]] : !quantum.reg
 
 // CHECK:    func.func private @simpleCircuit.withMeasurements(%arg0: tensor<3xf64>, %arg1: !quantum.reg) -> f64 {
     // CHECK:    [[q_0:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
+    // CHECK:    [[q_1:%.+]] = quantum.custom "h"() [[q_0]] : !quantum.bit
+    // CHECK:    [[q_2:%.+]] = quantum.custom "rz"({{.*}}) [[q_1]] : !quantum.bit
+    // CHECK:    [[q_3:%.+]] = quantum.custom "u3"({{.*}}, {{.*}}, {{.*}}) [[q_2]] : !quantum.bit
     // CHECK:    [[q_4:%.+]] = quantum.insert %arg1[ 0], [[q_3]] : !quantum.reg, !quantum.bit
     // CHECK:    [[q_5:%.+]] = quantum.namedobs [[q_3]][ PauliX] : !quantum.obs
     // CHECK:    [[resulst:%.+]] = quantum.expval [[q_5]] : f64

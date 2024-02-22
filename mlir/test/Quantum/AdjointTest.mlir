@@ -182,18 +182,18 @@ func.func private @circuit(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
 }
 
 // CHECK:   func.func private @circuit.adjoint(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
-// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
+// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
 
 // CHECK:   func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> {
-// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
 // CHECK:   call @circuit.adjoint(%arg0, {{%.+}}) : (f64, !quantum.reg) -> !quantum.reg
-// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint, odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
-// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} {odsResultSegmentSizes = array<i32: 1, 0>} : !quantum.bit
+// CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
+// CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} : !quantum.bit
 
 func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
