@@ -86,18 +86,19 @@ class BaseCudaInstructionSet(qml.QubitDevice):
 class SoftwareQQPP(BaseCudaInstructionSet):
     """Concrete device class for qpp-cpu"""
 
-    name = "SoftwareQ q++ simulator"
+    formal_name = "SoftwareQ q++ simulator"
     short_name = "softwareq.qpp"
 
     @property
     def name(self):
+        """Target name"""
         return "qpp-cpu"
 
 
 class NvidiaCuStateVec(BaseCudaInstructionSet):
     """Concrete device class for CuStateVec"""
 
-    name = "CuStateVec"
+    formal_name = "CuStateVec"
     short_name = "nvidia.custatevec"
 
     def __init__(self, shots=None, wires=None, multi_gpu=False):  # pragma: no cover
@@ -106,6 +107,7 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 
     @property
     def name(self):  # pragma: no cover
+        """Target name"""
         option = "-mgpu" if self.multi_gpu else ""
         return f"nvidia{option}"
 
@@ -113,7 +115,7 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 class NvidiaCuTensorNet(BaseCudaInstructionSet):
     """Concrete device class for CuTensorNet"""
 
-    name = "CuTensorNet"
+    formal_name = "CuTensorNet"
     short_name = "nvidia.cutensornet"
 
     def __init__(self, shots=None, wires=None, mps=False):  # pragma: no cover
@@ -122,5 +124,6 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
 
     @property
     def name(self):  # pragma: no cover
+        """Target name"""
         option = "-mps" if self.mps else ""
         return f"tensornet{option}"
