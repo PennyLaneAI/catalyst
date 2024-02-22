@@ -411,7 +411,7 @@ def change_instruction(ctx, eqn):
         "RY": "ry",
         "RZ": "rz",
         "SWAP": "swap",
-        # "CSWAP": "cswap", Bug in CUDA quantum. CSWAP is not exposed.
+        "CSWAP": "cswap",
         # Other instructions that are missing:
         # ch
         # sdg
