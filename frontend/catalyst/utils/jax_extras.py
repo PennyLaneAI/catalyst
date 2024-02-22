@@ -91,6 +91,7 @@ from catalyst.utils.patching import Patcher
 
 __all__ = (
     "ClosedJaxpr",
+    "DynshapedJaxpr",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
     "Jaxpr",
@@ -107,7 +108,6 @@ __all__ = (
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "jaxpr_to_mlir",
-    "jaxpr_remove_implicit",
     "make_jaxpr_effects",
     "make_jaxpr2",
     "new_dynamic_main2",
@@ -123,6 +123,35 @@ __all__ = (
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
+
+
+class DynshapedJaxpr(ClosedJaxpr):
+    """A wrapper class to handle implicit/explicit result information used by JAX for dynamically
+    shaped arrays. Can be used inplace of any other ClosedJaxpr instance."""
+
+    def __init__(self, jaxpr: Jaxpr, consts: Sequence, output_type: OutputType):
+        super().__init__(jaxpr, consts)
+        self.output_type = output_type
+
+    def remove_implicit_results(self):
+        """Remove all implicit result values from this JAXPR.
+
+        Returns:
+            ClosedJaxpr
+        """
+        # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the
+        # unneeded tracers.
+        if not self.output_type:
+            return self
+
+        jaxpr = self.jaxpr
+        out_keep = tuple(zip(*self.output_type))[1]
+        outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
+        filtered_jaxpr = Jaxpr(
+            jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
+        )
+
+        return ClosedJaxpr(filtered_jaxpr, self.consts)
 
 
 @contextmanager
@@ -467,22 +496,6 @@ def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     return args_flat
 
 
-def jaxpr_remove_implicit(
-    closed_jaxpr: ClosedJaxpr, out_type: OutputType
-) -> tuple[ClosedJaxpr, OutputType]:
-    """Remove all the implicit result values of the ``closed_jaxpr``."""
-    # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the unneeded
-    # tracers.
-    jaxpr = closed_jaxpr.jaxpr
-    out_keep = list(tuple(zip(*out_type))[1]) if len(out_type) > 0 else []
-    outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
-    out_type2 = [o for o, keep in zip(out_type, out_keep) if keep]
-    jaxpr2 = Jaxpr(
-        jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
-    )
-    return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
-
-
 def make_jaxpr2(
     fun: Callable,
     static_argnums: Any | None = None,
@@ -521,9 +534,9 @@ def make_jaxpr2(
             in_type, in_tree = abstractify(args, kwargs)
             f, out_tree_promise = flatten_fun(f, in_tree)
             f = annotate(f, in_type)
-            jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
-        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        return closed_jaxpr, out_type, out_tree_promise()
+            jaxpr, output_type, consts = trace_to_jaxpr_dynamic2(f)
+        closed_jaxpr = DynshapedJaxpr(jaxpr, consts, output_type)
+        return closed_jaxpr, out_tree_promise()
 
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
     return make_jaxpr_f

@@ -62,6 +62,7 @@ from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
+    DynshapedJaxpr,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
@@ -70,7 +71,6 @@ from catalyst.utils.jax_extras import (
     convert_element_type,
     deduce_avals,
     eval_jaxpr,
-    jaxpr_remove_implicit,
     jaxpr_to_mlir,
     make_jaxpr2,
     sort_eqns,
@@ -100,7 +100,7 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -354,10 +354,7 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
                 "static_argnums": static_argnums,
                 "abstracted_axes": abstracted_axes,
             }
-            jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
-
-        # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-        jaxpr, _ = jaxpr_remove_implicit(jaxpr, out_type)
+            jaxpr, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     return jaxpr, out_treedef
 
@@ -381,6 +378,10 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     mlir_fn_cache.clear()
 
     with transient_jax_config():
+        # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
+        if isinstance(jaxpr, DynshapedJaxpr):
+            jaxpr = jaxpr.remove_implicit_results()
+
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
 
     return mlir_module, ctx
