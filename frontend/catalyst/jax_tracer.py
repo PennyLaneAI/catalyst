@@ -24,7 +24,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
-from pennylane.ops import Controlled
+from pennylane.ops import Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -395,9 +395,11 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def _bind_op(qrp, op, controlled_wires, controlled_values):
-        if isinstance(op, Controlled):
-            return _bind_op(qrp, op.base, op.control_wires, op.control_values)
+    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+        # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
+        # `Controlled(OP)` bind OP with native quantum control syntax.
+        if (op.__class__ is Controlled) or (op.__class__ is ControlledOp):
+            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -431,7 +433,7 @@ def trace_quantum_tape(
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
             else:
-                qrp2 = _bind_op(qrp, op, [], [])
+                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
