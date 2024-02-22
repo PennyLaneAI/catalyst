@@ -53,8 +53,8 @@ entry_points = {
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
         "catalyst.ops = catalyst:pennylane_extensions",
         "catalyst.qjit = catalyst:qjit",
-        "cuda_quantum.context = catalyst.cuda:EvaluationContext",
-        "cuda_quantum.ops = catalyst.cuda:pennylane_extensions",
+        "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
+        "cuda_quantum.ops = catalyst:pennylane_extensions",
         "cuda_quantum.qjit = catalyst.cuda:qjit",
     ],
 }
