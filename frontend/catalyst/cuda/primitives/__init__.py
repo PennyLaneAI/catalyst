@@ -401,7 +401,7 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
         # But in Catalyst, these are floats.
         # So we use floats.
         bitarray = [float(bit) for bit in bitstring]
-        for c in range(count):
+        for _ in range(count):
             aggregate.append(bitarray)
 
     return jax.numpy.array(aggregate)
