@@ -27,6 +27,7 @@ from catalyst.utils.exceptions import CompileError
 # when we are running kokkos. Importing CUDA before running any kokkos
 # kernel polutes the environment and will create a segfault.
 # pylint: disable=import-outside-toplevel
+# pylint: disable=too-many-public-methods
 
 
 @pytest.mark.cuda
