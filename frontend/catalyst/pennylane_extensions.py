@@ -72,6 +72,7 @@ from catalyst.jax_tracer import (
     unify_result_types,
 )
 from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
+
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
