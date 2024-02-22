@@ -71,6 +71,7 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
     unify_result_types,
 )
+from catalyst.qjit_device import QJITDevice
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -92,7 +93,6 @@ from catalyst.utils.jax_extras import (
     unzip2,
 )
 from catalyst.utils.runtime import extract_backend_info, get_lib_path
-from catalyst.qjit_device import QJITDevice
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
