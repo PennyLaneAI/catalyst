@@ -1355,21 +1355,19 @@ class QCtrl(HybridOp):
         return self._work_wires
 
 
-def _apply_default_control(op, control_wires, control_values, work_wires):
-    # TODO: Enable when ready
-    # ctrl_op = _try_wrap_in_custom_ctrl_op(
-    #     op, control_wires, control_values=control_values, work_wires=work_wires
-    # )
-    # if ctrl_op is not None:
-    #     return ctrl_op
-    # pauli_x_based_ctrl_ops = _get_pauli_x_based_ops()
-    # # Special handling for PauliX-based controlled operations
-    # if isinstance(op, pauli_x_based_ctrl_ops):
-    #     return _handle_pauli_x_based_controlled_ops(op, control_wires, control_values, work_wires)
+def _apply_pennylane_ctrl(op, control_wires, control_values, work_wires):
+    """ Apply the default ctrl algorithm """
+    try:
+        from pennylane.ops.op_math.controlled import _ctrl as ctrl
+    except ImportError as _:
+        # Older PL versions do not have separate _ctrl implementations so we apply `Controlled`
+        # directly. By this we skip some automatic transformations like
+        # `Controlled(PauliX) -> CNOT`
+        ctrl = Controlled
 
-    return Controlled(
+    return ctrl(
         op,
-        control_wires=control_wires,
+        control_wires,
         control_values=control_values,
         work_wires=work_wires,
     )
@@ -1413,7 +1411,7 @@ def qctrl_distribute(
                 ops2.append(op)
         else:
             ops2.append(
-                _apply_default_control(
+                _apply_pennylane_ctrl(
                     copy.copy(op),
                     control_wires=control_wires,
                     control_values=control_values,
