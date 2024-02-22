@@ -34,19 +34,19 @@ class TestVectorizeMap:
         def workflow(axes_dct):
             return axes_dct["x"] + axes_dct["y"]
 
-        excepted = jnp.array([1, 2, 3, 4, 5])
+        expected = jnp.array([1, 2, 3, 4, 5])
 
         # Outside qjit
         result_out = vmap_fn(qjit(workflow), in_axes=({"x": None, "y": 0},))(
             {"x": 1, "y": jnp.arange(5)}
         )
-        assert jnp.allclose(result_out, excepted)
+        assert jnp.allclose(result_out, expected)
 
         # Inside qjit
         result_in = qjit(vmap_fn(workflow, in_axes=({"x": None, "y": 0},)))(
             {"x": 1, "y": jnp.arange(5)}
         )
-        assert jnp.allclose(result_in, excepted)
+        assert jnp.allclose(result_in, expected)
 
     @pytest.mark.parametrize("vmap_fn", (jax.vmap, vmap))
     def test_simple_circuit(self, vmap_fn, backend):
@@ -124,11 +124,11 @@ class TestVectorizeMap:
         )
 
         result = workflow(x)
-        excepted = jnp.array([0.93005586, 0.00498127, -0.88789978])
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(result[1], excepted)
-        assert jnp.allclose(result[2], excepted)
-        assert jnp.allclose(result[3], excepted[0])
+        expected = jnp.array([0.93005586, 0.00498127, -0.88789978])
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
+        assert jnp.allclose(result[2], expected)
+        assert jnp.allclose(result[3], expected[0])
 
     def test_vmap_nonzero_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with axes > 0."""
@@ -155,9 +155,41 @@ class TestVectorizeMap:
         )
 
         result = workflow(x)
-        excepted = jnp.array([0.93005586, 0.00498127])
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(result[1], excepted)
+        expected = jnp.array([0.93005586, 0.00498127])
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
+
+    def test_vmap_nonzero_axes_2(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with axes > 0."""
+
+        @qjit
+        def workflow(y, x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(y, x):
+                qml.RX(jnp.pi * x[0] * y, wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2] * y, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            res1 = vmap(circuit, in_axes=[None, 1])(y[0], x)
+            res2 = vmap(circuit, in_axes=(0, 1))(y, x)
+            return res1, res2
+
+        x = jnp.array(
+            [
+                [0.1, 0.4],
+                [0.2, 0.5],
+                [0.3, 0.6],
+            ]
+        )
+
+        y = jnp.array([1, 2])
+
+        result = workflow(y, x)
+        expected = jnp.array([0.93005586, 0.00498127])
+        expected2 = jnp.array([0.93005586, -0.97884155])
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected2)
 
     def test_vmap_failed_nonint_check(self, backend):
         """Test catalyst.vmap with invalid type of in_axes."""
@@ -263,12 +295,12 @@ class TestVectorizeMap:
         )
 
         result = workflow(x, y, 1)
-        excepted = jnp.array([0.93005586, 0.00498127, -0.88789978]) * y
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(result[1], excepted)
-        assert jnp.allclose(result[2], excepted)
-        assert jnp.allclose(result[3], excepted)
-        assert jnp.allclose(result[4], excepted[:2])
+        expected = jnp.array([0.93005586, 0.00498127, -0.88789978]) * y
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
+        assert jnp.allclose(result[2], expected)
+        assert jnp.allclose(result[3], expected)
+        assert jnp.allclose(result[4], expected[:2])
 
     def test_vmap_tuple_in_axes_multiple_nonuniform(self, backend):
         """Test expected ValueError with non-uniform batch sizes."""
@@ -294,13 +326,13 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid batch sizes; expected to get a uniform batch sizes",
+            match="Invalid batch sizes; expected the batch size to be the same for all arguments",
         ):
             qjit(workflow)(x, y1)
 
         with pytest.raises(
             ValueError,
-            match="Invalid batch sizes; expected to get a uniform batch sizes",
+            match="Invalid batch sizes; expected the batch size to be the same for all arguments",
         ):
             qjit(workflow)(x, y2)
 
@@ -343,12 +375,12 @@ class TestVectorizeMap:
         )
 
         result = workflow(x, y, 1)
-        excepted = jnp.array([-0.93005586, -0.97165424, -0.6987465])
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(result[1], excepted)
-        assert jnp.allclose(result[2], excepted)
-        assert jnp.allclose(result[3], excepted)
-        assert jnp.allclose(result[4], excepted[:2])
+        expected = jnp.array([-0.93005586, -0.97165424, -0.6987465])
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
+        assert jnp.allclose(result[2], expected)
+        assert jnp.allclose(result[3], expected)
+        assert jnp.allclose(result[4], expected[:2])
 
     def test_vmap_pytree_in_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a PyTree in_axes."""
@@ -390,11 +422,11 @@ class TestVectorizeMap:
         }
 
         result = workflow(x, y, 1)
-        excepted = jnp.array([0.93005586, 0.00498127, -0.88789978]) * y
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(result[1], excepted)
-        assert jnp.allclose(result[2], excepted)
-        assert jnp.allclose(result[3], excepted)
+        expected = jnp.array([0.93005586, 0.00498127, -0.88789978]) * y
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
+        assert jnp.allclose(result[2], expected)
+        assert jnp.allclose(result[3], expected)
 
     def test_vmap_circuit_return_tensor(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT returning tensors."""
@@ -415,14 +447,14 @@ class TestVectorizeMap:
         x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
 
         result = workflow(x)
-        excepted = jnp.array(
+        expected = jnp.array(
             [
                 [0.98235508 + 0.00253459j, 0.0198374 - 0.18595308j],
                 [0.10537427 + 0.2120056j, 0.23239136 - 0.94336851j],
             ]
         )
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(result[1], excepted)
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
 
     def test_vmap_circuit_return_tensor_out_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with out_axes."""
@@ -443,14 +475,14 @@ class TestVectorizeMap:
         x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
 
         result = workflow(x)
-        excepted = jnp.array(
+        expected = jnp.array(
             [
                 [0.98235508 + 0.00253459j, 0.0198374 - 0.18595308j],
                 [0.10537427 + 0.2120056j, 0.23239136 - 0.94336851j],
             ]
         )
-        assert jnp.allclose(result[0], excepted)
-        assert jnp.allclose(jnp.transpose(result[1], (1, 0)), excepted)
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(jnp.transpose(result[1], (1, 0)), expected)
 
     def test_vmap_circuit_return_tensor_pytree(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT returning PyTrees."""
@@ -513,3 +545,36 @@ class TestVectorizeMap:
         assert jnp.allclose(result["b"]["c"], expected_probs)
         assert jnp.allclose(result["b"]["d"], expected_expval)
         assert jnp.allclose(result["b"]["e"], x)
+
+    def test_vmap_invalid_axis_size(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid axis_size."""
+
+        def workflow(x, y, z):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x, y):
+                qml.RX(jnp.pi * x[0] + y - y, wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            def workflow4(y, x, z):
+                return circuit(x, y) * y * z
+
+            res = vmap(workflow4, in_axes=(None, 0, None), axis_size=5)(y, x, z)
+            return res
+
+        y = jnp.pi
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid axis_size; the default batch is expected to be None, "
+            "or less than or equal to the computed batch size",
+        ):
+            qjit(workflow)(x, y, 1)

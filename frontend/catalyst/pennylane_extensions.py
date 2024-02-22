@@ -2266,7 +2266,8 @@ def vmap(
         f (Callable): A Python function containing PennyLane quantum operations.
         in_axes (Union[int, Sequence[Any]]): It specifies the value(s) over which input
             array axes to map.
-        out_axes (int): It specifies where the mapped axis should appear in the output.
+        out_axes (Union[int, Sequence[Any]]): It specifies where the mapped axis should appear
+            in the output.
         axis_size (int): An integer can be optionally provided to indicate the size of the
             axis to be mapped. If omitted, the size of the mapped axis will be inferred from
             the provided arguments.
@@ -2283,10 +2284,6 @@ def vmap(
     # Dispatch to jax.vmap when it is called outside qjit.
     if not EvaluationContext.is_tracing():
         return jax.vmap(fn, in_axes, out_axes)
-
-    # Check the validity of arguments
-    if isinstance(in_axes, list):
-        in_axes = tuple(in_axes)
 
     if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
         raise ValueError(
@@ -2364,7 +2361,6 @@ def vmap(
                 f"arguments, but got out_axes={out_axes} and out_shape={out_shape}"
             )
 
-        # TODO: replace for_loop with parallelfor_loop
         # Apply mapping batched_args[1:] ---> fn(args)'
         @for_loop(1, batch_size, 1)
         def loop_fn(i, batched_result_list):
@@ -2398,7 +2394,19 @@ def vmap(
 
 
 def _vmap_tree_flatten(args):
-    """Custom tree_flatten for vmap to keep 'None' elements into the flatten list."""
+    """
+    Custom tree_flatten function for vmap to include 'None' elements in the flattened list.
+
+    This function computes the flattened tree using the JAX library's tree_flatten function.
+    It ensures that 'None' elements from the original PyTree are preserved in the flattened list.
+    The resulting flattened tree includes 'None' elements in the correct order.
+
+    Args:
+        args (PyTree): PyTree to be flattened.
+
+    Returns:
+        List: A tuple containing the flattened elements of the PyTree, including 'None' elements.
+    """
 
     args_flat, args_tree = tree_flatten(args)
 
@@ -2407,9 +2415,8 @@ def _vmap_tree_flatten(args):
     elif args_tree.num_leaves == 0:
         return [None]
 
-    # Reverse non-None values,
-    # popped out in 'include_nones'
-    # to append args to 'flatten_tree_with_nones'
+    # Reverse the non-None values which will be popped out in 'include_nones'
+    # and append them to 'flatten_tree_with_nones' in the correct order
     args_flat.reverse()
 
     flatten_tree_with_nones = []
@@ -2429,17 +2436,41 @@ def _vmap_tree_flatten(args):
 
 
 def _get_batch_loc(axes_flat):
-    """Get the list of mapping locations in the flatten list of in- or out- axes"""
+    """
+    Get the list of mapping locations in the flattened list of in-axes or out-axes.
+
+    This function takes a flattened list of axes and identifies all elements with a
+    non-None value. The resulting list contains the indices of these non-None values,
+    indicating where the mapping should apply.
+
+    Args:
+        axes_flat (List): Flattened list of in-axes or out-axes including `None` elements.
+
+    Returns:
+        (List): A list of indices representing the locations where the mapping should be applied.
+    """
 
     return [i for i, d in enumerate(axes_flat) if d is not None]
 
 
 def _get_batch_size(args_flat, axes_flat, axis_size):
     """Get the batch size based on the provided arguments and axes specifiers, or the manually
-       specified batch size. The batch size must be the same for all arguments."""
+       specified batch size by the user request. The batch size must be the same for all arguments.
 
-    if axis_size is not None:
-        return axis_size
+    Args:
+        args_flat (List): Flatten list of arguments.
+        axes_flat (List): Flatten list of `in_axes` or `our_axes` including `None` elements.
+        axis_size (Optional[int]): Optional default batch size.
+
+    Returns:
+        (int): Returns the batch size used as the upperbound of the QJIT-compatible for loop
+            in the computation of vmap.
+
+    Raises:
+        ValueError: The batch size must be the same for all arguments.
+        ValueError: The default batch is expected to be None, or less than or equal
+        to the computed batch size.
+    """
 
     batch_sizes = []
     for arg, d in zip(args_flat, axes_flat):
@@ -2449,8 +2480,20 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
     if any(size != batch_sizes[0] for size in batch_sizes[1:]):
         raise ValueError(
-            "Invalid batch sizes; expected to get a uniform batch sizes, "
+            "Invalid batch sizes; expected the batch size to be the same for all arguments, "
             f"but got batch_sizes={batch_sizes} from args_flat={args_flat}"
         )
 
-    return batch_sizes[0] if batch_sizes else 0
+    batch_size = batch_sizes[0] if batch_sizes else 0
+
+    if axis_size is not None:
+        if axis_size <= batch_size:
+            return axis_size
+        else:
+            raise ValueError(
+                "Invalid axis_size; the default batch is expected to be None, "
+                "or less than or equal to the computed batch size, but got "
+                f"axis_size={axis_size} > batch_size={batch_size}"
+            )
+
+    return batch_size

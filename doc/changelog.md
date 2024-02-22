@@ -42,11 +42,6 @@
 
 * Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
   `catalyst.vmap` offers the vectorization mapping backed by `catalyst.for_loop`.
-  In terms of feature parity with `jax.vmap`, `catalyst.vmap` supports mapping of
-  any arbitrary PyTrees as input parameters or return values. Besides, you can use:
-  - `in_axes` to specify the value(s) over which input array axes to map.
-  - `out_axes` to specify where te mapped axis should appear in the output.
-  - `axis_size` to optionally indicate the size of the axis to be mapped.
 
   For example,
 
