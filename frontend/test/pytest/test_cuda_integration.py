@@ -471,6 +471,22 @@ class TestCudaQ:
         expected = catalyst_compiled()
         assert_allclose(expected, observed)
 
+    def test_state_is_jax_array(self):
+        """Test return type for state."""
+
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=3))
+        def circuit():
+            qml.Hadamard(wires=[0])
+            qml.RX(jnp.pi / 7, wires=[1])
+            qml.CSWAP(wires=[0, 1, 2])
+            return qml.state()
+
+        cuda_compiled = catalyst.cuda.qjit(circuit)
+        observed = cuda_compiled()
+        assert isinstance(observed, jax.Array)
+
     def test_error_message_using_host_context(self):
         """Test error message"""
         from catalyst.cuda import SoftwareQQPP

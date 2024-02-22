@@ -268,7 +268,7 @@ def cudaq_getstate(kernel):
 @cudaq_getstate_p.def_impl
 def cudaq_getstate_primitive_impl(kernel):
     """Concrete implementation."""
-    return cudaq.get_state(kernel)
+    return jax.numpy.array(cudaq.get_state(kernel))
 
 
 @cudaq_getstate_p.def_abstract_eval
