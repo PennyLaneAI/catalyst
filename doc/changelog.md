@@ -116,7 +116,29 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+* Add support for reset option in mid-circuit measurements.
+  [(#507)](https://github.com/PennyLaneAI/catalyst/pull/507)
+
+  This is an example of reset usage:
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def f():
+      qml.Hadamard(0)
+      m = measure(0, reset=True)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Breaking changes</h3>
+
+* `QCtrl` is overriden and never used.
+  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/522)
+
+  This is not so much a breaking change, it was just never used in the past.
+  This will be set back to its original behaviour once it is implemented in the frontend.
 
 * We match better the Jax convention for returning gradient, jacobian, vjp and jvp. Therefore some breaking
   changes about the return shapes of those functions were introduced.
@@ -215,6 +237,9 @@
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* Only set `JAX_DYNAMIC_SHAPES` configuration option during `trace_to_mlir()`.
+  [(#526)](https://github.com/PennyLaneAI/catalyst/pull/526)
 
 * Handle run time exception in async qnodes.
   [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)

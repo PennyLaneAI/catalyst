@@ -61,3 +61,9 @@ LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     }
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// ZneOp, getArgOperandsMutable
+//===----------------------------------------------------------------------===//
+
+MutableOperandRange ZneOp::getArgOperandsMutable() { return getArgsMutable(); }

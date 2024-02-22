@@ -72,7 +72,11 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
     unify_result_types,
 )
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
+)
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
@@ -274,7 +278,8 @@ class QJITDevice(qml.QubitDevice):
             QJITDevice.operations += ["Adjoint"]
 
         if QJITDevice._check_quantum_control(config):  # pragma: nocover
-            QJITDevice.operations += ["QCtrl"]
+            # TODO: Once control is added on the frontend.
+            ...
 
     @staticmethod
     def _set_supported_observables(config):
@@ -1147,9 +1152,7 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-
-        # Check if the postselect value was given, otherwise default to None
-        postselect = op.in_classical_tracers[1] if len(op.in_classical_tracers) > 1 else None
+        postselect = op.in_classical_tracers[1]
 
         qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
@@ -1954,7 +1957,9 @@ def while_loop(cond_fn):
     return _body_query
 
 
-def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
+def measure(
+    wires, reset: Optional[bool] = False, postselect: Optional[int] = None
+) -> DynamicJaxprTracer:
     """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
 
     .. important::
@@ -1964,6 +1969,7 @@ def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
 
     Args:
         wires (Wires): The wire of the qubit the measurement process applies to
+        reset (Optional[bool]): Whether to reset the wire to the |0⟩ state after measurement.
         postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
     Returns:
@@ -2010,6 +2016,22 @@ def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
 
     >>> circuit()
     -1.0
+
+    **Example with reset**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            m = measure(0, reset=True)
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit()
+    1.0
     """
     EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
@@ -2020,22 +2042,31 @@ def measure(wires, postselect: Optional[int] = None) -> DynamicJaxprTracer:
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
 
-    in_classical_tracers = wires
+    # Copy, so wires remain unmodified
+    in_classical_tracers = wires.copy()
 
-    # Check the postselect value. If given, add it to the classical tracers list
-    if postselect is not None:
-        if postselect not in [0, 1]:
-            raise TypeError(f"postselect must be '0' or '1', got {postselect}")
-        in_classical_tracers.append(postselect)
+    if postselect is not None and postselect not in [0, 1]:
+        raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+    in_classical_tracers.append(postselect)
 
     # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
-    out_classical_tracer = new_inner_tracer(ctx.trace, get_aval(True))
+    m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
-        out_classical_tracers=[out_classical_tracer],
+        out_classical_tracers=[m],
         regions=[],
     )
-    return out_classical_tracer
+
+    # If reset was requested, reset qubit only if the measurement result was 1
+    if reset:
+
+        @cond(m)
+        def reset_fn():
+            qml.PauliX(wires=wires)
+
+        reset_fn()
+
+    return m
 
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:

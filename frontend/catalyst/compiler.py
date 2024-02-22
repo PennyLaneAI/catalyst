@@ -128,7 +128,6 @@ HLO_LOWERING_PASS = (
         "func.func(hlo-legalize-to-linalg)",
         "func.func(mhlo-legalize-to-std)",
         "convert-to-signless",
-        "func.func(scalarize)",
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
@@ -179,6 +178,7 @@ BUFFERIZATION_PASS = (
 MLIR_TO_LLVM_PASS = (
     "MLIRToLLVMDialect",
     [
+        "expand-realloc",
         "convert-gradient-to-llvm",
         "func.func(convert-linalg-to-loops)",
         "convert-scf-to-cf",

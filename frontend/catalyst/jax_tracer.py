@@ -52,7 +52,11 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
@@ -70,6 +74,7 @@ from catalyst.utils.jax_extras import (
     jaxpr_to_mlir,
     make_jaxpr2,
     sort_eqns,
+    transient_jax_config,
     tree_flatten,
     tree_structure,
     tree_unflatten,
@@ -344,14 +349,12 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs):
                         explicintess flags).
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
-    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
-    # which do not exist in the current translation unit will be assumed to exist if an equivalent
-    # python function is seen in the cache. This happens during testing or if we wanted to compile a
-    # single python function multiple times with different options.
-    mlir_fn_cache.clear()
 
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-        make_jaxpr_kwargs = {"static_argnums": static_argnums, "abstracted_axes": abstracted_axes}
+        make_jaxpr_kwargs = {
+            "abstracted_axes": abstracted_axes,
+            "static_argnums": static_argnums,
+        }
         jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
     # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
@@ -379,11 +382,18 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
                         explicintess flags).
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
+    # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
+    # which do not exist in the current translation unit will be assumed to exist if an equivalent
+    # python function is seen in the cache. This happens during testing or if we wanted to compile a
+    # single python function multiple times with different options.
+    mlir_fn_cache.clear()
 
-    jaxpr, postprocessed_jaxpr, out_type, out_tree = trace_to_jaxpr(
-        func, static_argnums, abstracted_axes, *args, **kwargs
-    )
-    module, context = jaxpr_to_mlir(func.__name__, postprocessed_jaxpr)
+    with transient_jax_config():
+        jaxpr, postprocessed_jaxpr, out_type, out_tree = trace_to_jaxpr(
+           func, static_argnums, abstracted_axes, *args, **kwargs
+        )
+        module, context = jaxpr_to_mlir(func.__name__, postprocessed_jaxpr)
+        
     return module, context, jaxpr, out_type, out_tree
 
 
