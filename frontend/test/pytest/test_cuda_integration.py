@@ -478,6 +478,28 @@ class TestCudaQ:
         with pytest.raises(CompileError, match="Cannot translate tapes with context"):
             catalyst.cuda.qjit(wrapper)(1.0)
 
+    def test_samples(self):
+        """Samples with more than one wire."""
+
+        from catalyst.cuda import qjit as cjit
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10))
+        def circuit1(a):
+            qml.RX(a, wires=0)
+            return qml.sample()
+
+        expected = circuit1(3.14)
+
+        @cjit
+        @qml.qnode(qml.device("softwareq.qpp", wires=2, shots=10))
+        def circuit2(a):
+            qml.RX(a, wires=0)
+            return qml.sample()
+
+        observed = circuit2(3.14)
+        assert_allclose(expected, observed)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
