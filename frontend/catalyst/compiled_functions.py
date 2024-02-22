@@ -80,10 +80,10 @@ class SharedObjectManager:
         """Load symbols necessary for for execution of the compiled function.
 
         Returns:
-            function: function handle
-            setup: handle to the setup function, which initializes the device
-            teardown: handle to the teardown function, which tears down the device
-            mem_transfer: memory transfer shared object
+            CFuncPtr: handle to the main function of the program
+            CFuncPtr: handle to the setup function, which initializes the device
+            CFuncPtr: handle to the teardown function, which tears down the device
+            CFuncPtr: handle to the memory transfer function for program results
         """
 
         setup = self.shared_object.setup
@@ -146,7 +146,7 @@ class CompiledFunction:
             *args: arguments to the function
 
         Returns:
-            retval: the value computed by the function or None if the function has no return value
+            the return values computed by the function or None if the function has no results
         """
 
         with shared_object as lib:
@@ -262,8 +262,8 @@ class CompiledFunction:
             args: the JAX arrays to be used as arguments to the function
 
         Returns:
-            c_abi_args: a list of memref descriptor pointers to return values and parameters
-            numpy_arg_buffer: A list to the return values. It must be kept around until the function
+            List: a list of memref descriptor pointers to return values and parameters
+            List: A list to the return values. It must be kept around until the function
                 finishes execution as the memref descriptors will point to memory locations inside
                 numpy arrays.
 
@@ -392,13 +392,18 @@ class CompilationCache:
         self.cache = {}
 
     def get_function_status_and_key(self, args):
-        """Check if the provided arguments match an existing function in the cache.
+        """Check if the provided arguments match an existing function in the cache. The cache
+        status of the function is returned as a compilation action:
+         - no match: requires compilation
+         - partial match: requires argument promotion
+         - full match: skip promotion
 
         Args:
             args: arguments to match to existing functions
 
         Returns:
-            Tuple[TypeCompatibility, CacheKey | None]
+            TypeCompatibility
+            CacheKey | None
         """
         if not self.cache:
             return TypeCompatibility.NEEDS_COMPILATION, None
@@ -421,7 +426,8 @@ class CompilationCache:
             args (Iterable): the arguments to match to existing functions
 
         Returns:
-            Tuple[CacheEntry | None, bool]
+            CacheEntry | None: the matched cache entry
+            bool: whether the matched entry requires argument promotion
         """
         action, key = self.get_function_status_and_key(args)
 
