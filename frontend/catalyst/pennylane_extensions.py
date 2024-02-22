@@ -1359,6 +1359,7 @@ def _apply_pennylane_ctrl(op, control_wires, control_values, work_wires):
     """Apply the default ctrl algorithm"""
     try:
         # Introduced by https://github.com/PennyLaneAI/pennylane/pull/5247
+        # pylint: disable=import-outside-toplevel
         from pennylane.ops.op_math.controlled import _ctrl as ctrl_fn
     except ImportError as _:
         # Older PL versions do not have separate _ctrl implementations so we apply `Controlled`
