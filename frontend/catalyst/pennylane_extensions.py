@@ -42,11 +42,13 @@ from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
 from pennylane.ops import Controlled
-from pennylane.ops.op_math.controlled import (
-    _get_pauli_x_based_ops,
-    _handle_pauli_x_based_controlled_ops,
-    _try_wrap_in_custom_ctrl_op,
-)
+
+# TODO: Enable when ready
+# from pennylane.ops.op_math.controlled import (
+#     _get_pauli_x_based_ops,
+#     _handle_pauli_x_based_controlled_ops,
+#     _try_wrap_in_custom_ctrl_op,
+# )
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -1350,17 +1352,16 @@ class QCtrl(HybridOp):
 
 
 def _apply_default_control(op, control_wires, control_values, work_wires):
-    ctrl_op = _try_wrap_in_custom_ctrl_op(
-        op, control_wires, control_values=control_values, work_wires=work_wires
-    )
-    if ctrl_op is not None:
-        return ctrl_op
-
-    pauli_x_based_ctrl_ops = _get_pauli_x_based_ops()
-
-    # Special handling for PauliX-based controlled operations
-    if isinstance(op, pauli_x_based_ctrl_ops):
-        return _handle_pauli_x_based_controlled_ops(op, control_wires, control_values, work_wires)
+    # TODO: Enable when ready
+    # ctrl_op = _try_wrap_in_custom_ctrl_op(
+    #     op, control_wires, control_values=control_values, work_wires=work_wires
+    # )
+    # if ctrl_op is not None:
+    #     return ctrl_op
+    # pauli_x_based_ctrl_ops = _get_pauli_x_based_ops()
+    # # Special handling for PauliX-based controlled operations
+    # if isinstance(op, pauli_x_based_ctrl_ops):
+    #     return _handle_pauli_x_based_controlled_ops(op, control_wires, control_values, work_wires)
 
     return Controlled(
         op,
