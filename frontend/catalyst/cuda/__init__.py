@@ -105,7 +105,7 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
         super().__init__(wires=wires, shots=shots)
 
     @property
-    def name(self):
+    def name(self):  # pragma: no cover
         option = "-mgpu" if self.multi_gpu else ""
         return f"nvidia{option}"
 
@@ -121,6 +121,6 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
         super().__init__(wires=wires, shots=shots)
 
     @property
-    def name(self):
+    def name(self):  # pragma: no cover
         option = "-mps" if self.mps else ""
         return f"tensornet{option}"
