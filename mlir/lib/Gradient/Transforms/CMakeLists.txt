@@ -18,6 +18,7 @@ set(LIBS
     MLIRCatalyst
     MLIRCatalystUtils
     MLIRGradient
+    MLIRGradientAnalysis
     GradientUtils
     MLIRQuantum
     QuantumUtils

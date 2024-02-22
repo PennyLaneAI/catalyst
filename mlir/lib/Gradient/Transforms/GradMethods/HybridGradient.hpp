@@ -25,11 +25,15 @@ namespace gradient {
 /// A pattern responsible for common transformations required when differentiating hybrid circuits
 /// with Enzyme.
 struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
-    using OpRewritePattern<GradOp>::OpRewritePattern;
+    HybridGradientLowering(MLIRContext *ctx, bool printActivity)
+        : OpRewritePattern(ctx), printActivity(printActivity)
+    {
+    }
 
     mlir::LogicalResult matchAndRewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
 
   private:
+    bool printActivity;
     /// Recursively process all the QNodes of the `callee` being differentiated. The resulting
     /// BackpropOps will be called with `backpropArgs`.
     static mlir::FailureOr<mlir::func::FuncOp>

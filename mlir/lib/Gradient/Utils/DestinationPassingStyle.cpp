@@ -45,7 +45,7 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
     dpsArgumentTypes.append(memRefReturnTypes);
     auto dpsFunctionType = FunctionType::get(ctx, dpsArgumentTypes, nonMemRefReturns);
 
-    if (callee.isDeclaration()) {
+    if (callee.isExternal()) {
         // If the function does not have a body, we are done after modifying the function type.
         callee.setFunctionType(dpsFunctionType);
         return;

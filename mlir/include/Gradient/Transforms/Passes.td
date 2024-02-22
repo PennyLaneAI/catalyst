@@ -43,6 +43,22 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
     ];
 
     let constructor = "catalyst::createGradientLoweringPass()";
+    let options = [
+        Option<
+            /*C++ var name=*/"enableActivity",
+            /*CLI arg name=*/"activity-analysis",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Skip computation of gate parameters statically proven to be unnecessary."
+        >,
+        Option<
+            /*C++ var name=*/"printActivity",
+            /*CLI arg name=*/"print-activity",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Print the results of activity analysis to stderr."
+        >
+    ];
 }
 
 def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {

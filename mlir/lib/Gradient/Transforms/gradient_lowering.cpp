@@ -17,6 +17,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -28,6 +29,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Utils/CallGraph.h"
+#include "Gradient/Analysis/ActivityAnalysis.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -50,7 +53,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
     void runOnOperation() final
     {
         RewritePatternSet gradientPatterns(&getContext());
-        populateLoweringPatterns(gradientPatterns);
+        populateLoweringPatterns(gradientPatterns, printActivity);
 
         // This is required to remove qubit values returned by if/for ops in the
         // quantum gradient function of the parameter-shift pattern.
