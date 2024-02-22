@@ -75,6 +75,36 @@ def print(x, memref=False):
         builtins.print(x)
 
 
+def print_compilation_stage(fn, stage):
+    """Print one of the recorded compilation stages for a JIT-compiled function.
+
+    The stages are indexed by their Catalyst compilation pipeline name, which are either provided
+    by the user as a compilation option, or predefined in ``catalyst.compiler``.
+
+    Requires ``keep_intermediate=True``.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        stage (str): string corresponding with the name of the stage to be printed
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit(keep_intermediate=True)
+        def func(x: float):
+            return x
+
+        debug.print_compilation_stage(func, "HLOLoweringPass")
+    """
+    EvaluationContext.check_is_not_tracing("C interface cannot be generated from tracing context.")
+
+    if not isinstance(fn, catalyst.QJIT):
+        raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
+
+    print(fn.compiler.get_output_of(stage))
+
+
 def get_cmain(fn, *args):
     """Return a C program that calls a jitted function with the provided arguments.
 
@@ -133,7 +163,7 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
             }
         \"""
 
-        compiled_function = compile_from_mlir(ir)
+        compiled_function = debug.compile_from_mlir(ir)
 
     >>> compiled_function(0.1)
     [0.1]
