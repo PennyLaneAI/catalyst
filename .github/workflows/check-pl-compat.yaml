@@ -21,6 +21,8 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+      with:
+        use_release_tag: ${{ inputs.catalyst == 'stable' }}
 
   check-config:
     name: Build Configuration
