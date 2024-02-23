@@ -41,8 +41,7 @@ def qjit(fn=None, **kwargs):
 class BaseCudaInstructionSet(qml.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 
-    # TODO: Once 0.35 is released, remove -dev suffix.
-    pennylane_requires = "0.34"
+    pennylane_requires = ">=0.34"
     version = "0.1.0"
     author = "Xanadu, Inc."
 
@@ -86,7 +85,6 @@ class BaseCudaInstructionSet(qml.QubitDevice):
 class SoftwareQQPP(BaseCudaInstructionSet):
     """Concrete device class for qpp-cpu"""
 
-    formal_name = "SoftwareQ q++ simulator"
     short_name = "softwareq.qpp"
 
     @property
@@ -98,7 +96,6 @@ class SoftwareQQPP(BaseCudaInstructionSet):
 class NvidiaCuStateVec(BaseCudaInstructionSet):
     """Concrete device class for CuStateVec"""
 
-    formal_name = "CuStateVec"
     short_name = "nvidia.custatevec"
 
     def __init__(self, shots=None, wires=None, multi_gpu=False):  # pragma: no cover
@@ -115,7 +112,6 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 class NvidiaCuTensorNet(BaseCudaInstructionSet):
     """Concrete device class for CuTensorNet"""
 
-    formal_name = "CuTensorNet"
     short_name = "nvidia.cutensornet"
 
     def __init__(self, shots=None, wires=None, mps=False):  # pragma: no cover
