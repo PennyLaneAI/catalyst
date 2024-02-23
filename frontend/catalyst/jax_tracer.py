@@ -31,7 +31,7 @@ from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    DynshapedJaxpr,
+    DynshapedClosedJaxpr,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
@@ -379,7 +379,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
 
     with transient_jax_config():
         # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-        if isinstance(jaxpr, DynshapedJaxpr):
+        if isinstance(jaxpr, DynshapedClosedJaxpr):
             jaxpr = jaxpr.remove_implicit_results()
 
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)

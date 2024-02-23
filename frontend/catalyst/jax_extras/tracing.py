@@ -68,7 +68,7 @@ from catalyst.utils.patching import Patcher
 
 __all__ = (
     "ClosedJaxpr",
-    "DynshapedJaxpr",
+    "DynshapedClosedJaxpr",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
     "Jaxpr",
@@ -102,7 +102,7 @@ __all__ = (
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
 
 
-class DynshapedJaxpr(ClosedJaxpr):
+class DynshapedClosedJaxpr(ClosedJaxpr):
     """A wrapper class to handle implicit/explicit result information used by JAX for dynamically
     shaped arrays. Can be used inplace of any other ClosedJaxpr instance."""
 
@@ -393,7 +393,7 @@ def make_jaxpr2(
             f, out_tree_promise = flatten_fun(f, in_tree)
             f = annotate(f, in_type)
             jaxpr, output_type, consts = trace_to_jaxpr_dynamic2(f)
-        closed_jaxpr = DynshapedJaxpr(jaxpr, consts, output_type)
+        closed_jaxpr = DynshapedClosedJaxpr(jaxpr, consts, output_type)
         return closed_jaxpr, out_tree_promise()
 
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
