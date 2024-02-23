@@ -31,7 +31,6 @@ from catalyst.utils.exceptions import CompileError
 
 
 @pytest.mark.cuda
-@pytest.mark.skip("for now")
 class TestCudaQ:
     """CUDA Quantum integration tests. Skip if kokkos."""
 
