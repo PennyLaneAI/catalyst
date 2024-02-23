@@ -91,6 +91,7 @@ from .primitives import (
     kernel_qalloc,
     mz_call,
     qreg_getitem,
+    cudaq_for,
 )
 
 # We disable protected access in particular to avoid warnings with
@@ -708,6 +709,34 @@ def change_adjoint(ctx, eqn):
     _map(ctx.write, eqn.outvars, [register])
 
 
+def change_for(ctx, eqn):
+    assert eqn.primitive == for_p
+    # read input operands
+    invals = _map(ctx.read, eqn.invars)
+    # [0, b, 1, 0, f]
+    # start, end, step, loop_var, wires
+    start = invals[0]
+    end = invals[1]
+    loop_body = eqn.params['body_jaxpr'].jaxpr
+
+    class LoopContext:
+        def __init__(self, ctx, loop_body):
+            self.ctx = ctx
+            self.loop_body = loop_body
+            self.outvars = None
+
+        def interp_iter(self, iter):
+            res = interpret_impl(self.ctx, self.loop_body)
+            # _map(self.ctx.write, loop_body.outvars, res)
+            self.outvars = res
+
+    # before interpretation
+    _map(ctx.write, loop_body.invars, invals[3:])
+    body_ctx = LoopContext(ctx, loop_body)
+    cudaq_for(ctx.kernel, start, end, body_ctx.interp_iter)
+    _map(ctx.write, eqn.outvars, body_ctx.outvars)
+
+
 def ignore_impl(_ctx, _eqn):
     """No-op"""
 
@@ -744,6 +773,7 @@ INST_IMPL = {
     namedobs_p: change_namedobs,
     hamiltonian_p: change_hamiltonian,
     adjoint_p: change_adjoint,
+    for_p: change_for,
     # ignore set of instructions we don't care about.
     # because they have been handled before or they are just
     # not necessary in the CUDA-quantum API.
@@ -759,7 +789,6 @@ INST_IMPL = {
     probs_p: unimplemented_impl,
     cond_p: unimplemented_impl,
     while_p: unimplemented_impl,
-    for_p: unimplemented_impl,
     grad_p: unimplemented_impl,
     func_p: unimplemented_impl,
     jvp_p: unimplemented_impl,
