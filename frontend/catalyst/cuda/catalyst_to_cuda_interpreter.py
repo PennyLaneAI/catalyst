@@ -275,18 +275,11 @@ def change_device_to_cuda_device(ctx):
 
     device_name = qdevice_eqn.params.get("rtd_name")
 
-    # TODO(@erick-xanadu) as more devices become available
-    # map the names here.
-    # TODO(@erick-xanadu) why does the device instruction lists the whole
-    # name instead of a short name?
-    target_map = {"SoftwareQ q++ simulator": "qpp-cpu"}
-    target = target_map.get(device_name, device_name)
-
-    if not target or not cudaq.has_target(target):
-        msg = f"Unavailable target {target}."  # pragma: no cover
+    if not cudaq.has_target(device_name):
+        msg = f"Unavailable target {device_name}."  # pragma: no cover
         raise ValueError(msg)
 
-    cudaq_target = cudaq.get_target(target)
+    cudaq_target = cudaq.get_target(device_name)
     cudaq.set_target(cudaq_target)
 
     # cudaq_make_kernel returns a multiple values depending on the arguments.
@@ -411,7 +404,7 @@ def change_instruction(ctx, eqn):
         "RY": "ry",
         "RZ": "rz",
         "SWAP": "swap",
-        # "CSWAP": "cswap", Bug in CUDA quantum. CSWAP is not exposed.
+        "CSWAP": "cswap",
         # Other instructions that are missing:
         # ch
         # sdg
