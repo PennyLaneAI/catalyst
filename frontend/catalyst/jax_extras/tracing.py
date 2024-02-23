@@ -43,15 +43,7 @@ from jax._src.util import partition_list, safe_map, unzip2, unzip3, wraps
 from jax.api_util import flatten_fun
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import (
-    ShapedArray,
-    Trace,
-    Tracer,
-    concrete_aval,
-    eval_jaxpr,
-    gensym,
-    thread_local_state,
-)
+from jax.core import ShapedArray, Trace, eval_jaxpr, gensym, thread_local_state
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,

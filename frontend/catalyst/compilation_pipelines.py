@@ -34,7 +34,6 @@ import catalyst
 from catalyst.ag_utils import run_autograph
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.jax_extras import get_aval2, get_implicit_and_explicit_flat_args
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.tracing.contexts import EvaluationContext
