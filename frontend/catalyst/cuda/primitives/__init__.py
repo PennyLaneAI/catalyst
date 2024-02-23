@@ -268,7 +268,7 @@ def cudaq_getstate(kernel):
 @cudaq_getstate_p.def_impl
 def cudaq_getstate_primitive_impl(kernel):
     """Concrete implementation."""
-    return cudaq.get_state(kernel)
+    return jax.numpy.array(cudaq.get_state(kernel))
 
 
 @cudaq_getstate_p.def_abstract_eval
@@ -394,9 +394,17 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
     So, let's perform a little conversion here.
     """
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
-    lls = [[k] * v for k, v in a_dict.items()]
-    # Weirdly enough Catalyst returns this transposed.
-    return jax.numpy.atleast_2d(jax.numpy.array([int(l) for ls in lls for l in ls])).T
+    aggregate = []
+    for bitstring, count in a_dict.items():
+        # It is technically a bit array
+        # So we should use int(bit)
+        # But in Catalyst, these are floats.
+        # So we use floats.
+        bitarray = [float(bit) for bit in bitstring]
+        for _ in range(count):
+            aggregate.append(bitarray)
+
+    return jax.numpy.array(aggregate)
 
 
 @cudaq_sample_p.def_abstract_eval
