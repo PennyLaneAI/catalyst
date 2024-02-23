@@ -44,6 +44,21 @@ from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (  # infer_output_type3,
+    ClosedJaxpr,
+    DynamicJaxprTracer,
+    Jaxpr,
+    ShapedArray,
+    _initial_style_jaxpr,
+    _input_type_to_tracers,
+    convert_constvars_jaxpr,
+    deduce_avals,
+    get_implicit_and_explicit_flat_args,
+    initial_style_jaxprs_with_common_consts1,
+    initial_style_jaxprs_with_common_consts2,
+    new_inner_tracer,
+    unzip2,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     GradParams,
@@ -65,7 +80,6 @@ from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
-    deduce_avals,
     has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
@@ -78,20 +92,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.utils.jax_extras import (
-    ClosedJaxpr,
-    DynamicJaxprTracer,
-    Jaxpr,
-    ShapedArray,
-    _initial_style_jaxpr,
-    _input_type_to_tracers,
-    convert_constvars_jaxpr,
-    get_implicit_and_explicit_flat_args,
-    initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
-    new_inner_tracer,
-    unzip2,
-)
 from catalyst.utils.runtime import extract_backend_info, get_lib_path
 
 
