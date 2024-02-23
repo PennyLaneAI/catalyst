@@ -468,6 +468,7 @@ class TestCudaQ:
 
 @pytest.mark.cuda
 class TestForLoops:
+    """Test for loops."""
 
     def test_basic_loop(self):
         """Test simple for loop."""
@@ -499,6 +500,8 @@ class TestForLoops:
         assert_allclose(expected, observed)
 
     def test_loop_caried_values(self):
+        """Test for loop with updating loop carried values."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(n):
             @for_loop(0, n, 1)
@@ -528,6 +531,8 @@ class TestForLoops:
         assert_allclose(expected, observed)
 
     def test_dynamic_wires(self):
+        """Test for loops with iteration index-dependant wires."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=6))
         def circuit_lightning(n: int):
             @for_loop(0, n - 1, 1)
@@ -555,10 +560,11 @@ class TestForLoops:
         assert_allclose(expected, observed)
 
     def test_closure(self):
+        """Test for loop with captured values (closures)."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(x):
-            y = 2 * x
-
+            # y = 2 * x
             @for_loop(0, 1, 1)
             def loop_fn(_):
                 qml.PauliX(0)
@@ -570,7 +576,7 @@ class TestForLoops:
 
         @qml.qnode(SoftwareQQPP(wires=1))
         def circuit(x):
-            y = 2 * x
+            # y = 2 * x
 
             @for_loop(0, 1, 1)
             def loop_fn(_):
@@ -586,6 +592,8 @@ class TestForLoops:
         assert_allclose(expected, observed)
 
     def test_nested_loops(self):
+        """Test nested for loops."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit_lightning(n):
             @for_loop(0, n, 1)

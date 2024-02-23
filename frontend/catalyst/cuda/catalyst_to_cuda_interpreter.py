@@ -710,6 +710,7 @@ def change_adjoint(ctx, eqn):
 
 
 def change_for(ctx, eqn):
+    """Change Catalyst for loop to an equivalent expression in CUDA."""
     assert eqn.primitive == for_p
     invals = _map(ctx.read, eqn.invars)
     start = invals[0]
@@ -719,13 +720,16 @@ def change_for(ctx, eqn):
     loop_body = eqn.params["body_jaxpr"].jaxpr
 
     class LoopContext:
+        """This class is used to capture the loop body and the context."""
+
         def __init__(self, ctx, loop_body):
+            """Capture the context and the loop body."""
             self.ctx = ctx
             self.loop_body = loop_body
             self.outvars = None
 
-        # cuda_q.for_loop calls this function.
-        def interp_iter(self, iter):
+        def interp_iter(self, iteration):  # pylint: disable=unused-argument
+            """Called by cudaq.for_loop, interpret the loop body."""
             res = interpret_impl(self.ctx, self.loop_body)
             self.outvars = res
 
