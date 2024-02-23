@@ -40,6 +40,15 @@
   f(2, MyClass(5)) # no re-compilation
   ```
 
+* Catalyst now supports executing tapes in CUDA-Quantum simulators.
+  [(#477)](https://github.com/PennyLaneAI/catalyst/pull/477)
+  [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
+
+  It has added the following devices:
+  * softwareq.qpp
+  * nvidia.statevec (with support for multi-gpu)
+  * nvidia.tensornet (with support for matrix product state)
+
 <h3>Improvements</h3>
 
 * Catalyst will now remember previously compiled functions when the PyTree metadata of arguments
@@ -304,6 +313,7 @@
 
 * Handle run time exception in async qnodes.
   [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
+  [(#510)](https://github.com/PennyLaneAI/catalyst/pull/510)
 
   This is done by:
   * changeing `llvm.call` to `llvm.invoke`

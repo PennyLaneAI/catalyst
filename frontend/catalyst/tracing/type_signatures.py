@@ -27,7 +27,7 @@ from jax._src.pjit import _flat_axes_specs
 from jax.api_util import shaped_abstractify
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from catalyst.utils.jax_extras import get_aval2
+from catalyst.jax_extras import get_aval2
 from catalyst.utils.patching import Patcher
 
 
