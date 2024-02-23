@@ -29,7 +29,7 @@ from jax.interpreters.mlir import ir
 from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
-from catalyst.ag_utils import run_autograph
+from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import trace_to_mlir
