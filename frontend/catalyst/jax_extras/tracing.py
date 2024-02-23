@@ -43,7 +43,23 @@ from jax._src.util import partition_list, safe_map, unzip2, unzip3, wraps
 from jax.api_util import flatten_fun
 from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, OutputType
 from jax.core import Primitive as JaxprPrimitive
-from jax.core import ShapedArray, Trace, eval_jaxpr, gensym, thread_local_state
+from jax.core import (
+    ShapedArray,
+    Trace,
+    Tracer,
+    concrete_aval,
+    eval_jaxpr,
+    gensym,
+    thread_local_state,
+)
+from jax.interpreters.mlir import (
+    AxisContext,
+    LoweringParameters,
+    ModuleContext,
+    ir,
+    lower_jaxpr_to_fun,
+    lowerable_effects,
+)
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -90,6 +106,7 @@ __all__ = (
     "new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
+    "transient_jax_config",
     "treedef_is_leaf",
     "tree_flatten",
     "tree_structure",
@@ -99,6 +116,26 @@ __all__ = (
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
+
+
+@contextmanager
+def transient_jax_config() -> Generator[None, None, None]:
+    """Context manager which updates transient JAX configuration options,
+    yields, and then restores the original configuration values.
+    """
+    want_vals = {"jax_dynamic_shapes": True}
+    prev_vals = {}
+
+    for name, val in want_vals.items():
+        # Using ``read()`` to retrieve the value of an option is not permitted
+        # for JAX context manager flags.
+        prev_vals[name] = jax.config.values[name]
+        jax.config.update(name, val)
+
+    yield
+
+    for name, val in prev_vals.items():
+        jax.config.update(name, val)
 
 
 @contextmanager
