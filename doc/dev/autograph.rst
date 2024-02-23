@@ -29,19 +29,12 @@ restrictions and constraints you may discover.
 Using AutoGraph
 ---------------
 
-AutoGraph currently requires TensorFlow as a dependency; in most cases it can
-be installed via
+The AutoGraph feature in Catalyst is supported by the ``diastatic-malt`` package, a standalone
+fork of the AutoGraph module in TensorFlow (
+`official documentation <https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/autograph/g3doc/reference/index.md>`_
+).
 
-.. code-block:: console
-
-    pip install tensorflow
-
-but please refer to the
-`TensorFlow documentation <https://www.tensorflow.org/install>`__
-for specific details on installing TensorFlow for your platform.
-
-Once TensorFlow is available, AutoGraph can be enabled by passing
-``autograph=True`` to the ``@qjit`` decorator:
+To enable AutoGraph in Catalyst, simply pass ``autograph=True`` to the ``@qjit`` decorator:
 
 .. code-block:: python
 
@@ -661,7 +654,7 @@ of multiple measurements. For example,
         qml.RY(0.5, wires=1)
 
         m1 = measure(0)
-        m2 = measure(1)  
+        m2 = measure(1)
 
         if m1 and not m2:
             qml.Hadamard(wires=1)
@@ -713,8 +706,8 @@ Array arguments
 
 Note that, like with NumPy and JAX, logical operators apply elementwise to array arguments:
 
->>> @qjit(autograph=True)  
-... def f(x, y):  
+>>> @qjit(autograph=True)
+... def f(x, y):
 ...     return x and y
 >>> f(jnp.array([0, 1]), jnp.array([1, 1]))
 array([False,  True])
@@ -722,8 +715,8 @@ array([False,  True])
 Care must therefore be taken when using logical operators within conditional branches;
 ``jnp.all`` and ``jnp.any`` can be used to generate a single boolean for conditionals:
 
->>> @qjit(autograph=True)  
-... def f(x, y):  
+>>> @qjit(autograph=True)
+... def f(x, y):
 ...     if jnp.all(x and y):
 ...         z = 1
 ...     else:

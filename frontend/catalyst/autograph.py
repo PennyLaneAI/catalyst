@@ -13,7 +13,8 @@
 # limitations under the License.
 
 """AutoGraph is a source-to-source transformation system for converting imperative code into
-traceable code for compute graph generation. The system is implemented in the tensorflow project.
+traceable code for compute graph generation. The system is implemented in the Diastatic-Malt
+package (originally from TensorFlow).
 Here, we integrate AutoGraph into Catalyst to improve the UX and allow programmers to use built-in
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst."""
@@ -140,7 +141,6 @@ def autograph_source(fn):
     Raises:
         AutoGraphError: If the given function was not converted by AutoGraph, an error will be
                         raised.
-        ImportError: If TensorFlow is not installed, an error will be raised.
 
     **Example**
 
