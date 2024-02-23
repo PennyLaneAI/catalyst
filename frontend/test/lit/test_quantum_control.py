@@ -13,27 +13,27 @@
 # limitations under the License.
 
 # RUN: %PYTHON %s | FileCheck %s
+""" Test the lowering cases involving quantum control """
 
-import jax
 import jax.numpy as jnp
 import pennylane as qml
 
-from catalyst import cond, for_loop, measure, qjit, while_loop
+from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
 
 
-def get_custom_device(num_wires, discarded_operations=set(), added_operations=set()):
+def get_custom_device(num_wires, discarded_operations=None, added_operations=None):
     """Generate a custom device with the modified set of supported gates."""
 
     lightning = qml.device("lightning.qubit", wires=3)
     operations_copy = lightning.operations.copy()
     observables_copy = lightning.observables.copy()
-    for op in discarded_operations:
+    for op in discarded_operations or []:
         operations_copy.discard(op)
-    for op in added_operations:
+    for op in added_operations or []:
         operations_copy.add(op)
 
     class CustomDevice(qml.QubitDevice):
@@ -57,7 +57,7 @@ def get_custom_device(num_wires, discarded_operations=set(), added_operations=se
             self.backend_kwargs = backend_kwargs if backend_kwargs else ""
             super().__init__(wires=wires, shots=shots)
 
-        def apply(self, operations, **kwargs):
+        def apply(self, operations, **kwargs):  # pylint: disable=missing-function-docstring
             pass
 
         @staticmethod
