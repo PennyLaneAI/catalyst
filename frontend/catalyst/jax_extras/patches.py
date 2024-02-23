@@ -71,6 +71,7 @@ def _gather_shape_rule_dynamic(
     version released under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
+    TODO(@grwlf): delete once PR https://github.com/google/jax/pull/19083 has been merged
     """
     # pylint: disable=unused-argument
     # pylint: disable=too-many-branches
