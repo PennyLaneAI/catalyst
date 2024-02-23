@@ -252,6 +252,7 @@
 
 * Handle run time exception in async qnodes.
   [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
+  [(#510)](https://github.com/PennyLaneAI/catalyst/pull/510)
 
   This is done by:
   * changeing `llvm.call` to `llvm.invoke`
