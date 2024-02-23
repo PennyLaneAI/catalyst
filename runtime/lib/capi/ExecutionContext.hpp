@@ -81,11 +81,7 @@ struct PythonInterpreterGuard {
 };
 #endif
 
-extern "C" void pyregistry(void *p, uintptr_t *aligned, int64_t i)
-{
-    fprintf(stderr, "%ld\n", *aligned);
-    callbackCall(aligned[0]);
-}
+extern "C" void pyregistry(void *p, uintptr_t *aligned, int64_t i);
 
 class MemoryManager final {
   private:

@@ -106,6 +106,12 @@ void deactivateDevice()
 
 extern "C" {
 
+void pyregistry(void *p, uintptr_t *aligned, int64_t i)
+{
+    fprintf(stderr, "%ld\n", *aligned);
+    callbackCall(aligned[0]);
+}
+
 void __catalyst__host__rt__unrecoverable_error()
 {
     RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
