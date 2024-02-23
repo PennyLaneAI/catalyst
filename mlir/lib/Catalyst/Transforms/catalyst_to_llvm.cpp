@@ -323,8 +323,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
             auto type2 = LLVM::LLVMFunctionType::get(ptr, argTypes);
             LLVM::LLVMFuncOp customCallFnOp =
                 rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type2);
-            LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-                mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
             rewriter.restoreInsertionPoint(point);
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, customCallFnOp, adaptor.getOperands());
             return success();
