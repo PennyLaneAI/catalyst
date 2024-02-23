@@ -83,6 +83,7 @@ from .primitives import (
     cudaq_adjoint,
     cudaq_counts,
     cudaq_expectation,
+    cudaq_for,
     cudaq_getstate,
     cudaq_make_kernel,
     cudaq_observe,
@@ -91,7 +92,6 @@ from .primitives import (
     kernel_qalloc,
     mz_call,
     qreg_getitem,
-    cudaq_for,
 )
 
 # We disable protected access in particular to avoid warnings with

@@ -13,15 +13,15 @@
 # limitations under the License.
 """CUDA Integration testing."""
 
-import numpy as np
 import jax
+import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
 import catalyst
-from catalyst import measure, qjit, for_loop
+from catalyst import for_loop, measure, qjit
 from catalyst.utils.exceptions import CompileError
 
 # This import is here on purpose. We shouldn't ever import CUDA
