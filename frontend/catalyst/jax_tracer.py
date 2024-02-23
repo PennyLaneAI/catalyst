@@ -28,6 +28,28 @@ from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (
+    ClosedJaxpr,
+    DynamicJaxprTrace,
+    DynamicJaxprTracer,
+    PyTreeDef,
+    PyTreeRegistry,
+    ShapedArray,
+    _abstractify,
+    _input_type_to_tracers,
+    convert_element_type,
+    deduce_avals,
+    eval_jaxpr,
+    jaxpr_remove_implicit,
+    jaxpr_to_mlir,
+    make_jaxpr2,
+    sort_eqns,
+    transient_jax_config,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+    wrap_init,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -59,28 +81,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import (
-    ClosedJaxpr,
-    DynamicJaxprTrace,
-    DynamicJaxprTracer,
-    PyTreeDef,
-    PyTreeRegistry,
-    ShapedArray,
-    _abstractify,
-    _input_type_to_tracers,
-    convert_element_type,
-    deduce_avals,
-    eval_jaxpr,
-    jaxpr_remove_implicit,
-    jaxpr_to_mlir,
-    make_jaxpr2,
-    sort_eqns,
-    transient_jax_config,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    wrap_init,
-)
 
 
 class Function:
