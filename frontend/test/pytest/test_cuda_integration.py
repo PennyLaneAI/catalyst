@@ -471,6 +471,7 @@ class TestForLoops:
 
     def test_basic_loop(self):
         """Test simple for loop."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(n):
             @for_loop(0, n, 1)
@@ -479,8 +480,9 @@ class TestForLoops:
 
             loop_fn()
             return qml.state()
-        
+
         from catalyst.cuda import SoftwareQQPP
+
         @qml.qnode(SoftwareQQPP(wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -496,7 +498,6 @@ class TestForLoops:
         observed = cuda_compiled(2)
         assert_allclose(expected, observed)
 
-    
     def test_loop_caried_values(self):
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(n):
@@ -509,6 +510,7 @@ class TestForLoops:
             return qml.expval(qml.PauliZ(0))
 
         from catalyst.cuda import SoftwareQQPP
+
         @qml.qnode(SoftwareQQPP(wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -518,14 +520,13 @@ class TestForLoops:
 
             loop_fn(0.0)
             return qml.expval(qml.PauliZ(0))
-        
+
         cuda_compiled = catalyst.cuda.qjit(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(2)
         observed = cuda_compiled(2)
         assert_allclose(expected, observed)
 
-    
     def test_dynamic_wires(self):
         @qml.qnode(qml.device("lightning.qubit", wires=6))
         def circuit_lightning(n: int):
@@ -535,8 +536,9 @@ class TestForLoops:
 
             loop_fn()
             return qml.state()
-        
+
         from catalyst.cuda import SoftwareQQPP
+
         @qml.qnode(SoftwareQQPP(wires=6))
         def circuit(n: int):
             @for_loop(0, n - 1, 1)
@@ -563,8 +565,9 @@ class TestForLoops:
 
             loop_fn()
             return qml.expval(qml.PauliZ(0))
-        
+
         from catalyst.cuda import SoftwareQQPP
+
         @qml.qnode(SoftwareQQPP(wires=1))
         def circuit(x):
             y = 2 * x
@@ -590,13 +593,16 @@ class TestForLoops:
                 @for_loop(i + 1, n, 1)
                 def inner(j):
                     qml.CNOT(wires=[i, j])
+
                 inner()
+
             qft()
 
             # Expected output: |100...>
             return qml.state()
-        
+
         from catalyst.cuda import SoftwareQQPP
+
         @qml.qnode(SoftwareQQPP(wires=4))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -604,7 +610,9 @@ class TestForLoops:
                 @for_loop(i + 1, n, 1)
                 def inner(j):
                     qml.CNOT(wires=[i, j])
+
                 inner()
+
             qft()
 
             # Expected output: |100...>
