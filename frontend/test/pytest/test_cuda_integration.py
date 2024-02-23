@@ -564,10 +564,11 @@ class TestForLoops:
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit_lightning(x):
-            # y = 2 * x
+            y = 2 * x
+
             @for_loop(0, 1, 1)
             def loop_fn(_):
-                qml.PauliX(0)
+                qml.RY(y, wires=0)
 
             loop_fn()
             return qml.expval(qml.PauliZ(0))
@@ -576,11 +577,11 @@ class TestForLoops:
 
         @qml.qnode(SoftwareQQPP(wires=1))
         def circuit(x):
-            # y = 2 * x
+            y = 2 * x
 
             @for_loop(0, 1, 1)
             def loop_fn(_):
-                qml.PauliX(0)
+                qml.RY(y, wires=0)
 
             loop_fn()
             return qml.expval(qml.PauliZ(0))
