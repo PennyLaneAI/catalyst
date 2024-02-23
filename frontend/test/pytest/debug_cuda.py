@@ -17,57 +17,36 @@ from catalyst import for_loop, measure, qjit, while_loop
 
 @qml.qnode(qml.device("lightning.qubit", wires=4))
 def circuit_lightning(n):
-        # Input state: equal superposition
-    @for_loop(0, n, 1)
-    def init(i):
-        # qml.Hadamard(wires=i)
-        pass
-
     # QFT
-    @for_loop(0, n, 1)
-    def qft(i):
-        # qml.Hadamard(wires=i)
-        pass
+    # @for_loop(0, n-2, 1)
+    # def qft(i):
+    #     @for_loop(i+1, n-1, 1)
+    #     def inner(j):
+    #         # qml.ControlledPhaseShift(np.pi / 2 ** (n - j + 1), [i, j])
+    #         qml.CNOT(wires=[i, j])
 
-        @for_loop(i + 1, n, 1)
-        def inner(j):
-            qml.ControlledPhaseShift(np.pi / 2 ** (n - j + 1), [i, j])
-            pass
-
-        inner()
-
-    init()
-    qft()
+    #     inner()
+    # qft()
 
     # Expected output: |100...>
+    qml.ControlledPhaseShift(np.pi / 2 ** (n - 1 + 1), [0, 1])
     return qml.state()
 
 from catalyst.cuda import SoftwareQQPP
 @qml.qnode(SoftwareQQPP(wires=4))
 def circuit(n):
-        # Input state: equal superposition
-    @for_loop(0, n, 1)
-    def init(i):
-        # qml.Hadamard(wires=i)
-        pass
-
     # QFT
-    @for_loop(0, n, 1)
-    def qft(i):
-        # qml.Hadamard(wires=i)
-        pass
+    # @for_loop(0, n-2, 1)
+    # def qft(i):
+    #     @for_loop(i+ 1, n - 1, 1)
+    #     def inner(j):
+    #         qml.CNOT(wires=[i, j])
 
-        @for_loop(i + 1, n, 1)
-        def inner(j):
-            qml.ControlledPhaseShift(np.pi / 2 ** (n - j + 1), [i, j])
-            pass
-
-        inner()
-
-    init()
-    qft()
+    #     inner()
+    # qft()
 
     # Expected output: |100...>
+    qml.ControlledPhaseShift(np.pi / 2 ** (n - 1 + 1), [0, 1])
     return qml.state()
 
 cuda_compiled = catalyst.cuda.qjit(circuit)

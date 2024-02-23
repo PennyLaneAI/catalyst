@@ -715,8 +715,11 @@ def change_for(ctx, eqn):
     invals = _map(ctx.read, eqn.invars)
     # [0, b, 1, 0, f]
     # start, end, step, loop_var, wires
+    # import ipdb; ipdb.set_trace() 
     start = invals[0]
     end = invals[1]
+    step = invals[2]
+    assert step == 1, "Only step=1 is supported for now."
     loop_body = eqn.params['body_jaxpr'].jaxpr
 
     class LoopContext:
@@ -727,14 +730,18 @@ def change_for(ctx, eqn):
 
         def interp_iter(self, iter):
             res = interpret_impl(self.ctx, self.loop_body)
-            # _map(self.ctx.write, loop_body.outvars, res)
+            _map(self.ctx.write, loop_body.outvars, res)
             self.outvars = res
 
     # before interpretation
     _map(ctx.write, loop_body.invars, invals[3:])
     body_ctx = LoopContext(ctx, loop_body)
     cudaq_for(ctx.kernel, start, end, body_ctx.interp_iter)
+    # what is new variable?
+    # outvariables = [ctx.new_variable()]
+    # _map(ctx.replace, eqn.outvars, outvariables)
     _map(ctx.write, eqn.outvars, body_ctx.outvars)
+    # import ipdb; ipdb.set_trace()  
 
 
 def ignore_impl(_ctx, _eqn):

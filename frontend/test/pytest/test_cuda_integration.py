@@ -586,23 +586,12 @@ class TestForLoops:
     def test_nested_loops(self):
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit_lightning(n):
-             # Input state: equal superposition
-            @for_loop(0, n, 1)
-            def init(i):
-                qml.Hadamard(wires=i)
-
-            # QFT
             @for_loop(0, n, 1)
             def qft(i):
-                qml.Hadamard(wires=i)
-
                 @for_loop(i + 1, n, 1)
                 def inner(j):
-                    qml.ControlledPhaseShift(np.pi / 2 ** (n - j + 1), [i, j])
-
+                    qml.CNOT(wires=[i, j])
                 inner()
-
-            init()
             qft()
 
             # Expected output: |100...>
@@ -611,23 +600,12 @@ class TestForLoops:
         from catalyst.cuda import SoftwareQQPP
         @qml.qnode(SoftwareQQPP(wires=4))
         def circuit(n):
-             # Input state: equal superposition
-            @for_loop(0, n, 1)
-            def init(i):
-                qml.Hadamard(wires=i)
-
-            # QFT
             @for_loop(0, n, 1)
             def qft(i):
-                qml.Hadamard(wires=i)
-
                 @for_loop(i + 1, n, 1)
                 def inner(j):
-                    qml.ControlledPhaseShift(np.pi / 2 ** (n - j + 1), [i, j])
-
+                    qml.CNOT(wires=[i, j])
                 inner()
-
-            init()
             qft()
 
             # Expected output: |100...>
