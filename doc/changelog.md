@@ -51,6 +51,44 @@
 
 <h3>Improvements</h3>
 
+* Catalyst will now remember previously compiled functions when the PyTree metadata of arguments
+  changes, in addition to already rememebering compiled functions when static arguments change.
+  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
+
+  The following example will no longer trigger a third compilation:
+  ```py
+  @qjit
+  def func(x):
+      print("compiling")
+      return x
+  ```
+  ```pycon
+  >>> func([1,]);             # list
+  compiling
+  >>> func((2,));             # tuple
+  compiling
+  >>> func([3,]);             # list
+
+  ```
+
+  Note however that in order to keep overheads low, changing the argument *type* or *shape* (in a
+  promotion incompatible way) may override a previously stored function (with identical PyTree
+  metadata and static argument values):
+  ```py
+  @qjit
+  def func(x):
+      print("compiling")
+      return x
+  ```
+  ```pycon
+  >>> func(jnp.array(1));     # scalar
+  compiling
+  >>> func(jnp.array([2.]));  # 1-D array
+  compiling
+  >>> func(jnp.array(3));     # scalar
+  compiling
+  ```
+
 * Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
@@ -142,6 +180,24 @@
   ```
 
 <h3>Breaking changes</h3>
+
+* The Catalyst Python frontend has been partially refactored. The impact on user-facing
+  functionality is minimal, but the location of certain classes and methods used by the package
+  may have changed.
+  [(#529)](https://github.com/PennyLaneAI/catalyst/pull/529)
+  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
+
+  The following changes have been made:
+  * Some debug methods and features on the QJIT class have been turned into free functions and moved
+    to the `catalyst.debug` module, which will now appear in the public documention. This includes
+    compiling a program from ir, obtaining a C program to invoke a compiled function from, and
+    printing fine-grained MLIR compilation stages.
+  * The `compilation_pipelines.py` module has been renamed to `jit.py`, and certain functionality
+    has been moved out (see following items).
+  * A new module `compiled_functions.py` now manages low-level access to compiled functions.
+  * A new module `tracing/type_signatures.py` handles functionality related managing arguments
+    and type signatures during the tracing process.
+  * The `contexts.py` module has been moved from `utils` to the new `tracing` sub-module.
 
 * `QCtrl` is overriden and never used.
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/522)
@@ -246,6 +302,11 @@
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* Catalyst will no longer print a warning that recompilation is triggered when a `@qjit` decorated
+  function with no arguments is invoke without having been compiled first, for example via the use
+  of `target="mlir"`.
+  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
 
 * Only set `JAX_DYNAMIC_SHAPES` configuration option during `trace_to_mlir()`.
   [(#526)](https://github.com/PennyLaneAI/catalyst/pull/526)

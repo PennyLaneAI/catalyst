@@ -524,10 +524,3 @@ class Compiler:
             return None
 
         return self.last_compiler_output.get_pipeline_output(pipeline)
-
-    def print(self, pipeline):
-        """Print the output IR of pass.
-        Args:
-            pipeline (str): name of pass class
-        """
-        print(self.get_output_of(pipeline))  # pragma: no cover
