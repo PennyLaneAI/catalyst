@@ -52,14 +52,6 @@ from jax.core import (
     gensym,
     thread_local_state,
 )
-from jax.interpreters.mlir import (
-    AxisContext,
-    LoweringParameters,
-    ModuleContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
-)
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,

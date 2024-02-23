@@ -46,6 +46,7 @@ from catalyst.jax_extras.tracing import (
     new_dynamic_main2,
     new_inner_tracer,
     sort_eqns,
+    transient_jax_config,
     tree_flatten,
     tree_structure,
     tree_unflatten,

@@ -26,6 +26,7 @@ from jax._src.util import wrap_name
 from jax.core import ClosedJaxpr
 from jax.interpreters.mlir import (
     AxisContext,
+    LoweringParameters,
     ModuleContext,
     ir,
     lower_jaxpr_to_fun,
