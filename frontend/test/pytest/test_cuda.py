@@ -61,3 +61,5 @@ observed = cuda_compiled(2)
 assert_allclose(expected, observed)
 
 print("works!")
+
+# RX, Hadamard
