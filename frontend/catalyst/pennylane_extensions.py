@@ -2129,9 +2129,39 @@ def vmap(
         (Callable): Vectorized version of ``fn``.
 
     Raises:
-        TypeError: Invalid `in_axes` and `out_axes` values.
-        ValueError: Vectorize with more than one argument.
-        RuntimeError: Incompatible length of ``in_axes`` and positional arguments of ``fn``.
+        ValueError: Invalid `in_axes`, `out_axes`, and `axis_size` values.
+
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        def workflow(x, y, z):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x, y):
+                qml.RX(jnp.pi * x[0] + y, wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            def postcircuit(y, x, z):
+                return circuit(x, y) * z
+
+            res = vmap(postcircuit, in_axes=(0, 0, None))(y, x, z)
+            return res
+
+        y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+    >>> workflow(x, y, 1)
+    [-0.93005586, -0.97165424, -0.6987465]
     """
 
     # Dispatch to jax.vmap when it is called outside qjit.
@@ -2140,13 +2170,14 @@ def vmap(
 
     if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
         raise ValueError(
-            "Invalid 'in_axes'; it can be an int or a tuple of PyTrees with integer leaves,"
+            "Invalid 'in_axes'; it can be an int or a tuple of PyTrees with integer leaves, "
             f"but got {in_axes}"
         )
 
     if not all(isinstance(l, int) for l in tree_leaves(out_axes)):
         raise ValueError(
-            f"Invalid 'out_axes'' it can be a PyTree with integer leaves, but got {out_axes}"
+            "Invalid 'out_axes'; it can be an int or a tuple of PyTree with integer leaves, "
+            f"but got {out_axes}"
         )
 
     def batched_fn(*args, **kwargs):
@@ -2344,7 +2375,7 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
             return axis_size
         else:
             raise ValueError(
-                "Invalid axis_size; the default batch is expected to be None, "
+                "Invalid 'axis_size'; the default batch is expected to be None, "
                 "or less than or equal to the computed batch size, but got "
                 f"axis_size={axis_size} > batch_size={batch_size}"
             )

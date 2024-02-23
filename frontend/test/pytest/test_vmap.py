@@ -229,6 +229,25 @@ class TestVectorizeMap:
         ):
             qjit(workflow)(0.1)
 
+    def test_vmap_failed_invalid_out_axes_type(self, backend):
+        """Test catalyst.vmap with invalid out_axes type."""
+
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            res = vmap(circuit, out_axes=(0.1, None))(x)
+            return res
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'out_axes'; it can be an int or a tuple "
+            "of PyTree with integer leaves",
+        ):
+            qjit(workflow)(0.1)
+
     def test_vmap_failed_invalid_out_axes(self, backend):
         """Test catalyst.vmap with invalid out_axes."""
 
@@ -341,7 +360,7 @@ class TestVectorizeMap:
         and multiple non-zero axes."""
 
         @qjit
-        def workflow(x, y, z):
+        def workflow(x, x2, y, z):
             @qml.qnode(qml.device(backend, wires=1))
             def circuit(x, y):
                 qml.RX(jnp.pi * x[0] + y, wires=0)
@@ -363,7 +382,8 @@ class TestVectorizeMap:
             res3 = vmap(workflow3, in_axes=(0, 0))(y, x)
             res4 = vmap(workflow4, in_axes=(0, 0, None))(y, x, z)
             res5 = vmap(workflow4, in_axes=(0, 0, None), axis_size=2)(y, x, z)
-            return res1, res2, res3, res4, res5
+            res6 = vmap(workflow4, in_axes=(0, 1, None))(y, x2, z)
+            return res1, res2, res3, res4, res5, res6
 
         y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
         x = jnp.array(
@@ -374,13 +394,22 @@ class TestVectorizeMap:
             ]
         )
 
-        result = workflow(x, y, 1)
+        x2 = jnp.array(
+            [
+                [0.1, 0.4, 0.7],
+                [0.2, 0.5, 0.8],
+                [0.3, 0.6, 0.9],
+            ]
+        )
+
+        result = workflow(x, x2, y, 1)
         expected = jnp.array([-0.93005586, -0.97165424, -0.6987465])
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
         assert jnp.allclose(result[2], expected)
         assert jnp.allclose(result[3], expected)
         assert jnp.allclose(result[4], expected[:2])
+        assert jnp.allclose(result[5], expected)
 
     def test_vmap_pytree_in_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a PyTree in_axes."""
@@ -574,7 +603,7 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid axis_size; the default batch is expected to be None, "
+            match="Invalid 'axis_size'; the default batch is expected to be None, "
             "or less than or equal to the computed batch size",
         ):
             qjit(workflow)(x, y, 1)
