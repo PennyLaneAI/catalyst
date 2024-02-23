@@ -116,11 +116,11 @@ def test_native_controlled_unitary():
 
     @qjit(target="mlir")
     @qfunc(device=dev)
-    # CHECK-LABEL: public @jit_native_controlled_unitary
+    # COM: CHECK-LABEL: public @jit_native_controlled_unitary
     def native_controlled_unitary():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:3 = quantum.unitary
-        # CHECK-SAME: ctrl
-        # CHECK-SAME: ctrlval %true, %true, %true
+        # COM: CHECK: [[out:%.+]], [[out_ctrl:%.+]]:3 = quantum.unitary
+        # COM: CHECK-SAME: ctrl
+        # COM: CHECK-SAME: ctrlval %true, %true, %true
         qml.ctrl(
             qml.QubitUnitary(
                 jnp.array(
@@ -139,7 +139,8 @@ def test_native_controlled_unitary():
     print(native_controlled_unitary.mlir)
 
 
-test_native_controlled_unitary()
+# TODO: Remove `COM` comments and enable, once the PL fixes the unitary decomposition tracing
+# test_native_controlled_unitary()
 
 
 def test_native_controlled_multirz():
