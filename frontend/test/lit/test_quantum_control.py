@@ -26,7 +26,7 @@ from catalyst.pennylane_extensions import qfunc
 
 
 def get_custom_device(num_wires, discarded_operations=set(), added_operations=set()):
-    """Generate a custom device without gates in discards."""
+    """Generate a custom device with the modified set of supported gates."""
 
     lightning = qml.device("lightning.qubit", wires=3)
     operations_copy = lightning.operations.copy()
@@ -69,7 +69,7 @@ def get_custom_device(num_wires, discarded_operations=set(), added_operations=se
 
 
 def test_named_controlled():
-    """Test decomposition of single excitation plus."""
+    """Test that named-controlled operations are passed as-is."""
     dev = get_custom_device(2, set(), set())
 
     @qjit(target="mlir")
@@ -91,7 +91,7 @@ test_named_controlled()
 
 
 def test_native_controlled_custom():
-    """Test decomposition of single excitation plus."""
+    """Test native control of a custom operation."""
     dev = get_custom_device(3, discarded_operations={"CRot"}, added_operations={"Rot", "C(Rot)"})
 
     @qjit(target="mlir")
@@ -111,7 +111,7 @@ test_native_controlled_custom()
 
 
 def test_native_controlled_unitary():
-    """Test decomposition of single excitation plus."""
+    """Test native control of the unitary operation."""
     dev = get_custom_device(4, set(), set())
 
     @qjit(target="mlir")
@@ -143,7 +143,7 @@ test_native_controlled_unitary()
 
 
 def test_native_controlled_multirz():
-    """Test decomposition of single excitation plus."""
+    """Test native control of the multirz operation."""
     dev = get_custom_device(3, set(), {"C(MultiRZ)"})
 
     @qjit(target="mlir")
