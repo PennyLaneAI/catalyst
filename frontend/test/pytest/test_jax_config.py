@@ -16,7 +16,7 @@
 
 import jax
 
-from catalyst.utils.jax_extras import transient_jax_config
+from catalyst.jax_extras import transient_jax_config
 
 
 def test_transient_jax_config():

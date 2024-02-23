@@ -27,6 +27,28 @@ from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (
+    ClosedJaxpr,
+    DynamicJaxprTrace,
+    DynamicJaxprTracer,
+    PyTreeDef,
+    PyTreeRegistry,
+    ShapedArray,
+    _abstractify,
+    _input_type_to_tracers,
+    convert_element_type,
+    deduce_avals,
+    eval_jaxpr,
+    jaxpr_remove_implicit,
+    jaxpr_to_mlir,
+    make_jaxpr2,
+    sort_eqns,
+    transient_jax_config,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+    wrap_init,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -58,28 +80,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import (
-    ClosedJaxpr,
-    DynamicJaxprTrace,
-    DynamicJaxprTracer,
-    PyTreeDef,
-    PyTreeRegistry,
-    ShapedArray,
-    _abstractify,
-    _input_type_to_tracers,
-    convert_element_type,
-    deduce_avals,
-    eval_jaxpr,
-    jaxpr_remove_implicit,
-    jaxpr_to_mlir,
-    make_jaxpr2,
-    sort_eqns,
-    transient_jax_config,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    wrap_init,
-)
 
 
 class Function:
@@ -332,6 +332,37 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
+def trace_to_jaxpr(func, static_argnums, abstracted_axes, *args, **kwargs):
+    """Trace a function to JAXPR.
+
+    Args:
+        func: python function to be lowered
+        abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
+            sizes.
+        args: arguments to ``func``
+        kwargs: keyword arguments to ``func``
+
+    Returns:
+        ClosedJaxpr: the Jaxpr program corresponding to ``func``
+        ClosedJaxpr: the Jaxpr program corresponding to ``func`` without implicit result values.
+        jax.OutputType: Jaxpr output type (a list of abstract values paired with
+                        explicintess flags).
+        PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
+    """
+
+    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+        make_jaxpr_kwargs = {
+            "abstracted_axes": abstracted_axes,
+            "static_argnums": static_argnums,
+        }
+        jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+
+    # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
+    jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+
+    return jaxpr, jaxpr2, out_type2, out_tree
+
+
 def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
@@ -351,7 +382,6 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
                         explicintess flags).
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
-
     # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
     # which do not exist in the current translation unit will be assumed to exist if an equivalent
     # python function is seen in the cache. This happens during testing or if we wanted to compile a
@@ -359,18 +389,12 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with transient_jax_config():
-        with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "abstracted_axes": abstracted_axes,
-                "static_argnums": static_argnums,
-            }
-            jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+        jaxpr, postprocessed_jaxpr, out_type, out_tree = trace_to_jaxpr(
+            func, static_argnums, abstracted_axes, *args, **kwargs
+        )
+        module, context = jaxpr_to_mlir(func.__name__, postprocessed_jaxpr)
 
-        # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-        jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
-        module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
-
-    return module, context, jaxpr, out_type2, out_tree
+    return module, context, jaxpr, out_type, out_tree
 
 
 def trace_quantum_tape(
