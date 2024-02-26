@@ -40,6 +40,7 @@ jobs:
 
     - name: Install deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
