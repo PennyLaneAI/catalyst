@@ -25,7 +25,47 @@ from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
 
 def cudaqjit(fn=None, **kwargs):
-    """Wrapper around QJIT for CUDA-quantum."""
+    """A decorator for compiling PennyLane and JAX programs using CUDA Quantum.
+
+    .. note::
+
+        Currently, only the following devices are supported:
+
+        * `softwareq.qpp`: a modern C++ statevector simulator
+        * `nvidia.statevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
+        * `nvidia.tensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product
+          state)
+
+    Args:
+        fn (Callable): the quantum or classical function to compile
+
+    Returns:
+        QJIT object.
+
+    **Example**
+
+    The compilation is triggered at the call site the
+    when the quantum function is executed:
+
+    .. code-block:: python
+
+        dev = qml.device("softwareq.qpp", wires=2)
+
+        @cudaqjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x[0], wires=0)
+            qml.RY(x[1], wires=1)
+            qml.CNOT(wires=[0, 1])
+            return qml.expval(qml.PauliY(0))
+
+    >>> circuit(jnp.array([0.5, 1.4]))
+    -0.47244976756708373
+
+    Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
+    compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
+    statistics (such as probabilities and variance) are not yet supported.
+    """
 
     if fn is not None:
         return interpret(fn, **kwargs)
@@ -83,7 +123,36 @@ class BaseCudaInstructionSet(qml.QubitDevice):
 
 
 class SoftwareQQPP(BaseCudaInstructionSet):
-    """Concrete device class for qpp-cpu"""
+    """The SoftwareQ Q++ statevector simulator.
+
+    .. note::
+
+        This device currently only supports QNodes compiled with CUDA Quantum. For a
+        high-performance CPU device with support with other compilers, please use
+        ``lightning.qubit`` or ``lightning.kokkos``.
+
+    Args:
+        shots (None, int): Number of shots to use for measurments and statistics.
+            ``None`` corresponds to exact statistics.
+        wires (int): Number of wires present on the device.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("softwareq.qpp", wires=2)
+
+        @catalyst.cuda.cudaqjit
+        @qml.qnode(dev)
+        def circuit(x):
+          qml.RX(x[0], wires=0)
+          qml.RY(x[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliY(0))
+
+    >>> circuit(jnp.array([0.5, 1.4]))
+    -0.47244976756708373
+    """
 
     short_name = "softwareq.qpp"
 
@@ -94,7 +163,36 @@ class SoftwareQQPP(BaseCudaInstructionSet):
 
 
 class NvidiaCuStateVec(BaseCudaInstructionSet):
-    """Concrete device class for CuStateVec"""
+    """The NVIDIA CuStateVec GPU simulator (with support for multi-gpu).
+
+    .. note::
+
+        This device currently only supports QNodes compiled with CUDA Quantum. For a multi-GPU
+        device with support with other compilers, please use ``lightning.gpu``.
+
+    Args:
+        shots (None, int): Number of shots to use for measurments and statistics.
+            ``None`` corresponds to exact statistics.
+        wires (int): Number of wires present on the device.
+        multi_gpu (bool): Whether to utilize multiple GPUs.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("nvidia.custatevec", wires=2)
+
+        @catalyst.cuda.cudaqjit
+        @qml.qnode(dev)
+        def circuit(x):
+          qml.RX(x[0], wires=0)
+          qml.RY(x[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliY(0))
+
+    >>> circuit(jnp.array([0.5, 1.4]))
+    -0.47244976756708373
+    """
 
     short_name = "nvidia.custatevec"
 
@@ -110,7 +208,35 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 
 
 class NvidiaCuTensorNet(BaseCudaInstructionSet):
-    """Concrete device class for CuTensorNet"""
+    """The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
+
+    .. note::
+
+        This device currently only supports QNodes compiled with CUDA Quantum.
+
+    Args:
+        shots (None, int): Number of shots to use for measurments and statistics.
+            ``None`` corresponds to exact statistics.
+        wires (int): Number of wires present on the device.
+        mps (bool): Whether to use matrix product state approximations.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("nvidia.cutensornet", wires=2)
+
+        @catalyst.cuda.cudaqjit
+        @qml.qnode(dev)
+        def circuit(x):
+          qml.RX(x[0], wires=0)
+          qml.RY(x[1], wires=1)
+          qml.CNOT(wires=[0, 1])
+          return qml.expval(qml.PauliY(0))
+
+    >>> circuit(jnp.array([0.5, 1.4]))
+    -0.47244976756708373
+    """
 
     short_name = "nvidia.cutensornet"
 
@@ -123,6 +249,7 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
         """Target name"""
         option = "-mps" if self.mps else ""
         return f"tensornet{option}"
+
 
 __all__ = [
     "cudaqjit",
