@@ -350,10 +350,11 @@ def _check_grad_params(
     return GradParams(method, scalar_out, h, argnum)
 
 
-def _unflatten_derivatives(results, out_tree, argnum, num_results):
+def _unflatten_derivatives(results, in_tree, out_tree, argnum, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
     num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
     results_final = []
+
     for i in range(0, num_results):
         intermediate_results = results[
             i * num_trainable_params : i * num_trainable_params + num_trainable_params
@@ -363,6 +364,11 @@ def _unflatten_derivatives(results, out_tree, argnum, num_results):
         else:
             intermediate_results = intermediate_results[0]
         results_final.append(intermediate_results)
+
+    if num_results == 1:
+        results_final = results_final[0]
+
+    results_final = tree_unflatten(in_tree, results_final)
     results_final = tree_unflatten(out_tree, results_final)
     return results_final
 
@@ -398,12 +404,22 @@ class Grad:
             grad_params = _check_grad_params(*self.grad_params)
             jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
-            args_data, _ = tree_flatten(args)
+            args_data, in_tree = tree_flatten(args)
+
+            
+            total_argnums = list(range(0, len(args_data)))
+            argnums_unflatten = tree_unflatten(in_tree, total_argnums)
+            argnums_selected = [argnums_unflatten[i] for i in grad_params.argnum]
+            argnums_correct, _ = tree_flatten(argnums_selected)
+            args_argnum = [args[i] for i in grad_params.argnum]
+            _, in_tree = tree_flatten(args_argnum)
+            grad_params.argnum = argnums_correct
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
             results = _unflatten_derivatives(
-                results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
+                results, in_tree, out_tree, grad_params.argnum, len(jaxpr.out_avals)
             )
         else:
             if argnums := self.grad_params.argnum is None:
