@@ -18,10 +18,10 @@ from typing import Iterable
 
 import jax
 import jax.numpy as jnp
-from jax._src.tree_util import tree_flatten
 import numpy as np
 import pennylane as qml
 import pytest
+from jax._src.tree_util import tree_flatten
 
 from catalyst import adjoint, cond, for_loop, grad, measure, qjit
 
