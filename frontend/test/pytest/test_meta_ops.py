@@ -104,7 +104,9 @@ def test_control_variable_wires(g, ctrls):
         qml.ctrl(g, control=ctrls)
         return qml.state()
 
-    result = qjit(qml.qnode(qml.device("lightning.qubit", wires=7), interface="jax")(circuit))(jnp.array(ctrls))
+    result = qjit(qml.qnode(qml.device("lightning.qubit", wires=7), interface="jax")(circuit))(
+        jnp.array(ctrls)
+    )
     expected = qml.qnode(qml.device("default.qubit", 7), interface="jax")(circuit)(ctrls)
 
     assert jnp.allclose(result, expected)
