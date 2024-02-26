@@ -1,3 +1,8 @@
+option(ENABLE_OQC "Build OQC backend device" ON)
+
+set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
+set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
+set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,7 +42,8 @@ endif()
 add_library(rtd_oqc SHARED OQCDevice.cpp)
 
 target_include_directories(rtd_oqc PRIVATE .
-    ${PROJECT_SOURCE_DIR}/include
+    ${runtime_includes}
+    ${backend_includes}
     )
 
 target_link_libraries(rtd_oqc pybind11::module)

@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,24 +27,24 @@
 
 #include "Exception.hpp"
 
-namespace Catalyst::Runtime::Device::OpenQasm {
+namespace Catalyst::Runtime::Device::OQC {
 
 /**
- * Types of the OpenQasm builder and runner.
+ * Types of the OQC builder and runner.
  */
 enum class BuilderType : uint8_t {
     Common, // = 0
 };
 
 /**
- * Supported OpenQasm variables by the builder.
+ * Supported OQC variables by the builder.
  */
 enum class VariableType : uint8_t {
     Float, // = 0
 };
 
 /**
- * Supported OpenQasm register modes by the builder.
+ * Supported OQC register modes by the builder.
  */
 enum class RegisterMode : uint8_t {
     Alloc, // = 0
@@ -54,7 +54,7 @@ enum class RegisterMode : uint8_t {
 };
 
 /**
- * Supported OpenQasm register types by the builder.
+ * Supported OQC register types by the builder.
  */
 enum class RegisterType : uint8_t {
     Qubit, // = 0
@@ -69,6 +69,9 @@ using GateNameT = std::string_view;
 constexpr std::array rt_qasm_gate_map = {
     // (RT-GateName, Qasm-GateName)
     std::tuple<GateNameT, GateNameT>{"Identity", "i"},
+    std::tuple<GateNameT, GateNameT>{"X", "x"},
+    std::tuple<GateNameT, GateNameT>{"Y", "y"},
+    std::tuple<GateNameT, GateNameT>{"Z", "z"},
     std::tuple<GateNameT, GateNameT>{"PauliX", "x"},
     std::tuple<GateNameT, GateNameT>{"PauliY", "y"},
     std::tuple<GateNameT, GateNameT>{"PauliZ", "z"},
@@ -221,70 +224,6 @@ class QasmRegister {
 };
 
 /**
- * The OpenQasm Matrix Builder for the following matrix data-types:
- * - `std::vector<double>`
- * - `std::vector<std::complex<double>>`
- *
- * @note It doesn't store the given matrix.
- */
-struct MatrixBuilder {
-    [[nodiscard]] static auto toOpenQasm(const std::vector<std::complex<double>> &matrix,
-                                         size_t num_cols, size_t precision = 5,
-                                         [[maybe_unused]] const std::string &version = "3.0")
-        -> std::string
-    {
-        constexpr std::complex<double> zero{0, 0};
-        size_t index{0};
-        std::ostringstream oss;
-        oss << "[[";
-        for (const auto &c : matrix) {
-            if (index == num_cols) {
-                oss << "], [";
-                index = 0;
-            }
-            else if (index) {
-                oss << ", ";
-            }
-            index++;
-
-            if (c == zero) {
-                oss << "0";
-                continue;
-            }
-            oss << std::setprecision(precision) << c.real();
-            oss << std::setprecision(precision) << (c.imag() < 0 ? "" : "+") << c.imag() << "im";
-        }
-        oss << "]]";
-        return oss.str();
-    }
-
-    [[nodiscard]] static auto toOpenQasm(const std::vector<double> &matrix, size_t num_cols,
-                                         size_t precision = 5,
-                                         [[maybe_unused]] const std::string &version = "3.0")
-        -> std::string
-    {
-        size_t index{0};
-
-        std::ostringstream oss;
-        oss << "[[";
-        for (const auto &c : matrix) {
-            if (index == num_cols) {
-                oss << "], [";
-                index = 0;
-            }
-            else if (index) {
-                oss << ", ";
-            }
-            index++;
-
-            oss << std::setprecision(precision) << c;
-        }
-        oss << "]]";
-        return oss.str();
-    }
-};
-
-/**
  * The OpenQasm gate type.
  *
  * @param name The name of the gate to apply from the list of supported gates
@@ -337,15 +276,6 @@ class QasmGate {
                                   const std::string &version = "3.0") const -> std::string
     {
         std::ostringstream oss;
-        // @note This is a Braket specific functionality
-        // #pragma braket unitary(matrix) qubit_1, ..., qubit_m
-        if (name == "QubitUnitary") {
-            oss << "#pragma braket unitary(";
-            oss << MatrixBuilder::toOpenQasm(matrix, (1UL << wires.size()), precision, version);
-            oss << ") ";
-            oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << "\n";
-            return oss.str();
-        }
 
         // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         oss << name;
@@ -412,7 +342,6 @@ class QasmMeasure {
         return oss.str();
     }
 };
-
 
 /**
  * The OpenQasm circuit builder interface.
@@ -540,89 +469,4 @@ class OpenQasmBuilder {
     }
 };
 
-/**
- * The Braket OpenQasm3 circuit builder derived from OpenQasmBuilder.
- *
- * @note Braket devices currently don't support mid-circuit measurement and partial measurement
- * results.
- * @note Only one user-specified quantum register is currently supported.
- * @note User-specified measurement results registers are not currently supported.
- */
-class BraketBuilder : public OpenQasmBuilder {
-  public:
-    using OpenQasmBuilder::OpenQasmBuilder;
-
-    [[nodiscard]] auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
-        -> std::string override
-    {
-        RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
-                                      "register is currently supported.");
-
-        RT_FAIL_IF(
-            !bregs.empty(),
-            "Invalid number of measurement results registers; User-specified measurement results "
-            "register is not currently supported.");
-
-        std::ostringstream oss;
-
-        // header
-        oss << "OPENQASM " << version << ";\n";
-
-        // variables
-        for (auto &var : vars) {
-            oss << var.toOpenQasm();
-        }
-
-        // quantum registers
-        oss << qregs[0].toOpenQasm(RegisterMode::Alloc, {}, version);
-
-        // measurement results registers
-        QasmRegister braket_mresults{RegisterType::Bit, "bits", qregs[0].getSize()};
-        oss << braket_mresults.toOpenQasm(RegisterMode::Alloc, {}, version);
-
-        // quantum gates assuming qregs.size() == 1
-        for (auto &gate : gates) {
-            oss << gate.toOpenQasm(qregs[0], precision, version);
-        }
-
-        // quantum measures assuming bregs[0].size() == qregs[0].size()
-        // and "mresults" isn't a user-specified register.
-        QasmMeasure braket_measure{0, 0};
-        oss << braket_measure.toOpenQasm(braket_mresults, qregs[0], RegisterMode::Name, version);
-
-        return oss.str();
-    }
-
-    [[nodiscard]] auto toOpenQasmWithCustomInstructions(const std::string &serialized_instructions,
-                                                        size_t precision = 5,
-                                                        const std::string &version = "3.0") const
-        -> std::string override
-    {
-        RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
-                                      "register is currently supported.");
-
-        RT_FAIL_IF(
-            !bregs.empty(),
-            "Invalid number of measurement results registers; User-specified measurement results "
-            "register is not currently supported.");
-
-        std::ostringstream oss;
-
-        // header
-        oss << "OPENQASM " << version << ";\n";
-
-        // quantum registers
-        oss << qregs[0].toOpenQasm(RegisterMode::Alloc, {}, version);
-
-        // quantum gates assuming qregs.size() == 1
-        for (auto &gate : gates) {
-            oss << gate.toOpenQasm(qregs[0], precision, version);
-        }
-
-        oss << serialized_instructions;
-
-        return oss.str();
-    }
-};
-
-} // namespace Catalyst::Runtime::Device::OpenQasm
+} // namespace Catalyst::Runtime::Device::OQC

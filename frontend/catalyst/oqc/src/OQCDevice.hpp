@@ -27,17 +27,19 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
+//catalyst/runtime/lib/backend/common/
+
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
 #include "Utils.hpp"
 
 #include <pybind11/embed.h>
 
-#include "OpenQasmBuilder.hpp"
 #include "OQCRunner.hpp" // <pybind11/embed.h>
+#include "OpenQasmBuilder.hpp"
 
 namespace Catalyst::Runtime::Device {
-class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
+class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
@@ -51,7 +53,6 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
     size_t device_shots;
 
-    OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
     std::unordered_map<std::string, std::string> device_kwargs;
 
@@ -71,42 +72,16 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OpenQasmDevice(
-        const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
+    explicit OQCDevice(const std::string &kwargs = "{device_type : oqc.remote, backend : default}")
     {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
 
-        if (device_kwargs.contains("device_type")) {
-            if (device_kwargs["device_type"] == "braket.aws.qubit") {
-                builder_type = OpenQasm::BuilderType::BraketRemote;
-                if (!device_kwargs.contains("device_arn")) {
-                    device_kwargs["device_arn"] =
-                        "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
-                }
-            }
-            else if (device_kwargs["device_type"] == "braket.local.qubit") {
-                builder_type = OpenQasm::BuilderType::BraketLocal;
-                if (!device_kwargs.contains("backend")) {
-                    device_kwargs["backend"] = "default";
-                }
-            }
-            else {
-                RT_ASSERT("Invalid OpenQasm device type");
-            }
-        }
-        else {
-            builder_type = OpenQasm::BuilderType::Common;
-            builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
-            runner = std::make_unique<OpenQasm::OpenQasmRunner>();
-        }
-
-        if (builder_type != OpenQasm::BuilderType::Common) {
-            builder = std::make_unique<OpenQasm::BraketBuilder>();
-            runner = std::make_unique<OpenQasm::BraketRunner>();
-        }
+        builder_type = OpenQasm::BuilderType::Common;
+        builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
+        runner = std::make_unique<OpenQasm::OpenQasmRunner>();
     }
     ~OpenQasmDevice() = default;
 

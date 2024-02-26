@@ -85,7 +85,7 @@ frontend:
 	$(PYTHON) -m pip install -e .
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime
+.PHONY: mlir llvm mhlo enzyme dialects runtime oqc
 mlir:
 	$(MAKE) -C mlir all
 
@@ -97,6 +97,9 @@ mhlo:
 
 enzyme:
 	$(MAKE) -C mlir enzyme
+
+oqc:
+	$(MAKE) -C frontend/catalyst/oqc/src oqc
 
 dialects:
 	$(MAKE) -C mlir dialects
