@@ -350,7 +350,9 @@ def _check_grad_params(
     return GradParams(method, scalar_out, h, argnum)
 
 
-def _unflatten_derivatives(results, in_tree, out_tree, argnum, argnum_is_int, num_results):
+def _unflatten_derivatives(
+    results, in_tree, out_tree, argnum, argnum_is_int, num_results
+):  # pylint: disable=too-many-arguments
     """Unflatten the flat list of derivatives results given the out tree."""
     num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
     results_final = []
