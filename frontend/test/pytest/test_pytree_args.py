@@ -18,6 +18,7 @@ from typing import Iterable
 
 import jax
 import jax.numpy as jnp
+from jax._src.tree_util import tree_flatten
 import numpy as np
 import pennylane as qml
 import pytest
@@ -423,8 +424,8 @@ class TestPyTreesFuncArgs:
         }
         result = workflow1(params)
         expected = {"a": [-0.32140083, 0.0], "b": [0.0, -0.52007016]}
-        result_flatten, tree = jax._src.tree_util.tree_flatten(result)
-        result_flatten_expected, tree_expected = jax._src.tree_util.tree_flatten(expected)
+        result_flatten, tree = tree_flatten(result)
+        result_flatten_expected, tree_expected = tree_flatten(expected)
         assert np.allclose(result_flatten, result_flatten_expected)
         assert tree == tree_expected
 
@@ -446,8 +447,8 @@ class TestPyTreesFuncArgs:
         }
         result = workflow2(params)
         expected = {"a": (-0.32140083, 0.0), "b": [-0.52007016]}
-        result_flatten, tree = jax._src.tree_util.tree_flatten(result)
-        result_flatten_expected, tree_expected = jax._src.tree_util.tree_flatten(expected)
+        result_flatten, tree = tree_flatten(result)
+        result_flatten_expected, tree_expected = tree_flatten(expected)
         assert np.allclose(result_flatten, result_flatten_expected)
         assert tree == tree_expected
 
