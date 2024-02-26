@@ -25,29 +25,44 @@ from catalyst.utils.exceptions import CompileError
 class TestStaticArguments:
     """Test QJIT with static arguments."""
 
+    def test_function_without_hints(self):
+        """Test that a function without type hints works with static argnums (bug fix)."""
+
+        @qjit(static_argnums=1)
+        def f(x, y):
+            return x + len(y)
+
+        assert f(5, "hi") == 7
+
+    def test_function_with_varargs(self):
+        """Test that a function without a fixed number of arguments works with static argnums."""
+
+        @qjit(static_argnums=1)
+        def f(*args):
+            return args[0] + len(args[1]) + args[2]
+
+        assert f(1, "hi", 4) == 7
+
     @pytest.mark.parametrize("argnums", [(), None])
     def test_zero_static_argument(self, argnums):
-        """Test QJIT with zero static argument."""
+        """Test QJIT with no static arguments."""
 
         @qjit(static_argnums=argnums)
-        def f(
-            x: int,
-        ):
+        def f(x: int):
             return x
 
         assert f(1) == 1
 
     @pytest.mark.parametrize("argnums", [-1, 100])
     def test_out_of_bounds_static_argument(self, argnums):
-        """Test QJIT with invalid static argument index."""
+        """Test QJIT with invalid static argument index with respect to provided arguments."""
 
-        with pytest.raises(CompileError):
+        @qjit(static_argnums=argnums)
+        def f(x):
+            return x
 
-            @qjit(static_argnums=argnums)
-            def f(
-                x: int,
-            ):
-                return x
+        with pytest.raises(CompileError, match="is beyond the valid range"):
+            f(5)
 
     def test_one_static_argument(self):
         """Test QJIT with one static argument."""
@@ -62,10 +77,7 @@ class TestStaticArguments:
                 return hash(str(self))
 
         @qjit(static_argnums=1)
-        def f(
-            x: int,
-            y: MyClass,
-        ):
+        def f(x: int, y: MyClass):
             return x + y.val
 
         assert f(1, MyClass(5)) == 6
@@ -77,7 +89,7 @@ class TestStaticArguments:
         assert function == f.compiled_function
 
     def test_multiple_static_arguments(self):
-        """Test QJIT with more than one static arguments."""
+        """Test QJIT with more than one static argument."""
 
         @dataclass
         class MyClass:
@@ -113,10 +125,7 @@ class TestStaticArguments:
                 return hash(str(self))
 
         @qjit(static_argnums=1)
-        def f(
-            x: int,
-            y: MyClass,
-        ):
+        def f(x: int, y: MyClass):
             return x + y.val_0 + y.val_1
 
         my_obj = MyClass(5, 5)
