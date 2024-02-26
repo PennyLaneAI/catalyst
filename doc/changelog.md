@@ -4,6 +4,7 @@
 
 * Catalyst now supports just-in-time compilation of static arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
+  [(#550)](https://github.com/PennyLaneAI/catalyst/pull/550)
 
   The ``@qjit`` decorator can now be used to compile functions with static arguments with
   the ``static_argnums`` keyword argument. ``static_argnums`` can be an integer or an iterable
