@@ -683,10 +683,8 @@ def _qinsert_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len: int = None, params_len: int = 0, ctrl_len: int = 0
+    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
 ):
-    if qubits_len is None:
-        qubits_len = len(qubits_or_params)
     for idx in range(qubits_len):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -704,15 +702,13 @@ def _qinst_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *qubits_or_params: tuple,
     op=None,
-    qubits_len: int = None,
+    qubits_len: int = 0,
     params_len: int = 0,
     ctrl_len: int = 0,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    if qubits_len is None:
-        qubits_len = len(qubits_or_params)
     qubits = qubits_or_params[:qubits_len]
     params = qubits_or_params[qubits_len : qubits_len + params_len]
     ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
@@ -777,9 +773,7 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = None, ctrl_len: int = 0):
-    if qubits_len is None:
-        qubits_len = len(qubits)
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int = 0):
     for idx in range(qubits_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -797,12 +791,9 @@ def _qunitary_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     matrix: ir.Value,
     *qubits_or_controlled: tuple,
-    qubits_len: int = None,
+    qubits_len: int = 0,
     ctrl_len: int = 0,
 ):
-    if qubits_len is None:
-        qubits_len = len(qubits_or_controlled)
-
     qubits = qubits_or_controlled[:qubits_len]
     ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
     ctrl_values = qubits_or_controlled[qubits_len + ctrl_len :]
