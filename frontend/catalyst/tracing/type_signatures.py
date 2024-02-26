@@ -27,7 +27,7 @@ from jax._src.pjit import _flat_axes_specs
 from jax.api_util import shaped_abstractify
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from catalyst.utils.jax_extras import get_aval2
+from catalyst.jax_extras import get_aval2
 from catalyst.utils.patching import Patcher
 
 
@@ -77,8 +77,7 @@ def filter_static_args(args, static_argnums):
     return tuple(args[idx] for idx in range(len(args)) if idx not in static_argnums)
 
 
-# TODO: remove pragma in part 2
-def split_static_args(args, static_argnums):  # pragma: nocover
+def split_static_args(args, static_argnums):
     """Split arguments into static and dynamic values using the provided index list.
 
     Args:
@@ -121,8 +120,7 @@ def merge_static_args(signature, args, static_argnums):
     return tuple(merged_sig)
 
 
-# TODO: remove pragma in part 2
-def get_decomposed_signature(args, static_argnums):  # pragma: nocover
+def get_decomposed_signature(args, static_argnums):
     """Decompose function arguments into dynamic and static arguments, where the dynamic arguments
     are further processed into abstract values and PyTree metadata. All values returned by this
     function are hashable.

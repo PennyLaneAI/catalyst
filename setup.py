@@ -48,7 +48,11 @@ requirements = [
 ]
 
 entry_points = {
-    "pennylane.plugins": "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
+    "pennylane.plugins": [
+        "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
+        "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
+        "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
+    ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
         "catalyst.ops = catalyst:pennylane_extensions",
