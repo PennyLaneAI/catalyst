@@ -1065,6 +1065,44 @@ def test_pytrees_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
+def test_pytrees_args_classical():
+    """Test the jacobian on a function with a return including list and dictionnaries."""
+
+    def f(x, y):
+        return x["res1"], x["res2"] + y
+
+    x = {"res1": 0.3, "res2": 0.4}
+    y = 0.2
+
+    jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+
+    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+
+    assert tree_jax == tree_catalyst
+    assert np.allclose(flatten_res_jax, flatten_res_catalyst)
+
+
+def test_pytrees_args_return_classical():
+    """Test the jacobian on a function with a args and return including list and dictionnaries."""
+
+    def f(x, y):
+        return [{"res": x["args1"], "res2": x["args2"] + y}, x["args1"] + y]
+
+    x = {"args1": 0.3, "args2": 0.4}
+    y = 0.2
+
+    jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
+    catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
+
+    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+
+    assert tree_jax == tree_catalyst
+    assert np.allclose(flatten_res_jax, flatten_res_catalyst)
+
+
 @pytest.mark.xfail(reason="QubitUnitrary is not support with catalyst.grad")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
