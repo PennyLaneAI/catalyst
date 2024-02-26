@@ -24,7 +24,6 @@
 #include <stdexcept>
 
 #include "AdjointJacobianKokkos.hpp"
-#include "LinearAlgebra.hpp"
 #include "MeasurementsKokkos.hpp"
 #include "StateVectorKokkos.hpp"
 

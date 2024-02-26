@@ -12,20 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests JAX configuration utilities."""
+"""Unit tests for Catalyst's tracing module."""
 
 import jax
+import pytest
 
-from catalyst.jax_extras import transient_jax_config
+from catalyst.jax_tracer import lower_jaxpr_to_mlir
 
 
-def test_transient_jax_config():
-    """Test that the ``transient_jax_config()`` context manager updates and
-    restores the value of the JAX dynamic shapes option.
-    """
-    jax.config.update("jax_dynamic_shapes", False)
+def test_jaxpr_lowering_without_dynshapes():
+    """Test that the lowering function can be used without Catalyst's dynamic shape support."""
 
-    with transient_jax_config():
-        assert jax.config.jax_dynamic_shapes is True  # type: ignore
+    def f():
+        return 0
 
-    assert jax.config.jax_dynamic_shapes is False  # type: ignore
+    jaxpr = jax.make_jaxpr(f)()
+    result, _ = lower_jaxpr_to_mlir(jaxpr, "test_fn")
+
+    assert "@jit_test_fn() -> tensor<i64>" in str(result)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
