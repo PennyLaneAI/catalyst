@@ -53,6 +53,10 @@
 
 <h3>Improvements</h3>
 
+* Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
+  the standalone `diastatic-malt` package is used and automatically installed as a dependency.
+  [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
+
 * Catalyst will now remember previously compiled functions when the PyTree metadata of arguments
   changes, in addition to already rememebering compiled functions when static arguments change.
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)

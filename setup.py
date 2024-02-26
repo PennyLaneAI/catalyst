@@ -45,6 +45,7 @@ requirements = [
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
     "scipy",
+    "diastatic-malt>=2.15.1",
 ]
 
 entry_points = {

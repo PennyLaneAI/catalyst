@@ -66,7 +66,7 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
 )
 
 from catalyst import debug
-from catalyst.ag_utils import AutoGraphError, autograph_source
+from catalyst.autograph import autograph_source
 from catalyst.compiler import CompileOptions
 from catalyst.jit import QJIT, qjit
 from catalyst.pennylane_extensions import (
@@ -82,7 +82,7 @@ from catalyst.pennylane_extensions import (
     vjp,
     while_loop,
 )
-from catalyst.utils.exceptions import CompileError
+from catalyst.utils.exceptions import AutoGraphError, CompileError
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
