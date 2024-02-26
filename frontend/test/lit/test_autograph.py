@@ -529,7 +529,7 @@ def logical_calls(x: float, y: float):
 
     # CHECK:   try:
     # CHECK:     do_return = True
-    # CHECK:     retval_ = ag__.or_(lambda: ag__.ld(a), lambda: ag__.ld(b))
+    # CHECK:     retval_ = ag__.or_(lambda{{\ ?}}: ag__.ld(a), lambda{{\ ?}}: ag__.ld(b))
     # CHECK:   return fscope.ret(retval_, do_return)
     return a or b
 
