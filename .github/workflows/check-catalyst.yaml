@@ -31,6 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
       - name: Build Catalyst-Runtime
