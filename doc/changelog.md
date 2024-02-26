@@ -61,6 +61,7 @@
   CUDA Quantum compiler toolchain.
   [(#477)](https://github.com/PennyLaneAI/catalyst/pull/477)
   [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
+  [(#547)](https://github.com/PennyLaneAI/catalyst/pull/547)
 
   Simply import the CUDA Quantum `@qjit` decorator to use this functionality:
 
