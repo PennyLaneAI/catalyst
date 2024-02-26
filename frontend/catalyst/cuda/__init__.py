@@ -24,7 +24,7 @@ import pennylane as qml
 from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
 
-def qjit(fn=None, **kwargs):
+def cudaqjit(fn=None, **kwargs):
     """Wrapper around QJIT for CUDA-quantum."""
 
     if fn is not None:
@@ -125,7 +125,7 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
         return f"tensornet{option}"
 
 __all__ = [
-    "qjit",
+    "cudaqjit",
     "BaseCudaInstructionSet",
     "SoftwareQQPP",
     "NvidiaCuStateVec",

@@ -63,10 +63,10 @@
   [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
   [(#547)](https://github.com/PennyLaneAI/catalyst/pull/547)
 
-  Simply import the CUDA Quantum `@qjit` decorator to use this functionality:
+  Simply import the CUDA Quantum `@cudaqjit` decorator to use this functionality:
 
   ```python
-  from catalyst.cuda import qjit as cqjit
+  from catalyst.cuda import cudaqjit
   ```
 
   Or, if using Catalyst from PennyLane, simply specify `@qml.qjit(compiler="cuda_quantum")`.
@@ -82,7 +82,7 @@
   ```python
   dev = qml.device("softwareq.qpp", wires=2)
 
-  @cqjit
+  @cudaqjit
   @qml.qnode(dev)
   def circuit(x):
       qml.RX(x[0], wires=0)
