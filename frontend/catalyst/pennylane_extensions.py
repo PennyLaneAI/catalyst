@@ -202,14 +202,14 @@ def qfunc(device):
 
 
 Differentiable = Union[Function, QNode]
-DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
+DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
 
     # Unwrap the function from an existing QJIT object.
-    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+    if isinstance(f, catalyst.QJIT):
         f = f.user_function
 
     if isinstance(f, (Function, QNode)):

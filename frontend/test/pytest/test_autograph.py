@@ -159,6 +159,8 @@ class TestIntegration:
         class FN:
             """Test object."""
 
+            __name__ = "unknown"
+
             def __call__(self, x):
                 return x**2
 

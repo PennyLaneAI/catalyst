@@ -25,6 +25,7 @@ from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.filesystem import WorkspaceManager
 
 
@@ -74,6 +75,36 @@ def print(x, memref=False):
         builtins.print(x)
 
 
+def print_compilation_stage(fn, stage):
+    """Print one of the recorded compilation stages for a JIT-compiled function.
+
+    The stages are indexed by their Catalyst compilation pipeline name, which are either provided
+    by the user as a compilation option, or predefined in ``catalyst.compiler``.
+
+    Requires ``keep_intermediate=True``.
+
+    Args:
+        fn (QJIT): a qjit-decorated function
+        stage (str): string corresponding with the name of the stage to be printed
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit(keep_intermediate=True)
+        def func(x: float):
+            return x
+
+        debug.print_compilation_stage(func, "HLOLoweringPass")
+    """
+    EvaluationContext.check_is_not_tracing("C interface cannot be generated from tracing context.")
+
+    if not isinstance(fn, catalyst.QJIT):
+        raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
+
+    print(fn.compiler.get_output_of(stage))
+
+
 def get_cmain(fn, *args):
     """Return a C program that calls a jitted function with the provided arguments.
 
@@ -89,13 +120,13 @@ def get_cmain(fn, *args):
     if not isinstance(fn, catalyst.QJIT):
         raise TypeError(f"First argument needs to be a 'QJIT' object, got a {type(fn)}.")
 
-    # TODO: will be removed in part 2 of the refactor
-    # pylint: disable=protected-access
-    complied_function, args = fn._ensure_real_arguments_and_formal_parameters_are_compatible(
-        fn.compiled_function, *args
-    )
+    requires_promotion = fn.jit_compile(args)
 
-    return complied_function.get_cmain(*args)
+    if requires_promotion:
+        dynamic_args = filter_static_args(args, fn.compile_options.static_argnums)
+        args = promote_arguments(fn.c_sig, dynamic_args)
+
+    return fn.compiled_function.get_cmain(*args)
 
 
 # pylint: disable=line-too-long
@@ -132,7 +163,7 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
             }
         \"""
 
-        compiled_function = compile_from_mlir(ir)
+        compiled_function = debug.compile_from_mlir(ir)
 
     >>> compiled_function(0.1)
     [0.1]
