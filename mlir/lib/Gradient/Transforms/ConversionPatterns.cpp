@@ -362,17 +362,30 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
+        // TRICK: I am forcing the extraction of the values because I don't know how to
+        // get value of the withValue flag
+        bool withVal = true;
+
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc,
+                                  {.dupNoNeed = withVal ? false : true});
         }
 
         // The results of backprop are in argShadows, except scalar derivatives which are in the
         // results of the enzyme call.
         auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
-        SmallVector<Value> scalarResults;
-        unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
-        rewriter.replaceOp(op, scalarResults);
+        SmallVector<Value> valResults, gradResults;
+
+        // TRICK: I am forcing the size of values and gradients to 1, because I don't know how
+        // to take it from the ValAndGrad Op
+
+        unsigned numVals = 1;
+        unsigned numGradients = 1;
+
+        unpackScalarResults(enzymeCall, valResults, gradResults, rewriter, loc, withVal, numVals,
+                            numGradients);
+        rewriter.replaceOp(op, {valResults, gradResults});
         return success();
     }
 
@@ -448,24 +461,49 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return LLVM::LLVMStructType::getLiteral(ctx, SmallVector<Type>(scalarReturns));
     }
 
-    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &results,
-                                    OpBuilder &builder, Location loc)
+    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &valResults,
+                                    SmallVectorImpl<Value> &gradResults, OpBuilder &builder,
+                                    Location loc, bool withValue, unsigned numVals,
+                                    unsigned numGradients)
     {
         if (enzymeCall.getNumResults() == 0) {
             return;
         }
 
-        // LLVM Functions can only return up to one result. If one scalar is being differentiated,
-        // it will be the sole result. If there are multiple scalars being differentiated, Enzyme
-        // will return a struct of all the derivatives with respect to those scalars.
         Value result = enzymeCall.getResult();
-        if (isa<FloatType>(result.getType())) {
-            results.push_back(result);
+        bool isFloatType = isa<FloatType>(result.getType());
+        auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType());
+
+        if (!isFloatType || !structType) {
+            return;
         }
-        if (auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType())) {
-            size_t numResults = structType.getBody().size();
-            for (size_t i = 0; i < numResults; i++) {
-                results.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+
+        size_t numResults = structType.getBody().size();
+
+        if (withValue) {
+            assert(!isFloatType && "Wrong result type");
+            assert(numResults == numVals + numGradients);
+
+            for (size_t i = 0; i < numVals; i++) {
+                valResults.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+            }
+
+            for (size_t i = numVals; i < numResults; i++) {
+                gradResults.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+            }
+        }
+        else {
+            // LLVM Functions can only return up to one result. If one scalar is being
+            // differentiated, it will be the sole result. If there are multiple scalars being
+            // differentiated, Enzyme will return a struct of all the derivatives with respect to
+            // those scalars.
+            if (isFloatType) {
+                gradResults.push_back(result);
+            }
+            else { // structType
+                for (size_t i = 0; i < numResults; i++) {
+                    gradResults.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+                }
             }
         }
     }

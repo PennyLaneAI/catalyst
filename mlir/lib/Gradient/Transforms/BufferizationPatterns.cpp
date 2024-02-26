@@ -141,7 +141,8 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
             loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
-            calleeResults, resShadows, diffArgIndicesAttr);
+            calleeResults, resShadows,
+            /*with_val=*/rewriter.create<arith::ConstantIntOp>(loc, false, 1), diffArgIndicesAttr);
 
         // Fill in the null placeholders.
         for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
