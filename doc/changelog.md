@@ -51,6 +51,10 @@
 
 <h3>Improvements</h3>
 
+* Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
+  the standalone `diastatic-malt` package is used and automatically installed as a dependency.
+  [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
+
 * Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
