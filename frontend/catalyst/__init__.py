@@ -66,6 +66,7 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
 )
 
 from catalyst import debug
+from catalyst.autograph import autograph_source
 from catalyst.compiler import CompileOptions
 from catalyst.jit import QJIT, qjit
 from catalyst.pennylane_extensions import (
