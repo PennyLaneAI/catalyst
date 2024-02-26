@@ -553,6 +553,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
@@ -612,6 +613,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
 
       - name: Build Runtime test suite for Lightning simulator
