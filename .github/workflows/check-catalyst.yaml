@@ -103,6 +103,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
@@ -177,6 +178,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build MHLO Dialect
@@ -246,6 +248,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build Enzyme
@@ -272,6 +275,7 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
@@ -373,6 +377,7 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
@@ -444,6 +449,7 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
@@ -497,6 +503,7 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
