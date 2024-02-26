@@ -60,7 +60,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     }
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                         type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0});
+                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
 }
 
 /**
@@ -102,13 +102,13 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *co
     auto structType = LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
     auto modifiersPtr = rewriter.create<LLVM::AllocaOp>(loc, ptrType, structType, c1).getResult();
     auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                   llvm::ArrayRef<LLVM::GEPArg>{0, 0});
+                                                   llvm::ArrayRef<LLVM::GEPArg>{0, 0}, true);
     auto numControlledPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                         llvm::ArrayRef<LLVM::GEPArg>{0, 1});
+                                                         llvm::ArrayRef<LLVM::GEPArg>{0, 1}, true);
     auto controlledWiresPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                           llvm::ArrayRef<LLVM::GEPArg>{0, 2});
+                                                           llvm::ArrayRef<LLVM::GEPArg>{0, 2}, true);
     auto controlledValuesPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{0, 3});
+                                                            llvm::ArrayRef<LLVM::GEPArg>{0, 3}, true);
 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
@@ -120,13 +120,13 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *co
         for (size_t i = 0; i < controlledQubits.size(); i++) {
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i});
+                                                            llvm::ArrayRef<LLVM::GEPArg>{i}, true);
                 auto qubit = controlledQubits[i];
                 rewriter.create<LLVM::StoreOp>(loc, qubit, itemPtr);
             }
             {
                 auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, boolType, valuePtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i});
+                                                            llvm::ArrayRef<LLVM::GEPArg>{i}, true);
                 auto value = controlledValues[i];
                 rewriter.create<LLVM::StoreOp>(loc, value, itemPtr);
             }

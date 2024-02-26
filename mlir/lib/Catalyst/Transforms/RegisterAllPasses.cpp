@@ -37,4 +37,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createTestPass);
     mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
     mlir::registerPass(catalyst::createAddExceptionHandlingPass);
+    mlir::registerPass(catalyst::createGEPInboundsPass);
 }

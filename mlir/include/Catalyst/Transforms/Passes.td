@@ -124,4 +124,14 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
     ];
 }
 
+def GEPInboundsPass : Pass<"gep-inbounds"> {
+    let summary = "Mark GEPOp inbounds.";
+
+    let dependentDialects = [
+        "mlir::LLVM::LLVMDialect",
+    ];
+
+    let constructor = "catalyst::GEPInboundsPass()";
+}
+
 #endif // CATALYST_PASSES

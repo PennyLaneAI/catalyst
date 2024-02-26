@@ -57,7 +57,7 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 func.func @dbprint_str() {
 
     // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
-    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<15 x i8>
+    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr inbounds [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<15 x i8>
     // CHECK: llvm.call @__catalyst__rt__print_string([[char_ptr]])
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
@@ -77,7 +77,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[encodeRank:%.+]] = llvm.insertvalue [[c2]], [[undef]][0] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[c0:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK-NEXT: [[argStruct:%.+]] = llvm.extractvalue [[convertedArg]][1] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)> 
-    // CHECK-NEXT: [[getPtr:%.+]] = llvm.getelementptr [[argStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
+    // CHECK-NEXT: [[getPtr:%.+]] = llvm.getelementptr inbounds [[argStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
     // CHECK-NEXT: [[encodeData:%.+]] = llvm.insertvalue [[getPtr]], [[encodeRank]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodeType:%.+]] = llvm.insertvalue [[numericTypeArg]], [[encodeData]][2] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
@@ -92,7 +92,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[encodedRes:%.+]] = llvm.insertvalue [[c2_1]], [[undef1_1]][0] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[c0:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK-NEXT: [[resStruct:%.+]] = llvm.extractvalue [[allocConverted]][1] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)> 
-    // CHECK-NEXT: [[getPtrRes:%.+]] = llvm.getelementptr [[resStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
+    // CHECK-NEXT: [[getPtrRes:%.+]] = llvm.getelementptr inbounds [[resStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
     // CHECK-NEXT: [[encodedResData:%.+]] = llvm.insertvalue [[getPtrRes]], [[encodedRes]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodedResType:%.+]] = llvm.insertvalue [[numericTypeRes]], [[encodedResData]][2] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[allocaRes:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
