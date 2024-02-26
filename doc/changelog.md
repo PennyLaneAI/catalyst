@@ -14,7 +14,7 @@
 
   ```python
   @qjit(static_argnums=(1,))
-  def f(x: float, y: float):
+  def f(x, y):
       print(f"Compiling with y={y}")
       return x + y
   ```
@@ -32,7 +32,6 @@
 
   This functionality can be used to support passing arbitrary Python objects to QJIT-compiled
   functions, as long as they are hashable:
-
 
   ```py
   from dataclasses import dataclass
@@ -95,6 +94,10 @@
   >>> circuit(jnp.array([0.5, 1.4]))
   -0.47244976756708373
   ```
+
+  Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
+  compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
+  statistics (such as probabilities and variance) are not yet supported.
 
   For more details, please see the TK.
 

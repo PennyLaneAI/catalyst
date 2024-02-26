@@ -123,3 +123,11 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
         """Target name"""
         option = "-mps" if self.mps else ""
         return f"tensornet{option}"
+
+__all__ = [
+    "qjit",
+    "BaseCudaInstructionSet",
+    "SoftwareQQPP",
+    "NvidiaCuStateVec",
+    "NvidiaCuTensorNet",
+]
