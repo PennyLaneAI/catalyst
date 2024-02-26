@@ -545,3 +545,40 @@ func.func @state(%q : !quantum.bit) {
 
     return
 }
+
+// CHECK-LABEL: @controlled_circuit
+func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) {
+
+    %arg0 = memref.alloc() : memref<2x2xcomplex<f64>>
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
+    %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
+    %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
+
+    // CHECK: [[oneA:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[oneB:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[mod:%.+]] = llvm.alloca [[oneA]] x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr [[mod]][0, 2]
+    // CHECK: [[pctrl:%.+]] = llvm.alloca [[oneB]] x !llvm.ptr
+    // CHECK: llvm.store [[pctrl]], [[ppctrl]]
+    // CHECK: __catalyst__qis__Rot(
+    // CHECK-SAME:                 [[mod]]
+    %out_qubits, %out_ctrl_qubits = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrl %3 ctrlval %true : !quantum.bit ctrl !quantum.bit
+    // CHECK: [[mod:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr [[mod]][0, 2]
+    // CHECK: [[pctrl:%.+]] = llvm.alloca {{%.+}} x !llvm.ptr : (i64) -> !llvm.ptr
+    // CHECK: llvm.store [[pctrl]], [[ppctrl]]
+    // CHECK: __catalyst__qis__MultiRZ(
+    // CHECK-SAME:                 [[mod]]
+    %out_qubits_2:2, %out_ctrl_qubits_3 = quantum.multirz(%cst) %out_qubits, %1 ctrl %out_ctrl_qubits ctrlval %true : !quantum.bit, !quantum.bit ctrl !quantum.bit
+    // CHECK: [[mod:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr [[mod]][0, 2]
+    // CHECK: [[pctrl:%.+]] = llvm.alloca {{%.+}} x !llvm.ptr : (i64) -> !llvm.ptr
+    // CHECK: llvm.store [[pctrl]], [[ppctrl]]
+    // CHECK: __catalyst__qis__QubitUnitary(
+    // CHECK-SAME:                 [[mod]]
+    %out_qubits_4, %out_ctrl_qubits_5 = quantum.unitary(%arg0 : memref<2x2xcomplex<f64>>) %out_qubits_2#0 ctrl %out_ctrl_qubits_3 ctrlval %true : !quantum.bit ctrl !quantum.bit
+
+    return
+}
+
