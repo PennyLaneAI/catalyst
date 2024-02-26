@@ -71,6 +71,7 @@ from catalyst.jax_primitives import (
     jvp_p,
     probs_p,
     qmeasure_p,
+    value_and_grad_p,
     vjp_p,
     while_p,
     zne_p,
@@ -263,7 +264,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
             primitive = eqn.primitive
             if primitive is func_p:
                 child_jaxpr = eqn.params.get("call_jaxpr")
-            elif primitive is grad_p:
+            elif primitive in [grad_p, value_and_grad_p]:
                 child_jaxpr = eqn.params.get("jaxpr")
             else:
                 continue
@@ -283,7 +284,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 def _check_primitive_is_differentiable(primitive, method):
     """Verify restriction on primitives in the call graph of a Grad operation."""
 
-    if primitive is grad_p and method != "fd":
+    if primitive in [grad_p, value_and_grad_p] and method != "fd":
         raise DifferentiableCompileError(
             "Only finite difference can compute higher order derivatives."
         )
@@ -404,8 +405,11 @@ class Grad:
 
             args_data, _ = tree_flatten(args)
 
+            # choose between value_and_grad_p or just grad_p
+            grad_func = value_and_grad_p if grad_params.with_value else grad_p
+
             # It always returns list as required by catalyst control-flows
-            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = grad_func.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
             results = _unflatten_derivatives(
                 results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
             )

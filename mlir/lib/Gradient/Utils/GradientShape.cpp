@@ -75,6 +75,61 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
     return gradResultTypes;
 }
 
+/// Compute the result types of the gradient of a function.
+///
+/// The argument signature of the GradOp is the same as that of the differentiated function,
+/// whereas the result signature is the set of shape unions for each combination of differentiable
+/// argument function result.
+///
+std::vector<Type> computeValueAndGradTypes(func::FuncOp callee,
+                                           const std::vector<size_t> &diffArgIndices)
+{
+    std::vector<Type> gradResultTypes;
+    FunctionType fnType = callee.getFunctionType();
+
+    // The grad output should contain one set of results (equal in size to
+    // the number of function results) for each differentiable argument.
+    size_t numDiffArgs = diffArgIndices.size();
+    size_t numFnResults = fnType.getNumResults();
+    size_t numGradResults = numFnResults * numDiffArgs;
+    gradResultTypes.reserve(numGradResults);
+    for (size_t j = 0; j < numFnResults; j++) {
+        Type fnResType = fnType.getResult(j);
+
+        std::vector<int64_t> resShape;
+        auto tensorType = fnResType.dyn_cast<TensorType>();
+        if (tensorType) {
+            resShape.reserve(tensorType.getRank());
+            resShape.insert(resShape.end(), tensorType.getShape().begin(),
+                            tensorType.getShape().end());
+        }
+
+        for (size_t i = 0; i < numDiffArgs; i++) {
+            assert(diffArgIndices[i] < callee.getNumArguments() && "invalid diff argument index");
+
+            std::vector<int64_t> gradResShape = resShape;
+            Type diffArgType = fnType.getInput(diffArgIndices[i]);
+            if (auto tensorType = diffArgType.dyn_cast<TensorType>()) {
+                gradResShape.reserve(resShape.size() + tensorType.getRank());
+                gradResShape.insert(gradResShape.end(), tensorType.getShape().begin(),
+                                    tensorType.getShape().end());
+                fnResType = tensorType.getElementType();
+            }
+            else {
+                fnResType = diffArgType;
+            }
+
+            Type gradResType = !gradResShape.empty() || tensorType
+                                   ? RankedTensorType::get(gradResShape, fnResType)
+                                   : fnResType;
+
+            gradResultTypes.push_back(gradResType);
+        }
+    }
+
+    return gradResultTypes;
+}
+
 std::vector<Type> computeQGradTypes(func::FuncOp callee)
 {
     std::vector<Type> qGradResTypes;

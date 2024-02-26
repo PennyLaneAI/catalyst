@@ -29,48 +29,9 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult FiniteDiffLowering::match(GradOp op) const
-{
-    if (op.getMethod() == "fd") {
-        return success();
-    }
-
-    return failure();
-}
-
-void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
-{
-    Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
-    std::stringstream uniquer;
-    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
-    std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
-    FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
-    StringAttr visibility = rewriter.getStringAttr("private");
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-
-    double hValue =
-        op.getFiniteDiffParam().has_value() ? op.getFiniteDiffParamAttr().getValueAsDouble() : 1e-7;
-
-    func::FuncOp gradFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
-    if (!gradFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointAfter(callee);
-
-        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
-
-        computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
-    }
-
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
-}
-
-void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location loc,
-                                           func::FuncOp gradFn, func::FuncOp callee,
-                                           const std::vector<size_t> &diffArgIndices, double hValue)
+static void computeFiniteDiff(PatternRewriter &rewriter, Location loc, func::FuncOp gradFn,
+                              func::FuncOp callee, const std::vector<size_t> &diffArgIndices,
+                              double hValue)
 {
     ValueRange callArgs = gradFn.getArguments();
     TypeRange gradResTypes = gradFn.getResultTypes();
@@ -189,6 +150,84 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
     }
 
     rewriter.create<func::ReturnOp>(loc, gradients);
+}
+
+LogicalResult FiniteDiffLowering::match(GradOp op) const
+{
+    if (op.getMethod() == "fd") {
+        return success();
+    }
+
+    return failure();
+}
+
+void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
+{
+    Location loc = op.getLoc();
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+    std::stringstream uniquer;
+    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
+    std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
+    FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
+    StringAttr visibility = rewriter.getStringAttr("private");
+    func::FuncOp callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+
+    double hValue =
+        op.getFiniteDiffParam().has_value() ? op.getFiniteDiffParamAttr().getValueAsDouble() : 1e-7;
+
+    func::FuncOp gradFn =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
+    if (!gradFn) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointAfter(callee);
+
+        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
+
+        computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
+    }
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
+}
+
+LogicalResult FiniteValueAndGradDiffLowering::match(ValueAndGradOp op) const
+{
+    if (op.getMethod() == "fd") {
+        return success();
+    }
+
+    return failure();
+}
+
+void FiniteValueAndGradDiffLowering::rewrite(ValueAndGradOp op, PatternRewriter &rewriter) const
+{
+    Location loc = op.getLoc();
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+    std::stringstream uniquer;
+    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
+    std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
+    FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
+    StringAttr visibility = rewriter.getStringAttr("private");
+    func::FuncOp callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+
+    double hValue =
+        op.getFiniteDiffParam().has_value() ? op.getFiniteDiffParamAttr().getValueAsDouble() : 1e-7;
+
+    func::FuncOp gradFn =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
+    if (!gradFn) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointAfter(callee);
+
+        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
+
+        computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
+    }
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
 }
 
 } // namespace gradient
