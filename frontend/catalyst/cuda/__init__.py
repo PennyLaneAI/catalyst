@@ -27,13 +27,17 @@ from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 def cudaqjit(fn=None, **kwargs):
     """A decorator for compiling PennyLane and JAX programs using CUDA Quantum.
 
+    .. important::
+
+        This feature currently only supports CUDA Quantum version 0.6.
+
     .. note::
 
         Currently, only the following devices are supported:
 
-        * `softwareq.qpp`: a modern C++ statevector simulator
-        * `nvidia.statevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
-        * `nvidia.tensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product
+        * :class:`softwareq.qpp <SoftwareQQPP>`: a modern C++ statevector simulator
+        * :class:`nvidia.statevec <NvidiaCuStateVec>`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
+        * :class:`nvidia.tensornet <NvidiaCuTensorNet>`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product
           state)
 
     Args:
@@ -61,6 +65,10 @@ def cudaqjit(fn=None, **kwargs):
 
     >>> circuit(jnp.array([0.5, 1.4]))
     -0.47244976756708373
+
+    From PennyLane, this functionality can also be accessed via
+
+    >>> @qml.qjit(compiler="cuda_quantum")
 
     Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
     compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
