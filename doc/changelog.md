@@ -43,6 +43,7 @@
 * Catalyst now supports executing tapes in CUDA-Quantum simulators.
   [(#477)](https://github.com/PennyLaneAI/catalyst/pull/477)
   [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
+  [(#547)](https://github.com/PennyLaneAI/catalyst/pull/547)
 
   It has added the following devices:
   * softwareq.qpp
