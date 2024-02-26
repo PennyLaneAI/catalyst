@@ -43,7 +43,7 @@ module {
 
   // Check that we call __catalyst__host__rt__unrecoverable_error
   llvm.func internal @async_execute_fn() -> !llvm.ptr attributes { catalyst.preHandleError } {
-    %0 = llvm.mlir.null : !llvm.ptr
+    %0 = llvm.mlir.zero : !llvm.ptr
     llvm.return %0 : !llvm.ptr
   }
 
@@ -79,7 +79,7 @@ module {
 
   // Check that we add a source and a sink
   llvm.func internal @async_execute_fn() -> !llvm.ptr attributes { catalyst.preHandleError } {
-    %0 = llvm.mlir.null : !llvm.ptr
+    %0 = llvm.mlir.zero : !llvm.ptr
     llvm.return %0 : !llvm.ptr
   }
 

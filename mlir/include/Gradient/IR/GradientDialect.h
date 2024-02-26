@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Dialect.h"
 
 #include "Gradient/IR/GradientOpsDialect.h.inc"

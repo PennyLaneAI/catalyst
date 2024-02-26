@@ -56,10 +56,17 @@ Additionally, all measurements will always return ``true``.
             void StopTapeRecording() override {}
             void PrintState() override {}
             void NamedOperation(const std::string &, const std::vector<double> &,
-                                        const std::vector<QubitIdType> &, bool) override {}
+                                        const std::vector<QubitIdType> &,
+                                        bool,
+                                        const std::vector<QubitIdType> &,
+                                        const std::vector<bool> &
+                                        ) override {}
             void MatrixOperation(const std::vector<std::complex<double>> &,
-                                        const std::vector<QubitIdType> &, bool) override{}
-
+                                        const std::vector<QubitIdType> &,
+                                        bool,
+                                        const std::vector<QubitIdType> &,
+                                        const std::vector<bool> &
+                                        ) override{}
             auto Expval(ObsIdType) -> double override { return 0.0; }
             auto Var(ObsIdType) -> double override { return 0.0; }
             void State(DataView<std::complex<double>, 1> &) override {}

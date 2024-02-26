@@ -106,17 +106,7 @@ LLVM::LLVMFunctionType convertFunctionTypeCatalystWrapper(PatternRewriter &rewri
     }
 
     LLVMTypeConverter typeConverter(rewriter.getContext());
-    Type inputType = hasInputs ? typeConverter.packFunctionResults(inputs) : ptrType;
-    bool noChange = inputs.size() == 1;
-    if (noChange) {
-        // Still wrap the pointer into a struct
-        // for uniformity in Python and in the unwrapping.
-        inputType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), inputType);
-    }
-    if (inputType.isa<LLVM::LLVMStructType>()) {
-        inputType = LLVM::LLVMPointerType::get(inputType);
-    }
-    transformedInputs.push_back(inputType);
+    transformedInputs.push_back(ptrType);
 
     Type voidType = LLVM::LLVMVoidType::get(rewriter.getContext());
     return LLVM::LLVMFunctionType::get(voidType, transformedInputs);
@@ -131,6 +121,17 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
     bool hasInputs = functionHasInputs(callee);
 
     LLVM::LLVMFunctionType functionType = op.getFunctionType();
+    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    LLVMTypeConverter typeConverter(rewriter.getContext());
+    Type inputType =
+        hasInputs ? typeConverter.packFunctionResults(functionType.getParams()) : ptrType;
+    bool noChange = functionType.getParams().size() == 1;
+    if (noChange) {
+        // Still wrap the pointer into a struct
+        // for uniformity in Python and in the unwrapping.
+        inputType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), inputType);
+    }
+
     LLVM::LLVMFunctionType wrapperFuncType =
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
 
@@ -154,7 +155,8 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 
     if (hasInputs) {
         Value arg = wrapperFuncOp.getArgument(1);
-        Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, arg);
+        auto argType = inputType;
+        Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, argType, arg);
 
         for (size_t idx = 0; idx < params.size(); idx++) {
             Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, idx);

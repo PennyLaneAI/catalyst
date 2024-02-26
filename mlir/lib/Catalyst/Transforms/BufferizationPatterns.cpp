@@ -61,7 +61,7 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
             }
             auto options = bufferization::BufferizationOptions();
             FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
-                rewriter, op->getLoc(), result, false, options, false);
+                rewriter, op->getLoc(), result, options, false);
             MemRefType memrefType =
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto newBuffer =

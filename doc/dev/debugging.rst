@@ -35,9 +35,9 @@ Below is an example of how to obtain a C program that can be linked against the 
     def identity(x):
         return x
 
-    print(identity.get_cmain(1.0))
+    print(debug.get_cmain(identity, 1.0))
 
-Using the ``QJIT.get_cmain`` function, the following string is returned to the user:
+Using the ``debug.get_cmain`` function, the following string is returned to the user:
 
 .. code-block:: C
 
@@ -298,4 +298,3 @@ And finally some real LLVMIR adhering to the QIR specification:
 The LLVMIR code is compiled to an object file using the LLVM static compiler and linked to the
 runtime libraries. The generated shared object is stored by the caching mechanism in Catalyst
 for future calls.
-

@@ -21,6 +21,8 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    with:
+      use_release_tag: ${{ inputs.catalyst == 'stable' }}
 
   check-config:
     name: Build Configuration
@@ -38,6 +40,7 @@ jobs:
 
     - name: Install deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
@@ -98,8 +101,13 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_LLD=ON \
         make dialects
-        pip install --upgrade .
-
+        if [ ${{ inputs.pennylane }} = "stable" ]; then
+            pip install --upgrade .
+        else
+            # TODO(@erick-xanadu): Remove after release. See issue
+            # https://github.com/PennyLaneAI/catalyst/issues/494
+            pl_version="==0.35.0.dev0" pip install --upgrade .
+        fi
 
     - name: Build Catalyst Runtime (latest)
       if: ${{ inputs.lightning == 'latest' }}
@@ -149,7 +157,7 @@ jobs:
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.34.0-rc0
+        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.35.0-rc0
 
 
     - name: Add Frontend Dependencies to PATH

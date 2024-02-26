@@ -29,7 +29,7 @@ struct ArrayListBuilder {
     Value capacityField;
     Type elementType;
 
-    static FailureOr<ArrayListBuilder> get(Location loc, TypeConverter *typeConverter,
+    static FailureOr<ArrayListBuilder> get(Location loc, const TypeConverter *typeConverter,
                                            TypedValue<ArrayListType> list, OpBuilder &b)
     {
         SmallVector<Type> resultTypes;
@@ -190,9 +190,9 @@ struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
     LogicalResult matchAndRewrite(ListDeallocOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-
+        auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
-            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+            ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
         if (failed(arraylistBuilder)) {
             return failure();
         }
@@ -213,8 +213,9 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
     LogicalResult matchAndRewrite(ListPushOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
-            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+            ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
         if (failed(arraylistBuilder)) {
             return failure();
         }
@@ -233,8 +234,9 @@ struct LowerListPop : public OpConversionPattern<ListPopOp> {
     LogicalResult matchAndRewrite(ListPopOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
-            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+            ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
         if (failed(arraylistBuilder)) {
             return failure();
         }
@@ -253,8 +255,9 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
     LogicalResult matchAndRewrite(ListLoadDataOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        auto typeConverter = getTypeConverter();
         FailureOr<ArrayListBuilder> arraylistBuilder =
-            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+            ArrayListBuilder::get(op.getLoc(), typeConverter, op.getList(), rewriter);
         if (failed(arraylistBuilder)) {
             return failure();
         }

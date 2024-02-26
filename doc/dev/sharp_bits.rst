@@ -310,7 +310,6 @@ array(0.16996714)
 However, deviating from this will result in recompilation and a warning message:
 
 >>> circuit(jnp.array([1.4, 1.4, 0.3, 0.1]))
-catalyst/compilation_pipelines.py:592:
 UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 array(0.16996714)

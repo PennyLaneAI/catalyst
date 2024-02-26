@@ -47,69 +47,69 @@ llvm.func @_mlir_ciface_foo() {
 
 // -----
 
-llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: !llvm.ptr<f64>, %arg4: !llvm.ptr<f64>, %arg5: i64) -> !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)> attributes {llvm.emit_c_interface} 
+llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64, %arg3: !llvm.ptr, %arg4: !llvm.ptr, %arg5: i64) -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> attributes {llvm.emit_c_interface} 
 
 // Test that the return argument type remains unchanged in wrapper function
-// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>, %arg1: !llvm.ptr<struct<(ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64)>>)>>)  
+// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr)  
 
-llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg2: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
-    %0 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %4 = llvm.load %arg2 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %8 = llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr<f64>, !llvm.ptr<f64>, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64) -> !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>
-    llvm.store %8, %arg0 : !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>
+llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr) {
+    %0 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr,  i64)>
+    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
+    %4 = llvm.load %arg2 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr, ptr, i64)> 
+    %8 = llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, i64) -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    llvm.store %8, %arg0 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
     llvm.return
 }
 
 // -----
 
-llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: !llvm.ptr<f64>, %arg4: !llvm.ptr<f64>, %arg5: i64) -> !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)> attributes {llvm.emit_c_interface} 
+llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64, %arg3: !llvm.ptr, %arg4: !llvm.ptr, %arg5: i64) -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> attributes {llvm.emit_c_interface} 
 
 // Test that the return argument is passed without modification to the wrapped function
 // CHECK-LABEL: llvm.call @_catalyst_ciface_foo(%arg0
 
-llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg2: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
-    %0 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %4 = llvm.load %arg2 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %8 = llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr<f64>, !llvm.ptr<f64>, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64) -> !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>
-    llvm.store %8, %arg0 : !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>
+llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr) {
+    %0 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
+    %4 = llvm.load %arg2 : !llvm.ptr ->  !llvm.struct<(ptr, ptr, i64)>
+    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr, ptr, i64)> 
+    %8 = llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, i64) -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    llvm.store %8, %arg0 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
     llvm.return
 }
 
 // -----
 
-llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: !llvm.ptr<f64>, %arg4: !llvm.ptr<f64>, %arg5: i64) -> () attributes {llvm.emit_c_interface} 
+llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64, %arg3: !llvm.ptr, %arg4: !llvm.ptr, %arg5: i64) -> () attributes {llvm.emit_c_interface} 
 
 // Test that the input argument is wrapped around a structure and a pointer
-// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr<struct<(ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64)>>)>>)
+// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr)
 
-llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
-    %0 = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %4 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr<f64>, !llvm.ptr<f64>, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64) -> ()
+llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr) {
+    %0 = llvm.load %arg0 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
+    %4 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr, ptr, i64)> 
+    llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, i64) -> ()
     llvm.return
 }
 
 // -----
 
-llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: !llvm.ptr<f64>, %arg4: !llvm.ptr<f64>, %arg5: i64) -> () attributes {llvm.emit_c_interface} 
+llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64, %arg3: !llvm.ptr, %arg4: !llvm.ptr, %arg5: i64) -> () attributes {llvm.emit_c_interface} 
 
 // Test that the input argument is correctly translated to the one needed by _mlir_ciface_foo
 
@@ -119,38 +119,37 @@ llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: 
 // CHECK:    [[var2:%.+]] = llvm.extractvalue [[var0]][1]
 // CHECK:    llvm.call @_catalyst_ciface_foo([[var1]], [[var2]])
 
-llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
-    %0 = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %4 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr<f64>, !llvm.ptr<f64>, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64) -> ()
+llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr) {
+    %0 = llvm.load %arg0 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
+    %4 = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %5 = llvm.extractvalue %4[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %6 = llvm.extractvalue %4[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %7 = llvm.extractvalue %4[2] : !llvm.struct<(ptr, ptr, i64)> 
+    llvm.call @foo(%1, %2, %3, %5, %6, %7) : (!llvm.ptr, !llvm.ptr, i64, !llvm.ptr, !llvm.ptr, i64) -> ()
     llvm.return
 }
 
 // -----
 
-llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64) -> () attributes {llvm.emit_c_interface} 
+llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> () attributes {llvm.emit_c_interface} 
 
 // Test that the input argument is wrapped around a structure and a pointer for only one
-// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr<struct<(ptr<struct<(ptr<f64>, ptr<f64>, i64)>>)>>)
-
-llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
-    %0 = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    llvm.call @foo(%1, %2, %3) : (!llvm.ptr<f64>, !llvm.ptr<f64>, i64) -> ()
+// CHECK-LABEL: llvm.func @_catalyst_pyface_foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr)
+llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr) {
+    %0 = llvm.load %arg0 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
+    llvm.call @foo(%1, %2, %3) : (!llvm.ptr, !llvm.ptr, i64) -> ()
     llvm.return
 }
 
 // -----
 
-llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64) -> () attributes {llvm.emit_c_interface} 
+llvm.func @foo(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> () attributes {llvm.emit_c_interface} 
 
 // Test that the input argument is correctly translated to the one needed by _mlir_ciface_foo
 // For only one argument
@@ -160,12 +159,12 @@ llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64) -> () a
 // CHECK:    [[var1:%.+]] = llvm.extractvalue [[var0]][0]
 // CHECK:    llvm.call @_catalyst_ciface_foo([[var1]])
 
-llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
-    %0 = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
-    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
-    llvm.call @foo(%1, %2, %3) : (!llvm.ptr<f64>, !llvm.ptr<f64>, i64) -> ()
+llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr) {
+    %0 = llvm.load %arg0 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr, ptr, i64)> 
+    %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %3 = llvm.extractvalue %0[2] : !llvm.struct<(ptr, ptr, i64)> 
+    llvm.call @foo(%1, %2, %3) : (!llvm.ptr, !llvm.ptr, i64) -> ()
     llvm.return
 }
 

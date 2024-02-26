@@ -22,7 +22,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import for_loop, measure, qjit
-from catalyst.compilation_pipelines import JAX_QJIT
+from catalyst.jit import JAX_QJIT
 
 
 class TestJAXJIT:

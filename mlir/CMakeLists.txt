@@ -37,16 +37,12 @@ endif()
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
 set(ALL_MHLO_PASSES
   ChloPasses
-  GmlStPasses
-  GmlStTransforms
   MhloPasses
-  MhloToLhloConversion
   MhloToArithmeticConversion
   MhloToMemrefConversion
   MhloToStandard
   HloToLinalgUtils
   MhloToLinalg
-  MhloToThloConversion
   MhloShapeOpsToStandard
   MhloToStablehlo
   StablehloToMhlo

@@ -752,12 +752,12 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
 
     rewriter.setInsertionPoint(callOp);
     Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
-    auto nullOp = rewriter.create<LLVM::NullOp>(callOp.getLoc(), ptrTy);
+    auto zeroOp = rewriter.create<LLVM::ZeroOp>(callOp.getLoc(), ptrTy);
     Block *unwindBlock = rewriter.createBlock(successBlock);
 
     rewriter.setInsertionPointToEnd(unwindBlock);
     bool isCleanUp = true;
-    std::vector<Value> operands = {nullOp.getResult()};
+    std::vector<Value> operands = {zeroOp.getResult()};
     auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
     auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
     rewriter.create<LLVM::LandingpadOp>(callOp.getLoc(), structTy, isCleanUp, operands);

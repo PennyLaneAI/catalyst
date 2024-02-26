@@ -426,8 +426,6 @@ def multiple_stablehlo_custom_call(A: ShapedArray([2, 2], jax.numpy.float64)):
 
     # CHECK: func.func private @eigh
     # CHECK: stablehlo.custom_call @lapack_dsyevd
-    # CHECK: func.func private @eigh_1
-    # CHECK: stablehlo.custom_call @lapack_dsyevd
     B = qml.math.sqrt_matrix(A) @ qml.math.sqrt_matrix(A)
     return B
 

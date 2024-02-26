@@ -38,7 +38,7 @@ The ``catalyst`` Python package is a mixed Python package which relies on some C
 
 and the following modules:
 
-- `compilation_pipelines.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/compilation_pipelines.py>`_:
+- `jit.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jit.py>`_:
     This module contains classes and decorators for just-in-time and ahead-of-time compilation of
     hybrid quantum-classical functions using Catalyst.
 

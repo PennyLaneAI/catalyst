@@ -49,10 +49,17 @@
     [[nodiscard]] auto One() const->Result override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
-    void NamedOperation(const std::string &name, const std::vector<double> &params,                \
-                        const std::vector<QubitIdType> &wires, bool inverse) override;             \
-    void MatrixOperation(const std::vector<std::complex<double>> &matrix,                          \
-                         const std::vector<QubitIdType> &wires, bool inverse) override;            \
+    void NamedOperation(                                                                           \
+        const std::string &name, const std::vector<double> &params,                                \
+        const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse = false,              \
+        [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
+        [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
+    using Catalyst::Runtime::QuantumDevice::MatrixOperation;                                       \
+    void MatrixOperation(                                                                          \
+        const std::vector<std::complex<double>> &matrix, const std::vector<QubitIdType> &wires,    \
+        [[maybe_unused]] bool inverse = false,                                                     \
+        [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
+        [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
     auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,                     \
                     const std::vector<QubitIdType> &wires)                                         \
         ->ObsIdType override;                                                                      \

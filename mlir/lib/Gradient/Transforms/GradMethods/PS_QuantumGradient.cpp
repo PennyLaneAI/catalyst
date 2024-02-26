@@ -156,7 +156,10 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             Value gradientSubview =
                 rewriter.create<memref::SubViewOp>(loc, resultType, gradientBuffer, dynOffsets,
                                                    dynSizes, dynStrides, offsets, sizes, strides);
-            rewriter.create<memref::TensorStoreOp>(loc, derivative, gradientSubview);
+
+            auto materializeOp = rewriter.create<bufferization::MaterializeInDestinationOp>(
+                loc, derivative, gradientSubview);
+            materializeOp.setWritable(true);
         }
         else if (isDerivativeScalarTensor) {
             Value extracted = rewriter.create<tensor::ExtractOp>(loc, derivative);
