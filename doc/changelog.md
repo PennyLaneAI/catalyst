@@ -2,24 +2,40 @@
 
 <h3>New features</h3>
 
-* Catalyst now supports just-in-time compilation of static arguments.
+* Catalyst now supports just-in-time compilation of static (compile-time constant) arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
 
-  The ``@qjit`` decorator can now be used to compile functions with static arguments with
-  the ``static_argnums`` keyword argument. ``static_argnums`` can be an integer or an iterable
-  of integers that specify which positional arguments of a compiled function should be treated as
-  static. This feature allows users to pass hashable Python objects to a compiled function (as the
-  static arguments).
+  The `@qjit` decorator takes a new argument `static_argnums`, which specifies positional
+  arguments of the decorated function should be treated as compile-time static arguments.
 
-  A ``qjit`` object stores the hash value of a compiled function's static arguments. If any static
-  arguments are changed, the ``qjit`` object will check its stored hash values. If no hash value is
-  found, the function will be re-compiled with new static arguments. Otherwise, no re-compilation
-  will be triggered and the previously compiled function will be used.
+  This allows any hashable Python object to be passed to the function during compilation;
+  the function will only be re-compiled if the value of the static arguments change. Otherwise,
+  re-using previous static argument values will result in no re-compilation.
+
+  ```python
+  @qjit(static_argnums=(1,))
+  def f(x: float, y: float):
+      print(f"Compiling with y={y}")
+      return x + y
+  ```
+
+  ```pycon
+  >>> f(0.5, 0.3)
+  Compiling with y=0.3
+  array(0.8)
+  >>> f(0.1, 0.3)  # no re-compilation occurs
+  array(0.4)
+  >>> f(0.1, 0.4)  # y changes, re-compilation
+  Compiling with y=0.4
+  array(0.5)
+  ```
+
+  This functionality can be used to support passing arbitrary Python objects to QJIT-compiled
+  functions, as long as they are hashable:
+
 
   ```py
   from dataclasses import dataclass
-
-  from catalyst import qjit
 
   @dataclass
   class MyClass:
@@ -29,25 +45,58 @@
           return hash(str(self))
 
   @qjit(static_argnums=(1,))
-  def f(
-      x: int,
-      y: MyClass,
-  ):
+  def f(x: int, y: MyClass):
       return x + y.val
-
-  f(1, MyClass(5))
-  f(1, MyClass(6)) # re-compilation
-  f(2, MyClass(5)) # no re-compilation
   ```
 
-* Catalyst now supports executing tapes in CUDA-Quantum simulators.
+  ```pycon
+  >>> f(1, MyClass(5))
+  array(6)
+  >>> f(1, MyClass(6))  # re-compilation
+  array(7)
+  >>> f(2, MyClass(5))  # no re-compilation
+  array(7)
+  ```
+
+* Catalyst now supports compiling and executing QJIT-compiled QNodes using the
+  CUDA Quantum compiler toolchain.
   [(#477)](https://github.com/PennyLaneAI/catalyst/pull/477)
   [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
 
-  It has added the following devices:
-  * softwareq.qpp
-  * nvidia.statevec (with support for multi-gpu)
-  * nvidia.tensornet (with support for matrix product state)
+  Simply import the CUDA Quantum `@qjit` decorator to use this functionality:
+
+  ```python
+  from catalyst.cuda import qjit as cqjit
+  ```
+
+  Or, if using Catalyst from PennyLane, simply specify `@qml.qjit(compiler="cuda_quantum")`.
+
+  The following devices are available when compiling with CUDA Quantum:
+
+  * `softwareq.qpp`: a modern C++ statevector simulator
+  * `nvidia.statevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
+  * `nvidia.tensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
+  
+  For example:
+
+  ```python
+  dev = qml.device("softwareq.qpp", wires=2)
+
+  @cqjit
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x[0], wires=0)
+      qml.RY(x[1], wires=1)
+      qml.CNOT(wires=[0, 1])
+      return qml.expval(qml.PauliY(0))
+  ```
+
+  ```pycon
+  >>> circuit(jnp.array([0.5, 1.4]))
+  -0.47244976756708373
+  ```
+
+  For more details, please see the TK.
 
 <h3>Improvements</h3>
 
@@ -68,12 +117,12 @@
   >>> func((2,));             # tuple
   compiling
   >>> func([3,]);             # list
-
   ```
 
   Note however that in order to keep overheads low, changing the argument *type* or *shape* (in a
   promotion incompatible way) may override a previously stored function (with identical PyTree
   metadata and static argument values):
+
   ```py
   @qjit
   def func(x):
@@ -89,7 +138,10 @@
   compiling
   ```
 
-* Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
+* Catalyst gradient functions (`grad`, `jacobian`, `vjp`, and `jvp`) now support
+  being applied to functions that use (nested) container
+  types as inputs and outputs. This includes lists and dictionaries, as well
+  as any data structure implementing the [PyTree protocol](https://jax.readthedocs.io/en/latest/pytrees.html).
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
   [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
@@ -111,12 +163,12 @@
   [{'expval0': (array(-0.0978434), array(-0.19767681))}, (array(-0.0978434), array(-0.19767681))]
   ```
 
-* Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices. Specifically, a circuit like
+* Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices.
+  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
+
+  Specifically, a circuit like
 
   ```py
-  import pennylane as qml
-  from catalyst import qjit
-
   dev = qml.device("braket.local.qubit", wires=2, shots=100)
 
   @qjit
@@ -128,8 +180,7 @@
       return qml.probs()
   ```
 
-  would no longer decompose the `PSWAP` and `ISWAP` gates to `SWAP`s, `CNOT`s and `Hadamard`s. Instead it would just call Braket's native `PSWAP` and `ISWAP` gates at runtime.
-  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
+  would no longer decompose the `PSWAP` and `ISWAP` gates.
 
 * Add support for the `BlockEncode` operator in Catalyst.
   [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
@@ -144,7 +195,8 @@
   the current state-vector before qubit re-allocations.
   [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
 
-* Add support for post-selection in mid-circuit measurements. This is currently supported only on Lightning simulators.
+* Add support for post-selection in mid-circuit measurements. This is currently supported
+  only on Lightning simulators.
   [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
 
   This is an example of post-selection usage:
