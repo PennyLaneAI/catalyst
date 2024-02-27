@@ -16,6 +16,7 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
+from typing import Any
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
@@ -33,7 +34,8 @@ if tomllib is None and tomlkit is None:  # pragma: nocover
 # Give preference to tomllib
 if tomllib:
     from tomllib import load as toml_load  # pragma: nocover
+    TOMLDocument = Any
 else:
-    from tomlkit import load as toml_load  # pragma: nocover
+    from tomlkit import load as toml_load, TOMLDocument  # pragma: nocover
 
-__all__ = ["toml_load"]
+__all__ = ["toml_load", "TOMLDocument"]

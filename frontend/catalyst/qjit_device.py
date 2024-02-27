@@ -18,6 +18,7 @@ from pennylane.measurements import MidMeasureMP
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
+from catalyst.utils.runtime import get_native_gates_PL
 
 
 class QJITDevice(qml.QubitDevice):
@@ -108,7 +109,7 @@ class QJITDevice(qml.QubitDevice):
     @staticmethod
     def _set_supported_operations(config):
         """Override the set of supported operations."""
-        native_gates = set(config["operators"]["gates"][0]["native"])
+        native_gates = get_native_gates_PL(config)
         qir_gates = QJITDevice.operations_supported_by_QIR_runtime
         supported_native_gates = list(set.intersection(native_gates, qir_gates))
         QJITDevice.operations = supported_native_gates
@@ -121,26 +122,6 @@ class QJITDevice(qml.QubitDevice):
 
         if QJITDevice._check_adjoint(config):
             QJITDevice.operations += ["Adjoint"]
-
-        if QJITDevice._check_quantum_control(config):  # pragma: nocover
-            # TODO: Once control is added on the frontend.
-            gates_to_be_decomposed_if_controlled = [
-                "Identity",
-                "CNOT",
-                "CY",
-                "CZ",
-                "CSWAP",
-                "CRX",
-                "CRY",
-                "CRZ",
-                "CRot",
-            ]
-            native_controlled_gates = ["ControlledQubitUnitary"] + [
-                f"C({gate})"
-                for gate in native_gates
-                if gate not in gates_to_be_decomposed_if_controlled
-            ]
-            QJITDevice.operations += native_controlled_gates
 
     @staticmethod
     def _set_supported_observables(config):

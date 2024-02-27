@@ -21,6 +21,7 @@ import pytest
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime import get_native_gates_PL
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -97,13 +98,15 @@ OBSERVABLES = [
     "Exp",
 ]
 
+RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
 @pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
+    not pathlib.Path(RUNTIME_LIB_PATH + "/libdummy_device.so").is_file(),
     reason="lib_dummydevice.so was not found.",
 )
-def test_custom_device():
+def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
+
 
     class DummyDevice(qml.QubitDevice):
         """Dummy Device"""
@@ -114,9 +117,8 @@ def test_custom_device():
         version = "0.0.1"
         author = "Dummy"
 
-        # Doesn't matter as at the moment it is dictated by QJITDevice
-        operations = OPERATIONS
-        observables = OBSERVABLES
+        operations = [] # To be loaded from the toml file
+        observables = [] # To be loaded from the toml file
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)

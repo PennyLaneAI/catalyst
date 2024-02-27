@@ -1,4 +1,4 @@
-schema = 1
+schema = 2
 
 [device]
 name = "dummy.device.qubit"
@@ -21,40 +21,7 @@ observables = [
         "Exp",
 ]
 
-# The union of all gate types listed in this section must match what
-# the device considers "supported" through PennyLane's device API.
-[[operators.gates]]
-native = [
-        "QubitUnitary",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "MultiRZ",
-        "Hadamard",
-        "S",
-        "T",
-        "CNOT",
-        "SWAP",
-        "CSWAP",
-        "Toffoli",
-        "CY",
-        "CZ",
-        "PhaseShift",
-        "ControlledPhaseShift",
-        "RX",
-        "RY",
-        "RZ",
-        "Rot",
-        "CRX",
-        "CRY",
-        "CRZ",
-        "CRot",
-        "Identity",
-        "IsingXX",
-        "IsingYY",
-        "IsingZZ",
-        "IsingXY",
-]
+[operators.gates]
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
@@ -91,6 +58,38 @@ matrix = [
         "MultiControlledX",
 ]
 
+[operators.gates.named]
+
+QubitUnitary = { controllable = true }
+PauliX = { controllable = true }
+PauliY = { controllable = true }
+PauliZ = { controllable = true }
+MultiRZ = { controllable = true }
+Hadamard = { controllable = true }
+S = { controllable = true }
+T = { controllable = true }
+CNOT = { }
+SWAP = { controllable = true }
+CSWAP = { }
+Toffoli = { controllable = true }
+CY = { }
+CZ = { }
+PhaseShift = { controllable = true }
+ControlledPhaseShift = { }
+RX = { controllable = true }
+RY = { controllable = true }
+RZ = { controllable = true }
+Rot = { controllable = true }
+CRX = { }
+CRY = { }
+CRZ = { }
+CRot = { }
+Identity = { controllable = true }
+IsingXX = { controllable = true }
+IsingYY = { controllable = true }
+IsingZZ = { controllable = true }
+IsingXY = { controllable = true }
+
 [measurement_processes]
 exactshots = [
 	"Expval",
@@ -113,8 +112,6 @@ qjit_compatible = true
 runtime_code_generation = false
 # If the device supports adjoint
 quantum_adjoint = true
-# If the device supports quantum control instructions natively
-quantum_control = false
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = true
 

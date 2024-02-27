@@ -21,12 +21,13 @@ import os
 import pathlib
 import platform
 import re
+from typing import Set, Dict, Any, Tuple
 
 import pennylane as qml
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import toml_load
+from catalyst.utils.toml import toml_load, TOMLDocument
 
 package_root = os.path.dirname(__file__)
 
@@ -91,14 +92,24 @@ def check_device_config(device):
     raise CompileError(msg)
 
 
-def get_native_gates(config):
+def get_native_gates_PL(config) -> Set[str]:
     """Get gates that are natively supported by the device and therefore do not need to be
     decomposed.
 
     Args:
         config (Dict[Str, Any]): Configuration dictionary
+
+    Returns:
+        List[str]: List of gate names in the PennyLane format.
     """
-    return config["operators"]["gates"][0]["native"]
+    gates = config["operators"]["gates"]["named"]
+    # import pdb; pdb.set_trace()
+    gates_PL = set()
+    for gate_name in [str(g) for g in gates]:
+        gates_PL.add(f"{gate_name}")
+        if gates[gate_name].get('controllable', False):
+            gates_PL.add(f"C({gate_name})")
+    return gates_PL
 
 
 def get_decomposable_gates(config):
@@ -107,7 +118,7 @@ def get_decomposable_gates(config):
     Args:
         config (Dict[Str, Any]): Configuration dictionary
     """
-    return config["operators"]["gates"][0]["decomp"]
+    return config["operators"]["gates"]["decomp"]
 
 
 def get_matrix_decomposable_gates(config):
@@ -116,7 +127,7 @@ def get_matrix_decomposable_gates(config):
     Args:
         config (Dict[Str, Any]): Configuration dictionary
     """
-    return config["operators"]["gates"][0]["matrix"]
+    return config["operators"]["gates"]["matrix"]
 
 
 def check_no_overlap(*args):
@@ -171,14 +182,20 @@ def check_full_overlap(device, *args):
 
     Raises: CompileError
     """
-    operations = filter_out_adjoint_and_control(device.operations)
-    gates_in_device = set(operations)
+    # operations = filter_out_adjoint_and_control(device.operations)
+    gates_in_device = set(device.operations)
     set_of_sets = [set(arg) for arg in args]
-    union = set.union(*set_of_sets)
-    if gates_in_device == union:
+    gates_in_spec = set.union(*set_of_sets)
+    if gates_in_device == gates_in_spec:
         return
 
-    msg = "Gates in qml.device.operations and specification file do not match"
+    import pdb; pdb.set_trace()
+
+    msg = (
+        "Gates in qml.device.operations and specification file do not match.\n"
+        f"Gates that present only in the device: {gates_in_device - gates_in_spec}\n"
+        f"Gates that present only in spec: {gates_in_spec - gates_in_device}\n"
+    )
     raise CompileError(msg)
 
 
@@ -191,17 +208,15 @@ def check_gates_are_compatible_with_device(device, config):
 
     Raises: CompileError
     """
-
-    native = get_native_gates(config)
+    native = get_native_gates_PL(config)
     decomposable = get_decomposable_gates(config)
     matrix = get_matrix_decomposable_gates(config)
     check_no_overlap(native, decomposable, matrix)
-    if not hasattr(device, "operations"):  # pragma: nocover
+
+    if hasattr(device, "operations"):  # pragma: nocover
         # The new device API has no "operations" field
         # so we cannot check that there's an overlap or not.
-        return
-
-    check_full_overlap(device, native, decomposable, matrix)
+        check_full_overlap(device, native)
 
 
 def validate_config_with_device(device):
@@ -226,7 +241,36 @@ def validate_config_with_device(device):
     check_gates_are_compatible_with_device(device, config)
 
 
-def extract_backend_info(device):
+def load_toml_file_into(device, toml_file_name=None):
+    """Temporary function. This function adds the `config` field to devices containing the path to
+    it's TOML configuration file.
+    TODO: Remove this function when `qml.Device`s are guaranteed to have their own
+    config file field."""
+    device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    name = device.name
+    if isinstance(device, qml.Device):
+        name = device.short_name
+
+    # The toml files name convention we follow is to replace
+    # the dots with underscores in the device short name.
+    if toml_file_name is None:
+        toml_file_name = name.replace(".", "_") + ".toml"
+    # And they are currently saved in the following directory.
+    toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+
+    with open(toml_file, "rb") as f:
+        config = toml_load(f)
+
+    toml_operations = get_native_gates_PL(config)
+    device.operations = toml_operations
+    # if not hasattr(device, "operations") or device.operations is None:
+    # else:
+    #     # TODO: make sure toml_operations matches the device operations
+    #     pass
+    device.config = toml_file
+
+
+def extract_backend_info(device) -> Tuple[TOMLDocument, str, str, Dict[str, Any]]:
     """Extract the backend info as a tuple of (name, lib, kwargs)."""
 
     validate_config_with_device(device)

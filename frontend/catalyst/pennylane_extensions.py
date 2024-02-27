@@ -94,7 +94,7 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.utils.runtime import extract_backend_info, get_lib_path
+from catalyst.utils.runtime import extract_backend_info, get_lib_path, load_toml_file_into
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -130,26 +130,6 @@ class QFunc:
         update_wrapper(self, fn)
 
     @staticmethod
-    def _add_toml_file(device):
-        """Temporary function. This function adds the config field to devices.
-        TODO: Remove this function when `qml.Device`s are guaranteed to have their own
-        config file field."""
-        if hasattr(device, "config"):  # pragma: no cover
-            # Devices that already have a config field do not need it to be overwritten.
-            return
-        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        name = device.name
-        if isinstance(device, qml.Device):
-            name = device.short_name
-
-        # The toml files name convention we follow is to replace
-        # the dots with underscores in the device short name.
-        toml_file_name = name.replace(".", "_") + ".toml"
-        # And they are currently saved in the following directory.
-        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
-        device.config = toml_file
-
-    @staticmethod
     def extract_backend_info(device):
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device)
@@ -158,7 +138,8 @@ class QFunc:
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
-            QFunc._add_toml_file(self.device)
+            if not hasattr(self.device, "config"):
+                load_toml_file_into(self.device)
             dev_args = QFunc.extract_backend_info(self.device)
             config, rest = dev_args[0], dev_args[1:]
             device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
