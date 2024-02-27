@@ -55,7 +55,7 @@
 
   For example,
 
-  ``` py
+  ```py
   @qjit
   def workflow(x, y):
       @qml.qnode(qml.device('lightning.qubit, wires=1))

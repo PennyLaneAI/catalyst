@@ -2113,23 +2113,24 @@ def vmap(
     out_axes: Union[int, Sequence[Any]] = 0,
     axis_size: Optional[int] = None,
 ) -> Callable:
-    """A :func:`~.qjit` compatible vectorizing map for PennyLane/Catalyst.
+    """A :func:`~.qjit` compatible vectorizing map.
+    Creates a function which maps an input function over argument axes.
 
     Args:
         f (Callable): A Python function containing PennyLane quantum operations.
-        in_axes (Union[int, Sequence[Any]]): It specifies the value(s) over which input
+        in_axes (Union[int, Sequence[Any]]): Specifies the value(s) over which input
             array axes to map.
-        out_axes (Union[int, Sequence[Any]]): It specifies where the mapped axis should appear
+        out_axes (Union[int, Sequence[Any]]): Specifies where the mapped axis should appear
             in the output.
         axis_size (int): An integer can be optionally provided to indicate the size of the
             axis to be mapped. If omitted, the size of the mapped axis will be inferred from
             the provided arguments.
 
     Returns:
-        (Callable): Vectorized version of ``fn``.
+        Callable: Vectorized version of ``fn``.
 
     Raises:
-        ValueError: Invalid `in_axes`, `out_axes`, and `axis_size` values.
+        ValueError: Invalid ``in_axes``, ``out_axes``, and ``axis_size`` values.
 
 
     **Example**
@@ -2331,7 +2332,7 @@ def _get_batch_loc(axes_flat):
         axes_flat (List): Flattened list of in-axes or out-axes including `None` elements.
 
     Returns:
-        (List): A list of indices representing the locations where the mapping should be applied.
+        List: A list of indices representing the locations where the mapping should be applied.
     """
 
     return [i for i, d in enumerate(axes_flat) if d is not None]
@@ -2347,7 +2348,7 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
         axis_size (Optional[int]): Optional default batch size.
 
     Returns:
-        (int): Returns the batch size used as the upperbound of the QJIT-compatible for loop
+        int: Returns the batch size used as the upper bound of the QJIT-compatible for loop
             in the computation of vmap.
 
     Raises:
