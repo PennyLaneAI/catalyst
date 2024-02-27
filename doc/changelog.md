@@ -309,6 +309,12 @@
 
 <h3>Bug fixes</h3>
 
+* `QCtrl` now implements `map_wires`.
+  [(#555)](https://github.com/PennyLaneAI/catalyst/pull/555)
+
+  Applying `map_wires` to `QCtrl` lead to an incorrect circuit.
+  The wires in the nested regions remained unchanged.
+
 * Catalyst will no longer print a warning that recompilation is triggered when a `@qjit` decorated
   function with no arguments is invoke without having been compiled first, for example via the use
   of `target="mlir"`.
