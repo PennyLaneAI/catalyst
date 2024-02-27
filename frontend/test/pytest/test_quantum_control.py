@@ -426,7 +426,7 @@ def test_qctrl_wires_controlflow(backend):
     assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
 
 
-def test_map_wires(backend):
+def test_map_wires():
     """Test map wires."""
 
     X = HybridOpRegion(
@@ -439,7 +439,7 @@ def test_map_wires(backend):
         control_wires=[0], regions=[X], in_classical_tracers=[], out_classical_tracers=[0]
     )
     new_qctrl = qctrl.map_wires({1: 0, 0: 1})
-    assert new_qctrl._control_wires == [1]
+    assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
     assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
 
