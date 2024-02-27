@@ -38,9 +38,13 @@ with open(".dep-versions") as f:
     pl_str = "pennylane="
     pl_str_length = len(pl_str)
     pl_version = [line[pl_str_length:].strip() for line in lines if pl_str in line][0]
+    lightning_str = "lightning="
+    lightning_str_length = len(pl_str)
+    lightning_version = [line[lightning_str_length:].strip() for line in lines if lightning_str in line][0]
 
 requirements = [
     f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}",
+    f"pennylane-lightning @ git+https://github.com/pennylaneai/pennylane-lightning@{lightning_version}",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
