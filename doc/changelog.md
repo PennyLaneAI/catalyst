@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Catalyst now supports Python 3.12
+  [(#532)](https://github.com/PennyLaneAI/catalyst/pull/532)
+
 * Catalyst now supports just-in-time compilation of static arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
   [(#550)](https://github.com/PennyLaneAI/catalyst/pull/550)
