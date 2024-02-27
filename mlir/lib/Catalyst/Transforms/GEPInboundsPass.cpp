@@ -42,14 +42,11 @@ struct GEPInboundsPass : impl::GEPInboundsPassBase<GEPInboundsPass> {
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
-        std::cout << "BEFORE" << std::endl;
+
         populateGEPInboundsPatterns(patterns);
-        std::cout << "AFTER" << std::endl;
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-            std::cout << "FAILURE" << std::endl;
             return signalPassFailure();
         }
-        std::cout << "AFTERRUN" << std::endl;
     }
 };
 

@@ -26,11 +26,15 @@ namespace {
 struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
     using mlir::OpRewritePattern<LLVM::GEPOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(LLVM::GEPOp op, mlir::PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(LLVM::GEPOp op,
+                                        mlir::PatternRewriter &rewriter) const override
     {
-        std::cout << "MATCH" << std::endl;
-        op.dump();
+        if (op.getInbounds()) {
+            return failure();
+        }
+        rewriter.startRootUpdate(op);
         op.setInbounds(true);
+        rewriter.finalizeRootUpdate(op);
         return success();
     }
 };
@@ -41,9 +45,7 @@ namespace catalyst {
 
 void populateGEPInboundsPatterns(RewritePatternSet &patterns)
 {
-    std::cout << "POPULATE" << std::endl;
     patterns.add<GEPOpRewritePattern>(patterns.getContext());
-    std::cout << "POPULATE" << std::endl;
 }
 
 } // namespace catalyst
