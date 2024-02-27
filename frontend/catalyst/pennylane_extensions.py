@@ -2163,6 +2163,26 @@ def vmap(
 
     >>> workflow(x, y, 1)
     [-0.93005586, -0.97165424, -0.6987465]
+
+    .. details::
+        :title: Selecting batching axes for arguments
+
+        The ``in_axes`` parameter provides different modes the allow large- and fine-grained
+        control over which arguments to apply the batching transformation on. Enabling batching for
+        a particular argument requires that the selected axis be of the same size as the determined
+        batch size, which is the same for all arguments.
+
+        The following modes are supported:
+
+        - ``int``: specifies the same batch axis for all arguments
+        - ``Tuple[int]``: specify a different batch axis for each argument
+        - ``Tuple[int | None]``: same as previous, but selectively disable batching for certain
+          arguments with a ``None`` value
+        - ``Tuple[int | PyTree[int] | None]``: same as previous, but specify a different batch
+          axis for each leaf of an argument (Note that the ``PyTreeDefs``, i.e. the container
+          structure, must match between the ``in_axes`` element and the corresponding argument.)
+        - ``Tuple[int | PyTree[int | None] | None]``: same as previous, but selectively disable
+          batching for individual PyTree leaves
     """
 
     # Dispatch to jax.vmap when it is called outside qjit.
@@ -2246,7 +2266,7 @@ def vmap(
                 f"arguments, but got out_axes={out_axes} and out_shape={out_shape}"
             )
 
-        # Apply mapping batched_args[1:] ---> fn(args)'
+        # Apply mapping batched_args[1:] ---> fn(args)
         @for_loop(1, batch_size, 1)
         def loop_fn(i, batched_result_list):
             fn_args_flat = args_flat
