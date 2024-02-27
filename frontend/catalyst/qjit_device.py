@@ -77,6 +77,7 @@ class QJITDevice(qml.QubitDevice):
         "QubitUnitary",
         "ISWAP",
         "PSWAP",
+        "GlobalPhase",
     }
 
     @staticmethod
