@@ -11,27 +11,26 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
+#include <iostream>
 
-#include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
 using namespace catalyst;
 
 namespace {
+struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
+    using mlir::OpRewritePattern<LLVM::GEPOp>::OpRewritePattern;
 
-struct GEPInboundsOp : public OpConversionPattern<LLVM::GEPOp> {
-    using OpConversionPattern::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(LLVM::GEPOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(LLVM::GEPOp op, mlir::PatternRewriter &rewriter) const override
     {
-        // op.dump();
-        // op.setInbounds(false);
-        // rewriter.replaceOp(op, op);
+        std::cout << "MATCH" << std::endl;
+        op.dump();
+        op.setInbounds(true);
         return success();
     }
 };
@@ -42,7 +41,9 @@ namespace catalyst {
 
 void populateGEPInboundsPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<GEPInboundsOp>(patterns.getContext(), 1);
+    std::cout << "POPULATE" << std::endl;
+    patterns.add<GEPOpRewritePattern>(patterns.getContext());
+    std::cout << "POPULATE" << std::endl;
 }
 
 } // namespace catalyst

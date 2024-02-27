@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "gepinbounds"
 
+#include <iostream>
 #include "llvm/Support/Debug.h"
 
 #include "mlir/Pass/Pass.h"
@@ -41,15 +42,19 @@ struct GEPInboundsPass : impl::GEPInboundsPassBase<GEPInboundsPass> {
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
+        std::cout << "BEFORE" << std::endl;
         populateGEPInboundsPatterns(patterns);
+        std::cout << "AFTER" << std::endl;
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+            std::cout << "FAILURE" << std::endl;
             return signalPassFailure();
         }
+        std::cout << "AFTERRUN" << std::endl;
     }
 };
 
 std::unique_ptr<Pass> createGEPInboundsPass()
-{
+{   
     return std::make_unique<GEPInboundsPass>();
 }
 
