@@ -1091,16 +1091,6 @@ class Adjoint(HybridOp):
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def map_wires(self, wire_map):
-        """Map wires to new wires according to wire_map"""
-        new_ops = []
-        for op in self.regions[0].quantum_tape.operations:
-            new_ops.append(op.map_wires(wire_map))
-        self.regions[0].quantum_tape = QuantumTape(new_ops, [])
-        self._control_wires = [wire_map.get(wire, wire) for wire in self._control_wires]
-        self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
-        return self
-
     def __init__(self, *args, control_wires, control_values=None, work_wires=None, **kwargs):
         self._control_wires = qml.wires.Wires(control_wires)
         self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
@@ -1156,6 +1146,16 @@ class QCtrl(HybridOp):
     def work_wires(self):
         """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
+
+    def map_wires(self, wire_map):
+        """Map wires to new wires according to wire_map"""
+        new_ops = []
+        for op in self.regions[0].quantum_tape.operations:
+            new_ops.append(op.map_wires(wire_map))
+        self.regions[0].quantum_tape = QuantumTape(new_ops, [])
+        self._control_wires = [wire_map.get(wire, wire) for wire in self._control_wires]
+        self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
+        return self
 
 
 def qctrl_distribute(
