@@ -53,6 +53,9 @@
 
 <h3>Improvements</h3>
 
+* Add support for `GlobalPhase` gate in the runtime.
+  [(#558)](https://github.com/PennyLaneAI/catalyst/pull/558)
+
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
   [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
