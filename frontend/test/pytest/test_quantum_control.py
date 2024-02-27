@@ -24,11 +24,15 @@ import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
 from pennylane import ctrl as PL_ctrl
+from pennylane.operation import Wires
+from pennylane.tape import QuantumTape
 
 from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
 from catalyst import for_loop, measure, qjit, while_loop
+from catalyst.jax_tracer import HybridOpRegion
+from catalyst.pennylane_extensions import QCtrl
 
 
 def verify_catalyst_ctrl_against_pennylane(
@@ -420,6 +424,23 @@ def test_qctrl_wires_controlflow(backend):
 
     # It returns `[2, 0, -1]`
     assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
+
+
+def test_map_wires(backend):
+    """Test map wires."""
+
+    X = HybridOpRegion(
+        quantum_tape=QuantumTape([qml.X(wires=[1])], []),
+        arg_classical_tracers=[],
+        res_classical_tracers=[],
+        trace=None,
+    )
+    qctrl = QCtrl(
+        control_wires=[0], regions=[X], in_classical_tracers=[], out_classical_tracers=[0]
+    )
+    new_qctrl = qctrl.map_wires({1: 0, 0: 1})
+    assert new_qctrl._control_wires == [1]
+    assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
 
 if __name__ == "__main__":
