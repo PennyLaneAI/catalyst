@@ -13,38 +13,33 @@
 # limitations under the License.
 
 """This module contains classes and decorators for just-in-time and ahead-of-time
-compiling of hybrid quantum-classical functions using Catalyst.
+compilation of hybrid quantum-classical functions using Catalyst.
 """
 
-# pylint: disable=too-many-lines
-
+import copy
 import functools
 import inspect
-import pathlib
+import os
 import warnings
-from copy import deepcopy
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.interpreters.mlir import ir
+from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
-from catalyst.ag_utils import run_autograph
-from catalyst.compiled_functions import CompiledFunction
+from catalyst.autograph import run_autograph
+from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
-from catalyst.jax_tracer import trace_to_mlir
-from catalyst.pennylane_extensions import QFunc
+from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
-    TypeCompatibility,
     filter_static_args,
     get_abstract_signature,
     get_type_annotations,
     merge_static_args,
     promote_arguments,
-    typecheck_signatures,
 )
 from catalyst.utils.c_template import mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
@@ -71,150 +66,199 @@ class QJIT:
         the :func:`~.qjit` documentation for more details.
 
     Args:
-        fn (Callable): the quantum or classical function
-        compile_options (Optional[CompileOptions]): common compilation options
+        fn (Callable): the quantum or classical function to compile
+        compile_options (CompileOptions): compilation options to use
     """
 
     def __init__(self, fn, compile_options):
+        self.original_function = fn
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
-        self.original_function = fn
-        self.user_function = fn
-        self.jaxed_function = None
-        self.compiled_function = None
-        self.mlir_module = None
-        self.user_typed = False
+        self.fn_cache = CompilationCache(
+            compile_options.static_argnums, compile_options.abstracted_axes
+        )
+        # Active state of the compiler.
+        # TODO: rework ownership of workspace, possibly CompiledFunction
+        self.workspace = None
         self.c_sig = None
-        self.out_tree = None
-        self._jaxpr = None
-        self._mlir = None
-        self._llvmir = None
-        self.function_name = None
-        self.preferred_workspace_dir = None
-        self.stored_compiled_functions = {}
-        self.workspace_used = False
+        self.out_treedef = None
+        self.compiled_function = None
+        self.jaxed_function = None
+        # IRs are only available for the most recently traced function.
+        self.jaxpr = None
+        self.mlir = None  # string form (historic presence)
+        self.mlir_module = None
+        self.qir = None
 
         functools.update_wrapper(self, fn)
+        self.user_sig = get_type_annotations(fn)
+        self._validate_configuration()
 
-        if compile_options.autograph:
-            self.user_function = run_autograph(fn)
+        self.user_function = self.pre_compilation()
 
-        # QJIT is the owner of workspace.
-        # do not move to compiler.
-        preferred_workspace_dir = (
-            pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
-        )
-        self.preferred_workspace_dir = preferred_workspace_dir
+        # Static arguments require values, so we cannot AOT compile.
+        if self.user_sig is not None and not self.compile_options.static_argnums:
+            self.aot_compile()
 
-        # pylint: disable=no-member
-        # Guaranteed to exist after functools.update_wrapper
-        self.function_name = self.__name__
+    def __call__(self, *args, **kwargs):
+        # Transparantly call Python function in case of nested QJIT calls.
+        if EvaluationContext.is_tracing():
+            return self.user_function(*args, **kwargs)
 
-        self.workspace = WorkspaceManager.get_or_create_workspace(
-            self.function_name, preferred_workspace_dir
-        )
+        requires_promotion = self.jit_compile(args)
 
-        parameter_types = get_type_annotations(self.user_function)
+        # If we receive tracers as input, dispatch to the JAX integration.
+        if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
+            if self.jaxed_function is None:
+                self.jaxed_function = JAX_QJIT(self)  # lazy gradient compilation
+            return self.jaxed_function(*args, **kwargs)
 
-        for argnum in self.compile_options.static_argnums:
-            if argnum < 0 or argnum >= len(parameter_types):
-                msg = f"argnum {argnum} is beyond the valid range of [0, {len(parameter_types)})."
-                raise CompileError(msg)
+        elif requires_promotion:
+            dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
+            args = promote_arguments(self.c_sig, dynamic_args)
 
-        if parameter_types is not None and not self.compile_options.static_argnums:
-            self.user_typed = True
-            self.mlir_module = self.get_mlir(*parameter_types)
-            if self.compile_options.target == "binary":
-                self.compiled_function = self.compile()
+        return self.run(args, kwargs)
 
-    def print_stage(self, stage):
-        """Print one of the recorded stages.
+    def aot_compile(self):
+        """Compile Python function on initialization using the type hint signature."""
 
-        Args:
-            stage: string corresponding with the name of the stage to be printed
-        """
-        self.compiler.print(stage)  # pragma: nocover
+        self.workspace = self._get_workspace()
 
-    @property
-    def mlir(self):
-        """str: Returns the MLIR intermediate representation
-        of the quantum program.
-        """
-        return self._mlir
+        # TODO: awkward, refactor or redesign the target feature
+        if self.compile_options.target in ("jaxpr", "mlir", "binary"):
+            self.jaxpr, self.out_treedef, self.c_sig = self.capture(self.user_sig or ())
 
-    @property
-    def jaxpr(self):
-        """str: Returns the JAXPR intermediate representation
-        of the quantum program.
-        """
-        return self._jaxpr
+        if self.compile_options.target in ("mlir", "binary"):
+            self.mlir_module, self.mlir = self.generate_ir()
 
-    @property
-    def qir(self):
-        """str: Returns the LLVM and QIR intermediate representation
-        of the quantum program. Only available if the function was compiled to binary.
-        """
-        return self._llvmir
-
-    def get_static_args_hash(self, *args):
-        """Get hash values of all static arguments.
-
-        Args:
-            args: arguments to the compiled function.
-        Returns:
-            a tuple of hash values of all static arguments.
-        """
-        static_argnums = self.compile_options.static_argnums
-        static_args_hash = tuple(
-            hash(args[idx]) for idx in range(len(args)) if idx in static_argnums
-        )
-        return static_args_hash
-
-    def get_mlir(self, *args):
-        """Trace :func:`~.user_function`
-
-        Args:
-            *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
-
-        Returns:
-            an MLIR module
-        """
-        static_argnums = self.compile_options.static_argnums
-        dynamic_args = filter_static_args(args, static_argnums)
-        self.c_sig = get_abstract_signature(dynamic_args)
-
-        with Patcher(
-            (qml.QNode, "__call__", QFunc.__call__),
-        ):
-            func = self.user_function
-            sig = merge_static_args(self.c_sig, args, static_argnums)
-            abstracted_axes = self.compile_options.abstracted_axes
-            mlir_module, ctx, jaxpr, _, self.out_tree = trace_to_mlir(
-                func, static_argnums, abstracted_axes, *sig
+        if self.compile_options.target in ("binary",):
+            self.compiled_function, self.qir = self.compile()
+            self.fn_cache.insert(
+                self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
+    def jit_compile(self, args):
+        """Compile Python function on invocation using the provided arguments.
+
+        Args:
+            args (Iterable): arguments to use for program capture
+
+        Returns:
+            bool: whether the provided arguments will require promotion to be used with the compiled
+                  function
+        """
+
+        cached_fn, requires_promotion = self.fn_cache.lookup(args)
+
+        if cached_fn is None:
+            if self.user_sig and not self.compile_options.static_argnums:
+                msg = "Provided arguments did not match declared signature, recompiling..."
+                warnings.warn(msg, UserWarning)
+
+            # Cleanup before recompilation:
+            #  - recompilation should always happen in new workspace
+            #  - compiled functions for jax integration are not yet cached
+            #  - close existing shared library
+            self.workspace = self._get_workspace()
+            self.jaxed_function = None
+            if self.compiled_function and self.compiled_function.shared_object:
+                self.compiled_function.shared_object.close()
+
+            self.jaxpr, self.out_treedef, self.c_sig = self.capture(args)
+            self.mlir_module, self.mlir = self.generate_ir()
+            self.compiled_function, self.qir = self.compile()
+
+            self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
+
+        elif self.compiled_function is not cached_fn.compiled_fn:
+            # Restore active state from cache.
+            self.workspace = cached_fn.workspace
+            self.compiled_function = cached_fn.compiled_fn
+            self.out_treedef = cached_fn.out_treedef
+            self.c_sig = cached_fn.signature
+            self.jaxed_function = None
+
+            self.compiled_function.shared_object.open()
+
+        return requires_promotion
+
+    # Processing Stages #
+
+    def pre_compilation(self):
+        """Perform pre-processing tasks on the Python function, such as AST transformations."""
+        processed_fn = self.original_function
+
+        if self.compile_options.autograph:
+            processed_fn = run_autograph(self.original_function)
+
+        return processed_fn
+
+    def capture(self, args):
+        """Capture the JAX program representation (JAXPR) of the wrapped function.
+
+        Args:
+            args (Iterable): arguments to use for program capture
+
+        Returns:
+            ClosedJaxpr: captured JAXPR
+            PyTreeDef: PyTree metadata of the function output
+            Tuple[Any]: the dynamic argument signature
+        """
+
+        self._verify_static_argnums(args)
+        static_argnums = self.compile_options.static_argnums
+        abstracted_axes = self.compile_options.abstracted_axes
+
+        dynamic_args = filter_static_args(args, static_argnums)
+        dynamic_sig = get_abstract_signature(dynamic_args)
+        full_sig = merge_static_args(dynamic_sig, args, static_argnums)
+
+        with Patcher(
+            (qml.QNode, "__call__", catalyst.pennylane_extensions.QFunc.__call__),
+        ):
+            # TODO: improve PyTree handling
+            jaxpr, treedef = trace_to_jaxpr(
+                self.user_function, static_argnums, abstracted_axes, full_sig, {}
+            )
+
+        return jaxpr, treedef, dynamic_sig
+
+    def generate_ir(self):
+        """Generate Catalyst's intermediate representation (IR) as an MLIR module.
+
+        Returns:
+            Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
+        """
+
+        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+
+        # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx)
-        self._jaxpr = jaxpr
-        canonicalizer_options = deepcopy(self.compile_options)
-        canonicalizer_options.pipelines = [("0_canonicalize", ["canonicalize"])]
-        canonicalizer_options.lower_to_llvm = False
-        canonicalizer = Compiler(canonicalizer_options)
-        _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
-        return mlir_module
+
+        # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
+        options = copy.deepcopy(self.compile_options)
+        options.pipelines = [("0_canonicalize", ["canonicalize"])]
+        options.lower_to_llvm = False
+        canonicalizer = Compiler(options)
+
+        # TODO: the in-memory and textual form are different after this, consider unification
+        _, mlir_string, _ = canonicalizer.run(mlir_module, self.workspace)
+
+        return mlir_module, mlir_string
 
     def compile(self):
-        """Compile the current MLIR module."""
+        """Compile an MLIR module to LLVMIR and shared library code.
 
-        if self.compiled_function and self.compiled_function.shared_object:
-            self.compiled_function.shared_object.close()
+        Returns:
+            Tuple[CompiledFunction, str]: the compilation result and LLVMIR
+        """
 
-        # WARNING: assumption is that the first function
-        # is the entry point to the compiled program.
+        # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
         restype = entry_point_func.type.results
 
         for res in restype:
-            baseType = ir.RankedTensorType(res).element_type
+            baseType = mlir.ir.RankedTensorType(res).element_type
             # This will make a check before sending it to the compiler that the return type
             # is actually available in most systems. f16 needs a special symbol and linking
             # will fail if it is not available.
@@ -223,118 +267,50 @@ class QJIT:
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
-        qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
+        func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
+        shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
 
-        shared_object, llvm_ir, _inferred_func_data = self.compiler.run(
-            self.mlir_module, self.workspace
-        )
+        shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
+        compiled_fn = CompiledFunction(shared_object, func_name, restype, self.compile_options)
 
-        self._llvmir = llvm_ir
-        options = self.compile_options
-        compiled_function = CompiledFunction(shared_object, qfunc_name, restype, options)
-        return compiled_function
+        return compiled_fn, llvm_ir
 
-    def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
-        """Logic to decide whether the function needs to be recompiled
-        given ``*args`` and whether ``*args`` need to be promoted.
-        A function may need to be compiled if:
-            1. It was not compiled before. Without static arguments, the compiled function
-                should be stored in ``self.compiled_function``. With static arguments,
-                ``self.compile_options.static_argnums`` stores all previous compiled ones.
-            2. The real arguments sent to the function are not promotable to the type of the
-                formal parameters.
+    def run(self, args, kwargs):
+        """Invoke a previously compiled function with the supplied arguments.
 
         Args:
-          function: an instance of ``CompiledFunction`` that may need recompilation
-          *args: arguments that may be promoted.
+            args (Iterable): the positional arguments to the compiled function
+            kwargs: the keyword arguments to the compiled function
 
         Returns:
-          function: an instance of ``CompiledFunction`` that may have been recompiled
-          *args: arguments that may have been promoted
+            Any: results of the execution arranged into the original function's output PyTrees
         """
-        static_argnums = self.compile_options.static_argnums
-        dynamic_args = filter_static_args(args, static_argnums)
-        r_sig = get_abstract_signature(dynamic_args)
 
-        has_been_compiled = self.compiled_function is not None
-        if static_argnums:
-            static_args_hash = self.get_static_args_hash(*args)
-            prev_function, _ = self.stored_compiled_functions.get(static_args_hash, (None, None))
-            has_been_compiled = False
-            if prev_function:
-                function = prev_function
-                has_been_compiled = True
-                function.shared_object.open(function.shared_object_file, function.func_name)
-            elif self.workspace_used:
-                # Create a new space for the new function if the workspace is used.
-                self.workspace = WorkspaceManager.get_or_create_workspace(
-                    self.function_name, self.preferred_workspace_dir
-                )
-            # The workspace is unused only for first compilation with static arguments.
-            self.workspace_used = True
+        results = self.compiled_function(*args, **kwargs)
 
-        next_action = TypeCompatibility.UNKNOWN
-        if not has_been_compiled:
-            next_action = TypeCompatibility.NEEDS_COMPILATION
-        else:
-            abstracted_axes = self.compile_options.abstracted_axes
-            next_action = typecheck_signatures(self.c_sig, r_sig, abstracted_axes)
+        # TODO: Move this to the compiled function object.
+        return tree_unflatten(self.out_treedef, results)
 
-        if next_action == TypeCompatibility.NEEDS_PROMOTION:
-            args = promote_arguments(self.c_sig, dynamic_args)
-        elif next_action == TypeCompatibility.NEEDS_COMPILATION:
-            if self.user_typed:
-                msg = "Provided arguments did not match declared signature, recompiling..."
-                warnings.warn(msg, UserWarning)
-            sig = merge_static_args(r_sig, args, static_argnums)
-            self.mlir_module = self.get_mlir(*sig)
-            function = self.compile()
-        else:
-            assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
+    # Helper Methods #
 
-        return function, args
+    def _validate_configuration(self):
+        """Run validations on the supplied options and parameters."""
+        if not hasattr(self.original_function, "__name__"):
+            self.__name__ = "unknown"  # allow these cases anyways?
 
-    def __call__(self, *args, **kwargs):
-        static_argnums = self.compile_options.static_argnums
+    def _verify_static_argnums(self, args):
+        for argnum in self.compile_options.static_argnums:
+            if argnum < 0 or argnum >= len(args):
+                msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
+                raise CompileError(msg)
 
-        if EvaluationContext.is_tracing():
-            return self.user_function(*args, **kwargs)
+    def _get_workspace(self):
+        """Get or create a workspace to use for compilation."""
 
-        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
-            self.compiled_function, *args
-        )
+        workspace_name = self.__name__
+        preferred_workspace_dir = os.getcwd() if self.compile_options.keep_intermediate else None
 
-        recompilation_happened = (
-            function != self.compiled_function
-        ) and function not in self.stored_compiled_functions.values()
-
-        # Check if a function is created and add newly created ones into the hash table.
-        if static_argnums and recompilation_happened:
-            static_args_hash = self.get_static_args_hash(*args)
-            workspace = self.workspace
-            self.stored_compiled_functions[static_args_hash] = (function, workspace)
-
-        self.compiled_function = function
-
-        args_data, _args_shape = tree_flatten(args)
-        if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
-            # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_function is None or recompilation_happened:
-                self.jaxed_function = JAX_QJIT(self)
-
-            return self.jaxed_function(*args, **kwargs)
-
-        data = self.compiled_function(*args, **kwargs)
-
-        # Unflatten the return value w.r.t. the original PyTree definition if available
-        if self.out_tree is not None:
-            data = tree_unflatten(self.out_tree, data)
-
-        # For the classical and pennylane_extensions compilation path,
-        if isinstance(data, (list, tuple)) and len(data) == 1:
-            data = data[0]
-
-        return data
+        return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
 
 
 class JAX_QJIT:
@@ -368,8 +344,8 @@ class JAX_QJIT:
         )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        assert qjit_function.out_tree is not None, "PyTree shape must not be none."
-        return tree_unflatten(qjit_function.out_tree, data)
+        assert qjit_function.out_treedef is not None, "PyTree shape must not be none."
+        return tree_unflatten(qjit_function.out_treedef, data)
 
     def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""

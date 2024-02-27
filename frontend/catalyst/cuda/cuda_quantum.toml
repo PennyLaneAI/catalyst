@@ -1,0 +1,67 @@
+schema = 1
+
+[device]
+name = "cuda_quantum"
+
+[operators]
+# Observables supported by the device
+observables = [
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "Hadamard",
+]
+
+# The union of all gate types listed in this section must match what
+# the device considers "supported" through PennyLane's device API.
+[[operators.gates]]
+native = [
+    "CNOT",
+    "CY",
+    "CZ",
+    "CRX",
+    "CRY",
+    "CRZ",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "Hadamard",
+    "S",
+    "T",
+    "RX",
+    "RY",
+    "RZ",
+    "SWAP",
+    "CSWAP",
+]
+
+# Operators that should be decomposed according to the algorithm used
+# by PennyLane's device API.
+# Optional, since gates not listed in this list will typically be decomposed by
+# default, but can be useful to express a deviation from this device's regular
+# strategy in PennyLane.
+# Everything else should be decomposed.
+decomp = []
+
+# Gates which should be translated to QubitUnitary
+matrix = []
+
+[measurement_processes]
+exactshots = []
+finiteshots = []
+
+[compilation]
+# If the device is compatible with qjit
+qjit_compatible = true
+# If the device requires run time generation of the quantum circuit.
+runtime_code_generation = false
+# If the device supports adjoint
+quantum_adjoint = true
+# If the device supports quantum control instructions natively
+quantum_control = false
+# Technically limited support
+mid_circuit_measurement = true
+
+# This field is currently unchecked but it is reserved for the purpose of
+# determining if the device supports dynamic qubit allocation/deallocation.
+dynamic_qubit_management = false

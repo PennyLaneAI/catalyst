@@ -251,7 +251,7 @@ class LinkerDriver:
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
     @staticmethod
-    def get_default_flags():
+    def get_default_flags(options):
         """Re-compute the path where the libraries exist.
 
         The use case for this is if someone is in a python jupyter notebook and
@@ -311,6 +311,14 @@ class LinkerDriver:
             system_flags += ["-Wl,-no-as-needed"]
         elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
+
+        # The exception handling mechanism requires linking against
+        # __gxx_personality_v0 which is either on -lstdc++ in
+        # or -lc++. We choose based on the operating system.
+        if options.async_qnodes and platform.system() == "Linux":  # pragma: nocover
+            system_flags += ["-lstdc++"]
+        elif options.async_qnodes and platform.system() == "Darwin":  # pragma: nocover
+            system_flags += ["-lc++"]
 
         default_flags = [
             "-shared",
@@ -395,12 +403,12 @@ class LinkerDriver:
         """
         if outfile is None:
             outfile = LinkerDriver.get_output_filename(infile)
-        if flags is None:
-            flags = LinkerDriver.get_default_flags()
-        if fallback_compilers is None:
-            fallback_compilers = LinkerDriver._default_fallback_compilers
         if options is None:
             options = CompileOptions()
+        if flags is None:
+            flags = LinkerDriver.get_default_flags(options)
+        if fallback_compilers is None:
+            fallback_compilers = LinkerDriver._default_fallback_compilers
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
@@ -516,10 +524,3 @@ class Compiler:
             return None
 
         return self.last_compiler_output.get_pipeline_output(pipeline)
-
-    def print(self, pipeline):
-        """Print the output IR of pass.
-        Args:
-            pipeline (str): name of pass class
-        """
-        print(self.get_output_of(pipeline))  # pragma: no cover

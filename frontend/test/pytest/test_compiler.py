@@ -160,13 +160,13 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
 
-        @qjit(target="fake_binary")
+        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=1))
         def cpp_exception_test():
             return None
 
         cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
-        compiled_function = cpp_exception_test.compile()
+        compiled_function, _ = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
             compiled_function()
@@ -179,6 +179,31 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 
 class TestCompilerState:
     """Test states that the compiler can reach."""
+
+    def test_invalid_target(self):
+        """Test that nothing happens in AOT compilation when an invalid target is provided."""
+
+        @qjit(target="hello")
+        def f():
+            return 0
+
+        assert f.jaxpr is None
+        assert f.mlir is None
+        assert f.qir is None
+        assert f.compiled_function is None
+
+    def test_callable_without_name(self):
+        """Test that a callable without __name__ property can be compiled, if it is otherwise
+        traceable."""
+
+        class NoNameClass:
+            def __call__(self, x):
+                return x
+
+        f = qjit(NoNameClass())
+
+        assert f(3) == 3
+        assert f.__name__ == "unknown"
 
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
