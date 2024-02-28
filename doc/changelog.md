@@ -54,6 +54,25 @@
   * nvidia.statevec (with support for multi-gpu)
   * nvidia.tensornet (with support for matrix product state)
 
+* Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
+  `catalyst.vmap` offers the vectorization mapping backed by `catalyst.for_loop`.
+  [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
+
+  For example,
+
+  ```py
+  @qjit
+  def workflow(x, y):
+      @qml.qnode(qml.device('lightning.qubit, wires=1))
+      def circuit(x, y):
+          qml.RX(jnp.pi * x['a'][0], wires=0)
+          qml.RY(x['a'][1] ** 2, wires=0)
+          qml.RX(x['b'][1] * x['b'][2] + y, wires=0)
+          return qml.state(), qml.probs(0)
+
+      return vmap(circuit, in_axes=(1, None), axis_size=5)(x, y)
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
