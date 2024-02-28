@@ -98,11 +98,6 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _check_quantum_control(config):
-        # TODO: Remove the special case when the
-        # https://github.com/PennyLaneAI/pennylane-lightning/pull/615
-        # is merged.
-        if config["device"]["name"] == "lightning.qubit":
-            return True
         return config["compilation"]["quantum_control"]
 
     @staticmethod
