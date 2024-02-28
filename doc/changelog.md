@@ -258,7 +258,8 @@
 * Remove copies of TOML device configuration files for Lightning device in Catalyst.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
 
-* Remove `qextract_p` and `qinst_p` from forced-order primitives.
+* Capturing quantum circuits with many gates prior to compilation is now quadratically faster (up to
+  a factor), by removing `qextract_p` and `qinst_p` from forced-order primitives.
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
 
 * Update `AllocateQubit` and `AllocateQubits` in `LightningKokkosSimulator` to preserve
