@@ -814,7 +814,7 @@ class ZNE:
         TypeError: Non-QNode object was passed as `fn`.
     """
 
-    def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
+    def __init__(self, fn: Callable, scale_factors: jnp.ndarray, deg: int):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
@@ -835,7 +835,7 @@ class ZNE:
         args_data, _ = tree_flatten(args)
         results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = jax.numpy.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        results = jnp.polyfit(float_scale_factors, results[0], self.deg)[-1]
         # Single measurement
         if results.shape == ():
             return results
@@ -843,7 +843,7 @@ class ZNE:
         return tuple(res for res in results)
 
 
-def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
+def mitigate_with_zne(f, *, scale_factors: jnp.ndarray, deg: int = None):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -2256,7 +2256,7 @@ def vmap(
         fn_args_flat = args_flat.copy()
         for loc in batch_loc:
             ax = in_axes_flat[loc]
-            fn_args_flat[loc] = jax.numpy.take(args_flat[loc], 0, axis=ax)
+            fn_args_flat[loc] = jnp.take(args_flat[loc], 0, axis=ax)
 
         fn_args = tree_unflatten(args_tree, fn_args_flat)
 
@@ -2304,7 +2304,7 @@ def vmap(
             fn_args_flat = args_flat
             for loc in batch_loc:
                 ax = in_axes_flat[loc]
-                fn_args_flat[loc] = jax.numpy.take(args_flat[loc], i, axis=ax)
+                fn_args_flat[loc] = jnp.take(args_flat[loc], i, axis=ax)
 
             fn_args = tree_unflatten(args_tree, fn_args_flat)
             res = fn(*fn_args, **kwargs)
