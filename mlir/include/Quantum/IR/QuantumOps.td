@@ -278,7 +278,7 @@ def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate]> {
     }];
 
     let arguments = (ins
-        Variadic<F64>:$params,
+        F64:$params,
         OptionalAttr<UnitAttr>:$adjoint
     );
 
