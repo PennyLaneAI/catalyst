@@ -2195,22 +2195,8 @@ def vmap(
         - ``Tuple[int | PyTree[int | None] | None]``: Same as previous, but selectively disable
           batching for individual PyTree leaves
 
-    .. details::
-        :title: Selecting output axes for return results
-
-        The ``out_axes`` parameter can be used to specify the positions of the mapped axis in the
-        output.
-
-        The following modes are supported:
-
-        - ``int``: Specifies the position of the mapped axis in the output
-        - ``Tuple[int]``: Specify the positions of the mapped axis for multiple output arrays
-        - ``Tuple[int | None]``: Same as the previous mode, allowing for ``None`` to indicate no
-          mapped axis for a specific output
-        - ``Tuple[int | PyTree[int] | None]``: Same as the previous mode, but extended to support
-          nested Python containers for specifying mapped axes
-        - ``Tuple[int | PyTree[int | None] | None]``: Similar to the previous mode, allowing for
-          ``None`` in nested containers to indicate no mapped axis for specific outputs
+        The ``out_axes`` parameter can be also used to specify the positions of the mapped axis
+        in the output. ``out_axes`` is subject to the same modes as well.
     """
 
     # Dispatch to jax.vmap when it is called outside qjit.
