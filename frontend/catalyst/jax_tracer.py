@@ -25,6 +25,8 @@ from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
+from pennylane.transforms import transform
+from pennylane.transforms.core import TransformContainer
 
 import catalyst
 from catalyst.jax_extras import (
@@ -540,9 +542,45 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
-    """Identity transform"""
-    return [tape], lambda res: res[0]
+@transform
+def add_wires_to_global_phase(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    return _add_wires_to_global_phase(tape)
+
+
+def _add_wires_to_global_phase(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    new_ops = []
+
+    for op in tape.operations:
+        if isinstance(op, HybridOp):
+            for region in op.regions:
+                if not region.quantum_tape:
+                    continue
+                # What about other fields of regions?
+                # We don't change anything else except
+                # the GlobalPhase. I think this is good enough.
+                inner_tape = region.quantum_tape
+                # This is needed to avoid an error
+                inner_tapes, inner_res = _add_wires_to_global_phase(inner_tape)
+                inner_tape = inner_tapes[0]
+                region.quantum_tape = inner_tape
+
+            new_ops.append(op)
+            continue
+
+        if not isinstance(op, qml.GlobalPhase):
+            new_ops.append(op)
+            continue
+
+        if op.wires:
+            # Keep the original wires
+            new_ops.append(op)
+            continue
+
+        # We must have at least one wire
+        new_ops.append(qml.GlobalPhase(*op.parameters, wires=[0]))
+
+    new_tape = QuantumTape(new_ops, tape.measurements)
+    return [new_tape], lambda res: res[0]
 
 
 def trace_quantum_measurements(
@@ -675,13 +713,15 @@ def apply_transform(qnode, tape, flat_results):
 
     if is_program_transformed:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
+        qnode.transform_program.push_back(TransformContainer(add_wires_to_global_phase))
         tapes, post_processing = qnode.transform_program([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
+
     else:
-        # Apply the identity transform in order to keep generalization
-        tapes, post_processing = identity_qnode_transform(tape)
+        tapes, post_processing = add_wires_to_global_phase(tape)
+
     return tapes, post_processing
 
 
