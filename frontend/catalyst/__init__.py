@@ -19,6 +19,8 @@ This package contains the Catalyst Python interface.
 
 import sys
 import types
+from os.path import dirname
+from typing import Optional
 
 import jaxlib as _jaxlib
 
@@ -35,6 +37,21 @@ if _jaxlib.__version__ != _jaxlib_version:
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
+
+try:
+    if INSTALLED:
+        from catalyst._revision import __revision__
+    else:
+        # pragma: no cover
+        from subprocess import check_output
+
+        __revision__ = (
+            check_output(["git", "rev-parse", "HEAD"], cwd=dirname(__file__)).decode().strip()
+        )
+except Exception as err:
+    print(err)
+    # Revision was not determined
+    __revision__ = None  # pragma: no cover
 
 if not INSTALLED:
     import os
