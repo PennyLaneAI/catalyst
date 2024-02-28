@@ -100,7 +100,7 @@ def test_native_controlled_custom():
     def native_controlled():
         # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.custom "Rot"
         # CHECK-SAME: ctrl
-        # CHECK-SAME: ctrlval %true, %true
+        # CHECK-SAME: ctrlvals(%true, %true)
         qml.ctrl(qml.Rot(0.3, 0.4, 0.5, wires=[0]), control=[1, 2])
         return measure(wires=0)
 
@@ -153,7 +153,7 @@ def test_native_controlled_multirz():
     def native_controlled_multirz():
         # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.multirz
         # CHECK-SAME: ctrl
-        # CHECK-SAME: ctrlval %true
+        # CHECK-SAME: ctrlvals(%true)
         qml.ctrl(qml.MultiRZ(0.6, wires=[0, 2]), control=[1])
         return measure(wires=0)
 
