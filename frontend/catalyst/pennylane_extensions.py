@@ -2244,7 +2244,7 @@ def vmap(
                 f"arguments, but got {in_axes_deep_struct} axis specifiers "
                 f"and {args_deep_struct} arguments."
             )
-        elif isinstance(in_axes, int):
+        if isinstance(in_axes, int):
             in_axes_flat = [
                 in_axes,
             ] * len(args_flat)
@@ -2268,8 +2268,9 @@ def vmap(
         init_result_deep_struct = tree_structure(init_result, is_leaf=lambda x: x is None)
         if not isinstance(out_axes, int) and out_axes_deep_struct != init_result_deep_struct:
             raise ValueError(
-                "Invalid 'out_axes'; it must be an int or match the number of function results, "
-                f"but got {out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
+                "Invalid 'out_axes'; it must be an int or match "
+                "the number of function results, but got "
+                f"{out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
             )
 
         # Return 'init_result' if none is requested
