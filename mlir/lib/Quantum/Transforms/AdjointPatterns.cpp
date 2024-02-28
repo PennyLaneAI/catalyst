@@ -152,18 +152,8 @@ class AdjointGenerator {
 
     void visitOperation(quantum::QuantumGate gate, OpBuilder &builder)
     {
-        // FIXME: why this doesn't work?
-        /* for (const auto &[qubitResult, qubitOperand] : */
-        /*      llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) { */
-        /*     remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult)); */
-        /* } */
-
         for (const auto &[qubitResult, qubitOperand] :
-            llvm::zip(gate.getNonCtrlQubitResults(), gate.getNonCtrlQubitOperands())) {
-            remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
-        }
-        for (const auto &[qubitResult, qubitOperand] :
-             llvm::zip(gate.getCtrlQubitResults(), gate.getCtrlQubitOperands())) {
+             llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
             remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
         }
 
