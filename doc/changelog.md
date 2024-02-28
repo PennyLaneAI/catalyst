@@ -2,8 +2,12 @@
 
 <h3>New features</h3>
 
+* Catalyst now supports Python 3.12
+  [(#532)](https://github.com/PennyLaneAI/catalyst/pull/532)
+
 * Catalyst now supports just-in-time compilation of static arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
+  [(#550)](https://github.com/PennyLaneAI/catalyst/pull/550)
 
   The ``@qjit`` decorator can now be used to compile functions with static arguments with
   the ``static_argnums`` keyword argument. ``static_argnums`` can be an integer or an iterable
@@ -51,6 +55,10 @@
   * nvidia.tensornet (with support for matrix product state)
 
 <h3>Improvements</h3>
+
+* Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
+  the standalone `diastatic-malt` package is used and automatically installed as a dependency.
+  [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
 
 * Catalyst will now remember previously compiled functions when the PyTree metadata of arguments
   changes, in addition to already rememebering compiled functions when static arguments change.
@@ -304,6 +312,12 @@
   * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* `QCtrl` now implements `map_wires`.
+  [(#555)](https://github.com/PennyLaneAI/catalyst/pull/555)
+
+  Applying `map_wires` to `QCtrl` lead to an incorrect circuit.
+  The wires in the nested regions remained unchanged.
 
 * Catalyst will no longer print a warning that recompilation is triggered when a `@qjit` decorated
   function with no arguments is invoke without having been compiled first, for example via the use
