@@ -31,13 +31,15 @@ from setuptools.command.build_ext import build_ext
 system_platform = platform.system()
 
 
-REVISION:Optional[str]
+REVISION: Optional[str]
 try:
     from subprocess import check_output
-    REVISION=check_output(['git', 'rev-parse', 'HEAD'],
-                           cwd=path.dirname(__file__)).decode().strip()
+
+    REVISION = (
+        check_output(["git", "rev-parse", "HEAD"], cwd=path.dirname(__file__)).decode().strip()
+    )
 except Exception:
-    REVISION=None
+    REVISION = None
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
     version = f.readlines()[-1].split()[-1].strip("\"'")
