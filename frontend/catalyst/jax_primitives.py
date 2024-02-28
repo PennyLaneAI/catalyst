@@ -685,8 +685,13 @@ def _qinsert_lowering(
 def _qinst_abstract_eval(
     *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
 ):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_or_params[:qubits_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
     for idx in range(qubits_len + ctrl_len):
-        qubit = qubits_or_params[idx]
+        qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
