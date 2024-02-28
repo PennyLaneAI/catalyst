@@ -707,3 +707,24 @@ class TestVectorizeMap:
             "or less than or equal to the computed batch size",
         ):
             qjit(workflow)(x, y, 1)
+
+    def test_vmap_zero_axis_size(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid zero axis_size."""
+
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.state()
+
+            return vmap(circuit, axis_size=0)(x)
+
+        x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid batch size; it must be a non-zero integer, but got 0.",
+        ):
+            qjit(workflow)(x)

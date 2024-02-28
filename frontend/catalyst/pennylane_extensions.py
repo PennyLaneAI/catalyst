@@ -2233,7 +2233,7 @@ def vmap(
         """Vectorization wrapper around the hybrid program using catalyst.for_loop"""
 
         args_flat, args_tree = tree_flatten(args)
-        in_axes_flat = _vmap_tree_flatten(in_axes)
+        in_axes_flat, _ = tree_flatten(in_axes, is_leaf=lambda x: x is None)
 
         # Check the validity of the input arguments w.r.t. in_axes
         in_axes_deep_struct = tree_structure(in_axes, is_leaf=lambda x: x is None)
@@ -2273,10 +2273,6 @@ def vmap(
                 f"{out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
             )
 
-        # Return 'init_result' if none is requested
-        if not batch_size:
-            return init_result
-
         init_result_flat, init_result_tree = tree_flatten(init_result)
 
         num_axes_out = len(init_result_flat)
@@ -2286,7 +2282,7 @@ def vmap(
                 out_axes,
             ] * num_axes_out
         else:
-            out_axes_flat = _vmap_tree_flatten(out_axes)
+            out_axes_flat, _ = tree_flatten(out_axes, is_leaf=lambda x: x is None)
 
         out_loc = _get_batch_loc(out_axes_flat)
 
@@ -2334,31 +2330,6 @@ def vmap(
         return tree_unflatten(init_result_tree, batched_result_list)
 
     return batched_fn
-
-
-def _vmap_tree_flatten(args):
-    """
-    Custom tree_flatten function for vmap to include 'None' elements in the flattened list.
-
-    This function computes the flattened tree using the JAX library's tree_flatten function.
-    It ensures that 'None' elements from the original PyTree are preserved in the flattened list.
-    The resulting flattened tree includes 'None' elements in the correct order.
-
-    Args:
-        args (PyTree): PyTree to be flattened.
-
-    Returns:
-        List: A tuple containing the flattened elements of the PyTree, including 'None' elements.
-    """
-
-    args_flat, args_tree = tree_flatten(args, is_leaf=lambda x: x is None)
-
-    if isinstance(args, int):
-        return args_flat
-    elif args_tree.num_leaves == 0:
-        return [None]
-
-    return args_flat
 
 
 def _get_batch_loc(axes_flat):
@@ -2414,12 +2385,17 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
     if axis_size is not None:
         if axis_size <= batch_size:
-            return axis_size
+            batch_size = axis_size
         else:
             raise ValueError(
                 "Invalid 'axis_size'; the default batch is expected to be None, "
                 "or less than or equal to the computed batch size, but got "
                 f"axis_size={axis_size} > batch_size={batch_size}"
             )
+
+    if not batch_size:
+        raise ValueError(
+            f"Invalid batch size; it must be a non-zero integer, but got {batch_size}."
+        )
 
     return batch_size
