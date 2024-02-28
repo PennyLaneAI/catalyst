@@ -75,7 +75,7 @@ void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, const Modif
 void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
-void __catalyst__qis__GlobalPhase(double, /* ignored */...);
+void __catalyst__qis__GlobalPhase(double);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
 
