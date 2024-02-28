@@ -685,7 +685,7 @@ def _qinsert_lowering(
 def _qinst_abstract_eval(
     *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
 ):
-    for idx in range(qubits_len):
+    for idx in range(qubits_len + ctrl_len):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
@@ -774,7 +774,7 @@ def _qinst_lowering(
 #
 @qunitary_p.def_abstract_eval
 def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int = 0):
-    for idx in range(qubits_len):
+    for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
