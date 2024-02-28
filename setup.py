@@ -36,7 +36,10 @@ try:
     from subprocess import check_output
 
     REVISION = (
-        check_output(["git", "rev-parse", "HEAD"], cwd=path.dirname(__file__)).decode().strip()
+        # nosec B607
+        check_output(["git", "rev-parse", "HEAD"], cwd=path.dirname(__file__))
+        .decode()
+        .strip()
     )
 except Exception:  # pylint: disable=broad-exception-caught
     REVISION = None
