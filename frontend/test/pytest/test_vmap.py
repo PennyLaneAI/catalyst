@@ -425,6 +425,34 @@ class TestVectorizeMap:
         assert jnp.allclose(result[3], expected[:2])
         assert jnp.allclose(result[4], expected)
 
+    def test_vmap_incomp_in_axes_pytree(self):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with
+        incompatible PyTrees for in_axes and args."""
+
+        def f(x, y):
+            return x, y
+
+        x = jnp.array([0, 1, 2, 3])
+        xx = jnp.stack([x, x])
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid batch sizes; expected the batch size to be the same for all arguments",
+        ):
+            qjit(lambda: vmap(f, in_axes=0)(xx, x))()
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'in_axes'; it must be an int or match the length of positional",
+        ):
+            qjit(lambda: vmap(f, in_axes=[0, {"hi": 0}])(xx, xx))()
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'in_axes'; it must be an int or match the length of positional",
+        ):
+            qjit(lambda: vmap(f, in_axes=[0, {"bi": 0}])(xx, {"hi": xx}))()
+
     def test_vmap_pytree_in_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a PyTree in_axes."""
 
@@ -618,6 +646,34 @@ class TestVectorizeMap:
         assert jnp.allclose(result["b"]["c"], expected_probs)
         assert jnp.allclose(result["b"]["d"], expected_expval)
         assert jnp.allclose(result["b"]["e"], x)
+
+    def test_vmap_incomp_out_axes_pytree(self):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with
+        incompatible PyTrees for out_axes and return values."""
+
+        def f(x, y):
+            return {"x": x, "y": y}
+
+        x = jnp.array([0, 1, 2, 3])
+        xx = jnp.stack([x, x])
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid batch sizes; expected the batch size to be the same for all arguments",
+        ):
+            qjit(lambda: vmap(f, out_axes=0)(xx, x))()
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'out_axes'; it must be an int or match the number of function results",
+        ):
+            qjit(lambda: vmap(f, out_axes=[0, {"hi": 0}])(xx, xx))()
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid 'out_axes'; it must be an int or match the number of function results",
+        ):
+            qjit(lambda: vmap(f, out_axes=[0, {"bi": 0}])(xx, {"hi": xx}))()
 
     def test_vmap_invalid_axis_size(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with an invalid axis_size."""

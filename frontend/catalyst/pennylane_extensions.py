@@ -2187,7 +2187,7 @@ def vmap(
 
 
     .. details::
-        :title: Selecting output axes for arguments
+        :title: Selecting output axes for return results
 
         The ``out_axes`` parameter can be used to specify the positions of the mapped axis in the
         output.
