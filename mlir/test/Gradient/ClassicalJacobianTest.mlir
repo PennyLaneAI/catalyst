@@ -249,7 +249,7 @@ func.func @all_ops_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_
     // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
     // CHECK-NEXT: memref.store [[e0]], [[paramBuffer]][[[idx]]]
     // CHECK-NOT: quantum.
-    %q_2:3 = quantum.multirz(%f0) %q_0, %q_0, %q_0 : !quantum.bit, !quantum.bit, !quantum.bit
+    %q_2:3 = quantum.multi "MultiRZ"(%f0) %q_0, %q_0, %q_0 : !quantum.bit, !quantum.bit, !quantum.bit
 
     func.return %f0 : f64
 }

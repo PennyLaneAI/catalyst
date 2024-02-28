@@ -69,7 +69,7 @@ func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
 
 func.func @multirz1(%theta : f64) {
     // expected-error@+1 {{must have at least 1 qubit}}
-    %err = quantum.multirz(%theta) : !quantum.bit
+    %err = quantum.multi "MultiRZ"(%theta) : !quantum.bit
 
     return
 }
@@ -78,7 +78,7 @@ func.func @multirz1(%theta : f64) {
 
 func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
     // expected-error@+1 {{number of qubits in input and output must be the same}}
-    %err = quantum.multirz(%theta) %q0, %q1 : !quantum.bit
+    %err = quantum.multi "MultiRZ"(%theta) %q0, %q1 : !quantum.bit
 
     return
 }
@@ -87,7 +87,7 @@ func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
 
 func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
     // expected-error@+1 {{number of qubits in input and output must be the same}}
-    %err:2 = quantum.multirz(%theta) %q0 : !quantum.bit, !quantum.bit
+    %err:2 = quantum.multi "MultiRZ"(%theta) %q0 : !quantum.bit, !quantum.bit
 
     return
 }

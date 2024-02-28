@@ -242,7 +242,7 @@ def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]>
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
+def MultiQubitOp : Gate_Op<"multi", [DifferentiableGate]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -252,6 +252,7 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
+        StrAttr:$gate_name,
         OptionalAttr<UnitAttr>:$adjoint
     );
 
@@ -260,7 +261,7 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+        $gate_name `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
