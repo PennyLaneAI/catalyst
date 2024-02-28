@@ -317,9 +317,6 @@ class GradParams:
     argnum_list: List[int] = None
     argnum_final: List[int] = None
 
-    def __iter__(self):
-        return iter(astuple(self))
-
 
 @grad_p.def_impl
 def _grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
