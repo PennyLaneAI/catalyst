@@ -196,8 +196,8 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
-        mlir::ValueRange getQubitOperands() {
-            mlir::SmallVector<mlir::Value> values;
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
             values.insert(values.end(), getInQubits().begin(),
                           getInQubits().end());
             values.insert(values.end(), getInCtrlQubits().begin(),
@@ -205,8 +205,8 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             return values;
         }
 
-        mlir::ValueRange getQubitResults() {
-            mlir::SmallVector<mlir::Value> values;
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
             values.insert(values.end(), getOutQubits().begin(),
                           getOutQubits().end());
             values.insert(values.end(), getOutCtrlQubits().begin(),

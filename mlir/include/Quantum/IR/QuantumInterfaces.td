@@ -65,11 +65,11 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     let methods = [
         InterfaceMethod<
             "Return all operands which are considered input qubit values.",
-            "mlir::ValueRange", "getQubitOperands"
+            "std::vector<mlir::Value>", "getQubitOperands"
         >,
         InterfaceMethod<
             "Return all results which are considered output qubit values.",
-            "mlir::ValueRange", "getQubitResults"
+            "std::vector<mlir::Value>", "getQubitResults"
         >,
         InterfaceMethod<
             "Return operands which are considered non-controlled input qubit values.",
