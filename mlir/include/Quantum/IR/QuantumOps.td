@@ -197,11 +197,21 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
 
     code extraBaseClassDeclaration = [{
         mlir::ValueRange getQubitOperands() {
-            return getInQubits();
+            mlir::SmallVector<mlir::Value> values;
+            values.insert(values.end(), getInQubits().begin(),
+                          getInQubits().end());
+            values.insert(values.end(), getInCtrlQubits().begin(),
+                          getInCtrlQubits().end());
+            return values;
         }
 
         mlir::ValueRange getQubitResults() {
-            return getOutQubits();
+            mlir::SmallVector<mlir::Value> values;
+            values.insert(values.end(), getOutQubits().begin(),
+                          getOutQubits().end());
+            values.insert(values.end(), getOutCtrlQubits().begin(),
+                          getOutCtrlQubits().end());
+            return values;
         }
 
         bool getAdjointFlag() {
@@ -214,8 +224,14 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ValueRange getCtrlValueOperands() {
             return getInCtrlValues();
         }
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return getInQubits();
+        }
         mlir::ValueRange getCtrlQubitOperands() {
             return getInCtrlQubits();
+        }
+        mlir::ValueRange getNonCtrlQubitResults() {
+            return getOutQubits();
         }
         mlir::ValueRange getCtrlQubitResults() {
             return getOutCtrlQubits();
