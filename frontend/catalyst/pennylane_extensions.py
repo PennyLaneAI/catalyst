@@ -41,13 +41,6 @@ from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
 from pennylane.ops import Controlled
-
-# TODO: Enable when ready
-# from pennylane.ops.op_math.controlled import (
-#     _get_pauli_x_based_ops,
-#     _handle_pauli_x_based_controlled_ops,
-#     _try_wrap_in_custom_ctrl_op,
-# )
 from pennylane.tape import QuantumTape
 
 import catalyst
