@@ -38,7 +38,7 @@ try:
     REVISION = (
         check_output(["git", "rev-parse", "HEAD"], cwd=path.dirname(__file__)).decode().strip()
     )
-except Exception:
+except Exception:  # pylint: disable=broad-exception-caught
     REVISION = None
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
