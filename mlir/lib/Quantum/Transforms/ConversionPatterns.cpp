@@ -385,6 +385,32 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
     }
 };
 
+struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(GlobalPhaseOp op, GlobalPhaseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
+
+        std::string qirName = "__catalyst__qis__GlobalPhase";
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), modifiersPtr.getType()});
+
+        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        SmallVector<Value> args = adaptor.getOperands();
+        args.insert(args.begin() + 1, modifiersPtr);
+
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+
+        return success();
+    }
+};
+
 struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -882,6 +908,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ComputationalBasisOpPattern>(typeConverter, patterns.getContext());
