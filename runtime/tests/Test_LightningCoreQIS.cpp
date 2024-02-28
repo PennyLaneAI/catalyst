@@ -612,7 +612,7 @@ TEST_CASE("Test __catalyst__qis__ GlobalPhase", "[CoreQIS]")
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
 
-        __catalyst__qis__GlobalPhase(M_PI / 4);
+        __catalyst__qis__GlobalPhase(M_PI / 4, NO_MODIFIERS);
 
         MemRefT_CplxT_double_1d result = getState(2);
         __catalyst__qis__State(&result, 0);

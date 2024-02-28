@@ -377,10 +377,10 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     Catalyst::Runtime::getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
-void __catalyst__qis__GlobalPhase(double phi)
+void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {},
-                                                             MODIFIERS_ARGS(nullptr));
+                                                             MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
