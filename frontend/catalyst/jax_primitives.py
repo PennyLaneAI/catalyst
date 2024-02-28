@@ -730,7 +730,7 @@ def _qinst_lowering(
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
-    if name_str == "MultiRZ" or name_str == "GlobalPhase":
+    if name_str in {"MultiRZ", "GlobalPhase"}:
         assert len(float_params) == 1, f"{name_str} takes one float parameter"
         float_param = float_params[0]
         return MultiQubitOp(
