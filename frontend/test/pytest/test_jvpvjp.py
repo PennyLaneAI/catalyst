@@ -48,13 +48,18 @@ def test_vjp_outside_qjit_scalar_scalar():
     def f(x):
         return x**2
 
-    x = (4.0,)
-    ct = (1.0,)
-
-    expected = jax.vjp(f, *x)[1](*ct)
+    x = jnp.array(4.0)
+    ct = jnp.array(1.0)
+    res, f_vjp = jax.vjp(f, x)
+    expected = tuple([res, f_vjp(ct)])
     result = C_vjp(f, x, ct)
 
-    assert_allclose(expected, result)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(expected)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(result)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 def test_vjp_outside_qjit_tuple_scalar():
@@ -63,13 +68,19 @@ def test_vjp_outside_qjit_tuple_scalar():
     def f(x, y):
         return x**2 + y**2
 
-    x = (4.0, 4.0)
-    ct = (1.0,)
+    x = (jnp.array(4.0), jnp.array(4.0))
+    ct = jnp.array(1.0)
 
-    expected = jax.vjp(f, *x)[1](*ct)
+    res, f_vjp = jax.vjp(f, *x)
+    expected = tuple([res, f_vjp(ct)])
     result = C_vjp(f, x, ct)
 
-    assert_allclose(expected, result)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(expected)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(result)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 def test_vjp_outside_qjit_tuple_tuple():
@@ -81,10 +92,16 @@ def test_vjp_outside_qjit_tuple_tuple():
     x = (4.0, 4.0)
     ct = (1.0, 1.0)
 
-    expected = jax.vjp(f, *x)[1](ct)
+    res, f_vjp = jax.vjp(f, *x)
+    expected = tuple([res, f_vjp(ct)])
     result = C_vjp(f, x, ct)
 
-    assert_allclose(expected, result)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(expected)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(result)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 def test_jvp_outside_qjit_scalar_scalar():

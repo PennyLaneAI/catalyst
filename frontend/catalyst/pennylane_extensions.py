@@ -32,7 +32,6 @@ from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import (
     PyTreeDef,
-    flatten_one_level,
     tree_flatten,
     tree_unflatten,
     treedef_is_leaf,
@@ -230,7 +229,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.argnum_final:
+        if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
             raise DifferentiableCompileError(
                 "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
@@ -357,14 +356,14 @@ def _check_grad_params(
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
-    argnum_final, _ = tree_flatten(argnum_selected)
-    return GradParams(method, scalar_out, h, argnum, argnum_list, argnum_final)
+    argnum_expanded, _ = tree_flatten(argnum_selected)
+    scalar_argnum = isinstance(argnum, int) or argnum is None
+    return GradParams(method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded)
 
 
 def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
-    argnum_is_int = isinstance(grad_params.argnum, int) or grad_params.argnum is None
-    num_trainable_params = len(grad_params.argnum_final)
+    num_trainable_params = len(grad_params.expanded_argnum)
     results_final = []
 
     for i in range(0, num_results):
@@ -372,7 +371,7 @@ def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results)
             i * num_trainable_params : i * num_trainable_params + num_trainable_params
         ]
         intermediate_results = tree_unflatten(in_tree, intermediate_results)
-        if argnum_is_int:
+        if grad_params.scalar_argnum:
             intermediate_results = intermediate_results[0]
         else:
             intermediate_results = tuple(intermediate_results)
@@ -421,7 +420,7 @@ class Grad:
                 in_tree,
             )
             jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
-            args_argnum = tuple(args[i] for i in grad_params.argnum_list)
+            args_argnum = tuple(args[i] for i in grad_params.argnum)
             _, in_tree = tree_flatten(args_argnum)
 
             # It always returns list as required by catalyst control-flows
@@ -800,7 +799,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
         grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
-        args_argnum = tuple(params[i] for i in grad_params.argnum_list)
+        args_argnum = tuple(params[i] for i in grad_params.argnum)
         _, in_tree = tree_flatten(args_argnum)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
@@ -816,21 +815,16 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         func_res = tree_unflatten(out_tree, func_res)
         vjps = tree_unflatten(in_tree, vjps)
 
-        results = tuple([func_res, tuple(vjps)])
+        results = (func_res, vjps)
 
     else:
-        primal_outputs, vjp_fn = jax.vjp(f, *params)
 
-        # JAX requires that the PyTree shape of cotangents matches that of the function results.
-        # Generally, the user is responsible for this, except when the function returns a "bare"
-        # array, since we do force users to provide cotangents as an iterable.
-        # TODO: Add support for PyTrees in the compiled branch, then we can remove this special
-        # handling here by relaxing the input type restriction.
-        if len(cotangents) == 1 and isinstance(primal_outputs, jax.Array):
-            children, _ = flatten_one_level(cotangents)
-            cotangents = children[0]
+        if isinstance(params, jax.numpy.ndarray) and params.ndim == 0:
+            primal_outputs, vjp_fn = jax.vjp(f, params)
+        else:
+            primal_outputs, vjp_fn = jax.vjp(f, *params)
 
-        results = vjp_fn(cotangents)
+        results = (primal_outputs, vjp_fn(cotangents))
 
     return results
 
