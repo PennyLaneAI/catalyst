@@ -321,13 +321,14 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         )
 
 
+# pylint: disable=too-many-arguments
 def _check_grad_params(
     method: str,
     scalar_out: bool,
     h: Optional[float],
     argnum: Optional[Union[int, List[int]]],
-    len_flatten_args,
-    in_tree,
+    len_flatten_args: int,
+    in_tree: PyTreeDef,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -360,9 +361,7 @@ def _check_grad_params(
     return GradParams(method, scalar_out, h, argnum, argnum_list, argnum_final)
 
 
-def _unflatten_derivatives(
-    results, in_tree, out_tree, grad_params, num_results
-):  # pylint: disable=too-many-arguments
+def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
     argnum_is_int = isinstance(grad_params.argnum, int) or grad_params.argnum is None
     num_trainable_params = len(grad_params.argnum_final)
