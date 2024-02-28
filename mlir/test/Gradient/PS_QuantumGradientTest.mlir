@@ -46,7 +46,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "h"() %q_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_1 = quantum.custom "h"() %q_0 : !quantum.bit
 
     // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift0pos]], [[sel]])
@@ -59,7 +59,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_2 = quantum.custom "rz"(%f0) %q_1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_2 = quantum.custom "rz"(%f0) %q_1 : !quantum.bit
 
     // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
     // CHECK: [[epos:%[a-zA-Z0-9_]+]] = call @simple_circuit.shifted(%arg0, [[shift1pos]], [[sel]])
@@ -92,7 +92,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_3 = quantum.custom "u3"(%f0, %f1, %f2) %q_2 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_3 = quantum.custom "u3"(%f0, %f1, %f2) %q_2 : !quantum.bit
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
@@ -147,7 +147,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
 
     // CHECK: scf.if %arg1
     %q_2 = scf.if %arg1 -> !quantum.bit {
@@ -162,7 +162,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
         // CHECK: memref.store [[newIdx]], [[gradIdx]]
         //
         // CHECK-NOT: quantum.custom
-        %q_1_0 = quantum.custom "ry"(%arg0) %q_1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+        %q_1_0 = quantum.custom "ry"(%arg0) %q_1 : !quantum.bit
 
         // CHECK: scf.if %arg2
         %q_1_1 = scf.if %arg2 -> !quantum.bit {
@@ -177,7 +177,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_1_0_0 = quantum.custom "rz"(%arg0) %q_1_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+            %q_1_0_0 = quantum.custom "rz"(%arg0) %q_1_0 : !quantum.bit
             scf.yield %q_1_0_0 : !quantum.bit
         // CHECK: else
         } else {
@@ -192,7 +192,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_1_0_1 = quantum.custom "rz"(%arg0) %q_1_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+            %q_1_0_1 = quantum.custom "rz"(%arg0) %q_1_0 : !quantum.bit
             // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
             // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift4pos]], [[sel]])
             // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift4neg]], [[sel]])
@@ -204,7 +204,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_1_0_2 = quantum.custom "rz"(%arg0) %q_1_0_1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+            %q_1_0_2 = quantum.custom "rz"(%arg0) %q_1_0_1 : !quantum.bit
             scf.yield %q_1_0_2 : !quantum.bit
         }
         scf.yield %q_1_1 : !quantum.bit
@@ -227,7 +227,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_3 = quantum.custom "rx"(%arg0) %q_2 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_3 = quantum.custom "rx"(%arg0) %q_2 : !quantum.bit
     %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
@@ -278,7 +278,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
 
     %lb = arith.constant 0 : index
     %ub = arith.constant 10: index
@@ -299,7 +299,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
         // CHECK: memref.store [[newIdx]], [[gradIdx]]
         //
         // CHECK-NOT: quantum.custom
-        %q_1_1 = quantum.custom "ry"(%arg0) %q_1_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+        %q_1_1 = quantum.custom "ry"(%arg0) %q_1_0 : !quantum.bit
 
         scf.yield %q_1_1 : !quantum.bit
     }
@@ -319,7 +319,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
         // CHECK: memref.store [[newIdx]], [[gradIdx]]
         //
         // CHECK-NOT: quantum.custom
-        %q_2_1 = quantum.custom "ry"(%arg0) %q_2_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+        %q_2_1 = quantum.custom "ry"(%arg0) %q_2_0 : !quantum.bit
 
         // CHECK: scf.for [[k:%[a-zA-Z0-9_]+]] =
         %q_1_1 = scf.for %k = %j to %ub step %st iter_args(%q_2_1_0 = %q_2_1) -> !quantum.bit {
@@ -336,7 +336,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_2_1_1 = quantum.custom "rz"(%arg0) %q_2_1_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+            %q_2_1_1 = quantum.custom "rz"(%arg0) %q_2_1_0 : !quantum.bit
 
             scf.yield %q_2_1_1 : !quantum.bit
         }
@@ -388,7 +388,7 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
     %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
@@ -439,7 +439,7 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     // CHECK:         [[NEWIDX:%.+]] = index.add [[IDX]], [[C1]]
     // CHECK:         memref.store [[NEWIDX]], [[GRADIDX]]
     // CHECK-NOT: quantum.
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
     %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
@@ -463,7 +463,7 @@ func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_meth
     %r = quantum.alloc(1) : !quantum.reg
     %q = quantum.extract %r[%c0] : !quantum.reg -> !quantum.bit
 
-    %q_1 = quantum.custom "rz"(%arg0) %q { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q_1 = quantum.custom "rz"(%arg0) %q : !quantum.bit
     %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
