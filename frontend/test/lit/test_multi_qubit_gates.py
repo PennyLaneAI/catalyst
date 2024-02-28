@@ -31,7 +31,7 @@ def circuit(x: float):
     # CHECK: {{%.+}} = quantum.custom "CSWAP"() {{.+}} : !quantum.bit, !quantum.bit, !quantum.bit
     qml.CSWAP(wires=[0, 1, 2])
     # pylint: disable=line-too-long
-    # CHECK: {{%.+}} = quantum.multirz({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    # CHECK: {{%.+}} = quantum.multi "MultiRZ"({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     qml.MultiRZ(x, wires=[0, 1, 2, 3, 4])
     return measure(wires=0)
 

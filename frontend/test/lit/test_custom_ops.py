@@ -102,11 +102,11 @@ def compile_circuit_with_device(device):
 
 # CHECK-LABEL: public @jit_f
 # CHECK-NOT: RXX
-# CHECK: multirz
+# CHECK: multi "MultiRZ"
 # CHECK-NOT: RXX
 compile_circuit_with_device(devMultiRZ)
 # CHECK-LABEL: public @jit_f
-# CHECK-NOT: multirz
+# CHECK-NOT: multi "MultiRZ"
 # CHECK: RXX
-# CHECK-NOT: multirz
+# CHECK-NOT: multi "MultiRZ"
 compile_circuit_with_device(devRXX)

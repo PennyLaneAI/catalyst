@@ -50,7 +50,7 @@ from mlir_quantum.dialects.quantum import (
     HermitianOp,
     InsertOp,
     MeasureOp,
-    MultiRZOp,
+    MultiQubitOp,
     NamedObsOp,
     ProbsOp,
     QubitUnitaryOp,
@@ -730,10 +730,12 @@ def _qinst_lowering(
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
 
-    if name_str == "MultiRZ":
-        assert len(float_params) == 1, "MultiRZ takes one float parameter"
+    if name_str == "MultiRZ" or name_str == "GlobalPhase":
+        assert len(float_params) == 1, f"{name_str} takes one float parameter"
         float_param = float_params[0]
-        return MultiRZOp([qubit.type for qubit in qubits], float_param, qubits).results
+        return MultiQubitOp(
+            [qubit.type for qubit in qubits], float_param, qubits, name_attr
+        ).results
 
     return CustomOp([qubit.type for qubit in qubits], float_params, qubits, name_attr).results
 
