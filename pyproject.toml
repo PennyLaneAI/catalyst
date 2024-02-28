@@ -40,6 +40,7 @@ source = [
 omit = [
     "*/python_bindings/*",
     "./frontend/catalyst/_version.py",
+    "./frontend/catalyst/_revision.py",
 ]
 
 [tool.coverage.html]

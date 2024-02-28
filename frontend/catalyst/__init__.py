@@ -40,7 +40,7 @@ from catalyst._version import __version__
 
 try:
     if INSTALLED:
-        from catalyst._revision import __revision__
+        from catalyst._revision import __revision__ # pylint: disable=no-name-in-module
     else:
         # pragma: no cover
         from subprocess import check_output
@@ -48,8 +48,7 @@ try:
         __revision__ = (
             check_output(["git", "rev-parse", "HEAD"], cwd=dirname(__file__)).decode().strip()
         )
-except Exception as err:
-    print(err)
+except Exception: # pylint: disable=broad-exception-caught
     # Revision was not determined
     __revision__ = None  # pragma: no cover
 
