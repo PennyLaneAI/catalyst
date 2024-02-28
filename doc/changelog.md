@@ -103,14 +103,52 @@
 
   For more details, please see the TK.
 
+* Mid-circuit measurements now support post-selection and qubit reset when used with
+  the Lightning simulators.
+  [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
+  [(#507)](https://github.com/PennyLaneAI/catalyst/pull/507)
+
+
+  To specify post-selection, simply pass the `postselect` argument to the `catalyst.measure`
+  function:
+
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def f():
+      qml.Hadamard(0)
+      m = measure(0, postselect=1)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  Likewise, to reset a wire after mid-circuit measurement, simply specify `reset=True`:
+
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def f():
+      qml.Hadamard(0)
+      m = measure(0, reset=True)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Improvements</h3>
+
+* Catalyst now supports Python 3.12
+  [(#532)](https://github.com/PennyLaneAI/catalyst/pull/532)
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
   [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
 
-* Catalyst will now remember previously compiled functions when the PyTree metadata of arguments
-  changes, in addition to already rememebering compiled functions when static arguments change.
+* The ``@qjit`` decorator will now remember previously compiled functions when the PyTree metadata
+  of arguments changes, in addition to already rememebering compiled functions when static
+  arguments change.
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
 
   The following example will no longer trigger a third compilation:
@@ -172,7 +210,7 @@
   [{'expval0': (array(-0.0978434), array(-0.19767681))}, (array(-0.0978434), array(-0.19767681))]
   ```
 
-* Add native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices.
+* Native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices has been added.
   [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
 
   Specifically, a circuit like
@@ -191,8 +229,31 @@
 
   would no longer decompose the `PSWAP` and `ISWAP` gates.
 
-* Add support for the `BlockEncode` operator in Catalyst.
+* The `qml.BlockEncode` operator is now supported with Catalyst.
   [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
+
+* Additional debugging functions are now available in the `catalyst.debug` directory.
+  [(#529)](https://github.com/PennyLaneAI/catalyst/pull/529)
+  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
+
+  This includes:
+
+  - `compile_from_mlir(ir[, compiler, ...])` to compile a Catalyst function to binary code from the
+    provided MLIR.
+
+  - `filter_static_args(args, static_argnums)` to remove static values from arguments using the
+    provided index list.
+
+  - `get_cmain(fn, *args)` to return a C program that calls a jitted function with the provided
+    arguments.
+
+  - `print_compilation_stage(fn, stage)` to print one of the recorded compilation stages for a
+    JIT-compiled function.
+
+  - `promote_arguments(target_signature, args)` to promote arguments to the provided target
+    signature, preserving PyTrees.
+
+  For more details, please see the `catalyst.debug` documentation.
 
 * Remove copies of TOML device configuration files for Lightning device in Catalyst.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
@@ -204,43 +265,20 @@
   the current state-vector before qubit re-allocations.
   [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
 
-* Add support for post-selection in mid-circuit measurements. This is currently supported
-  only on Lightning simulators.
-  [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
-
-  This is an example of post-selection usage:
-
-  ```py
-  import pennylane as qml
-  from catalyst import qjit
-
-  dev = qml.device("lightning.qubit", wires=1)
-
-  @qjit
-  @qml.qnode(dev)
-  def f():
-      qml.Hadamard(0)
-      m = measure(0, postselect=1)
-      return qml.expval(qml.PauliZ(0))
-  ```
-
-* Add support for reset option in mid-circuit measurements.
-  [(#507)](https://github.com/PennyLaneAI/catalyst/pull/507)
-
-  This is an example of reset usage:
-
-  ```py
-  dev = qml.device("lightning.qubit", wires=1)
-
-  @qjit
-  @qml.qnode(dev)
-  def f():
-      qml.Hadamard(0)
-      m = measure(0, reset=True)
-      return qml.expval(qml.PauliZ(0))
-  ```
+* The [PennyLane custom compiler entry point name convention has changed](https://github.com/PennyLaneAI/pennylane/pull/5140), necessitating
+  a change to the Catalyst entry points.
+  [(#493)](https://github.com/PennyLaneAI/catalyst/pull/493)
 
 <h3>Breaking changes</h3>
+
+* Catalyst gradient functions now match the Jax convention for the returned axes of
+  gradients, Jacobians, VJPs, and JVPs. As a result, the returned tensor shape from various
+  Catalyst gradient functions may differ compared to previous versions of Catalyst.
+  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
+  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
+  [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
+
+<h3>Internal changes</h3>
 
 * The Catalyst Python frontend has been partially refactored. The impact on user-facing
   functionality is minimal, but the location of certain classes and methods used by the package
@@ -249,15 +287,20 @@
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
 
   The following changes have been made:
+
   * Some debug methods and features on the QJIT class have been turned into free functions and moved
     to the `catalyst.debug` module, which will now appear in the public documention. This includes
-    compiling a program from ir, obtaining a C program to invoke a compiled function from, and
+    compiling a program from IR, obtaining a C program to invoke a compiled function from, and
     printing fine-grained MLIR compilation stages.
+
   * The `compilation_pipelines.py` module has been renamed to `jit.py`, and certain functionality
     has been moved out (see following items).
+
   * A new module `compiled_functions.py` now manages low-level access to compiled functions.
+
   * A new module `tracing/type_signatures.py` handles functionality related managing arguments
     and type signatures during the tracing process.
+
   * The `contexts.py` module has been moved from `utils` to the new `tracing` sub-module.
 
 * `QCtrl` is overriden and never used.
@@ -266,113 +309,62 @@
   This is not so much a breaking change, it was just never used in the past.
   This will be set back to its original behaviour once it is implemented in the frontend.
 
-* We match better the Jax convention for returning gradient, jacobian, vjp and jvp. Therefore some breaking
-  changes about the return shapes of those functions were introduced.
-  [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
-  [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
-  [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
-
-* The entry point name convention has changed.
-  [(#493)](https://github.com/PennyLaneAI/catalyst/pull/493)
-
-  From the [documentation](https://packaging.python.org/en/latest/specifications/entry-points/#data-model):
-
-     Within a distribution, entry points should be unique.
-
-  This meant that within a single distribution there cannot be two different `qjit` entry points like so:
-
-  ```py
-  entry_points={"pennylane.compilers": [
-      "qjit = foo:Foo",
-      "qjit = bar:Bar",
-  ]}
-  ```
-
-  Now, entry point's names are preppended with the name of the compiler.
-
-  ```py
-  entry_points={"pennylane.compilers": [
-      "compilerFoo.qjit = foo:Foo",
-      "compilerBar.qjit = bar:Bar",
-  ]}
-  ```
-
-  The behaviour will be reflected when using the `@qml.qjit` decorator.
-  For example,
-
-  ```py
-  @qml.qjit(compiler="compilerFoo")
-  def circuit(): ...
-  ```
-
-  will point call `foo:Foo` in the entry points' distribution.
-  Please note that `compilerFoo` can also be `foo`. The compiler name
-  does not have to be distinct from the object reference path. To keep
-  the previous user facing behaviour, simply define entry points as follows:
-
-  ```py
-  entry_points={"pennylane.compilers": [
-      "foo.qjit = foo:Foo",
-      "bar.qjit = bar:Bar",
-  ]}
-  ```
-
-  and the following example will still work:
-
-  ```py
-  @qml.qjit(compiler="foo")
-  def circuit(): ...
-  ```
-
-* The Catalyst runtime now has a different API from QIR instructions.
+* Changes to the runtime QIR API and dependencies, to avoid symbol conflicts
+  with other libraries that utilize QIR.
   [(#464)](https://github.com/PennyLaneAI/catalyst/pull/464)
-
-  QIR encodes quantum instructions as LLVM function calls. This allows frontends to generate
-  QIR, middle-ends to optimizie QIR, and code generators to lower these function calls into
-  appropriate instructions for the target. One of the possible implementations for QIR is to
-  lower QIR instructions to function calls with the same signature and implement QIR as a library.
-  Other implementations might choose to lower QIR to platform specific APIs, or replace function
-  calls with semantically equivalent code.
-
-  Catalyst implemented QIR as a library that can be linked against a QIR module.
-  This works great when Catalyst is the only implementor of QIR.
-  However, when other QIR implementors, who also lower implement a quantum runtime as functions to be
-  linked against, this may generate symbol conflicts.
-
-  This PR changes the runtime such that QIR instructions are now lowered to functions where
-  the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
-  the possibility of symbol conflicts with other libraries that implement QIR as a library.
-  However, it doesn't solve it completely. Since the `__catalyst__` functions are still exported.
-  If another library implemented the same symbols exported by the runtime, the same problem would
-  presist.
-
-* The Catalyst runtime no longer depends on QIR runner's stdlib.
   [(#470)](https://github.com/PennyLaneAI/catalyst/pull/470)
 
-  Similar to changing the runtime API for QIR instructions, we no longer depend nor link against
-  QIR runner's stdlib. With PR #464, most of the symbol conflicts were resolved, but by linking
-  against QIR runner's stdlib, some definitions persisted that may be different than ones
-  used by third party implementors. To prevent symbol conflicts QIR runner's stdlib was removed
-  and is no longer linked against. As a result, the following functions are now defined and
-  implemented in Catalyst's runtime:
-  * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
-  * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
+  The existing Catalyst runtime implements QIR as a library that can be linked against a QIR module.
+  This works great when Catalyst is the only implementor of QIR, however it may generate
+  symbol conflicts when used alongside other QIR implementations.
 
-  and the following functions were removed since the frontend does not generate them
-  * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
-  * `QirString *__catalyst__rt__result_to_string(RESULT *)`
+  To avoid this, two changes were necessary:
+
+  * The Catalyst runtime now has a different API from QIR instructions.
+  
+    The runtime has been modified such that QIR instructions are lowered to functions where
+    the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
+    the possibility of symbol conflicts with other libraries that implement QIR as a library.
+
+  * The Catalyst runtime no longer depends on QIR runner's stdlib.
+
+    We no longer depend nor link against QIR runner's stdlib. By linking against QIR runner's stdlib,
+    some definitions persisted that may be different than ones used by third party implementors. To
+    prevent symbol conflicts QIR runner's stdlib was removed and is no longer linked against. As a
+    result, the following functions are now defined and implemented in Catalyst's runtime:
+
+    * `int64_t __catalyst__rt__array_get_size_1d(QirArray *)`
+    * `int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t)`
+
+    and the following functions were removed since the frontend does not generate them
+
+    * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
+    * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
 <h3>Bug fixes</h3>
+
+* `QCtrl` now implements `map_wires`.
+  [(#555)](https://github.com/PennyLaneAI/catalyst/pull/555)
+
+  Applying `map_wires` to `QCtrl` lead to an incorrect circuit.
+  The wires in the nested regions remained unchanged.
 
 * Catalyst will no longer print a warning that recompilation is triggered when a `@qjit` decorated
   function with no arguments is invoke without having been compiled first, for example via the use
   of `target="mlir"`.
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
 
-* Only set `JAX_DYNAMIC_SHAPES` configuration option during `trace_to_mlir()`.
+* Fixes a bug in the configuration of dynamic shaped arrays that would cause certain program to
+  error with `TypeError: cannot unpack non-iterable ShapedArray object`.
   [(#526)](https://github.com/PennyLaneAI/catalyst/pull/526)
 
-* Handle run time exception in async qnodes.
+  This is fixed by replacing the code which updates the `JAX_DYNAMIC_SHAPES` option with a
+  `transient_jax_config()`` context manager which temporarily sets the value of
+  `JAX_DYNAMIC_SHAPES` to True and then restores the original configuration value following the
+  yield. The context manager is used by `trace_to_mlir()``.
+
+* Exceptions encountered in the runtime when using the `@qjit` option `async_qnodes=Tue`
+  will now be properly propagated to the frontend.
   [(#447)](https://github.com/PennyLaneAI/catalyst/pull/447)
   [(#510)](https://github.com/PennyLaneAI/catalyst/pull/510)
 
@@ -393,7 +385,7 @@
   qubit re-allocation.
   [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
 
-* Add the `wires` property to `catalyst.adjoint` and `catalyst.ctrl`.
+* Added the `wires` property to `catalyst.adjoint` and `catalyst.ctrl`.
   [(#480)](https://github.com/PennyLaneAI/catalyst/pull/480)
 
   Without implementing the `wires` property, users would get `<Wires = [<WiresEnum.AnyWires: -1>]>`
@@ -403,7 +395,7 @@
   nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
   control flow operations.
 
-* Add support for lowering the eigen vectors/values computation lapack method: `lapack_dsyevd`
+* Add support for lowering the eigenvectors/values computation lapack method: `lapack_dsyevd`
   via `stablehlo.custom_call`. For Catalyst, it means that you now can QJIT compile eigen
   vector/values operations and any other `qml.math` methods that uses these operations.
   [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
