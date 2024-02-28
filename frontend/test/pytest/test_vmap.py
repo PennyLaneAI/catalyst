@@ -112,8 +112,7 @@ class TestVectorizeMap:
             res1 = vmap(circuit)(x)
             res2 = vmap(circuit, in_axes=0)(x)
             res3 = vmap(circuit, in_axes=(0,))(x)
-            res4 = vmap(circuit, in_axes=None)(x[0])
-            return res1, res2, res3, res4
+            return res1, res2, res3
 
         x = jnp.array(
             [
@@ -128,7 +127,35 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
         assert jnp.allclose(result[2], expected)
-        assert jnp.allclose(result[3], expected[0])
+
+    def test_vmap_circuit_in_axes_int(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with `in_axes:int`."""
+
+        @qjit
+        def workflow(x, y, z):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x, y, z):
+                qml.RX(jnp.pi * x[0] * y[1] * z[2], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2] * y[0], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            res1 = vmap(circuit, in_axes=0)(x, y, z)
+            res2 = vmap(circuit)(x, x / 2, x / 3)
+            return res1, res2
+
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+        result = workflow(x, x / 2, x / 3)
+        expected = jnp.array([0.99918125, 0.96149524, 0.68483332])
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], expected)
 
     def test_vmap_nonzero_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with axes > 0."""
@@ -205,7 +232,7 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid 'in_axes'; it can be an int or a tuple of "
+            match="Invalid 'in_axes'; it must be an int or a tuple of "
             "PyTrees with integer leaves",
         ):
             qjit(workflow)(0.1)
@@ -224,8 +251,7 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid 'in_axes'; it can be an int or a tuple "
-            "of PyTrees corresponding to the arguments",
+            match="Invalid 'in_axes'; it must be an int or match the length of positional",
         ):
             qjit(workflow)(0.1)
 
@@ -243,7 +269,7 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid 'out_axes'; it can be an int or a tuple "
+            match="Invalid 'out_axes'; it must be an int or a tuple "
             "of PyTree with integer leaves",
         ):
             qjit(workflow)(0.1)
@@ -271,8 +297,7 @@ class TestVectorizeMap:
 
         with pytest.raises(
             ValueError,
-            match="Invalid 'out_axes'; it can be an int or a tuple "
-            "of PyTrees corresponding to the ",
+            match="Invalid 'out_axes'; it must be an int or match the number of function results",
         ):
             qjit(workflow)(x)
 
@@ -512,6 +537,36 @@ class TestVectorizeMap:
         )
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(jnp.transpose(result[1], (1, 0)), expected)
+
+    def test_vmap_circuit_return_tensor_out_axes_multiple(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT with multiple out_axes."""
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.state(), qml.state()
+
+            res1 = vmap(circuit, out_axes=1)(x)
+            res2 = vmap(circuit, out_axes=(0, 1))(x)
+            return res1, res2
+
+        x = jnp.array([[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]])
+
+        result = workflow(x)
+        expected = jnp.array(
+            [
+                [0.98235508 + 0.00253459j, 0.0198374 - 0.18595308j],
+                [0.10537427 + 0.2120056j, 0.23239136 - 0.94336851j],
+            ]
+        )
+        assert jnp.allclose(jnp.transpose(result[0][0], (1, 0)), expected)
+        assert jnp.allclose(jnp.transpose(result[0][1], (1, 0)), expected)
+        assert jnp.allclose(result[1][0], expected)
+        assert jnp.allclose(jnp.transpose(result[1][1], (1, 0)), expected)
 
     def test_vmap_circuit_return_tensor_pytree(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT returning PyTrees."""

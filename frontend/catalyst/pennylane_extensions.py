@@ -2174,15 +2174,33 @@ def vmap(
 
         The following modes are supported:
 
-        - ``int``: specifies the same batch axis for all arguments
-        - ``Tuple[int]``: specify a different batch axis for each argument
-        - ``Tuple[int | None]``: same as previous, but selectively disable batching for certain
+        - ``int``: Specifies the same batch axis for all arguments
+        - ``Tuple[int]``: Specify a different batch axis for each argument
+        - ``Tuple[int | None]``: Same as previous, but selectively disable batching for certain
           arguments with a ``None`` value
-        - ``Tuple[int | PyTree[int] | None]``: same as previous, but specify a different batch
+        - ``Tuple[int | PyTree[int] | None]``: Same as previous, but specify a different batch
           axis for each leaf of an argument (Note that the ``PyTreeDefs``, i.e. the container
           structure, must match between the ``in_axes`` element and the corresponding argument.)
-        - ``Tuple[int | PyTree[int | None] | None]``: same as previous, but selectively disable
+        - ``Tuple[int | PyTree[int | None] | None]``: Same as previous, but selectively disable
           batching for individual PyTree leaves
+
+
+    .. details::
+        :title: Selecting output axes for arguments
+
+        The ``out_axes`` parameter can be used to specify the positions of the mapped axis in the
+        output.
+
+        The following modes are supported:
+
+        - ``int``: Specifies the position of the mapped axis in the output
+        - ``Tuple[int]``: Specify the positions of the mapped axis for multiple output arrays
+        - ``Tuple[int | None]``: Same as the previous mode, allowing for ``None`` to indicate no
+          mapped axis for a specific output
+        - ``Tuple[int | PyTree[int] | None]``: Same as the previous mode, but extended to support
+          nested Python containers for specifying mapped axes
+        - ``Tuple[int | PyTree[int | None] | None]``: Similar to the previous mode, allowing for
+          ``None`` in nested containers to indicate no mapped axis for specific outputs
     """
 
     # Dispatch to jax.vmap when it is called outside qjit.
@@ -2191,50 +2209,55 @@ def vmap(
 
     if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
         raise ValueError(
-            "Invalid 'in_axes'; it can be an int or a tuple of PyTrees with integer leaves, "
+            "Invalid 'in_axes'; it must be an int or a tuple of PyTrees with integer leaves, "
             f"but got {in_axes}"
         )
 
     if not all(isinstance(l, int) for l in tree_leaves(out_axes)):
         raise ValueError(
-            "Invalid 'out_axes'; it can be an int or a tuple of PyTree with integer leaves, "
+            "Invalid 'out_axes'; it must be an int or a tuple of PyTree with integer leaves, "
             f"but got {out_axes}"
         )
 
     def batched_fn(*args, **kwargs):
         """Vectorization wrapper around the hybrid program using catalyst.for_loop"""
 
-        # Check the validity of the input arguments
-        if isinstance(in_axes, tuple) and len(in_axes) != len(args):
-            raise ValueError(
-                "Invalid 'in_axes'; it can be an int or a tuple of PyTrees corresponding to "
-                f"the arguments, but got {len(in_axes)} and {len(args)}"
-            )
-
         args_flat, args_tree = tree_flatten(args)
         in_axes_flat = _vmap_tree_flatten(in_axes)
+
+        # Check the validity of the input arguments
+        if not isinstance(in_axes, int) and len(in_axes) != len(args):
+            raise ValueError(
+                "Invalid 'in_axes'; it must be an int or match the length of positional "
+                f"arguments, but got {len(in_axes)} axis specifiers and {len(args)} arguments."
+            )
+        elif isinstance(in_axes, int):
+            in_axes_flat = [
+                in_axes,
+            ] * len(args_flat)
 
         batch_size = _get_batch_size(args_flat, in_axes_flat, axis_size)
         batch_loc = _get_batch_loc(in_axes_flat)
 
-        # If vmap is requested on any axes
-        if len(batch_loc):
-            for loc in batch_loc:
-                # Support vectorization on dim > 0
-                if ax := in_axes_flat[loc]:
-                    up_axes = [*range(args_flat[loc].ndim)]
-                    up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
-                    args_flat[loc] = jnp.transpose(args_flat[loc], up_axes)
-
         # Prepare args_flat to run 'fn' one time and get the output-shape
         fn_args_flat = args_flat.copy()
         for loc in batch_loc:
-            fn_args_flat[loc] = args_flat[loc][0]
+            ax = in_axes_flat[loc]
+            fn_args_flat[loc] = jax.numpy.take(args_flat[loc], 0, axis=ax)
 
         fn_args = tree_unflatten(args_tree, fn_args_flat)
 
         # Run 'fn' one time to get output-shape
         init_result = fn(*fn_args, **kwargs)
+
+        # To support both Tracer and Python built-in container objects results:
+        init_result_len = init_result.size if hasattr(init_result, "size") else len(init_result)
+
+        if not isinstance(out_axes, int) and len(out_axes) != init_result_len:
+            raise ValueError(
+                "Invalid 'out_axes'; it must be an int or match the number of function results, "
+                f"but got {len(out_axes)} axis specifiers and {init_result.size} results."
+            )
 
         # Return 'init_result' if none is requested
         if not batch_size:
@@ -2242,11 +2265,16 @@ def vmap(
 
         init_result_flat, init_result_tree = tree_flatten(init_result)
 
-        out_axes_flat = _vmap_tree_flatten(out_axes)
-        out_pos = _get_batch_loc(out_axes_flat)
-        out_pos = out_pos[0]
-
         num_axes_out = len(init_result_flat)
+
+        if isinstance(out_axes, int):
+            out_axes_flat = [
+                out_axes,
+            ] * num_axes_out
+        else:
+            out_axes_flat = _vmap_tree_flatten(out_axes)
+
+        out_loc = _get_batch_loc(out_axes_flat)
 
         # Store batched results of all leaves
         # in the flatten format with respect to the 'init_result' shape
@@ -2260,18 +2288,13 @@ def vmap(
             batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
             batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
 
-        if isinstance(out_axes, tuple) and len(out_axes) != len(out_shape):
-            raise ValueError(
-                "Invalid 'out_axes'; it can be an int or a tuple of PyTrees corresponding to the "
-                f"arguments, but got out_axes={out_axes} and out_shape={out_shape}"
-            )
-
         # Apply mapping batched_args[1:] ---> fn(args)
         @for_loop(1, batch_size, 1)
         def loop_fn(i, batched_result_list):
             fn_args_flat = args_flat
             for loc in batch_loc:
-                fn_args_flat[loc] = args_flat[loc][i]
+                ax = in_axes_flat[loc]
+                fn_args_flat[loc] = jax.numpy.take(args_flat[loc], i, axis=ax)
 
             fn_args = tree_unflatten(args_tree, fn_args_flat)
             res = fn(*fn_args, **kwargs)
@@ -2282,15 +2305,16 @@ def vmap(
             for j in range(num_axes_out):
                 batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
 
-            # Support out_axes on dim > 0
-            if ax := out_axes_flat[out_pos]:
-                up_axes = [*range(batched_result_list[out_pos].ndim)]
-                up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
-                batched_result_list[out_pos] = jnp.transpose(batched_result_list[out_pos], up_axes)
-
             return batched_result_list
 
         batched_result_list = loop_fn(batched_result_list)
+
+        # Support out_axes on dim > 0
+        for loc in out_loc:
+            if ax := out_axes_flat[loc]:
+                up_axes = [*range(batched_result_list[loc].ndim)]
+                up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
+                batched_result_list[loc] = jnp.transpose(batched_result_list[loc], up_axes)
 
         # Unflatten batched_result before return
         return tree_unflatten(init_result_tree, batched_result_list)
