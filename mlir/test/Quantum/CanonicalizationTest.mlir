@@ -113,7 +113,7 @@ func.func @test_insert_canonicalize(%r1: !quantum.reg, %i: i64) -> !quantum.bit 
     %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
     // CHECK:  quantum.insert
     %r2 = quantum.insert %r1[0], %q1 : !quantum.reg, !quantum.bit
-    %4 = quantum.custom "Hadamard"() %q1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %4 = quantum.custom "Hadamard"() %q1 : !quantum.bit
     // CHECK:  quantum.dealloc
     quantum.dealloc %r2 : !quantum.reg
     return %4 : !quantum.bit

@@ -57,7 +57,7 @@ quantum.dealloc %r1 : !quantum.reg
 func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
     %q3 = quantum.custom "Hadamard"() %q1 : !quantum.bit
     %q4 = quantum.custom "RZ"(%f) %q1 : !quantum.bit
-    %q5, %q6 = quantum.custom "CNOT"() %q1, %q2 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
+    %q5, %q6 = quantum.custom "CNOT"() %q1, %q2 : !quantum.bit, !quantum.bit
 
     // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
     %err = quantum.custom "CNOT"() %q1, %q2 : !quantum.bit
@@ -87,7 +87,7 @@ func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
 
 func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
     // expected-error@+1 {{number of qubits in input (1) and output (2) must be the same}}
-    %err:2 = quantum.multirz(%theta) %q0 { result_segment_sizes = array<i32: 2, 0> } : !quantum.bit, !quantum.bit
+    %err:2 = quantum.multirz(%theta) %q0 : !quantum.bit, !quantum.bit
 
     return
 }
