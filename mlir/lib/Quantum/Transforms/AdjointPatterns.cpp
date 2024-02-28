@@ -156,10 +156,6 @@ class AdjointGenerator {
              llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
             remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
         }
-        for (const auto &[qubitResult, qubitOperand] :
-             llvm::zip(gate.getCtrlQubitResults(), gate.getCtrlQubitOperands())) {
-            remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
-        }
 
         auto clone = cast<QuantumGate>(builder.clone(*gate, remappedValues));
         clone.setAdjointFlag(!gate.getAdjointFlag());
@@ -269,7 +265,7 @@ class AdjointGenerator {
         }
 
         for (const auto &[qubitResult, qubitOperand] :
-             llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
+             llvm::zip(clone.getNonCtrlQubitResults(), gate.getNonCtrlQubitOperands())) {
             remappedValues.map(qubitOperand, qubitResult);
         }
     }
