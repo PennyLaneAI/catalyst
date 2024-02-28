@@ -132,7 +132,7 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     }];
 }
 
-def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
+def ParametrizedGate : OpInterface<"ParametrizedGate", []> {
     let description = [{
         This interface provides a generic way to interact with parametrized
         quantum instructions. These are quantum operations with differentiable

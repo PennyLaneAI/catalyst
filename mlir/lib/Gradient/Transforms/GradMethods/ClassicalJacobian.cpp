@@ -172,7 +172,9 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
                     rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
                 }
 
-                rewriter.replaceOp(op, gate.getQubitOperands());
+                if (auto g = dyn_cast<quantum::QuantumGate>(op)) {
+                    rewriter.replaceOp(op, g.getQubitOperands());
+                }
             }
             // Any other gates or quantum instructions also need to be stripped.
             // Measurements are handled separately.
@@ -266,7 +268,9 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                     rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
                 }
 
-                rewriter.replaceOp(op, gate.getQubitOperands());
+                if (auto g = dyn_cast<quantum::QuantumGate>(op)) {
+                    rewriter.replaceOp(op, g.getQubitOperands());
+                }
             }
             // Any other gates or quantum instructions also need to be stripped.
             // Measurements are handled separately.
