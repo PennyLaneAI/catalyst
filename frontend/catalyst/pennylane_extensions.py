@@ -36,6 +36,7 @@ from jax._src.tree_util import (
     flatten_one_level,
     tree_flatten,
     tree_leaves,
+    tree_structure,
     tree_unflatten,
     treedef_is_leaf,
 )
@@ -2225,11 +2226,14 @@ def vmap(
         args_flat, args_tree = tree_flatten(args)
         in_axes_flat = _vmap_tree_flatten(in_axes)
 
-        # Check the validity of the input arguments
-        if not isinstance(in_axes, int) and len(in_axes) != len(args):
+        # Check the validity of the input arguments w.r.t. in_axes
+        in_axes_deep_struct = tree_structure(in_axes, is_leaf=lambda x: x is None)
+        args_deep_struct = tree_structure(args, is_leaf=lambda x: x is None)
+        if not isinstance(in_axes, int) and in_axes_deep_struct != args_deep_struct:
             raise ValueError(
                 "Invalid 'in_axes'; it must be an int or match the length of positional "
-                f"arguments, but got {len(in_axes)} axis specifiers and {len(args)} arguments."
+                f"arguments, but got {in_axes_deep_struct} axis specifiers "
+                f"and {args_deep_struct} arguments."
             )
         elif isinstance(in_axes, int):
             in_axes_flat = [
@@ -2250,13 +2254,13 @@ def vmap(
         # Run 'fn' one time to get output-shape
         init_result = fn(*fn_args, **kwargs)
 
-        # To support both Tracer and Python built-in container objects results:
-        init_result_len = init_result.size if hasattr(init_result, "size") else len(init_result)
-
-        if not isinstance(out_axes, int) and len(out_axes) != init_result_len:
+        # Check the validity of the output w.r.t. out_axes
+        out_axes_deep_struct = tree_structure(out_axes, is_leaf=lambda x: x is None)
+        init_result_deep_struct = tree_structure(init_result, is_leaf=lambda x: x is None)
+        if not isinstance(out_axes, int) and out_axes_deep_struct != init_result_deep_struct:
             raise ValueError(
                 "Invalid 'out_axes'; it must be an int or match the number of function results, "
-                f"but got {len(out_axes)} axis specifiers and {init_result.size} results."
+                f"but got {out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
             )
 
         # Return 'init_result' if none is requested
@@ -2337,31 +2341,14 @@ def _vmap_tree_flatten(args):
         List: A tuple containing the flattened elements of the PyTree, including 'None' elements.
     """
 
-    args_flat, args_tree = tree_flatten(args)
+    args_flat, args_tree = tree_flatten(args, is_leaf=lambda x: x is None)
 
     if isinstance(args, int):
         return args_flat
     elif args_tree.num_leaves == 0:
         return [None]
 
-    # Reverse the non-None values which will be popped out in 'include_nones'
-    # and append them to 'flatten_tree_with_nones' in the correct order
-    args_flat.reverse()
-
-    flatten_tree_with_nones = []
-
-    def include_nones(tree):
-        for child in tree.children():
-            if len(child.children()):
-                include_nones(child)
-            elif child.num_leaves:
-                flatten_tree_with_nones.append(args_flat.pop())
-            else:
-                flatten_tree_with_nones.append(None)
-
-    include_nones(args_tree)
-
-    return flatten_tree_with_nones
+    return args_flat
 
 
 def _get_batch_loc(axes_flat):

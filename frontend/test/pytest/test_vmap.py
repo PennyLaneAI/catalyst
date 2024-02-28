@@ -198,7 +198,7 @@ class TestVectorizeMap:
                 qml.RX(x[1] * x[2] * y, wires=0)
                 return qml.expval(qml.PauliZ(0))
 
-            res1 = vmap(circuit, in_axes=[None, 1])(y[0], x)
+            res1 = vmap(circuit, in_axes=(None, 1))(y[0], x)
             res2 = vmap(circuit, in_axes=(0, 1))(y, x)
             return res1, res2
 
@@ -323,11 +323,10 @@ class TestVectorizeMap:
                 return circuit(x, y) * y * z
 
             res1 = vmap(workflow2, in_axes=(0, None))(x, y)
-            res2 = vmap(workflow2, in_axes=[0, None])(x, y)
-            res3 = vmap(workflow3, in_axes=(None, 0))(y, x)
-            res4 = vmap(workflow4, in_axes=(None, 0, None))(y, x, z)
-            res5 = vmap(workflow4, in_axes=(None, 0, None), axis_size=2)(y, x, z)
-            return res1, res2, res3, res4, res5
+            res2 = vmap(workflow3, in_axes=(None, 0))(y, x)
+            res3 = vmap(workflow4, in_axes=(None, 0, None))(y, x, z)
+            res4 = vmap(workflow4, in_axes=(None, 0, None), axis_size=2)(y, x, z)
+            return res1, res2, res3, res4
 
         y = jnp.pi
         x = jnp.array(
@@ -343,8 +342,7 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
         assert jnp.allclose(result[2], expected)
-        assert jnp.allclose(result[3], expected)
-        assert jnp.allclose(result[4], expected[:2])
+        assert jnp.allclose(result[3], expected[:2])
 
     def test_vmap_tuple_in_axes_multiple_nonuniform(self, backend):
         """Test expected ValueError with non-uniform batch sizes."""
@@ -366,19 +364,12 @@ class TestVectorizeMap:
         )
 
         y1 = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
-        y2 = [jnp.pi, jnp.pi / 2]  # TODO: support Python lists in vmap.
 
         with pytest.raises(
             ValueError,
             match="Invalid batch sizes; expected the batch size to be the same for all arguments",
         ):
             qjit(workflow)(x, y1)
-
-        with pytest.raises(
-            ValueError,
-            match="Invalid batch sizes; expected the batch size to be the same for all arguments",
-        ):
-            qjit(workflow)(x, y2)
 
     def test_vmap_tuple_in_axes_multiple(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a tuple in_axes
@@ -403,12 +394,11 @@ class TestVectorizeMap:
                 return circuit(x, y) * z
 
             res1 = vmap(workflow2, in_axes=(0, 0))(x, y)
-            res2 = vmap(workflow2, in_axes=[0, 0])(x, y)
-            res3 = vmap(workflow3, in_axes=(0, 0))(y, x)
-            res4 = vmap(workflow4, in_axes=(0, 0, None))(y, x, z)
-            res5 = vmap(workflow4, in_axes=(0, 0, None), axis_size=2)(y, x, z)
-            res6 = vmap(workflow4, in_axes=(0, 1, None))(y, x2, z)
-            return res1, res2, res3, res4, res5, res6
+            res2 = vmap(workflow3, in_axes=(0, 0))(y, x)
+            res3 = vmap(workflow4, in_axes=(0, 0, None))(y, x, z)
+            res4 = vmap(workflow4, in_axes=(0, 0, None), axis_size=2)(y, x, z)
+            res5 = vmap(workflow4, in_axes=(0, 1, None))(y, x2, z)
+            return res1, res2, res3, res4, res5
 
         y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
         x = jnp.array(
@@ -432,9 +422,8 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], expected)
         assert jnp.allclose(result[2], expected)
-        assert jnp.allclose(result[3], expected)
-        assert jnp.allclose(result[4], expected[:2])
-        assert jnp.allclose(result[5], expected)
+        assert jnp.allclose(result[3], expected[:2])
+        assert jnp.allclose(result[4], expected)
 
     def test_vmap_pytree_in_axes(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with a PyTree in_axes."""
@@ -458,7 +447,7 @@ class TestVectorizeMap:
                 return circuit(x, y) * y * z
 
             res1 = vmap(workflow2, in_axes=({"arr": 0, "foo": None}, None))(x, y)
-            res2 = vmap(workflow2, in_axes=[{"arr": 0, "foo": None}, None])(x, y)
+            res2 = vmap(workflow2, in_axes=({"arr": 0, "foo": None}, None))(x, y)
             res3 = vmap(workflow3, in_axes=(None, {"arr": 0, "foo": None}))(y, x)
             res4 = vmap(workflow4, in_axes=(None, {"arr": 0, "foo": None}, None))(y, x, z)
             return res1, res2, res3, res4
