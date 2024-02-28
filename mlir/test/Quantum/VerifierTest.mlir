@@ -95,7 +95,7 @@ func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
 // -----
 
 func.func @unitary1(%m : tensor<4x4xcomplex<f64>>) {
-    // expected-error@+1 {{'quantum.unitary' op must have at least 1 qubit}}
+    // expected-error@+1 {{must have at least 1 qubit}}
     %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     return
@@ -113,11 +113,35 @@ func.func @unitary2(%q0 : !quantum.bit, %q1 : !quantum.bit,  %m : tensor<4x4xcom
 // -----
 
 func.func @unitary3(%q0 : !quantum.bit, %q1 : !quantum.bit, %m : tensor<4x4xcomplex<f64>>) {
-    // expected-error@+1 {{'quantum.unitary' op The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)}}
+    // expected-error@+1 {{The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)}}
     quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
 
     quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 { result_segment_sizes = array<i32: 1, 0> } : !quantum.bit, !quantum.bit
 
+    return
+}
+
+// -----
+
+func.func @controlled1(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
+    %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
+    %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
+    // expected-error@+1 {{number of controlling qubits in input (1) and output (0) must be the same}}
+    %out_qubits  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit
+    return
+}
+
+// -----
+
+func.func @controlled2(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
+    %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
+    %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
+    // expected-error@+1 {{number of controlling qubits in input (2) and controlling values (1) must be the same}}
+    %out_qubits  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3, %3) ctrlvals (%true) : !quantum.bit
     return
 }
 

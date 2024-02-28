@@ -109,7 +109,6 @@ def QuantumGate : OpInterface<"QuantumGate"> {
 
         if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size())
             return $_op->emitError() <<
-                "'" << $_op->getName() << "' op " <<
                 "number of controlling qubits in input (" <<
                 gate.getCtrlQubitOperands().size() << ") " <<
                 "and controlling values (" <<
@@ -118,7 +117,6 @@ def QuantumGate : OpInterface<"QuantumGate"> {
 
         if (gate.getCtrlQubitOperands().size() != gate.getCtrlQubitResults().size())
             return $_op->emitError() <<
-                "'" << $_op->getName() << "' op " <<
                 "number of controlling qubits in input (" <<
                 gate.getCtrlQubitOperands().size() << ") " <<
                 "and output (" <<
@@ -127,7 +125,6 @@ def QuantumGate : OpInterface<"QuantumGate"> {
 
         if (gate.getQubitOperands().size() != gate.getQubitResults().size())
             return $_op->emitError() <<
-                "'" << $_op->getName() << "' op " <<
                 "number of qubits in input (" << gate.getQubitOperands().size() << ") " <<
                 "and output (" << gate.getQubitResults().size() << ") must be the same";
 
