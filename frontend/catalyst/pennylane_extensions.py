@@ -2185,7 +2185,6 @@ def vmap(
         - ``Tuple[int | PyTree[int | None] | None]``: Same as previous, but selectively disable
           batching for individual PyTree leaves
 
-
     .. details::
         :title: Selecting output axes for return results
 
