@@ -272,6 +272,33 @@ def CustomOp : Gate_Op<"custom", [DifferentiableGate,
     }];
 }
 
+def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate]> {
+    let summary = "A generic quantum gate on n qubits with m floating point parameters.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<F64>:$params,
+        OptionalAttr<UnitAttr>:$adjoint
+    );
+
+    let assemblyFormat = [{
+        `(` $params `)` attr-dict
+    }];
+
+    code extraClassDeclaration = [{
+        mlir::ValueRange getAllParams() {
+            return getParams();
+        }
+        bool getAdjointFlag() {
+            return getAdjoint().has_value() ? getAdjoint().value() : false;
+        }
+        void setAdjointFlag(bool adjoint) {
+            setAdjoint(adjoint);
+        };
+    }];
+}
+
 def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments ]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
