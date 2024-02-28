@@ -205,14 +205,14 @@ def qfunc(device):
 
 
 Differentiable = Union[Function, QNode]
-DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
+DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
 
     # Unwrap the function from an existing QJIT object.
-    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+    if isinstance(f, catalyst.QJIT):
         f = f.user_function
 
     if isinstance(f, (Function, QNode)):
@@ -1149,6 +1149,16 @@ class QCtrl(HybridOp):
     def work_wires(self):
         """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
+
+    def map_wires(self, wire_map):
+        """Map wires to new wires according to wire_map"""
+        new_ops = []
+        for op in self.regions[0].quantum_tape.operations:
+            new_ops.append(op.map_wires(wire_map))
+        self.regions[0].quantum_tape = QuantumTape(new_ops, [])
+        self._control_wires = [wire_map.get(wire, wire) for wire in self._control_wires]
+        self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
+        return self
 
 
 def qctrl_distribute(

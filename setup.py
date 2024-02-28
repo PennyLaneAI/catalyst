@@ -45,13 +45,14 @@ requirements = [
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
     "scipy",
+    "diastatic-malt>=2.15.1",
 ]
 
 entry_points = {
     "pennylane.plugins": [
         "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
-        "nvidia.statevec = catalyst.cuda:NvidiaCuStateVec",
-        "nvidia.tensornet = catalyst.cuda:NvidiaCuTensorNet",
+        "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
+        "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
@@ -74,6 +75,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
 ]
 
