@@ -377,12 +377,6 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     Catalyst::Runtime::getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
-void __catalyst__qis__GlobalPhase(double phi)
-{
-    Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {},
-                                                             MODIFIERS_ARGS(nullptr));
-}
-
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
@@ -598,6 +592,20 @@ void __catalyst__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2, const Mo
         {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
          reinterpret_cast<QubitIdType>(wire2)},
         /* modifiers */ MODIFIERS_ARGS(modifiers));
+}
+
+void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers, int64_t numQubits, ...)
+{
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {wires},
+                                                             MODIFIERS_ARGS(modifiers));
 }
 
 void __catalyst__qis__MultiRZ(double theta, const Modifiers *modifiers, int64_t numQubits, ...)

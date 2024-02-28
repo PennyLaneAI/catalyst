@@ -611,8 +611,9 @@ TEST_CASE("Test __catalyst__qis__ GlobalPhase", "[CoreQIS]")
                                     (int8_t *)rtd_kwargs.c_str());
 
         QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+        QUBIT **q0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
 
-        __catalyst__qis__GlobalPhase(M_PI / 4);
+        __catalyst__qis__GlobalPhase(M_PI / 4, NO_MODIFIERS, 1, *q0);
 
         MemRefT_CplxT_double_1d result = getState(2);
         __catalyst__qis__State(&result, 0);
