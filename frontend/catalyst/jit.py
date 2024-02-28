@@ -29,7 +29,7 @@ from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
 
 import catalyst
-from catalyst.ag_utils import run_autograph
+from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -205,6 +205,7 @@ class QJIT:
             Tuple[Any]: the dynamic argument signature
         """
 
+        self._verify_static_argnums(args)
         static_argnums = self.compile_options.static_argnums
         abstracted_axes = self.compile_options.abstracted_axes
 
@@ -297,11 +298,10 @@ class QJIT:
         if not hasattr(self.original_function, "__name__"):
             self.__name__ = "unknown"  # allow these cases anyways?
 
-        # TODO: remove bug since this only works with user-provided signatures
-        parameter_types = self.user_sig or ()
+    def _verify_static_argnums(self, args):
         for argnum in self.compile_options.static_argnums:
-            if argnum < 0 or argnum >= len(parameter_types):
-                msg = f"argnum {argnum} is beyond the valid range of [0, {len(parameter_types)})."
+            if argnum < 0 or argnum >= len(args):
+                msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
                 raise CompileError(msg)
 
     def _get_workspace(self):
