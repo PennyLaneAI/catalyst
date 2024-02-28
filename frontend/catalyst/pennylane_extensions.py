@@ -230,7 +230,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.argnum:
+        if arg.dtype.kind != "f" and pos in grad_params.argnum_final:
             raise DifferentiableCompileError(
                 "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
@@ -322,7 +322,12 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
 
 
 def _check_grad_params(
-    method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+    method: str,
+    scalar_out: bool,
+    h: Optional[float],
+    argnum: Optional[Union[int, List[int]]],
+    len_flatten_args,
+    in_tree,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -338,23 +343,29 @@ def _check_grad_params(
     if not (h is None or isinstance(h, numbers.Number)):
         raise ValueError(f"Invalid h value ({h}). None or number was expected.")
     if argnum is None:
-        argnum = [0]
+        argnum_list = [0]
     elif isinstance(argnum, int):
-        argnum = [argnum]
+        argnum_list = [argnum]
     elif isinstance(argnum, tuple):
-        argnum = list(argnum)
+        argnum_list = list(argnum)
     elif isinstance(argnum, list) and all(isinstance(i, int) for i in argnum):
-        pass
+        argnum_list = argnum
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
-    return GradParams(method, scalar_out, h, argnum)
+    # Compute the argnums of the pytree arg
+    total_argnums = list(range(0, len_flatten_args))
+    argnum_unflatten = tree_unflatten(in_tree, total_argnums)
+    argnum_selected = [argnum_unflatten[i] for i in argnum_list]
+    argnum_final, _ = tree_flatten(argnum_selected)
+    return GradParams(method, scalar_out, h, argnum, argnum_list, argnum_final)
 
 
 def _unflatten_derivatives(
-    results, in_tree, out_tree, argnum, argnum_is_int, num_results
+    results, in_tree, out_tree, grad_params, num_results
 ):  # pylint: disable=too-many-arguments
     """Unflatten the flat list of derivatives results given the out tree."""
-    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    argnum_is_int = isinstance(grad_params.argnum, int) or grad_params.argnum is None
+    num_trainable_params = len(grad_params.argnum_final)
     results_final = []
 
     for i in range(0, num_results):
@@ -400,27 +411,25 @@ class Grad:
 
         if EvaluationContext.is_tracing():
             fn = _ensure_differentiable(self.fn)
-            argnum_is_int = (
-                isinstance(self.grad_params.argnum, int) or self.grad_params.argnum is None
-            )
-            grad_params = _check_grad_params(*self.grad_params)
-            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
             args_data, in_tree = tree_flatten(args)
-
-            total_argnums = list(range(0, len(args_data)))
-            argnums_unflatten = tree_unflatten(in_tree, total_argnums)
-            argnums_selected = [argnums_unflatten[i] for i in grad_params.argnum]
-            argnums_correct, _ = tree_flatten(argnums_selected)
-            args_argnum = tuple(args[i] for i in grad_params.argnum)
+            grad_params = _check_grad_params(
+                self.grad_params.method,
+                self.grad_params.scalar_out,
+                self.grad_params.h,
+                self.grad_params.argnum,
+                len(args_data),
+                in_tree,
+            )
+            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+            args_argnum = tuple(args[i] for i in grad_params.argnum_list)
             _, in_tree = tree_flatten(args_argnum)
-            grad_params.argnum = argnums_correct
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
             results = _unflatten_derivatives(
-                results, in_tree, out_tree, grad_params.argnum, argnum_is_int, len(jaxpr.out_avals)
+                results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
             )
         else:
             if argnums := self.grad_params.argnum is None:
@@ -707,11 +716,15 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+        args_flatten, in_tree = tree_flatten(params)
+        tangents_flatten, _ = tree_flatten(tangents)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
-        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        results = jvp_p.bind(
+            *args_flatten, *tangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
 
         midpoint = len(results) // 2
         func_res = results[:midpoint]
@@ -782,20 +795,27 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        args_flatten, in_tree = tree_flatten(params)
+        cotangents_flatten, _ = tree_flatten(cotangents)
+
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
+
+        args_argnum = tuple(params[i] for i in grad_params.argnum_list)
+        _, in_tree = tree_flatten(args_argnum)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         cotangents, _ = tree_flatten(cotangents)
 
-        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        results = vjp_p.bind(
+            *args_flatten, *cotangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
 
         func_res = results[: len(jaxpr.out_avals)]
         vjps = results[len(jaxpr.out_avals) :]
         func_res = tree_unflatten(out_tree, func_res)
-        # We do not change the shape of the VJP as it is the same as the parameters not
-        # as the output
-        # TODO: update when we add support for pytrees params
+        vjps = tree_unflatten(in_tree, vjps)
 
         results = tuple([func_res, tuple(vjps)])
 

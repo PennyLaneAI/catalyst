@@ -17,7 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import astuple, dataclass
 from itertools import chain
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Union
 
 import jax
 import numpy as np
@@ -313,7 +313,9 @@ class GradParams:
     method: str
     scalar_out: bool
     h: float
-    argnum: List[int]
+    argnum: Union[int, List]
+    argnum_list: List[int] = None
+    argnum_final: List[int] = None
 
     def __iter__(self):
         return iter(astuple(self))
@@ -329,7 +331,7 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.argnum]
+    new_argnum = [num + offset for num in grad_params.argnum_final]
     transformed_signature = calculate_grad_shape(signature, new_argnum)
     return tuple(transformed_signature.get_results())
 
@@ -346,7 +348,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         argnum: argument indices which define over which arguments to
             differentiate.
     """
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum_final
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:
@@ -401,7 +403,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum_final
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
@@ -447,7 +449,7 @@ def _vjp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 # pylint: disable=unused-argument
 def _vjp_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
-    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.argnum]
+    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.argnum_final]
 
 
 def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -456,7 +458,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum_final
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
