@@ -43,6 +43,7 @@ from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
 from pennylane.ops import Controlled
+from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -1191,26 +1192,6 @@ class QCtrl(HybridOp):
         return self
 
 
-def _apply_pennylane_ctrl(op, control_wires, control_values, work_wires):
-    """Apply the default ctrl algorithm"""
-    try:
-        # Introduced by https://github.com/PennyLaneAI/pennylane/pull/5247
-        # pylint: disable=import-outside-toplevel
-        from pennylane.ops.op_math.controlled import create_controlled_op as ctrl_fn
-    except ImportError as _:
-        # Older PL versions do not have `create_controlled_op` so we apply `Controlled`
-        # directly. By this we skip some automatic transformations like
-        # `Controlled(PauliX) -> CNOT`
-        ctrl_fn = Controlled
-
-    return ctrl_fn(
-        op,
-        control_wires,
-        control_values=control_values,
-        work_wires=work_wires,
-    )
-
-
 def qctrl_distribute(
     tape: QuantumTape,
     control_wires: List[Any],
@@ -1249,7 +1230,7 @@ def qctrl_distribute(
                 ops2.append(op)
         else:
             ops2.append(
-                _apply_pennylane_ctrl(
+                create_controlled_op(
                     copy.copy(op),
                     control_wires=control_wires,
                     control_values=control_values,
