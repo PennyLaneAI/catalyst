@@ -847,14 +847,12 @@ def trace_quantum_function(
             )
 
             if isinstance(device, qml.devices.Device):
-                device_transform_program, _ = device.preprocess()
+                transform_program, _ = device.preprocess()
             else:
-                device_transform_program = TransformProgram()
+                transform_program = TransformProgram()
 
             if qnode:
-                transform_program = qnode.transform_program + device_transform_program
-            else:
-                transform_program = device_transform_program
+                transform_program = qnode.transform_program + transform_program
 
             tapes, post_processing = apply_transform(
                 transform_program, quantum_tape, return_values_flat
