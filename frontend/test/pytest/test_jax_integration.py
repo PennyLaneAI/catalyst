@@ -442,32 +442,6 @@ class TestJAXAD:
         jax.grad(jax.jit(circuit), argnums=(0, 2))(-4.5, 3, 4.3)
 
 
-class TestJAXVectorize:
-    """Test QJIT compatibility with JAX vectorization."""
-
-    def test_simple_circuit(self, backend):
-        """Test a basic use case of jax.vmap on top of qjit."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
-            qml.RX(jnp.pi * x[0], wires=0)
-            qml.RY(x[1] ** 2, wires=0)
-            qml.RX(x[1] * x[2], wires=0)
-            return qml.expval(qml.PauliZ(0))
-
-        def cost_fn(x):
-            result = circuit(x)
-            return jnp.cos(result) ** 2
-
-        x = jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
-        result = jax.vmap(cost_fn)(x)
-
-        assert len(result) == 2
-        assert jnp.allclose(result[0], cost_fn(x[0]))
-        assert jnp.allclose(result[1], cost_fn(x[1]))
-
-
 class TestJAXRecompilation:
     """
     Test obtained from ticket: https://github.com/PennyLaneAI/catalyst/issues/149

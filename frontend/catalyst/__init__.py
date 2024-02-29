@@ -96,6 +96,7 @@ from catalyst.pennylane_extensions import (
     measure,
     mitigate_with_zne,
     vjp,
+    vmap,
     while_loop,
 )
 from catalyst.utils.exceptions import AutoGraphError, CompileError
@@ -193,6 +194,7 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
+    "vmap",
     "mitigate_with_zne",
     "debug",
     "autograph_source",

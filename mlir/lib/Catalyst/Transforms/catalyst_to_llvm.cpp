@@ -65,7 +65,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     }
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
                                         type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0});
+                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
 }
 
 enum NumericType : int8_t {
@@ -292,7 +292,7 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     MemRefDescriptor desc = MemRefDescriptor(memrefLlvm);
     Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
     Value data = rewriter.create<LLVM::GEPOp>(loc, ptr, memrefType.getElementType(),
-                                              desc.alignedPtr(rewriter, loc), c0);
+                                              desc.alignedPtr(rewriter, loc), c0, true);
     memref = rewriter.create<LLVM::InsertValueOp>(loc, memref, data, 1);
 
     // Dtype

@@ -14,6 +14,8 @@ file(GLOB SRC
     HloCustomCallPatterns.cpp
     DetectQNodes.cpp
     AsyncUtils.cpp
+    GEPInboundsPatterns.cpp
+    GEPInboundsPass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
