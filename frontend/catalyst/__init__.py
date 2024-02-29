@@ -40,9 +40,9 @@ from catalyst._version import __version__
 
 try:
     if INSTALLED:
-        from catalyst._revision import __revision__  # pylint: disable=no-name-in-module
+        # pylint: disable=no-name-in-module
+        from catalyst._revision import __revision__  # pragma: no cover
     else:
-        # pragma: no cover
         from subprocess import check_output
 
         __revision__ = (
