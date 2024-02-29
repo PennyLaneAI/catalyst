@@ -14,6 +14,10 @@
 """Custom Catalyst exceptions."""
 
 
+class AutoGraphError(Exception):
+    """Errors related to Catalyst's AutoGraph module."""
+
+
 class CompileError(Exception):
     """Error encountered in the compilation phase."""
 
