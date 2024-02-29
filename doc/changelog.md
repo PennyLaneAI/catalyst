@@ -137,10 +137,46 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+* Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
+  `catalyst.vmap` offers the vectorization mapping backed by `catalyst.for_loop`.
+  [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
+
+  For example,
+
+  ```py
+  @qjit
+  def workflow(x, y):
+      @qml.qnode(qml.device('lightning.qubit, wires=1'))
+      def circuit(x, y):
+          qml.RX(jnp.pi * x['a'][0], wires=0)
+          qml.RY(x['a'][1] ** 2, wires=0)
+          qml.RX(x['b'][1] * x['b'][2] + y, wires=0)
+          return qml.state(), qml.probs(0)
+
+      return vmap(circuit, in_axes=(1, None), axis_size=5)(x, y)
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst now supports Python 3.12
   [(#532)](https://github.com/PennyLaneAI/catalyst/pull/532)
+
+* The JAX version used by Catalyst has been updated to `v0.4.23`.
+  [(#428)](https://github.com/PennyLaneAI/catalyst/pull/428)
+
+* Catalyst now supports the differentiation of sliced arrays.
+  [(#552)](https://github.com/PennyLaneAI/catalyst/pull/552)
+
+  ```py
+  def f(x):
+    return jax.numpy.sum(x[::2])
+  
+  x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
+  ```
+  ```pycon
+  >>> catalyst.qjit(catalyst.grad(f))(x)
+  [1. 0. 1. 0.]
+  ```
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
@@ -192,6 +228,7 @@
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
   [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
+  [(#549)](https://github.com/PennyLaneAI/catalyst/pull/549)
 
   ```py
   dev = qml.device("lightning.qubit", wires=1)

@@ -21,19 +21,21 @@ while using :func:`~.qjit`.
 import copy
 import numbers
 import pathlib
-from collections.abc import Sized
+from collections.abc import Sequence, Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import (
     PyTreeDef,
-    flatten_one_level,
     tree_flatten,
+    tree_leaves,
+    tree_structure,
     tree_unflatten,
     treedef_is_leaf,
 )
@@ -230,7 +232,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.argnum:
+        if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
             raise DifferentiableCompileError(
                 "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
@@ -321,8 +323,14 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         )
 
 
+# pylint: disable=too-many-arguments
 def _check_grad_params(
-    method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+    method: str,
+    scalar_out: bool,
+    h: Optional[float],
+    argnum: Optional[Union[int, List[int]]],
+    len_flatten_args: int,
+    in_tree: PyTreeDef,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -338,31 +346,40 @@ def _check_grad_params(
     if not (h is None or isinstance(h, numbers.Number)):
         raise ValueError(f"Invalid h value ({h}). None or number was expected.")
     if argnum is None:
-        argnum = [0]
+        argnum_list = [0]
     elif isinstance(argnum, int):
-        argnum = [argnum]
+        argnum_list = [argnum]
     elif isinstance(argnum, tuple):
-        argnum = list(argnum)
+        argnum_list = list(argnum)
     elif isinstance(argnum, list) and all(isinstance(i, int) for i in argnum):
-        pass
+        argnum_list = argnum
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
-    return GradParams(method, scalar_out, h, argnum)
+    # Compute the argnums of the pytree arg
+    total_argnums = list(range(0, len_flatten_args))
+    argnum_unflatten = tree_unflatten(in_tree, total_argnums)
+    argnum_selected = [argnum_unflatten[i] for i in argnum_list]
+    argnum_expanded, _ = tree_flatten(argnum_selected)
+    scalar_argnum = isinstance(argnum, int) or argnum is None
+    return GradParams(method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded)
 
 
-def _unflatten_derivatives(results, out_tree, argnum, num_results):
+def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
-    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    num_trainable_params = len(grad_params.expanded_argnum)
     results_final = []
+
     for i in range(0, num_results):
         intermediate_results = results[
             i * num_trainable_params : i * num_trainable_params + num_trainable_params
         ]
-        if not (isinstance(argnum, int) or argnum is None):
-            intermediate_results = tuple(intermediate_results)
-        else:
+        intermediate_results = tree_unflatten(in_tree, intermediate_results)
+        if grad_params.scalar_argnum:
             intermediate_results = intermediate_results[0]
+        else:
+            intermediate_results = tuple(intermediate_results)
         results_final.append(intermediate_results)
+
     results_final = tree_unflatten(out_tree, results_final)
     return results_final
 
@@ -395,15 +412,25 @@ class Grad:
 
         if EvaluationContext.is_tracing():
             fn = _ensure_differentiable(self.fn)
-            grad_params = _check_grad_params(*self.grad_params)
-            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
-            args_data, _ = tree_flatten(args)
+            args_data, in_tree = tree_flatten(args)
+            grad_params = _check_grad_params(
+                self.grad_params.method,
+                self.grad_params.scalar_out,
+                self.grad_params.h,
+                self.grad_params.argnum,
+                len(args_data),
+                in_tree,
+            )
+            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+            args_argnum = tuple(args[i] for i in grad_params.argnum)
+            _, in_tree = tree_flatten(args_argnum)
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
             results = _unflatten_derivatives(
-                results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
+                results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
             )
         else:
             if argnums := self.grad_params.argnum is None:
@@ -690,11 +717,15 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+        args_flatten, in_tree = tree_flatten(params)
+        tangents_flatten, _ = tree_flatten(tangents)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
-        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        results = jvp_p.bind(
+            *args_flatten, *tangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
 
         midpoint = len(results) // 2
         func_res = results[:midpoint]
@@ -765,36 +796,38 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        args_flatten, in_tree = tree_flatten(params)
+        cotangents_flatten, _ = tree_flatten(cotangents)
+
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
+
+        args_argnum = tuple(params[i] for i in grad_params.argnum)
+        _, in_tree = tree_flatten(args_argnum)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         cotangents, _ = tree_flatten(cotangents)
 
-        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        results = vjp_p.bind(
+            *args_flatten, *cotangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
 
         func_res = results[: len(jaxpr.out_avals)]
         vjps = results[len(jaxpr.out_avals) :]
         func_res = tree_unflatten(out_tree, func_res)
-        # We do not change the shape of the VJP as it is the same as the parameters not
-        # as the output
-        # TODO: update when we add support for pytrees params
+        vjps = tree_unflatten(in_tree, vjps)
 
-        results = tuple([func_res, tuple(vjps)])
+        results = (func_res, vjps)
 
     else:
-        primal_outputs, vjp_fn = jax.vjp(f, *params)
 
-        # JAX requires that the PyTree shape of cotangents matches that of the function results.
-        # Generally, the user is responsible for this, except when the function returns a "bare"
-        # array, since we do force users to provide cotangents as an iterable.
-        # TODO: Add support for PyTrees in the compiled branch, then we can remove this special
-        # handling here by relaxing the input type restriction.
-        if len(cotangents) == 1 and isinstance(primal_outputs, jax.Array):
-            children, _ = flatten_one_level(cotangents)
-            cotangents = children[0]
+        if isinstance(params, jax.numpy.ndarray) and params.ndim == 0:
+            primal_outputs, vjp_fn = jax.vjp(f, params)
+        else:
+            primal_outputs, vjp_fn = jax.vjp(f, *params)
 
-        results = vjp_fn(cotangents)
+        results = (primal_outputs, vjp_fn(cotangents))
 
     return results
 
@@ -811,7 +844,7 @@ class ZNE:
         TypeError: Non-QNode object was passed as `fn`.
     """
 
-    def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
+    def __init__(self, fn: Callable, scale_factors: jnp.ndarray, deg: int):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
@@ -832,7 +865,7 @@ class ZNE:
         args_data, _ = tree_flatten(args)
         results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = jax.numpy.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        results = jnp.polyfit(float_scale_factors, results[0], self.deg)[-1]
         # Single measurement
         if results.shape == ():
             return results
@@ -840,7 +873,7 @@ class ZNE:
         return tuple(res for res in results)
 
 
-def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
+def mitigate_with_zne(f, *, scale_factors: jnp.ndarray, deg: int = None):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -2113,3 +2146,272 @@ def ctrl(
 
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
+
+
+def vmap(
+    fn: Callable,
+    in_axes: Union[int, Sequence[Any]] = 0,
+    out_axes: Union[int, Sequence[Any]] = 0,
+    axis_size: Optional[int] = None,
+) -> Callable:
+    """A :func:`~.qjit` compatible vectorizing map.
+    Creates a function which maps an input function over argument axes.
+
+    Args:
+        f (Callable): A Python function containing PennyLane quantum operations.
+        in_axes (Union[int, Sequence[Any]]): Specifies the value(s) over which input
+            array axes to map.
+        out_axes (Union[int, Sequence[Any]]): Specifies where the mapped axis should appear
+            in the output.
+        axis_size (int): An integer can be optionally provided to indicate the size of the
+            axis to be mapped. If omitted, the size of the mapped axis will be inferred from
+            the provided arguments.
+
+    Returns:
+        Callable: Vectorized version of ``fn``.
+
+    Raises:
+        ValueError: Invalid ``in_axes``, ``out_axes``, and ``axis_size`` values.
+
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        def workflow(x, y, z):
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(x, y):
+                qml.RX(jnp.pi * x[0] + y, wires=0)
+                qml.RY(x[1] ** 2, wires=0)
+                qml.RX(x[1] * x[2], wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            def postcircuit(y, x, z):
+                return circuit(x, y) * z
+
+            res = vmap(postcircuit, in_axes=(0, 0, None))(y, x, z)
+            return res
+
+        y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+    >>> workflow(x, y, 1)
+    [-0.93005586, -0.97165424, -0.6987465]
+
+    .. details::
+        :title: Selecting batching axes for arguments
+
+        The ``in_axes`` parameter provides different modes the allow large- and fine-grained
+        control over which arguments to apply the batching transformation on. Enabling batching for
+        a particular argument requires that the selected axis be of the same size as the determined
+        batch size, which is the same for all arguments.
+
+        The following modes are supported:
+
+        - ``int``: Specifies the same batch axis for all arguments
+        - ``Tuple[int]``: Specify a different batch axis for each argument
+        - ``Tuple[int | None]``: Same as previous, but selectively disable batching for certain
+          arguments with a ``None`` value
+        - ``Tuple[int | PyTree[int] | None]``: Same as previous, but specify a different batch
+          axis for each leaf of an argument (Note that the ``PyTreeDefs``, i.e. the container
+          structure, must match between the ``in_axes`` element and the corresponding argument.)
+        - ``Tuple[int | PyTree[int | None] | None]``: Same as previous, but selectively disable
+          batching for individual PyTree leaves
+
+        The ``out_axes`` parameter can be also used to specify the positions of the mapped axis
+        in the output. ``out_axes`` is subject to the same modes as well.
+    """
+
+    # Dispatch to jax.vmap when it is called outside qjit.
+    if not EvaluationContext.is_tracing():
+        return jax.vmap(fn, in_axes, out_axes)
+
+    if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
+        raise ValueError(
+            "Invalid 'in_axes'; it must be an int or a tuple of PyTrees with integer leaves, "
+            f"but got {in_axes}"
+        )
+
+    if not all(isinstance(l, int) for l in tree_leaves(out_axes)):
+        raise ValueError(
+            "Invalid 'out_axes'; it must be an int or a tuple of PyTree with integer leaves, "
+            f"but got {out_axes}"
+        )
+
+    def batched_fn(*args, **kwargs):
+        """Vectorization wrapper around the hybrid program using catalyst.for_loop"""
+
+        args_flat, args_tree = tree_flatten(args)
+        in_axes_flat, _ = tree_flatten(in_axes, is_leaf=lambda x: x is None)
+
+        # Check the validity of the input arguments w.r.t. in_axes
+        in_axes_deep_struct = tree_structure(in_axes, is_leaf=lambda x: x is None)
+        args_deep_struct = tree_structure(args, is_leaf=lambda x: x is None)
+        if not isinstance(in_axes, int) and in_axes_deep_struct != args_deep_struct:
+            raise ValueError(
+                "Invalid 'in_axes'; it must be an int or match the length of positional "
+                f"arguments, but got {in_axes_deep_struct} axis specifiers "
+                f"and {args_deep_struct} arguments."
+            )
+        if isinstance(in_axes, int):
+            in_axes_flat = [
+                in_axes,
+            ] * len(args_flat)
+
+        batch_size = _get_batch_size(args_flat, in_axes_flat, axis_size)
+        batch_loc = _get_batch_loc(in_axes_flat)
+
+        # Prepare args_flat to run 'fn' one time and get the output-shape
+        fn_args_flat = args_flat.copy()
+        for loc in batch_loc:
+            ax = in_axes_flat[loc]
+            fn_args_flat[loc] = jnp.take(args_flat[loc], 0, axis=ax)
+
+        fn_args = tree_unflatten(args_tree, fn_args_flat)
+
+        # Run 'fn' one time to get output-shape
+        init_result = fn(*fn_args, **kwargs)
+
+        # Check the validity of the output w.r.t. out_axes
+        out_axes_deep_struct = tree_structure(out_axes, is_leaf=lambda x: x is None)
+        init_result_deep_struct = tree_structure(init_result, is_leaf=lambda x: x is None)
+        if not isinstance(out_axes, int) and out_axes_deep_struct != init_result_deep_struct:
+            raise ValueError(
+                "Invalid 'out_axes'; it must be an int or match "
+                "the number of function results, but got "
+                f"{out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
+            )
+
+        init_result_flat, init_result_tree = tree_flatten(init_result)
+
+        num_axes_out = len(init_result_flat)
+
+        if isinstance(out_axes, int):
+            out_axes_flat = [
+                out_axes,
+            ] * num_axes_out
+        else:
+            out_axes_flat, _ = tree_flatten(out_axes, is_leaf=lambda x: x is None)
+
+        out_loc = _get_batch_loc(out_axes_flat)
+
+        # Store batched results of all leaves
+        # in the flatten format with respect to the 'init_result' shape
+        batched_result_list = []
+        for j in range(num_axes_out):
+            out_shape = (
+                (batch_size,)
+                if not init_result_flat[j].shape
+                else (batch_size, *init_result_flat[j].shape)
+            )
+            batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
+            batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
+
+        # Apply mapping batched_args[1:] ---> fn(args)
+        @for_loop(1, batch_size, 1)
+        def loop_fn(i, batched_result_list):
+            fn_args_flat = args_flat
+            for loc in batch_loc:
+                ax = in_axes_flat[loc]
+                fn_args_flat[loc] = jnp.take(args_flat[loc], i, axis=ax)
+
+            fn_args = tree_unflatten(args_tree, fn_args_flat)
+            res = fn(*fn_args, **kwargs)
+
+            res_flat, _ = tree_flatten(res)
+
+            # Update the list of results
+            for j in range(num_axes_out):
+                batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
+
+            return batched_result_list
+
+        batched_result_list = loop_fn(batched_result_list)
+
+        # Support out_axes on dim > 0
+        for loc in out_loc:
+            if ax := out_axes_flat[loc]:
+                up_axes = [*range(batched_result_list[loc].ndim)]
+                up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
+                batched_result_list[loc] = jnp.transpose(batched_result_list[loc], up_axes)
+
+        # Unflatten batched_result before return
+        return tree_unflatten(init_result_tree, batched_result_list)
+
+    return batched_fn
+
+
+def _get_batch_loc(axes_flat):
+    """
+    Get the list of mapping locations in the flattened list of in-axes or out-axes.
+
+    This function takes a flattened list of axes and identifies all elements with a
+    non-None value. The resulting list contains the indices of these non-None values,
+    indicating where the mapping should apply.
+
+    Args:
+        axes_flat (List): Flattened list of in-axes or out-axes including `None` elements.
+
+    Returns:
+        List: A list of indices representing the locations where the mapping should be applied.
+    """
+
+    return [i for i, d in enumerate(axes_flat) if d is not None]
+
+
+def _get_batch_size(args_flat, axes_flat, axis_size):
+    """Get the batch size based on the provided arguments and axes specifiers, or the manually
+       specified batch size by the user request. The batch size must be the same for all arguments.
+
+    Args:
+        args_flat (List): Flatten list of arguments.
+        axes_flat (List): Flatten list of `in_axes` or `our_axes` including `None` elements.
+        axis_size (Optional[int]): Optional default batch size.
+
+    Returns:
+        int: Returns the batch size used as the upper bound of the QJIT-compatible for loop
+            in the computation of vmap.
+
+    Raises:
+        ValueError: The batch size must be the same for all arguments.
+        ValueError: The default batch is expected to be None, or less than or equal
+        to the computed batch size.
+    """
+
+    batch_sizes = []
+    for arg, d in zip(args_flat, axes_flat):
+        shape = np.shape(arg) if arg.shape else (1,)
+        if d is not None and len(shape) > d:
+            batch_sizes.append(shape[d])
+
+    if any(size != batch_sizes[0] for size in batch_sizes[1:]):
+        raise ValueError(
+            "Invalid batch sizes; expected the batch size to be the same for all arguments, "
+            f"but got batch_sizes={batch_sizes} from args_flat={args_flat}"
+        )
+
+    batch_size = batch_sizes[0] if batch_sizes else 0
+
+    if axis_size is not None:
+        if axis_size <= batch_size:
+            batch_size = axis_size
+        else:
+            raise ValueError(
+                "Invalid 'axis_size'; the default batch is expected to be None, "
+                "or less than or equal to the computed batch size, but got "
+                f"axis_size={axis_size} > batch_size={batch_size}"
+            )
+
+    if not batch_size:
+        raise ValueError(
+            f"Invalid batch size; it must be a non-zero integer, but got {batch_size}."
+        )
+
+    return batch_size
