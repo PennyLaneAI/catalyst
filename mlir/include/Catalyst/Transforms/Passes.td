@@ -124,4 +124,10 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
     ];
 }
 
+def GEPInboundsPass : Pass<"gep-inbounds"> {
+    let summary = "Mark GEPOp inbounds.";
+
+    let constructor = "catalyst::GEPInboundsPass()";
+}
+
 #endif // CATALYST_PASSES
