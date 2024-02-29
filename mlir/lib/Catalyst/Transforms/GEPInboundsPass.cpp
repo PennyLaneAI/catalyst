@@ -14,16 +14,14 @@
 
 #define DEBUG_TYPE "gepinbounds"
 
-#include <iostream>
 #include "llvm/Support/Debug.h"
 
-#include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Patterns.h"
-
 
 using namespace llvm;
 using namespace mlir;
@@ -50,9 +48,6 @@ struct GEPInboundsPass : impl::GEPInboundsPassBase<GEPInboundsPass> {
     }
 };
 
-std::unique_ptr<Pass> createGEPInboundsPass()
-{   
-    return std::make_unique<GEPInboundsPass>();
-}
+std::unique_ptr<Pass> createGEPInboundsPass() { return std::make_unique<GEPInboundsPass>(); }
 
 } // namespace catalyst

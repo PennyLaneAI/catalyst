@@ -13,7 +13,6 @@
 // limitations under the License.
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
-#include <iostream>
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/PatternMatch.h"

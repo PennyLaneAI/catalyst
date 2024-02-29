@@ -105,10 +105,10 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *co
                                                    llvm::ArrayRef<LLVM::GEPArg>{0, 0}, true);
     auto numControlledPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
                                                          llvm::ArrayRef<LLVM::GEPArg>{0, 1}, true);
-    auto controlledWiresPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                           llvm::ArrayRef<LLVM::GEPArg>{0, 2}, true);
-    auto controlledValuesPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{0, 3}, true);
+    auto controlledWiresPtr = rewriter.create<LLVM::GEPOp>(
+        loc, ptrType, structType, modifiersPtr, llvm::ArrayRef<LLVM::GEPArg>{0, 2}, true);
+    auto controlledValuesPtr = rewriter.create<LLVM::GEPOp>(
+        loc, ptrType, structType, modifiersPtr, llvm::ArrayRef<LLVM::GEPArg>{0, 3}, true);
 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
