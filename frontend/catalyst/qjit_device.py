@@ -135,7 +135,7 @@ class QJITDevice(qml.QubitDevice):
                 "CRZ",
                 "CRot",
             ]
-            native_controlled_gates = [
+            native_controlled_gates = ["ControlledQubitUnitary"] + [
                 f"C({gate})"
                 for gate in native_gates
                 if gate not in gates_to_be_decomposed_if_controlled

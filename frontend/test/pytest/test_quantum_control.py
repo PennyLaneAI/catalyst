@@ -18,6 +18,7 @@
 
 from typing import Callable
 
+import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
 import pytest
@@ -450,6 +451,34 @@ def test_native_controlled_custom():
     @qml.qnode(dev)
     def native_controlled():
         qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
+        return qml.state()
+
+    compiled = qjit()(native_controlled)
+    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+    result = compiled()
+    expected = native_controlled()
+    assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
+
+
+def test_native_controlled_unitary():
+    """Test native control of a custom operation."""
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qml.qnode(dev)
+    def native_controlled():
+        qml.ctrl(
+            qml.QubitUnitary(
+                jnp.array(
+                    [
+                        [0.70710678 + 0.0j, 0.70710678 + 0.0j],
+                        [0.70710678 + 0.0j, -0.70710678 + 0.0j],
+                    ],
+                    dtype=jnp.complex128,
+                ),
+                wires=[0],
+            ),
+            control=[1, 2, 3],
+        )
         return qml.state()
 
     compiled = qjit()(native_controlled)
