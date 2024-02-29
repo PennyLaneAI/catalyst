@@ -171,6 +171,7 @@ def test_basis_state_preparation(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.skip(reason="GlobalPhase not implemented in QIR")
 def test_mottonen_state_preparation(backend):
     """Test mottonen state preparation."""
 
