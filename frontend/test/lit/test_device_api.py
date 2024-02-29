@@ -45,7 +45,7 @@ class DummyDevice(Device):
 
     def execute(self, circuits, execution_config):
         """Execute"""
-        return super().execute(circuits, execution_config)
+        return 1.0
 
     def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
         """Preprocess"""
@@ -78,7 +78,8 @@ test_circuit()
 
 
 def test_preprocess():
-    """Test a circuit (with preprocessing transforms) compilation to MLIR when using the new device API."""
+    """Test a circuit (with preprocessing transforms) compilation to MLIR when
+    using the new device API."""
 
     # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
