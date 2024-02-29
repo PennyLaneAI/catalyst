@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from jax import numpy as jnp
 
-from catalyst import qjit, grad
+from catalyst import grad, qjit
 
 
 def test_add_multiply():
