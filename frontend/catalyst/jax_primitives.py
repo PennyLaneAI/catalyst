@@ -684,8 +684,11 @@ def _qinsert_lowering(
 #
 @gphase_p.def_abstract_eval
 def _gphase_abstract_eval(*qubits_or_params, qubits_len=None):
-    """This operation returns nothing"""
-    return tuple()
+    """This operation returns qubits in JAX"""
+    qubits = qubits_or_params[:qubits_len]
+    for qubit in qubits:
+        assert isinstance(qubit, AbstractQbit)
+    return (AbstractQbit(),) * len(qubits)
 
 @qinst_p.def_impl
 def _gphase_abstract_eval(*qubits_or_params):
@@ -721,7 +724,8 @@ def _gphase_lowering(
         float_params.append(p)
 
     GlobalPhaseOp(float_params[0])
-    return tuple()
+    qubits = qubits_or_params[:qubits_len]
+    return qubits
 
 #
 # qinst
