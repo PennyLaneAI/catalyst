@@ -46,7 +46,7 @@ class DummyDevice(Device):
 
     def execute(self, circuits, execution_config):
         """Execution."""
-        return 1.0
+        return circuits, execution_config
 
     def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
         """Preprocessing."""
