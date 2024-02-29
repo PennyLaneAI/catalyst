@@ -63,6 +63,52 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     }];
 }
 
+def ValueAndGradOp : Gradient_Op<"value_and_grad", [
+        SameVariadicResultSize,
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
+    let summary = "Compute the value and gradient of a function.";
+    let description = [{
+        The `gradient.value_and_grad` operation computes the value and the gradient of a function
+        using the finite difference method.
+
+        This operation acts much like the `func.call` operation, taking a
+        symbol reference and arguments to the original functionan as input.
+        The function result and the gradient of the function are returned.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%arg0: f64) -> f64 {
+            %res = arith.mulf %arg0, %arg0 : f64
+            func.return %res : f64
+        }
+
+        %0 = arith.constant 2.0 : f64
+        %1 = gradient.value_and_grad @foo(%0) : (f64) -> f64
+        ```
+    }];
+
+    let arguments = (ins
+        StrAttr:$method,
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$operands,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+    );
+    let results = (outs 
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$calleeResults,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$gradients
+    );
+
+    let hasVerifier = 1;
+
+    let assemblyFormat = [{
+        $method $callee `(` $operands `)` attr-dict `:` functional-type(operands, results)
+    }];
+}
+
 def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 

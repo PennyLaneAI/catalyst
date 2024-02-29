@@ -31,11 +31,13 @@ struct FiniteDiffLowering : public OpRewritePattern<GradOp> {
 
     LogicalResult match(GradOp op) const override;
     void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+};
 
-  private:
-    static void computeFiniteDiff(PatternRewriter &rewriter, Location loc, func::FuncOp gradFn,
-                                  func::FuncOp callee, const std::vector<size_t> &diffArgIndices,
-                                  double hValue);
+struct FiniteValueAndGradDiffLowering : public OpRewritePattern<ValueAndGradOp> {
+    using OpRewritePattern<ValueAndGradOp>::OpRewritePattern;
+
+    LogicalResult match(ValueAndGradOp op) const override;
+    void rewrite(ValueAndGradOp op, PatternRewriter &rewriter) const override;
 };
 
 } // namespace gradient

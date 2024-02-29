@@ -101,6 +101,43 @@ LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
     return success();
 }
 
+// Gradient output checker
+LogicalResult verifyValueAndGradOutputs(OpState *op_state, func::FuncOp fn,
+                                        const std::vector<size_t> &diff_arg_indices,
+                                        TypeRange result_types)
+{
+    const std::vector<Type> &expectedTypes = computeValueAndGradTypes(fn, diff_arg_indices);
+
+    // Verify the number of results matches the expected gradient shape.
+    // The grad output should contain one set of results (equal in size to
+    // the number of function results) for each differentiable argument.
+    if (result_types.size() != expectedTypes.size())
+        return op_state->emitOpError(
+                   "incorrect number of results in the value and gradient of the callee, ")
+               << "expected " << expectedTypes.size() << " results "
+               << "but got " << result_types.size();
+
+    // Verify the shape of each result. The numeric type should match the numeric type
+    // of the corresponding function result. The shape is given by grouping the differentiated
+    // argument shape with the corresponding function result shape.
+    TypeRange gradResultTypes = result_types;
+    for (unsigned i = 0; i < expectedTypes.size(); i++) {
+        op_state->emitRemark("Expected: ") << i << " = " << expectedTypes[i] << '\n';
+    }
+
+    for (unsigned i = 0; i < gradResultTypes.size(); i++) {
+        op_state->emitRemark("Obtained: ") << i << " = " << gradResultTypes[i] << '\n';
+    }
+
+    for (unsigned i = 0; i < expectedTypes.size(); i++) {
+        if (gradResultTypes[i] != expectedTypes[i])
+            return op_state->emitOpError("invalid result type: grad result at position ")
+                   << i << " must be " << expectedTypes[i] << " but got " << gradResultTypes[i];
+    }
+
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // GradOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -152,6 +189,73 @@ LogicalResult GradOp::verify()
 }
 
 MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable ValueAndGradOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
+Operation::operand_range ValueAndGradOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    auto callee = ({
+        auto callee = this->getCalleeAttr();
+        func::FuncOp fn =
+            symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << callee;
+        fn;
+    });
+
+    auto diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
+    auto r1 = ::verifyGradInputs(this, callee, this->getArgOperands(), diffArgIndices);
+    if (r1.failed()) {
+        return r1;
+    }
+
+    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
+        return this->emitOpError(
+                   "invalid number of results: must be twice the number of callee results")
+               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
+               << this->getNumResults();
+    }
+
+    // TODO: verify output types
+    /*auto r2 = ::verifyValueAndGradOutputs(
+        this, callee, diffArgIndices, this->getResultTypes());
+
+    if (r2.failed()) {
+        return r2;
+    }*/
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verify()
+{
+    StringRef method = this->getMethod();
+    if (method != "fd" && method != "auto")
+        return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
+MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getOperandsMutable(); }
 
 //===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
