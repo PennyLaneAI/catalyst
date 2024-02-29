@@ -406,6 +406,7 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
         args.insert(args.begin() + 1, modifiersPtr);
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        rewriter.eraseOp(op);
 
         return success();
     }
