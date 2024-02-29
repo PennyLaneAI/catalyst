@@ -247,15 +247,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
     operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
-    def _get_operations_to_convert_to_matrix(_config):
-        # We currently override and only set a few gates to preserve existing behaviour.
-        # We could choose to read from config and use the "matrix" gates.
-        # However, that affects differentiability.
-        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
-        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX", "BlockEncode"}
-
-    @staticmethod
     def _check_mid_circuit_measurement(config):
         return config["compilation"]["mid_circuit_measurement"]
 
@@ -324,4 +315,4 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """
         Raises: RuntimeError
         """
-        raise RuntimeError("QJIT devices cannot execute tapes.")  # pragma: no cover
+        raise RuntimeError("QJIT devices cannot execute tapes.")

@@ -18,14 +18,17 @@ import pathlib
 import pennylane as qml
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig, DefaultExecutionConfig
+from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
+
 from catalyst.compiler import get_lib_path
 from catalyst.qjit_device import QJITDeviceNewAPI
+from catalyst.utils.runtime import extract_backend_info
 
 
 class DummyDevice(Device):
 
-    config = pathlib.Path(__file__).parent.parent.joinpath("/lit/dummy_device.toml")
+    config = pathlib.Path(__file__).parent.parent.joinpath("lit/dummy_device.toml")
 
     def __init__(self, wires, shots=1024, **kwargs):
         super().__init__(wires=wires, shots=shots)
@@ -43,21 +46,35 @@ class DummyDevice(Device):
 
     def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
         transform_program = TransformProgram()
-        transform_program.add_transform(qml.transforms.split_non_commuting)
+        transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
-    
+
 
 def test_initialization():
     device = DummyDevice(wires=10, shots=2032)
 
-    device_qjit = QJITDeviceNewAPI(device)
-    assert device_qjit.config == pathlib.Path(__file__).parent.parent.joinpath("/lit/dummy_device.toml")
+    # Create qjit device
+    dev_args = extract_backend_info(device)
+    config, rest = dev_args[0], dev_args[1:]
+    device_qjit = QJITDeviceNewAPI(device, config, *rest)
+
+    # Check attributes of the new device
+    assert isinstance(device_qjit.config, dict)
     assert device_qjit.shots == qml.measurements.Shots(2032)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
+
+    # Check the preprocess of the new device
     transform_program, _ = device_qjit.preprocess()
     assert transform_program
     assert len(transform_program) == 1
-    print(transform_program[0].transform)
-    assert transform_program[0].name == "split_non_commuting"
+
+    t = transform_program[0].transform.__name__
+    assert t == "split_non_commuting"
+
+    # Check that the device cannot execute tapes
+    with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
+        device_qjit.execute(10, 2)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
