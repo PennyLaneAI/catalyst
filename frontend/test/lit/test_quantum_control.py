@@ -23,6 +23,8 @@ from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
+from catalyst.qjit_device import QJITDevice
+from catalyst.utils.toml import toml_load
 
 
 def get_custom_device(num_wires, discarded_operations=None, added_operations=None):
@@ -36,7 +38,7 @@ def get_custom_device(num_wires, discarded_operations=None, added_operations=Non
     for op in added_operations or []:
         operations_copy.add(op)
 
-    class CustomDevice(qml.QubitDevice):
+    class CustomDevice(QJITDevice):
         """Custom Device"""
 
         name = "Device without some operations"
@@ -55,7 +57,10 @@ def get_custom_device(num_wires, discarded_operations=None, added_operations=Non
             self.backend_name = backend_name if backend_name else "default"
             self.backend_lib = backend_lib if backend_lib else "default"
             self.backend_kwargs = backend_kwargs if backend_kwargs else ""
-            super().__init__(wires=wires, shots=shots)
+
+            with open(lightning.config, "rb") as f:
+                config = toml_load(f)
+            super().__init__(config, wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):  # pylint: disable=missing-function-docstring
             pass
@@ -82,7 +87,7 @@ def test_named_controlled():
         qml.CY(wires=[0, 1])
         # CHECK: quantum.custom "CZ"
         qml.CZ(wires=[0, 1])
-        return measure(wires=0)
+        return qml.state()
 
     print(named_controlled.mlir)
 
@@ -99,10 +104,10 @@ def test_native_controlled_custom():
     # CHECK-LABEL: public @jit_native_controlled
     def native_controlled():
         # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.custom "Rot"
-        # CHECK-SAME: ctrl
+        # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true, %true)
         qml.ctrl(qml.Rot(0.3, 0.4, 0.5, wires=[0]), control=[1, 2])
-        return measure(wires=0)
+        return qml.state()
 
     print(native_controlled.mlir)
 
@@ -112,15 +117,15 @@ test_native_controlled_custom()
 
 def test_native_controlled_unitary():
     """Test native control of the unitary operation."""
-    dev = get_custom_device(4, set(), set())
+    dev = get_custom_device(4, set(), added_operations={"C(QubitUnitary)"})
 
     @qjit(target="mlir")
     @qfunc(device=dev)
-    # COM: CHECK-LABEL: public @jit_native_controlled_unitary
+    # CHECK-LABEL: public @jit_native_controlled_unitary
     def native_controlled_unitary():
-        # COM: CHECK: [[out:%.+]], [[out_ctrl:%.+]]:3 = quantum.unitary
-        # COM: CHECK-SAME: ctrl
-        # COM: CHECK-SAME: ctrlval %true, %true, %true
+        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:3 = quantum.unitary
+        # CHECK-SAME: ctrls
+        # CHECK-SAME: ctrlvals(%true, %true, %true)
         qml.ctrl(
             qml.QubitUnitary(
                 jnp.array(
@@ -134,13 +139,12 @@ def test_native_controlled_unitary():
             ),
             control=[1, 2, 3],
         )
-        return measure(wires=0)
+        return qml.state()
 
     print(native_controlled_unitary.mlir)
 
 
-# TODO: Remove `COM` comments and enable, once the PL fixes the unitary decomposition tracing
-# test_native_controlled_unitary()
+test_native_controlled_unitary()
 
 
 def test_native_controlled_multirz():
@@ -152,10 +156,10 @@ def test_native_controlled_multirz():
     # CHECK-LABEL: public @jit_native_controlled_multirz
     def native_controlled_multirz():
         # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.multirz
-        # CHECK-SAME: ctrl
+        # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true)
         qml.ctrl(qml.MultiRZ(0.6, wires=[0, 2]), control=[1])
-        return measure(wires=0)
+        return qml.state()
 
     print(native_controlled_multirz.mlir)
 
