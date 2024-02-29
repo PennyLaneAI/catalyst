@@ -18,7 +18,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit, cond
+from catalyst import cond, qjit
 
 
 def test_global_phase(backend):
@@ -32,7 +32,7 @@ def test_global_phase(backend):
         return qml.state()
 
     expected = qnn()
-    observed = qjit(qnn())
+    observed = qjit(qnn)()
     assert np.allclose(expected, observed)
 
 
@@ -53,5 +53,5 @@ def test_global_phase_in_region(backend, inp):
         return qml.state()
 
     expected = qnn(inp)
-    observed = qjit(qnn(inp))
+    observed = qjit(qnn)(inp)
     assert np.allclose(expected, observed)
