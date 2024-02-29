@@ -445,10 +445,11 @@ def test_map_wires():
 
 def test_native_controlled_custom():
     """Test native control of a custom operation."""
+    dev = qml.device("lightning.qubit", wires=4)
 
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(dev)
     def native_controlled():
-        qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2])
+        qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
         return qml.state()
 
     compiled = qjit()(native_controlled)
