@@ -544,10 +544,12 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
 
 @transform
 def add_wires_to_global_phase(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    """Transform to add wires to global phase"""
     return _add_wires_to_global_phase(tape)
 
 
 def _add_wires_to_global_phase(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    """Actual implementation. Useful to be able to call without warning."""
     new_ops = []
 
     for op in tape.operations:
@@ -560,7 +562,7 @@ def _add_wires_to_global_phase(tape: QuantumTape) -> (Sequence[QuantumTape], Cal
                 # the GlobalPhase. I think this is good enough.
                 inner_tape = region.quantum_tape
                 # This is needed to avoid an error
-                inner_tapes, inner_res = _add_wires_to_global_phase(inner_tape)
+                inner_tapes, _ = _add_wires_to_global_phase(inner_tape)
                 inner_tape = inner_tapes[0]
                 region.quantum_tape = inner_tape
 
