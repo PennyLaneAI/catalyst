@@ -42,7 +42,6 @@ from jax._src.tree_util import (
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
-from pennylane.ops import Controlled
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
