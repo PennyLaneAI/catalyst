@@ -560,21 +560,21 @@ func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantu
     // CHECK: [[oneA:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[oneB:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[mod:%.+]] = llvm.alloca [[oneA]] x !llvm.struct<(i1, i64, ptr, ptr)>
-    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr [[mod]][0, 2]
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr inbounds [[mod]][0, 2]
     // CHECK: [[pctrl:%.+]] = llvm.alloca [[oneB]] x !llvm.ptr
     // CHECK: llvm.store [[pctrl]], [[ppctrl]]
     // CHECK: __catalyst__qis__Rot(
     // CHECK-SAME:                 [[mod]]
     %out_qubits, %out_ctrl_qubits = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit ctrls !quantum.bit
     // CHECK: [[mod:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
-    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr [[mod]][0, 2]
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr inbounds [[mod]][0, 2]
     // CHECK: [[pctrl:%.+]] = llvm.alloca {{%.+}} x !llvm.ptr : (i64) -> !llvm.ptr
     // CHECK: llvm.store [[pctrl]], [[ppctrl]]
     // CHECK: __catalyst__qis__MultiRZ(
     // CHECK-SAME:                 [[mod]]
     %out_qubits_2:2, %out_ctrl_qubits_3 = quantum.multirz(%cst) %out_qubits, %1 ctrls (%out_ctrl_qubits) ctrlvals (%true) : !quantum.bit, !quantum.bit ctrls !quantum.bit
     // CHECK: [[mod:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
-    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr [[mod]][0, 2]
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr inbounds [[mod]][0, 2]
     // CHECK: [[pctrl:%.+]] = llvm.alloca {{%.+}} x !llvm.ptr : (i64) -> !llvm.ptr
     // CHECK: llvm.store [[pctrl]], [[ppctrl]]
     // CHECK: __catalyst__qis__QubitUnitary(
