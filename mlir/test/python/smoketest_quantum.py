@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ with Context() as ctx:
         %c0 = "arith.constant"() {value = 0 : i64} : () -> i64
         %0 = "quantum.alloc"() {nqubits_attr = 2} : () -> !quantum.reg
         %1 = "quantum.extract"(%0, %c0) : (!quantum.reg, i64) -> !quantum.bit
-        %2 = "quantum.custom"(%1) { gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1> } : (!quantum.bit) -> !quantum.bit
+        %2 = "quantum.custom"(%1) { gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0> } : (!quantum.bit) -> !quantum.bit
         %3, %4 = "quantum.measure"(%1) : (!quantum.bit) -> (i1, !quantum.bit)
         %5 = "quantum.insert"(%0, %c0, %4) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
         "quantum.dealloc"(%5) : (!quantum.reg) -> ()

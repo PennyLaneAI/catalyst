@@ -265,7 +265,7 @@ class AdjointGenerator {
         }
 
         for (const auto &[qubitResult, qubitOperand] :
-             llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
+             llvm::zip(clone.getNonCtrlQubitResults(), gate.getNonCtrlQubitOperands())) {
             remappedValues.map(qubitOperand, qubitResult);
         }
     }

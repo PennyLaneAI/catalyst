@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -189,12 +189,12 @@ func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.
     // CHECK: llvm.store [[nullPtr]], [[ptr1]] : !llvm.ptr, !llvm.ptr
     // CHECK: llvm.store [[nullPtr]], [[ptr2]] : !llvm.ptr, !llvm.ptr
     // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[struct]])
-    %q6 = quantum.custom "RX"(%p) %q5#0 { adjoint, result_segment_sizes = array<i32: 1, 0> } : !quantum.bit
+    %q6 = quantum.custom "RX"(%p) %q5#0 { adjoint } : !quantum.bit
 
     // CHECK: [[z:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK: [[p:%.+]] = llvm.mlir.zero : !llvm.ptr
     // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[p]])
-    %q7 = quantum.custom "RX"(%p)  %q6#0 : !quantum.bit
+    %q7 = quantum.custom "RX"(%p) %q6#0 : !quantum.bit
 
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
@@ -545,3 +545,42 @@ func.func @state(%q : !quantum.bit) {
 
     return
 }
+
+// -----
+
+// CHECK-LABEL: @controlled_circuit
+func.func @controlled_circuit(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) {
+
+    %arg0 = memref.alloc() : memref<2x2xcomplex<f64>>
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
+    %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
+    %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
+
+    // CHECK: [[oneA:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[oneB:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[mod:%.+]] = llvm.alloca [[oneA]] x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr inbounds [[mod]][0, 2]
+    // CHECK: [[pctrl:%.+]] = llvm.alloca [[oneB]] x !llvm.ptr
+    // CHECK: llvm.store [[pctrl]], [[ppctrl]]
+    // CHECK: __catalyst__qis__Rot(
+    // CHECK-SAME:                 [[mod]]
+    %out_qubits, %out_ctrl_qubits = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit ctrls !quantum.bit
+    // CHECK: [[mod:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr inbounds [[mod]][0, 2]
+    // CHECK: [[pctrl:%.+]] = llvm.alloca {{%.+}} x !llvm.ptr : (i64) -> !llvm.ptr
+    // CHECK: llvm.store [[pctrl]], [[ppctrl]]
+    // CHECK: __catalyst__qis__MultiRZ(
+    // CHECK-SAME:                 [[mod]]
+    %out_qubits_2:2, %out_ctrl_qubits_3 = quantum.multirz(%cst) %out_qubits, %1 ctrls (%out_ctrl_qubits) ctrlvals (%true) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+    // CHECK: [[mod:%.+]] = llvm.alloca {{%.+}} x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[ppctrl:%.+]] = llvm.getelementptr inbounds [[mod]][0, 2]
+    // CHECK: [[pctrl:%.+]] = llvm.alloca {{%.+}} x !llvm.ptr : (i64) -> !llvm.ptr
+    // CHECK: llvm.store [[pctrl]], [[ppctrl]]
+    // CHECK: __catalyst__qis__QubitUnitary(
+    // CHECK-SAME:                 [[mod]]
+    %out_qubits_4, %out_ctrl_qubits_5 = quantum.unitary(%arg0 : memref<2x2xcomplex<f64>>) %out_qubits_2#0 ctrls (%out_ctrl_qubits_3) ctrlvals (%true) : !quantum.bit ctrls !quantum.bit
+
+    return
+}
+

@@ -301,7 +301,7 @@ class TestCutCircuitMCTransform:
         expected = cut_circuit_jit(x)
         observed = cut_circuit_qjit(x)
 
-        assert np.allclose(expected, observed)
+        assert_allclose(expected, observed)
 
 
 class TestHamiltonianExpand:

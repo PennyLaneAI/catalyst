@@ -42,7 +42,7 @@ from jax._src.tree_util import (
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
-from pennylane.ops import Controlled
+from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -1229,9 +1229,9 @@ def qctrl_distribute(
                 ops2.append(op)
         else:
             ops2.append(
-                Controlled(
+                create_controlled_op(
                     copy.copy(op),
-                    control_wires=control_wires,
+                    control=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
                 )
