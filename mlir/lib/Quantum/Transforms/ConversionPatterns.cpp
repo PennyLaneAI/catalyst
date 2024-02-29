@@ -343,22 +343,6 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
-        if (0 == op.getGateName().str().compare("GlobalPhase")) {
-            std::string qirName = "__catalyst__qis__" + op.getGateName().str();
-            SmallVector<Type> argTypes;
-            argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
-                            adaptor.getParams().getTypes().end());
-            Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
-            LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-            SmallVector<Value> args;
-            args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-            SmallVector<Value> values;
-            values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-            rewriter.replaceOp(op, values);
-            return success();
-        }
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
         argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
