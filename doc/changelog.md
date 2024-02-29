@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* Catalyst now provides a QJIT compatible [`catalyst.vmap()`](https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.vmap.html)
+* Catalyst now provides a QJIT compatible `catalyst.vmap`
   function, which makes it even easier to modify functions to map over inputs
   with additional batch dimensions.
   [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
@@ -71,8 +71,8 @@
   The following devices are available when compiling with CUDA Quantum:
 
   * `softwareq.qpp`: a modern C++ statevector simulator
-  * `nvidia.statevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
-  * `nvidia.tensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
+  * `nvidia.custatevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
+  * `nvidia.cutensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
   
   For example:
 
@@ -160,12 +160,10 @@
   [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
   [(#507)](https://github.com/PennyLaneAI/catalyst/pull/507)
 
-
   To specify post-selection, simply pass the `postselect` argument to the `catalyst.measure`
   function:
 
-
-  ```py
+  ```python
   dev = qml.device("lightning.qubit", wires=1)
 
   @qjit
@@ -178,7 +176,7 @@
 
   Likewise, to reset a wire after mid-circuit measurement, simply specify `reset=True`:
 
-  ```py
+  ```python
   dev = qml.device("lightning.qubit", wires=1)
 
   @qjit
