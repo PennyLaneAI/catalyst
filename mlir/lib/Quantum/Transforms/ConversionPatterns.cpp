@@ -378,7 +378,7 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
-        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), {}, {});
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(), adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
         std::string qirName = "__catalyst__qis__GlobalPhase";
         Type qirSignature = LLVM::LLVMFunctionType::get(
