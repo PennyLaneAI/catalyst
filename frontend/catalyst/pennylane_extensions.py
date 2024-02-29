@@ -1231,7 +1231,7 @@ def qctrl_distribute(
             ops2.append(
                 create_controlled_op(
                     copy.copy(op),
-                    control_wires=control_wires,
+                    control=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
                 )
