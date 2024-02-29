@@ -18,7 +18,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit, cond
+from catalyst import cond, qjit
 
 
 def test_global_phase(backend):
