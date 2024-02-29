@@ -18,7 +18,7 @@
 import jax.numpy as jnp
 import pennylane as qml
 
-from catalyst import measure, qjit
+from catalyst import qjit
 from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
