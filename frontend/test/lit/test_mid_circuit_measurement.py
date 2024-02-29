@@ -23,7 +23,7 @@ from catalyst import measure, qjit
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(x: float):
     qml.RX(x, wires=0)
-    # CHECK: {{%.+}}, {{%.+}} = quantum.measure {{%[0-9]+}}
+    # CHECK: {{%.+}}, {{%.+}} = quantum.measure {{%.+}}
     m = measure(wires=0)
     return m
 
