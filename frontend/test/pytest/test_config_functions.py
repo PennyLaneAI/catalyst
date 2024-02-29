@@ -33,7 +33,7 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import toml_load
 
 
-class TestDevice(qml.QubitDevice):
+class DeviceTest(qml.QubitDevice):
     """Test device"""
 
     name = "Test Device"
@@ -54,31 +54,31 @@ qjit_compatible = false
         config = toml_load(f)
         f.close()
 
-        name = TestDevice.name
+        name = DeviceTest.name
         with pytest.raises(
             CompileError, match=f"Attempting to compile program for incompatible device {name}."
         ):
-            check_qjit_compatibility(TestDevice, config)
+            check_qjit_compatibility(DeviceTest, config)
 
 
 def test_device_has_config_attr():
     """Test error is raised when device has no config attr."""
-    name = TestDevice.name
+    name = DeviceTest.name
     msg = f"Attempting to compile program for incompatible device {name}."
     with pytest.raises(CompileError, match=msg):
-        check_device_config(TestDevice)
+        check_device_config(DeviceTest)
 
 
 def test_device_with_invalid_config_attr():
     """Test error is raised when device has invalid config attr."""
-    name = TestDevice.name
+    name = DeviceTest.name
     with tempfile.NamedTemporaryFile(mode="w+b") as f:
         f.close()
-        setattr(TestDevice, "config", Path(f.name))
+        setattr(DeviceTest, "config", Path(f.name))
         msg = f"Attempting to compile program for incompatible device {name}."
         with pytest.raises(CompileError, match=msg):
-            check_device_config(TestDevice)
-        delattr(TestDevice, "config")
+            check_device_config(DeviceTest)
+        delattr(DeviceTest, "config")
 
 
 def test_get_native_gates():
@@ -145,3 +145,6 @@ def test_check_full_overlap():
     msg = f"Gates in qml.device.operations and specification file do not match"
     with pytest.raises(CompileError, match=msg):
         check_full_overlap(Device(), ["A", "A", "A"], ["B", "B"])
+
+if __name__ == "__main__":
+    pytest.main([__file__])
