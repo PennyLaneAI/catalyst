@@ -860,7 +860,7 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
-        is_program_transformed = qnode and qnode.transform_program
+        is_program_transformed = transform_program
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up same device and quantum register for all tapes in the program.

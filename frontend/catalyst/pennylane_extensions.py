@@ -162,7 +162,7 @@ class QFunc:
             dev_args = QFunc.extract_backend_info(self.device)
             config, rest = dev_args[0], dev_args[1:]
             if isinstance(self.device, qml.devices.Device):
-                device = QJITDeviceNewAPI(config, self.device.shots, self.device.wires, *rest)
+                device = QJITDeviceNewAPI(self.device, config, *rest)
             else:
                 device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
         else:  # pragma: nocover

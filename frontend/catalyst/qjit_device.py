@@ -291,19 +291,21 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def _set_supported_observables(config):
         """Override the set of supported observables."""
         QJITDeviceNewAPI.observables = config["operators"]["observables"]
-        print(QJITDeviceNewAPI.observables )
-
 
     # pylint: disable=too-many-arguments
     def __init__(
         self,
+        original_device,
         config,
-        shots=None,
-        wires=None,
         backend_name=None,
         backend_lib=None,
         backend_kwargs=None,
     ):
+        self.original_device = original_device
+
+        for key, value in original_device.__dict__.items():
+            self.__setattr__(key, value)
+
         QJITDeviceNewAPI._set_supported_operations(config)
         QJITDeviceNewAPI._set_supported_observables(config)
 
@@ -311,7 +313,13 @@ class QJITDeviceNewAPI(qml.devices.Device):
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
-        super().__init__(wires=wires, shots=shots)
+
+    def preprocess(
+        self,
+        execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
+    ):
+        program, config = self.original_device.preprocess(execution_config)
+        return program, config
 
     def execute(self, circuits, execution_config):
         """

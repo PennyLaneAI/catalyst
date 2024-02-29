@@ -19,8 +19,12 @@
 import pathlib
 import pennylane as qml
 from pennylane.devices import Device
+from pennylane.devices.execution_config import ExecutionConfig, DefaultExecutionConfig
+from pennylane.transforms.core import TransformProgram
 from catalyst.compiler import get_lib_path
 from catalyst import qjit
+
+
 class DummyDevice(Device):
 
     config = pathlib.Path(__file__).parent.joinpath("dummy_device.toml")
@@ -38,19 +42,55 @@ class DummyDevice(Device):
 
     def execute(self, circuits, execution_config):
         return super().execute(circuits, execution_config)
-    
+
+    def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+        transform_program = TransformProgram()
+        transform_program.add_transform(qml.transforms.split_non_commuting)
+        return transform_program, execution_config
+
 
 def test_circuit():
 
+    # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
     @qml.qnode(device=dev)
     def circuit():
+        # CHECK:   quantum.custom "Hadamard"
         qml.Hadamard(wires=0)
+        # CHECK:   quantum.custom "CNOT"
         qml.CNOT(wires=[0, 1])
+        # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
+        # CHECK:   quantum.expval
         return qml.expval(qml.PauliZ(wires=0))
-    
+
     print(circuit.mlir)
 
+
 test_circuit()
+
+
+def test_preprocess():
+
+    # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
+    dev = DummyDevice(wires=2, shots=2048)
+
+    @qjit(target="mlir")
+    @qml.qnode(device=dev)
+    def circuit_split():
+        qml.Hadamard(wires=0)
+        qml.CNOT(wires=[0, 1])
+        # CHECK:   quantum.custom "Hadamard"
+        # CHECK:   quantum.custom "CNOT"
+        # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
+        # CHECK:   quantum.custom "Hadamard"
+        # CHECK:   quantum.custom "CNOT"
+        # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliY]
+        # CHECK:    return [[RETURN:.*]]: tensor<f64>, tensor<f64>
+        return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliY(wires=0))
+
+    print(circuit_split.mlir)
+
+
+test_preprocess()
