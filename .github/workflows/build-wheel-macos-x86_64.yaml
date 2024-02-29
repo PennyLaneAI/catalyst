@@ -361,7 +361,7 @@ jobs:
 
     - name: Install PennyLane-Lightning master
       run: |
-        python${{ matrix.python_version }} pip -m install -i https://test.pypi.org/simple/ PennyLane-Lightning --pre --upgrade
+        python${{ matrix.python_version }} -m pip install -i https://test.pypi.org/simple/ PennyLane-Lightning --pre --upgrade
 
     - name: Install PennyLane Plugins
       run: |
