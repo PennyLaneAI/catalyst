@@ -146,5 +146,6 @@ def test_check_full_overlap():
     with pytest.raises(CompileError, match=msg):
         check_full_overlap(Device(), ["A", "A", "A"], ["B", "B"])
 
+
 if __name__ == "__main__":
     pytest.main([__file__])
