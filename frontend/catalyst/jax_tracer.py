@@ -851,7 +851,9 @@ def trace_quantum_function(
             else:
                 transform_program = TransformProgram()
 
-            if qnode:
+            # We add pragma because lit test are giving qfunc directly
+            # But lit tests are not sending coverage results
+            if qnode: # pragma: no branch
                 transform_program = qnode.transform_program + transform_program
 
             tapes, post_processing = apply_transform(
