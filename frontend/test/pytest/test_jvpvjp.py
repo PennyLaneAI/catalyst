@@ -48,13 +48,18 @@ def test_vjp_outside_qjit_scalar_scalar():
     def f(x):
         return x**2
 
-    x = (4.0,)
-    ct = (1.0,)
-
-    expected = jax.vjp(f, *x)[1](*ct)
+    x = jnp.array(4.0)
+    ct = jnp.array(1.0)
+    res, f_vjp = jax.vjp(f, x)
+    expected = tuple([res, f_vjp(ct)])
     result = C_vjp(f, x, ct)
 
-    assert_allclose(expected, result)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(expected)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(result)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 def test_vjp_outside_qjit_tuple_scalar():
@@ -63,13 +68,19 @@ def test_vjp_outside_qjit_tuple_scalar():
     def f(x, y):
         return x**2 + y**2
 
-    x = (4.0, 4.0)
-    ct = (1.0,)
+    x = (jnp.array(4.0), jnp.array(4.0))
+    ct = jnp.array(1.0)
 
-    expected = jax.vjp(f, *x)[1](*ct)
+    res, f_vjp = jax.vjp(f, *x)
+    expected = tuple([res, f_vjp(ct)])
     result = C_vjp(f, x, ct)
 
-    assert_allclose(expected, result)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(expected)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(result)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 def test_vjp_outside_qjit_tuple_tuple():
@@ -81,10 +92,16 @@ def test_vjp_outside_qjit_tuple_tuple():
     x = (4.0, 4.0)
     ct = (1.0, 1.0)
 
-    expected = jax.vjp(f, *x)[1](ct)
+    res, f_vjp = jax.vjp(f, *x)
+    expected = tuple([res, f_vjp(ct)])
     result = C_vjp(f, x, ct)
 
-    assert_allclose(expected, result)
+    res_jax, tree_jax = jax.tree_util.tree_flatten(expected)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(result)
+    assert tree_jax == tree_cat
+
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
 
 
 def test_jvp_outside_qjit_scalar_scalar():
@@ -289,7 +306,7 @@ def test_jvp_against_jax_full_argnum_case_TT_TT(diff_method):
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_pytrees(diff_method):
+def test_jvp_pytrees_return(diff_method):
     """Test that a JVP with pytrees as return."""
 
     def f(x, y):
@@ -301,6 +318,58 @@ def test_jvp_pytrees(diff_method):
 
     catalyst_res = workflow()
     jax_res = J_jvp(f, [0.1, 0.2], [1.0, 1.0])
+
+    catalyst_res_flatten, tree_cat = jax.tree_util.tree_flatten(catalyst_res)
+    jax_res_flatten, tree_jax = jax.tree_util.tree_flatten(jax_res)
+    assert tree_cat == tree_jax
+    assert_allclose(catalyst_res_flatten, jax_res_flatten)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_pytrees_args(diff_method):
+    """Test that a JVP with pytrees as args."""
+
+    def f(x, y):
+        return x["res1"] + y * x["res2"]
+
+    @qjit
+    def workflow():
+        return C_jvp(
+            f,
+            [{"res1": 0.1, "res2": 0.2}, 0.3],
+            [{"res1": 1.0, "res2": 1.0}, 1.0],
+            method=diff_method,
+            argnum=[0, 1],
+        )
+
+    catalyst_res = workflow()
+    jax_res = J_jvp(f, [{"res1": 0.1, "res2": 0.2}, 0.3], [{"res1": 1.0, "res2": 1.0}, 1.0])
+
+    catalyst_res_flatten, tree_cat = jax.tree_util.tree_flatten(catalyst_res)
+    jax_res_flatten, tree_jax = jax.tree_util.tree_flatten(jax_res)
+    assert tree_cat == tree_jax
+    assert_allclose(catalyst_res_flatten, jax_res_flatten)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_pytrees_args_and_return(diff_method):
+    """Test that a JVP with pytrees as args."""
+
+    def f(x, y):
+        return [x["res1"] + y * x["res2"], {"res": y}, x["res1"]]
+
+    @qjit
+    def workflow():
+        return C_jvp(
+            f,
+            [{"res1": 0.1, "res2": 0.2}, 0.3],
+            [{"res1": 1.0, "res2": 1.0}, 1.0],
+            method=diff_method,
+            argnum=[0, 1],
+        )
+
+    catalyst_res = workflow()
+    jax_res = J_jvp(f, [{"res1": 0.1, "res2": 0.2}, 0.3], [{"res1": 1.0, "res2": 1.0}, 1.0])
 
     catalyst_res_flatten, tree_cat = jax.tree_util.tree_flatten(catalyst_res)
     jax_res_flatten, tree_jax = jax.tree_util.tree_flatten(jax_res)
@@ -658,7 +727,7 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_pytrees(diff_method):
+def test_vjp_pytrees_return(diff_method):
     """Test VJP with pytree return."""
 
     def f(x, y):
@@ -666,13 +735,67 @@ def test_vjp_pytrees(diff_method):
 
     @qjit
     def C_workflowA():
-        ct2 = tree_unflatten(tree_flatten(f(0.1, 0.2))[1], [1.0, 1.0, 1.0])
+        ct2 = [1.0, {"res": 1.0}, 1.0]
         return C_vjp(f, [0.1, 0.2], ct2, method=diff_method, argnum=[0, 1])
 
     @jax.jit
     def J_workflow():
         y, ft = J_vjp(f, *[0.1, 0.2])
-        ct2 = tree_unflatten(tree_flatten(y)[1], [1.0, 1.0, 1.0])
+        ct2 = [1.0, {"res": 1.0}, 1.0]
+        return (y, ft(ct2))
+
+    r1 = C_workflowA()
+    r2 = J_workflow()
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_pytrees_args(diff_method):
+    """Test VJP with pytree args."""
+
+    def f(x, y):
+        return x["res1"] + y * x["res2"], y
+
+    @qjit
+    def C_workflowA():
+        ct2 = [1.0, 1.0]
+        return C_vjp(f, [{"res1": 0.1, "res2": 0.2}, 0.3], ct2, method=diff_method, argnum=[0, 1])
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(f, *[{"res1": 0.1, "res2": 0.2}, 0.3])
+        ct2 = (1.0, 1.0)
+        return (y, ft(ct2))
+
+    r1 = C_workflowA()
+    r2 = J_workflow()
+    res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
+    res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
+    assert tree_jax == tree_cat
+    for r_j, r_c in zip(res_jax, res_cat):
+        assert_allclose(r_j, r_c)
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_VJP_pytrees_args_and_return(diff_method):
+    """Test that a VJP with pytrees as args."""
+
+    def f(x, y):
+        return [x["res1"] + y * x["res2"], {"res": y}, x["res1"]]
+
+    @qjit
+    def C_workflowA():
+        ct2 = [1.0, {"res": 1.0}, 1.0]
+        return C_vjp(f, [{"res1": 0.1, "res2": 0.2}, 0.3], ct2, method=diff_method, argnum=[0, 1])
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(f, *[{"res1": 0.1, "res2": 0.2}, 0.3])
+        ct2 = [1.0, {"res": 1.0}, 1.0]
         return (y, ft(ct2))
 
     r1 = C_workflowA()
