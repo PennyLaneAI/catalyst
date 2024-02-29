@@ -287,6 +287,15 @@ def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate]> {
     }];
 
     code extraClassDeclaration = [{
+
+        mlir::ValueRange getQubitOperands() {
+            return mlir::ValueRange();
+        }
+
+        mlir::ValueRange getQubitResults() {
+            return mlir::ValueRange();
+        }
+
         mlir::ValueRange getAllParams() {
             return getParams();
         }

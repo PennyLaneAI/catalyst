@@ -104,9 +104,6 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     let verify = [{
         auto gate = mlir::cast<ConcreteOp>($_op);
 
-        if (gate.getQubitOperands().size() < 1)
-            return $_op->emitOpError("must have at least 1 qubit");
-
         if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size())
             return $_op->emitError() <<
                 "number of controlling qubits in input (" <<
@@ -132,7 +129,7 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     }];
 }
 
-def ParametrizedGate : OpInterface<"ParametrizedGate", []> {
+def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
     let description = [{
         This interface provides a generic way to interact with parametrized
         quantum instructions. These are quantum operations with differentiable
