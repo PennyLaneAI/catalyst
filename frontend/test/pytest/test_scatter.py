@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from jax import numpy as jnp
 
-from catalyst import qjit
+from catalyst import qjit, grad
 
 
 def test_add_multiply():
@@ -57,6 +57,19 @@ def test_matrix():
 
     res = multiple_index_multiply(jnp.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]]))
     assert np.allclose(res, jnp.array([[0, 1, 2], [9, 12, 15], [18, 21, 24]]))
+
+
+def test_gather_derivative():
+    """Test the derivative of indexing."""
+
+    def f(x):
+        return jax.numpy.sum(x[::2])
+
+    x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
+
+    expected = jax.grad(f)(x)
+    results = qjit(grad(f))(x)
+    assert np.allclose(expected, results)
 
 
 if __name__ == "__main__":
