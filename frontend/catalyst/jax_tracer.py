@@ -445,8 +445,8 @@ def trace_quantum_tape(
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
             )
-            qrp.insert(op.wires, qubits2[:len(qubits))
-            qrp.insert(controlled_wires, qubits2[len(qubits) :)
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)

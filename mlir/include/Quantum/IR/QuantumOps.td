@@ -279,6 +279,7 @@ def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSe
 
     let arguments = (ins
         F64:$params,
+        OptionalAttr<UnitAttr>:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values
     );
@@ -305,8 +306,6 @@ def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSe
 
         std::vector<mlir::Value> getQubitResults() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getOutQubits().begin(),
-                          getOutQubits().end());
             values.insert(values.end(), getOutCtrlQubits().begin(),
                           getOutCtrlQubits().end());
             return values;
@@ -323,13 +322,13 @@ def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSe
             return getInCtrlValues();
         }
         mlir::ValueRange getNonCtrlQubitOperands() {
-            return getInQubits();
+            return mlir::ValueRange();
         }
         mlir::ValueRange getCtrlQubitOperands() {
             return getInCtrlQubits();
         }
         mlir::ValueRange getNonCtrlQubitResults() {
-            return getOutQubits();
+            return mlir::ValueRange();
         }
         mlir::ValueRange getCtrlQubitResults() {
             return getOutCtrlQubits();
