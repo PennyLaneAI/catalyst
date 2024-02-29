@@ -305,11 +305,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
-
-        QJITDeviceNewAPI._set_supported_operations(config)
-        QJITDeviceNewAPI._set_supported_observables(config)
-
         self.config = config
+        QJITDeviceNewAPI._set_supported_operations(self.config)
+        QJITDeviceNewAPI._set_supported_observables(self.config)
+
         self.backend_name = backend_name if backend_name else "default"
         self.backend_lib = backend_lib if backend_lib else ""
         self.backend_kwargs = backend_kwargs if backend_kwargs else {}
