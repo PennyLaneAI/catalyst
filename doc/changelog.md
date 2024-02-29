@@ -117,10 +117,11 @@
   compiling
   ```
 
-* Keep the structure of the function return when taking the derivatives, JVP and VJP (pytrees support).
+* Keep the structure of the function arguments and return when taking the derivatives, JVP and VJP (pytrees support).
   [(#500)](https://github.com/PennyLaneAI/catalyst/pull/500)
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
   [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
+  [(#549)](https://github.com/PennyLaneAI/catalyst/pull/549)
 
   ```py
   dev = qml.device("lightning.qubit", wires=1)
