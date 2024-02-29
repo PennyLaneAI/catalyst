@@ -211,6 +211,9 @@ class QRegPromise:
         for w in wires:
             if w in qrp.cache:
                 qubit = qrp.cache[w]
+                assert (
+                    qubit is not None
+                ), f"Attempting to extract wire {w} from register {qrp.base} for the second time"
                 qubits.append(qubit)
                 if not allow_reuse:
                     qrp.cache[w] = None
