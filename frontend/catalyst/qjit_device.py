@@ -291,6 +291,8 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def _set_supported_observables(config):
         """Override the set of supported observables."""
         QJITDeviceNewAPI.observables = config["operators"]["observables"]
+        print(QJITDeviceNewAPI.observables )
+
 
     # pylint: disable=too-many-arguments
     def __init__(
