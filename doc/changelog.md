@@ -224,7 +224,7 @@
 
 <h3>Breaking changes</h3>
 
-* * The JAX version used by Catalyst has been updated to `v0.4.23`.
+* The JAX version used by Catalyst has been updated to `v0.4.23`.
   [(#428)](https://github.com/PennyLaneAI/catalyst/pull/428)
 
 * The Catalyst Python frontend has been partially refactored. The impact on user-facing
