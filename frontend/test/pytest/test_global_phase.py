@@ -46,12 +46,27 @@ def test_global_phase_in_region(backend, inp):
         qml.RX(np.pi / 4, wires=[0])
 
         @cond(c)
-        def foo():
+        def cir():
             qml.GlobalPhase(np.pi / 4)
 
-        foo()
+        cir()
         return qml.state()
 
     expected = qnn(inp)
     observed = qjit(qnn)(inp)
+    assert np.allclose(expected, observed)
+
+
+def test_global_phase_control(backend):
+    """Test global phase controlled"""
+    dev = qml.device(backend, wires=2)
+
+    @qml.qnode(dev)
+    def qnn():
+        qml.RX(np.pi / 4, wires=[0])
+        qml.ctrl(qml.GlobalPhase(np.pi / 4), control=[0])
+        return qml.state()
+
+    expected = qnn()
+    observed = qjit(qnn)()
     assert np.allclose(expected, observed)
