@@ -452,7 +452,6 @@ def test_native_controlled_custom():
         return qml.state()
 
     compiled = qjit()(native_controlled)
-    print(compiled.mlir)
     assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
     result = compiled()
     expected = native_controlled()
