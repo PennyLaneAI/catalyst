@@ -45,6 +45,7 @@ requirements = [
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
     "scipy",
+    "diastatic-malt>=2.15.1",
 ]
 
 entry_points = {
@@ -74,6 +75,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
 ]
 
