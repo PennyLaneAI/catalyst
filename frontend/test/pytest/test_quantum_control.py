@@ -443,5 +443,21 @@ def test_map_wires():
     assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
 
+def test_native_controlled_custom():
+    """Test native control of a custom operation."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def native_controlled():
+        qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2])
+        return qml.state()
+
+    compiled = qjit()(native_controlled)
+    print(compiled.mlir)
+    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+    result = compiled()
+    expected = native_controlled()
+    assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
