@@ -27,6 +27,7 @@
   
   ```pycon
   >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
+  Array(-0.93005586, dtype=float64)
   ```
   
   We can use `catalyst.vmap` to introduce additional batch dimensions to our input arguments,
