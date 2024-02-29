@@ -29,7 +29,8 @@ struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
     mlir::LogicalResult matchAndRewrite(LLVM::GEPOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        if (op.getInbounds()) {
+        auto defOp = op.getBase().getDefiningOp();
+        if (op.getInbounds() || (defOp && isa<LLVM::ZeroOp>(defOp))) {
             return failure();
         }
         rewriter.startRootUpdate(op);
