@@ -26,6 +26,7 @@ from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
+from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.jax_extras import (
@@ -450,7 +451,12 @@ def trace_quantum_tape(
         return qrp
 
     qrp = QRegPromise(qreg)
-    for op in device.expand_fn(quantum_tape):
+    if isinstance(device, qml.Device):
+        ops = device.expand_fn(quantum_tape)
+    else:
+        ops = quantum_tape
+
+    for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
@@ -574,6 +580,7 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
+    tape: QuantumTape,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurement. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -589,7 +596,11 @@ def trace_quantum_measurements(
         out_tree: modified PyTree-shape of the qnode output.
     """
     # pylint: disable=too-many-branches
-    shots = device.shots
+    if isinstance(device, qml.Device):
+        shots = device.shots
+    else:
+        # TODO: support shot vectors
+        shots = tape.shots.total_shots
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
@@ -683,7 +694,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(qnode, tape, flat_results):
+def apply_transform(transform_program, tape, flat_results):
     """Apply transform."""
 
     # Some transforms use trainability as a basis for transforming.
@@ -691,15 +702,15 @@ def apply_transform(qnode, tape, flat_results):
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_program_transformed = qnode and qnode.transform_program
+    is_program_transformed = transform_program
 
-    if is_program_transformed and qnode.transform_program.is_informative:
+    if is_program_transformed and transform_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
     if is_program_transformed:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        tapes, post_processing = qnode.transform_program([tape])
+        tapes, post_processing = transform_program([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
@@ -835,11 +846,15 @@ def trace_quantum_function(
                 return_values, is_leaf=is_leaf
             )
 
-            # TODO: In order to compose transforms, we would need to recursively
-            # call apply_transform while popping the latest transform applied,
-            # until there are no more transforms to be applied.
-            # But first we should clean this up this method a bit more.
-            tapes, post_processing = apply_transform(qnode, quantum_tape, return_values_flat)
+            if isinstance(device, qml.devices.Device):
+                device_transform_program, _ = device.preprocess()
+            else:
+                device_transform_program = TransformProgram()
+
+            transform_program = qnode.transform_program + device_transform_program
+            tapes, post_processing = apply_transform(
+                transform_program, quantum_tape, return_values_flat
+            )
 
         # (2) - Quantum tracing
         transformed_results = []
@@ -868,7 +883,7 @@ def trace_quantum_function(
                     trees = return_values_tree
 
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
