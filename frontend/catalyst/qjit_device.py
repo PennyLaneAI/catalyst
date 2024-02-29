@@ -308,6 +308,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         self,
         execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
     ):
+        """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
         return program, config
 

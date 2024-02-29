@@ -51,11 +51,11 @@ qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = true
 # If the device supports adjoint
-quantum_adjoint = false
+quantum_adjoint = true
 # If the device supports quantum control instructions natively
-quantum_control = false
+quantum_control = true
 # If the device supports mid circuit measurements natively
-mid_circuit_measurement = false
+mid_circuit_measurement = true
 
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.

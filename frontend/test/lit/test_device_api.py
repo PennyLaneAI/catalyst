@@ -17,19 +17,22 @@
 """Test for the device API.
 """
 import pathlib
+
 import pennylane as qml
 from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig, DefaultExecutionConfig
+from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
-from catalyst.compiler import get_lib_path
+
 from catalyst import qjit
+from catalyst.compiler import get_lib_path
 
 
 class DummyDevice(Device):
+    """A dummy device from the device API."""
 
     config = pathlib.Path(__file__).parent.joinpath("dummy_device.toml")
 
-    def __init__(self, wires, shots=1024, **kwargs):
+    def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
 
     @staticmethod
@@ -41,15 +44,18 @@ class DummyDevice(Device):
         return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     def execute(self, circuits, execution_config):
+        """Execute"""
         return super().execute(circuits, execution_config)
 
     def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+        """Preprocess"""
         transform_program = TransformProgram()
         transform_program.add_transform(qml.transforms.split_non_commuting)
         return transform_program, execution_config
 
 
 def test_circuit():
+    """Test a circuit compilation to MLIR when using the new device API."""
 
     # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
@@ -72,6 +78,7 @@ test_circuit()
 
 
 def test_preprocess():
+    """Test a circuit (with preprocessing transforms) compilation to MLIR when using the new device API."""
 
     # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)

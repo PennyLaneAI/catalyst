@@ -13,24 +13,27 @@
 # limitations under the License.
 """Test for the device API.
 """
-import pytest
 import pathlib
+
 import pennylane as qml
+import pytest
 from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig, DefaultExecutionConfig
+from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
+from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.qjit_device import QJITDeviceNewAPI
 from catalyst.utils.runtime import extract_backend_info
 
 
 class DummyDevice(Device):
+    """A dummy device from the device API."""
 
     config = pathlib.Path(__file__).parent.parent.joinpath("lit/dummy_device.toml")
 
-    def __init__(self, wires, shots=1024, **kwargs):
+    def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
 
     @staticmethod
@@ -42,15 +45,18 @@ class DummyDevice(Device):
         return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     def execute(self, circuits, execution_config):
+        """Execution."""
         return super().execute(circuits, execution_config)
 
     def preprocess(self, execution_config: ExecutionConfig = DefaultExecutionConfig):
+        """Preprocessing."""
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
 
 
-def test_initialization():
+def test_qjit_device():
+    """Test the qjit device from a device using the new api."""
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
@@ -74,6 +80,20 @@ def test_initialization():
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
         device_qjit.execute(10, 2)
+
+
+def test_simple_circuit():
+    """Test that a circuit with the new device API is compiling to MLIR."""
+    dev = DummyDevice(wires=2, shots=2048)
+
+    @qjit(target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.Hadamard(wires=0)
+        qml.CNOT(wires=[0, 1])
+        return qml.expval(qml.PauliZ(wires=0))
+
+    assert circuit.mlir
 
 
 if __name__ == "__main__":
