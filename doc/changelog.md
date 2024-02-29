@@ -2,6 +2,102 @@
 
 <h3>New features</h3>
 
+* Catalyst now provides a QJIT compatible [`catalyst.vmap()`](https://docs.pennylane.ai/projects/catalyst/en/latest/code/api/catalyst.vmap.html)
+  function, which makes it even easier to modify functions to map over inputs
+  with additional batch dimensions.
+  [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
+
+  When working with tensor/array frameworks in Python, it can be important to ensure that code is
+  written to minimize usage of Python for loops (which can be slow and inefficient), and instead
+  push as much of the computation through to the array manipulation library, by taking advantage of
+  extra batch dimensions.
+  
+  For example, consider the following QNode:
+  
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+  
+  @qml.qnode(dev)
+  def circuit(x, y):
+      qml.RX(jnp.pi * x[0] + y, wires=0)
+      qml.RY(x[1] ** 2, wires=0)
+      qml.RX(x[1] * x[2], wires=0)
+      return qml.expval(qml.PauliZ(0))
+  ```
+  
+  ```pycon
+  >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
+  ```
+  
+  We can use `catalyst.vmap` to introduce additional batch dimensions to our input arguments,
+  without needing to use a Python for loop:
+  
+  ```python
+  @qjit
+  def cost(x, y):
+      return vmap(circuit)(x, y)
+  
+  x = jnp.array([[0.1, 0.2, 0.3],
+                 [0.4, 0.5, 0.6],
+                 [0.7, 0.8, 0.9]])
+  
+  y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+  ```
+  
+  ```pycon
+  >>> cost(x, y)
+  array([-0.93005586, -0.97165424, -0.6987465 ])
+  ```
+  
+  `catalyst.vmap()` has been implemented to match the same behaviour of `jax.vmap`, so should be a drop-in
+  replacement in most cases. Under-the-hood, it is automatically inserting Catalyst-compatible for loops,
+  which will be compiled and executed outside of Python for increased performance.
+
+* Catalyst now supports compiling and executing QJIT-compiled QNodes using the
+  CUDA Quantum compiler toolchain.
+  [(#477)](https://github.com/PennyLaneAI/catalyst/pull/477)
+  [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
+  [(#547)](https://github.com/PennyLaneAI/catalyst/pull/547)
+
+  Simply import the CUDA Quantum `@cudaqjit` decorator to use this functionality:
+
+  ```python
+  from catalyst.cuda import cudaqjit
+  ```
+
+  Or, if using Catalyst from PennyLane, simply specify `@qml.qjit(compiler="cuda_quantum")`.
+
+  The following devices are available when compiling with CUDA Quantum:
+
+  * `softwareq.qpp`: a modern C++ statevector simulator
+  * `nvidia.statevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
+  * `nvidia.tensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
+  
+  For example:
+
+  ```python
+  dev = qml.device("softwareq.qpp", wires=2)
+
+  @cudaqjit
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(x[0], wires=0)
+      qml.RY(x[1], wires=1)
+      qml.CNOT(wires=[0, 1])
+      return qml.expval(qml.PauliY(0))
+  ```
+
+  ```pycon
+  >>> circuit(jnp.array([0.5, 1.4]))
+  -0.47244976756708373
+  ```
+
+  Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
+  compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
+  statistics (such as probabilities and variance) are not yet supported.
+
+  For more details, please see the TK.
+
 * Catalyst now supports just-in-time compilation of static (compile-time constant) arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
   [(#550)](https://github.com/PennyLaneAI/catalyst/pull/550)
@@ -58,51 +154,6 @@
   array(7)
   ```
 
-* Catalyst now supports compiling and executing QJIT-compiled QNodes using the
-  CUDA Quantum compiler toolchain.
-  [(#477)](https://github.com/PennyLaneAI/catalyst/pull/477)
-  [(#536)](https://github.com/PennyLaneAI/catalyst/pull/536)
-  [(#547)](https://github.com/PennyLaneAI/catalyst/pull/547)
-
-  Simply import the CUDA Quantum `@cudaqjit` decorator to use this functionality:
-
-  ```python
-  from catalyst.cuda import cudaqjit
-  ```
-
-  Or, if using Catalyst from PennyLane, simply specify `@qml.qjit(compiler="cuda_quantum")`.
-
-  The following devices are available when compiling with CUDA Quantum:
-
-  * `softwareq.qpp`: a modern C++ statevector simulator
-  * `nvidia.statevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
-  * `nvidia.tensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
-  
-  For example:
-
-  ```python
-  dev = qml.device("softwareq.qpp", wires=2)
-
-  @cudaqjit
-  @qml.qnode(dev)
-  def circuit(x):
-      qml.RX(x[0], wires=0)
-      qml.RY(x[1], wires=1)
-      qml.CNOT(wires=[0, 1])
-      return qml.expval(qml.PauliY(0))
-  ```
-
-  ```pycon
-  >>> circuit(jnp.array([0.5, 1.4]))
-  -0.47244976756708373
-  ```
-
-  Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
-  compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
-  statistics (such as probabilities and variance) are not yet supported.
-
-  For more details, please see the TK.
-
 * Mid-circuit measurements now support post-selection and qubit reset when used with
   the Lightning simulators.
   [(#491)](https://github.com/PennyLaneAI/catalyst/pull/491)
@@ -135,25 +186,6 @@
       qml.Hadamard(0)
       m = measure(0, reset=True)
       return qml.expval(qml.PauliZ(0))
-  ```
-
-* Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
-  `catalyst.vmap` offers the vectorization mapping backed by `catalyst.for_loop`.
-  [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
-
-  For example,
-
-  ```py
-  @qjit
-  def workflow(x, y):
-      @qml.qnode(qml.device('lightning.qubit, wires=1'))
-      def circuit(x, y):
-          qml.RX(jnp.pi * x['a'][0], wires=0)
-          qml.RY(x['a'][1] ** 2, wires=0)
-          qml.RX(x['b'][1] * x['b'][2] + y, wires=0)
-          return qml.state(), qml.probs(0)
-
-      return vmap(circuit, in_axes=(1, None), axis_size=5)(x, y)
   ```
 
 <h3>Improvements</h3>
