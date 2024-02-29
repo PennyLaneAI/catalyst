@@ -71,6 +71,7 @@ This release contains contributions from (in alphabetical order):
 * Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
   `catalyst.vmap` offers the vectorization mapping backed by `catalyst.for_loop`.
   [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
+  [(#569)](https://github.com/PennyLaneAI/catalyst/pull/569)
 
   For example,
 
