@@ -57,6 +57,7 @@ from catalyst.jax_primitives import (
     counts_p,
     expval_p,
     func_p,
+    gphase_p,
     hamiltonian_p,
     hermitian_p,
     mlir_fn_cache,
@@ -116,7 +117,7 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
 # is constrained to occur before all subsequent equations in the quantum operations trace.
-FORCED_ORDER_PRIMITIVES = {qdevice_p}
+FORCED_ORDER_PRIMITIVES = {qdevice_p, gphase_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
@@ -431,6 +432,17 @@ def trace_quantum_tape(
             qubits2 = qunitary_p.bind(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        elif isinstance(op, qml.GlobalPhase):
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = gphase_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])

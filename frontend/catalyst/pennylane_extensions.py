@@ -2229,10 +2229,7 @@ def vmap(
         in the output. ``out_axes`` is subject to the same modes as well.
     """
 
-    # Dispatch to jax.vmap when it is called outside qjit.
-    if not EvaluationContext.is_tracing():
-        return jax.vmap(fn, in_axes, out_axes)
-
+    # Check the validity of in_axes and out_axes
     if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
         raise ValueError(
             "Invalid 'in_axes'; it must be an int or a tuple of PyTrees with integer leaves, "
@@ -2247,6 +2244,10 @@ def vmap(
 
     def batched_fn(*args, **kwargs):
         """Vectorization wrapper around the hybrid program using catalyst.for_loop"""
+
+        # Dispatch to jax.vmap when it is called outside qjit.
+        if not EvaluationContext.is_tracing():
+            return jax.vmap(fn, in_axes, out_axes)(*args, **kwargs)
 
         args_flat, args_tree = tree_flatten(args)
         in_axes_flat, _ = tree_flatten(in_axes, is_leaf=lambda x: x is None)

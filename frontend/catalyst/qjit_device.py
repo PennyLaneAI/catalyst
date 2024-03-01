@@ -77,6 +77,7 @@ class QJITDevice(qml.QubitDevice):
         "QubitUnitary",
         "ISWAP",
         "PSWAP",
+        "GlobalPhase",
     }
 
     @staticmethod
@@ -98,11 +99,6 @@ class QJITDevice(qml.QubitDevice):
 
     @staticmethod
     def _check_quantum_control(config):
-        # TODO: Remove this special case when we depend on the version of PL-lightning that includes
-        # the quantum_control = True.
-        # https://github.com/PennyLaneAI/catalyst/pull/559
-        if config["device"]["name"] == "lightning.qubit":
-            return True
         return config["compilation"]["quantum_control"]
 
     @staticmethod
