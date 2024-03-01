@@ -447,6 +447,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Install lightning.kokkos used in Python tests
+      run: |
+        pip install PennyLane-Lightning-Kokkos
+
     - name: Install Deps
       run: |
         sudo apt-get update
@@ -480,10 +484,6 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-
-    - name: Install lightning.kokkos used in Python tests
-      run: |
-        pip install PennyLane-Lightning-Kokkos
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
