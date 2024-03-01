@@ -454,7 +454,7 @@ def test_native_controlled_custom():
         return qml.state()
 
     compiled = qjit()(native_controlled)
-    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+    assert all([sign in compiled.mlir for sign in ["ctrls", "ctrlvals"]])
     result = compiled()
     expected = native_controlled()
     assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
@@ -482,7 +482,7 @@ def test_native_controlled_unitary():
         return qml.state()
 
     compiled = qjit()(native_controlled)
-    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+    assert all([sign in compiled.mlir for sign in ["ctrls", "ctrlvals"]])
     result = compiled()
     expected = native_controlled()
     assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
