@@ -315,9 +315,6 @@
 
   This includes:
 
-  - `compile_from_mlir(ir[, compiler, ...])` to compile a Catalyst function to binary code from the
-    provided MLIR.
-
   - `filter_static_args(args, static_argnums)` to remove static values from arguments using the
     provided index list.
 
@@ -326,9 +323,6 @@
 
   - `print_compilation_stage(fn, stage)` to print one of the recorded compilation stages for a
     JIT-compiled function.
-
-  - `promote_arguments(target_signature, args)` to promote arguments to the provided target
-    signature, preserving PyTrees.
 
   For more details, please see the `catalyst.debug` documentation.
 
@@ -358,8 +352,6 @@
   [(#501)](https://github.com/PennyLaneAI/catalyst/pull/501)
   [(#508)](https://github.com/PennyLaneAI/catalyst/pull/508)
 
-<h3>Internal changes</h3>
-
 * The Catalyst Python frontend has been partially refactored. The impact on user-facing
   functionality is minimal, but the location of certain classes and methods used by the package
   may have changed.
@@ -382,6 +374,8 @@
     and type signatures during the tracing process.
 
   * The `contexts.py` module has been moved from `utils` to the new `tracing` sub-module.
+
+<h3>Internal changes</h3>
 
 * Changes to the runtime QIR API and dependencies, to avoid symbol conflicts
   with other libraries that utilize QIR.
@@ -450,7 +444,8 @@
   * setting async runtime tokens and values to be errors
   * deallocating live tokens and values
 
-* Fix the scatter operation lowering when `updatedWindowsDim` is empty.
+* Fixes a bug when computing gradients with the indexing/slicing,
+  by fixing the scatter operation lowering when `updatedWindowsDim` is empty.
   [(#475)](https://github.com/PennyLaneAI/catalyst/pull/475)
 
 * Fix the issue in `LightningKokkos::AllocateQubits` with allocating too many qubit IDs on
@@ -461,11 +456,6 @@
   when using `catalyst.adjoint` and `catalyst.ctrl`, by adding a `wires` property to
   these operations.
   [(#480)](https://github.com/PennyLaneAI/catalyst/pull/480)
-
-  Currently, `catalyst.adjoint.wires` supports static wires and workflows with nested branches,
-  and `catalyst.ctrl.wires` provides support for workflows with static and variable wires as well as
-  nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
-  control flow operations.
 
 * Fix the issue with multiple lapack symbol definitions in the compiled program by updating
   the `stablehlo.custom_call` conversion pass.
