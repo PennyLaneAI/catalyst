@@ -14,13 +14,14 @@
 """CUDA Integration testing."""
 
 import jax
+import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
 import catalyst
-from catalyst import measure, qjit
+from catalyst import for_loop, measure, qjit
 from catalyst.utils.exceptions import CompileError
 
 # This import is here on purpose. We shouldn't ever import CUDA
@@ -499,6 +500,174 @@ class TestCudaQ:
             return qml.sample()
 
         observed = circuit2(3.14)
+        assert_allclose(expected, observed)
+
+
+@pytest.mark.cuda
+class TestForLoops:
+    """Test for loops."""
+
+    def test_basic_loop(self):
+        """Test simple for loop."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_lightning(n):
+            @for_loop(0, n, 1)
+            def loop_fn(_):
+                qml.PauliX(0)
+
+            loop_fn()
+            return qml.state()
+
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=1))
+        def circuit(n):
+            @for_loop(0, n, 1)
+            def loop_fn(_):
+                qml.PauliX(0)
+
+            loop_fn()
+            return qml.state()
+
+        cuda_compiled = catalyst.cuda.qjit(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(2)
+        observed = cuda_compiled(2)
+        assert_allclose(expected, observed)
+
+    def test_loop_caried_values(self):
+        """Test for loop with updating loop carried values."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_lightning(n):
+            @for_loop(0, n, 1)
+            def loop_fn(_, x):
+                qml.PauliX(0)
+                return x + np.pi / 4
+
+            loop_fn(0.0)
+            return qml.expval(qml.PauliZ(0))
+
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=1))
+        def circuit(n):
+            @for_loop(0, n, 1)
+            def loop_fn(_, x):
+                qml.PauliX(0)
+                return x + np.pi / 4
+
+            loop_fn(0.0)
+            return qml.expval(qml.PauliZ(0))
+
+        cuda_compiled = catalyst.cuda.qjit(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(2)
+        observed = cuda_compiled(2)
+        assert_allclose(expected, observed)
+
+    def test_dynamic_wires(self):
+        """Test for loops with iteration index-dependant wires."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=6))
+        def circuit_lightning(n: int):
+            @for_loop(0, n - 1, 1)
+            def loop_fn(i):
+                qml.CNOT(wires=[i, i + 1])
+
+            loop_fn()
+            return qml.state()
+
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=6))
+        def circuit(n: int):
+            @for_loop(0, n - 1, 1)
+            def loop_fn(i):
+                qml.CNOT(wires=[i, i + 1])
+
+            loop_fn()
+            return qml.state()
+
+        cuda_compiled = catalyst.cuda.qjit(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(4)
+        observed = cuda_compiled(4)
+        assert_allclose(expected, observed)
+
+    def test_closure(self):
+        """Test for loop with captured values (closures)."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_lightning(x):
+            y = 2 * x
+
+            @for_loop(0, 1, 1)
+            def loop_fn(_):
+                qml.RY(y, wires=0)
+
+            loop_fn()
+            return qml.expval(qml.PauliZ(0))
+
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=1))
+        def circuit(x):
+            y = 2 * x
+
+            @for_loop(0, 1, 1)
+            def loop_fn(_):
+                qml.RY(y, wires=0)
+
+            loop_fn()
+            return qml.expval(qml.PauliZ(0))
+
+        cuda_compiled = catalyst.cuda.qjit(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(4)
+        observed = cuda_compiled(4)
+        assert_allclose(expected, observed)
+
+    def test_nested_loops(self):
+        """Test nested for loops."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def circuit_lightning(n):
+            @for_loop(0, n, 1)
+            def qft(i):
+                @for_loop(i + 1, n, 1)
+                def inner(j):
+                    qml.CNOT(wires=[i, j])
+
+                inner()
+
+            qft()
+
+            # Expected output: |100...>
+            return qml.state()
+
+        from catalyst.cuda import SoftwareQQPP
+
+        @qml.qnode(SoftwareQQPP(wires=4))
+        def circuit(n):
+            @for_loop(0, n, 1)
+            def qft(i):
+                @for_loop(i + 1, n, 1)
+                def inner(j):
+                    qml.CNOT(wires=[i, j])
+
+                inner()
+
+            qft()
+
+            # Expected output: |100...>
+            return qml.state()
+
+        cuda_compiled = catalyst.cuda.qjit(circuit)
+        catalyst_compiled = qjit(circuit_lightning)
+        expected = catalyst_compiled(4)
+        observed = cuda_compiled(4)
         assert_allclose(expected, observed)
 
 

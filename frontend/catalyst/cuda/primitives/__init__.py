@@ -477,6 +477,27 @@ def cudaq_spin_abs(target, kind):  # pragma: nocover
     return AbsCudaSpinOperator()
 
 
+cudaq_for_p = jax.core.Primitive("cudaq_for")
+
+
+def cudaq_for(kernel, start, stop, function):
+    """Convenience wrapper around the primitive."""
+    # what exactly does it do
+    return cudaq_for_p.bind(kernel, start, stop, function)
+
+
+@cudaq_for_p.def_impl
+def cudaq_for_impl(kernel, start, stop, function):
+    """Concrete implementation."""
+    return kernel.for_loop(start, stop, function)
+
+
+@cudaq_for_p.def_abstract_eval
+def cudaq_for_abs(start, stop, function):  # pragma: nocover
+    """Abstract for loop."""
+    return AbsCudaValue()
+
+
 cudaq_observe_p = jax.core.Primitive("observe")
 
 

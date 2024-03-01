@@ -83,6 +83,7 @@ from .primitives import (
     cudaq_adjoint,
     cudaq_counts,
     cudaq_expectation,
+    cudaq_for,
     cudaq_getstate,
     cudaq_make_kernel,
     cudaq_observe,
@@ -701,6 +702,36 @@ def change_adjoint(ctx, eqn):
     _map(ctx.write, eqn.outvars, [register])
 
 
+def change_for(ctx, eqn):
+    """Change Catalyst for loop to an equivalent expression in CUDA."""
+    assert eqn.primitive == for_p
+    invals = _map(ctx.read, eqn.invars)
+    start = invals[0]
+    end = invals[1]
+    step = invals[2]
+    assert step == 1, "Only step=1 is supported for now."
+    loop_body = eqn.params["body_jaxpr"].jaxpr
+
+    class LoopContext:
+        """This class is used to capture the loop body and the context."""
+
+        def __init__(self, ctx, loop_body):
+            """Capture the context and the loop body."""
+            self.ctx = ctx
+            self.loop_body = loop_body
+            self.outvars = None
+
+        def interp_iter(self, iteration):  # pylint: disable=unused-argument
+            """Called by cudaq.for_loop, interpret the loop body."""
+            res = interpret_impl(self.ctx, self.loop_body)
+            self.outvars = res
+
+    _map(ctx.write, loop_body.invars, invals[3:])
+    body_ctx = LoopContext(ctx, loop_body)
+    cudaq_for(ctx.kernel, start, end, body_ctx.interp_iter)
+    _map(ctx.write, eqn.outvars, body_ctx.outvars)
+
+
 def ignore_impl(_ctx, _eqn):
     """No-op"""
 
@@ -737,6 +768,7 @@ INST_IMPL = {
     namedobs_p: change_namedobs,
     hamiltonian_p: change_hamiltonian,
     adjoint_p: change_adjoint,
+    for_p: change_for,
     # ignore set of instructions we don't care about.
     # because they have been handled before or they are just
     # not necessary in the CUDA-quantum API.
@@ -752,7 +784,6 @@ INST_IMPL = {
     probs_p: unimplemented_impl,
     cond_p: unimplemented_impl,
     while_p: unimplemented_impl,
-    for_p: unimplemented_impl,
     grad_p: unimplemented_impl,
     func_p: unimplemented_impl,
     jvp_p: unimplemented_impl,
