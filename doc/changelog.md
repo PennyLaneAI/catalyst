@@ -33,20 +33,12 @@
   We can use `catalyst.vmap` to introduce additional batch dimensions to our input arguments,
   without needing to use a Python for loop:
   
-  ```python
-  @qjit
-  def cost(x, y):
-      return vmap(circuit)(x, y)
-  
-  x = jnp.array([[0.1, 0.2, 0.3],
-                 [0.4, 0.5, 0.6],
-                 [0.7, 0.8, 0.9]])
-  
-  y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
-  ```
-  
   ```pycon
-  >>> cost(x, y)
+  >>> x = jnp.array([[0.1, 0.2, 0.3],
+  ...                [0.4, 0.5, 0.6],
+  ...                [0.7, 0.8, 0.9]])
+  >>> y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+  >>> qjit(vmap(cost))(x, y)
   array([-0.93005586, -0.97165424, -0.6987465 ])
   ```
   
