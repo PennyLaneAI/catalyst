@@ -655,7 +655,6 @@ void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, const Modifi
                                    int64_t numQubits, /*qubits*/...)
 {
     RT_ASSERT(numQubits >= 0);
-    RT_ASSERT(modifiers == nullptr || modifiers->num_controlled == 0);
 
     if (matrix == nullptr) {
         RT_FAIL("The QubitUnitary matrix must be initialized");

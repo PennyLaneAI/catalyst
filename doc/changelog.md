@@ -1,4 +1,18 @@
-# Release 0.5.0-dev
+# Release 0.6.0-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.5.0
 
 <h3>New features</h3>
 
@@ -74,6 +88,20 @@
   ```
 
 <h3>Improvements</h3>
+
+* Catalyst now supports the differentiation of sliced arrays.
+  [(#552)](https://github.com/PennyLaneAI/catalyst/pull/552)
+
+  ```py
+  def f(x):
+    return jax.numpy.sum(x[::2])
+  
+  x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
+  ```
+  ```pycon
+  >>> catalyst.qjit(catalyst.grad(f))(x)
+  [1. 0. 1. 0.]
+  ```
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
@@ -209,6 +237,9 @@
   ```
 
 <h3>Breaking changes</h3>
+
+* The JAX version used by Catalyst has been updated to `v0.4.23`.
+  [(#428)](https://github.com/PennyLaneAI/catalyst/pull/428)
 
 * The Catalyst Python frontend has been partially refactored. The impact on user-facing
   functionality is minimal, but the location of certain classes and methods used by the package

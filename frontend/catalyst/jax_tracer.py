@@ -24,6 +24,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -222,7 +223,7 @@ class QRegPromise:
     def insert(self, wires, qubits) -> None:
         """Insert qubits to the cache."""
         qrp = self
-        assert len(wires) == len(qubits)
+        assert len(wires) == len(qubits), f"len(wires)({len(wires)}) != len(qubits)({len(qubits)})"
         for w, qubit in zip(wires, qubits):
             assert (w not in qrp.cache) or (
                 qrp.cache[w] is None
@@ -234,7 +235,8 @@ class QRegPromise:
         qrp = self
         qreg = qrp.base
         for w, qubit in qrp.cache.items():
-            qreg = qinsert_p.bind(qreg, w, qubit)
+            if qubit is not None:
+                qreg = qinsert_p.bind(qreg, w, qubit)
         qrp.cache = {}
         qrp.base = qreg
         return qreg
@@ -418,6 +420,35 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
+    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+        # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
+        # `Controlled(OP)` bind OP with native quantum control syntax.
+        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
+            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        elif isinstance(op, QubitUnitary):
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = qunitary_p.bind(
+                *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
+                qubits_len=len(qubits),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        else:
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = qinst_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                op=op.name,
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        return qrp
+
     qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
         qrp2 = None
@@ -427,15 +458,7 @@ def trace_quantum_tape(
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
             else:
-                qubits = qrp.extract(op.wires)
-                if isinstance(op, QubitUnitary):
-                    qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
-                else:
-                    qubits2 = qinst_p.bind(
-                        *qubits, *op.parameters, op=op.name, qubits_len=len(qubits)
-                    )
-                qrp.insert(op.wires, qubits2)
-                qrp2 = qrp
+                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
