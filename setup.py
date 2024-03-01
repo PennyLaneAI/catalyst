@@ -50,13 +50,25 @@ with open(path.join("frontend", "catalyst", "_revision.py"), "w", encoding="utf-
 
 with open(".dep-versions") as f:
     lines = f.readlines()
-    jax_version = [line[4:].strip() for line in lines if "jax=" in line][0]
-    pl_str = "pennylane="
-    pl_str_length = len(pl_str)
-    pl_version = [line[pl_str_length:].strip() for line in lines if pl_str in line][0]
+    jax_version = next(line[4:].strip() for line in lines if "jax=" in line)
+    pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
+    lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
+
+pl_min_release = 0.35
+lq_min_release = pl_min_release
+
+if pl_version is not None:
+    pennylane_dep = f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}"
+else:
+    pennylane_dep = f"pennylane>={pl_min_release}"
+if lq_version is not None:
+    lightning_dep = f"pennylane-lightning=={lq_version}"  # use TestPyPI wheels to avoid rebuild
+else:
+    lightning_dep = f"pennylane-lightning>={lq_min_release}"
 
 requirements = [
-    f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}",
+    pennylane_dep,
+    lightning_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",

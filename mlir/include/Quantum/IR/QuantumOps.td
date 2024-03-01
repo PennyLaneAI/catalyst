@@ -272,6 +272,73 @@ def CustomOp : Gate_Op<"custom", [DifferentiableGate,
     }];
 }
 
+def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+    let summary = "Global Phase.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        F64:$params,
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    code extraBaseClassDeclaration = [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInCtrlQubits().begin(),
+                          getInCtrlQubits().end());
+            return values;
+        }
+
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutCtrlQubits().begin(),
+                          getOutCtrlQubits().end());
+            return values;
+        }
+
+        bool getAdjointFlag() {
+            return getAdjoint().has_value() ? getAdjoint().value() : false;
+        }
+        void setAdjointFlag(bool adjoint) {
+            setAdjoint(adjoint);
+        };
+
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return mlir::ValueRange();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getNonCtrlQubitResults() {
+            return mlir::ValueRange();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+
+}
+
 def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments ]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
