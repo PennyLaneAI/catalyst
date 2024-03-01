@@ -639,7 +639,7 @@ def qjit(
         function ``f`` be re-compiled because ``my_obj_1`` is changed. This requires that
         the mutation is properly reflected in the hash value.
 
-        Note that when ``static_argnums`` is used in conjunction with type hinting,
+        Note that even when ``static_argnums`` is used in conjunction with type hinting,
         ahead-of-time compilation will not be possible since the static argument values
         are not yet available. Instead, compilation will be just-in-time.
 

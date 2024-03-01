@@ -321,8 +321,8 @@ The ``@qjit`` decorator argument ``static_argnums`` allows positional arguments
 to be specified which should be treated as compile-time static arguments.
 
 This allows any hashable Python object to be passed to the function during compilation;
-the function will only be re-compiled if the value of the static arguments change. Otherwise,
-re-using previous static argument values will result in no re-compilation:
+the function will only be re-compiled if the hash value of the static arguments change.
+Otherwise, re-using previous static argument values will result in no re-compilation:
 
 >>> @qjit(static_argnums=(1,))
 ... def f(x, y):

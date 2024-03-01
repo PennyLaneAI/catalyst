@@ -89,6 +89,7 @@
   Note that CUDA Quantum compilation currently does not have feature parity with Catalyst
   compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
   statistics (such as probabilities and variance) are not yet supported.
+  Classical code support is also limited.
 
 * Catalyst now supports just-in-time compilation of static (compile-time constant) arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
@@ -98,8 +99,8 @@
   arguments of the decorated function should be treated as compile-time static arguments.
 
   This allows any hashable Python object to be passed to the function during compilation;
-  the function will only be re-compiled if the value of the static arguments change. Otherwise,
-  re-using previous static argument values will result in no re-compilation.
+  the function will only be re-compiled if the hash value of the static arguments change.
+  Otherwise, re-using previous static argument values will result in no re-compilation.
 
   ```python
   @qjit(static_argnums=(1,))
@@ -436,9 +437,9 @@
   [(#526)](https://github.com/PennyLaneAI/catalyst/pull/526)
 
   This is fixed by replacing the code which updates the `JAX_DYNAMIC_SHAPES` option with a
-  `transient_jax_config()`` context manager which temporarily sets the value of
+  `transient_jax_config()` context manager which temporarily sets the value of
   `JAX_DYNAMIC_SHAPES` to True and then restores the original configuration value following the
-  yield. The context manager is used by `trace_to_mlir()``.
+  yield. The context manager is used by `trace_to_jaxpr()` and `lower_jaxpr_to_mlir()`.
 
 * Exceptions encountered in the runtime when using the `@qjit` option `async_qnodes=Tue`
   will now be properly propagated to the frontend.
