@@ -342,7 +342,7 @@
   [(#469)](https://github.com/PennyLaneAI/catalyst/pull/469)
 
 * Update `AllocateQubit` and `AllocateQubits` in `LightningKokkosSimulator` to preserve
-  the current state-vector before qubit re-allocations.
+  the current state-vector before qubit re-allocations in the runtime dynamic qubits management.
   [(#479)](https://github.com/PennyLaneAI/catalyst/pull/479)
 
 * The [PennyLane custom compiler entry point name convention has changed](https://github.com/PennyLaneAI/pennylane/pull/5140), necessitating
