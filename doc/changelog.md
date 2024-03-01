@@ -315,8 +315,10 @@
 
   For more details, please see the `catalyst.debug` documentation.
 
-* Remove copies of TOML device configuration files for Lightning device in Catalyst.
+* Remove redundant copies of TOML files for `lightning.kokkos` and `lightning.qubit`.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
+  
+  `lightning.kokkos` and `lightning.qubit` now ship with their own TOML file. As such, we use the TOML file provided by them.
 
 * Capturing quantum circuits with many gates prior to compilation is now quadratically faster (up to
   a factor), by removing `qextract_p` and `qinst_p` from forced-order primitives.
