@@ -216,8 +216,8 @@
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
   [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
 
-* The `@qjit` decorator will now remember previously compiled functions when the PyTree metadata
-  of arguments changes, in addition to already rememebering compiled functions when static
+* The `@qjit` decorator will remember previously compiled functions when the PyTree metadata
+  of arguments changes, in addition to also remembering compiled functions when static
   arguments change.
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
 
