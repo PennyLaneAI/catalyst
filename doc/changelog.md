@@ -1,4 +1,4 @@
-# Release 0.5.0-dev
+# Release 0.5.0
 
 <h3>New features</h3>
 
@@ -6,6 +6,7 @@
   function, which makes it even easier to modify functions to map over inputs
   with additional batch dimensions.
   [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
+  [(#569)](https://github.com/PennyLaneAI/catalyst/pull/569)
 
   When working with tensor/array frameworks in Python, it can be important to ensure that code is
   written to minimize usage of Python for loops (which can be slow and inefficient), and instead
@@ -200,6 +201,8 @@
   >>> catalyst.qjit(catalyst.grad(f))(x)
   [1. 0. 1. 0.]
   ```
+* Add support for `GlobalPhase` gate in the runtime.
+  [(#563)](https://github.com/PennyLaneAI/catalyst/pull/563)
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
