@@ -25,10 +25,6 @@ import pytest
 from catalyst._configuration import INSTALLED
 
 
-
-
-
-
 def test_jaxlib_mismatch(monkeypatch):
     """Test import warning if jaxlib package version doesn't match expected."""
     import jaxlib
