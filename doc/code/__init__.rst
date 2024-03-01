@@ -19,3 +19,11 @@ Module: catalyst.debug
     :no-heading:
     :no-inheritance-diagram:
     :fullname:
+
+Module: catalyst.cuda
+---------------------
+
+.. automodapi:: catalyst.cuda
+    :no-heading:
+    :no-inheritance-diagram:
+    :fullname:
