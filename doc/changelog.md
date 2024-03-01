@@ -187,19 +187,6 @@
 * The JAX version used by Catalyst has been updated to `v0.4.23`.
   [(#428)](https://github.com/PennyLaneAI/catalyst/pull/428)
 
-* Catalyst now supports the differentiation of sliced arrays.
-  [(#552)](https://github.com/PennyLaneAI/catalyst/pull/552)
-
-  ```py
-  def f(x):
-    return jax.numpy.sum(x[::2])
-  
-  x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
-  ```
-  ```pycon
-  >>> catalyst.qjit(catalyst.grad(f))(x)
-  [1. 0. 1. 0.]
-  ```
 * Catalyst now supports the `qml.GlobalPhase` operation.
   [(#563)](https://github.com/PennyLaneAI/catalyst/pull/563)
 
@@ -416,6 +403,20 @@
   [(#496)](https://github.com/PennyLaneAI/catalyst/pull/496)
 
 <h3>Bug fixes</h3>
+
+* Fixed a bug where differentiation of sliced arrays would result in an error.
+  [(#552)](https://github.com/PennyLaneAI/catalyst/pull/552)
+
+  ```py
+  def f(x):
+    return jax.numpy.sum(x[::2])
+  
+  x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
+  ```
+  ```pycon
+  >>> catalyst.qjit(catalyst.grad(f))(x)
+  [1. 0. 1. 0.]
+  ```
 
 * Fixed a bug where quantum control applied to a subcircuit was not correctly mapping wires,
   and the wires in the nested region remained unchanged.
