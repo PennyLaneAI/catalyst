@@ -90,8 +90,6 @@
   compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
   statistics (such as probabilities and variance) are not yet supported.
 
-  For more details, please see the TK.
-
 * Catalyst now supports just-in-time compilation of static (compile-time constant) arguments.
   [(#476)](https://github.com/PennyLaneAI/catalyst/pull/476)
   [(#550)](https://github.com/PennyLaneAI/catalyst/pull/550)
@@ -201,14 +199,36 @@
   >>> catalyst.qjit(catalyst.grad(f))(x)
   [1. 0. 1. 0.]
   ```
-* Add support for `GlobalPhase` gate in the runtime.
+* Catalyst now supports the `qml.GlobalPhase` operation.
   [(#563)](https://github.com/PennyLaneAI/catalyst/pull/563)
+
+* Native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices has been added.
+  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
+
+  Specifically, a circuit like
+
+  ```py
+  dev = qml.device("braket.local.qubit", wires=2, shots=100)
+
+  @qjit
+  @qml.qnode(dev)
+  def f(x: float):
+      qml.Hadamard(0)
+      qml.PSWAP(x, wires=[0, 1])
+      qml.ISWAP(wires=[1, 0])
+      return qml.probs()
+  ```
+
+  would no longer decompose the `PSWAP` and `ISWAP` gates.
+
+* The `qml.BlockEncode` operator is now supported with Catalyst.
+  [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.
   [(#401)](https://github.com/PennyLaneAI/catalyst/pull/401)
 
-* The ``@qjit`` decorator will now remember previously compiled functions when the PyTree metadata
+* The `@qjit` decorator will now remember previously compiled functions when the PyTree metadata
   of arguments changes, in addition to already rememebering compiled functions when static
   arguments change.
   [(#522)](https://github.com/PennyLaneAI/catalyst/pull/531)
@@ -273,27 +293,21 @@
   [{'expval0': (array(-0.0978434), array(-0.19767681))}, (array(-0.0978434), array(-0.19767681))]
   ```
 
-* Native support for `qml.PSWAP` and `qml.ISWAP` gates on Amazon Braket devices has been added.
-  [(#458)](https://github.com/PennyLaneAI/catalyst/pull/458)
+* Support has been added for linear algebra functions which depend on computing the eigenvalues
+  of symmetric matrices, such as `np.sqrt_matrix()`.
+  [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
 
-  Specifically, a circuit like
+  For example, you can compile `qml.math.sqrt_matrix`:
 
-  ```py
-  dev = qml.device("braket.local.qubit", wires=2, shots=100)
-
-  @qjit
-  @qml.qnode(dev)
-  def f(x: float):
-      qml.Hadamard(0)
-      qml.PSWAP(x, wires=[0, 1])
-      qml.ISWAP(wires=[1, 0])
-      return qml.probs()
+  ```python
+  @qml.qjit
+  def workflow(A):
+      B = qml.math.sqrt_matrix(A)
+      return B @ A
   ```
 
-  would no longer decompose the `PSWAP` and `ISWAP` gates.
-
-* The `qml.BlockEncode` operator is now supported with Catalyst.
-  [(#483)](https://github.com/PennyLaneAI/catalyst/pull/483)
+  Internally, this involves support for lowering the eigenvectors/values computation lapack method
+  `lapack_dsyevd` via `stablehlo.custom_call`.
 
 * Additional debugging functions are now available in the `catalyst.debug` directory.
   [(#529)](https://github.com/PennyLaneAI/catalyst/pull/529)
@@ -369,12 +383,6 @@
 
   * The `contexts.py` module has been moved from `utils` to the new `tracing` sub-module.
 
-* `QCtrl` is overriden and never used.
-  [(#522)](https://github.com/PennyLaneAI/catalyst/pull/522)
-
-  This is not so much a breaking change, it was just never used in the past.
-  This will be set back to its original behaviour once it is implemented in the frontend.
-
 * Changes to the runtime QIR API and dependencies, to avoid symbol conflicts
   with other libraries that utilize QIR.
   [(#464)](https://github.com/PennyLaneAI/catalyst/pull/464)
@@ -407,13 +415,16 @@
     * `QirString *__catalyst__rt__qubit_to_string(QUBIT *)`
     * `QirString *__catalyst__rt__result_to_string(RESULT *)`
 
+* Fix an issue when no qubit number was specified for the `qinst` primitive. The primitive now
+  correctly deduces the number of qubits when no gate parameters are present. This change is not
+  user facing.
+  [(#496)](https://github.com/PennyLaneAI/catalyst/pull/496)
+
 <h3>Bug fixes</h3>
 
-* `QCtrl` now implements `map_wires`.
+* Fixed a bug where quantum control applied to a subcircuit was not correctly mapping wires,
+  and the wires in the nested region remained unchanged.
   [(#555)](https://github.com/PennyLaneAI/catalyst/pull/555)
-
-  Applying `map_wires` to `QCtrl` lead to an incorrect circuit.
-  The wires in the nested regions remained unchanged.
 
 * Catalyst will no longer print a warning that recompilation is triggered when a `@qjit` decorated
   function with no arguments is invoke without having been compiled first, for example via the use
@@ -439,11 +450,6 @@
   * setting async runtime tokens and values to be errors
   * deallocating live tokens and values
 
-* Fix an issue when no qubit number was specified for the `qinst` primitive. The primitive now
-  correctly deduces the number of qubits when no gate parameters are present. This change is not
-  user facing.
-  [(#496)](https://github.com/PennyLaneAI/catalyst/pull/496)
-
 * Fix the scatter operation lowering when `updatedWindowsDim` is empty.
   [(#475)](https://github.com/PennyLaneAI/catalyst/pull/475)
 
@@ -451,29 +457,15 @@
   qubit re-allocation.
   [(#473)](https://github.com/PennyLaneAI/catalyst/pull/473)
 
-* Added the `wires` property to `catalyst.adjoint` and `catalyst.ctrl`.
+* Fixed an issue where wires was incorrectly set as `<Wires = [<WiresEnum.AnyWires: -1>]>`
+  when using `catalyst.adjoint` and `catalyst.ctrl`, by adding a `wires` property to
+  these operations.
   [(#480)](https://github.com/PennyLaneAI/catalyst/pull/480)
 
-  Without implementing the `wires` property, users would get `<Wires = [<WiresEnum.AnyWires: -1>]>`
-  for the list of wires in these operations.
   Currently, `catalyst.adjoint.wires` supports static wires and workflows with nested branches,
   and `catalyst.ctrl.wires` provides support for workflows with static and variable wires as well as
   nested branches. The `wires` property in `adjoint` and `ctrl` cannot be used in workflows with
   control flow operations.
-
-* Add support for lowering the eigenvectors/values computation lapack method: `lapack_dsyevd`
-  via `stablehlo.custom_call`. For Catalyst, it means that you now can QJIT compile eigen
-  vector/values operations and any other `qml.math` methods that uses these operations.
-  [(#488)](https://github.com/PennyLaneAI/catalyst/pull/488)
-
-  For example, you can compile `qml.math.sqrt_matrix`:
-
-  ```python
-  @qml.qjit
-  def workflow(A):
-      B = qml.math.sqrt_matrix(A)
-      return B @ A
-  ```
 
 * Fix the issue with multiple lapack symbol definitions in the compiled program by updating
   the `stablehlo.custom_call` conversion pass.
