@@ -480,6 +480,7 @@ def cudaq_spin_abs(target, kind):  # pragma: nocover
 cudaq_for_p = jax.core.Primitive("cudaq_for")
 cudaq_for_p.multiple_results = True
 
+
 def cudaq_for(kernel, start, stop, function):
     """Convenience wrapper around the primitive."""
     cudaq_for_p.bind(kernel, start, stop, function)

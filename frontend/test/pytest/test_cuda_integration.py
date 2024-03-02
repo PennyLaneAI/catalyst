@@ -509,6 +509,7 @@ class TestForLoops:
 
     def test_basic_loop(self):
         """Test simple for loop."""
+
         @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -522,9 +523,9 @@ class TestForLoops:
         np.testing.assert_allclose(cuda_compiled(4), np.array([1, 0]).astype(np.complex128))
         np.testing.assert_allclose(cuda_compiled(5), np.array([0, 1]).astype(np.complex128))
 
-
     def test_closure(self):
         """Test for loop with captured values (closures)."""
+
         @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit(x):
             y = 2 * x
@@ -551,7 +552,9 @@ class TestForLoops:
                 def inner_loop_fn(j):
                     qml.PauliX(j)
                     qml.Hadamard(i)
+
                 inner_loop_fn()
+
             loop_fn()
 
             return qml.state()
