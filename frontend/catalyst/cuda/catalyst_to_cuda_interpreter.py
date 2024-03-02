@@ -722,10 +722,12 @@ def change_for(ctx, eqn):
             self.loop_body = loop_body
             self.outvars = None
 
-        def interp_iter_backup(self, iteration):
+        def interp_iter(self, iteration):
             """Called by cudaq.for_loop, interpret the loop body."""
             new_elems = invals[3:]
-            new_elems[0] = iteration
+            # why -2? Because the loop body invars are:
+            # loop_body.invars: [captured_vars, iteration, qreg]
+            new_elems[-2] = iteration
             _map(self.ctx.write, loop_body.invars, new_elems)
             res = interpret_impl(self.ctx, self.loop_body)
             self.outvars = res
