@@ -709,7 +709,8 @@ def change_for(ctx, eqn):
     start = invals[0]
     end = invals[1]
     step = invals[2]
-    assert step == 1, "Only step=1 is supported for now."
+    if step != 1:
+        raise CompileError(f"CUDA-quantum only supports for loops with step 1, got step {step}")
     loop_body = eqn.params["body_jaxpr"].jaxpr
 
     class LoopContext:
@@ -721,12 +722,14 @@ def change_for(ctx, eqn):
             self.loop_body = loop_body
             self.outvars = None
 
-        def interp_iter(self, iteration):  # pylint: disable=unused-argument
+        def interp_iter_backup(self, iteration):
             """Called by cudaq.for_loop, interpret the loop body."""
+            new_elems = invals[3:]
+            new_elems[0] = iteration
+            _map(self.ctx.write, loop_body.invars, new_elems)
             res = interpret_impl(self.ctx, self.loop_body)
             self.outvars = res
 
-    _map(ctx.write, loop_body.invars, invals[3:])
     body_ctx = LoopContext(ctx, loop_body)
     cudaq_for(ctx.kernel, start, end, body_ctx.interp_iter)
     _map(ctx.write, eqn.outvars, body_ctx.outvars)
