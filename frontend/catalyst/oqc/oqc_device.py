@@ -72,23 +72,11 @@ class OQCDevice(Device):
         oqc_tasks = []
         for circuit in circuits:
             oqc_config = CompilerConfig(repeats=circuit.shots, results_format=RES_FORMAT, optimizations=None)
-            oqc_tasks.append(QPUTask(to_qasm2(circuit), oqc_config))
+            print(circuit.to_openqasm())
+            oqc_tasks.append(QPUTask(circuit.to_openqasm(), oqc_config))
         results = self._client.execute_tasks(oqc_tasks)
         return results
 
 def _check_backend(backend):
     if backend not in BACKENDS:
         raise (ValueError, "Backend not supported.")
-
-
-def to_qasm2(tape):
-    hello_world = """
-    OPENQASM 2.0;
-    include "qelib1.inc";
-    qreg q[2];
-    creg c[2];
-    h q;
-    cx q[0], q[1];
-    measure q->c;
-    """
-    return  hello_world
