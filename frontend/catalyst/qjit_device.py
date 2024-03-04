@@ -50,6 +50,7 @@ RUNTIME_OPERATIONS = {
     "QubitUnitary",
     "ISWAP",
     "PSWAP",
+    "GlobalPhase",
 }
 
 
