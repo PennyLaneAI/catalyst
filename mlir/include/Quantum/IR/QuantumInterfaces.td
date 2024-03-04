@@ -104,9 +104,6 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     let verify = [{
         auto gate = mlir::cast<ConcreteOp>($_op);
 
-        if (gate.getQubitOperands().size() < 1)
-            return $_op->emitOpError("must have at least 1 qubit");
-
         if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size())
             return $_op->emitError() <<
                 "number of controlling qubits in input (" <<

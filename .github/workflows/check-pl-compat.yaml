@@ -101,13 +101,7 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_LLD=ON \
         make dialects
-        if [ ${{ inputs.pennylane }} = "stable" ]; then
-            pip install --upgrade .
-        else
-            # TODO(@erick-xanadu): Remove after release. See issue
-            # https://github.com/PennyLaneAI/catalyst/issues/494
-            pl_version="==0.35.0.dev0" pip install --upgrade .
-        fi
+        make frontend
 
     - name: Build Catalyst Runtime (latest)
       if: ${{ inputs.lightning == 'latest' }}
@@ -128,6 +122,7 @@ jobs:
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
+        LIGHTNING_GIT_TAG_VALUE=latest_release \
         ENABLE_LIGHTNING_KOKKOS=ON \
         ENABLE_OPENQASM=ON \
         make runtime

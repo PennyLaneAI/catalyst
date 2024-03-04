@@ -46,6 +46,7 @@ from mlir_quantum.dialects.quantum import (
     DeviceReleaseOp,
     ExpvalOp,
     ExtractOp,
+    GlobalPhaseOp,
     HamiltonianOp,
     HermitianOp,
     InsertOp,
@@ -174,6 +175,8 @@ qdealloc_p = core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
 qextract_p = core.Primitive("qextract")
 qinsert_p = core.Primitive("qinsert")
+gphase_p = core.Primitive("gphase")
+gphase_p.multiple_results = True
 qinst_p = core.Primitive("qinst")
 qinst_p.multiple_results = True
 qunitary_p = core.Primitive("qunitary")
@@ -675,6 +678,81 @@ def _qinsert_lowering(
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
     return InsertOp(qreg_type, qreg_old, qubit, idx=qubit_idx).results
+
+
+#
+# gphase
+#
+@gphase_p.def_abstract_eval
+def _gphase_abstract_eval(
+    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_or_params[:qubits_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
+    for idx in range(qubits_len + ctrl_len):
+        qubit = all_qubits[idx]
+        assert isinstance(qubit, AbstractQbit)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
+
+
+@qinst_p.def_impl
+def _gphase_abstract_eval(
+    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+):
+    """Not implemented"""
+    raise NotImplementedError()
+
+
+def _gphase_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params,
+    op=None,
+    qubits_len: int = 0,
+    params_len: int = 0,
+    ctrl_len: int = 0,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits_or_params[:qubits_len]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+
+    float_params = []
+    assert 1 == len(params), "Only one param in GlobalPhase"
+    for p in params:
+        if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
+            baseType = ir.RankedTensorType(p.type).element_type
+
+        if not ir.F64Type.isinstance(baseType):
+            baseType = ir.F64Type.get()
+            resultTensorType = ir.RankedTensorType.get((), baseType)
+            p = ConvertOp(resultTensorType, p).results
+
+        p = TensorExtractOp(baseType, p, []).result
+
+        assert ir.F64Type.isinstance(
+            p.type
+        ), "Only scalar double parameters are allowed for quantum gates!"
+
+        float_params.append(p)
+
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    GlobalPhaseOp(
+        params=float_params[0],
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+    )
+    return qubits + ctrl_qubits
 
 
 #
@@ -1576,6 +1654,7 @@ mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
 mlir.register_lowering(qextract_p, _qextract_lowering)
 mlir.register_lowering(qinsert_p, _qinsert_lowering)
 mlir.register_lowering(qinst_p, _qinst_lowering)
+mlir.register_lowering(gphase_p, _gphase_lowering)
 mlir.register_lowering(qunitary_p, _qunitary_lowering)
 mlir.register_lowering(qmeasure_p, _qmeasure_lowering)
 mlir.register_lowering(compbasis_p, _compbasis_lowering)
