@@ -92,6 +92,7 @@ OBSERVABLES = [
     "Identity",
     "Projector",
     "Hamiltonian",
+    "SparseHamiltonian",
     "Sum",
     "SProd",
     "Prod",
@@ -100,13 +101,13 @@ OBSERVABLES = [
 
 RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
+
 @pytest.mark.skipif(
     not pathlib.Path(RUNTIME_LIB_PATH + "/libdummy_device.so").is_file(),
     reason="lib_dummydevice.so was not found.",
 )
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
-
 
     class DummyDevice(qml.QubitDevice):
         """Dummy Device"""
@@ -117,8 +118,8 @@ def test_custom_device_load():
         version = "0.0.1"
         author = "Dummy"
 
-        operations = [] # To be loaded from the toml file
-        observables = [] # To be loaded from the toml file
+        operations = OPERATIONS
+        observables = OBSERVABLES
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)

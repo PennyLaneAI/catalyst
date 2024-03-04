@@ -94,7 +94,14 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.utils.runtime import extract_backend_info, get_lib_path, load_toml_file_into
+from catalyst.utils.runtime import (
+    BackendInfo,
+    device_get_toml_config,
+    extract_backend_info,
+    get_native_gates_PL,
+    validate_config_with_device,
+)
+from catalyst.utils.toml import TOMLDocument, toml_load
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -130,19 +137,18 @@ class QFunc:
         update_wrapper(self, fn)
 
     @staticmethod
-    def extract_backend_info(device):
+    def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device)
+        return extract_backend_info(device, config)
 
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
-            if not hasattr(self.device, "config"):
-                load_toml_file_into(self.device)
-            dev_args = QFunc.extract_backend_info(self.device)
-            config, rest = dev_args[0], dev_args[1:]
-            device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
+            config = device_get_toml_config(self.device)
+            validate_config_with_device(self.device, config)
+            backend_info = QFunc.extract_backend_info(self.device, config)
+            device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
         else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device

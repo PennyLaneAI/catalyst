@@ -13,12 +13,24 @@
 # limitations under the License.
 """This module contains the qjit device classes.
 """
+from typing import Optional, Set
+
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import get_native_gates_PL
+from catalyst.utils.runtime import (
+    BackendInfo,
+    deduce_native_controlled_gates,
+    get_native_gates_PL,
+)
+from catalyst.utils.toml import (
+    TOMLDocument,
+    check_adjoint_flag,
+    check_mid_circuit_measurement_flag,
+    get_observables,
+)
 
 
 class QJITDevice(qml.QubitDevice):
@@ -82,7 +94,7 @@ class QJITDevice(qml.QubitDevice):
     }
 
     @staticmethod
-    def _get_operations_to_convert_to_matrix(_config):
+    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
         # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
@@ -91,57 +103,45 @@ class QJITDevice(qml.QubitDevice):
         return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
-    def _check_mid_circuit_measurement(config):
-        return config["compilation"]["mid_circuit_measurement"]
-
-    @staticmethod
-    def _check_adjoint(config):
-        return config["compilation"]["quantum_adjoint"]
-
-    @staticmethod
-    def _check_quantum_control(config):
-        return config["compilation"]["quantum_control"]
-
-    @staticmethod
-    def _set_supported_operations(config):
+    def _get_supported_operations(config: TOMLDocument) -> Set[str]:
         """Override the set of supported operations."""
+        # Supported gates of the target PennyLane's device
         native_gates = get_native_gates_PL(config)
-        qir_gates = QJITDevice.operations_supported_by_QIR_runtime
-        supported_native_gates = list(set.intersection(native_gates, qir_gates))
-        QJITDevice.operations = supported_native_gates
+        qir_gates = set.union(
+            QJITDevice.operations_supported_by_QIR_runtime,
+            deduce_native_controlled_gates(QJITDevice.operations_supported_by_QIR_runtime),
+        )
+        supported_gates = list(set.intersection(native_gates, qir_gates))
 
         # These are added unconditionally.
-        QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
+        supported_gates += ["Cond", "WhileLoop", "ForLoop"]
 
-        if QJITDevice._check_mid_circuit_measurement(config):  # pragma: no branch
-            QJITDevice.operations += ["MidCircuitMeasure"]
+        if check_mid_circuit_measurement_flag(config):  # pragma: no branch
+            supported_gates += ["MidCircuitMeasure"]
 
-        if QJITDevice._check_adjoint(config):
-            QJITDevice.operations += ["Adjoint"]
+        if check_adjoint_flag(config):
+            supported_gates += ["Adjoint"]
 
-    @staticmethod
-    def _set_supported_observables(config):
-        """Override the set of supported observables."""
-        QJITDevice.observables = config["operators"]["observables"]
+        supported_gates += ["ControlledQubitUnitary"]
+        return set(supported_gates)
 
     # pylint: disable=too-many-arguments
     def __init__(
         self,
-        config,
+        target_config: TOMLDocument,
         shots=None,
         wires=None,
-        backend_name=None,
-        backend_lib=None,
-        backend_kwargs=None,
+        backend: Optional[BackendInfo] = None,
     ):
-        QJITDevice._set_supported_operations(config)
-        QJITDevice._set_supported_observables(config)
-
-        self.config = config
-        self.backend_name = backend_name if backend_name else "default"
-        self.backend_lib = backend_lib if backend_lib else ""
-        self.backend_kwargs = backend_kwargs if backend_kwargs else {}
         super().__init__(wires=wires, shots=shots)
+
+        self.target_config = target_config
+        self.backend_name = backend.name if backend else "default"
+        self.backend_lib = backend.lpath if backend else ""
+        self.backend_kwargs = backend.kwargs if backend else {}
+
+        self.operations += list(QJITDevice._get_supported_operations(target_config))
+        self.observables += list(get_observables(target_config))
 
     def apply(self, operations, **kwargs):
         """
@@ -170,7 +170,9 @@ class QJITDevice(qml.QubitDevice):
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
-        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
+        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
+            self.target_config
+        )
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
             try:

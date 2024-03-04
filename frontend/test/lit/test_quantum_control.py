@@ -24,13 +24,15 @@ from catalyst.compiler import get_lib_path
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
 from catalyst.qjit_device import QJITDevice
+from catalyst.utils.runtime import device_get_toml_config
 from catalyst.utils.toml import toml_load
 
 
-def get_custom_device(num_wires, discarded_operations=None, added_operations=None):
+def get_custom_qjit_device(num_wires, discarded_operations=None, added_operations=None):
     """Generate a custom device with the modified set of supported gates."""
 
     lightning = qml.device("lightning.qubit", wires=3)
+    config = device_get_toml_config(lightning)
     operations_copy = lightning.operations.copy()
     observables_copy = lightning.observables.copy()
     for op in discarded_operations or []:
@@ -38,7 +40,7 @@ def get_custom_device(num_wires, discarded_operations=None, added_operations=Non
     for op in added_operations or []:
         operations_copy.add(op)
 
-    class CustomDevice(QJITDevice):
+    class CustomQJITDevice(QJITDevice):
         """Custom Device"""
 
         name = "Device without some operations"
@@ -51,31 +53,18 @@ def get_custom_device(num_wires, discarded_operations=None, added_operations=Non
         observables = observables_copy
 
         # pylint: disable=too-many-arguments
-        def __init__(
-            self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
-        ):
-            self.backend_name = backend_name if backend_name else "default"
-            self.backend_lib = backend_lib if backend_lib else "default"
-            self.backend_kwargs = backend_kwargs if backend_kwargs else ""
-
-            with open(lightning.config, "rb") as f:
-                config = toml_load(f)
-            super().__init__(config, wires=wires, shots=shots)
+        def __init__(self, shots=None, wires=None, backend=None):
+            super().__init__(config, wires=wires, shots=shots, backend=backend)
 
         def apply(self, operations, **kwargs):  # pylint: disable=missing-function-docstring
             pass
 
-        @staticmethod
-        def get_c_interface():
-            """Location to shared object with C/C++ implementation"""
-            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
-
-    return CustomDevice(wires=num_wires)
+    return CustomQJITDevice(wires=num_wires)
 
 
 def test_named_controlled():
     """Test that named-controlled operations are passed as-is."""
-    dev = get_custom_device(2, set(), set())
+    dev = get_custom_qjit_device(2, set(), set())
 
     @qjit(target="mlir")
     @qfunc(device=dev)
@@ -97,7 +86,9 @@ test_named_controlled()
 
 def test_native_controlled_custom():
     """Test native control of a custom operation."""
-    dev = get_custom_device(3, discarded_operations={"CRot"}, added_operations={"Rot", "C(Rot)"})
+    dev = get_custom_qjit_device(
+        3, discarded_operations={"CRot"}, added_operations={"Rot", "C(Rot)"}
+    )
 
     @qjit(target="mlir")
     @qfunc(device=dev)
@@ -117,7 +108,7 @@ test_native_controlled_custom()
 
 def test_native_controlled_unitary():
     """Test native control of the unitary operation."""
-    dev = get_custom_device(4, set(), added_operations={"C(QubitUnitary)"})
+    dev = get_custom_qjit_device(4, set(), added_operations={"C(QubitUnitary)"})
 
     @qjit(target="mlir")
     @qfunc(device=dev)
@@ -149,7 +140,7 @@ test_native_controlled_unitary()
 
 def test_native_controlled_multirz():
     """Test native control of the multirz operation."""
-    dev = get_custom_device(3, set(), {"C(MultiRZ)"})
+    dev = get_custom_qjit_device(3, set(), {"C(MultiRZ)"})
 
     @qjit(target="mlir")
     @qfunc(device=dev)
