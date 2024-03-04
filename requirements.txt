@@ -14,7 +14,7 @@ isort
 
 # testing
 lit
-pytest
+pytest==8.0.2
 pytest-xdist
 pytest-cov
 nbmake
