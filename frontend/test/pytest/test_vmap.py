@@ -128,6 +128,30 @@ class TestVectorizeMap:
         assert jnp.allclose(result[1], expected)
         assert jnp.allclose(result[2], expected)
 
+    def test_vmap_circuit_inside_without_jax_dispatch(self, backend):
+        """Test catalyst.vmap of a hybrid workflow inside QJIT."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1] ** 2, wires=0)
+            qml.RX(x[1] * x[2], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        x = jnp.array(
+            [
+                [0.1, 0.2, 0.3],
+                [0.4, 0.5, 0.6],
+                [0.7, 0.8, 0.9],
+            ]
+        )
+
+        result0 = qjit(vmap(circuit))(x)
+        result1 = qjit(vmap(circuit, in_axes=(0,)))(x)
+        expected = jnp.array([0.93005586, 0.00498127, -0.88789978])
+        assert jnp.allclose(result0, expected)
+        assert jnp.allclose(result1, expected)
+
     def test_vmap_circuit_in_axes_int(self, backend):
         """Test catalyst.vmap of a hybrid workflow inside QJIT with `in_axes:int`."""
 
