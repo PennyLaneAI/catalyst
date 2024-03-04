@@ -1,7 +1,6 @@
 project(catalyst_oqc)
 option(ENABLE_OQC "Build OQC backend device" ON)
 
-message("${PROJECT_SOURCE_DIR}/../../../../runtime/include")
 set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/backend/common")

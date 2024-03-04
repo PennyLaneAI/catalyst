@@ -63,6 +63,7 @@ help:
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
+	@echo "  oqc                to build Catalyst-OQC Runtime"
 	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
@@ -106,6 +107,9 @@ runtime:
 
 dummy_device:
 	$(MAKE) -C runtime dummy_device
+
+oqc:
+	$(MAKE) -C frontend/catalyst/oqc/src oqc
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
