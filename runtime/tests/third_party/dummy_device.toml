@@ -89,20 +89,20 @@ IsingYY = { controllable = true }
 IsingZZ = { controllable = true }
 IsingXY = { controllable = true }
 
-[measurement_processes]
-exactshots = [
-	"Expval",
-	"Var",
-	"Probs",
-	"State",
-]
-finiteshots = [
-	"Expval",
-	"Var",
-	"Probs",
-	"Sample",
-	"Counts",
-]
+[measurement_processes.exactshots]
+
+Expval
+Var
+Probs
+State
+
+[measurement_processes.finiteshots]
+
+Expval
+Var
+Probs
+Sample
+Counts
 
 [compilation]
 # If the device is compatible with qjit
