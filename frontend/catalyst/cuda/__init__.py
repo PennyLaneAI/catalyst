@@ -36,9 +36,10 @@ def cudaqjit(fn=None, **kwargs):
         Currently, only the following devices are supported:
 
         * :class:`softwareq.qpp <SoftwareQQPP>`: a modern C++ statevector simulator
-        * :class:`nvidia.statevec <NvidiaCuStateVec>`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
-        * :class:`nvidia.tensornet <NvidiaCuTensorNet>`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product
-          state)
+        * :class:`nvidia.statevec <NvidiaCuStateVec>`: The NVIDIA CuStateVec GPU simulator
+                                                       (with support for multi-gpu)
+        * :class:`nvidia.tensornet <NvidiaCuTensorNet>`: The NVIDIA CuTensorNet GPU simulator
+                                                       (with support for matrix product state)
 
     Args:
         fn (Callable): the quantum or classical function to compile
