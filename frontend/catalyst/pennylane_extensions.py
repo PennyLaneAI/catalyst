@@ -967,12 +967,6 @@ def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
 
     for i in range(num_results):
         aval_slice = [avals[i] for avals in signatures]
-
-        if any(isinstance(aval, AbstractQreg) for aval in aval_slice):
-            assert i == num_results - 1, "qreq only allowed as last result"
-            assert all(isinstance(aval, AbstractQreg) for aval in aval_slice)
-            continue
-
         slice_shapes = [aval.shape for aval in aval_slice]
         expected_shape = slice_shapes[0]
         for shape in slice_shapes:
