@@ -63,10 +63,10 @@ def test_validate_config_with_device(schema):
             f.write(
                 dedent(
                     f"""
-                schema = {schema}
-                [compilation]
-                qjit_compatible = false
-            """
+                        schema = {schema}
+                        [compilation]
+                        qjit_compatible = false
+                    """
                 )
             )
         with open(toml_file, encoding="utf-8") as f:
@@ -90,10 +90,10 @@ def test_get_native_gates_schema1():
             f.write(
                 dedent(
                     r"""
-                schema = 1
-                [[operators.gates]]
-                native = [ "TestNativeGate" ]
-            """
+                        schema = 1
+                        [[operators.gates]]
+                        native = [ "TestNativeGate" ]
+                    """
                 )
             )
         with open(toml_file, encoding="utf-8") as f:
@@ -111,11 +111,11 @@ def test_get_native_gates_schema2():
             f.write(
                 dedent(
                     r"""
-                schema = 2
-                [operators.gates.native]
-                TestNativeGate1 = { controllable = true }
-                TestNativeGate2 = { }
-            """
+                        schema = 2
+                        [operators.gates.native]
+                        TestNativeGate1 = { controllable = true }
+                        TestNativeGate2 = { }
+                    """
                 )
             )
         with open(toml_file, encoding="utf-8") as f:
@@ -132,10 +132,10 @@ def test_get_decomp_gates_schema1():
             f.write(
                 dedent(
                     f"""
-                schema = 1
-                [[operators.gates]]
-                decomp = {str(list(test_gates))}
-            """
+                        schema = 1
+                        [[operators.gates]]
+                        decomp = {str(list(test_gates))}
+                    """
                 )
             )
 
@@ -154,10 +154,10 @@ def test_get_decomp_gates_schema2():
             f.write(
                 dedent(
                     f"""
-                schema = 2
-                [operators.gates]
-                decomp = {str(list(test_gates))}
-            """
+                        schema = 2
+                        [operators.gates]
+                        decomp = {str(list(test_gates))}
+                    """
                 )
             )
 
@@ -176,10 +176,10 @@ def test_get_matrix_decomposable_gates_schema1():
             f.write(
                 dedent(
                     f"""
-                schema = 1
-                [[operators.gates]]
-                matrix = {str(list(test_gates))}
-            """
+                        schema = 1
+                        [[operators.gates]]
+                        matrix = {str(list(test_gates))}
+                    """
                 )
             )
 
@@ -192,23 +192,21 @@ def test_get_matrix_decomposable_gates_schema1():
 def test_get_matrix_decomposable_gates_schema2():
     """Test native matrix gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:
-        test_gates = {"TestMatrixGate"}
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
             f.write(
                 dedent(
-                    f"""
-                schema = 2
-                [operators.gates]
-                matrix = {str(list(test_gates))}
-            """
+                    r"""
+                        schema = 2
+                        [[operators.gates.matrix.TestMatrixGate]]
+                    """
                 )
             )
 
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
 
-    assert test_gates == get_matrix_decomposable_gates(config)
+    assert {"TestMatrixGate"} == get_matrix_decomposable_gates(config)
 
 
 def test_check_overlap_msg():
