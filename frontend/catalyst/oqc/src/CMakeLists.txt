@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.21)
+
 project(catalyst_oqc)
 option(ENABLE_OQC "Build OQC backend device" ON)
 
@@ -47,7 +49,7 @@ target_include_directories(rtd_oqc PRIVATE .
     ${backend_includes}
     )
 
-target_link_libraries(rtd_oqc pybind11::module)
+target_link_libraries(rtd_oqc PRIVATE pybind11::module)
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
 

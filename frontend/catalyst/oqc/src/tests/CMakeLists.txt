@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.21)
 
 project(oqc_runtime_tests)
 
-
 set(CMAKE_CXX_STANDARD 20)
 
 Include(FetchContent)
@@ -40,7 +39,6 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
 # Modify `ctest` to only run the supported subset of tests.
 include(CTest)
 include(Catch)
-
 
 add_executable(runner_tests_oqc runner_main.cpp)
 
