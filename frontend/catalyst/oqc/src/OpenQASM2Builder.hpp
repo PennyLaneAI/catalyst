@@ -94,7 +94,6 @@ constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_
     RT_FAIL("The given QIR gate name is not supported by the OpenQASM builder.");
 }
 
-
 /**
  * The OpenQasm quantum register type.
  *
@@ -122,23 +121,23 @@ class QASMRegister {
     void updateSize(size_t new_size) { size = new_size; }
     void resetSize() { size = 0; }
 
-    [[nodiscard]] auto toOpenQASM2(RegisterMode mode) const
-        -> std::string
+    [[nodiscard]] auto toOpenQASM2(RegisterMode mode) const -> std::string
     {
         std::ostringstream oss;
         switch (mode) {
         case RegisterMode::Alloc: {
             // qubit[size] name;
             if (type == RegisterType::Qubit) {
-                oss << "qubit";
+                oss << "qreg ";
             }
             else if (type == RegisterType::Bit) {
-                oss << "bit";
+                oss << "creg ";
             }
             else {
                 RT_FAIL("Unsupported OpenQasm register type");
             }
-            oss << "[" << size << "] " << name << ";\n";
+            oss << name << "[" << size << "]"
+                << ";\n";
             return oss.str();
         }
         case RegisterMode::Reset: {
@@ -152,76 +151,62 @@ class QASMRegister {
     }
 };
 
-// /**
-//  * The OpenQasm gate type.
-//  *
-//  * @param name The name of the gate to apply from the list of supported gates
-//  * (`rt_qasm_gate_map`)
-//  * @param matrix Optional matrix of complex numbers for QubitUnitary
-//  * @param params_val Optional list of parameter values for parametric gates
-//  * @param params_str Optional list of parameter names for parametric gates
-//  * @param wires Wires to apply gate to
-//  * @param inverse Indicates whether to use inverse of gate
-//  *
-//  * @note Parametric gates are currently supported via either their values or names
-//  * but not both.
-//  */
-// class QasmGate {
-//   private:
-//     const std::string name;
-//     const std::vector<double> params_val;
-//     const std::vector<std::string> params_str;
-//     const std::vector<size_t> wires;
-//     const bool inverse;
+/**
+ * The OpenQasm gate type.
+ *
+ * @param name The name of the gate to apply from the list of supported gates
+ * (`rt_qasm_gate_map`)
+ * @param params_val Optional list of parameter values for parametric gates
+ * @param params_str Optional list of parameter names for parametric gates
+ * @param wires Wires to apply gate to
+ * @param inverse Indicates whether to use inverse of gate
+ *
+ * @note Parametric gates are currently supported via either their values or names
+ * but not both.
+ */
+class QASMGate {
+  private:
+    const std::string name;
+    const std::vector<double> params_val;
+    const std::vector<size_t> wires;
 
-//   public:
-//     explicit QasmGate(const std::string &_name, const std::vector<double> &_params_val,
-//                       const std::vector<std::string> &_params_str,
-//                       const std::vector<size_t> &_wires, [[maybe_unused]] bool _inverse)
-//         : name(lookup_qasm_gate_name(_name)), params_val(_params_val),
-//           params_str(_params_str), wires(_wires), inverse(_inverse)
-//     {
-//         RT_FAIL_IF(!(params_str.empty() || params_val.empty()),
-//                    "Parametric gates are currently supported via either their values or names but "
-//                    "not both.");
-//     }
-//     ~QasmGate() = default;
+  public:
+    explicit QASMGate(const std::string &_name, const std::vector<double> &_params_val,
+                      const std::vector<size_t> &_wires)
+        : name(lookup_qasm_gate_name(_name)), params_val(_params_val), wires(_wires)
+    {
+    }
+    ~QASMGate() = default;
 
-//     [[nodiscard]] auto getName() const -> std::string { return name; }
-//     [[nodiscard]] auto getParams() const -> std::vector<double> { return params_val; }
-//     [[nodiscard]] auto getParamsStr() const -> std::vector<std::string> { return params_str; }
-//     [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
-//     [[nodiscard]] auto getInverse() const -> bool { return inverse; }
+    [[nodiscard]] auto getName() const -> std::string { return name; }
+    [[nodiscard]] auto getParams() const -> std::vector<double> { return params_val; }
+    [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
 
-//     [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister, size_t precision = 5,
-//                                   const std::string &version = "3.0") const -> std::string
-//     {
-//         std::ostringstream oss;
-//         // name(param_1, ..., param_n) qubit_1, ..., qubit_m
-//         oss << name;
-//         if (!params_val.empty()) {
-//             oss << "(";
-//             auto iter = params_val.begin();
-//             for (; iter != params_val.end() - 1; iter++) {
-//                 oss << std::setprecision(precision) << *iter << ", ";
-//             }
-//             oss << std::setprecision(precision) << *iter << ") ";
-//         }
-//         else if (!params_str.empty()) {
-//             oss << "(";
-//             auto iter = params_str.begin();
-//             for (; iter != params_str.end() - 1; iter++) {
-//                 oss << *iter << ", ";
-//             }
-//             oss << *iter << ") ";
-//         }
-//         else {
-//             oss << " ";
-//         }
-//         oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << ";\n";
-//         return oss.str();
-//     }
-// };
+    [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister, size_t precision = 5) const
+        -> std::string
+    {
+        std::ostringstream oss;
+        // name(param_1, ..., param_n) qubit_1, ..., qubit_m
+        oss << name;
+        if (!params_val.empty()) {
+            oss << "(";
+            auto iter = params_val.begin();
+            for (; iter != params_val.end() - 1; iter++) {
+                oss << std::setprecision(precision) << *iter << ", ";
+            }
+            oss << std::setprecision(precision) << *iter << ") ";
+        }
+        else {
+            oss << " ";
+        }
+        auto iter = wires.begin();
+        for (; iter != wires.end() - 1; iter++) {
+            oss << qregister.getName() << "[" << *iter << "], ";
+        }
+        oss << qregister.getName() << "[" << *iter << "]" << ";\n";
+        return oss.str();
+    }
+};
 
 // /**
 //  * A base class for all Braket/OpenQasm3 observable types.
@@ -240,7 +225,8 @@ class QASMRegister {
 //     [[nodiscard]] virtual auto getWires() const -> std::vector<size_t> = 0;
 //     [[nodiscard]] virtual auto toOpenQasm(const QasmRegister &qregister,
 //                                           [[maybe_unused]] size_t precision = 5,
-//                                           [[maybe_unused]] const std::string &version = "3.0") const
+//                                           [[maybe_unused]] const std::string &version = "3.0")
+//                                           const
 //         -> std::string = 0;
 // };
 
@@ -329,7 +315,8 @@ class QASMRegister {
 //     // void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
 
 //     [[nodiscard]] virtual auto toOpenQasm(size_t precision = 5,
-//                                           const std::string &version = "3.0") const -> std::string
+//                                           const std::string &version = "3.0") const ->
+//                                           std::string
 //     {
 //         RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
 //                                       "register is currently supported.");
