@@ -31,6 +31,7 @@ from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     TOMLDocument,
+    check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
     get_observables,
@@ -78,12 +79,8 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
         "CRot",
     ]
     native_controlled_gates = set(
-        ["ControlledQubitUnitary"]
-        + [
-            f"C({gate})"
-            for gate in native_gates
-            if gate not in gates_to_be_decomposed_if_controlled
-        ]
+        [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
+        + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
     )
     return native_controlled_gates
 
@@ -107,7 +104,7 @@ def get_native_gates_PL(config: TOMLDocument) -> Set[str]:
         gates_PL = set.union(native_gates, native_controlled_gates)
 
     elif schema == 2:
-        gates = config["operators"]["gates"]["named"]
+        gates = config["operators"]["gates"]["native"]
         for gate_name in [str(g) for g in gates]:
             gates_PL.add(f"{gate_name}")
             if gates[gate_name].get("controllable", False):
@@ -167,12 +164,12 @@ def filter_out_adjoint_and_control(operations):
     return set(operations_no_adj_no_ctrl)
 
 
-def check_full_overlap(device_gates, spec_gates):
+def check_full_overlap(device_gates: Set[str], spec_gates: Set[str]) -> None:
     """Check that device.operations is equivalent to the union of *args
 
     Args:
-        device (qml.Device): An instance of a quantum device.
-        *args (List[Str]): List of strings.
+        device_gates (Set[str]): device gates
+        spec_gates (Set[str]): spec gates
 
     Raises: CompileError
     """
@@ -202,11 +199,6 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     Raises: CompileError
     """
-    # if not (hasattr(device, "config") and device.config.exists()):
-    #      raise CompileError(
-    #          f"Attempting to compile program for incompatible device '{device.name}': "
-    #          f"Config is not valid."
-    #      )
 
     if not config["compilation"]["qjit_compatible"]:
         raise CompileError(
@@ -221,7 +213,8 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     # Filter-out ControlledQubitUnitary because some devices are known to support it.
     # TODO: Should we honor this configuration instead?
-    matrix = matrix - {"ControlledQubitUnitary"}
+    if "ControlledQubitUnitary" in native and check_quantum_control_flag(config):
+        matrix = matrix - {"ControlledQubitUnitary"}
 
     check_no_overlap(native, decomposable, matrix)
 

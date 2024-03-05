@@ -14,21 +14,22 @@
 
 """Unit tests for functions to check config validity."""
 
-import tempfile
+from os.path import join
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from textwrap import dedent
 
 import pennylane as qml
 import pytest
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import (
-    check_device_config,
+from catalyst.utils.runtime import (  # check_device_config,
     check_full_overlap,
     check_no_overlap,
-    check_qjit_compatibility,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
-    get_native_gates,
+    get_native_gates_PL,
+    validate_config_with_device,
 )
 from catalyst.utils.toml import toml_load
 
@@ -36,102 +37,183 @@ from catalyst.utils.toml import toml_load
 class DummyDevice(qml.QubitDevice):
     """Test device"""
 
-    name = "Test Device"
-    short_name = "test.device"
+    name = "Dummy Device"
+    short_name = "dummy.device"
+    pennylane_requires = "0.33.0"
+    version = "0.0.1"
+    author = "Dummy"
+
+    operations = []
+    observables = []
+
+    def apply(self, operations, **kwargs):
+        """Unused"""
+        raise RuntimeError("Only C/C++ interface is defined")
 
 
-def test_toml_file():
+ALL_SCHEMAS = [1, 2]
+
+
+@pytest.mark.parametrize("schema", ALL_SCHEMAS)
+def test_validate_config_with_device(schema):
     """Test error is raised if checking for qjit compatibility and field is false in toml file."""
-    with tempfile.NamedTemporaryFile(mode="w+b") as f:
-        f.write(
-            b"""
-[compilation]
-qjit_compatible = false
-        """
-        )
-        f.flush()
-        f.seek(0)
-        config = toml_load(f)
-        f.close()
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    f"""
+                schema = {schema}
+                [compilation]
+                qjit_compatible = false
+            """
+                )
+            )
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
 
-        name = DummyDevice.name
+        device = DummyDevice()
         with pytest.raises(
-            CompileError, match=f"Attempting to compile program for incompatible device {name}."
+            CompileError,
+            match=f"Attempting to compile program for incompatible device '{device.name}'",
         ):
-            check_qjit_compatibility(DummyDevice, config)
+            validate_config_with_device(device, config)
 
 
-def test_device_has_config_attr():
-    """Test error is raised when device has no config attr."""
-    name = DummyDevice.name
-    msg = f"Attempting to compile program for incompatible device {name}."
-    with pytest.raises(CompileError, match=msg):
-        check_device_config(DummyDevice)
-
-
-def test_device_with_invalid_config_attr():
-    """Test error is raised when device has invalid config attr."""
-    name = DummyDevice.name
-    with tempfile.NamedTemporaryFile(mode="w+b") as f:
-        f.close()
-        setattr(DummyDevice, "config", Path(f.name))
-        msg = f"Attempting to compile program for incompatible device {name}."
-        with pytest.raises(CompileError, match=msg):
-            check_device_config(DummyDevice)
-        delattr(DummyDevice, "config")
-
-
-def test_get_native_gates():
+def test_get_native_gates_schema1():
     """Test native gates are properly obtained from the toml."""
-    with tempfile.NamedTemporaryFile(mode="w+b") as f:
-        test_gates = ["TestNativeGate"]
-        payload = f"""
-[[operators.gates]]
-native = {str(test_gates)}
-        """
-        f.write(str.encode(payload))
-        f.flush()
-        f.seek(0)
-        config = toml_load(f)
-        f.close()
-    assert test_gates == get_native_gates(config)
+    with TemporaryDirectory() as d:
+        test_deduced_gates = {"C(TestNativeGate)", "TestNativeGate"}
+
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                schema = 1
+                [[operators.gates]]
+                native = [ "TestNativeGate" ]
+            """
+                )
+            )
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+    assert test_deduced_gates == get_native_gates_PL(config)
 
 
-def test_get_decomp_gates():
+def test_get_native_gates_schema2():
+    """Test native gates are properly obtained from the toml."""
+    with TemporaryDirectory() as d:
+        test_deduced_gates = {"C(TestNativeGate1)", "TestNativeGate1", "TestNativeGate2"}
+
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                schema = 2
+                [operators.gates.native]
+                TestNativeGate1 = { controllable = true }
+                TestNativeGate2 = { }
+            """
+                )
+            )
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+    assert test_deduced_gates == get_native_gates_PL(config)
+
+
+def test_get_decomp_gates_schema1():
     """Test native decomposition gates are properly obtained from the toml."""
-    with tempfile.NamedTemporaryFile(mode="w+b") as f:
-        test_gates = ["TestDecompGate"]
-        payload = f"""
-[[operators.gates]]
-decomp = {str(test_gates)}
-        """
-        f.write(str.encode(payload))
-        f.flush()
-        f.seek(0)
-        config = toml_load(f)
-        f.close()
+    with TemporaryDirectory() as d:
+        test_gates = {"TestDecompGate"}
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    f"""
+                schema = 1
+                [[operators.gates]]
+                decomp = {str(list(test_gates))}
+            """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
     assert test_gates == get_decomposable_gates(config)
 
 
-def test_get_matrix_decomposable_gates():
+def test_get_decomp_gates_schema2():
+    """Test native decomposition gates are properly obtained from the toml."""
+    with TemporaryDirectory() as d:
+        test_gates = {"TestDecompGate"}
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    f"""
+                schema = 2
+                [operators.gates]
+                decomp = {str(list(test_gates))}
+            """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+    assert test_gates == get_decomposable_gates(config)
+
+
+def test_get_matrix_decomposable_gates_schema1():
     """Test native matrix gates are properly obtained from the toml."""
-    with tempfile.NamedTemporaryFile(mode="w+b") as f:
-        test_gates = ["TestMatrixGate"]
-        payload = f"""
-[[operators.gates]]
-matrix = {str(test_gates)}
-        """
-        f.write(str.encode(payload))
-        f.flush()
-        f.seek(0)
-        config = toml_load(f)
-        f.close()
+    with TemporaryDirectory() as d:
+        test_gates = {"TestMatrixGate"}
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    f"""
+                schema = 1
+                [[operators.gates]]
+                matrix = {str(list(test_gates))}
+            """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+    assert test_gates == get_matrix_decomposable_gates(config)
+
+
+def test_get_matrix_decomposable_gates_schema2():
+    """Test native matrix gates are properly obtained from the toml."""
+    with TemporaryDirectory() as d:
+        test_gates = {"TestMatrixGate"}
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    f"""
+                schema = 2
+                [operators.gates]
+                matrix = {str(list(test_gates))}
+            """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
     assert test_gates == get_matrix_decomposable_gates(config)
 
 
 def test_check_overlap_msg():
     """Test error is raised if there is an overlap in sets."""
-    msg = "Device has overlapping gates in native and decomposable sets."
+    msg = "Device has overlapping gates."
     with pytest.raises(CompileError, match=msg):
         check_no_overlap(["A"], ["A"], ["A"])
 
@@ -139,12 +221,9 @@ def test_check_overlap_msg():
 def test_check_full_overlap():
     """Test that if there is no full overlap of operations, then an error is raised."""
 
-    class Device:
-        operations = ["A", "B", "C"]
-
     msg = f"Gates in qml.device.operations and specification file do not match"
     with pytest.raises(CompileError, match=msg):
-        check_full_overlap(Device(), ["A", "A", "A"], ["B", "B"])
+        check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "A", "A", "B", "B", "Adjoint(Y)"})
 
 
 if __name__ == "__main__":

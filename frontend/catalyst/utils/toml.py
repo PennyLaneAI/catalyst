@@ -52,7 +52,8 @@ def check_adjoint_flag(config: TOMLDocument) -> bool:
 
 
 def check_quantum_control_flag(config: TOMLDocument) -> bool:
-    if config.schema == 1:
+    schema = int(config["schema"])
+    if schema == 1:
         return bool(config["compilation"]["quantum_control"])
 
     raise NotImplementedError("quantum_control flag is deprecated in later TOMLs")
