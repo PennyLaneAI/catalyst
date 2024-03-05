@@ -398,6 +398,12 @@ void __catalyst__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResul
     Catalyst::Runtime::getQuantumDevicePtr()->Gradient(mem_views, train_params);
 }
 
+void __catalyst__qis__GlobalPhase(double phi, const Modifiers *modifiers)
+{
+    Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation("GlobalPhase", {phi}, {},
+                                                             MODIFIERS_ARGS(modifiers));
+}
+
 void __catalyst__qis__Identity(QUBIT *qubit, const Modifiers *modifiers)
 {
     Catalyst::Runtime::getQuantumDevicePtr()->NamedOperation(
@@ -676,7 +682,6 @@ void __catalyst__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, const Modifi
                                    int64_t numQubits, /*qubits*/...)
 {
     RT_ASSERT(numQubits >= 0);
-    RT_ASSERT(modifiers == nullptr || modifiers->num_controlled == 0);
 
     if (matrix == nullptr) {
         RT_FAIL("The QubitUnitary matrix must be initialized");

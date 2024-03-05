@@ -21,30 +21,46 @@ while using :func:`~.qjit`.
 import copy
 import numbers
 import pathlib
-from collections.abc import Sized
+from collections.abc import Sequence, Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import (
     PyTreeDef,
-    flatten_one_level,
     tree_flatten,
+    tree_leaves,
+    tree_structure,
     tree_unflatten,
     treedef_is_leaf,
 )
 from jax.core import eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
-from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
-from pennylane.ops import Controlled
+from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (  # infer_output_type3,
+    ClosedJaxpr,
+    DynamicJaxprTracer,
+    Jaxpr,
+    ShapedArray,
+    _initial_style_jaxpr,
+    _input_type_to_tracers,
+    convert_constvars_jaxpr,
+    deduce_avals,
+    get_implicit_and_explicit_flat_args,
+    initial_style_jaxprs_with_common_consts1,
+    initial_style_jaxprs_with_common_consts2,
+    new_inner_tracer,
+    unzip2,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     GradParams,
@@ -66,29 +82,18 @@ from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
-    deduce_avals,
     has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
     unify_result_types,
 )
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
-from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.jax_extras import (
-    ClosedJaxpr,
-    DynamicJaxprTracer,
-    Jaxpr,
-    ShapedArray,
-    _initial_style_jaxpr,
-    _input_type_to_tracers,
-    convert_constvars_jaxpr,
-    get_implicit_and_explicit_flat_args,
-    initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
-    new_inner_tracer,
-    unzip2,
+from catalyst.qjit_device import QJITDevice
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
 )
-from catalyst.utils.patching import Patcher
+from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.runtime import extract_backend_info, get_lib_path
 
 
@@ -144,12 +149,17 @@ class QFunc:
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
         device.config = toml_file
 
+    @staticmethod
+    def extract_backend_info(device):
+        """Wrapper around extract_backend_info in the runtime module."""
+        return extract_backend_info(device)
+
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
             QFunc._add_toml_file(self.device)
-            dev_args = extract_backend_info(self.device)
+            dev_args = QFunc.extract_backend_info(self.device)
             config, rest = dev_args[0], dev_args[1:]
             device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
         else:  # pragma: nocover
@@ -170,188 +180,6 @@ class QFunc:
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)
-
-
-class QJITDevice(qml.QubitDevice):
-    """QJIT device.
-
-    A device that interfaces the compilation pipeline of Pennylane programs.
-
-    Args:
-        wires (int): the number of wires to initialize the device with
-        shots (int): How many times the circuit should be evaluated (or sampled) to estimate
-            the expectation values. Defaults to ``None`` if not specified. Setting
-            to ``None`` results in computing statistics like expectation values and
-            variances analytically
-        backend_name (str): name of the device from the list of supported and compiled backend
-            devices by the runtime
-        backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
-    """
-
-    name = "QJIT device"
-    short_name = "qjit.device"
-    pennylane_requires = "0.1.0"
-    version = "0.0.1"
-    author = ""
-
-    # These must be present even if empty.
-    operations = []
-    observables = []
-
-    operations_supported_by_QIR_runtime = {
-        "Identity",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "Hadamard",
-        "S",
-        "T",
-        "PhaseShift",
-        "RX",
-        "RY",
-        "RZ",
-        "Rot",
-        "CNOT",
-        "CY",
-        "CZ",
-        "SWAP",
-        "IsingXX",
-        "IsingYY",
-        "IsingXY",
-        "ControlledPhaseShift",
-        "CRX",
-        "CRY",
-        "CRZ",
-        "CRot",
-        "CSWAP",
-        "Toffoli",
-        "MultiRZ",
-        "QubitUnitary",
-        "ISWAP",
-        "PSWAP",
-    }
-
-    @staticmethod
-    def _get_operations_to_convert_to_matrix(_config):
-        # We currently override and only set a few gates to preserve existing behaviour.
-        # We could choose to read from config and use the "matrix" gates.
-        # However, that affects differentiability.
-        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
-        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX", "BlockEncode"}
-
-    @staticmethod
-    def _check_mid_circuit_measurement(config):
-        return config["compilation"]["mid_circuit_measurement"]
-
-    @staticmethod
-    def _check_adjoint(config):
-        return config["compilation"]["quantum_adjoint"]
-
-    @staticmethod
-    def _check_quantum_control(config):
-        return config["compilation"]["quantum_control"]
-
-    @staticmethod
-    def _set_supported_operations(config):
-        """Override the set of supported operations."""
-        native_gates = set(config["operators"]["gates"][0]["native"])
-        qir_gates = QJITDevice.operations_supported_by_QIR_runtime
-        QJITDevice.operations = list(native_gates.intersection(qir_gates))
-
-        # These are added unconditionally.
-        QJITDevice.operations += ["Cond", "WhileLoop", "ForLoop"]
-
-        if QJITDevice._check_mid_circuit_measurement(config):  # pragma: no branch
-            QJITDevice.operations += ["MidCircuitMeasure"]
-
-        if QJITDevice._check_adjoint(config):
-            QJITDevice.operations += ["Adjoint"]
-
-        if QJITDevice._check_quantum_control(config):  # pragma: nocover
-            # TODO: Once control is added on the frontend.
-            ...
-
-    @staticmethod
-    def _set_supported_observables(config):
-        """Override the set of supported observables."""
-        QJITDevice.observables = config["operators"]["observables"]
-
-    # pylint: disable=too-many-arguments
-    def __init__(
-        self,
-        config,
-        shots=None,
-        wires=None,
-        backend_name=None,
-        backend_lib=None,
-        backend_kwargs=None,
-    ):
-        QJITDevice._set_supported_operations(config)
-        QJITDevice._set_supported_observables(config)
-
-        self.config = config
-        self.backend_name = backend_name if backend_name else "default"
-        self.backend_lib = backend_lib if backend_lib else ""
-        self.backend_kwargs = backend_kwargs if backend_kwargs else {}
-        super().__init__(wires=wires, shots=shots)
-
-    def apply(self, operations, **kwargs):
-        """
-        Raises: RuntimeError
-        """
-        raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
-
-    def default_expand_fn(self, circuit, max_expansion=10):
-        """
-        Most decomposition logic will be equivalent to PennyLane's decomposition.
-        However, decomposition logic will differ in the following cases:
-
-        1. All :class:`qml.QubitUnitary <pennylane.ops.op_math.Controlled>` operations
-            will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-        2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations
-            will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-        3. The list of device-supported gates employed by Catalyst is currently different than
-            that of the ``lightning.qubit`` device, as defined by the
-            :class:`~.pennylane_extensions.QJITDevice`.
-
-        Args:
-            circuit: circuit to expand
-            max_expansion: the maximum number of expansion steps if no fixed-point is reached.
-        """
-        # Ensure catalyst.measure is used instead of qml.measure.
-        if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
-            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-
-        decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(self.config)
-
-        def _decomp_to_unitary(self, *_args, **_kwargs):
-            try:
-                mat = self.matrix()
-            except Exception as e:
-                raise CompileError(
-                    f"Operation {self} could not be decomposed, it might be unsupported."
-                ) from e
-            return [qml.QubitUnitary(mat, wires=self.wires)]
-
-        # Fallback for controlled gates that won't decompose successfully.
-        # Doing so before rather than after decomposition is generally a trade-off. For low
-        # numbers of qubits, a unitary gate might be faster, while for large qubit numbers prior
-        # decomposition is generally faster.
-        # At the moment, bypassing decomposition for controlled gates will generally have a higher
-        # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-        overriden_methods = [  # pragma: no cover
-            (qml.ops.Controlled, "has_decomposition", lambda self: True),
-            (qml.ops.Controlled, "decomposition", _decomp_to_unitary),
-        ]
-        for gate in decompose_to_qubit_unitary:
-            overriden_methods.append((getattr(qml, gate), "decomposition", _decomp_to_unitary))
-
-        with Patcher(*overriden_methods):
-            expanded_tape = super().default_expand_fn(circuit, max_expansion)
-
-        self.check_validity(expanded_tape.operations, [])
-        return expanded_tape
 
 
 def qfunc(device):
@@ -376,14 +204,14 @@ def qfunc(device):
 
 
 Differentiable = Union[Function, QNode]
-DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
+DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
 
     # Unwrap the function from an existing QJIT object.
-    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+    if isinstance(f, catalyst.QJIT):
         f = f.user_function
 
     if isinstance(f, (Function, QNode)):
@@ -404,7 +232,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.argnum:
+        if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
             raise DifferentiableCompileError(
                 "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
@@ -495,8 +323,14 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         )
 
 
+# pylint: disable=too-many-arguments
 def _check_grad_params(
-    method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+    method: str,
+    scalar_out: bool,
+    h: Optional[float],
+    argnum: Optional[Union[int, List[int]]],
+    len_flatten_args: int,
+    in_tree: PyTreeDef,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -512,31 +346,40 @@ def _check_grad_params(
     if not (h is None or isinstance(h, numbers.Number)):
         raise ValueError(f"Invalid h value ({h}). None or number was expected.")
     if argnum is None:
-        argnum = [0]
+        argnum_list = [0]
     elif isinstance(argnum, int):
-        argnum = [argnum]
+        argnum_list = [argnum]
     elif isinstance(argnum, tuple):
-        argnum = list(argnum)
+        argnum_list = list(argnum)
     elif isinstance(argnum, list) and all(isinstance(i, int) for i in argnum):
-        pass
+        argnum_list = argnum
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
-    return GradParams(method, scalar_out, h, argnum)
+    # Compute the argnums of the pytree arg
+    total_argnums = list(range(0, len_flatten_args))
+    argnum_unflatten = tree_unflatten(in_tree, total_argnums)
+    argnum_selected = [argnum_unflatten[i] for i in argnum_list]
+    argnum_expanded, _ = tree_flatten(argnum_selected)
+    scalar_argnum = isinstance(argnum, int) or argnum is None
+    return GradParams(method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded)
 
 
-def _unflatten_derivatives(results, out_tree, argnum, num_results):
+def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
     """Unflatten the flat list of derivatives results given the out tree."""
-    num_trainable_params = len(argnum) if isinstance(argnum, list) else 1
+    num_trainable_params = len(grad_params.expanded_argnum)
     results_final = []
+
     for i in range(0, num_results):
         intermediate_results = results[
             i * num_trainable_params : i * num_trainable_params + num_trainable_params
         ]
-        if not (isinstance(argnum, int) or argnum is None):
-            intermediate_results = tuple(intermediate_results)
-        else:
+        intermediate_results = tree_unflatten(in_tree, intermediate_results)
+        if grad_params.scalar_argnum:
             intermediate_results = intermediate_results[0]
+        else:
+            intermediate_results = tuple(intermediate_results)
         results_final.append(intermediate_results)
+
     results_final = tree_unflatten(out_tree, results_final)
     return results_final
 
@@ -569,15 +412,25 @@ class Grad:
 
         if EvaluationContext.is_tracing():
             fn = _ensure_differentiable(self.fn)
-            grad_params = _check_grad_params(*self.grad_params)
-            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
 
-            args_data, _ = tree_flatten(args)
+            args_data, in_tree = tree_flatten(args)
+            grad_params = _check_grad_params(
+                self.grad_params.method,
+                self.grad_params.scalar_out,
+                self.grad_params.h,
+                self.grad_params.argnum,
+                len(args_data),
+                in_tree,
+            )
+            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+            args_argnum = tuple(args[i] for i in grad_params.argnum)
+            _, in_tree = tree_flatten(args_argnum)
 
             # It always returns list as required by catalyst control-flows
             results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
             results = _unflatten_derivatives(
-                results, out_tree, self.grad_params.argnum, len(jaxpr.out_avals)
+                results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
             )
         else:
             if argnums := self.grad_params.argnum is None:
@@ -864,11 +717,15 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+        args_flatten, in_tree = tree_flatten(params)
+        tangents_flatten, _ = tree_flatten(tangents)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
-        results = jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        results = jvp_p.bind(
+            *args_flatten, *tangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
 
         midpoint = len(results) // 2
         func_res = results[:midpoint]
@@ -939,36 +796,38 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum)
+
+        args_flatten, in_tree = tree_flatten(params)
+        cotangents_flatten, _ = tree_flatten(cotangents)
+
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
+
+        args_argnum = tuple(params[i] for i in grad_params.argnum)
+        _, in_tree = tree_flatten(args_argnum)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         cotangents, _ = tree_flatten(cotangents)
 
-        results = vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+        results = vjp_p.bind(
+            *args_flatten, *cotangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
 
         func_res = results[: len(jaxpr.out_avals)]
         vjps = results[len(jaxpr.out_avals) :]
         func_res = tree_unflatten(out_tree, func_res)
-        # We do not change the shape of the VJP as it is the same as the parameters not
-        # as the output
-        # TODO: update when we add support for pytrees params
+        vjps = tree_unflatten(in_tree, vjps)
 
-        results = tuple([func_res, tuple(vjps)])
+        results = (func_res, vjps)
 
     else:
-        primal_outputs, vjp_fn = jax.vjp(f, *params)
 
-        # JAX requires that the PyTree shape of cotangents matches that of the function results.
-        # Generally, the user is responsible for this, except when the function returns a "bare"
-        # array, since we do force users to provide cotangents as an iterable.
-        # TODO: Add support for PyTrees in the compiled branch, then we can remove this special
-        # handling here by relaxing the input type restriction.
-        if len(cotangents) == 1 and isinstance(primal_outputs, jax.Array):
-            children, _ = flatten_one_level(cotangents)
-            cotangents = children[0]
+        if isinstance(params, jax.numpy.ndarray) and params.ndim == 0:
+            primal_outputs, vjp_fn = jax.vjp(f, params)
+        else:
+            primal_outputs, vjp_fn = jax.vjp(f, *params)
 
-        results = vjp_fn(cotangents)
+        results = (primal_outputs, vjp_fn(cotangents))
 
     return results
 
@@ -985,7 +844,7 @@ class ZNE:
         TypeError: Non-QNode object was passed as `fn`.
     """
 
-    def __init__(self, fn: Callable, scale_factors: jax.numpy.ndarray, deg: int):
+    def __init__(self, fn: Callable, scale_factors: jnp.ndarray, deg: int):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
@@ -1006,7 +865,7 @@ class ZNE:
         args_data, _ = tree_flatten(args)
         results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = jax.numpy.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        results = jnp.polyfit(float_scale_factors, results[0], self.deg)[-1]
         # Single measurement
         if results.shape == ():
             return results
@@ -1014,7 +873,7 @@ class ZNE:
         return tuple(res for res in results)
 
 
-def mitigate_with_zne(f, *, scale_factors: jax.numpy.ndarray, deg: int = None):
+def mitigate_with_zne(f, *, scale_factors: jnp.ndarray, deg: int = None):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -1321,6 +1180,16 @@ class QCtrl(HybridOp):
         """Optional wires that can be used in the expansion of this op."""
         return self._work_wires
 
+    def map_wires(self, wire_map):
+        """Map wires to new wires according to wire_map"""
+        new_ops = []
+        for op in self.regions[0].quantum_tape.operations:
+            new_ops.append(op.map_wires(wire_map))
+        self.regions[0].quantum_tape = QuantumTape(new_ops, [])
+        self._control_wires = [wire_map.get(wire, wire) for wire in self._control_wires]
+        self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
+        return self
+
 
 def qctrl_distribute(
     tape: QuantumTape,
@@ -1360,9 +1229,9 @@ def qctrl_distribute(
                 ops2.append(op)
         else:
             ops2.append(
-                Controlled(
+                create_controlled_op(
                     copy.copy(op),
-                    control_wires=control_wires,
+                    control=control_wires,
                     control_values=control_values,
                     work_wires=work_wires,
                 )
@@ -2277,3 +2146,278 @@ def ctrl(
 
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
+
+
+def vmap(
+    fn: Callable,
+    in_axes: Union[int, Sequence[Any]] = 0,
+    out_axes: Union[int, Sequence[Any]] = 0,
+    axis_size: Optional[int] = None,
+) -> Callable:
+    """A :func:`~.qjit` compatible vectorizing map.
+    Creates a function which maps an input function over argument axes.
+
+    Args:
+        f (Callable): A Python function containing PennyLane quantum operations.
+        in_axes (Union[int, Sequence[Any]]): Specifies the value(s) over which input
+            array axes to map.
+        out_axes (Union[int, Sequence[Any]]): Specifies where the mapped axis should appear
+            in the output.
+        axis_size (int): An integer can be optionally provided to indicate the size of the
+            axis to be mapped. If omitted, the size of the mapped axis will be inferred from
+            the provided arguments.
+
+    Returns:
+        Callable: Vectorized version of ``fn``.
+
+    Raises:
+        ValueError: Invalid ``in_axes``, ``out_axes``, and ``axis_size`` values.
+
+    **Example**
+
+    For example, consider the following QNode:
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def circuit(x, y):
+          qml.RX(jnp.pi * x[0] + y, wires=0)
+          qml.RY(x[1] ** 2, wires=0)
+          qml.RX(x[1] * x[2], wires=0)
+          return qml.expval(qml.PauliZ(0))
+
+    >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
+    Array(-0.93005586, dtype=float64)
+
+    We can use ``catalyst.vmap`` to introduce additional batch dimensions
+    to our input arguments,
+    without needing to use a Python for loop:
+
+    >>> x = jnp.array([[0.1, 0.2, 0.3],
+    ...                [0.4, 0.5, 0.6],
+    ...                [0.7, 0.8, 0.9]])
+    >>> y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+    >>> qjit(vmap(cost))(x, y)
+    array([-0.93005586, -0.97165424, -0.6987465 ])
+
+    ``catalyst.vmap()`` has been implemented to match the same behaviour of
+    ``jax.vmap``, so should be a drop-in replacement in most cases.
+    Under-the-hood, it is automatically inserting Catalyst-compatible for loops,
+    which will be compiled and executed outside of Python for increased performance.
+
+    Outside of a Catalyst qjit-compiled function, ``vmap`` will simply dispatch to
+    ``jax.vmap``.
+
+    .. details::
+        :title: Selecting batching axes for arguments
+
+        The ``in_axes`` parameter provides different modes the allow large- and fine-grained
+        control over which arguments to apply the batching transformation on. Enabling batching for
+        a particular argument requires that the selected axis be of the same size as the determined
+        batch size, which is the same for all arguments.
+
+        The following modes are supported:
+
+        - ``int``: Specifies the same batch axis for all arguments
+        - ``Tuple[int]``: Specify a different batch axis for each argument
+        - ``Tuple[int | None]``: Same as previous, but selectively disable batching for certain
+          arguments with a ``None`` value
+        - ``Tuple[int | PyTree[int] | None]``: Same as previous, but specify a different batch
+          axis for each leaf of an argument (Note that the ``PyTreeDefs``, i.e. the container
+          structure, must match between the ``in_axes`` element and the corresponding argument.)
+        - ``Tuple[int | PyTree[int | None] | None]``: Same as previous, but selectively disable
+          batching for individual PyTree leaves
+
+        The ``out_axes`` parameter can be also used to specify the positions of the mapped axis
+        in the output. ``out_axes`` is subject to the same modes as well.
+    """
+
+    # Check the validity of in_axes and out_axes
+    if not all(isinstance(l, int) for l in tree_leaves(in_axes)):
+        raise ValueError(
+            "Invalid 'in_axes'; it must be an int or a tuple of PyTrees with integer leaves, "
+            f"but got {in_axes}"
+        )
+
+    if not all(isinstance(l, int) for l in tree_leaves(out_axes)):
+        raise ValueError(
+            "Invalid 'out_axes'; it must be an int or a tuple of PyTree with integer leaves, "
+            f"but got {out_axes}"
+        )
+
+    def batched_fn(*args, **kwargs):
+        """Vectorization wrapper around the hybrid program using catalyst.for_loop"""
+
+        # Dispatch to jax.vmap when it is called outside qjit.
+        if not EvaluationContext.is_tracing():
+            return jax.vmap(fn, in_axes, out_axes)(*args, **kwargs)
+
+        args_flat, args_tree = tree_flatten(args)
+        in_axes_flat, _ = tree_flatten(in_axes, is_leaf=lambda x: x is None)
+
+        # Check the validity of the input arguments w.r.t. in_axes
+        in_axes_deep_struct = tree_structure(in_axes, is_leaf=lambda x: x is None)
+        args_deep_struct = tree_structure(args, is_leaf=lambda x: x is None)
+        if not isinstance(in_axes, int) and in_axes_deep_struct != args_deep_struct:
+            raise ValueError(
+                "Invalid 'in_axes'; it must be an int or match the length of positional "
+                f"arguments, but got {in_axes_deep_struct} axis specifiers "
+                f"and {args_deep_struct} arguments."
+            )
+        if isinstance(in_axes, int):
+            in_axes_flat = [
+                in_axes,
+            ] * len(args_flat)
+
+        batch_size = _get_batch_size(args_flat, in_axes_flat, axis_size)
+        batch_loc = _get_batch_loc(in_axes_flat)
+
+        # Prepare args_flat to run 'fn' one time and get the output-shape
+        fn_args_flat = args_flat.copy()
+        for loc in batch_loc:
+            ax = in_axes_flat[loc]
+            fn_args_flat[loc] = jnp.take(args_flat[loc], 0, axis=ax)
+
+        fn_args = tree_unflatten(args_tree, fn_args_flat)
+
+        # Run 'fn' one time to get output-shape
+        init_result = fn(*fn_args, **kwargs)
+
+        # Check the validity of the output w.r.t. out_axes
+        out_axes_deep_struct = tree_structure(out_axes, is_leaf=lambda x: x is None)
+        init_result_deep_struct = tree_structure(init_result, is_leaf=lambda x: x is None)
+        if not isinstance(out_axes, int) and out_axes_deep_struct != init_result_deep_struct:
+            raise ValueError(
+                "Invalid 'out_axes'; it must be an int or match "
+                "the number of function results, but got "
+                f"{out_axes_deep_struct} axis specifiers and {init_result_deep_struct} results."
+            )
+
+        init_result_flat, init_result_tree = tree_flatten(init_result)
+
+        num_axes_out = len(init_result_flat)
+
+        if isinstance(out_axes, int):
+            out_axes_flat = [
+                out_axes,
+            ] * num_axes_out
+        else:
+            out_axes_flat, _ = tree_flatten(out_axes, is_leaf=lambda x: x is None)
+
+        out_loc = _get_batch_loc(out_axes_flat)
+
+        # Store batched results of all leaves
+        # in the flatten format with respect to the 'init_result' shape
+        batched_result_list = []
+        for j in range(num_axes_out):
+            out_shape = (
+                (batch_size,)
+                if not init_result_flat[j].shape
+                else (batch_size, *init_result_flat[j].shape)
+            )
+            batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
+            batched_result_list[j] = batched_result_list[j].at[0].set(init_result_flat[j])
+
+        # Apply mapping batched_args[1:] ---> fn(args)
+        @for_loop(1, batch_size, 1)
+        def loop_fn(i, batched_result_list):
+            fn_args_flat = args_flat
+            for loc in batch_loc:
+                ax = in_axes_flat[loc]
+                fn_args_flat[loc] = jnp.take(args_flat[loc], i, axis=ax)
+
+            fn_args = tree_unflatten(args_tree, fn_args_flat)
+            res = fn(*fn_args, **kwargs)
+
+            res_flat, _ = tree_flatten(res)
+
+            # Update the list of results
+            for j in range(num_axes_out):
+                batched_result_list[j] = batched_result_list[j].at[i].set(res_flat[j])
+
+            return batched_result_list
+
+        batched_result_list = loop_fn(batched_result_list)
+
+        # Support out_axes on dim > 0
+        for loc in out_loc:
+            if ax := out_axes_flat[loc]:
+                up_axes = [*range(batched_result_list[loc].ndim)]
+                up_axes[ax], up_axes[0] = up_axes[0], up_axes[ax]
+                batched_result_list[loc] = jnp.transpose(batched_result_list[loc], up_axes)
+
+        # Unflatten batched_result before return
+        return tree_unflatten(init_result_tree, batched_result_list)
+
+    return batched_fn
+
+
+def _get_batch_loc(axes_flat):
+    """
+    Get the list of mapping locations in the flattened list of in-axes or out-axes.
+
+    This function takes a flattened list of axes and identifies all elements with a
+    non-None value. The resulting list contains the indices of these non-None values,
+    indicating where the mapping should apply.
+
+    Args:
+        axes_flat (List): Flattened list of in-axes or out-axes including `None` elements.
+
+    Returns:
+        List: A list of indices representing the locations where the mapping should be applied.
+    """
+
+    return [i for i, d in enumerate(axes_flat) if d is not None]
+
+
+def _get_batch_size(args_flat, axes_flat, axis_size):
+    """Get the batch size based on the provided arguments and axes specifiers, or the manually
+       specified batch size by the user request. The batch size must be the same for all arguments.
+
+    Args:
+        args_flat (List): Flatten list of arguments.
+        axes_flat (List): Flatten list of `in_axes` or `our_axes` including `None` elements.
+        axis_size (Optional[int]): Optional default batch size.
+
+    Returns:
+        int: Returns the batch size used as the upper bound of the QJIT-compatible for loop
+            in the computation of vmap.
+
+    Raises:
+        ValueError: The batch size must be the same for all arguments.
+        ValueError: The default batch is expected to be None, or less than or equal
+        to the computed batch size.
+    """
+
+    batch_sizes = []
+    for arg, d in zip(args_flat, axes_flat):
+        shape = np.shape(arg) if arg.shape else (1,)
+        if d is not None and len(shape) > d:
+            batch_sizes.append(shape[d])
+
+    if any(size != batch_sizes[0] for size in batch_sizes[1:]):
+        raise ValueError(
+            "Invalid batch sizes; expected the batch size to be the same for all arguments, "
+            f"but got batch_sizes={batch_sizes} from args_flat={args_flat}"
+        )
+
+    batch_size = batch_sizes[0] if batch_sizes else 0
+
+    if axis_size is not None:
+        if axis_size <= batch_size:
+            batch_size = axis_size
+        else:
+            raise ValueError(
+                "Invalid 'axis_size'; the default batch is expected to be None, "
+                "or less than or equal to the computed batch size, but got "
+                f"axis_size={axis_size} > batch_size={batch_size}"
+            )
+
+    if not batch_size:
+        raise ValueError(
+            f"Invalid batch size; it must be a non-zero integer, but got {batch_size}."
+        )
+
+    return batch_size

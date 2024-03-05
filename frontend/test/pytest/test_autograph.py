@@ -14,7 +14,6 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
-import sys
 import traceback
 from collections import defaultdict
 
@@ -38,7 +37,9 @@ from catalyst import (
     qjit,
     vjp,
 )
-from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
+from catalyst.autograph import TRANSFORMER, AutoGraphError, autograph_source
+
+check_cache = TRANSFORMER.has_cache
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
@@ -63,17 +64,6 @@ class Failing:
             Failing.triggered[self.label] = True
             raise Exception(f"Emulated failure with label {self.label}")
         return self.ref
-
-
-def test_unavailable(monkeypatch):
-    """Check the error produced in the absence of tensorflow."""
-    monkeypatch.setitem(sys.modules, "tensorflow", None)
-
-    def fn(x):
-        return x**2
-
-    with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
-        qjit(autograph=True)(fn)
 
 
 @pytest.mark.tf
@@ -168,6 +158,8 @@ class TestIntegration:
 
         class FN:
             """Test object."""
+
+            __name__ = "unknown"
 
             def __call__(self, x):
                 return x**2

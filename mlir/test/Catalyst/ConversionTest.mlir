@@ -18,7 +18,7 @@
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>, i1)
+// CHECK-DAG: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr, i1)
 
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {
@@ -31,12 +31,11 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 
     // CHECK: [[memref_ptr:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: llvm.store [[memref]], [[memref_ptr]]
-    // CHECK: [[memref_ptr_cast:%.+]] = llvm.bitcast [[memref_ptr]] : {{.*}} to !llvm.ptr
-    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr_cast]], [[struct0]][1]
+    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr]], [[struct0]][1]
 
     // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
 
-    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>
+    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} : (i64) -> !llvm.ptr
     // CHECK: llvm.store [[struct2]], [[struct_ptr]]
     // CHECK: [[memref_flag:%.+]] = llvm.mlir.constant(false)
     // CHECK: llvm.call @__catalyst__rt__print_tensor([[struct_ptr]], [[memref_flag]])
@@ -52,14 +51,13 @@ func.func @dbprint_val(%arg0 : memref<1xi64>) {
 // -----
 
 // CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Hello, Catalyst")
-// CHECK-DAG: llvm.func @__catalyst__rt__print_string(!llvm.ptr<i8>)
+// CHECK-DAG: llvm.func @__catalyst__rt__print_string(!llvm.ptr)
 
 // CHECK-LABEL: @dbprint_str
 func.func @dbprint_str() {
 
-    // CHECK: [[C0:%.+]] = llvm.mlir.constant(0 : index)
-    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr<array<15 x i8>>
-    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr [[array_ptr]][[[C0]], [[C0]]] : {{.*}} -> !llvm.ptr<i8>
+    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
+    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr inbounds [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<15 x i8>
     // CHECK: llvm.call @__catalyst__rt__print_string([[char_ptr]])
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
@@ -79,7 +77,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[encodeRank:%.+]] = llvm.insertvalue [[c2]], [[undef]][0] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[c0:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK-NEXT: [[argStruct:%.+]] = llvm.extractvalue [[convertedArg]][1] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)> 
-    // CHECK-NEXT: [[getPtr:%.+]] = llvm.getelementptr [[argStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
+    // CHECK-NEXT: [[getPtr:%.+]] = llvm.getelementptr inbounds [[argStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
     // CHECK-NEXT: [[encodeData:%.+]] = llvm.insertvalue [[getPtr]], [[encodeRank]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodeType:%.+]] = llvm.insertvalue [[numericTypeArg]], [[encodeData]][2] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[alloca:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr
@@ -94,7 +92,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK-NEXT: [[encodedRes:%.+]] = llvm.insertvalue [[c2_1]], [[undef1_1]][0] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[c0:%.+]] = llvm.mlir.constant(0 : i64) : i64
     // CHECK-NEXT: [[resStruct:%.+]] = llvm.extractvalue [[allocConverted]][1] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)> 
-    // CHECK-NEXT: [[getPtrRes:%.+]] = llvm.getelementptr [[resStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
+    // CHECK-NEXT: [[getPtrRes:%.+]] = llvm.getelementptr inbounds [[resStruct]][[[c0]]] : (!llvm.ptr, i64) -> !llvm.ptr, f64
     // CHECK-NEXT: [[encodedResData:%.+]] = llvm.insertvalue [[getPtrRes]], [[encodedRes]][1] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[encodedResType:%.+]] = llvm.insertvalue [[numericTypeRes]], [[encodedResData]][2] : !llvm.struct<(i64, ptr, i8)> 
     // CHECK-NEXT: [[allocaRes:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(i64, ptr, i8)> : (i64) -> !llvm.ptr

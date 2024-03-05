@@ -196,12 +196,22 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
-        mlir::ValueRange getQubitOperands() {
-            return getInQubits();
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInQubits().begin(),
+                          getInQubits().end());
+            values.insert(values.end(), getInCtrlQubits().begin(),
+                          getInCtrlQubits().end());
+            return values;
         }
 
-        mlir::ValueRange getQubitResults() {
-            return getOutQubits();
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutQubits().begin(),
+                          getOutQubits().end());
+            values.insert(values.end(), getOutCtrlQubits().begin(),
+                          getOutCtrlQubits().end());
+            return values;
         }
 
         bool getAdjointFlag() {
@@ -210,12 +220,29 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         void setAdjointFlag(bool adjoint) {
             setAdjoint(adjoint);
         };
+
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return getInQubits();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getNonCtrlQubitResults() {
+            return getOutQubits();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
+        }
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]> {
+def CustomOp : Gate_Op<"custom", [DifferentiableGate,
+                                  AttrSizedOperandSegments, AttrSizedResultSegments ]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -224,15 +251,18 @@ def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]>
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
+        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -242,7 +272,74 @@ def CustomOp : Gate_Op<"custom", [AttrSizedOperandSegments, DifferentiableGate]>
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
+def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+    let summary = "Global Phase.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        F64:$params,
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    code extraBaseClassDeclaration = [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInCtrlQubits().begin(),
+                          getInCtrlQubits().end());
+            return values;
+        }
+
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutCtrlQubits().begin(),
+                          getOutCtrlQubits().end());
+            return values;
+        }
+
+        bool getAdjointFlag() {
+            return getAdjoint().has_value() ? getAdjoint().value() : false;
+        }
+        void setAdjointFlag(bool adjoint) {
+            setAdjoint(adjoint);
+        };
+
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return mlir::ValueRange();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getNonCtrlQubitResults() {
+            return mlir::ValueRange();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+
+}
+
+def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments ]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -252,15 +349,18 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+        `(` $theta `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -270,7 +370,10 @@ def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate]> {
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate
+        , AttrSizedOperandSegments
+        , AttrSizedResultSegments
+        ]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -283,15 +386,18 @@ def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate]> {
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
+        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

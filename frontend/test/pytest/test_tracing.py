@@ -12,24 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the JAX primitives module."""
+"""Unit tests for Catalyst's tracing module."""
 
+import jax
 import pytest
 
-from catalyst.jax_primitives import AbstractQbit, qinst_p
+from catalyst.jax_tracer import lower_jaxpr_to_mlir
 
 
-class TestQinstPrim:
-    """Test the quantum instruction primitive."""
+def test_jaxpr_lowering_without_dynshapes():
+    """Test that the lowering function can be used without Catalyst's dynamic shape support."""
 
-    def test_abstract_eval_no_len(self):
-        """Test that the number of qubits is properly deduced when not set automatically."""
+    def f():
+        return 0
 
-        qb0, qb1 = (AbstractQbit(),) * 2
-        result = qinst_p.abstract_eval(qb0, qb1, op="GarbageOp")[0]
+    jaxpr = jax.make_jaxpr(f)()
+    result, _ = lower_jaxpr_to_mlir(jaxpr, "test_fn")
 
-        assert len(result) == 2
-        assert all(isinstance(r, AbstractQbit) for r in result)
+    assert "@jit_test_fn() -> tensor<i64>" in str(result)
 
 
 if __name__ == "__main__":

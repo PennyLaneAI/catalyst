@@ -15,9 +15,9 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-from dataclasses import astuple, dataclass
+from dataclasses import dataclass
 from itertools import chain
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Union
 
 import jax
 import numpy as np
@@ -46,6 +46,7 @@ from mlir_quantum.dialects.quantum import (
     DeviceReleaseOp,
     ExpvalOp,
     ExtractOp,
+    GlobalPhaseOp,
     HamiltonianOp,
     HermitianOp,
     InsertOp,
@@ -174,6 +175,8 @@ qdealloc_p = core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
 qextract_p = core.Primitive("qextract")
 qinsert_p = core.Primitive("qinsert")
+gphase_p = core.Primitive("gphase")
+gphase_p.multiple_results = True
 qinst_p = core.Primitive("qinst")
 qinst_p.multiple_results = True
 qunitary_p = core.Primitive("qunitary")
@@ -201,7 +204,7 @@ for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
-grad_p.multiple_results = True
+func_p.multiple_results = True
 jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
@@ -313,10 +316,9 @@ class GradParams:
     method: str
     scalar_out: bool
     h: float
-    argnum: List[int]
-
-    def __iter__(self):
-        return iter(astuple(self))
+    argnum: Union[int, List]
+    scalar_argnum: bool = None
+    expanded_argnum: List[int] = None
 
 
 @grad_p.def_impl
@@ -329,7 +331,7 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.argnum]
+    new_argnum = [num + offset for num in grad_params.expanded_argnum]
     transformed_signature = calculate_grad_shape(signature, new_argnum)
     return tuple(transformed_signature.get_results())
 
@@ -346,7 +348,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         argnum: argument indices which define over which arguments to
             differentiate.
     """
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:
@@ -401,7 +403,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
@@ -447,7 +449,7 @@ def _vjp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 # pylint: disable=unused-argument
 def _vjp_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
-    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.argnum]
+    return jaxpr.out_avals + [jaxpr.in_avals[i] for i in grad_params.expanded_argnum]
 
 
 def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -456,7 +458,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         MLIR results
     """
     args = list(args)
-    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.expanded_argnum
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
@@ -679,29 +681,120 @@ def _qinsert_lowering(
 
 
 #
-# qinst
+# gphase
 #
-@qinst_p.def_abstract_eval
-def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=None):
+@gphase_p.def_abstract_eval
+def _gphase_abstract_eval(
+    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
     qubits = qubits_or_params[:qubits_len]
-    for qubit in qubits:
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
+    for idx in range(qubits_len + ctrl_len):
+        qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
-    return (AbstractQbit(),) * len(qubits)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
 @qinst_p.def_impl
-def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len):  # pragma: no cover
+def _gphase_abstract_eval(
+    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+):
+    """Not implemented"""
     raise NotImplementedError()
 
 
-def _qinst_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params: tuple, op=None, qubits_len=None
+def _gphase_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params,
+    op=None,
+    qubits_len: int = 0,
+    params_len: int = 0,
+    ctrl_len: int = 0,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
     qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len:]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+
+    float_params = []
+    assert 1 == len(params), "Only one param in GlobalPhase"
+    for p in params:
+        if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
+            baseType = ir.RankedTensorType(p.type).element_type
+
+        if not ir.F64Type.isinstance(baseType):
+            baseType = ir.F64Type.get()
+            resultTensorType = ir.RankedTensorType.get((), baseType)
+            p = ConvertOp(resultTensorType, p).results
+
+        p = TensorExtractOp(baseType, p, []).result
+
+        assert ir.F64Type.isinstance(
+            p.type
+        ), "Only scalar double parameters are allowed for quantum gates!"
+
+        float_params.append(p)
+
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    GlobalPhaseOp(
+        params=float_params[0],
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+    )
+    return qubits + ctrl_qubits
+
+
+#
+# qinst
+#
+@qinst_p.def_abstract_eval
+def _qinst_abstract_eval(
+    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_or_params[:qubits_len]
+    ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
+    all_qubits = qubits + ctrl_qubits
+    for idx in range(qubits_len + ctrl_len):
+        qubit = all_qubits[idx]
+        assert isinstance(qubit, AbstractQbit)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
+
+
+@qinst_p.def_impl
+def _qinst_def_impl(
+    ctx, *qubits_or_params, op, qubits_len, params_len, ctrl_len
+):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _qinst_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params: tuple,
+    op=None,
+    qubits_len: int = 0,
+    params_len: int = 0,
+    ctrl_len: int = 0,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits_or_params[:qubits_len]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
 
     for qubit in qubits:
         assert ir.OpaqueType.isinstance(qubit.type)
@@ -726,6 +819,11 @@ def _qinst_lowering(
 
         float_params.append(p)
 
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
@@ -733,27 +831,55 @@ def _qinst_lowering(
     if name_str == "MultiRZ":
         assert len(float_params) == 1, "MultiRZ takes one float parameter"
         float_param = float_params[0]
-        return MultiRZOp([qubit.type for qubit in qubits], float_param, qubits).results
+        return MultiRZOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+        ).results
 
-    return CustomOp([qubit.type for qubit in qubits], float_params, qubits, name_attr).results
+    return CustomOp(
+        out_qubits=[qubit.type for qubit in qubits],
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        params=float_params,
+        in_qubits=qubits,
+        gate_name=name_attr,
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+    ).results
 
 
 #
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits):
-    for q in qubits:
-        assert isinstance(q, AbstractQbit)
-    return (AbstractQbit(),) * len(qubits)
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int = 0):
+    for idx in range(qubits_len + ctrl_len):
+        qubit = qubits[idx]
+        assert isinstance(qubit, AbstractQbit)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(ctx, matrix, qubits):  # pragma: no cover
+def _qunitary_def_impl(
+    ctx, matrix, qubits, qubits_len: int = None, ctrl_len: int = 0
+):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+def _qunitary_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    matrix: ir.Value,
+    *qubits_or_controlled: tuple,
+    qubits_len: int = 0,
+    ctrl_len: int = 0,
+):
+    qubits = qubits_or_controlled[:qubits_len]
+    ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
+    ctrl_values = qubits_or_controlled[qubits_len + ctrl_len :]
+
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -785,7 +911,19 @@ def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qub
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
         matrix = ConvertOp(tensor_complex_f64_type, matrix).results
 
-    return QubitUnitaryOp([q.type for q in qubits], matrix, qubits).results
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    return QubitUnitaryOp(
+        out_qubits=[q.type for q in qubits],
+        out_ctrl_qubits=[q.type for q in ctrl_qubits],
+        matrix=matrix,
+        in_qubits=qubits,
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+    ).results
 
 
 #
@@ -1516,6 +1654,7 @@ mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
 mlir.register_lowering(qextract_p, _qextract_lowering)
 mlir.register_lowering(qinsert_p, _qinsert_lowering)
 mlir.register_lowering(qinst_p, _qinst_lowering)
+mlir.register_lowering(gphase_p, _gphase_lowering)
 mlir.register_lowering(qunitary_p, _qunitary_lowering)
 mlir.register_lowering(qmeasure_p, _qmeasure_lowering)
 mlir.register_lowering(compbasis_p, _compbasis_lowering)
@@ -1544,7 +1683,7 @@ def _scalar_abstractify(t):
     # pylint: disable=protected-access
     if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
-    raise TypeError(f"Cannot convert given type {t} to scalar ShapedArray.")
+    raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
 
 # pylint: disable=protected-access

@@ -24,9 +24,32 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 import catalyst
+from catalyst.jax_extras import (
+    ClosedJaxpr,
+    DynamicJaxprTrace,
+    DynamicJaxprTracer,
+    DynshapedClosedJaxpr,
+    PyTreeDef,
+    PyTreeRegistry,
+    ShapedArray,
+    _abstractify,
+    _input_type_to_tracers,
+    convert_element_type,
+    deduce_avals,
+    eval_jaxpr,
+    jaxpr_to_mlir,
+    make_jaxpr2,
+    sort_eqns,
+    transient_jax_config,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+    wrap_init,
+)
 from catalyst.jax_primitives import (
     AbstractQreg,
     compbasis_p,
@@ -34,6 +57,7 @@ from catalyst.jax_primitives import (
     counts_p,
     expval_p,
     func_p,
+    gphase_p,
     hamiltonian_p,
     hermitian_p,
     mlir_fn_cache,
@@ -52,30 +76,12 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
-from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import (
-    ClosedJaxpr,
-    DynamicJaxprTrace,
-    DynamicJaxprTracer,
-    PyTreeDef,
-    PyTreeRegistry,
-    ShapedArray,
-    _abstractify,
-    _input_type_to_tracers,
-    convert_element_type,
-    deduce_avals,
-    eval_jaxpr,
-    jaxpr_remove_implicit,
-    jaxpr_to_mlir,
-    make_jaxpr2,
-    sort_eqns,
-    transient_jax_config,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    wrap_init,
+from catalyst.tracing.contexts import (
+    EvaluationContext,
+    EvaluationMode,
+    JaxTracingContext,
 )
+from catalyst.utils.exceptions import CompileError
 
 
 class Function:
@@ -96,11 +102,12 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
+        args, _ = jax.tree_util.tree_flatten(args)
         retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
         return tree_unflatten(out_tree, retval)
 
@@ -110,7 +117,7 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
 # is constrained to occur before all subsequent equations in the quantum operations trace.
-FORCED_ORDER_PRIMITIVES = {qdevice_p}
+FORCED_ORDER_PRIMITIVES = {qdevice_p, gphase_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
@@ -217,7 +224,7 @@ class QRegPromise:
     def insert(self, wires, qubits) -> None:
         """Insert qubits to the cache."""
         qrp = self
-        assert len(wires) == len(qubits)
+        assert len(wires) == len(qubits), f"len(wires)({len(wires)}) != len(qubits)({len(qubits)})"
         for w, qubit in zip(wires, qubits):
             assert (w not in qrp.cache) or (
                 qrp.cache[w] is None
@@ -229,7 +236,8 @@ class QRegPromise:
         qrp = self
         qreg = qrp.base
         for w, qubit in qrp.cache.items():
-            qreg = qinsert_p.bind(qreg, w, qubit)
+            if qubit is not None:
+                qreg = qinsert_p.bind(qreg, w, qubit)
         qrp.cache = {}
         qrp.base = qreg
         return qreg
@@ -328,11 +336,11 @@ def has_nested_tapes(op: Operation) -> bool:
     )
 
 
-def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
-    """Lower a Python function into an MLIR module.
+def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
+    """Trace a Python function to JAXPR.
 
     Args:
-        func: python function to be lowered
+        func: python function to be traced
         static_argnums: indices of static arguments.
         abstracted_axes: abstracted axes specification. Necessary for JAX to use dynamic tensor
             sizes.
@@ -340,12 +348,31 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
         kwargs: keyword arguments to ``func``
 
     Returns:
-        MLIR module: the MLIR module corresponding to ``func``
-        MLIR context: the MLIR context
         ClosedJaxpr: the Jaxpr program corresponding to ``func``
-        jax.OutputType: Jaxpr output type (a list of abstract values paired with
-                        explicintess flags).
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
+    """
+
+    with transient_jax_config():
+        with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+            make_jaxpr_kwargs = {
+                "static_argnums": static_argnums,
+                "abstracted_axes": abstracted_axes,
+            }
+            jaxpr, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+
+    return jaxpr, out_treedef
+
+
+def lower_jaxpr_to_mlir(jaxpr, func_name):
+    """Lower a JAXPR to MLIR.
+
+    Args:
+        ClosedJaxpr: the JAXPR to lower to MLIR
+        func_name: a name to use for the MLIR function
+
+    Returns:
+        ir.Module: the MLIR module coontaining the JAX program
+        ir.Context: the MLIR context
     """
 
     # The compilation cache must be clear for each translation unit. Otherwise, MLIR functions
@@ -355,18 +382,13 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     mlir_fn_cache.clear()
 
     with transient_jax_config():
-        with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
-            make_jaxpr_kwargs = {
-                "abstracted_axes": abstracted_axes,
-                "static_argnums": static_argnums,
-            }
-            jaxpr, out_type, out_tree = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
-
         # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-        jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
-        module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
+        if isinstance(jaxpr, DynshapedClosedJaxpr):
+            jaxpr = jaxpr.remove_implicit_results()
 
-    return module, context, jaxpr, out_type2, out_tree
+        mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
+
+    return mlir_module, ctx
 
 
 def trace_quantum_tape(
@@ -399,6 +421,46 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
+    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+        # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
+        # `Controlled(OP)` bind OP with native quantum control syntax.
+        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
+            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        elif isinstance(op, QubitUnitary):
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = qunitary_p.bind(
+                *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
+                qubits_len=len(qubits),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        elif isinstance(op, qml.GlobalPhase):
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = gphase_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        else:
+            qubits = qrp.extract(op.wires)
+            controlled_qubits = qrp.extract(controlled_wires)
+            qubits2 = qinst_p.bind(
+                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
+                op=op.name,
+                qubits_len=len(qubits),
+                params_len=len(op.parameters),
+                ctrl_len=len(controlled_qubits),
+            )
+            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        return qrp
+
     qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
         qrp2 = None
@@ -408,15 +470,7 @@ def trace_quantum_tape(
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
             else:
-                qubits = qrp.extract(op.wires)
-                if isinstance(op, QubitUnitary):
-                    qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
-                else:
-                    qubits2 = qinst_p.bind(
-                        *qubits, *op.parameters, op=op.name, qubits_len=len(qubits)
-                    )
-                qrp.insert(op.wires, qubits2)
-                qrp2 = qrp
+                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2

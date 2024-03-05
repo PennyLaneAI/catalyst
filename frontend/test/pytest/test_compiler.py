@@ -30,12 +30,9 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compilation_pipelines import WorkspaceManager
 from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
-from catalyst.jax_tracer import trace_to_mlir
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime import get_lib_path
 
 # pylint: disable=missing-function-docstring
 
@@ -163,13 +160,13 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
 
-        @qjit(target="fake_binary")
+        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=1))
         def cpp_exception_test():
             return None
 
         cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
-        compiled_function = cpp_exception_test.compile()
+        compiled_function, _ = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
             compiled_function()
@@ -182,6 +179,31 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 
 class TestCompilerState:
     """Test states that the compiler can reach."""
+
+    def test_invalid_target(self):
+        """Test that nothing happens in AOT compilation when an invalid target is provided."""
+
+        @qjit(target="hello")
+        def f():
+            return 0
+
+        assert f.jaxpr is None
+        assert f.mlir is None
+        assert f.qir is None
+        assert f.compiled_function is None
+
+    def test_callable_without_name(self):
+        """Test that a callable without __name__ property can be compiled, if it is otherwise
+        traceable."""
+
+        class NoNameClass:
+            def __call__(self, x):
+                return x
+
+        f = qjit(NoNameClass())
+
+        assert f(3) == 3
+        assert f.__name__ == "unknown"
 
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
@@ -262,75 +284,6 @@ class TestCompilerState:
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
-
-    def test_compiler_from_textual_ir(self):
-        """Test the textual IR compilation."""
-        full_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        extension = ".so" if platform.system() == "Linux" else ".dylib"
-
-        # pylint: disable=line-too-long
-        ir = (
-            r"""
-module @workflow {
-  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %0 = call @workflow(%arg0) : (tensor<f64>) -> tensor<f64>
-    return %0 : tensor<f64>
-  }
-  func.func private @workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "finite-diff", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    quantum.device ["""
-            + r'"'
-            + full_path
-            + r"""/librtd_lightning"""
-            + extension
-            + """", "LightningSimulator", "{'shots': 0}"]
-    %0 = stablehlo.constant dense<4> : tensor<i64>
-    %1 = quantum.alloc( 4) : !quantum.reg
-    %2 = stablehlo.constant dense<0> : tensor<i64>
-    %extracted = tensor.extract %2[] : tensor<i64>
-    %3 = quantum.extract %1[%extracted] : !quantum.reg -> !quantum.bit
-    %4 = quantum.custom "PauliX"() %3 : !quantum.bit
-    %5 = stablehlo.constant dense<1> : tensor<i64>
-    %extracted_0 = tensor.extract %5[] : tensor<i64>
-    %6 = quantum.extract %1[%extracted_0] : !quantum.reg -> !quantum.bit
-    %extracted_1 = tensor.extract %arg0[] : tensor<f64>
-    %7 = quantum.custom "RX"(%extracted_1) %6 : !quantum.bit
-    %8 = quantum.namedobs %4[ PauliZ] : !quantum.obs
-    %9 = quantum.expval %8 : f64
-    %from_elements = tensor.from_elements %9 : tensor<f64>
-    quantum.dealloc %1 : !quantum.reg
-    quantum.device_release
-    return %from_elements : tensor<f64>
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
-}
-"""
-        )
-        compiled_function = qjit(ir)
-        assert compiled_function(0.1) == -1
-
-    def test_parsing_errors(self):
-        """Test parsing error handling."""
-
-        ir = r"""
-module @workflow {
-  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %c = stablehlo.constant dense<4.0> : tensor<i64>
-    return %c : tensor<f64> // Invalid type
-  }
-}
-"""
-        with pytest.raises(CompileError) as e:
-            qjit(ir)(0.1)
-
-        assert "Failed to parse module as MLIR source" in e.value.args[0]
-        assert "Failed to parse module as LLVM source" in e.value.args[0]
 
     def test_pipeline_error(self):
         """Test pipeline error handling."""

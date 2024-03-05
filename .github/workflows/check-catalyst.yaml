@@ -31,6 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
       - name: Build Catalyst-Runtime
@@ -102,6 +103,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
@@ -176,6 +178,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build MHLO Dialect
@@ -245,6 +248,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build Enzyme
@@ -271,6 +275,7 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
@@ -372,10 +377,15 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        # cuda-quantum is added manually here.
+        # It can't be in requirements.txt as that will break
+        # macOS requirements.txt
+        python3 -m pip install cuda-quantum
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -437,12 +447,17 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Install lightning.kokkos used in Python tests
+      run: |
+        pip install PennyLane-Lightning-Kokkos
+
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -470,10 +485,6 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
 
-    - name: Install lightning.kokkos used in Python tests
-      run: |
-        pip install PennyLane-Lightning-Kokkos
-
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
         make pytest TEST_BACKEND="lightning.kokkos"
@@ -492,10 +503,11 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -548,6 +560,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
@@ -607,6 +620,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
 
       - name: Build Runtime test suite for Lightning simulator

@@ -27,4 +27,6 @@ void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
 void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
+void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
+
 } // namespace catalyst

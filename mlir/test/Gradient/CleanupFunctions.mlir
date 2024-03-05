@@ -26,10 +26,10 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_
     %c2_i64 = arith.constant 2 : i64
     %0 = "quantum.alloc"() {nqubits_attr = 3 : i64} : () -> !quantum.reg
     %1 = "quantum.extract"(%0, %c2_i64) : (!quantum.reg, i64) -> !quantum.bit
-    %2 = "quantum.custom"(%1) {gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1> } : (!quantum.bit) -> !quantum.bit
+    %2 = "quantum.custom"(%1) {gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0> } : (!quantum.bit) -> !quantum.bit
     %3 = "quantum.extract"(%0, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
     %4 = tensor.extract %arg0[] : tensor<f64>
-    %5:2 = "quantum.custom"(%4, %3, %2) {gate_name = "CRX", operand_segment_sizes = array<i32: 1, 2> } : (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    %5:2 = "quantum.custom"(%4, %3, %2) {gate_name = "CRX", operand_segment_sizes = array<i32: 1, 2, 0, 0>, result_segment_sizes = array<i32: 2, 0> } : (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
     %6 = "quantum.namedobs"(%5#0) {type = #quantum<named_observable PauliZ>} : (!quantum.bit) -> !quantum.obs
     %7 = "quantum.expval"(%6) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %8 = tensor.from_elements %7 : tensor<f64>
@@ -59,8 +59,8 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
     %0 = "quantum.alloc"() {nqubits_attr = 3 : i64} : () -> !quantum.reg
     %1 = "quantum.extract"(%0, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
     %extracted = tensor.extract %arg0[] : tensor<f64>
-    %2 = "quantum.custom"(%extracted, %1) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1>} : (f64, !quantum.bit) -> !quantum.bit
-    %3 = "quantum.custom"(%2) {gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1>} : (!quantum.bit) -> !quantum.bit
+    %2 = "quantum.custom"(%extracted, %1) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0>} : (f64, !quantum.bit) -> !quantum.bit
+    %3 = "quantum.custom"(%2) {gate_name = "Hadamard", operand_segment_sizes = array<i32: 0, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0>} : (!quantum.bit) -> !quantum.bit
     %4 = "quantum.insert"(%0, %c0_i64, %3) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
     %extracted_0 = tensor.extract %arg1[] : tensor<i64>
     %5 = arith.index_cast %extracted_0 : i64 to index
@@ -68,11 +68,11 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
         %10 = arith.index_cast %arg3 : index to i64
         %11 = "quantum.extract"(%arg4, %10) : (!quantum.reg, i64) -> !quantum.bit
         %extracted_2 = tensor.extract %arg0[] : tensor<f64>
-        %12 = "quantum.custom"(%extracted_2, %11) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1>} : (f64, !quantum.bit) -> !quantum.bit
+        %12 = "quantum.custom"(%extracted_2, %11) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0>} : (f64, !quantum.bit) -> !quantum.bit
         %13 = "quantum.insert"(%arg4, %10, %12) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
         %14 = "quantum.extract"(%13, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
         %15 = "quantum.extract"(%13, %10) : (!quantum.reg, i64) -> !quantum.bit
-        %16:2 = "quantum.custom"(%14, %15) {gate_name = "CNOT", operand_segment_sizes = array<i32: 0, 2>} : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        %16:2 = "quantum.custom"(%14, %15) {gate_name = "CNOT", operand_segment_sizes = array<i32: 0, 2, 0, 0>, result_segment_sizes = array<i32: 2, 0>} : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
         %17 = "quantum.insert"(%13, %10, %16#1) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
         %18 = "quantum.insert"(%17, %c0_i64, %16#0) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
         scf.yield %18 : !quantum.reg
@@ -124,13 +124,13 @@ func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> att
         } -> tensor<f64>
         %9 = "quantum.extract"(%0, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
         %extracted_1 = tensor.extract %8[] : tensor<f64>
-        %10 = "quantum.custom"(%extracted_1, %9) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1>} : (f64, !quantum.bit) -> !quantum.bit
+        %10 = "quantum.custom"(%extracted_1, %9) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0>} : (f64, !quantum.bit) -> !quantum.bit
         %11 = "quantum.insert"(%0, %c0_i64, %10) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
         scf.yield %11 : !quantum.reg
     } else {
         %7 = "quantum.extract"(%0, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
         %extracted_1 = tensor.extract %arg0[] : tensor<f64>
-        %8 = "quantum.custom"(%extracted_1, %7) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1>} : (f64, !quantum.bit) -> !quantum.bit
+        %8 = "quantum.custom"(%extracted_1, %7) {gate_name = "RX", operand_segment_sizes = array<i32: 1, 1, 0, 0>, result_segment_sizes = array<i32: 1, 0>} : (f64, !quantum.bit) -> !quantum.bit
         %9 = "quantum.insert"(%0, %c0_i64, %8) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
         scf.yield %9 : !quantum.reg
     }

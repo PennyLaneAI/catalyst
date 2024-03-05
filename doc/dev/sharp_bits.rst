@@ -310,10 +310,62 @@ array(0.16996714)
 However, deviating from this will result in recompilation and a warning message:
 
 >>> circuit(jnp.array([1.4, 1.4, 0.3, 0.1]))
-catalyst/compilation_pipelines.py:592:
 UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 array(0.16996714)
+
+Specifying compile-time constants
+---------------------------------
+
+The ``@qjit`` decorator argument ``static_argnums`` allows positional arguments
+to be specified which should be treated as compile-time static arguments.
+
+This allows any hashable Python object to be passed to the function during compilation;
+the function will only be re-compiled if the hash value of the static arguments change.
+Otherwise, re-using previous static argument values will result in no re-compilation:
+
+>>> @qjit(static_argnums=(1,))
+... def f(x, y):
+...   print(f"Compiling with y={y}")
+...   return x + y
+>>> f(0.5, 0.3)
+Compiling with y=0.3
+array(0.8)
+>>> f(0.1, 0.3)  # no re-compilation occurs
+array(0.4)
+>>> f(0.1, 0.4)  # y changes, re-compilation
+Compiling with y=0.4
+array(0.5)
+
+This functionality can be used to support passing arbitrary Python objects to QJIT-compiled
+functions, as long as they are hashable:
+
+.. code-block:: python
+
+    from dataclasses import dataclass
+
+    @dataclass
+    class MyClass:
+      val: int
+
+      def __hash__(self):
+          return hash(str(self))
+
+    @qjit(static_argnums=(1,))
+    def f(x: int, y: MyClass):
+      return x + y.val
+
+>>> f(1, MyClass(5))
+array(6)
+>>> f(1, MyClass(6))  # re-compilation
+array(7)
+>>> f(2, MyClass(5))  # no re-compilation
+array(7)
+
+Note that when ``static_argnums`` is used in conjunction with type hinting,
+ahead-of-time compilation will not be possible since the static argument values
+are not yet available. Instead, compilation will be just-in-time.
+
 
 Try and compile the full workflow
 ---------------------------------
