@@ -16,13 +16,16 @@ auto registerImpl(py::function f)
     // or can we just override it?
     // Asking in terms of memory management.
     uintptr_t id = (uintptr_t)f.ptr();
-    void* handle = dlopen("/home/ubuntu/code/catalyst/runtime/build/lib/registry.cpython-310-x86_64-linux-gnu.so", RTLD_LAZY);
+    // registry.cpython-310-x86_64-linux-gnu.so
+    // is in the same rpath.
+    // therefore this succeeds.
+    // Let's make a small test and also test the other operating systems.
+    void* handle = dlopen("registry.cpython-310-x86_64-linux-gnu.so", RTLD_LAZY | RTLD_NODELETE);
     if (!handle) { fprintf(stderr, "handle is null"); fflush(stderr); }
     _registerImpl = (fptr_t) dlsym(handle, "_registerImpl");
     if (!_registerImpl) { fprintf(stderr, "registerImpl is null"); fflush(stderr); }
     _registerImpl(id, f);
-    //dlclose(handle);
-    // references.insert({id, f});
+    dlclose(handle);
     return id;
 }
 
