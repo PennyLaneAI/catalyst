@@ -20,7 +20,6 @@ while using :func:`~.qjit`.
 
 import copy
 import numbers
-import pathlib
 from collections.abc import Sequence, Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
@@ -98,10 +97,9 @@ from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
     extract_backend_info,
-    get_native_gates_PL,
     validate_config_with_device,
 )
-from catalyst.utils.toml import TOMLDocument, toml_load
+from catalyst.utils.toml import TOMLDocument
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:

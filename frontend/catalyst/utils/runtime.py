@@ -23,7 +23,7 @@ import platform
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Set
 
 import pennylane as qml
 
@@ -67,6 +67,9 @@ def get_lib_path(project, env_var):
 
 
 def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
+    """Return the set of controlled gates given the set of nativly supported gates. This function
+    is used with the toml config schema 1. Later schemas provide the required information directly
+    """
     gates_to_be_decomposed_if_controlled = [
         "Identity",
         "CNOT",

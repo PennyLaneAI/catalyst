@@ -44,14 +44,17 @@ __all__ = ["toml_load", "TOMLDocument"]
 
 
 def check_mid_circuit_measurement_flag(config: TOMLDocument) -> bool:
+    """Check the global mid-circuit measurement flag"""
     return bool(config["compilation"]["mid_circuit_measurement"])
 
 
 def check_adjoint_flag(config: TOMLDocument) -> bool:
+    """Check the global adjoint flag"""
     return bool(config["compilation"]["quantum_adjoint"])
 
 
 def check_quantum_control_flag(config: TOMLDocument) -> bool:
+    """Check the control flag. Only exists in toml config schema 1"""
     schema = int(config["schema"])
     if schema == 1:
         return bool(config["compilation"]["quantum_control"])

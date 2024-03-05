@@ -77,7 +77,6 @@ from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import BackendInfo
-from catalyst.utils.toml import TOMLDocument, toml_load
 
 from .primitives import (
     cuda_inst,

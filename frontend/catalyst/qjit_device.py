@@ -125,7 +125,6 @@ class QJITDevice(qml.QubitDevice):
         supported_gates += ["ControlledQubitUnitary"]
         return set(supported_gates)
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         target_config: TOMLDocument,

@@ -1,8 +1,5 @@
 schema = 2
 
-[device]
-name = "dummy.device.qubit"
-
 [operators]
 # Observables supported by the device
 
