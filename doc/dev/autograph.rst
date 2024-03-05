@@ -173,40 +173,45 @@ converted, there are some important constraints and restrictions to be aware of.
 Return statements
 ~~~~~~~~~~~~~~~~~
 
-Return statements inside ``if``/``elif``/``else`` statements are not yet
-supported. No error will occur, but the resulting function will not have the
-expected behaviour.
+Return statements are generally supported inside of ``if``/``elif``/``else`` statements,
+however, the returned values require a matching shape and structure across branches.
 
-For example, consider the following pattern, where you return from an ``if``
-statement early,
-
-.. code-block:: python
-
-    def f(x):
-        if x > 5:
-            return x ** 2
-        return x ** 3
-
-This will not be correctly captured by AutoGraph, and instead will be
-interpreted as
+For example, consider the following pattern, where two different array dimensions are returned
+from each branch:
 
 .. code-block:: python
 
     def f(x):
         if x > 5:
-            x = x ** 2
-        return x ** 3
+            return jnp.array([1, 2])
+        return 0
 
-Instead of utilizing a return statement, use the following approach instead:
+This will generate the following error:
+
+>>> qjit(autograph=True)(f)
+TypeError: Conditional requires a consistent array shape per result across all branches!
+Got () for result #1 but expected (2,).
+
+Another example is the use of different *structure* across branches. The structure of function
+result is defined by things like the number of results, the containers used like lists or
+dictionaries, or more generally any (compile-time) PyTree metadata. For PennyLane, this means
+returning different observables for example is also not supported, as the observable class is
+compile-time information:
 
 .. code-block:: python
 
-    def f(x):
-        if x > 5:
-            y = x ** 2
-        else:
-            y = x ** 3
-        return y
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(switch: bool):
+
+        if switch:
+            return qml.expval(qml.PauliY(0))
+
+        return qml.expval(qml.PauliZ(0))
+
+>>> qjit(autograph=True)(f)
+TypeError: Conditional requires a consistent return structure across all branches!
+Got PyTreeDef((*, CustomNode(ExpectationMP[(('wires', None),)], [CustomNode(PauliZ[(<Wires = [0]>, ())], []), None])))
+and PyTreeDef((*, CustomNode(ExpectationMP[(('wires', None),)], [CustomNode(PauliY[(<Wires = [0]>, ())], []), None]))).
 
 Different branches must assign the same type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
