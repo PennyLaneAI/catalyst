@@ -36,7 +36,7 @@
 #include <pybind11/embed.h>
 
 // #include "OQCRunner.hpp" // <pybind11/embed.h>
-// #include "OpenQasmBuilder.hpp"
+#include "OpenQASM2Builder.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OQCDevice final : public Catalyst::Runtime::QuantumDevice {

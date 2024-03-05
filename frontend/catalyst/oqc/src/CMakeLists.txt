@@ -44,7 +44,7 @@ endif()
 
 add_library(rtd_oqc SHARED OQCDevice.cpp)
 
-target_include_directories(rtd_oqc PRIVATE .
+target_include_directories(rtd_oqc PUBLIC .
     ${runtime_includes}
     ${backend_includes}
     )

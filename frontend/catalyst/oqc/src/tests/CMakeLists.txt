@@ -49,6 +49,11 @@ target_link_libraries(runner_tests_oqc PRIVATE
     rtd_oqc
     )
 
+#     message(${PROJECT_SOURCE_DIR})
+# target_include_directories(runner_tests_oqc PRIVATE
+#     "${PROJECT_SOURCE_DIR}/../"
+# )
+
 target_sources(runner_tests_oqc PRIVATE
     Test_OpenQASM2Builder.cpp
     )
