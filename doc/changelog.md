@@ -71,6 +71,7 @@ This release contains contributions from (in alphabetical order):
 * Catalyst now supports QJIT compatible `catalyst.vmap` of hybrid programs.
   `catalyst.vmap` offers the vectorization mapping backed by `catalyst.for_loop`.
   [(#497)](https://github.com/PennyLaneAI/catalyst/pull/497)
+  [(#569)](https://github.com/PennyLaneAI/catalyst/pull/569)
 
   For example,
 
@@ -102,6 +103,8 @@ This release contains contributions from (in alphabetical order):
   >>> catalyst.qjit(catalyst.grad(f))(x)
   [1. 0. 1. 0.]
   ```
+* Add support for `GlobalPhase` gate in the runtime.
+  [(#563)](https://github.com/PennyLaneAI/catalyst/pull/563)
 
 * Catalyst no longer relies on a TensorFlow installation for its AutoGraph functionality. Instead,
   the standalone `diastatic-malt` package is used and automatically installed as a dependency.

@@ -378,14 +378,14 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
         python3 -m pip install cuda-quantum
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -447,13 +447,17 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Install lightning.kokkos used in Python tests
+      run: |
+        pip install PennyLane-Lightning-Kokkos
+
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -481,10 +485,6 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
 
-    - name: Install lightning.kokkos used in Python tests
-      run: |
-        pip install PennyLane-Lightning-Kokkos
-
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
         make pytest TEST_BACKEND="lightning.kokkos"
@@ -504,10 +504,10 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
