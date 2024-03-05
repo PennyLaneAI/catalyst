@@ -203,57 +203,51 @@ class QASMGate {
         for (; iter != wires.end() - 1; iter++) {
             oss << qregister.getName() << "[" << *iter << "], ";
         }
-        oss << qregister.getName() << "[" << *iter << "]" << ";\n";
+        oss << qregister.getName() << "[" << *iter << "]"
+            << ";\n";
         return oss.str();
     }
 };
 
-// /**
-//  * A base class for all Braket/OpenQasm3 observable types.
-//  */
-// class QasmObs {
-//   protected:
-//     QasmObs() = default;
-//     QasmObs(const QasmObs &) = default;
-//     QasmObs(QasmObs &&) = default;
-//     QasmObs &operator=(const QasmObs &) = default;
-//     QasmObs &operator=(QasmObs &&) noexcept = default;
+/**
+ * The OpenQasm measure type.
+ *
+ * @param bit The measurement bit result
+ * @param wire Wire to apply `measure` to
+ */
+class QASMMeasure {
+  private:
+    const size_t qubit;
+    const size_t bit;
+
+  public:
+    explicit QASMMeasure(size_t _qubit, size_t _bit) : qubit(_qubit), bit(_bit) {}
+    ~QASMMeasure() = default;
+
+    [[nodiscard]] auto getQubit() const -> size_t { return qubit; }
+    [[nodiscard]] auto getBit() const -> size_t { return qubit; }
+
+    [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister,
+                                  const QASMRegister &cregister) const -> std::string
+    {
+        // measure wire
+        std::ostringstream oss;
+        oss << "measure " << qregister.getName() << "[" << qubit << "] -> " << cregister.getName()
+            << "[" << bit << "];\n";
+        return oss.str();
+    }
+};
+
+// class QASMMeasureAll {
 
 //   public:
-//     virtual ~QasmObs() = default;
-//     [[nodiscard]] virtual auto getName() const -> std::string = 0;
-//     [[nodiscard]] virtual auto getWires() const -> std::vector<size_t> = 0;
-//     [[nodiscard]] virtual auto toOpenQasm(const QasmRegister &qregister,
-//                                           [[maybe_unused]] size_t precision = 5,
-//                                           [[maybe_unused]] const std::string &version = "3.0")
-//                                           const
-//         -> std::string = 0;
-// };
 
-// /**
-//  * A class for Braket/OpenQasm3 named observable (PauliX, PauliY, PauliZ, Hadamard, etc.)
-//  */
-// class QasmNamedObs final : public QasmObs {
-//   private:
-//     const std::string name;
-//     const std::vector<size_t> wires;
-
-//   public:
-//     explicit QasmNamedObs(const std::string &_name, std::vector<size_t> _wires)
-//         : name(lookup_qasm_gate_name(_name)), wires(_wires)
+//     [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister,
+//                                   const QASMRegister &cregister) const -> std::string
 //     {
-//     }
-
-//     [[nodiscard]] auto getName() const -> std::string override { return name; }
-//     [[nodiscard]] auto getWires() const -> std::vector<size_t> override { return wires; }
-
-//     [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
-//                                   [[maybe_unused]] size_t precision = 5,
-//                                   [[maybe_unused]] const std::string &version = "3.0") const
-//         -> std::string override
-//     {
+//         // measure wire
 //         std::ostringstream oss;
-//         oss << name << "(" << qregister.toOpenQasm(RegisterMode::Slice, wires) << ")";
+//         oss << "measure " << qregister.getName() << " -> " << cregister.getName() << ";\n";
 //         return oss.str();
 //     }
 // };
@@ -270,9 +264,9 @@ class QASMGate {
 //  */
 // class OpenQasmBuilder {
 //   protected:
-//     std::vector<QasmRegister> qregs;
-//     std::vector<QasmRegister> bregs;
-//     std::vector<QasmGate> gates;
+//     std::vector<QASMRegister> qregs;
+//     std::vector<QASMRegister> bregs;
+//     std::vector<QASMGate> gates;
 //     // std::vector<QasmMeasure> measures;
 //     size_t num_qubits;
 //     size_t num_bits;
@@ -345,19 +339,14 @@ class QASMGate {
 //             oss << gate.toOpenQasm(qregs[0], precision);
 //         }
 
-//         // quantum measures assuming qregs.size() == 1, bregs.size() <= 1
-//         // for (auto &m : measures) {
-//         //     if (bregs.empty()) {
-//         //         oss << m.toOpenQasm(qregs[0]);
-//         //     }
-//         //     else {
-//         //         oss << m.toOpenQasm(bregs[0], qregs[0]);
-//         //     }
-//         // }
-
-//         // reset quantum registers
-//         for (auto &qreg : qregs) {
-//             oss << qreg.toOpenQasm(RegisterMode::Reset);
+//         quantum measures assuming qregs.size() == 1, bregs.size() <= 1
+//         for (auto &m : measures) {
+//             if (bregs.empty()) {
+//                 oss << m.toOpenQasm(qregs[0]);
+//             }
+//             else {
+//                 oss << m.toOpenQasm(bregs[0], qregs[0]);
+//             }
 //         }
 
 //         return oss.str();

@@ -144,3 +144,31 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
         Catch::Contains("[Function:lookup_qasm_gate_name] Error in Catalyst Runtime: The given QIR "
                         "gate name is not supported by the OpenQASM builder"));
 }
+
+TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
+{
+    auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
+    auto cbits = QASMRegister(RegisterType::Bit, "c", 5);
+
+    auto mz1 = QASMMeasure(0, 0);
+    CHECK(mz1.getQubit() == 0);
+    CHECK(mz1.getBit() == 0);
+
+    std::string mz1_toqasm = "measure q[0] -> c[0];\n";
+    CHECK(mz1.toOpenQASM2(qubits, cbits) == mz1_toqasm);
+
+    auto mz2 = QASMMeasure(1, 1);
+    CHECK(mz2.getQubit() == 1);
+    CHECK(mz2.getBit() == 1);
+
+    std::string mz2_toqasm = "measure q[1] -> c[1];\n";
+    CHECK(mz2.toOpenQASM2(qubits, cbits) == mz2_toqasm);
+
+    auto bits = QASMRegister(RegisterType::Bit, "bit", 2);
+
+    std::string mz1_res_toqasm = "measure q[0] -> c[0];\n";
+    CHECK(mz1.toOpenQASM2(qubits, cbits) == mz1_res_toqasm);
+
+    std::string mz2_res_toqasm = "measure q[1] -> c[1];\n";
+    CHECK(mz2.toOpenQASM2(qubits, cbits) == mz2_res_toqasm);
+}
