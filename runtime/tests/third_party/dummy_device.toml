@@ -3,6 +3,8 @@ schema = 2
 [device]
 name = "dummy.device.qubit"
 
+[operators]
+
 [operators.observables]
 # Observables supported by the device
 
