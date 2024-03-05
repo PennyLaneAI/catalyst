@@ -38,3 +38,28 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
         lookup_qasm_gate_name("ABC"),
         Catch::Contains("The given QIR gate name is not supported by the OpenQASM builder"));
 }
+
+TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
+{
+    auto reg = QASMRegister(RegisterType::Qubit, "qubits", 5);
+    CHECK(reg.getName() == "qubits");
+    CHECK(reg.getSize() == 5);
+
+    reg.updateSize(10);
+    CHECK(reg.getSize() == 10);
+
+    reg.resetSize();
+    CHECK(reg.getSize() == 0);
+
+    reg.updateSize(10);
+
+    std::string case1 = "qubit[10] qubits;\n";
+    CHECK(reg.toOpenQASM2(RegisterMode::Alloc) == case1);
+
+    std::string case2 = "reset qubits;\n";
+    CHECK(reg.toOpenQASM2(RegisterMode::Reset) == case2);
+
+    REQUIRE_THROWS_WITH(reg.toOpenQASM2(static_cast<RegisterMode>(4)),
+                        Catch::Contains("[Function:toOpenQASM2] Error in Catalyst Runtime: "
+                                        "Unsupported OpenQasm register mode"));
+}

@@ -34,8 +34,6 @@ namespace Catalyst::Runtime::OpenQasm2 {
  */
 enum class RegisterMode : uint8_t {
     Alloc, // = 0
-    Slice,
-    Name,
     Reset,
 };
 
@@ -64,9 +62,9 @@ constexpr std::array rt_qasm_gate_map = {
     std::tuple<GateNameT, GateNameT>{"CZ", "cz"},
     std::tuple<GateNameT, GateNameT>{"Hadamard", "h"},
     std::tuple<GateNameT, GateNameT>{"S", "s"},
-    std::tuple<GateNameT, GateNameT>{"Adjoint(S)", "sdg"},
+    // std::tuple<GateNameT, GateNameT>{"Adjoint(S)", "sdg"},
     std::tuple<GateNameT, GateNameT>{"T", "t"},
-    std::tuple<GateNameT, GateNameT>{"Adjoint(T)", "tdg"},
+    // std::tuple<GateNameT, GateNameT>{"Adjoint(T)", "tdg"},
     std::tuple<GateNameT, GateNameT>{"SWAP", "swap"},
     std::tuple<GateNameT, GateNameT>{"CSWAP", "cswap"},
     std::tuple<GateNameT, GateNameT>{"RX", "rx"},
@@ -97,87 +95,62 @@ constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_
 }
 
 
-// /**
-//  * The OpenQasm quantum register type.
-//  *
-//  * @param type Type of the register
-//  * @param name Name of the register
-//  * @param size Size of the register
-//  */
-// class QasmRegister {
-//   private:
-//     const RegisterType type;
-//     const std::string name;
-//     size_t size;
+/**
+ * The OpenQasm quantum register type.
+ *
+ * @param type Type of the register
+ * @param name Name of the register
+ * @param size Size of the register
+ */
+class QASMRegister {
+  private:
+    const RegisterType type;
+    const std::string name;
+    size_t size;
 
-//   public:
-//     explicit QasmRegister(RegisterType _type, const std::string &_name, size_t _size)
-//         : type(_type), name(_name), size(_size)
-//     {
-//     }
-//     ~QasmRegister() = default;
+  public:
+    explicit QASMRegister(RegisterType _type, const std::string &_name, size_t _size)
+        : type(_type), name(_name), size(_size)
+    {
+    }
+    ~QASMRegister() = default;
 
-//     [[nodiscard]] auto getType() const -> RegisterType { return type; }
-//     [[nodiscard]] auto getName() const -> std::string { return name; }
-//     [[nodiscard]] auto getSize() const -> size_t { return size; }
+    [[nodiscard]] auto getType() const -> RegisterType { return type; }
+    [[nodiscard]] auto getName() const -> std::string { return name; }
+    [[nodiscard]] auto getSize() const -> size_t { return size; }
 
-//     void updateSize(size_t new_size) { size = new_size; }
-//     void resetSize() { size = 0; }
-//     [[nodiscard]] auto isValidSlice(const std::vector<size_t> &slice) const -> bool
-//     {
-//         if (slice.empty()) {
-//             return false;
-//         }
+    void updateSize(size_t new_size) { size = new_size; }
+    void resetSize() { size = 0; }
 
-//         return std::all_of(slice.begin(), slice.end(), [this](auto qubit) { return size > qubit; });
-//     }
-
-//     [[nodiscard]] auto toOpenQasm(RegisterMode mode,
-//                                   [[maybe_unused]] const std::vector<size_t> &slice = {},
-//                                   [[maybe_unused]] const std::string &version = "3.0") const
-//         -> std::string
-//     {
-//         std::ostringstream oss;
-//         switch (mode) {
-//         case RegisterMode::Alloc: {
-//             // qubit[size] name;
-//             if (type == RegisterType::Qubit) {
-//                 oss << "qubit";
-//             }
-//             else if (type == RegisterType::Bit) {
-//                 oss << "bit";
-//             }
-//             else {
-//                 RT_FAIL("Unsupported OpenQasm register type");
-//             }
-//             oss << "[" << size << "] " << name << ";\n";
-//             return oss.str();
-//         }
-//         case RegisterMode::Slice: {
-//             // name[slice_0], ..., name[slice_n]
-//             RT_ASSERT(isValidSlice(slice));
-//             auto iter = slice.begin();
-//             for (; iter != slice.end() - 1; iter++) {
-//                 oss << name << "[" << *iter << "], ";
-//             }
-//             oss << name << "[" << *iter << "]";
-//             return oss.str();
-//         }
-//         case RegisterMode::Name: {
-//             // name
-//             oss << name;
-//             return oss.str();
-//         }
-//         case RegisterMode::Reset: {
-//             // reset name;
-//             oss << "reset " << name << ";\n";
-//             return oss.str();
-//         }
-//         default:
-//             RT_FAIL("Unsupported OpenQasm register mode");
-//         }
-//     }
-// };
+    [[nodiscard]] auto toOpenQASM2(RegisterMode mode) const
+        -> std::string
+    {
+        std::ostringstream oss;
+        switch (mode) {
+        case RegisterMode::Alloc: {
+            // qubit[size] name;
+            if (type == RegisterType::Qubit) {
+                oss << "qubit";
+            }
+            else if (type == RegisterType::Bit) {
+                oss << "bit";
+            }
+            else {
+                RT_FAIL("Unsupported OpenQasm register type");
+            }
+            oss << "[" << size << "] " << name << ";\n";
+            return oss.str();
+        }
+        case RegisterMode::Reset: {
+            // reset name;
+            oss << "reset " << name << ";\n";
+            return oss.str();
+        }
+        default:
+            RT_FAIL("Unsupported OpenQasm register mode");
+        }
+    }
+};
 
 // /**
 //  * The OpenQasm gate type.
