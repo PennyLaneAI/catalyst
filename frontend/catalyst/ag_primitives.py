@@ -36,6 +36,9 @@ from tensorflow.python.autograph.core.function_wrappers import (
 )
 from tensorflow.python.autograph.impl.api import autograph_artifact
 from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
+from tensorflow.python.autograph.operators.slices import (
+    GetItemOpts,
+)
 from tensorflow.python.autograph.operators.variables import (
     Undefined,
     UndefinedReturnValue,
@@ -51,6 +54,7 @@ from catalyst.utils.patching import Patcher
 __all__ = [
     "STD",
     "ConversionOptions",
+    "GetItemOpts",
     "Undefined",
     "UndefinedReturnValue",
     "autograph_artifact",
@@ -63,6 +67,8 @@ __all__ = [
     "and_",
     "or_",
     "not_",
+    "get_item",
+    "set_item",
 ]
 
 
@@ -467,6 +473,27 @@ def or_(a, b):
 def not_(arg):
     """An implementation of the AutoGraph '.. not ..' statement."""
     return _logical_op(lambda: arg, jax_fn=jnp.logical_not, python_fn=lambda x: not x)
+
+
+def get_item(target, i, opts):
+    """An implementation of the AutoGraph 'target[i]' statement.
+
+    This does not do anything different for jax arrays, i.e. it is a
+    "pass-through" implementation that just returns 'target[i]'.
+    """
+    return target[i]
+
+
+def set_item(target, i, x):
+    """An implementation of the AutoGraph 'target[i] = x' statement."""
+    # Use the jax functional form if invoked on a jax array
+    if isinstance(target, DynamicJaxprTracer) and isinstance(target.aval, ShapedArray):
+        target = target.at[i].set(x)
+        return target
+    # Otherwise, fall back to a standard implementation
+    else:
+        target[i] = x
+        return target
 
 
 def get_source_code_info(tb_frame):

@@ -112,6 +112,7 @@ Currently, AutoGraph supports converting the following Python statements:
 - ``for`` loops
 - ``while`` loops
 - ``and``, ``or`, and ``not`` in certain cases
+- Slice assignment in certain cases, such as ``x[i] = 1``
 
 ``break`` and ``continue`` statements are currently not supported.
 
@@ -677,6 +678,37 @@ array(0.87758256)
 
 Note that there are a couple of important constraints and restrictions that must be
 considered when working with logical statements.
+
+Slicing
+~~~~~~~
+
+Indexing an array by slice is supported (it does not need to be translated).
+
+Slice updates are also allowed, although---somewhat confusingly---autograph
+does not support the `Slice` or `Tuple` types.
+
+This means that you can write
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     x[first_dim - 1] = 0
+...     return x
+>>> f(jnp.array([1, 2, 3]))
+array([1, 2, 0])
+
+and the translation will work fine. But if you want to use a `Slice` or `Tuple`,
+you will have to use
+` ``s_`` <https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.s_.html#jax.numpy.s_> `
+or a similar wrapper.
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     x[jnp.s_[:-1]] = 0
+...     return x
+>>> f(jnp.array([1, 2, 3]))
+array([0, 0, 3])
+
 
 All arguments must be dynamic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

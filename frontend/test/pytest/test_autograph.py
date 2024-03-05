@@ -400,6 +400,21 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
+    def test_slice_get_set_constant_basic(self):
+        """Test basic slice indexing and setting using constants."""
+
+        @qjit(autograph=True)
+        def zero_last_element(x):
+            """Set the last element of x to 0"""
+
+            first_dim = x.shape[0]
+            x[first_dim - 1] = 0
+            return x
+
+        x = jnp.array([5, 3, 4])
+        check_cache(zero_last_element.original_function)
+        assert jnp.allclose(zero_last_element(x), jnp.array([5, 3, 0]))
+
 
 @pytest.mark.tf
 class TestCodePrinting:
@@ -1198,6 +1213,27 @@ class TestForLoops:
             return acc
 
         assert f() == 9
+
+    def test_slice_get_set_constant(self):
+        """Test slice indexing and setting using constants in a for loop."""
+
+        @qjit(autograph=True)
+        def double(x):
+            """Create a new array that is equal to 2 * x using constant
+            slice get and set"""
+
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result[i] = x[i] * 2
+
+            print(result.aval)
+            return result
+
+        x = jnp.array([5, 3, 4])
+        check_cache(double.original_function)
+        assert jnp.allclose(double(x), jnp.array([10, 6, 8]))
 
 
 @pytest.mark.tf

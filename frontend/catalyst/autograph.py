@@ -26,6 +26,7 @@ from tensorflow.python.autograph.converters import (
     control_flow,
     functions,
     logical_expressions,
+    slices,
 )
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
 from tensorflow.python.autograph.pyct import transpiler
@@ -73,6 +74,16 @@ class CFTransformer(transpiler.PyToPy):
 
         # Convert function calls. This allows us to convert these called functions as well.
         node = call_trees.transform(node, ctx)
+
+        # Convert slices.
+        #
+        # This needs to come before converting control flow so that any slice
+        # assignments can be made explicit, as implementations such as
+        # 'ag__.for_stmt' expect them to be explicit.
+        #
+        # Confusingly, this currently does not convert slices or tuples per
+        # the default implementation of autograph's slice converter.
+        node = slices.transform(node, ctx)
 
         # Convert Python control flow to custom 'ag__.if_stmt' ... functions.
         node = control_flow.transform(node, ctx)
