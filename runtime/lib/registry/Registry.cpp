@@ -7,17 +7,20 @@
 
 namespace py = pybind11;
 
-std::unordered_map<uintptr_t, py::function> references;
+std::unordered_map<uintptr_t, py::function> *references;
 
 extern "C" {
 __attribute__((visibility("default"))) void _registerImpl(uintptr_t id, py::function f)
 {
-    references.insert({id, f});
+    if (references == nullptr)
+    references = new std::unordered_map<uintptr_t, py::function>();
+    // TODO: memory de-reference?
+    references->insert({id, f});
 }
 
 __attribute__((visibility("default"))) void callbackCall(uintptr_t identifier)
 {
-    auto it = references.find(identifier);
+    auto it = references->find(identifier);
     auto lambda = it->second();
 }
 }
