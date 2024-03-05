@@ -4,6 +4,30 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
+  functions.
+  [(#)]()
+
+  The following is now possible:
+
+  ```py
+  @qjit(autograph=True)
+  @qml.qnode(qml.device(backend, wires=1))
+  def f(x: float):
+    qml.RY(x, wires=0)
+
+    m = measure(0)
+    if not m:
+        return 0
+
+    ...
+
+    return qml.expval(qml.PauliZ(0))
+  ```
+
+  Note that returning different *kinds* of results, like different observables or differently
+  shaped arrays, is not possible.
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -11,6 +35,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+David Ittah.
 
 # Release 0.5.0
 
@@ -96,7 +122,7 @@ This release contains contributions from (in alphabetical order):
   ```py
   def f(x):
     return jax.numpy.sum(x[::2])
-  
+
   x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
   ```
   ```pycon
