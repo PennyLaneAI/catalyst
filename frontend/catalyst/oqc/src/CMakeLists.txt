@@ -50,3 +50,5 @@ target_include_directories(rtd_oqc PRIVATE .
 target_link_libraries(rtd_oqc pybind11::module)
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+add_subdirectory(tests)

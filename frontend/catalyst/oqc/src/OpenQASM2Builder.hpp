@@ -27,14 +27,7 @@
 
 #include "Exception.hpp"
 
-namespace Catalyst::Runtime::OpenQasm {
- 
-/**
- * Supported OpenQasm variables by the builder.
- */
-enum class VariableType : uint8_t {
-    Float, // = 0
-};
+namespace Catalyst::Runtime::OpenQasm2 {
 
 /**
  * Supported OpenQasm register modes by the builder.
@@ -61,25 +54,32 @@ using GateNameT = std::string_view;
  */
 constexpr std::array rt_qasm_gate_map = {
     // (RT-GateName, Qasm-GateName)
-    std::tuple<GateNameT, GateNameT>{"Identity", "i"},
+    std::tuple<GateNameT, GateNameT>{"Identity", "id"},
     std::tuple<GateNameT, GateNameT>{"PauliX", "x"},
     std::tuple<GateNameT, GateNameT>{"PauliY", "y"},
     std::tuple<GateNameT, GateNameT>{"PauliZ", "z"},
-    std::tuple<GateNameT, GateNameT>{"Hadamard", "h"},
-    std::tuple<GateNameT, GateNameT>{"S", "s"},
-    std::tuple<GateNameT, GateNameT>{"T", "t"},
-    std::tuple<GateNameT, GateNameT>{"CNOT", "cnot"},
+    std::tuple<GateNameT, GateNameT>{"CNOT", "cx"},
+    std::tuple<GateNameT, GateNameT>{"Toffoli", "ccx"},
     std::tuple<GateNameT, GateNameT>{"CY", "cy"},
     std::tuple<GateNameT, GateNameT>{"CZ", "cz"},
+    std::tuple<GateNameT, GateNameT>{"Hadamard", "h"},
+    std::tuple<GateNameT, GateNameT>{"S", "s"},
+    std::tuple<GateNameT, GateNameT>{"Adjoint(S)", "sdg"},
+    std::tuple<GateNameT, GateNameT>{"T", "t"},
+    std::tuple<GateNameT, GateNameT>{"Adjoint(T)", "tdg"},
     std::tuple<GateNameT, GateNameT>{"SWAP", "swap"},
-    std::tuple<GateNameT, GateNameT>{"PhaseShift", "phaseshift"},
+    std::tuple<GateNameT, GateNameT>{"CSWAP", "cswap"},
     std::tuple<GateNameT, GateNameT>{"RX", "rx"},
     std::tuple<GateNameT, GateNameT>{"RY", "ry"},
     std::tuple<GateNameT, GateNameT>{"RZ", "rz"},
-    std::tuple<GateNameT, GateNameT>{"CSWAP", "cswap"},
-    std::tuple<GateNameT, GateNameT>{"PSWAP", "pswap"},
-    std::tuple<GateNameT, GateNameT>{"ISWAP", "iswap"},
-    std::tuple<GateNameT, GateNameT>{"Toffoli", "ccnot"},
+    std::tuple<GateNameT, GateNameT>{"CRX", "crx"},
+    std::tuple<GateNameT, GateNameT>{"CRY", "cry"},
+    std::tuple<GateNameT, GateNameT>{"CRZ", "crz"},
+    std::tuple<GateNameT, GateNameT>{"PhaseShift", "u1"},
+    std::tuple<GateNameT, GateNameT>{"U1", "u1"},
+    std::tuple<GateNameT, GateNameT>{"U2", "u2"},
+    std::tuple<GateNameT, GateNameT>{"U3", "u3"},
+
 };
 
 /**
@@ -96,40 +96,6 @@ constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_
     RT_FAIL("The given QIR gate name is not supported by the OpenQASM builder.");
 }
 
-/**
- * The OpenQasm variable type.
- *
- * @param type Type of the variable
- * @param Name Name of the register
- */
-class QasmVariable {
-  private:
-    const VariableType type;
-    const std::string name;
-
-  public:
-    explicit QasmVariable(VariableType _type, const std::string &_name) : type(_type), name(_name)
-    {
-    }
-    ~QasmVariable() = default;
-
-    [[nodiscard]] auto getType() const -> VariableType { return type; }
-    [[nodiscard]] auto getName() const -> std::string { return name; }
-
-    [[nodiscard]] auto toOpenQasm([[maybe_unused]] const std::string &version = "3.0") const
-        -> std::string
-    {
-        std::ostringstream oss;
-        switch (type) {
-        case VariableType::Float: {
-            oss << "input float " << name << ";\n";
-            return oss.str();
-        }
-        default:
-            RT_FAIL("Unsupported OpenQasm variable type");
-        }
-    }
-};
 
 /**
  * The OpenQasm quantum register type.
@@ -213,7 +179,6 @@ class QasmRegister {
     }
 };
 
-
 /**
  * The OpenQasm gate type.
  *
@@ -231,7 +196,6 @@ class QasmRegister {
 class QasmGate {
   private:
     const std::string name;
-    const std::vector<std::complex<double>> matrix;
     const std::vector<double> params_val;
     const std::vector<std::string> params_str;
     const std::vector<size_t> wires;
@@ -241,23 +205,16 @@ class QasmGate {
     explicit QasmGate(const std::string &_name, const std::vector<double> &_params_val,
                       const std::vector<std::string> &_params_str,
                       const std::vector<size_t> &_wires, [[maybe_unused]] bool _inverse)
-        : name(lookup_qasm_gate_name(_name)), matrix({}), params_val(_params_val),
+        : name(lookup_qasm_gate_name(_name)), params_val(_params_val),
           params_str(_params_str), wires(_wires), inverse(_inverse)
     {
         RT_FAIL_IF(!(params_str.empty() || params_val.empty()),
                    "Parametric gates are currently supported via either their values or names but "
                    "not both.");
     }
-    explicit QasmGate(const std::vector<std::complex<double>> _matrix,
-                      const std::vector<size_t> &_wires, [[maybe_unused]] bool _inverse)
-        : name("QubitUnitary"), matrix(_matrix), params_val({}), params_str({}), wires(_wires),
-          inverse(_inverse)
-    {
-    }
     ~QasmGate() = default;
 
     [[nodiscard]] auto getName() const -> std::string { return name; }
-    [[nodiscard]] auto getMatrix() const -> std::vector<std::complex<double>> { return matrix; }
     [[nodiscard]] auto getParams() const -> std::vector<double> { return params_val; }
     [[nodiscard]] auto getParamsStr() const -> std::vector<std::string> { return params_str; }
     [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
@@ -292,7 +249,6 @@ class QasmGate {
         return oss.str();
     }
 };
-
 
 /**
  * A base class for all Braket/OpenQasm3 observable types.
@@ -343,7 +299,6 @@ class QasmNamedObs final : public QasmObs {
     }
 };
 
-
 /**
  * The OpenQasm circuit builder interface.
  *
@@ -353,11 +308,9 @@ class QasmNamedObs final : public QasmObs {
  * @param qregs Quantum registers
  * @param bregs Measurement results registers
  * @param gates Quantum gates
- * @param measures Quantum measures
  */
 class OpenQasmBuilder {
   protected:
-    std::vector<QasmVariable> vars;
     std::vector<QasmRegister> qregs;
     std::vector<QasmRegister> bregs;
     std::vector<QasmGate> gates;
@@ -394,10 +347,6 @@ class OpenQasmBuilder {
               [[maybe_unused]] bool inverse)
     {
         gates.emplace_back(name, params_val, params_str, wires, inverse);
-
-        for (auto &param : params_str) {
-            vars.emplace_back(VariableType::Float, param);
-        }
     }
     void Gate(const std::vector<std::complex<double>> &matrix, const std::vector<size_t> &wires,
               [[maybe_unused]] bool inverse)
@@ -420,11 +369,6 @@ class OpenQasmBuilder {
 
         // header
         oss << "OPENQASM " << version << ";\n";
-
-        // variables
-        for (auto &var : vars) {
-            oss << var.toOpenQasm();
-        }
 
         // quantum registers
         for (auto &qreg : qregs) {
@@ -458,7 +402,6 @@ class OpenQasmBuilder {
 
         return oss.str();
     }
-
 };
 
-} // namespace Catalyst::Runtime::OpenQasm
+} // namespace Catalyst::Runtime::OpenQasm2

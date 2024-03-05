@@ -122,6 +122,9 @@ test-mlir:
 
 test-frontend: lit pytest
 
+test-oqc:
+	$(MAKE) -C frontend/catalyst/oqc/src test
+
 lit:
 ifeq ($(ENABLE_ASAN),ON)
 ifneq ($(findstring clang,$(C_COMPILER)),clang)
