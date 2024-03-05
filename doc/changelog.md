@@ -6,19 +6,19 @@
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
-  [(#)]()
+  [(#583)](https://github.com/PennyLaneAI/catalyst/pull/583)
 
   The following is now possible:
 
   ```py
   @qjit(autograph=True)
-  @qml.qnode(qml.device(backend, wires=1))
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
   def f(x: float):
     qml.RY(x, wires=0)
 
     m = measure(0)
     if not m:
-        return 0
+        return qml.expval(qml.PauliZ(0))
 
     ...
 

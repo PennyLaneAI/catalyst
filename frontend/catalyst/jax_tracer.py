@@ -130,7 +130,7 @@ PAULI_NAMED_MAP = {
 def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
     """Return a JAXPR that is identical to the given one but with added type conversion operations
     to produce the provided type signature in its output."""
-    # TODO: is eval expense? or would it be better to modify the jaxpr in place?
+    # TODO: is eval expensive? or would it be better to modify the jaxpr in place?
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context(ctx) as trace:

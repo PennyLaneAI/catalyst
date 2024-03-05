@@ -192,10 +192,10 @@ This will generate the following error:
 TypeError: Conditional requires a consistent array shape per result across all branches!
 Got () for result #1 but expected (2,).
 
-Another example is the use of different *structure* across branches. The structure of function
-result is defined by things like the number of results, the containers used like lists or
+Another example is the use of different *structure* across branches. The structure of a function
+output is defined by things like the number of results, the containers used like lists or
 dictionaries, or more generally any (compile-time) PyTree metadata. For PennyLane, this means
-returning different observables for example is also not supported, as the observable class is
+returning different observables for example is not supported, as the observable class is
 compile-time information:
 
 .. code-block:: python
