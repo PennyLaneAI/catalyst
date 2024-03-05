@@ -320,7 +320,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         if (op.getCallTargetName().equals("pyregistry")) {
             SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
                                        adaptor.getOperands().getTypes().end());
-            auto type2 = LLVM::LLVMFunctionType::get(ptr, argTypes);
+            auto type2 = LLVM::LLVMFunctionType::get(voidType, argTypes);
             LLVM::LLVMFuncOp customCallFnOp =
                 rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type2);
             rewriter.restoreInsertionPoint(point);
