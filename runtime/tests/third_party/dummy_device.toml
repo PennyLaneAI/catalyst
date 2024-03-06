@@ -1,21 +1,36 @@
 schema = 2
 
-[operators.observables]
-# Observables supported by the device
+[operators.gates.native]
 
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-Hadamard = {}
-Hermitian = {}
-Identity = {}
-Projector = {}
-SparseHamiltonian = {}
-Hamiltonian = {}
-Sum = {}
-SProd = {}
-Prod = {}
-Exp = {}
+QubitUnitary = { controllable = true }
+PauliX = { controllable = true }
+PauliY = { controllable = true }
+PauliZ = { controllable = true }
+MultiRZ = { controllable = true }
+Hadamard = { controllable = true }
+S = { controllable = true }
+T = { controllable = true }
+CNOT = { }
+SWAP = { controllable = true }
+CSWAP = { }
+Toffoli = { controllable = true }
+CY = { }
+CZ = { }
+PhaseShift = { controllable = true }
+ControlledPhaseShift = { }
+RX = { controllable = true }
+RY = { controllable = true }
+RZ = { controllable = true }
+Rot = { controllable = true }
+CRX = { }
+CRY = { }
+CRZ = { }
+CRot = { }
+Identity = { controllable = true }
+IsingXX = { controllable = true }
+IsingYY = { controllable = true }
+IsingZZ = { controllable = true }
+IsingXY = { controllable = true }
 
 [operators.gates.decomp]
 
@@ -52,37 +67,23 @@ ECR = {}
 
 MultiControlledX = {}
 
-[operators.gates.native]
 
-QubitUnitary = { controllable = true }
-PauliX = { controllable = true }
-PauliY = { controllable = true }
-PauliZ = { controllable = true }
-MultiRZ = { controllable = true }
-Hadamard = { controllable = true }
-S = { controllable = true }
-T = { controllable = true }
-CNOT = { }
-SWAP = { controllable = true }
-CSWAP = { }
-Toffoli = { controllable = true }
-CY = { }
-CZ = { }
-PhaseShift = { controllable = true }
-ControlledPhaseShift = { }
-RX = { controllable = true }
-RY = { controllable = true }
-RZ = { controllable = true }
-Rot = { controllable = true }
-CRX = { }
-CRY = { }
-CRZ = { }
-CRot = { }
-Identity = { controllable = true }
-IsingXX = { controllable = true }
-IsingYY = { controllable = true }
-IsingZZ = { controllable = true }
-IsingXY = { controllable = true }
+[operators.observables]
+# Observables supported by the device
+
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
+Hermitian = {}
+Identity = {}
+Projector = {}
+SparseHamiltonian = {}
+Hamiltonian = {}
+Sum = {}
+SProd = {}
+Prod = {}
+Exp = {}
 
 [measurement_processes.exactshots]
 
