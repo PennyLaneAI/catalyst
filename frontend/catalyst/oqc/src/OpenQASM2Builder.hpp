@@ -261,10 +261,14 @@ class OpenQASM2Builder {
     QASMRegister qreg;
     QASMRegister creg;
     std::vector<QASMGate> gates;
-    std::vector<QASMMeasure> measures;
+    std::vector<QASMMeasure> measurements;
+    bool measure_all;
 
   public:
-    explicit OpenQASM2Builder(QASMRegister _qreg, QASMRegister _creg) : qreg(_qreg), creg(_creg) {}
+    explicit OpenQASM2Builder(QASMRegister _qreg, QASMRegister _creg)
+        : qreg(_qreg), creg(_creg), measure_all(false)
+    {
+    }
     virtual ~OpenQASM2Builder() = default;
 
     void Gate(const std::string &name, const std::vector<double> &params_val,
@@ -272,15 +276,17 @@ class OpenQASM2Builder {
     {
         gates.emplace_back(name, params_val, qubits);
     }
-    void Measure(size_t bit, size_t qubit) { measures.emplace_back(bit, qubit); }
-
+    void Measure(size_t bit, size_t qubit) { measurements.emplace_back(bit, qubit); }
+    void Measure() { measure_all = true; }
     [[nodiscard]] virtual auto toOpenQASM2(size_t precision = 5) const -> std::string
     {
         std::ostringstream oss;
 
         // header
-        oss << "OPENQASM 2.0" << ";\n";
-        oss << "include \"qelib1.inc\"" << ";\n";
+        oss << "OPENQASM 2.0"
+            << ";\n";
+        oss << "include \"qelib1.inc\""
+            << ";\n";
         // quantum registers
         oss << qreg.toOpenQASM2(RegisterMode::Alloc);
 
@@ -293,8 +299,13 @@ class OpenQASM2Builder {
         }
 
         // quantum measures assuming qregs.size() == 1, cregs.size() <= 1
-        for (auto &m : measures) {
-            oss << m.toOpenQASM2(creg, qreg);
+        if (!measure_all) {
+            for (auto &m : measurements) {
+                oss << m.toOpenQASM2(creg, qreg);
+            }
+        }
+        else {
+            oss << MeasureAll(qreg, creg);
         }
 
         return oss.str();
