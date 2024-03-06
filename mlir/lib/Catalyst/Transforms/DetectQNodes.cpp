@@ -514,7 +514,6 @@ void LivenessAnalysisDropRef::rewrite(LLVM::CallOp sink, PatternRewriter &rewrit
     //     llvm.func @mlirAsyncRuntimeAwaitToken(!llvm.ptr)
     //     llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64)
     auto awaitFnDecl = AsyncUtils::lookupOrCreateAwaitTokenName(moduleOp);
-    auto awaitValFnDecl = AsyncUtils::lookupOrCreateAwaitValueName(moduleOp);
     auto dropRefFnDecl = AsyncUtils::lookupOrCreateDropRef(moduleOp);
 
     Type llvmInt64Type = IntegerType::get(sink->getContext(), 64);
