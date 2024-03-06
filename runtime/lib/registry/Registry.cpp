@@ -33,3 +33,19 @@ extern "C" {
     lambda();
 }
 }
+
+auto registerImpl(py::function f)
+{
+    // TODO: Do we need to see if it is already present
+    // or can we just override it?
+    // Asking in terms of memory management.
+    uintptr_t id = (uintptr_t)f.ptr();
+    _registerImpl(id, f);
+    return id;
+}
+
+PYBIND11_MODULE(registry, m)
+{
+    m.doc() = "pybind11 example plugin"; // optional module docstring.
+    m.def("register", &registerImpl, "Call a function...");
+}

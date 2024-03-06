@@ -239,9 +239,9 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     from catalyst.compiler import get_lib_path
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    import pyregistry
+    import registry
 
-    callback_id = pyregistry.register(callback)
+    callback_id = registry.register(callback)
 
     value_id = StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(callback_id))).results
     return CustomCallOp([], [value_id], "pyregistry").results
