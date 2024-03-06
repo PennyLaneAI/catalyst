@@ -176,10 +176,11 @@ func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.
     // CHECK: llvm.call @__catalyst__qis__Toffoli(%arg0, %arg0, %arg0, [[p]])
     %q5:3 = quantum.custom "Toffoli"() %q4#0, %q4#1, %q4#1 : !quantum.bit, !quantum.bit, !quantum.bit
 
+    // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64) : i64
     // CHECK: [[nullPtr:%.+]] = llvm.mlir.zero : !llvm.ptr
     // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
     // CHECK: [[zero:%.+]] = llvm.mlir.constant(0 : i64) : i64
-    // CHECK: [[struct:%.+]] = llvm.alloca %10 x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
+    // CHECK: [[struct:%.+]] = llvm.alloca [[one]] x !llvm.struct<(i1, i64, ptr, ptr)> : (i64) -> !llvm.ptr
     // CHECK: [[bool:%.+]] = llvm.getelementptr inbounds [[struct]][0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
     // CHECK: [[integer:%.+]] = llvm.getelementptr inbounds [[struct]][0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
     // CHECK: [[ptr1:%.+]] = llvm.getelementptr inbounds [[struct]][0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i1, i64, ptr, ptr)>
