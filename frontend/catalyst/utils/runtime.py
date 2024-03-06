@@ -223,6 +223,11 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     if "ControlledQubitUnitary" in native and check_quantum_control_flag(config):
         matrix = matrix - {"ControlledQubitUnitary"}
 
+    # Add missing Projector gate to the kokkos device.
+    # TODO: remove once the PennyLane lightning toml files are updates
+    if device.short_name == "lightning.kokkos":
+        observables.update("Projector")
+
     check_no_overlap(native, decomposable, matrix)
 
     if hasattr(device, "operations") and hasattr(device, "observables"):  # pragma: nocover
