@@ -29,6 +29,7 @@ from catalyst import (
     adjoint,
     cond,
     ctrl,
+    debug,
     for_loop,
     grad,
     jacobian,
@@ -636,6 +637,58 @@ class TestConditionals:
             return res
 
         assert 0.0 == circuit()
+
+    def test_multiple_return(self):
+        """Test return statements from different branches with autograph."""
+
+        @qjit(autograph=True)
+        def f(x: int):
+            if x > 0:
+                return 25
+            else:
+                return 60
+
+        assert f(1) == 25
+        assert f(0) == 60
+
+    def test_multiple_return_early(self, backend, capfd):
+        """Test that returning early is possible."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RY(x, wires=0)
+
+            m = measure(0)
+            if not m:
+                return 0
+
+            debug.print("illegal fruit")
+            return 1
+
+        assert capfd.readouterr() == ("", "")
+
+        assert f(0) == 0
+
+        assert capfd.readouterr() == ("", "")
+
+        assert f(np.pi) == 1
+
+        assert capfd.readouterr() == ("illegal fruit\n", "")
+
+    def test_multiple_return_mismatched_type(self):
+        """Test that different obervables cannot be used in different branches."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(switch: bool):
+
+            if switch:
+                return qml.expval(qml.PauliY(0))
+
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(TypeError, match="requires a consistent return structure"):
+            qjit(autograph=True)(f)
 
 
 @pytest.mark.tf
