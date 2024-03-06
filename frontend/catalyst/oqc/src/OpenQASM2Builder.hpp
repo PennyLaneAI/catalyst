@@ -246,105 +246,59 @@ std::string MeasureAll(const QASMRegister &qregister, const QASMRegister &cregis
     return oss.str();
 };
 
-// /**
-//  * The OpenQasm circuit builder interface.
-//  *
-//  * @note Only one user-specified quantum register is currently supported.
-//  * @note User-specified measurement results registers are supported.
-//  *
-//  * @param qregs Quantum registers
-//  * @param bregs Measurement results registers
-//  * @param gates Quantum gates
-//  */
-// class OpenQasmBuilder {
-//   protected:
-//     std::vector<QASMRegister> qregs;
-//     std::vector<QASMRegister> bregs;
-//     std::vector<QASMGate> gates;
-//     // std::vector<QasmMeasure> measures;
-//     size_t num_qubits;
-//     size_t num_bits;
+/**
+ * The OpenQasm circuit builder interface.
+ *
+ * @note Only one user-specified quantum register is currently supported.
+ * @note User-specified measurement results registers are supported.
+ *
+ * @param qregs Quantum registers
+ * @param cregs Measurement results registers
+ * @param gates Quantum gates
+ */
+class OpenQASM2Builder {
+  protected:
+    QASMRegister qreg;
+    QASMRegister creg;
+    std::vector<QASMGate> gates;
+    std::vector<QASMMeasure> measures;
 
-//   public:
-//     explicit OpenQasmBuilder() : num_qubits(0), num_bits(0) {}
-//     virtual ~OpenQasmBuilder() = default;
+  public:
+    explicit OpenQASM2Builder(QASMRegister _qreg, QASMRegister _creg) : qreg(_qreg), creg(_creg) {}
+    virtual ~OpenQASM2Builder() = default;
 
-//     [[nodiscard]] auto getNumQubits() const -> size_t { return num_qubits; }
-//     [[nodiscard]] auto getNumBits() const -> size_t { return num_bits; }
-//     [[nodiscard]] auto getQubits() const -> std::vector<QasmRegister> { return qregs; }
+    void Gate(const std::string &name, const std::vector<double> &params_val,
+              const std::vector<size_t> &qubits)
+    {
+        gates.emplace_back(name, params_val, qubits);
+    }
+    void Measure(size_t bit, size_t qubit) { measures.emplace_back(bit, qubit); }
 
-//     void Register(RegisterType type, const std::string &name, size_t size)
-//     {
-//         switch (type) {
-//         case RegisterType::Qubit:
-//             qregs.emplace_back(type, name, size);
-//             num_qubits += size;
-//             break;
-//         case RegisterType::Bit:
-//             bregs.emplace_back(type, name, size);
-//             num_bits += size;
-//             break;
-//         default:
-//             RT_FAIL("Unsupported OpenQasm register type");
-//         }
-//     }
+    [[nodiscard]] virtual auto toOpenQASM2(size_t precision = 5) const -> std::string
+    {
+        std::ostringstream oss;
 
-//     void Gate(const std::string &name, const std::vector<double> &params_val,
-//               const std::vector<std::string> &params_str, const std::vector<size_t> &wires,
-//               [[maybe_unused]] bool inverse)
-//     {
-//         gates.emplace_back(name, params_val, params_str, wires, inverse);
-//     }
-//     void Gate(const std::vector<std::complex<double>> &matrix, const std::vector<size_t> &wires,
-//               [[maybe_unused]] bool inverse)
-//     {
-//         gates.emplace_back(matrix, wires, inverse);
-//     }
-//     // void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
+        // header
+        oss << "OPENQASM 2.0" << ";\n";
+        oss << "include \"qelib1.inc\"" << ";\n";
+        // quantum registers
+        oss << qreg.toOpenQASM2(RegisterMode::Alloc);
 
-//     [[nodiscard]] virtual auto toOpenQasm(size_t precision = 5,
-//                                           const std::string &version = "3.0") const ->
-//                                           std::string
-//     {
-//         RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
-//                                       "register is currently supported.");
+        // measurement results registers
+        oss << creg.toOpenQASM2(RegisterMode::Alloc);
 
-//         RT_FAIL_IF(bregs.size() > 1,
-//                    "Invalid number of measurement results registers; At most one measurement"
-//                    "results register is currently supported.");
+        // quantum gates assuming qregs.size() == 1
+        for (auto &gate : gates) {
+            oss << gate.toOpenQASM2(qreg, precision);
+        }
 
-//         std::ostringstream oss;
+        // quantum measures assuming qregs.size() == 1, cregs.size() <= 1
+        for (auto &m : measures) {
+            oss << m.toOpenQASM2(creg, qreg);
+        }
 
-//         // header
-//         oss << "OPENQASM " << version << ";\n";
-
-//         // quantum registers
-//         for (auto &qreg : qregs) {
-//             oss << qreg.toOpenQasm(RegisterMode::Alloc);
-//         }
-
-//         // measurement results registers
-//         for (auto &breg : bregs) {
-//             oss << breg.toOpenQasm(RegisterMode::Alloc);
-//         }
-
-//         // quantum gates assuming qregs.size() == 1
-//         for (auto &gate : gates) {
-//             oss << gate.toOpenQasm(qregs[0], precision);
-//         }
-
-//         quantum measures assuming qregs.size() == 1, bregs.size() <= 1
-//         for (auto &m : measures) {
-//             if (bregs.empty()) {
-//                 oss << m.toOpenQasm(qregs[0]);
-//             }
-//             else {
-//                 oss << m.toOpenQasm(bregs[0], qregs[0]);
-//             }
-//         }
-
-//         return oss.str();
-//     }
-// };
+        return oss.str();
+    }
+};
 
 } // namespace Catalyst::Runtime::OpenQasm2

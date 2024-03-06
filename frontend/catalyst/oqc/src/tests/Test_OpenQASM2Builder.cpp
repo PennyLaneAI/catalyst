@@ -95,7 +95,6 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
                                         "Unsupported OpenQasm register mode"));
 }
 
-
 TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
 {
     auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
@@ -173,7 +172,6 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
     CHECK(mz2.toOpenQASM2(qubits, cbits) == mz2_res_toqasm);
 }
 
-
 TEST_CASE("Test MeasureAll from OpenQasmBuilder", "[openqasm]")
 {
     auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
@@ -181,5 +179,34 @@ TEST_CASE("Test MeasureAll from OpenQasmBuilder", "[openqasm]")
 
     std::string measure_all = "measure q -> c;\n";
     CHECK(MeasureAll(qubits, cbits) == measure_all);
+}
 
+TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure", "[openqasm]")
+{
+    auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
+    auto cbits = QASMRegister(RegisterType::Bit, "c", 5);
+    auto builder = OpenQASM2Builder(qubits, cbits);
+
+    builder.Gate("PauliX", {}, {0});
+    builder.Gate("Hadamard", {}, {1});
+    builder.Gate("SWAP", {}, {0, 1});
+    builder.Gate("RZ", {0.12}, {1});
+    builder.Gate("RX", {}, {0});
+
+    builder.Measure(0, 0);
+    builder.Measure(1, 1);
+
+    auto toqasm = "OPENQASM 2.0;\n"
+                  "include \"qelib1.inc\";\n"
+                  "qreg q[5];\n"
+                  "creg c[5];\n"
+                  "x q[0];\n"
+                  "h q[1];\n"
+                  "swap q[0], q[1];\n"
+                  "rz(0.12) q[1];\n"
+                  "rx q[0];\n"
+                  "measure c[0] -> q[0];\n"
+                  "measure c[1] -> q[1];\n";
+
+    CHECK(builder.toOpenQASM2() == toqasm);
 }
