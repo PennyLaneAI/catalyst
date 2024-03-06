@@ -108,7 +108,7 @@ extern "C" {
 
 void pyregistry(void *p, uintptr_t *aligned, int64_t i)
 {
-    void* handle = dlopen("registry.cpython-310-x86_64-linux-gnu.so", RTLD_LAZY | RTLD_NODELETE);
+    void *handle = dlopen("registry.cpython-310-x86_64-linux-gnu.so", RTLD_LAZY | RTLD_NODELETE);
     void (*callbackCall)(uintptr_t);
     typedef void (*func_ptr_t)(uintptr_t);
     callbackCall = (func_ptr_t)dlsym(handle, "callbackCall");
