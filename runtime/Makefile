@@ -15,7 +15,7 @@ ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
 # TODO: Update to v0.35.0 after the next lightning release.
-LIGHTNING_GIT_TAG_VALUE?="03e465d96a665a2d1bcea2f1e6d79321e9d1c3fe"
+LIGHTNING_GIT_TAG_VALUE?=v0.35.0
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 BUILD_TARGETS := rt_capi

@@ -2158,37 +2158,42 @@ def vmap(
     Raises:
         ValueError: Invalid ``in_axes``, ``out_axes``, and ``axis_size`` values.
 
-
     **Example**
+
+    For example, consider the following QNode:
 
     .. code-block:: python
 
-        @qjit
-        def workflow(x, y, z):
-            @qml.qnode(qml.device(backend, wires=1))
-            def circuit(x, y):
-                qml.RX(jnp.pi * x[0] + y, wires=0)
-                qml.RY(x[1] ** 2, wires=0)
-                qml.RX(x[1] * x[2], wires=0)
-                return qml.expval(qml.PauliZ(0))
+        dev = qml.device("lightning.qubit", wires=1)
 
-            def postcircuit(y, x, z):
-                return circuit(x, y) * z
+        @qml.qnode(dev)
+        def circuit(x, y):
+          qml.RX(jnp.pi * x[0] + y, wires=0)
+          qml.RY(x[1] ** 2, wires=0)
+          qml.RX(x[1] * x[2], wires=0)
+          return qml.expval(qml.PauliZ(0))
 
-            res = vmap(postcircuit, in_axes=(0, 0, None))(y, x, z)
-            return res
+    >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
+    Array(-0.93005586, dtype=float64)
 
-        y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
-        x = jnp.array(
-            [
-                [0.1, 0.2, 0.3],
-                [0.4, 0.5, 0.6],
-                [0.7, 0.8, 0.9],
-            ]
-        )
+    We can use ``catalyst.vmap`` to introduce additional batch dimensions
+    to our input arguments,
+    without needing to use a Python for loop:
 
-    >>> workflow(x, y, 1)
-    [-0.93005586, -0.97165424, -0.6987465]
+    >>> x = jnp.array([[0.1, 0.2, 0.3],
+    ...                [0.4, 0.5, 0.6],
+    ...                [0.7, 0.8, 0.9]])
+    >>> y = jnp.array([jnp.pi, jnp.pi / 2, jnp.pi / 4])
+    >>> qjit(vmap(cost))(x, y)
+    array([-0.93005586, -0.97165424, -0.6987465 ])
+
+    ``catalyst.vmap()`` has been implemented to match the same behaviour of
+    ``jax.vmap``, so should be a drop-in replacement in most cases.
+    Under-the-hood, it is automatically inserting Catalyst-compatible for loops,
+    which will be compiled and executed outside of Python for increased performance.
+
+    Outside of a Catalyst qjit-compiled function, ``vmap`` will simply dispatch to
+    ``jax.vmap``.
 
     .. details::
         :title: Selecting batching axes for arguments
