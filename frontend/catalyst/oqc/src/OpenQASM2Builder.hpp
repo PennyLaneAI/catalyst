@@ -228,7 +228,7 @@ class QASMMeasure {
     [[nodiscard]] auto getBit() const -> size_t { return qubit; }
 
     [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister,
-                                  const QASMRegister &cregister) const -> std::string
+                                   const QASMRegister &cregister) const -> std::string
     {
         // measure wire
         std::ostringstream oss;
@@ -238,19 +238,13 @@ class QASMMeasure {
     }
 };
 
-// class QASMMeasureAll {
-
-//   public:
-
-//     [[nodiscard]] auto toOpenQASM2(const QASMRegister &qregister,
-//                                   const QASMRegister &cregister) const -> std::string
-//     {
-//         // measure wire
-//         std::ostringstream oss;
-//         oss << "measure " << qregister.getName() << " -> " << cregister.getName() << ";\n";
-//         return oss.str();
-//     }
-// };
+std::string MeasureAll(const QASMRegister &qregister, const QASMRegister &cregister)
+{
+    // measure wire
+    std::ostringstream oss;
+    oss << "measure " << qregister.getName() << " -> " << cregister.getName() << ";\n";
+    return oss.str();
+};
 
 // /**
 //  * The OpenQasm circuit builder interface.
