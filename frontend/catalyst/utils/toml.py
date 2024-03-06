@@ -18,7 +18,7 @@ Module for abstracting which toml_load to use.
 import importlib.util
 from functools import reduce
 from itertools import repeat
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
