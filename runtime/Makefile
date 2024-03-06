@@ -128,10 +128,6 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 dummy_device:
 	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
 
-.PHONE: pyregistry
-pyregistry:
-	cmake --build $(RT_BUILD_DIR) --target pyregistry -j$(NPROC)
-
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "test the Catalyst runtime test suite"
