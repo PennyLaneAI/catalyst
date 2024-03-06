@@ -19,13 +19,11 @@ import jax.numpy as jnp
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
 from catalyst.qjit_device import QJITDevice
 from catalyst.utils.runtime import device_get_toml_config
-from catalyst.utils.toml import toml_load
 
 
 def get_custom_qjit_device(num_wires, discarded_operations=None, added_operations=None):

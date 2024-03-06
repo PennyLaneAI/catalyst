@@ -15,7 +15,6 @@
 """Unit tests for functions to check config validity."""
 
 from os.path import join
-from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
@@ -287,7 +286,7 @@ def test_check_full_overlap():
 
     msg = f"Gates in qml.device.operations and specification file do not match"
     with pytest.raises(CompileError, match=msg):
-        check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "A", "A", "B", "B", "Adjoint(Y)"})
+        check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "B", "Adjoint(Y)"})
 
 
 if __name__ == "__main__":

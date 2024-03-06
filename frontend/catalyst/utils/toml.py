@@ -65,6 +65,8 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
 
 
 def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
+    """Read the toml config section specified by `path`. Filters-out gates which don't match the
+    condition"""
     gates = {}
     iterable = reduce(lambda x, y: x[y], path, config)
     gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
@@ -82,6 +84,7 @@ def get_observables(config: TOMLDocument, shots_present: bool) -> Dict[str, dict
 
 
 def get_native_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+    """Get the gates from the `native` section of the config."""
 
     schema = int(config["schema"])
     if schema == 1:

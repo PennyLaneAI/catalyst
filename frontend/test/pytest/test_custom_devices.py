@@ -21,7 +21,6 @@ import pytest
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import get_native_gates_PL
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
