@@ -258,26 +258,32 @@ std::string MeasureAll(const QASMRegister &qregister, const QASMRegister &cregis
  */
 class OpenQASM2Builder {
   protected:
-    QASMRegister qreg;
-    QASMRegister creg;
+    std::vector<QASMRegister> qregs;
+    std::vector<QASMRegister> cregs;
     std::vector<QASMGate> gates;
     std::vector<QASMMeasure> measurements;
-    bool measure_all;
+    size_t num_qubits;
+    bool measure_all = false;
 
   public:
-    explicit OpenQASM2Builder(QASMRegister _qreg, QASMRegister _creg)
-        : qreg(_qreg), creg(_creg), measure_all(false)
-    {
-    }
+    explicit OpenQASM2Builder() : measure_all(false), num_qubits(0) {}
     virtual ~OpenQASM2Builder() = default;
 
-    void Gate(const std::string &name, const std::vector<double> &params_val,
-              const std::vector<size_t> &qubits)
+    void AddRegisters(const std::string &nameQreg, const size_t &numQubits,
+                      const std::string &nameCreg, const size_t &numCbits)
+    {
+        qregs.emplace_back(RegisterType::Qubit, nameQreg, numQubits);
+        num_qubits += numQubits;
+        cregs.emplace_back(RegisterType::Bit, nameCreg, numCbits);
+    }
+    void AddGate(const std::string &name, const std::vector<double> &params_val,
+                 const std::vector<size_t> &qubits)
     {
         gates.emplace_back(name, params_val, qubits);
     }
-    void Measure(size_t bit, size_t qubit) { measurements.emplace_back(bit, qubit); }
-    void Measure() { measure_all = true; }
+    void AddMeasurement(size_t bit, size_t qubit) { measurements.emplace_back(bit, qubit); }
+    void AddMeasurements() { measure_all = true; }
+    size_t getNumQubits() { return num_qubits; }
     [[nodiscard]] virtual auto toOpenQASM2(size_t precision = 5) const -> std::string
     {
         std::ostringstream oss;
@@ -288,24 +294,24 @@ class OpenQASM2Builder {
         oss << "include \"qelib1.inc\""
             << ";\n";
         // quantum registers
-        oss << qreg.toOpenQASM2(RegisterMode::Alloc);
+        oss << qregs[0].toOpenQASM2(RegisterMode::Alloc);
 
         // measurement results registers
-        oss << creg.toOpenQASM2(RegisterMode::Alloc);
+        oss << cregs[0].toOpenQASM2(RegisterMode::Alloc);
 
         // quantum gates assuming qregs.size() == 1
         for (auto &gate : gates) {
-            oss << gate.toOpenQASM2(qreg, precision);
+            oss << gate.toOpenQASM2(qregs[0], precision);
         }
 
         // quantum measures assuming qregs.size() == 1, cregs.size() <= 1
         if (!measure_all) {
             for (auto &m : measurements) {
-                oss << m.toOpenQASM2(creg, qreg);
+                oss << m.toOpenQASM2(qregs[0], cregs[0]);
             }
         }
         else {
-            oss << MeasureAll(qreg, creg);
+            oss << MeasureAll(qregs[0], cregs[0]);
         }
 
         return oss.str();

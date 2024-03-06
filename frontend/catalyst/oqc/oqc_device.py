@@ -24,14 +24,12 @@ class OQCDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
-
-        #TODO: Replace with the oqc share library
-        return "oqc.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "oqc", str(pathlib.Path(__file__).parent.joinpath("src/build/librtd_oqc.so"))
 
     def __init__(self, wires, backend, credentials, shots=1024, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
-        self._client = self._authenticate(credentials)
+        # self._client = self._authenticate(credentials)
         super().__init__(wires=wires, shots=shots)
 
     def _authenticate(self, credentials: dict):

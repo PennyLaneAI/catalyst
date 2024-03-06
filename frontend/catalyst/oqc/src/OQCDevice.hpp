@@ -35,8 +35,11 @@
 
 #include <pybind11/embed.h>
 
-// #include "OQCRunner.hpp" // <pybind11/embed.h>
+#include "OQCRunner.hpp" // <pybind11/embed.h>
 #include "OpenQASM2Builder.hpp"
+
+using namespace Catalyst::Runtime::OpenQasm2;
+using namespace Catalyst::Runtime::Device::OQC;
 
 namespace Catalyst::Runtime::Device {
 class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
@@ -46,14 +49,13 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
-    // std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
-    // std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
+    std::unique_ptr<OpenQASM2Builder> builder;
+    std::unique_ptr<OQCRunner> runner;
 
     Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
     bool tape_recording{false};
     size_t device_shots;
 
-    // OpenQasm::BuilderType builder_type;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -78,10 +80,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
-
-        // builder_type = OpenQasm::BuilderType::Common;
-        // builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
-        // runner = std::make_unique<OpenQasm::OpenQasmRunner>();
+        runner = std::make_unique<OQCRunner>();
     }
     ~OQCDevice() = default;
 

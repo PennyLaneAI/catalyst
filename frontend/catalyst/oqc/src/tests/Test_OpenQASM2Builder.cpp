@@ -183,18 +183,18 @@ TEST_CASE("Test MeasureAll from OpenQasmBuilder", "[openqasm]")
 
 TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure", "[openqasm]")
 {
-    auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
-    auto cbits = QASMRegister(RegisterType::Bit, "c", 5);
-    auto builder = OpenQASM2Builder(qubits, cbits);
+    auto builder = OpenQASM2Builder();
 
-    builder.Gate("PauliX", {}, {0});
-    builder.Gate("Hadamard", {}, {1});
-    builder.Gate("SWAP", {}, {0, 1});
-    builder.Gate("RZ", {0.12}, {1});
-    builder.Gate("RX", {}, {0});
+    builder.AddRegisters("q", 5, "c", 5);
 
-    builder.Measure(0, 0);
-    builder.Measure(1, 1);
+    builder.AddGate("PauliX", {}, {0});
+    builder.AddGate("Hadamard", {}, {1});
+    builder.AddGate("SWAP", {}, {0, 1});
+    builder.AddGate("RZ", {0.12}, {1});
+    builder.AddGate("RX", {}, {0});
+
+    builder.AddMeasurement(0, 0);
+    builder.AddMeasurement(1, 1);
 
     auto toqasm = "OPENQASM 2.0;\n"
                   "include \"qelib1.inc\";\n"
@@ -205,25 +205,26 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and meas
                   "swap q[0], q[1];\n"
                   "rz(0.12) q[1];\n"
                   "rx q[0];\n"
-                  "measure c[0] -> q[0];\n"
-                  "measure c[1] -> q[1];\n";
+                  "measure q[0] -> c[0];\n"
+                  "measure q[1] -> c[1];\n";
 
     CHECK(builder.toOpenQASM2() == toqasm);
 }
 
-TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure all", "[openqasm]")
+TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure all",
+          "[openqasm]")
 {
-    auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
-    auto cbits = QASMRegister(RegisterType::Bit, "c", 5);
-    auto builder = OpenQASM2Builder(qubits, cbits);
+    auto builder = OpenQASM2Builder();
 
-    builder.Gate("PauliX", {}, {0});
-    builder.Gate("Hadamard", {}, {1});
-    builder.Gate("SWAP", {}, {0, 1});
-    builder.Gate("RZ", {0.12}, {1});
-    builder.Gate("RX", {}, {0});
+    builder.AddRegisters("q", 5, "c", 5);
 
-    builder.Measure();
+    builder.AddGate("PauliX", {}, {0});
+    builder.AddGate("Hadamard", {}, {1});
+    builder.AddGate("SWAP", {}, {0, 1});
+    builder.AddGate("RZ", {0.12}, {1});
+    builder.AddGate("RX", {}, {0});
+
+    builder.AddMeasurements();
 
     auto toqasm = "OPENQASM 2.0;\n"
                   "include \"qelib1.inc\";\n"

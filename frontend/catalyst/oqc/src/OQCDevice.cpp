@@ -28,38 +28,23 @@ auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
         return {};
     }
 
-    // const size_t cur_num_qubits = builder->getNumQubits();
-    // RT_FAIL_IF(cur_num_qubits, "Partial qubits allocation is not supported by OQCDevice");
+    builder = std::make_unique<OpenQASM2Builder>();
 
-    // const size_t new_num_qubits = cur_num_qubits + num_qubits;
-    // if (cur_num_qubits) {
-    //     builder = std::make_unique<OQC::OQCBuilder>();
-    // }
+    builder->AddRegisters("qubits", num_qubits, "cbits", num_qubits);
 
-    // builder->Register(OQC::RegisterType::Qubit, "qubits", new_num_qubits);
-
-    return qubit_manager.AllocateRange(10, num_qubits);
+    return qubit_manager.AllocateRange(0, num_qubits);
 }
 
-void OQCDevice::ReleaseAllQubits()
-{
-    // refresh the builder for device re-use.
-    // if (builder_type != OpenQasm::BuilderType::Common) {
-    //     builder = std::make_unique<OpenQasm::BraketBuilder>();
-    // }
-    // else {
-    //     builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
-    // }
-}
+void OQCDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
+
+void OQCDevice::ReleaseAllQubits() { builder = std::make_unique<OpenQASM2Builder>(); }
 
 void OQCDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
 {
     RT_FAIL("Unsupported functionality");
 }
 
-auto OQCDevice::GetNumQubits() const -> size_t { 
-    // return builder->getNumQubits(); 
-    }
+auto OQCDevice::GetNumQubits() const -> size_t { return builder->getNumQubits(); }
 
 void OQCDevice::StartTapeRecording()
 {
@@ -78,18 +63,14 @@ void OQCDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shots = s
 
 auto OQCDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-
-auto OQCDevice::Zero() const -> Result
-{
-    return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
-}
+auto OQCDevice::Zero() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
 
 auto OQCDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
 
 void OQCDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                    const std::vector<QubitIdType> &wires, bool inverse,
-                                    const std::vector<QubitIdType> &controlled_wires,
-                                    const std::vector<bool> &controlled_values)
+                               const std::vector<QubitIdType> &wires, bool inverse,
+                               const std::vector<QubitIdType> &controlled_wires,
+                               const std::vector<bool> &controlled_values)
 {
     RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
                "OpenQasm device does not support native quantum control.");
@@ -106,16 +87,74 @@ void OQCDevice::NamedOperation(const std::string &name, const std::vector<double
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    // builder->Gate(name, params, {}, dev_wires, inverse);
+    builder->AddGate(name, params, dev_wires);
 }
 
-void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                            size_t shots)
+void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
 {
-    
-    // TODO: COUNTS
+    const size_t numQubits = GetNumQubits();
+
+    auto &&li_samples = runner->Sample(builder->toOpenQASM2(), "", 1000, GetNumQubits());
+}
+
+auto OQCDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int32_t> postselect)
+    -> Result
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+ObsIdType OQCDevice::Observable(ObsId, const std::vector<std::complex<double>> &,
+                                const std::vector<QubitIdType> &)
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+ObsIdType OQCDevice::TensorObservable(const std::vector<ObsIdType> &)
+{
+    RT_FAIL("Unsupported functionality");
+};
+
+ObsIdType OQCDevice::HamiltonianObservable(const std::vector<double> &,
+                                           const std::vector<ObsIdType> &)
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+void OQCDevice::MatrixOperation(const std::vector<std::complex<double>> &,
+                                const std::vector<QubitIdType> &, bool,
+                                const std::vector<QubitIdType> &, const std::vector<bool> &)
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+double OQCDevice::Expval(ObsIdType) { RT_FAIL("Unsupported functionality"); };
+double OQCDevice::Var(ObsIdType) { RT_FAIL("Unsupported functionality"); };
+void OQCDevice::State(DataView<std::complex<double>, 1> &)
+{
+    RT_FAIL("Unsupported functionality");
+};
+void OQCDevice::Probs(DataView<double, 1> &) { RT_FAIL("Unsupported functionality"); };
+void OQCDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &)
+{
+    RT_FAIL("Unsupported functionality");
+};
+void OQCDevice::Sample(DataView<double, 2> &, size_t) { RT_FAIL("Unsupported functionality"); };
+void OQCDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t)
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+void OQCDevice::PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                              const std::vector<QubitIdType> &, size_t)
+{
+    RT_FAIL("Unsupported functionality");
+}
+
+void OQCDevice::Gradient(std::vector<DataView<double, 1>> &, const std::vector<size_t> &)
+{
+    RT_FAIL("Unsupported functionality");
 }
 
 } // namespace Catalyst::Runtime::Device
 
-GENERATE_DEVICE_FACTORY(OQCDevice, Catalyst::Runtime::Device::OQCDevice);
+GENERATE_DEVICE_FACTORY(oqc, Catalyst::Runtime::Device::OQCDevice);
