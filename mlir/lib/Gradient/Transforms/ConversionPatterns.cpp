@@ -75,7 +75,7 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
-        TypeConverter *conv = getTypeConverter();
+        const TypeConverter *conv = getTypeConverter();
 
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
@@ -125,8 +125,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
-            Value newArg =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+            Value newArg = rewriter.create<LLVM::AllocaOp>(
+                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             args.push_back(newArg);
         }
@@ -160,8 +160,8 @@ static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, PatternRewriter &rewriter,
-                    Location loc, bool volatileArgs = false)
+void wrapMemRefArgs(func::FuncOp func, const LLVMTypeConverter *typeConverter,
+                    PatternRewriter &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
@@ -179,7 +179,7 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
             BlockArgument memrefArg = func.getArgument(idx);
             func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
             Value wrappedMemref = func.getArgument(idx);
-            Type structType = typeConverter.convertType(memrefType);
+            Type structType = typeConverter->convertType(memrefType);
 
             // We potentially need all arguments for the custom quantum gradient, but not all of
             // them will be used by the primal. Mark the load of the wrapped memref as volatile and
@@ -212,7 +212,7 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
                 SmallVector<Value> operands;
                 SmallVector<Value> outputs;
                 auto wrapMemref = [&](Value memref) {
-                    Type convertedType = typeConverter.convertType(memref.getType());
+                    Type convertedType = typeConverter->convertType(memref.getType());
                     Value space =
                         rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
                                                         /*elementType=*/convertedType, c1);
@@ -280,7 +280,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 }
                 catalyst::convertToDestinationPassingStyle(func, rewriter);
 
-                wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
+                wrapMemRefArgs(func, getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -292,10 +292,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
-            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
-                moduleOp, getTypeConverter()->getIndexType(), options.useOpaquePointers);
-            LLVM::LLVMFuncOp freeFn =
-                LLVM::lookupOrCreateGenericFreeFn(moduleOp, options.useOpaquePointers);
+            LLVM::LLVMFuncOp allocFn =
+                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType());
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp);
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with
@@ -363,17 +362,30 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
+        // TRICK: I am forcing the extraction of the values because I don't know how to
+        // get value of the withValue flag
+        bool withVal = true;
+
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc,
+                                  {.dupNoNeed = withVal ? false : true});
         }
 
         // The results of backprop are in argShadows, except scalar derivatives which are in the
         // results of the enzyme call.
         auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
-        SmallVector<Value> scalarResults;
-        unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
-        rewriter.replaceOp(op, scalarResults);
+        SmallVector<Value> valResults, gradResults;
+
+        // TRICK: I am forcing the size of values and gradients to 1, because I don't know how
+        // to take it from the ValAndGrad Op
+
+        unsigned numVals = 1;
+        unsigned numGradients = 1;
+
+        unpackScalarResults(enzymeCall, valResults, gradResults, rewriter, loc, withVal, numVals,
+                            numGradients);
+        rewriter.replaceOp(op, {valResults, gradResults});
         return success();
     }
 
@@ -449,24 +461,49 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return LLVM::LLVMStructType::getLiteral(ctx, SmallVector<Type>(scalarReturns));
     }
 
-    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &results,
-                                    OpBuilder &builder, Location loc)
+    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &valResults,
+                                    SmallVectorImpl<Value> &gradResults, OpBuilder &builder,
+                                    Location loc, bool withValue, unsigned numVals,
+                                    unsigned numGradients)
     {
         if (enzymeCall.getNumResults() == 0) {
             return;
         }
 
-        // LLVM Functions can only return up to one result. If one scalar is being differentiated,
-        // it will be the sole result. If there are multiple scalars being differentiated, Enzyme
-        // will return a struct of all the derivatives with respect to those scalars.
         Value result = enzymeCall.getResult();
-        if (isa<FloatType>(result.getType())) {
-            results.push_back(result);
+        bool isFloatType = isa<FloatType>(result.getType());
+        auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType());
+
+        if (!isFloatType || !structType) {
+            return;
         }
-        if (auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType())) {
-            size_t numResults = structType.getBody().size();
-            for (size_t i = 0; i < numResults; i++) {
-                results.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+
+        size_t numResults = structType.getBody().size();
+
+        if (withValue) {
+            assert(!isFloatType && "Wrong result type");
+            assert(numResults == numVals + numGradients);
+
+            for (size_t i = 0; i < numVals; i++) {
+                valResults.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+            }
+
+            for (size_t i = numVals; i < numResults; i++) {
+                gradResults.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+            }
+        }
+        else {
+            // LLVM Functions can only return up to one result. If one scalar is being
+            // differentiated, it will be the sole result. If there are multiple scalars being
+            // differentiated, Enzyme will return a struct of all the derivatives with respect to
+            // those scalars.
+            if (isFloatType) {
+                gradResults.push_back(result);
+            }
+            else { // structType
+                for (size_t i = 0; i < numResults; i++) {
+                    gradResults.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+                }
             }
         }
     }
@@ -543,7 +580,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         builder.create<func::CallOp>(loc, qnode, arguments);
-        Value tape = builder.create<LLVM::NullOp>(loc, tapeType);
+        Value tape = builder.create<LLVM::ZeroOp>(loc, tapeType);
         builder.create<func::ReturnOp>(loc, tape);
         return augmentedForward;
     }

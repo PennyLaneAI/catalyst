@@ -15,15 +15,27 @@
 Pytest configuration file for Catalyst test suite.
 """
 # pylint: disable=unused-import
+import platform
 import pytest
 
-try:
-    import catalyst
-    import tensorflow as tf
-except (ImportError, ModuleNotFoundError) as e:
-    tf_available = False
-else:
-    tf_available = True
+
+def is_cuda_available():
+    """Checks if cuda is available by trying an import.
+
+    Do not run from top level!
+    We do not want to import cudaq unless we absolutely need to.
+    This is because cudaq prevents kokkos kernels from executing properly.
+    See https://github.com/PennyLaneAI/catalyst/issues/513
+    """
+    try:
+        # pylint: disable=import-outside-toplevel
+        import cudaq
+    except (ImportError, ModuleNotFoundError):
+        cudaq_available = False
+    else:
+        cudaq_available = True
+    return cudaq_available
+
 
 # Default from PennyLane
 TOL_STOCHASTIC = 0.05
@@ -74,35 +86,47 @@ def pytest_configure(config):
         "braketremote: run on remote aws-braket devices backed by `OpenQasmDevice` in the runtime",
     )
 
+    config.addinivalue_line(
+        "markers",
+        "cuda: run cuda tests",
+    )
 
-def pytest_runtest_setup(item):
-    """Automatically skip tests if interfaces are not installed"""
-    interfaces = {"tf"}
-    available_interfaces = {
-        "tf": tf_available,
-    }
 
-    allowed_interfaces = [
-        allowed_interface
-        for allowed_interface in interfaces
-        if available_interfaces[allowed_interface] is True
-    ]
+def skip_cuda_tests(config, items):
+    """Skip cuda tests according to the following logic:
+    By default: RUN
+      except: if apple
+      except: if kokkos
+      except: is cuda-quantum not installed
 
-    # load the marker specifying what the interface is
-    all_interfaces = {"tf"}
-    marks = {mark.name for mark in item.iter_markers() if mark.name in all_interfaces}
-
-    for b in marks:
-        if b not in allowed_interfaces:
-            pytest.skip(
-                f"\nTest {item.nodeid} only runs with {allowed_interfaces}"
-                f" interfaces(s) but {b} interface provided",
-            )
+    Important! We should only check if cuda-quantum is installed
+    as a last resort. We don't want to check if cuda-quantum is
+    installed at all when we are running kokkos.
+    """
+    skipper = pytest.mark.skip()
+    is_kokkos = config.getoption("backend") == "lightning.kokkos"
+    is_apple = platform.system() == "Darwin"
+    # CUDA quantum is not supported in apple silicon.
+    # CUDA quantum cannot run with kokkos
+    skip_cuda_tests = is_kokkos or is_apple
+    if not skip_cuda_tests and not is_cuda_available():
+        # Only check this conditionally as it imports cudaq.
+        # And we don't even want to succeed with kokkos.
+        skip_cuda_tests = True
+    for item in items:
+        is_cuda_test = "cuda" in item.keywords
+        skip_cuda = is_cuda_test and skip_cuda_tests
+        if skip_cuda:
+            item.add_marker(skipper)
 
 
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
 
+    skip_cuda_tests(config, items)
+
+    # skip braket tests
+    skipper = pytest.mark.skip()
     braket_val = config.getoption("--runbraket")
     if braket_val in ["ALL", "LOCAL", "REMOTE"]:
         # only runs test with the braket marker
@@ -114,8 +138,6 @@ def pytest_collection_modifyitems(config, items):
                 braket_tests.append(item)
         items[:] = braket_tests
     else:
-        # skip braket tests
-        skipper = pytest.mark.skip()
         for item in items:
             if "braketlocal" in item.keywords or "braketremote" in item.keywords:
                 item.add_marker(skipper)

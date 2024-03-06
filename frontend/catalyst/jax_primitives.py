@@ -33,7 +33,7 @@ from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from mlir_quantum.dialects.catalyst import PrintOp
-from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
+from mlir_quantum.dialects.gradient import GradOp, JVPOp, ValueAndGradOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -200,8 +200,10 @@ for_p = core.AxisPrimitive("for_loop")
 for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
+value_and_grad_p = core.Primitive("value_and_grad")
+value_and_grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
-grad_p.multiple_results = True
+func_p.multiple_results = True
 jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
@@ -373,6 +375,70 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     return GradOp(
         flat_output_types,
+        ir.StringAttr.get(method),
+        ir.FlatSymbolRefAttr.get(symbol_name),
+        mlir.flatten_lowering_ir_args(args_and_consts),
+        diffArgIndices=diffArgIndices,
+        finiteDiffParam=finiteDiffParam,
+    ).results
+
+
+@value_and_grad_p.def_impl
+def _value_and_grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@value_and_grad_p.def_abstract_eval
+def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):
+    """This function is called with abstract arguments for tracing.
+    Note: argument names must match these of `_value_and_grad_lowering`."""
+    return jaxpr.out_avals + jaxpr.out_avals
+
+
+def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
+    """Lowering function to value and gradient.
+    Args:
+        ctx: the MLIR context
+        args: the points in the function in which we are to calculate the derivative
+        jaxpr: the jaxpr representation of the value and grad op
+        fn(Grad): the function to be differentiated
+        method: the method used for differentiation
+        h: the difference for finite difference. May be None when fn is not finite difference.
+        argnum: argument indices which define over which arguments to
+            differentiate.
+    """
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    mlir_ctx = ctx.module_context.context
+    finiteDiffParam = None
+    if h:
+        f64 = ir.F64Type.get(mlir_ctx)
+        finiteDiffParam = ir.FloatAttr.get(f64, h)
+    offset = len(jaxpr.consts)
+    new_argnum = [num + offset for num in argnum]
+    argnum_numpy = np.array(new_argnum)
+    diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
+
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+
+    num_flat_output_types = len(flat_output_types)
+    assert (
+        num_flat_output_types % 2 == 0
+    ), f"The total number of result tensors is expected to be even, not {num_flat_output_types}"
+
+    # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
+    # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
+    # such constants to numpy array types.
+    constants = [
+        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+    ]
+    args_and_consts = constants + list(args)
+
+    return ValueAndGradOp(
+        flat_output_types[: num_flat_output_types // 2],
+        flat_output_types[num_flat_output_types // 2 :],
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args_and_consts),
@@ -1534,6 +1600,7 @@ mlir.register_lowering(cond_p, _cond_lowering)
 mlir.register_lowering(while_p, _while_loop_lowering)
 mlir.register_lowering(for_p, _for_loop_lowering)
 mlir.register_lowering(grad_p, _grad_lowering)
+mlir.register_lowering(value_and_grad_p, _value_and_grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
@@ -1545,7 +1612,7 @@ def _scalar_abstractify(t):
     # pylint: disable=protected-access
     if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
-    raise TypeError(f"Cannot convert given type {t} to scalar ShapedArray.")
+    raise TypeError(f"Argument type {t} is not a valid JAX type.")
 
 
 # pylint: disable=protected-access

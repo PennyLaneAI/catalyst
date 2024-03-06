@@ -16,7 +16,7 @@ import glob
 import platform
 import subprocess
 from distutils import sysconfig
-from os import environ, path
+from os import path
 
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
@@ -33,40 +33,36 @@ with open(path.join("frontend", "catalyst", "_version.py")) as f:
     version = f.readlines()[-1].split()[-1].strip("\"'")
 
 with open(".dep-versions") as f:
-    jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
+    lines = f.readlines()
+    jax_version = [line[4:].strip() for line in lines if "jax=" in line][0]
+    pl_str = "pennylane="
+    pl_str_length = len(pl_str)
+    pl_version = [line[pl_str_length:].strip() for line in lines if pl_str in line][0]
 
-pl_version = environ.get("PL_VERSION", ">=0.32,<=0.34")
 requirements = [
-    f"pennylane{pl_version}",
+    f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
     "scipy",
+    "diastatic-malt>=2.15.1",
 ]
 
-# TODO: Once PL version 0.35 is released:
-# * remove this special handling
-# * make pennylane>=0.35 a requirement
-# * Close this ticket https://github.com/PennyLaneAI/catalyst/issues/494
-one_compiler_per_distribution = pl_version == ">=0.32,<=0.34"
-if one_compiler_per_distribution:
-    entry_points = {
-        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
-        "pennylane.compilers": [
-            "context = catalyst.utils.contexts:EvaluationContext",
-            "ops = catalyst:pennylane_extensions",
-            "qjit = catalyst:qjit",
-        ],
-    }
-else:
-    entry_points = {
-        "pennylane.plugins": "cudaq = catalystcuda:CudaQDevice",
-        "pennylane.compilers": [
-            "catalyst.context = catalyst.utils.contexts:EvaluationContext",
-            "catalyst.ops = catalyst:pennylane_extensions",
-            "catalyst.qjit = catalyst:qjit",
-        ],
-    }
+entry_points = {
+    "pennylane.plugins": [
+        "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
+        "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
+        "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
+    ],
+    "pennylane.compilers": [
+        "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
+        "catalyst.ops = catalyst:pennylane_extensions",
+        "catalyst.qjit = catalyst:qjit",
+        "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
+        "cuda_quantum.ops = catalyst:pennylane_extensions",
+        "cuda_quantum.qjit = catalyst.cuda:qjit",
+    ],
+}
 
 classifiers = [
     "Environment :: Console",
@@ -174,6 +170,7 @@ ext_modules.extend(intree_extension_list)
 # - `context`: Path to the compilation evaluation context manager.
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
+
 setup(
     classifiers=classifiers,
     name="PennyLane-Catalyst",

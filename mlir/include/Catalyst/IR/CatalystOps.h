@@ -20,6 +20,8 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 
+#include "mlir/Bytecode/BytecodeOpInterface.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 
 #define GET_OP_CLASSES
