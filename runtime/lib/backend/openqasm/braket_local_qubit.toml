@@ -1,84 +1,85 @@
-schema = 1
+schema = 2
 
 [device]
 name = "braket.aws.qubit"
 
-[operators]
+[operators.observables]
 # Observables supported by the device
-observables = [
-	"PauliX",
-	"PauliY",
-	"PauliZ",
-	"Hadamard",
-	"Hermitian",
-	"Tensor",
-]
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
+Hermitian = {}
+# Tensor,
+Projector = {}
+Sprod = {}
+Hamiltonian = { condition = ['noshots'] }
+Sum = {}
+Prod = {}
 
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
-[[operators.gates]]
-native = [
-        "ISWAP",
-        "PSWAP",
-	"Hadamard",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "S",
-        "T",
-        "CNOT",
-        "CZ",
-        "SWAP",
-        "PhaseShift",
-        "RX",
-        "RY",
-        "RZ",
-        "CSWAP",
-	"QubitUnitary",
-	"MS",
-	"CY",
-	"SX",
-	"AAMS",
-	"ECR",
-	"GPi",
-	"GPi2",
-	"CPhaseShift00",
-	"CPhaseShift01",
-	"CPhaseShift10",
-	"Identity",
-	"IsingXX",
-	"IsingXY",
-	"IsingYY",
-	"IsingZZ",
-	"Toffoli",
-	"ControlledPhaseShift",
-]
+[operators.gates.native]
+
+ISWAP = {}
+PSWAP = {}
+Hadamard = {}
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+S = {}
+T = {}
+CNOT = {}
+CZ = {}
+SWAP = {}
+PhaseShift = {}
+RX = {}
+RY = {}
+RZ = {}
+CSWAP = {}
+QubitUnitary = {}
+MS = {}
+CY = {}
+SX = {}
+AAMS = {}
+ECR = {}
+GPi = {}
+GPi2 = {}
+CPhaseShift00 = {}
+CPhaseShift01 = {}
+CPhaseShift10 = {}
+Identity = {}
+IsingXX = {}
+IsingXY = {}
+IsingYY = {}
+IsingZZ = {}
+Toffoli = {}
+ControlledPhaseShift = {}
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
 # Optional, since gates not listed in this list will typically be decomposed by
 # default, but can be useful to express a deviation from this device's regular
 # strategy in PennyLane.
-decomp = []
+[operators.gates.decomp]
 
 # Gates which should be translated to QubitUnitary
-matrix = [
-]
+[operators.gates.matrix]
 
-[measurement_processes]
-exactshots = [
-	"Expval",
-	"Var",
-	"Probs",
-	"State",
-]
-finiteshots = [
-	"Expval",
-	"Var",
-	"Probs",
-	"Sample",
-	"Counts",
-]
+[measurement_processes.exactshots]
+
+Expval = {}
+Var = {}
+Probs = {}
+State = {}
+
+[measurement_processes.finiteshots]
+
+Expval = {}
+Var = {}
+Probs = {}
+Sample = {}
+Counts = {}
 
 [compilation]
 # If the device is compatible with qjit
@@ -94,4 +95,4 @@ mid_circuit_measurement = false
 
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
-dynamic_qubit_management = false 
+dynamic_qubit_management = false

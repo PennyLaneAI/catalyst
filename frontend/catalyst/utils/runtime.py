@@ -34,6 +34,7 @@ from catalyst.utils.toml import (
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_native_gates,
     get_observables,
     toml_load,
 )
@@ -88,7 +89,7 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
     return native_controlled_gates
 
 
-def get_native_gates_PL(config: TOMLDocument) -> Set[str]:
+def get_native_gates_PL(config: TOMLDocument, shots_present: bool) -> Set[str]:
     """Get gates that are natively supported by the device and therefore do not need to be
     decomposed.
 
@@ -102,16 +103,21 @@ def get_native_gates_PL(config: TOMLDocument) -> Set[str]:
     schema = int(config["schema"])
 
     if schema == 1:
-        native_gates = set(config["operators"]["gates"][0]["native"])
-        native_controlled_gates = deduce_native_controlled_gates(native_gates)
+        native_gates_attrs = get_native_gates(config, shots_present)
+        assert all(len(v) == 0 for v in native_gates_attrs.values())
+        native_gates = set(native_gates_attrs)
+        supports_controlled = check_quantum_control_flag(config)
+        native_controlled_gates = (
+            deduce_native_controlled_gates(native_gates) if supports_controlled else set()
+        )
         gates_PL = set.union(native_gates, native_controlled_gates)
 
     elif schema == 2:
-        gates = config["operators"]["gates"]["native"]
-        for gate_name in [str(g) for g in gates]:
-            gates_PL.add(f"{gate_name}")
-            if gates[gate_name].get("controllable", False):
-                gates_PL.add(f"C({gate_name})")
+        native_gates = get_native_gates(config, shots_present)
+        for gate, attrs in native_gates.items():
+            gates_PL.add(f"{gate}")
+            if attrs.get("controllable", False):
+                gates_PL.add(f"C({gate})")
 
     else:
         raise CompileError("Device configuration schema {schema} is not supported")
@@ -176,23 +182,20 @@ def check_full_overlap(device_gates: Set[str], spec_gates: Set[str]) -> None:
 
     Raises: CompileError
     """
-    device_gates_filtered = filter_out_adjoint_and_control(device_gates)
-    spec_gates_filtered = filter_out_adjoint_and_control(spec_gates)
-    if device_gates_filtered == spec_gates_filtered:
+    if device_gates == spec_gates:
         return
 
     msg = (
         "Gates in qml.device.operations and specification file do not match.\n"
-        f"Gates that present only in the device: {device_gates_filtered - spec_gates_filtered}\n"
-        f"Gates that present only in spec: {spec_gates_filtered - device_gates_filtered}\n"
+        f"Gates that present only in the device: {device_gates - spec_gates}\n"
+        f"Gates that present only in spec: {spec_gates - device_gates}\n"
     )
     raise CompileError(msg)
 
 
 def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -> None:
-    """Validate configuration file against device.
-    Will raise a CompileError
-    * if device does not contain ``config`` attribute
+    """Validate configuration document against the device attributes.
+    Raise CompileError in case of mismatch.
     * if configuration file does not exists
     * if decomposable, matrix, and native gates have some overlap
     * if decomposable, matrix, and native gates do not match gates in ``device.operations``
@@ -209,24 +212,29 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
             f"Config is not marked as qjit-compatible"
         )
 
-    native = get_native_gates_PL(config)
-    observables = get_observables(config)
-    decomposable = get_decomposable_gates(config)
-    matrix = get_matrix_decomposable_gates(config)
+    shots_present = device.shots is not None
+    native = get_native_gates_PL(config, shots_present)
+    observables = set(get_observables(config, shots_present))
+    decomposable = set(get_decomposable_gates(config, shots_present))
+    matrix = set(get_matrix_decomposable_gates(config, shots_present))
 
     # Filter-out ControlledQubitUnitary because some devices are known to support it.
-    # TODO: Should we honor this configuration instead?
+    # TODO: Should we ignore this ambiguity instead?
     if "ControlledQubitUnitary" in native and check_quantum_control_flag(config):
         matrix = matrix - {"ControlledQubitUnitary"}
 
     check_no_overlap(native, decomposable, matrix)
 
-    if hasattr(device, "operations"):  # pragma: nocover
-        # The new device API has no "operations" field
-        # so we cannot check that there's an overlap or not.
+    if hasattr(device, "operations") and hasattr(device, "observables"):  # pragma: nocover
         device_gates = set.union(set(device.operations), set(device.observables))
+        device_gates = filter_out_adjoint_and_control(device_gates)
         spec_gates = set.union(native, observables, matrix, decomposable)
+        spec_gates = filter_out_adjoint_and_control(spec_gates)
         check_full_overlap(device_gates, spec_gates)
+    else:  # pragma: nocover
+        # TODO: How to check the validity for the new device API of PennyLane?  The new device API
+        # has no "operations" field so we cannot check that there's an overlap or not this way.
+        pass
 
 
 def device_get_toml_config(device, toml_file_name=None) -> Path:

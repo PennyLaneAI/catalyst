@@ -103,10 +103,10 @@ class QJITDevice(qml.QubitDevice):
         return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
-    def _get_supported_operations(config: TOMLDocument) -> Set[str]:
+    def _get_supported_operations(config: TOMLDocument, shots_present) -> Set[str]:
         """Override the set of supported operations."""
         # Supported gates of the target PennyLane's device
-        native_gates = get_native_gates_PL(config)
+        native_gates = get_native_gates_PL(config, shots_present)
         qir_gates = set.union(
             QJITDevice.operations_supported_by_QIR_runtime,
             deduce_native_controlled_gates(QJITDevice.operations_supported_by_QIR_runtime),
@@ -139,8 +139,9 @@ class QJITDevice(qml.QubitDevice):
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
 
-        self.operations += list(QJITDevice._get_supported_operations(target_config))
-        self.observables += list(get_observables(target_config))
+        shots_present = shots is not None
+        self.operations += list(QJITDevice._get_supported_operations(target_config, shots_present))
+        self.observables += list(get_observables(target_config, shots_present))
 
     def apply(self, operations, **kwargs):
         """

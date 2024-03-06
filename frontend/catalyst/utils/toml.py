@@ -16,7 +16,9 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-from typing import Any, Set
+from functools import reduce
+from itertools import repeat
+from typing import Any, Dict, List, Set
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
@@ -45,29 +47,52 @@ __all__ = ["toml_load", "TOMLDocument"]
 
 def check_mid_circuit_measurement_flag(config: TOMLDocument) -> bool:
     """Check the global mid-circuit measurement flag"""
-    return bool(config["compilation"]["mid_circuit_measurement"])
+    return bool(config.get("compilation", {}).get("mid_circuit_measurement", False))
 
 
 def check_adjoint_flag(config: TOMLDocument) -> bool:
     """Check the global adjoint flag"""
-    return bool(config["compilation"]["quantum_adjoint"])
+    return bool(config.get("compilation", {}).get("quantum_adjoint", False))
 
 
 def check_quantum_control_flag(config: TOMLDocument) -> bool:
     """Check the control flag. Only exists in toml config schema 1"""
     schema = int(config["schema"])
     if schema == 1:
-        return bool(config["compilation"]["quantum_control"])
+        return bool(config.get("compilation", {}).get("quantum_control", False))
 
     raise NotImplementedError("quantum_control flag is deprecated in later TOMLs")
 
 
-def get_observables(config: TOMLDocument) -> Set[str]:
+def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
+    gates = {}
+    iterable = reduce(lambda x, y: x[y], path, config)
+    gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
+    for g, values in gen:
+        if "condition" in values:
+            if "noshots" in values["condition"] and shots_present:
+                continue
+        gates[g] = values
+    return gates
+
+
+def get_observables(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
     """Override the set of supported observables."""
-    return set(config["operators"]["observables"])
+    return get_gates(config, ["operators", "observables"], shots_present)
 
 
-def get_decomposable_gates(config: TOMLDocument) -> Set[str]:
+def get_native_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+
+    schema = int(config["schema"])
+    if schema == 1:
+        return get_gates(config, ["operators", "gates", 0, "native"], shots_present)
+    elif schema == 2:
+        return get_gates(config, ["operators", "gates", "native"], shots_present)
+
+    raise NotImplementedError(f"Unsupported config schema {schema}")
+
+
+def get_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
     """Get gates that will be decomposed according to PL's decomposition rules.
 
     Args:
@@ -75,14 +100,14 @@ def get_decomposable_gates(config: TOMLDocument) -> Set[str]:
     """
     schema = int(config["schema"])
     if schema == 1:
-        return set(config["operators"]["gates"][0]["decomp"])
+        return get_gates(config, ["operators", "gates", 0, "decomp"], shots_present)
     elif schema == 2:
-        return set(config["operators"]["gates"]["decomp"])
+        return get_gates(config, ["operators", "gates", "decomp"], shots_present)
 
     raise NotImplementedError(f"Unsupported config schema {schema}")
 
 
-def get_matrix_decomposable_gates(config: TOMLDocument) -> Set[str]:
+def get_matrix_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
     """Get gates that will be decomposed to QubitUnitary.
 
     Args:
@@ -90,8 +115,8 @@ def get_matrix_decomposable_gates(config: TOMLDocument) -> Set[str]:
     """
     schema = int(config["schema"])
     if schema == 1:
-        return set(config["operators"]["gates"][0]["matrix"])
+        return get_gates(config, ["operators", "gates", 0, "matrix"], shots_present)
     elif schema == 2:
-        return set(config["operators"]["gates"]["matrix"])
+        return get_gates(config, ["operators", "gates", "matrix"], shots_present)
 
     raise NotImplementedError(f"Unsupported config schema {schema}")
