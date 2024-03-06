@@ -78,8 +78,6 @@ qjit_compatible = true
 runtime_code_generation = true
 # If the device supports adjoint
 quantum_adjoint = false
-# If the device supports quantum control instructions natively
-quantum_control = false
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = false
 
