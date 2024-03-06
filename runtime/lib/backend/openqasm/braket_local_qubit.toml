@@ -1,22 +1,5 @@
 schema = 2
 
-[device]
-name = "braket.aws.qubit"
-
-[operators.observables]
-# Observables supported by the device
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-Hadamard = {}
-Hermitian = {}
-# Tensor,
-Projector = {}
-Sprod = {}
-Hamiltonian = { condition = ['noshots'] }
-Sum = {}
-Prod = {}
-
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
 [operators.gates.native]
@@ -65,6 +48,20 @@ ControlledPhaseShift = {}
 
 # Gates which should be translated to QubitUnitary
 [operators.gates.matrix]
+
+[operators.observables]
+# Observables supported by the device
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
+Hermitian = {}
+# Tensor,
+Projector = {}
+Sprod = {}
+Hamiltonian = { condition = ['noshots'] }
+Sum = {}
+Prod = {}
 
 [measurement_processes.exactshots]
 
