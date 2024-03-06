@@ -56,8 +56,8 @@ class QJITDevice(qml.QubitDevice):
     author = ""
 
     # These must be present even if empty.
-    operations = []
-    observables = []
+    operations = set()
+    observables = set()
 
     operations_supported_by_QIR_runtime = {
         "Identity",
@@ -140,8 +140,10 @@ class QJITDevice(qml.QubitDevice):
         self.backend_kwargs = backend.kwargs if backend else {}
 
         shots_present = shots is not None
-        self.operations += list(QJITDevice._get_supported_operations(target_config, shots_present))
-        self.observables += list(get_observables(target_config, shots_present))
+        self.operations.update(
+            set(QJITDevice._get_supported_operations(target_config, shots_present))
+        )
+        self.observables.update(set(get_observables(target_config, shots_present)))
 
     def apply(self, operations, **kwargs):
         """
