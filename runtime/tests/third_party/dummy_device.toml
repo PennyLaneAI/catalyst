@@ -1,60 +1,56 @@
 schema = 2
 
-[operators]
+[operators.observables]
 # Observables supported by the device
 
-observables = [
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "Hadamard",
-    "Hermitian",
-    "Identity",
-    'Projector',
-    "SparseHamiltonian",
-    "Hamiltonian",
-    "Sum",
-    "SProd",
-    "Prod",
-    "Exp"
-]
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
+Hermitian = {}
+Identity = {}
+Projector = {}
+SparseHamiltonian = {}
+Hamiltonian = {}
+Sum = {}
+SProd = {}
+Prod = {}
+Exp = {}
 
-[operators.gates]
+[operators.gates.decomp]
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
 # Optional, since gates not listed in this list will typically be decomposed by
 # default, but can be useful to express a deviation from this device's regular
 # strategy in PennyLane.
-decomp = [
-    "SX",
-    "ISWAP",
-    "PSWAP",
-    "SISWAP",
-    "SQISW",
-    "CPhase",
-    "BasisState",
-    "QubitStateVector",
-    "StatePrep",
-    "ControlledQubitUnitary",
-    "DiagonalQubitUnitary",
-    "SingleExcitation",
-    "SingleExcitationPlus",
-    "SingleExcitationMinus",
-    "DoubleExcitation",
-    "DoubleExcitationPlus",
-    "DoubleExcitationMinus",
-    "QubitCarry",
-    "QubitSum",
-    "OrbitalRotation",
-    "QFT",
-    "ECR"
-]
+SX = {}
+ISWAP = {}
+PSWAP = {}
+SISWAP = {}
+SQISW = {}
+CPhase = {}
+BasisState = {}
+QubitStateVector = {}
+StatePrep = {}
+ControlledQubitUnitary = {}
+DiagonalQubitUnitary = {}
+SingleExcitation = {}
+SingleExcitationPlus = {}
+SingleExcitationMinus = {}
+DoubleExcitation = {}
+DoubleExcitationPlus = {}
+DoubleExcitationMinus = {}
+QubitCarry = {}
+QubitSum = {}
+OrbitalRotation = {}
+QFT = {}
+ECR = {}
 
 # Gates which should be translated to QubitUnitary
-matrix = [
-    "MultiControlledX"
-]
+[operators.gates.matrix]
+
+MultiControlledX = {}
 
 [operators.gates.native]
 
@@ -88,21 +84,20 @@ IsingYY = { controllable = true }
 IsingZZ = { controllable = true }
 IsingXY = { controllable = true }
 
-[measurement_processes]
-exactshots = [
-    "Expval",
-    "Var",
-    "Probs",
-    "State"
-]
+[measurement_processes.exactshots]
 
-finiteshots = [
-    "Expval",
-    "Var",
-    "Probs",
-    "Sample",
-    "Counts"
-]
+Expval = {}
+Var = {}
+Probs = {}
+Stat = {}
+
+[measurement_processes.finiteshots]
+
+Expval = {}
+Var = {}
+Probs = {}
+Sample = {}
+Count = {}
 
 [compilation]
 # If the device is compatible with qjit
