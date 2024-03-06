@@ -385,7 +385,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         unpackScalarResults(enzymeCall, valResults, gradResults, rewriter, loc, withVal, numVals,
                             numGradients);
-        rewriter.replaceOp(op, {valResults, gradResults});
+        valResults.insert(valResults.end(), gradResults.begin(), gradResults.end());
+        rewriter.replaceOp(op, valResults);
         return success();
     }
 
