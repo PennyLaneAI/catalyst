@@ -29,7 +29,7 @@ from catalyst.utils.runtime import (  # check_device_config,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
     get_native_gates,
-    get_native_gates_PL,
+    get_pennylane_operations,
     validate_config_with_device,
 )
 from catalyst.utils.toml import toml_load
@@ -101,7 +101,7 @@ def test_get_native_gates_schema1_no_qcontrol():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_native_gates_PL(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False)
 
 
 def test_get_native_gates_schema1_qcontrol():
@@ -124,7 +124,7 @@ def test_get_native_gates_schema1_qcontrol():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_native_gates_PL(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False)
 
 
 def test_get_native_gates_schema2():
@@ -146,7 +146,7 @@ def test_get_native_gates_schema2():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_native_gates_PL(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False)
 
 
 def test_get_native_gates_schema2_optional_shots():
@@ -167,7 +167,7 @@ def test_get_native_gates_schema2_optional_shots():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_native_gates_PL(config, True)
+    assert test_deduced_gates == get_pennylane_operations(config, True)
 
 
 def test_get_native_gates_schema2_optional_noshots():
@@ -186,7 +186,7 @@ def test_get_native_gates_schema2_optional_noshots():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert set() == get_native_gates_PL(config, True)
+    assert set() == get_pennylane_operations(config, True)
 
 
 def test_get_decomp_gates_schema1():
@@ -307,14 +307,16 @@ def test_config_unsupported_schema():
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(CompileError):
             check_quantum_control_flag(config)
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(CompileError):
             get_native_gates(config, False)
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(CompileError):
             get_decomposable_gates(config, False)
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(CompileError):
             get_matrix_decomposable_gates(config, False)
+        with pytest.raises(CompileError):
+            get_pennylane_operations(config, False)
 
 
 if __name__ == "__main__":

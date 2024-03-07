@@ -89,7 +89,7 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
     return native_controlled_gates
 
 
-def get_native_gates_PL(config: TOMLDocument, shots_present: bool) -> Set[str]:
+def get_pennylane_operations(config: TOMLDocument, shots_present: bool) -> Set[str]:
     """Get gates that are natively supported by the device and therefore do not need to be
     decomposed.
 
@@ -213,7 +213,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         )
 
     shots_present = device.shots is not None
-    native = get_native_gates_PL(config, shots_present)
+    native = get_pennylane_operations(config, shots_present)
     observables = set(get_observables(config, shots_present))
     decomposable = set(get_decomposable_gates(config, shots_present))
     matrix = set(get_matrix_decomposable_gates(config, shots_present))

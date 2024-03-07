@@ -20,6 +20,8 @@ from functools import reduce
 from itertools import repeat
 from typing import Any, Dict, List
 
+from catalyst.utils.exceptions import CompileError
+
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
 # and rely exclusively on tomllib.
@@ -61,7 +63,7 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
     if schema == 1:
         return bool(config.get("compilation", {}).get("quantum_control", False))
 
-    raise NotImplementedError("quantum_control flag is deprecated in later TOMLs")
+    raise CompileError("quantum_control flag is deprecated in later TOMLs")
 
 
 def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
@@ -92,7 +94,7 @@ def get_native_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dic
     elif schema == 2:
         return get_gates(config, ["operators", "gates", "native"], shots_present)
 
-    raise NotImplementedError(f"Unsupported config schema {schema}")
+    raise CompileError(f"Unsupported config schema {schema}")
 
 
 def get_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
@@ -107,7 +109,7 @@ def get_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[st
     elif schema == 2:
         return get_gates(config, ["operators", "gates", "decomp"], shots_present)
 
-    raise NotImplementedError(f"Unsupported config schema {schema}")
+    raise CompileError(f"Unsupported config schema {schema}")
 
 
 def get_matrix_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
@@ -122,4 +124,4 @@ def get_matrix_decomposable_gates(config: TOMLDocument, shots_present: bool) -> 
     elif schema == 2:
         return get_gates(config, ["operators", "gates", "matrix"], shots_present)
 
-    raise NotImplementedError(f"Unsupported config schema {schema}")
+    raise CompileError(f"Unsupported config schema {schema}")

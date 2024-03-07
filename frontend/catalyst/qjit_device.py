@@ -23,7 +23,7 @@ from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
     BackendInfo,
     deduce_native_controlled_gates,
-    get_native_gates_PL,
+    get_pennylane_operations,
 )
 from catalyst.utils.toml import (
     TOMLDocument,
@@ -102,7 +102,7 @@ class QJITDevice(qml.QubitDevice):
     def _get_supported_operations(config: TOMLDocument, shots_present) -> Set[str]:
         """Override the set of supported operations."""
         # Supported gates of the target PennyLane's device
-        native_gates = get_native_gates_PL(config, shots_present)
+        native_gates = get_pennylane_operations(config, shots_present)
         qir_gates = set.union(
             QJITDevice.operations_supported_by_QIR_runtime,
             deduce_native_controlled_gates(QJITDevice.operations_supported_by_QIR_runtime),
