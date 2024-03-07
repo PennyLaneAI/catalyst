@@ -94,6 +94,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.mitigation",
     "mlir_quantum.compiler_driver",
     "pybind11",
+    "cudaq",
 ]
 
 mock = Mock()
