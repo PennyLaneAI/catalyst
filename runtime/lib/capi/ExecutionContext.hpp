@@ -33,7 +33,7 @@
 #include "QuantumDevice.hpp"
 #include "Types.h"
 
-extern void callbackCall(uintptr_t);
+extern void callbackCall(int64_t);
 
 namespace Catalyst::Runtime {
 

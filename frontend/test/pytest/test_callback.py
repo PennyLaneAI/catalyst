@@ -32,3 +32,28 @@ def test_callback_no_returns_no_params(capsys):
     cir()
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
+
+
+def test_callback_twice(capsys):
+    """Test callback no parameters no returns"""
+
+    def my_callback():
+        print("Hello erick")
+
+    @qml.qjit
+    def cir():
+        callback(my_callback, [])
+        return None
+
+    cir()
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "Hello erick"
+
+    @qml.qjit
+    def cir2():
+        callback(my_callback, [])
+        return None
+
+    cir2()
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "Hello erick"
