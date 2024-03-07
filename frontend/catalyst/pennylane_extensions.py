@@ -2450,16 +2450,17 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
     return batch_size
 
 
-def callback(callback: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any):
+def callback(cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any):
     """TODO: Attribution. I looked into
     https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
     flat_args, in_tree = tree_flatten((args, kwargs))
 
     def _flat_callback(*flat_args):
         """This function packages flat arguments back into the shapes expected by the function."""
-        args, kwargs = tree_unflatten(in_tree, flat_args)
-        assert not args, "Args are not yet expected here."
-        return tree_util.tree_leaves(callback())
+        _args, _kwargs = tree_unflatten(in_tree, flat_args)
+        assert not _args, "Args are not yet expected here."
+        assert not _kwargs, "Kwargs are not yet supported here."
+        return tree_util.tree_leaves(cb())
 
 
     results_aval = tree_util.tree_map(
