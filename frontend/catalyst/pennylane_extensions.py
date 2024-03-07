@@ -2462,7 +2462,6 @@ def callback(cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwa
         assert not _kwargs, "Kwargs are not yet supported here."
         return tree_util.tree_leaves(cb())
 
-
     results_aval = tree_util.tree_map(
         lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes
     )
