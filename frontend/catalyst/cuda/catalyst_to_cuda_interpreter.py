@@ -825,7 +825,7 @@ class QJIT_CUDAQ:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
-            return BackendInfo(device.name, None, None)
+            return BackendInfo(device.name, "", {})
 
         with Patcher(
             (catalyst.pennylane_extensions.QFunc, "extract_backend_info", cudaq_backend_info),

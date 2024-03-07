@@ -279,8 +279,8 @@ class BackendInfo:
     """Backend information"""
 
     name: str
-    lpath: Optional[str]
-    kwargs: Optional[Dict[str, Any]]
+    lpath: str
+    kwargs: Dict[str, Any]
 
 
 def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
