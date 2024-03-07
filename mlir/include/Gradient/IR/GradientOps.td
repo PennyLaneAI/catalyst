@@ -151,6 +151,47 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
     }];
 }
 
+def BackpropWithValueOp : Gradient_Op<"backprop_with_value", [
+        AttrSizedOperandSegments,
+        SameVariadicResultSize,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
+    let summary = "Perform classic automatic differentiation using Enzyme AD.";
+
+    let arguments = (ins
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$args,
+        Variadic<MemRefOf<[AnyFloat]>>:$diffArgShadows,
+        Variadic<MemRefOf<[AnyFloat]>>:$calleeResults,
+        Variadic<AnyTypeOf<[
+            RankedTensorOf<[AnyFloat]>,
+            MemRefOf<[AnyFloat]>
+        ]>>:$cotangents,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[
+            AnyFloat,
+            RankedTensorOf<[AnyFloat]>
+        ]>>:$vals,
+        Variadic<AnyTypeOf<[
+            AnyFloat,
+            RankedTensorOf<[AnyFloat]>
+        ]>>:$gradients
+    );
+
+    let hasVerifier = 1;
+
+    let assemblyFormat = [{
+        $callee `(` $args `)`
+        ( `grad_out` `(` $diffArgShadows^ `:` type($diffArgShadows) `)` )?
+        ( `callee_out` `(` $calleeResults^ `:` type($calleeResults) `)` )?
+        `cotangents` `(` $cotangents `:` type($cotangents) `)`
+        attr-dict `:` functional-type($args, results)
+    }];
+}
+
 
 def JVPOp : Gradient_Op<"jvp", [
         AttrSizedOperandSegments,

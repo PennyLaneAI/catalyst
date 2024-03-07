@@ -468,3 +468,72 @@ LogicalResult BackpropOp::verify()
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// BackpropWithValue SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropWithValueOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(),
+                                                                        this->getCalleeAttr());
+    if (!fn) {
+        return this->emitOpError("invalid function name specified: ") << this->getCallee();
+    }
+
+    std::vector<size_t> diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
+    if (failed(::verifyGradInputs(this, fn, this->getArgs(), diffArgIndices))) {
+        return failure();
+    }
+
+    if (hasTensorSemantics(getOperandTypes(), getResultTypes())) {
+        // Verify the types of the outputs
+        std::vector<Type> backpropTypes = computeBackpropTypes(fn, diffArgIndices);
+        TypeRange resultTypes = this->getResultTypes();
+        if (backpropTypes.size() != resultTypes.size()) {
+            return emitOpError("incorrect number of results in the backprop of the callee, ")
+                   << "expected " << backpropTypes.size() << " results "
+                   << "but got " << resultTypes.size();
+        }
+
+        for (unsigned i = 0; i < backpropTypes.size(); ++i) {
+            if (backpropTypes[i] != resultTypes[i]) {
+                return emitOpError("result type mismatch: expected operand type ")
+                       << backpropTypes[i] << ", but provided " << resultTypes[i]
+                       << " for result number " << i;
+            }
+        }
+    }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BackpropWithValueOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropWithValueOp::verify()
+{
+    size_t numDiffArgs =
+        this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
+    bool tensorSemantics = hasTensorSemantics(getOperandTypes(), getResultTypes());
+
+    if (this->getDiffArgShadows().size() && tensorSemantics)
+        return emitOpError("cannot have both tensor results and memref output arguments");
+
+    if (this->getCalleeResults().size() && tensorSemantics)
+        return emitOpError("cannot have callee result buffers before bufferization");
+
+    if (!tensorSemantics && this->getCalleeResults().size() != this->getCotangents().size())
+        return emitOpError("need as many callee result buffers as there are cotangents")
+               << ", expected " << this->getCotangents().size() << " but got "
+               << this->getCalleeResults().size();
+
+    if (this->getDiffArgShadows().size() + this->getNumResults() != numDiffArgs)
+        return emitOpError("number of gradient results did not match number of differentiable")
+               << " arguments, expected " << numDiffArgs << " but got "
+               << this->getDiffArgShadows().size() + this->getNumResults();
+
+    return success();
+}

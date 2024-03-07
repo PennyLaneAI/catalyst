@@ -31,7 +31,8 @@ namespace gradient {
 void populateLoweringPatterns(RewritePatternSet &patterns)
 {
     patterns.add<HybridGradientLowering>(patterns.getContext());
-    patterns.add<HybridValueAndGradientLowering>(patterns.getContext());
+    patterns.add<HybridValueAndGradientLoweringExperimental>(patterns.getContext());
+    // patterns.add<HybridValueAndGradientLowering>(patterns.getContext());
     patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
     patterns.add<ParameterShiftLowering>(patterns.getContext(), 1);
     patterns.add<AdjointLowering>(patterns.getContext(), 1);
