@@ -15,9 +15,9 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import sys
 from dataclasses import dataclass
 from itertools import chain
-import sys
 from typing import Dict, Iterable, List, Union
 
 import jax
@@ -28,17 +28,12 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
-from jaxlib.mlir.dialects.arith import (
-    AddIOp,
-    CeilDivSIOp,
-    IndexCastOp,
-    MulIOp,
-    SubIOp,
-)
+from jaxlib.mlir.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
 from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
-from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp, CustomCallOp
+from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
+from jaxlib.mlir.dialects.stablehlo import CustomCallOp
 from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp

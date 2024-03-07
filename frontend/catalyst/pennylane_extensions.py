@@ -31,15 +31,16 @@ import numpy as np
 import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
+from jax._src import tree_util
 from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_leaves,
+    tree_map,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax._src import tree_util
 from jax.core import AbstractValue, eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
@@ -2460,13 +2461,11 @@ def callback(cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwa
         _args, _kwargs = tree_unflatten(in_tree, flat_args)
         assert not _args, "Args are not yet expected here."
         assert not _kwargs, "Kwargs are not yet supported here."
-        return tree_util.tree_leaves(cb())
+        return tree_leaves(cb())
 
-    results_aval = tree_util.tree_map(
-        lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes
-    )
+    results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )
-    return tree_util.tree_unflatten(out_tree, out_flat)
+    return tree_unflatten(out_tree, out_flat)
