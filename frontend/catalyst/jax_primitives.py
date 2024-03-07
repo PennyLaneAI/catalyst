@@ -321,6 +321,7 @@ class GradParams:
     argnum: Union[int, List]
     scalar_argnum: bool = None
     expanded_argnum: List[int] = None
+    with_value: bool = None  # if true it calls value_and_grad instead of grad
 
 
 @grad_p.def_impl

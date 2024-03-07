@@ -332,6 +332,7 @@ def _check_grad_params(
     argnum: Optional[Union[int, List[int]]],
     len_flatten_args: int,
     in_tree: PyTreeDef,
+    with_value: bool,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -356,13 +357,17 @@ def _check_grad_params(
         argnum_list = argnum
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
+    if with_value is None:
+        with_value = False
     # Compute the argnums of the pytree arg
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
     argnum_expanded, _ = tree_flatten(argnum_selected)
     scalar_argnum = isinstance(argnum, int) or argnum is None
-    return GradParams(method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded)
+    return GradParams(
+        method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded, with_value
+    )
 
 
 def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
@@ -422,23 +427,50 @@ class Grad:
                 self.grad_params.argnum,
                 len(args_data),
                 in_tree,
+                self.grad_params.with_value,
             )
             jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
-            args_argnum = tuple(args[i] for i in grad_params.argnum)
-            _, in_tree = tree_flatten(args_argnum)
 
-            # It always returns list as required by catalyst control-flows
-            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            if self.grad_params.with_value:  # use value_and_grad
+                # It always returns list as required by catalyst control-flows
+                results = value_and_grad_p.bind(
+                    *args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+                )
 
-            results = _unflatten_derivatives(
-                results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
-            )
+                # value_and_grad returns two results: the values and the gradients,
+                # hence we have to split the obtained results
+
+                midpoint = len(results) // 2
+                vals = results[:midpoint]
+                gradients = results[midpoint:]
+
+                vals = tree_unflatten(out_tree, vals)
+                gradients = tree_unflatten(out_tree, gradients)
+                results = (vals, gradients)
+            else:  # use grad
+                args_argnum = tuple(args[i] for i in grad_params.argnum)
+                _, in_tree = tree_flatten(args_argnum)
+
+                # It always returns list as required by catalyst control-flows
+                results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+                # grad returns only the gradients,
+                # so there is no need to split the results.
+
+                results = _unflatten_derivatives(
+                    results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
+                )
         else:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
             if self.grad_params.scalar_out:
-                results = jax.grad(self.fn, argnums=argnums)(*args)
+                if self.grad_params.with_value:
+                    results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
+                else:
+                    results = jax.grad(self.fn, argnums=argnums)(*args)
             else:
+                if with_value := self.grad_params.with_value:
+                    raise ValueError(f"with_value must be False , got {with_value}")
                 results = jax.jacobian(self.fn, argnums=argnums)(*args)
 
         return results
@@ -574,38 +606,9 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     return Grad(f, GradParams(method, scalar_out, h, argnum))
 
 
-# def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
-def value_and_grad(f: DifferentiableLike, operands, *, method=None, h=None, argnum=None):
-    # scalar_out = True
-    # return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
-
-    check_is_iterable(operands, "params")
-
-    if EvaluationContext.is_tracing():
-        scalar_out = False
-        fn = _ensure_differentiable(f)
-        args_flatten, in_tree = tree_flatten(operands)
-        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
-
-        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *operands)
-
-        results = value_and_grad_p.bind(*args_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
-
-        midpoint = len(results) // 2
-        func_res = results[:midpoint]
-        jvps = results[midpoint:]
-
-        func_res = tree_unflatten(out_tree, func_res)
-        jvps = tree_unflatten(out_tree, jvps)
-        results = (func_res, jvps)
-
-    else:
-        results = jax.jvp(f, operands)
-
-    return results
+def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+    scalar_out = True
+    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
