@@ -152,7 +152,7 @@ Integration with Python devices
 
 There are two things that are needed in order to integrate with PennyLane devices:
 
-* Adding a ``get_c_interface`` method to your ``qml.QubitDevice`` class.
+* Adding a ``get_c_interface`` method to your ``qml.Device`` or  ``qml.devices.Device`` class.
 * Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
@@ -163,9 +163,11 @@ The ``get_c_interface`` method should be a static method that takes no parameter
     The first result of ``get_c_interface`` needs to match the ``<DeviceIdentifier>``
     as described in the first section.
 
+With the old device API, you can simply build a QJIT compatible device:
+
 .. code-block:: python
 
-    class CustomDevice(qml.QubitDevice):
+    class CustomDevice(qml.Device):
         """Dummy Device"""
 
         name = "Dummy Device"
@@ -194,6 +196,33 @@ The ``get_c_interface`` method should be a static method that takes no parameter
     def f():
         return measure(0)
 
+or with the new device API:
+
+.. code-block:: python
+
+    class CustomDevice(qml.devices.Device):
+        """Dummy Device"""
+
+        config = pathlib.Path("absolute/path/to/configuration/file.toml")
+
+        @staticmethod
+        def get_c_interface():
+            """ Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            return "CustomDevice", "absolute/path/to/libdummy_device.so"
+
+        def __init__(self, shots=None, wires=None):
+            super().__init__(wires=wires, shots=shots)
+
+        def execute(self, circuits, config):
+            """Your normal definitions"""
+
+    @qjit
+    @qml.qnode(CustomDevice(wires=1))
+    def f():
+        return measure(0)
 
 Below is an example configuration file with inline descriptions of how to fill out the fields. All
 headers and fields are generally required, unless stated otherwise.

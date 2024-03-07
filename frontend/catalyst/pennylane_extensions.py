@@ -86,7 +86,7 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
     unify_jaxpr_result_types,
 )
-from catalyst.qjit_device import QJITDevice
+from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -146,7 +146,11 @@ class QFunc:
             config = device_get_toml_config(self.device)
             validate_config_with_device(self.device, config)
             backend_info = QFunc.extract_backend_info(self.device, config)
-            device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
+
+            if isinstance(self.device, qml.devices.Device):
+                device = QJITDeviceNewAPI(self.device, config, backend_info)
+            else:
+                device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
         else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
