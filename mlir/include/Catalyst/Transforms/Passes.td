@@ -130,15 +130,4 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let constructor = "catalyst::GEPInboundsPass()";
 }
 
-def CustomCallToPythonCallPass : Pass<"custom-call-to-python-call"> {
-    let summary = "A pass that transforms CustomCallOps into PythonCallOps.";
-
-    let description = [{
-        This pass specializes custom call ops into python call ops. This is useful to
-        have a special case inside custom call.
-    }];
-
-    let constructor = "catalyst::createCustomCallToPythonCallPass()";
-}
-
 #endif // CATALYST_PASSES
