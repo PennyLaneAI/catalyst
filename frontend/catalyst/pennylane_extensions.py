@@ -821,7 +821,6 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         results = (func_res, vjps)
 
     else:
-
         if isinstance(params, jax.numpy.ndarray) and params.ndim == 0:
             primal_outputs, vjp_fn = jax.vjp(f, params)
         else:

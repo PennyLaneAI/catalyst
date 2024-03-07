@@ -52,6 +52,24 @@ using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
 
+namespace catalyst::utils {
+
+void bufferSizeCounts(const llvm::SourceMgr &sourceMgr)
+{
+    for (size_t i = 1; i <= sourceMgr.getNumBuffers(); i++) {
+        auto *buffer = sourceMgr.getMemoryBuffer(i);
+        if (buffer) {
+            llvm::StringRef bufferContent = buffer->getBuffer();
+            std::string bufferString = bufferContent.str();
+            auto num_lines = std::count(bufferString.begin(), bufferString.end(), '\n');
+            std::cerr << "BufferNo: " << i << "\n"
+                      << "BufferSize: " << num_lines << std::endl;
+        }
+    }
+}
+
+} // namespace catalyst::utils
+
 namespace {
 
 std::string joinPasses(const Pipeline::PassList &passes)
@@ -390,6 +408,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
+    using timer = catalyst::utils::Timer;
+    const std::string timer_key{"CompilerDriver"};
+
     DialectRegistry registry;
     static bool initialized = false;
     if (!initialized) {
@@ -420,28 +441,22 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
-    catalyst::utils::Timer driver_timer{};
-
-    // First attempt to parse the input as an MLIR module.
-    driver_timer.start();
-    OwningOpRef<ModuleOp> op = parseMLIRSource(&ctx, *sourceMgr);
-    driver_timer.dump("parseMLIRSource", "CompilerDriver");
+    OwningOpRef<ModuleOp> op =
+        timer::timer(parseMLIRSource, "parseMLIRSource", timer_key, &ctx, *sourceMgr);
 
     if (op) {
-        driver_timer.start();
-        if (failed(runLowering(options, &ctx, *op, output))) {
+        if (failed(
+                timer::timer(runLowering, "runLowering", timer_key, options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
-        driver_timer.dump("runLowering", "CompilerDriver");
 
         output.outIR.clear();
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
-            driver_timer.start();
-            llvmModule = translateModuleToLLVMIR(*op, llvmContext);
-            driver_timer.dump("translateModuleToLLVMIR", "CompilerDriver");
+            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR", timer_key,
+                                      *op, llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
@@ -456,9 +471,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent,
                "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
-        driver_timer.start();
-        llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
-        driver_timer.dump("parseLLVMSource", "CompilerDriver");
+        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", timer_key, llvmContext,
+                                  options.source, options.moduleName, err);
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
@@ -468,17 +482,15 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-        driver_timer.start();
-        if (failed(runLLVMPasses(options, llvmModule, output))) {
+        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", timer_key, options, llvmModule,
+                                output))) {
             return failure();
         }
-        driver_timer.dump("runLLVMPasses", "CompilerDriver");
 
-        driver_timer.start();
-        if (failed(runEnzymePasses(options, llvmModule, output))) {
+        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", timer_key, options, llvmModule,
+                                output))) {
             return failure();
         }
-        driver_timer.dump("runEnzymePasses", "CompilerDriver");
 
         output.outIR.clear();
         outIRStream << *llvmModule;
