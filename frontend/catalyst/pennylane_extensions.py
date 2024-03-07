@@ -35,7 +35,6 @@ from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_leaves,
-    tree_map,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
@@ -2450,7 +2449,7 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
     return batch_size
 
 
-def callback(cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any):
+def callback(cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any):
     """TODO: Attribution. I looked into
     https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
     flat_args, in_tree = tree_flatten((args, kwargs))
