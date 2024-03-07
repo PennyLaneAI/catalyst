@@ -14,7 +14,6 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-# TODO: Update to v0.35.0 after the next lightning release.
 LIGHTNING_GIT_TAG_VALUE?=v0.35.0
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
