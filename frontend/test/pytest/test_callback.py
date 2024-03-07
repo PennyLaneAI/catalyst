@@ -16,4 +16,3 @@ def test_callback_print(capsys):
     foo()
     captured = capsys.readouterr()
     assert captured.out == "Hello erick\n"
-
