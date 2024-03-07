@@ -99,8 +99,15 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
     {
         builder->AddMeasurement(wire, wire);
     }
+    std::iota(eigvals.begin(), eigvals.end(), 0);
 
-    auto &&li_samples = runner->Counts(builder->toOpenQASM2(), "", shots, GetNumQubits());
+    auto &&results = runner->Counts(builder->toOpenQASM2(), "", shots, GetNumQubits());
+
+    int i = 0;
+    for(auto r: results) {
+        counts(i) = r;
+        i++;
+    }
 }
 
 // void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,

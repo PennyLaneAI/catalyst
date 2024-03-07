@@ -18,11 +18,12 @@ import pytest
 import pennylane as qml
 from catalyst.oqc import OQCDevice
 
+
 class TestOQC:
 
     def test_authenticate(self):
         """Test the authentification"""
-        credentials = {'url': 'abc', 'email': '@', 'password': '123' }
+        credentials = {"url": "abc", "email": "@", "password": "123"}
         device = OQCDevice(backend="lucy", shots=1000, wires=1, credentials=credentials)
 
         @qml.qnode(device=device)

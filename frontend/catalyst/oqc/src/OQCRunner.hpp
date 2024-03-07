@@ -23,6 +23,8 @@
 #include <utility>
 #include <vector>
 
+#include <iostream>
+
 #include "Exception.hpp"
 
 #include <pybind11/embed.h>
@@ -47,7 +49,6 @@ struct OQCRunnerBase {
         RT_FAIL("Not implemented method");
         return {};
     }
-
 };
 
 /**
@@ -58,7 +59,7 @@ struct OQCRunner : public OQCRunnerBase {
 
     [[nodiscard]] auto Counts(const std::string &circuit, const std::string &device, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
-        -> std::vector<size_t> override
+        -> std::vector<size_t>
     {
         std::lock_guard<std::mutex> lock(runner_mu);
         namespace py = pybind11;
@@ -66,17 +67,30 @@ struct OQCRunner : public OQCRunnerBase {
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+        auto locals = py::dict("circuit"_a = circuit, "device"_a = device, "kwargs"_a = kwargs,
+                               "shots"_a = shots, "msg"_a = "");
 
         py::exec(
             R"(
-            import numpy as np
-            
+            import os
+            from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
+            from scc.compiler.config import QuantumResultsFormat, Tket, TketOptimizations
+            optimisations = Tket()
+            optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
+
+            RES_FORMAT = QuantumResultsFormat().binary_count
 
             try:
-                result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                counts = np.array(result.measurements).flatten()
+                email = os.environ.get("OQC_EMAIL")
+                password = os.environ.get("OQC_PASSWORD")
+                url = os.environ.get("OQC_URL")
+                client = OQCClient(url=url, email=email, password=password)
+                client.authenticate()
+                oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
+                oqc_task = QPUTask(circuit, oqc_config)
+                #counts = client.execute_tasks(oqc_tasks)
+                counts = {'00': 1000, '01': 232, '10': 124, '11':123}
+
             except Exception as e:
                 print(f"circuit: {circuit}")
                 msg = str(e)
@@ -86,15 +100,15 @@ struct OQCRunner : public OQCRunnerBase {
         auto &&msg = locals["msg"].cast<std::string>();
         RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        py::list results = locals["samples"];
+        py::dict results = locals["counts"];
 
-        std::vector<size_t> samples;
-        samples.reserve(shots * num_qubits);
-        for (py::handle item : results) {
-            samples.push_back(item.cast<size_t>());
+        std::vector<size_t> counts_value;
+        for (auto item : results) {
+            auto key = item.first;
+            auto value = item.second;
+            counts_value.push_back(value.cast<size_t>());
         }
-
-        return samples;
+        return counts_value;
     }
 };
 
