@@ -814,6 +814,7 @@ def trace_quantum_function(
         device (QubitDevice): Quantum device to use for quantum computations
         args: Positional arguments to pass to ``f``
         kwargs: Keyword arguments to pass to ``f``
+        qnode: The quantum node to be traced, it contains user transforms.
 
     Returns:
         closed_jaxpr: JAXPR expression of the function ``f``.
