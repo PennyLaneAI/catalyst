@@ -55,10 +55,6 @@ class QJITDevice(qml.QubitDevice):
     version = "0.0.1"
     author = ""
 
-    # These must be present even if empty.
-    operations = set()
-    observables = set()
-
     operations_supported_by_QIR_runtime = {
         "Identity",
         "PauliX",
@@ -140,10 +136,18 @@ class QJITDevice(qml.QubitDevice):
         self.backend_kwargs = backend.kwargs if backend else {}
 
         shots_present = shots is not None
-        self.operations.update(
-            set(QJITDevice._get_supported_operations(target_config, shots_present))
-        )
-        self.observables.update(set(get_observables(target_config, shots_present)))
+        self._operations = set(QJITDevice._get_supported_operations(target_config, shots_present))
+        self._observables = set(get_observables(target_config, shots_present))
+
+    @property
+    def operations(self) -> Set[str]:
+        """Get the device operations"""
+        return self._operations
+
+    @property
+    def observables(self) -> Set[str]:
+        """Get the device observables"""
+        return self._observables
 
     def apply(self, operations, **kwargs):
         """
