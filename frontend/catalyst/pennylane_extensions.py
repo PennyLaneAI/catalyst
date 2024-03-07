@@ -73,6 +73,7 @@ from catalyst.jax_primitives import (
     jvp_p,
     probs_p,
     qmeasure_p,
+    value_and_grad_p,
     vjp_p,
     while_p,
     zne_p,
@@ -571,6 +572,44 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """
     scalar_out = True
     return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+
+# def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+def value_and_grad(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
+    # scalar_out = True
+    # return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
+    def check_is_iterable(x, hint):
+        if not isinstance(x, Iterable):
+            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+
+    check_is_iterable(params, "params")
+    check_is_iterable(tangents, "tangents")
+
+    if EvaluationContext.is_tracing():
+        scalar_out = False
+        fn = _ensure_differentiable(f)
+        args_flatten, in_tree = tree_flatten(params)
+        tangents_flatten, _ = tree_flatten(tangents)
+        grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
+
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+
+        results = value_and_grad_p.bind(
+            *args_flatten, *tangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
+        )
+
+        midpoint = len(results) // 2
+        func_res = results[:midpoint]
+        jvps = results[midpoint:]
+
+        func_res = tree_unflatten(out_tree, func_res)
+        jvps = tree_unflatten(out_tree, jvps)
+        results = (func_res, jvps)
+
+    else:
+        results = jax.jvp(f, params, tangents)
+
+    return results
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):

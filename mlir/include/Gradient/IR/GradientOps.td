@@ -63,6 +63,37 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     }];
 }
 
+def ValueAndGradOp : Gradient_Op<"value_and_grad", [
+        AttrSizedOperandSegments,
+        SameVariadicResultSize,
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
+    let summary = "Compute the value and gradient of a function.";
+
+    let arguments = (ins
+        StrAttr:$method,
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$params,
+        Variadic<AnyType>:$tangents,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$vals,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$gradients
+    );
+
+    let assemblyFormat = [{
+        $method $callee `(` $params `)` `tangents` `(` $tangents `)`
+        attr-dict `:` functional-type(operands, results)
+    }];
+
+
+    let hasVerifier = 1;
+}
+
 def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 

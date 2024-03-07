@@ -27,6 +27,13 @@ struct JVPLoweringPattern : public mlir::OpRewritePattern<JVPOp> {
     mlir::LogicalResult matchAndRewrite(JVPOp op, mlir::PatternRewriter &rewriter) const override;
 };
 
+struct HybridValueAndGradientLowering : public mlir::OpRewritePattern<ValueAndGradOp> {
+    using mlir::OpRewritePattern<ValueAndGradOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(ValueAndGradOp op,
+                                        mlir::PatternRewriter &rewriter) const override;
+};
+
 struct VJPLoweringPattern : public mlir::OpRewritePattern<VJPOp> {
     using mlir::OpRewritePattern<VJPOp>::OpRewritePattern;
 

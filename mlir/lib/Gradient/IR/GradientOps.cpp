@@ -154,6 +154,81 @@ LogicalResult GradOp::verify()
 MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
 
 //===----------------------------------------------------------------------===//
+// ValueAndGradOp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable ValueAndGradOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
+Operation::operand_range ValueAndGradOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp callee = ({
+        auto cattr = this->getCalleeAttr();
+        auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << cattr;
+        fn;
+    });
+
+    auto diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
+    auto r1 = ::verifyGradInputs(this, callee, this->getParams(), diffArgIndices);
+    if (r1.failed()) {
+        return r1;
+    }
+
+    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
+        return this->emitOpError(
+                   "invalid number of results: must be twice the number of callee results")
+               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
+               << this->getNumResults();
+    }
+
+    std::vector<Type> grad_types;
+    {
+        for (auto s : this->getGradients()) {
+            grad_types.push_back(s.getType());
+        }
+    }
+
+    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
+        auto calleeRtype = callee.getFunctionType().getResult(i);
+        auto gradRtype = grad_types[i];
+        if (calleeRtype != gradRtype) {
+            return this->emitOpError("result types do not match")
+                   << " result " << i << " should match "
+                   << " was expected to match the type " << gradRtype << " but got " << calleeRtype;
+        }
+    }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verify()
+{
+    StringRef method = this->getMethod();
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
+        return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
+MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getParamsMutable(); }
+
+//===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
 //===----------------------------------------------------------------------===//
 
