@@ -582,7 +582,7 @@ to the ``grad`` function:
   the classical computation is differentiated using traditional autodiff.
 
   With this strategy, Catalyst only currently supports QNodes with
-  ``diff_method="param-shift"`` and ``diff_method="adjoint"``.
+  ``diff_method="parameter-shift"`` and ``diff_method="adjoint"``.
 
 - ``method="fd"``: First-order finite-differences for the entire hybrid
   function. The ``diff_method`` argument for each QNode is ignored.
