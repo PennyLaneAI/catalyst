@@ -23,11 +23,11 @@ def test_callback_no_returns_no_params(capsys):
     def my_callback():
         print("Hello erick")
 
-    @qml.qjit(keep_intermediate=True)
-    def foo():
+    @qml.qjit
+    def cir():
         callback(my_callback, [])
         return None
 
-    foo()
+    cir()
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"

@@ -33,7 +33,6 @@ from jaxlib.mlir.dialects.arith import (
     IndexCastOp,
     MulIOp,
     SubIOp,
-    ConstantOp as ArithConstant,
 )
 from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp

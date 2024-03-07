@@ -73,6 +73,7 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
+    python_callback_p,
     qmeasure_p,
     vjp_p,
     while_p,
@@ -2455,14 +2456,11 @@ def callback(callback: Callable[..., Any], result_shape_dtypes: Any, *args: Any,
     flat_args, in_tree = tree_flatten((args, kwargs))
 
     def _flat_callback(*flat_args):
-        # Why is in_tree here, shouldn't it be after?
+        """This function packages flat arguments back into the shapes expected by the function."""
         args, kwargs = tree_unflatten(in_tree, flat_args)
-        if not args:
-            return tree_util.tree_leaves(callback())
-        return tree_util.tree_leaves(callback(*args, **kwargs))
+        assert not args, "Args are not yet expected here."
+        return tree_util.tree_leaves(callback())
 
-    import jax
-    from catalyst.jax_primitives import python_callback_p
 
     results_aval = tree_util.tree_map(
         lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes
