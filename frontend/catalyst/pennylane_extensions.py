@@ -2448,6 +2448,7 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
     return batch_size
 
+
 def callback(callback: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any):
     """TODO: Attribution. I looked into
     https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
