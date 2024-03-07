@@ -90,11 +90,65 @@ void OQCDevice::NamedOperation(const std::string &name, const std::vector<double
     builder->AddGate(name, params, dev_wires);
 }
 
-void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                              const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numQubits = GetNumQubits();
 
+    for (auto wire: wires)
+    {
+        builder->AddMeasurement(wire, wire);
+    }
+
     auto &&li_samples = runner->Sample(builder->toOpenQASM2(), "", 1000, GetNumQubits());
+}
+
+// void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+//                                    const std::vector<QubitIdType> &wires, size_t shots)
+// {
+//     const size_t numWires = wires.size();
+//     const size_t numQubits = GetNumQubits();
+//     const size_t numElements = 1U << numWires;
+
+//     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+//     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
+//     RT_FAIL_IF((eigvals.size() != numElements || counts.size() != numElements),
+//                "Invalid size for the pre-allocated partial-counts");
+
+//     auto &&dev_wires = getDeviceWires(wires);
+
+//     std::string s3_folder_str{};
+//     if (device_kwargs.contains("s3_destination_folder")) {
+//         s3_folder_str = device_kwargs["s3_destination_folder"];
+//     }
+
+//     std::string device_info{};
+//     if (builder_type == OpenQasm::BuilderType::BraketRemote) {
+//         device_info = device_kwargs["device_arn"];
+//     }
+//     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
+//         device_info = device_kwargs["backend"];
+//     }
+
+//     auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_info, device_shots,
+//                                        GetNumQubits(), s3_folder_str);
+
+//     std::iota(eigvals.begin(), eigvals.end(), 0);
+//     std::fill(counts.begin(), counts.end(), 0);
+
+//     for (size_t shot = 0; shot < shots; shot++) {
+//         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
+//         size_t idx = 0;
+//         for (auto wire : dev_wires) {
+//             basisState[idx++] = li_samples[shot * numQubits + wire];
+//         }
+//         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
+//     }
+// }
+
+void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
+{
+    RT_FAIL("Unsupported functionality");
 }
 
 auto OQCDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int32_t> postselect)
@@ -140,12 +194,6 @@ void OQCDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdTyp
 };
 void OQCDevice::Sample(DataView<double, 2> &, size_t) { RT_FAIL("Unsupported functionality"); };
 void OQCDevice::PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t)
-{
-    RT_FAIL("Unsupported functionality");
-}
-
-void OQCDevice::PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
-                              const std::vector<QubitIdType> &, size_t)
 {
     RT_FAIL("Unsupported functionality");
 }

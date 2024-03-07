@@ -617,7 +617,10 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
-            m_wires = o.wires if o.wires else range(device.num_wires)
+            if isinstance(device, qml.Device):
+                m_wires = o.wires if o.wires else range(device.num_wires)
+            else:
+                m_wires = o.wires if o.wires else range(len(tape.wires))
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
@@ -832,7 +835,10 @@ def trace_quantum_function(
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
-        quantum_tape = QuantumTape()
+        if isinstance(device, qml.devices.Device):
+            quantum_tape = QuantumTape(shots=device.shots)
+        else:
+            quantum_tape = QuantumTape()
         with EvaluationContext.frame_tracing_context(ctx) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)

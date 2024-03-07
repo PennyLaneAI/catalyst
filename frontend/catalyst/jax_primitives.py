@@ -1165,7 +1165,6 @@ def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
     ctx.allow_unregistered_dialects = True
 
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    print(shots)
     shots_attr = ir.IntegerAttr.get(i64_type, shots)
     f64_type = ir.F64Type.get()
     eigvals_type = ir.RankedTensorType.get(shape, f64_type)
