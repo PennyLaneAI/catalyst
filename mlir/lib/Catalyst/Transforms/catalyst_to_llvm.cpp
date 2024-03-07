@@ -325,9 +325,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         // Setup args and res
         int32_t numberArg = op.getNumberOriginalArgAttr()[0];
         SmallVector<Value> operands = op.getOperands();
-        // What if it h as no arguments and no results?
-        size_t how_many_args_and_results = operands.size();
-        bool has_results = (how_many_args_and_results - numberArg) > 0;
         SmallVector<Value> args = {operands.begin(), operands.begin() + numberArg};
         SmallVector<Value> res = {operands.begin() + numberArg, operands.end()};
 
@@ -422,6 +419,36 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
+struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PythonCallOp op, PythonCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = op.getContext();
+        Location loc = op.getLoc();
+
+        // Create function
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        auto point = rewriter.saveInsertionPoint();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        Type i64 = rewriter.getI64Type();
+        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
+            mod, "pyregistry", {/*args=*/i64}, /*ret_type=*/voidType);
+        customCallFnOp.setPrivate();
+        rewriter.restoreInsertionPoint(point);
+
+        auto identAttr = op.getIdentifier();
+        auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
+        SmallVector<Value> callArgs{ident};
+        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -439,6 +466,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
 
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
+        patterns.add<PythonCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
