@@ -128,31 +128,10 @@ PAULI_NAMED_MAP = {
 }
 
 
-def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
-    # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid abstact
-    # value. One need to investigate how to use it correctly and remove the condition [1]. Should we
-    # add AbstractQreg into the `_weak_types` list of JAX?
-    assert len(types) > 0, "Expected one or more set of types"
-    assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
-
-    def _shapes(ts):
-        return [t.shape for t in ts if isinstance(t, ShapedArray)]
-
-    assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
-    all_ends_with_qreg = all(isinstance(t[-1], AbstractQreg) for t in types)
-    all_not_ends_with_qreg = all(not isinstance(t[-1], AbstractQreg) for t in types)
-    assert (
-        all_ends_with_qreg or all_not_ends_with_qreg
-    ), "We require either all-qregs or all-non-qregs as last items of the type lists"
-    if all_ends_with_qreg:
-        types = [t[:-1] for t in types]
-    results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
-    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
-
-
-def _apply_result_type_conversion(
-    jaxpr: ClosedJaxpr, target_types: List[ShapedArray]
-) -> ClosedJaxpr:
+def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
+    """Return a JAXPR that is identical to the given one but with added type conversion operations
+    to produce the provided type signature in its output."""
+    # TODO: is eval expensive? or would it be better to modify the jaxpr in place?
     with_qreg = isinstance(target_types[-1], AbstractQreg)
     with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION) as ctx:
         with EvaluationContext.frame_tracing_context(ctx) as trace:
@@ -173,22 +152,35 @@ def _apply_result_type_conversion(
     return ClosedJaxpr(jaxpr2, consts)
 
 
-def unify_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
-    """Unify result types of the jaxpr equations given.
-    Args:
-        jaxprs (list of ClosedJaxpr): Source JAXPR expressions. The expression results must have
-                                      matching sizes and numpy array shapes but dtypes might be
-                                      different.
+def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
+    """Unify result signatures across a set of JAXPRs by promoting to common types.
 
-    Returns (list of ClosedJaxpr):
-        Same number of jaxprs with equal result dtypes.
+    Args:
+        jaxprs (List[ClosedJaxpr]): List of JAXPRs to unify. The result signatures must already have
+                                    matching result numbers, abstract value kinds, and array shapes,
+                                    but may differ in array dtypes.
+
+    Returns
+        List[ClosedJaxpr]: List of JAXPRs with unified result types.
 
     Raises:
-        TypePromotionError: Unification is not possible.
-
+        TypePromotionError: Type unification via promotion was not possible.
     """
-    promoted_types = _promote_jaxpr_types([j.out_avals for j in jaxprs])
-    return [_apply_result_type_conversion(j, promoted_types) for j in jaxprs]
+    out_signatures = [jaxpr.out_avals for jaxpr in jaxprs]
+    assert all(len(out_sig) == len(out_signatures[0]) for out_sig in out_signatures)
+
+    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
+        # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid
+        # abstact value. One need to investigate how to use it correctly and remove this condition.
+        # Should we add AbstractQreg into the `_weak_types` list of JAX?
+        out_signatures = [avals[:-1] for avals in out_signatures]
+
+    promoted_types = list(map(partial(reduce, jnp.promote_types), zip(*out_signatures)))
+
+    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
+        promoted_types.append(AbstractQreg())
+
+    return [retrace_with_result_types(jaxpr, promoted_types) for jaxpr in jaxprs]
 
 
 class QRegPromise:
@@ -256,7 +248,6 @@ class HybridOpRegion:
                                arguments during the classical tracing.
         res_classical_tracers: JAX tracers or constants returned to the outer scope after the
                                classical tracing of this region.
-
     """
 
     trace: Optional[DynamicJaxprTrace]
@@ -823,6 +814,7 @@ def trace_quantum_function(
         device (QubitDevice): Quantum device to use for quantum computations
         args: Positional arguments to pass to ``f``
         kwargs: Keyword arguments to pass to ``f``
+        qnode: The quantum node to be traced, it contains user transforms.
 
     Returns:
         closed_jaxpr: JAXPR expression of the function ``f``.

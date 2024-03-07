@@ -224,7 +224,7 @@ try:
         return y
 
 except TypeError as e:
-    # CHECK:   Conditional requires consistent return types across all branches
+    # CHECK:   Conditional requires a consistent return structure across all branches
     print(e)
 
 # -----

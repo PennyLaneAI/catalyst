@@ -117,7 +117,6 @@ jobs:
     - name: Build Catalyst Runtime (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
-        # TODO: remove ENABLE_{BACKEND}=ON after the next release
         COMPILER_LAUNCHER="" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \

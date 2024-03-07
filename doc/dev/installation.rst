@@ -107,16 +107,6 @@ On **macOS**, it is strongly recommended to install the official XCode Command L
   pip install cmake ninja
   brew install libomp
 
-If you install Catalyst on a macOS system with ``ARM`` architecture (e.g. Apple M1/M2), you
-additionally need to install `Rust <https://www.rust-lang.org/tools/install>`_ and the
-``llvm-tools-preview`` rustup component:
-
-.. code-block:: console
-
-  curl https://sh.rustup.rs -sSf | sh
-  source "$HOME/.cargo/env"
-  rustup component add llvm-tools-preview
-
 All additional build and developer dependencies are managed via the repository's
 ``requirements.txt`` and can be installed as follows:
 
