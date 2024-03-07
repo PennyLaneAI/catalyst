@@ -31,9 +31,12 @@ from catalyst.utils.runtime import extract_backend_info
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.parent.joinpath("lit/dummy_device.toml")
+    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
+        "runtime/tests/third_party/dummy_device.toml"
+    )
 
     def __init__(self, wires, shots=1024):
+        print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
 
     @staticmethod
