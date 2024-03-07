@@ -38,7 +38,7 @@ from jax._src.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax.core import eval_jaxpr, get_aval
+from jax.core import AbstractValue, eval_jaxpr, get_aval
 from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
 from pennylane.ops.op_math.controlled import create_controlled_op
@@ -84,7 +84,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
-    unify_result_types,
+    unify_jaxpr_result_types,
 )
 from catalyst.qjit_device import QJITDevice
 from catalyst.tracing.contexts import (
@@ -934,12 +934,32 @@ def _check_single_bool_value(tree: PyTreeDef, avals: List[Any]) -> None:
         raise TypeError(f"A single boolean scalar was expected, got the value {avals[0]}.")
 
 
-def _check_cond_same_shapes(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
-    assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
+def _assert_cond_result_structure(trees: List[PyTreeDef]):
+    """Ensure a consistent container structure across branch results."""
     expected_tree = trees[0]
-    for tree in list(trees)[1:]:
+    for tree in trees[1:]:
         if tree != expected_tree:
-            raise TypeError("Conditional requires consistent return types across all branches")
+            raise TypeError(
+                "Conditional requires a consistent return structure across all branches! "
+                f"Got {tree} and {expected_tree}."
+            )
+
+
+def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
+    """Ensure a consistent type signature across branch results."""
+    num_results = len(signatures[0])
+    assert all(len(sig) == num_results for sig in signatures), "mismatch: number or results"
+
+    for i in range(num_results):
+        aval_slice = [avals[i] for avals in signatures]
+        slice_shapes = [aval.shape for aval in aval_slice]
+        expected_shape = slice_shapes[0]
+        for shape in slice_shapes:
+            if shape != expected_shape:
+                raise TypeError(
+                    "Conditional requires a consistent array shape per result across all branches! "
+                    f"Got {shape} for result #{i} but expected {expected_shape}."
+                )
 
 
 class ForLoop(HybridOp):
@@ -1023,7 +1043,7 @@ class Cond(HybridOp):
                 ctx,
                 trace,
                 *(op.in_classical_tracers + combined_consts + [qreg]),
-                branch_jaxprs=unify_result_types(jaxprs2),
+                branch_jaxprs=unify_jaxpr_result_types(jaxprs2),
             )
         )
         return qrp2
@@ -1281,33 +1301,36 @@ class CondCallable:
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 
-        out_trees, out_avals = [], []
+        out_treedefs, out_signatures = [], []
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
                 wffa, _, _, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
+                    res_avals = [shaped_abstractify(res) for res in res_classical_tracers]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
-            out_trees.append(out_tree())
-            out_avals.append(res_classical_tracers)
+            out_treedefs.append(out_tree())
+            out_signatures.append(res_avals)
 
-        _check_cond_same_shapes(out_trees, out_avals)
-        res_avals = list(map(shaped_abstractify, res_classical_tracers))
-        out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+        _assert_cond_result_structure(out_treedefs)
+        _assert_cond_result_types(out_signatures)
+        out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in out_signatures[0]]
         Cond(in_classical_tracers, out_classical_tracers, regions)
         return tree_unflatten(out_tree(), out_classical_tracers)
 
     def _call_with_classical_ctx(self):
         args, args_tree = tree_flatten([])
         args_avals = tuple(map(_abstractify, args))
-        branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
+        branch_jaxprs, consts, out_treedefs = initial_style_jaxprs_with_common_consts1(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
-        _check_cond_same_shapes(out_trees, [j.out_avals for j in branch_jaxprs])
-        branch_jaxprs = unify_result_types(branch_jaxprs)
+        out_signatures = [jaxpr.out_avals for jaxpr in branch_jaxprs]
+        _assert_cond_result_structure(out_treedefs)
+        _assert_cond_result_types(out_signatures)
+        branch_jaxprs = unify_jaxpr_result_types(branch_jaxprs)
         out_classical_tracers = cond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
-        return tree_unflatten(out_trees[0], out_classical_tracers)
+        return tree_unflatten(out_treedefs[0], out_classical_tracers)
 
     def _call_during_interpretation(self):
         for pred, branch_fn in zip(self.preds, self.branch_fns):

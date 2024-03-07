@@ -85,9 +85,7 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *co
     auto sizeType = IntegerType::get(ctx, 64);
 
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
-    auto qubitType = conv->convertType(QubitType::get(ctx));
 
-    Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
     Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
     Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
 
