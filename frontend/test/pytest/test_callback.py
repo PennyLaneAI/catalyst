@@ -14,6 +14,7 @@
 """Test callbacks"""
 
 import pennylane as qml
+
 from catalyst.pennylane_extensions import callback
 
 
