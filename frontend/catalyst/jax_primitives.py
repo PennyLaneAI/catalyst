@@ -17,6 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import dataclass
 from itertools import chain
+import sys
 from typing import Dict, Iterable, List, Union
 
 import jax
@@ -68,6 +69,7 @@ from mlir_quantum.dialects.quantum import (
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 
+from catalyst.compiler import get_lib_path
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 
@@ -225,20 +227,21 @@ python_callback_p.multiple_results = True
 
 @python_callback_p.def_abstract_eval
 def _python_callback_abstract_eval(*avals, callback, results_aval):
+    """Abstract evaluation"""
     return results_aval
 
 
 @python_callback_p.def_impl
 def _python_callback_def_impl(*avals, callback, results_aval):
+    """Concrete evaluation"""
     raise NotImplementedError()
 
 
 def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
-    import sys
-    from catalyst.compiler import get_lib_path
+    """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    import registry
+    import registry  # # pylint: disable=import-outside-top-level
 
     callback_id = registry.register(callback)
 
