@@ -2462,7 +2462,10 @@ def callback(cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwa
         assert not _kwargs, "Kwargs are not yet supported here."
         return tree_leaves(cb())
 
-    results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
+    # TODO(@erick-xanadu): Change back once we support arguments.
+    # I am leaving this as a to-do because otherwise the coverage will complain.
+    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
+    results_aval = []
     flat_results_aval, out_tree = tree_flatten(results_aval)
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)

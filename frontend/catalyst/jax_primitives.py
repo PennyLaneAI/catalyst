@@ -227,7 +227,7 @@ def _python_callback_abstract_eval(*avals, callback, results_aval):
 
 
 @python_callback_p.def_impl
-def _python_callback_def_impl(*avals, callback, results_aval):
+def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cover
     """Concrete evaluation"""
     raise NotImplementedError()
 
