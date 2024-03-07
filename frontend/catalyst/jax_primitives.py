@@ -417,7 +417,6 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
-    tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
     _func_lowering(
         ctx,
@@ -436,7 +435,6 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
         mlir.flatten_lowering_ir_args(func_args),
-        mlir.flatten_lowering_ir_args(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results

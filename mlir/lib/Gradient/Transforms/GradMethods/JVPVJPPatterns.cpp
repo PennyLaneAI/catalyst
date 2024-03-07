@@ -188,10 +188,10 @@ LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
     auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
-    assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
+    assert(func_diff_operand_indices.size() <= op.getOperands().size());
     size_t func_operands_size = op.getOperands().size() - func_diff_operand_indices.size();
 
-    auto calleeOperands = op.getParams();
+    auto calleeOperands = op.getOperands();
     auto tangOperands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for (auto idx : func_diff_operand_indices) {

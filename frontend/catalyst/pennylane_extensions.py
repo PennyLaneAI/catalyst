@@ -575,28 +575,24 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
 
 # def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
-def value_and_grad(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
+def value_and_grad(f: DifferentiableLike, operands, *, method=None, h=None, argnum=None):
     # scalar_out = True
     # return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
     def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(tangents, "tangents")
+    check_is_iterable(operands, "params")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
         fn = _ensure_differentiable(f)
-        args_flatten, in_tree = tree_flatten(params)
-        tangents_flatten, _ = tree_flatten(tangents)
+        args_flatten, in_tree = tree_flatten(operands)
         grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
-        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *operands)
 
-        results = value_and_grad_p.bind(
-            *args_flatten, *tangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
-        )
+        results = value_and_grad_p.bind(*args_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
         midpoint = len(results) // 2
         func_res = results[:midpoint]
@@ -607,7 +603,7 @@ def value_and_grad(f: DifferentiableLike, params, tangents, *, method=None, h=No
         results = (func_res, jvps)
 
     else:
-        results = jax.jvp(f, params, tangents)
+        results = jax.jvp(f, operands)
 
     return results
 

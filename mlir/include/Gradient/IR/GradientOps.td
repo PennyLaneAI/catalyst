@@ -64,7 +64,6 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
 }
 
 def ValueAndGradOp : Gradient_Op<"value_and_grad", [
-        AttrSizedOperandSegments,
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>
@@ -74,8 +73,7 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
     let arguments = (ins
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$params,
-        Variadic<AnyType>:$tangents,
+        Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );
@@ -86,7 +84,7 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
     );
 
     let assemblyFormat = [{
-        $method $callee `(` $params `)` `tangents` `(` $tangents `)`
+        $method $callee `(` $operands `)`
         attr-dict `:` functional-type(operands, results)
     }];
 

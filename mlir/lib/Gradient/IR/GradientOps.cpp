@@ -182,7 +182,7 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
     });
 
     auto diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
-    auto r1 = ::verifyGradInputs(this, callee, this->getParams(), diffArgIndices);
+    auto r1 = ::verifyGradInputs(this, callee, this->getOperands(), diffArgIndices);
     if (r1.failed()) {
         return r1;
     }
@@ -226,7 +226,7 @@ LogicalResult ValueAndGradOp::verify()
     return success();
 }
 
-MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getParamsMutable(); }
+MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getOperandsMutable(); }
 
 //===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
