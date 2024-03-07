@@ -90,7 +90,7 @@ Exp = {}
 Expval = {}
 Var = {}
 Probs = {}
-Stat = {}
+State = {}
 
 [measurement_processes.finiteshots]
 
