@@ -307,9 +307,9 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        MLIRContext *ctx = op.getContext();
         Location loc = op.getLoc();
         // Create function
-        MLIRContext *ctx = op.getContext();
         Type ptr = LLVM::LLVMPointerType::get(ctx);
 
         Type voidType = LLVM::LLVMVoidType::get(ctx);
@@ -317,16 +317,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        if (op.getCallTargetName().equals("pyregistry")) {
-            SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
-                                       adaptor.getOperands().getTypes().end());
-            auto type2 = LLVM::LLVMFunctionType::get(voidType, argTypes);
-            LLVM::LLVMFuncOp customCallFnOp =
-                rewriter.create<LLVM::LLVMFuncOp>(loc, op.getCallTargetName(), type2);
-            rewriter.restoreInsertionPoint(point);
-            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, customCallFnOp, adaptor.getOperands());
-            return success();
-        }
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
             mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
         customCallFnOp.setPrivate();

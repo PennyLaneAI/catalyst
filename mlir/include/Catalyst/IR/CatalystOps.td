@@ -103,4 +103,23 @@ def CustomCallOp: Catalyst_Op<"custom_call",
   }];
 }
 
+def PythonCallOp: Catalyst_Op<"pycallback",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = "CustomCall specialized for python callbacks.";
+
+  let description = [{
+    A custom call invokes code external to Catalyst. The `inputs` are passed to the
+    external code, and the external code is expected to produce a result of the
+    given type.
+  }];
+
+  let arguments = (ins
+        I64Attr: $identifier
+  );
+
+  let assemblyFormat = [{
+    attr-dict
+  }];
+}
+
 #endif // GRADIENT_OPS
