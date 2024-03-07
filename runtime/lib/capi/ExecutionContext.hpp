@@ -81,7 +81,7 @@ struct PythonInterpreterGuard {
 };
 #endif
 
-extern "C" void pyregistry(void *p, uintptr_t *aligned, int64_t i);
+extern "C" void pyregistry(int64_t identifier);
 
 class MemoryManager final {
   private:

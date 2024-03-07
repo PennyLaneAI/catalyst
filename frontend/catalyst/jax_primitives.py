@@ -34,7 +34,7 @@ from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import CustomCallOp
-from mlir_quantum.dialects.catalyst import PrintOp
+from mlir_quantum.dialects.catalyst import PrintOp, PythonCallOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -240,8 +240,10 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     callback_id = registry.register(callback)
 
-    value_id = StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(callback_id))).results
-    return CustomCallOp([], [value_id], "pyregistry").results
+    ctx = jax_ctx.module_context.context
+    i64_type = ir.IntegerType.get_signless(64, ctx)
+    identifier = ir.IntegerAttr.get(i64_type, callback_id)
+    return PythonCallOp(identifier).results
 
 
 #
