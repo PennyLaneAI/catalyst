@@ -322,6 +322,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     ):
         """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
+        #TODO: Add Catalyst program verification and validation
         return program, config
 
     def execute(self, circuits, execution_config):
