@@ -288,7 +288,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
                 for gate in native_gates
                 if gate not in gates_to_be_decomposed_if_controlled
             ]
-            QJITDevice.operations += native_controlled_gates
+            QJITDeviceNewAPI.operations += native_controlled_gates
 
     @staticmethod
     def _set_supported_observables(config):
