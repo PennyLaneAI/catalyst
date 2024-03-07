@@ -435,8 +435,8 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         rewriter.setInsertionPointToStart(mod.getBody());
 
         Type i64 = rewriter.getI64Type();
-        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "pyregistry", {/*args=*/i64}, /*ret_type=*/voidType);
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, "pyregistry", {/*args=*/i64}, /*ret_type=*/voidType);
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
