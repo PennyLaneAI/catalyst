@@ -21,12 +21,13 @@ from catalyst.pennylane_extensions import callback
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
-    def my_callback():
+    @callback
+    def my_callback() -> None:
         print("Hello erick")
 
     @qml.qjit
     def cir():
-        callback(my_callback, [])
+        my_callback()
         return None
 
     cir()
@@ -37,12 +38,13 @@ def test_callback_no_returns_no_params(capsys):
 def test_callback_twice(capsys):
     """Test callback no parameters no returns"""
 
+    @callback
     def my_callback():
         print("Hello erick")
 
     @qml.qjit
     def cir():
-        callback(my_callback, [])
+        my_callback()
         return None
 
     cir()
@@ -51,7 +53,7 @@ def test_callback_twice(capsys):
 
     @qml.qjit
     def cir2():
-        callback(my_callback, [])
+        my_callback()
         return None
 
     cir2()

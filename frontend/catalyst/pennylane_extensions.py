@@ -22,7 +22,7 @@ import copy
 import numbers
 import pathlib
 from collections.abc import Sequence, Sized
-from functools import update_wrapper
+from functools import update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -2449,7 +2449,23 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
     return batch_size
 
 
-def callback(cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any):
+def callback(func):
+
+    import inspect
+
+    signature = inspect.signature(func)
+    retty = signature.return_annotation
+
+    @wraps(func)
+    def bind_callback(*args, **kwargs):
+        callback_implementation(func, retty)
+
+    return bind_callback
+
+
+def callback_implementation(
+    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
+):
     """TODO: Attribution. I looked into
     https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
     flat_args, in_tree = tree_flatten((args, kwargs))
