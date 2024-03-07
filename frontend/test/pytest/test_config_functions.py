@@ -25,8 +25,10 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import (  # check_device_config,
     check_full_overlap,
     check_no_overlap,
+    check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_native_gates,
     get_native_gates_PL,
     validate_config_with_device,
 )
@@ -287,6 +289,32 @@ def test_check_full_overlap():
     msg = f"Gates in qml.device.operations and specification file do not match"
     with pytest.raises(CompileError, match=msg):
         check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "B", "Adjoint(Y)"})
+
+
+def test_config_unsupported_schema():
+    """Test native matrix gates are properly obtained from the toml."""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 999
+                    """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+        with pytest.raises(NotImplementedError):
+            check_quantum_control_flag(config)
+        with pytest.raises(NotImplementedError):
+            get_native_gates(config, False)
+        with pytest.raises(NotImplementedError):
+            get_decomposable_gates(config, False)
+        with pytest.raises(NotImplementedError):
+            get_matrix_decomposable_gates(config, False)
 
 
 if __name__ == "__main__":

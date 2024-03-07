@@ -34,13 +34,13 @@ if tomllib is None and tomlkit is None:  # pragma: nocover
     raise ImportError(msg)
 
 # Give preference to tomllib
-if tomllib:
-    from tomllib import load as toml_load  # pragma: nocover
+if tomllib:  # pragma: nocover
+    from tomllib import load as toml_load
 
     TOMLDocument = Any
-else:
+else:  # pragma: nocover
     from tomlkit import TOMLDocument
-    from tomlkit import load as toml_load  # pragma: nocover
+    from tomlkit import load as toml_load
 
 __all__ = ["toml_load", "TOMLDocument"]
 
