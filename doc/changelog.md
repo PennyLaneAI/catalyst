@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now supports devices built from the 
+  [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
+  [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
+
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
   [(#583)](https://github.com/PennyLaneAI/catalyst/pull/583)
@@ -36,7 +40,8 @@
 
 This release contains contributions from (in alphabetical order):
 
-David Ittah.
+David Ittah,
+Romain Moyard.
 
 # Release 0.5.0
 
