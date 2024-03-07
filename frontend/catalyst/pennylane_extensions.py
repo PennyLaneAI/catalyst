@@ -29,9 +29,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+from jax._src import tree_util
 from jax._src.api_util import shaped_abstractify
 from jax._src.lax.lax import _abstractify
-from jax._src import tree_util
 from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
