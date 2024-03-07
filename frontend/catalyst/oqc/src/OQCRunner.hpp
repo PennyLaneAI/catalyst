@@ -56,7 +56,7 @@ struct OQCRunnerBase {
  */
 struct OQCRunner : public OQCRunnerBase {
 
-    [[nodiscard]] auto Sample(const std::string &circuit, const std::string &device, size_t shots,
+    [[nodiscard]] auto Counts(const std::string &circuit, const std::string &device, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t> override
     {
@@ -71,8 +71,16 @@ struct OQCRunner : public OQCRunnerBase {
 
         py::exec(
             R"(
-            print(circuit)
-              )",
+            import numpy as np
+            
+
+            try:
+                result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
+                counts = np.array(result.measurements).flatten()
+            except Exception as e:
+                print(f"circuit: {circuit}")
+                msg = str(e)
+            )",
             py::globals(), locals);
 
         auto &&msg = locals["msg"].cast<std::string>();

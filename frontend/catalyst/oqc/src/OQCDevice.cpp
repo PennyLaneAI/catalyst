@@ -100,7 +100,7 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
         builder->AddMeasurement(wire, wire);
     }
 
-    auto &&li_samples = runner->Sample(builder->toOpenQASM2(), "", 1000, GetNumQubits());
+    auto &&li_samples = runner->Counts(builder->toOpenQASM2(), "", shots, GetNumQubits());
 }
 
 // void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
