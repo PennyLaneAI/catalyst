@@ -173,7 +173,7 @@ class Timer {
         Timer timer{};
 
         timer.start();
-        auto &&result = func(std::forward<Args>(args)...);
+        auto result = func(std::forward<Args>(args)...);
         timer.dump(name);
 
         return result;
