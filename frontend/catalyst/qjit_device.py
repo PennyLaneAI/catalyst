@@ -272,7 +272,23 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         if QJITDeviceNewAPI._check_quantum_control(config):  # pragma: nocover
             # TODO: Once control is added on the frontend.
-            ...
+            gates_to_be_decomposed_if_controlled = [
+                "Identity",
+                "CNOT",
+                "CY",
+                "CZ",
+                "CSWAP",
+                "CRX",
+                "CRY",
+                "CRZ",
+                "CRot",
+            ]
+            native_controlled_gates = ["ControlledQubitUnitary"] + [
+                f"C({gate})"
+                for gate in native_gates
+                if gate not in gates_to_be_decomposed_if_controlled
+            ]
+            QJITDeviceNewAPI.operations += native_controlled_gates
 
     @staticmethod
     def _set_supported_observables(config):
@@ -306,6 +322,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     ):
         """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
+        #TODO: Add Catalyst program verification and validation
         return program, config
 
     def execute(self, circuits, execution_config):

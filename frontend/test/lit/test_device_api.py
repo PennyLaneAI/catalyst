@@ -30,7 +30,9 @@ from catalyst.compiler import get_lib_path
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.joinpath("dummy_device.toml")
+    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
+        "runtime/tests/third_party/dummy_device.toml"
+    )
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
