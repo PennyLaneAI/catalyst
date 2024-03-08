@@ -564,11 +564,10 @@ def test_adjoint_ctrl_ctrl_subroutine(backend):
         qml.ctrl(qml.PhaseShift, control=2)(0.1, wires=3)
 
     def subroutine():
-        # If either of the two lines below are commented, there is no error. Only when both run.
         subsubroutine()
         qml.adjoint(qml.ctrl(subsubroutine, control=0))()
 
-    dev = qml.device("lightning.qubit", wires=4, shots=500)
+    dev = qml.device(backend, wires=4, shots=500)
 
     @qml.qnode(dev)
     def circuit():
