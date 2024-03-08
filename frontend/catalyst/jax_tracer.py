@@ -713,8 +713,12 @@ def apply_transform(transform_program, tape, flat_results):
 
     if is_program_transformed:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        tapes, _post_processing = qnode.transform_program([tape])
-        post_processing = lambda r: _post_processing(r)[0]
+        tapes, post_processing_tuple_out = transform_program([tape])
+
+        def postprocessing(r):
+            retval = post_processing_tuple_out(r)
+            return retval[0]
+
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
