@@ -126,7 +126,6 @@ def PythonCallOp: Catalyst_Op<"pycallback",
             return build($_builder, $_state, inputs, id, argc);
         }]>
     ];
-    let assemblyFormat = [{ $list attr-dict `:` type($list) `->` type($data) }];
 
   let assemblyFormat = [{
     `(` $inputs `)` attr-dict `:` functional-type(operands, results)
