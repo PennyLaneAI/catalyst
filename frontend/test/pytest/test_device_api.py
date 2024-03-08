@@ -58,6 +58,10 @@ class DummyDevice(Device):
         return transform_program, execution_config
 
 
+@pytest.mark.skipif(
+    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
+    reason="lib_dummydevice.so was not found.",
+)
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
     device = DummyDevice(wires=10, shots=2032)
@@ -85,6 +89,10 @@ def test_qjit_device():
         device_qjit.execute(10, 2)
 
 
+@pytest.mark.skipif(
+    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
+    reason="lib_dummydevice.so was not found.",
+)
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
     dev = DummyDevice(wires=2, shots=2048)

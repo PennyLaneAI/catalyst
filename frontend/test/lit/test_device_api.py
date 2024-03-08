@@ -43,7 +43,7 @@ class DummyDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_lightning.so"
 
     def execute(self, circuits, execution_config):
         """Execute"""
@@ -59,7 +59,7 @@ class DummyDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.so", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -83,7 +83,7 @@ def test_preprocess():
     """Test a circuit (with preprocessing transforms) compilation to MLIR when
     using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]libdummy_device.so", "dummy.remote", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.so", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
