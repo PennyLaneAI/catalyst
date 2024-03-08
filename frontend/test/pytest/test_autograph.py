@@ -681,7 +681,6 @@ class TestConditionals:
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(switch: bool):
-
             if switch:
                 return qml.expval(qml.PauliY(0))
 
