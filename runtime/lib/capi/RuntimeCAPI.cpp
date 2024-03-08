@@ -106,7 +106,7 @@ void deactivateDevice()
 
 extern "C" {
 
-void pyregistry(int64_t identifier)
+void pyregistry(int64_t identifier, int64_t argc, ...)
 {
     // We need to guard calls to callback.
     // These are implemented in Python.
@@ -132,15 +132,18 @@ void pyregistry(int64_t identifier)
         RT_FAIL(err_msg);
     }
 
-    void (*callbackCall)(uintptr_t);
-    typedef void (*func_ptr_t)(uintptr_t);
+    void (*callbackCall)(int64_t, int64_t, va_list);
+    typedef void (*func_ptr_t)(int64_t, int64_t, va_list);
     callbackCall = (func_ptr_t)dlsym(handle, "callbackCall");
     if (!callbackCall) {
         char *err_msg = dlerror();
         RT_FAIL(err_msg);
     }
 
-    callbackCall(identifier);
+    va_list args;
+    va_start(args, argc);
+    callbackCall(identifier, argc, args);
+    va_end(args);
     dlclose(handle);
 }
 
