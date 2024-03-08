@@ -270,6 +270,7 @@ class QJIT:
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
 
+        shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
         compiled_fn = CompiledFunction(shared_object, func_name, restype, self.compile_options)
 
         return compiled_fn, llvm_ir

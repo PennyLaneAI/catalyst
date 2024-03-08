@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
 #include <list>
 #include <memory>
 #include <string>
@@ -54,53 +59,110 @@ using namespace catalyst::driver;
 
 namespace catalyst::utils {
 
-inline bool enable_debug_info()
-{
-    char *value = getenv("ENABLE_DEBUG_INFO");
-    if (!value || std::string(value) != "ON") {
-        return false;
-    }
-    return true;
-}
-
-void opLinesCount(Operation *op, const std::string &pipelineName)
-{
-    if (!enable_debug_info()) {
-        return;
-    }
-    std::string opStrBef;
-    llvm::raw_string_ostream ofile{opStrBef};
-    ofile << *op;
-    auto num_lines = std::count(opStrBef.begin(), opStrBef.end(), '\n');
-    std::cerr << "[DEBUG] After " << pipelineName << "\t program-size: " << num_lines << std::endl;
-}
-
-void moduleOpLinesCount(const ModuleOp &op, const std::string &name)
-{
-    if (!enable_debug_info()) {
-        return;
-    }
-    std::string modStrBef;
-    llvm::raw_string_ostream rawStrBef{modStrBef};
-    op->print(rawStrBef);
-    modStrBef = rawStrBef.str();
-    auto num_lines = std::count(modStrBef.begin(), modStrBef.end(), '\n');
-    std::cerr << "[DEBUG] After " << name << "\t program-size: " << num_lines << std::endl;
-}
-
-void moduleLinesCount(const llvm::Module &llvmModule, const std::string &name)
-{
-    if (!enable_debug_info()) {
-        return;
+/**
+ * LinesCount : A utility class to count the number of lines of embedded programs
+ * in different compilation stages.
+ *
+ * You can dump the program-size embedded in an `Operation`, `ModuleOp`, or
+ * `llvm::Module` using the static methods in this class.
+ *
+ * To display results, run the driver with the `ENABLE_DEBUG_INFO=ON` variable.
+ * To store results in YAML format, use `DEBUG_RESULTS_FILE=/path/to/file.yml`
+ * along with `ENABLE_DEBUG_INFO=ON`.
+ *
+ * Note that using both `ENABLE_DEBUG_INFO=ON` and `ENABLE_DEBUG_TIMER=ON` will
+ * introduce noise to the timing results.
+ */
+class LinesCount {
+  private:
+    [[nodiscard]] inline static bool enable_debug_info()
+    {
+        char *value = getenv("ENABLE_DEBUG_INFO");
+        if (!value || std::string(value) != "ON") {
+            return false;
+        }
+        return true;
     }
 
-    std::string modStrBef;
-    llvm::raw_string_ostream rawStrBef{modStrBef};
-    llvmModule.print(rawStrBef, nullptr);
-    modStrBef = rawStrBef.str();
-    auto num_lines = std::count(modStrBef.begin(), modStrBef.end(), '\n');
-    std::cerr << "[DEBUG] After " << name << "\t program-size: " << num_lines << std::endl;
-}
+    inline static void print(const std::string &opStrBuf, const std::string &name)
+    {
+        const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
+        std::cerr << "[DEBUG] After " << name << "\t program-size: " << num_lines << std::endl;
+    }
+
+    inline static void store(const std::string &opStrBuf, const std::string &name,
+                             const std::filesystem::path &file_path)
+    {
+        const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
+        if (!std::filesystem::exists(file_path)) {
+            std::ofstream ofile(file_path);
+            assert(ofile.is_open() && "Invalid file to store timer results");
+            ofile << "        - " << name << "\n";
+            ofile << "          program size: " << num_lines << "\n";
+            ofile.close();
+            return;
+        }
+        // else
+
+        // Second, update the file
+        std::ofstream ofile(file_path, std::ios::app);
+        assert(ofile.is_open() && "Invalid file to store timer results");
+        ofile << "        - " << name << "\n";
+        ofile << "          program size: " << num_lines << "\n";
+        ofile.close();
+    }
+
+    inline static void dump(const std::string &opStrBuf, const std::string &name)
+    {
+        char *file = getenv("DEBUG_RESULTS_FILE");
+        if (!file) {
+            print(opStrBuf, name);
+            return;
+        }
+        // else
+        store(opStrBuf, name, std::filesystem::path{file});
+    }
+
+  public:
+    static void Operation(Operation *op, const std::string &name)
+    {
+        if (!enable_debug_info()) {
+            return;
+        }
+
+        std::string opStrBuf;
+        llvm::raw_string_ostream rawStrBef{opStrBuf};
+        rawStrBef << *op;
+
+        dump(opStrBuf, name);
+    }
+
+    static void ModuleOp(const ModuleOp &op, const std::string &name)
+    {
+        if (!enable_debug_info()) {
+            return;
+        }
+
+        std::string modStrBef;
+        llvm::raw_string_ostream rawStrBef{modStrBef};
+        op->print(rawStrBef);
+
+        dump(modStrBef, name);
+    }
+
+    static void Module(const llvm::Module &llvmModule, const std::string &name)
+    {
+        if (!enable_debug_info()) {
+            return;
+        }
+
+        std::string modStrBef;
+        llvm::raw_string_ostream rawStrBef{modStrBef};
+        llvmModule.print(rawStrBef, nullptr);
+
+        dump(modStrBef, name);
+    }
+};
 
 } // namespace catalyst::utils
 
@@ -404,7 +466,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
-            catalyst::utils::opLinesCount(op, res->second);
+            catalyst::utils::LinesCount::Operation(op, res->second);
         }
 
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
@@ -477,28 +539,26 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
     OwningOpRef<ModuleOp> op = timer::timer(parseMLIRSource, "parseMLIRSource", &ctx, *sourceMgr);
-    catalyst::utils::moduleOpLinesCount(op.get(), "parseMLIRSource");
+    catalyst::utils::LinesCount::ModuleOp(op.get(), "parseMLIRSource");
 
     if (op) {
-        if (failed(timer::timer(runLowering, "runPasses", options, &ctx, *op, output))) {
+        if (failed(timer::timer(runLowering, "runMLIRPasses", options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
-
-        catalyst::utils::moduleOpLinesCount(op.get(), "runPasses");
 
         output.outIR.clear();
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
-            llvmModule = timer::timer(translateModuleToLLVMIR, "ModuleToLLVMIR", *op, llvmContext,
-                                      "LLVMDialectModule");
+            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR", *op,
+                                      llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
             }
 
-            catalyst::utils::moduleLinesCount(*llvmModule, "ModuleToLLVMIR");
+            catalyst::utils::LinesCount::Module(*llvmModule, "translateModuleToLLVMIR");
 
             if (options.keepIntermediate) {
                 dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
@@ -524,13 +584,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
 
-        catalyst::utils::moduleLinesCount(*llvmModule.get(), "runLLVMPasses");
+        catalyst::utils::LinesCount::Module(*llvmModule.get(), "runLLVMPasses");
 
         if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", options, llvmModule, output))) {
             return failure();
         }
 
-        catalyst::utils::moduleLinesCount(*llvmModule.get(), "runEnzymePasses");
+        catalyst::utils::LinesCount::Module(*llvmModule.get(), "runEnzymePasses");
 
         output.outIR.clear();
         outIRStream << *llvmModule;

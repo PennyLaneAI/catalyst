@@ -41,6 +41,16 @@ static inline double _getCPUTime() { return .0 }
 
 namespace catalyst::utils {
 
+/**
+ * Timer: A utility class to measure the wall-time and CPU-time of code blocks.
+ *
+ * To display results, run the driver with the `ENABLE_DEBUG_TIMER=ON` variable.
+ * To store results in YAML format, use `DEBUG_RESULTS_FILE=/path/to/file.yml`
+ * along with `ENABLE_DEBUG_TIMER=ON`.
+ *
+ * Note that using both `ENABLE_DEBUG_INFO=ON` and `ENABLE_DEBUG_TIMER=ON` will
+ * introduce noise to the timing results.
+ */
 class Timer {
   private:
     // Toggle the support w.r.t. the value of `ENABLE_DEBUG_TIMER`
@@ -144,7 +154,7 @@ class Timer {
             return;
         }
 
-        char *file = getenv("DEBUG_TIMER_RESULT_PATH");
+        char *file = getenv("DEBUG_RESULTS_FILE");
         if (!file) {
             print(name);
             return;
