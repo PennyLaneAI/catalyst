@@ -2463,7 +2463,7 @@ def callback(func):
 
     @wraps(func)
     def bind_callback(*args, **kwargs):
-        callback_implementation(func, retty, **args, **kwargs)
+        callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
 
