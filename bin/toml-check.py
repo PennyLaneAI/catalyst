@@ -26,10 +26,13 @@ from textwrap import dedent
 try:
     from lark import Lark, LarkError, UnexpectedInput
 except ImportError as e:
-    raise RuntimeError("toml-check.py requires `lark` library. Consider using `pip install lark`") \
-    from e
+    raise RuntimeError(
+        "toml-check.py requires `lark` library. Consider using `pip install lark`"
+    ) from e
 
-parser=Lark(dedent('''
+parser = Lark(
+    dedent(
+        """
     start: schema_body \
            gates_native_section \
            gates_decomp_section \
@@ -58,19 +61,22 @@ parser=Lark(dedent('''
     %import common.WS
     %ignore WS
     %ignore COMMENT
-    '''))
+    """
+    )
+)
 
 
-if __name__ == '__main__':
-    ap = ArgumentParser(prog='toml-check.py')
-    ap.add_argument('filenames', metavar='TOML', type=str, nargs='+',
-                    help='One or more *toml files to check')
-    ap.add_argument('--verbose', action='store_true', help='Be verbose')
+if __name__ == "__main__":
+    ap = ArgumentParser(prog="toml-check.py")
+    ap.add_argument(
+        "filenames", metavar="TOML", type=str, nargs="+", help="One or more *toml files to check"
+    )
+    ap.add_argument("--verbose", action="store_true", help="Be verbose")
     fname = None
     try:
         arguments = ap.parse_args(sys.argv[1:])
         for fname in arguments.filenames:
-            with open(fname, 'r', encoding='utf-8') as f:
+            with open(fname, "r", encoding="utf-8") as f:
                 contents = f.read()
             tree = parser.parse(contents)
             if arguments.verbose:
@@ -81,5 +87,3 @@ if __name__ == '__main__':
     except LarkError as e:
         print(f"toml-check: error in {fname}", file=sys.stderr)
         raise e
-
-

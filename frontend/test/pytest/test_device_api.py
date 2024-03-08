@@ -20,13 +20,12 @@ import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.transforms import split_non_commuting
-from catalyst.utils.runtime import device_get_toml_config
 from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.qjit_device import QJITDeviceNewAPI
-from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 
 
 class DummyDevice(Device):
