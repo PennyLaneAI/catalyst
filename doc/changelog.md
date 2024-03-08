@@ -39,6 +39,9 @@
 * Fix the issue of triggering the C++ compiler driver twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
+* Fix return type for transforms. Instead of returning a 1-element tuple, return the element.
+  [(#574)](https://github.com/PennyLaneAI/catalyst/pull/574)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
