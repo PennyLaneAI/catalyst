@@ -46,14 +46,13 @@ parser=Lark(dedent('''
     compilation_section: "[compilation]" flag_decl* -> compilation
     schema_decl: "schema" "=" "2"
     gate_decls: (gate_decl)*
-    gate_decl: /[a-zA-Z0-9_]+/ "=" "{" (gate_flag ("," gate_flag)*)? "}"
-    gate_flag: gate_condition | gate_modifiers
+    gate_decl: /[a-zA-Z0-9_]+/ "=" "{" (gate_trait ("," gate_trait)*)? "}"
+    gate_trait: gate_condition | gate_properties
     gate_condition: "condition" "=" "[" ( "\\"finiteshots\\"" | "\\"analytic\\"" ) "]"
-    gate_modifiers: "modifiers" "=" "[" gate_modifier ("," gate_modifier)* "]"
-    gate_modifier: "\\"controllable\\"" | "\\"invertible\\"" | "\\"differentiable\\""
+    gate_properties: "properties" "=" "[" gate_property ("," gate_property)* "]"
+    gate_property: "\\"controllable\\"" | "\\"invertible\\"" | "\\"differentiable\\""
     flag_decl: ( "qjit_compatible" | "runtime_code_generation" | \
-                 "quantum_adjoint" | "mid_circuit_measurement" | \
-                 "dynamic_qubit_management" | "quantum_control" ) "=" boolean
+                 "mid_circuit_measurement" | "dynamic_qubit_management" ) "=" boolean
     boolean: "true" | "false"
     COMMENT: "#" /./*
     %import common.WS

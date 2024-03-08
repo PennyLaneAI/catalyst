@@ -3,39 +3,39 @@ schema = 2
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
 [operators.gates.native]
-ISWAP = { modifiers = [ "invertible" ] }
-PSWAP = { modifiers = [ "invertible" ] }
-Hadamard = { modifiers = [ "invertible" ] }
-PauliX = { modifiers = [ "invertible" ] }
-PauliY = { modifiers = [ "invertible" ] }
-PauliZ = { modifiers = [ "invertible" ] }
-S = { modifiers = [ "invertible" ] }
-T = { modifiers = [ "invertible" ] }
-CNOT = { modifiers = [ "invertible" ] }
-CZ = { modifiers = [ "invertible" ] }
-SWAP = { modifiers = [ "invertible" ] }
-PhaseShift = { modifiers = [ "invertible" ] }
-RX = { modifiers = [ "invertible" ] }
-RY = { modifiers = [ "invertible" ] }
-RZ = { modifiers = [ "invertible" ] }
-CSWAP = { modifiers = [ "invertible" ] }
-MS = { modifiers = [ "invertible" ] }
-CY = { modifiers = [ "invertible" ] }
-SX = { modifiers = [ "invertible" ] }
-AAMS = { modifiers = [ "invertible" ] }
-ECR = { modifiers = [ "invertible" ] }
-GPi = { modifiers = [ "invertible" ] }
-GPi2 = { modifiers = [ "invertible" ] }
-CPhaseShift00 = { modifiers = [ "invertible" ] }
-CPhaseShift01 = { modifiers = [ "invertible" ] }
-CPhaseShift10 = { modifiers = [ "invertible" ] }
-Identity = { modifiers = [ "invertible" ] }
-IsingXX = { modifiers = [ "invertible" ] }
-IsingXY = { modifiers = [ "invertible" ] }
-IsingYY = { modifiers = [ "invertible" ] }
-IsingZZ = { modifiers = [ "invertible" ] }
-Toffoli = { modifiers = [ "invertible" ] }
-ControlledPhaseShift = { modifiers = [ "invertible" ] }
+ISWAP = { }
+PSWAP = { }
+Hadamard = { }
+PauliX = { }
+PauliY = { }
+PauliZ = { }
+S = { }
+T = { }
+CNOT = { }
+CZ = { }
+SWAP = { }
+PhaseShift = { }
+RX = { }
+RY = { }
+RZ = { }
+CSWAP = { }
+MS = { }
+CY = { }
+SX = { }
+AAMS = { }
+ECR = { }
+GPi = { }
+GPi2 = { }
+CPhaseShift00 = { }
+CPhaseShift01 = { }
+CPhaseShift10 = { }
+Identity = { }
+IsingXX = { }
+IsingXY = { }
+IsingYY = { }
+IsingZZ = { }
+Toffoli = { }
+ControlledPhaseShift = { }
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
@@ -69,8 +69,6 @@ Counts = { condition = [ "finiteshots" ] }
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = true
-# If the device supports adjoint
-quantum_adjoint = false
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = false
 

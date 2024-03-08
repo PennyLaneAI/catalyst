@@ -2,35 +2,35 @@ schema = 2
 
 [operators.gates.native]
 
-QubitUnitary = { modifiers = [ "controllable", "invertible"]  }
-PauliX = { modifiers = [ "controllable", "invertible"] }
-PauliY = { modifiers = [ "controllable", "invertible"] }
-PauliZ = { modifiers = [ "controllable", "invertible"] }
-MultiRZ = { modifiers = [ "controllable", "invertible" ] }
-Hadamard = { modifiers = [ "controllable", "invertible"] }
-S = { modifiers = [ "controllable", "invertible" ] }
-T = { modifiers = [ "controllable", "invertible" ] }
-CNOT = { modifiers = [ "invertible" ] }
-SWAP = { modifiers = [ "controllable", "invertible" ] }
-CSWAP = { modifiers = [ "invertible" ] }
-Toffoli = { modifiers = [ "controllable", "invertible" ] }
-CY = { modifiers = [ "invertible" ] }
-CZ = { modifiers = [ "invertible" ] }
-PhaseShift = { modifiers = [ "controllable", "invertible" ] }
-ControlledPhaseShift = { }
-RX = { modifiers = [ "controllable", "invertible" ] }
-RY = { modifiers = [ "controllable", "invertible" ] }
-RZ = { modifiers = [ "controllable", "invertible" ] }
-Rot = { modifiers = [ "controllable", "invertible" ] }
-CRX = { modifiers = [ "invertible" ] }
-CRY = { modifiers = [ "invertible" ] }
-CRZ = { modifiers = [ "invertible" ] }
-CRot = { modifiers = [ "invertible" ] }
-Identity = { modifiers = [ "controllable", "invertible" ] }
-IsingXX = { modifiers = [ "controllable", "invertible" ] }
-IsingYY = { modifiers = [ "controllable", "invertible" ] }
-IsingZZ = { modifiers = [ "controllable", "invertible" ] }
-IsingXY = { modifiers = [ "controllable", "invertible" ] }
+QubitUnitary = { properties = [ "controllable", "invertible"]  }
+PauliX = { properties = [ "controllable", "invertible"] }
+PauliY = { properties = [ "controllable", "invertible"] }
+PauliZ = { properties = [ "controllable", "invertible"] }
+MultiRZ = { properties = [ "controllable", "invertible" ] }
+Hadamard = { properties = [ "controllable", "invertible"] }
+S = { properties = [ "controllable", "invertible" ] }
+T = { properties = [ "controllable", "invertible" ] }
+CNOT = { properties = [ "invertible" ] }
+SWAP = { properties = [ "controllable", "invertible" ] }
+CSWAP = { properties = [ "invertible" ] }
+Toffoli = { properties = [ "controllable", "invertible" ] }
+CY = { properties = [ "invertible" ] }
+CZ = { properties = [ "invertible" ] }
+PhaseShift = { properties = [ "controllable", "invertible" ] }
+ControlledPhaseShift = { properties = [ "controllable", "invertible" ] }
+RX = { properties = [ "controllable", "invertible" ] }
+RY = { properties = [ "controllable", "invertible" ] }
+RZ = { properties = [ "controllable", "invertible" ] }
+Rot = { properties = [ "controllable", "invertible" ] }
+CRX = { properties = [ "invertible" ] }
+CRY = { properties = [ "invertible" ] }
+CRZ = { properties = [ "invertible" ] }
+CRot = { properties = [ "invertible" ] }
+Identity = { properties = [ "controllable", "invertible" ] }
+IsingXX = { properties = [ "controllable", "invertible" ] }
+IsingYY = { properties = [ "controllable", "invertible" ] }
+IsingZZ = { properties = [ "controllable", "invertible" ] }
+IsingXY = { properties = [ "controllable", "invertible" ] }
 
 [operators.gates.decomp]
 
@@ -98,8 +98,6 @@ Count = { condition = [ "finiteshots" ] }
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
-# If the device supports adjoint
-quantum_adjoint = true
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = true
 
