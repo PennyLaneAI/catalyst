@@ -17,6 +17,7 @@ ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
+TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*toml')
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -108,7 +109,10 @@ dummy_device:
 	$(MAKE) -C runtime dummy_device
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
-test: test-runtime test-frontend test-demos
+test: test-runtime test-frontend test-demos test-toml-spec
+
+test-toml-spec:
+	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
 
 test-runtime:
 	$(MAKE) -C runtime test

@@ -2,35 +2,35 @@ schema = 2
 
 [operators.gates.native]
 
-QubitUnitary = { controllable = true }
-PauliX = { controllable = true }
-PauliY = { controllable = true }
-PauliZ = { controllable = true }
-MultiRZ = { controllable = true }
-Hadamard = { controllable = true }
-S = { controllable = true }
-T = { controllable = true }
-CNOT = { }
-SWAP = { controllable = true }
-CSWAP = { }
-Toffoli = { controllable = true }
-CY = { }
-CZ = { }
-PhaseShift = { controllable = true }
+QubitUnitary = { modifiers = [ "controllable", "invertible"]  }
+PauliX = { modifiers = [ "controllable", "invertible"] }
+PauliY = { modifiers = [ "controllable", "invertible"] }
+PauliZ = { modifiers = [ "controllable", "invertible"] }
+MultiRZ = { modifiers = [ "controllable", "invertible" ] }
+Hadamard = { modifiers = [ "controllable", "invertible"] }
+S = { modifiers = [ "controllable", "invertible" ] }
+T = { modifiers = [ "controllable", "invertible" ] }
+CNOT = { modifiers = [ "invertible" ] }
+SWAP = { modifiers = [ "controllable", "invertible" ] }
+CSWAP = { modifiers = [ "invertible" ] }
+Toffoli = { modifiers = [ "controllable", "invertible" ] }
+CY = { modifiers = [ "invertible" ] }
+CZ = { modifiers = [ "invertible" ] }
+PhaseShift = { modifiers = [ "controllable", "invertible" ] }
 ControlledPhaseShift = { }
-RX = { controllable = true }
-RY = { controllable = true }
-RZ = { controllable = true }
-Rot = { controllable = true }
-CRX = { }
-CRY = { }
-CRZ = { }
-CRot = { }
-Identity = { controllable = true }
-IsingXX = { controllable = true }
-IsingYY = { controllable = true }
-IsingZZ = { controllable = true }
-IsingXY = { controllable = true }
+RX = { modifiers = [ "controllable", "invertible" ] }
+RY = { modifiers = [ "controllable", "invertible" ] }
+RZ = { modifiers = [ "controllable", "invertible" ] }
+Rot = { modifiers = [ "controllable", "invertible" ] }
+CRX = { modifiers = [ "invertible" ] }
+CRY = { modifiers = [ "invertible" ] }
+CRZ = { modifiers = [ "invertible" ] }
+CRot = { modifiers = [ "invertible" ] }
+Identity = { modifiers = [ "controllable", "invertible" ] }
+IsingXX = { modifiers = [ "controllable", "invertible" ] }
+IsingYY = { modifiers = [ "controllable", "invertible" ] }
+IsingZZ = { modifiers = [ "controllable", "invertible" ] }
+IsingXY = { modifiers = [ "controllable", "invertible" ] }
 
 [operators.gates.decomp]
 
@@ -85,20 +85,13 @@ SProd = {}
 Prod = {}
 Exp = {}
 
-[measurement_processes.exactshots]
-
-Expval = {}
-Var = {}
-Probs = {}
-State = {}
-
-[measurement_processes.finiteshots]
+[measurement_processes]
 
 Expval = {}
 Var = {}
 Probs = {}
 Sample = {}
-Count = {}
+Count = { condition = [ "finiteshots" ] }
 
 [compilation]
 # If the device is compatible with qjit

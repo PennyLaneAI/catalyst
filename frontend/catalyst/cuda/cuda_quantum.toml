@@ -1,39 +1,26 @@
-schema = 1
-
-[device]
-name = "cuda_quantum"
-
-[operators]
-# Observables supported by the device
-observables = [
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "Hadamard",
-]
+schema = 2
 
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
-[[operators.gates]]
-native = [
-    "CNOT",
-    "CY",
-    "CZ",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "Hadamard",
-    "S",
-    "T",
-    "RX",
-    "RY",
-    "RZ",
-    "SWAP",
-    "CSWAP",
-]
+[operators.gates.native]
+
+CNOT = {}
+CY = {}
+CZ = {}
+CRX = {}
+CRY = {}
+CRZ = {}
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
+S = {}
+T = {}
+RX = {}
+RY = {}
+RZ = {}
+SWAP = {}
+CSWAP = {}
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
@@ -41,14 +28,19 @@ native = [
 # default, but can be useful to express a deviation from this device's regular
 # strategy in PennyLane.
 # Everything else should be decomposed.
-decomp = []
+[operators.gates.decomp]
 
 # Gates which should be translated to QubitUnitary
-matrix = []
+[operators.gates.matrix]
+
+# Observables supported by the device
+[operators.observables]
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
 
 [measurement_processes]
-exactshots = []
-finiteshots = []
 
 [compilation]
 # If the device is compatible with qjit

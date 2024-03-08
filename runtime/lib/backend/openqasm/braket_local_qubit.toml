@@ -4,40 +4,40 @@ schema = 2
 # the device considers "supported" through PennyLane's device API.
 [operators.gates.native]
 
-ISWAP = {}
-PSWAP = {}
-Hadamard = {}
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-S = {}
-T = {}
-CNOT = {}
-CZ = {}
-SWAP = {}
-PhaseShift = {}
-RX = {}
-RY = {}
-RZ = {}
-CSWAP = {}
-QubitUnitary = {}
-MS = {}
-CY = {}
-SX = {}
-AAMS = {}
-ECR = {}
-GPi = {}
-GPi2 = {}
-CPhaseShift00 = {}
-CPhaseShift01 = {}
-CPhaseShift10 = {}
-Identity = {}
-IsingXX = {}
-IsingXY = {}
-IsingYY = {}
-IsingZZ = {}
-Toffoli = {}
-ControlledPhaseShift = {}
+ISWAP = { modifiers = [ "invertible"] }
+PSWAP = { modifiers = [ "invertible"] }
+Hadamard = { modifiers = [ "invertible"] }
+PauliX = { modifiers = [ "invertible"] }
+PauliY = { modifiers = [ "invertible"] }
+PauliZ = { modifiers = [ "invertible"] }
+S = { modifiers = [ "invertible"] }
+T = { modifiers = [ "invertible"] }
+CNOT = { modifiers = [ "invertible"] }
+CZ = { modifiers = [ "invertible"] }
+SWAP = { modifiers = [ "invertible"] }
+PhaseShift = { modifiers = [ "invertible"] }
+RX = { modifiers = [ "invertible"] }
+RY = { modifiers = [ "invertible"] }
+RZ = { modifiers = [ "invertible"] }
+CSWAP = { modifiers = [ "invertible"] }
+QubitUnitary = { modifiers = [ "invertible"] }
+MS = { modifiers = [ "invertible"] }
+CY = { modifiers = [ "invertible"] }
+SX = { modifiers = [ "invertible"] }
+AAMS = { modifiers = [ "invertible"] }
+ECR = { modifiers = [ "invertible"] }
+GPi = { modifiers = [ "invertible"] }
+GPi2 = { modifiers = [ "invertible"] }
+CPhaseShift00 = { modifiers = [ "invertible"] }
+CPhaseShift01 = { modifiers = [ "invertible"] }
+CPhaseShift10 = { modifiers = [ "invertible"] }
+Identity = { modifiers = [ "invertible"] }
+IsingXX = { modifiers = [ "invertible"] }
+IsingXY = { modifiers = [ "invertible"] }
+IsingYY = { modifiers = [ "invertible"] }
+IsingZZ = { modifiers = [ "invertible"] }
+Toffoli = { modifiers = [ "invertible"] }
+ControlledPhaseShift = { modifiers = [ "invertible"] }
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
@@ -59,24 +59,17 @@ Hermitian = {}
 # Tensor,
 Projector = {}
 Sprod = {}
-Hamiltonian = { condition = ['noshots'] }
+Hamiltonian = { condition = [ "finiteshots" ] }
 Sum = {}
 Prod = {}
 
-[measurement_processes.exactshots]
-
-Expval = {}
-Var = {}
-Probs = {}
-State = {}
-
-[measurement_processes.finiteshots]
+[measurement_processes]
 
 Expval = {}
 Var = {}
 Probs = {}
 Sample = {}
-Counts = {}
+Counts = { condition = [ "finiteshots" ] }
 
 [compilation]
 # If the device is compatible with qjit
