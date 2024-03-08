@@ -78,7 +78,7 @@ struct OQCRunner : public OQCRunnerBase {
             optimisations = Tket()
             optimisations.tket_optimizations = TketOptimizations.DefaultMappingPass
 
-            RES_FORMAT = QuantumResultsFormat().binary_count
+            RES_FORMAT = QuantumResultsFormat().binary_count()
 
             try:
                 email = os.environ.get("OQC_EMAIL")
@@ -88,8 +88,8 @@ struct OQCRunner : public OQCRunnerBase {
                 client.authenticate()
                 oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
                 oqc_task = QPUTask(circuit, oqc_config)
-                #counts = client.execute_tasks(oqc_tasks)
-                counts = {'00': 1000, '01': 232, '10': 124, '11':123}
+                res = client.execute_tasks(oqc_task)
+                counts = res[0].result["cbits"]
 
             except Exception as e:
                 print(f"circuit: {circuit}")
