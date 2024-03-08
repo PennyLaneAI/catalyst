@@ -225,85 +225,71 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
-    # These must be present even if empty.
-    operations = []
-    observables = []
-
     operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
-    def _check_mid_circuit_measurement(config):
-        return config["compilation"]["mid_circuit_measurement"]
+    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
+        # We currently override and only set a few gates to preserve existing behaviour.
+        # We could choose to read from config and use the "matrix" gates.
+        # However, that affects differentiability.
+        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
+        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
+        return {"MultiControlledX", "BlockEncode"}
 
     @staticmethod
-    def _check_adjoint(config):
-        return config["compilation"]["quantum_adjoint"]
-
-    @staticmethod
-    def _check_quantum_control(config):
-        return config["compilation"]["quantum_control"]
-
-    @staticmethod
-    def _set_supported_operations(config):
+    def _get_supported_operations(config: TOMLDocument, shots_present) -> Set[str]:
         """Override the set of supported operations."""
-        native_gates = set(config["operators"]["gates"][0]["native"])
-        qir_gates = QJITDeviceNewAPI.operations_supported_by_QIR_runtime
-        QJITDeviceNewAPI.operations = list(native_gates.intersection(qir_gates))
+        # Supported gates of the target PennyLane's device
+        native_gates = get_pennylane_operations(config, shots_present)
+        qir_gates = set.union(
+            QJITDeviceNewAPI.operations_supported_by_QIR_runtime,
+            deduce_native_controlled_gates(QJITDeviceNewAPI.operations_supported_by_QIR_runtime),
+        )
+        supported_gates = list(set.intersection(native_gates, qir_gates))
 
         # These are added unconditionally.
-        QJITDeviceNewAPI.operations += ["Cond", "WhileLoop", "ForLoop"]
+        supported_gates += ["Cond", "WhileLoop", "ForLoop"]
 
-        if QJITDeviceNewAPI._check_mid_circuit_measurement(config):  # pragma: no branch
-            QJITDeviceNewAPI.operations += ["MidCircuitMeasure"]
+        if check_mid_circuit_measurement_flag(config):  # pragma: no branch
+            supported_gates += ["MidCircuitMeasure"]
 
-        if QJITDeviceNewAPI._check_adjoint(config):
-            QJITDeviceNewAPI.operations += ["Adjoint"]
+        if check_adjoint_flag(config):
+            supported_gates += ["Adjoint"]
 
-        if QJITDeviceNewAPI._check_quantum_control(config):  # pragma: nocover
-            # TODO: Once control is added on the frontend.
-            gates_to_be_decomposed_if_controlled = [
-                "Identity",
-                "CNOT",
-                "CY",
-                "CZ",
-                "CSWAP",
-                "CRX",
-                "CRY",
-                "CRZ",
-                "CRot",
-            ]
-            native_controlled_gates = ["ControlledQubitUnitary"] + [
-                f"C({gate})"
-                for gate in native_gates
-                if gate not in gates_to_be_decomposed_if_controlled
-            ]
-            QJITDeviceNewAPI.operations += native_controlled_gates
-
-    @staticmethod
-    def _set_supported_observables(config):
-        """Override the set of supported observables."""
-        QJITDeviceNewAPI.observables = config["operators"]["observables"]
+        supported_gates += ["ControlledQubitUnitary"]
+        return set(supported_gates)
 
     # pylint: disable=too-many-arguments
     def __init__(
         self,
         original_device,
-        config,
-        backend_name=None,
-        backend_lib=None,
-        backend_kwargs=None,
+        target_config: TOMLDocument,
+        backend: Optional[BackendInfo] = None,
     ):
         self.original_device = original_device
 
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
-        self.config = config
-        QJITDeviceNewAPI._set_supported_operations(self.config)
-        QJITDeviceNewAPI._set_supported_observables(self.config)
+        super().__init__(wires=original_device.wires, shots=original_device.shots)
 
-        self.backend_name = backend_name if backend_name else "default"
-        self.backend_lib = backend_lib if backend_lib else ""
-        self.backend_kwargs = backend_kwargs if backend_kwargs else {}
+        self.target_config = target_config
+        self.backend_name = backend.name if backend else "default"
+        self.backend_lib = backend.lpath if backend else ""
+        self.backend_kwargs = backend.kwargs if backend else {}
+
+        shots_present = original_device.shots is not None
+        self._operations = set(self._get_supported_operations(target_config, shots_present))
+        self._observables = set(get_observables(target_config, shots_present))
+
+    @property
+    def operations(self) -> Set[str]:
+        """Get the device operations"""
+        return self._operations
+
+    @property
+    def observables(self) -> Set[str]:
+        """Get the device observables"""
+        return self._observables
 
     def preprocess(
         self,

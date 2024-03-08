@@ -20,6 +20,7 @@ import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.transforms import split_non_commuting
+from catalyst.utils.runtime import device_get_toml_config
 from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
@@ -67,12 +68,12 @@ def test_qjit_device():
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    dev_args = extract_backend_info(device)
-    config, rest = dev_args[0], dev_args[1:]
-    device_qjit = QJITDeviceNewAPI(device, config, *rest)
+    config = device_get_toml_config(device)
+    backend_info = extract_backend_info(device, config)
+    device_qjit = QJITDeviceNewAPI(device, config, backend_info)
 
     # Check attributes of the new device
-    assert isinstance(device_qjit.config, dict)
+    assert isinstance(device_qjit.target_config, dict)
     assert device_qjit.shots == qml.measurements.Shots(2032)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
