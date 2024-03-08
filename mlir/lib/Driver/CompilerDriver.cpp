@@ -404,9 +404,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
-    // TODO: FIXME:
-    // Let's try to enable multithreading. Do not forget to protect the printing.
-    ctx.disableMultithreading();
+    ctx.enableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
