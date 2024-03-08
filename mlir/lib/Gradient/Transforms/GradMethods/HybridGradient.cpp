@@ -625,7 +625,13 @@ func::FuncOp HybridValueAndGradientLoweringExperimental::genFullGradFunction(
         Block *entryBlock = fullGradFn.addEntryBlock();
         rewriter.setInsertionPointToStart(entryBlock);
 
-        SmallVector<Value> backpropResults{gradOp.getNumResults()};
+        // The number of backpropagation results is the same as the number of gradients.
+        // For the GradOp the gradients are exactly the GradOp operation results.
+        // But for the ValueAndGradOp, the ValueAndGradOp results are the values and the gradients
+        // combined. So, instead of using gradOp.getNumResults(), we have to use
+        // gradOp.getGradients().size() specifically.
+
+        SmallVector<Value> backpropResults{gradOp.getGradients().size()};
         // Iterate over the primal results
         for (const auto &[cotangentIdx, primalResult] : llvm::enumerate(callee.getResultTypes())) {
             // There is one Jacobian per distinct differential argument.
