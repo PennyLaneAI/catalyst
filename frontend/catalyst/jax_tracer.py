@@ -715,7 +715,7 @@ def apply_transform(transform_program, tape, flat_results):
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         tapes, post_processing_tuple_out = transform_program([tape])
 
-        def postprocessing(r):
+        def post_processing(r):
             retval = post_processing_tuple_out(r)
             return retval[0]
 
