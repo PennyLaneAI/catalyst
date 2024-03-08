@@ -62,23 +62,6 @@ std::string joinPasses(const Pipeline::PassList &passes)
     return joined;
 }
 
-struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
-    typedef std::function<LogicalResult(Pass *, PrintCallbackFn print)> PrintHandler;
-    PrintHandler printHandler;
-
-    CatalystIRPrinterConfig(PrintHandler printHandler)
-        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler)
-    {
-    }
-
-    void printAfterIfEnabled(Pass *pass, Operation *operation, PrintCallbackFn printCallback) final
-    {
-        if (failed(printHandler(pass, printCallback))) {
-            operation->emitError("IR printing failed");
-        }
-    }
-};
-
 struct CatalystPassInstrumentation : public PassInstrumentation {
     typedef std::function<void(Pass *pass, Operation *operation)> Callback;
     Callback afterPassCallback;
