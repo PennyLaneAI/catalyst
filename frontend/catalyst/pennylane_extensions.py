@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
+import inspect
 import numbers
 import pathlib
 from collections.abc import Sequence, Sized
@@ -2450,15 +2451,19 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
 
 def callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
 
-    import inspect
-
+    At the moment, this is a stub.
+    We can also use here isTracing to only bind with the callback while it is tracing,
+    otherwise, call the function itself.
+    """
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
     @wraps(func)
     def bind_callback(*args, **kwargs):
-        callback_implementation(func, retty)
+        callback_implementation(func, retty, **args, **kwargs)
 
     return bind_callback
 
