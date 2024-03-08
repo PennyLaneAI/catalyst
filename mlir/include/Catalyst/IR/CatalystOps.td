@@ -114,11 +114,12 @@ def PythonCallOp: Catalyst_Op<"pycallback",
   }];
 
   let arguments = (ins
+        Variadic<AnyType>:$inputs,
         I64Attr: $identifier
   );
 
   let assemblyFormat = [{
-    attr-dict
+    `(` $inputs `)` attr-dict `:` functional-type(operands, results)
   }];
 }
 
