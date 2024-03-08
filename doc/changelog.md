@@ -39,13 +39,17 @@
 * Fix the issue of triggering the C++ compiler driver twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
+* Fixes adjoint lowering bug that did not take into account control wires.
+  [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
-Romain Moyard.
+Romain Moyard,
+Erick Ochoa Lopez.
 
 # Release 0.5.0
 
