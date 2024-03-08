@@ -32,6 +32,9 @@
   Note that returning different *kinds* of results, like different observables or differently
   shaped arrays, is not possible.
 
+* Multi-threaded compilation is re-enabled.
+  [(#595)](https://github.com/PennyLaneAI/catalyst/pull/595)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
