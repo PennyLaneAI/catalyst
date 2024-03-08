@@ -39,6 +39,9 @@
 * Fix the issue of triggering the C++ compiler driver twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
+* Adds lowering pass for `shape` dialect. Allowing for a greater set of programs to be compiled.
+  [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
