@@ -107,58 +107,38 @@ class Timer {
         const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
 
         std::cerr << "[TIMER] Running " << name;
-        std::cerr << "\t wall-time: " << wall_elapsed << "ms";
-        std::cerr << "\t cpu-time: " << cpu_elapsed << "ms";
+        std::cerr << "\t walltime: " << wall_elapsed << "ms";
+        std::cerr << "\t cputime: " << cpu_elapsed << "ms";
         std::cerr << std::endl;
     }
 
-    void store(const std::string &name, const std::string &key,
-               const std::filesystem::path &file_path)
+    void store(const std::string &name, const std::filesystem::path &file_path)
     {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
         const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
-        // Get the hash of id as there is no conversion from id to size_t (or string)
-        const auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-        // Create YAML headers with key and thread-id conditionally
-        const auto header = key + " (thread_id=" + std::to_string(id) + ")";
 
         if (!std::filesystem::exists(file_path)) {
             std::ofstream ofile(file_path);
             assert(ofile.is_open() && "Invalid file to store timer results");
-            ofile << header << ":" << std::endl;
-            ofile << "  - " << name << "\t wall-time: " << wall_elapsed << "ms";
-            ofile << "\t cpu-time: " << cpu_elapsed << "ms";
-            ofile << std::endl;
+            ofile << "        - " << name << "\n";
+            ofile << "          walltime: " << wall_elapsed << "\n";
+            ofile << "          cputime: " << cpu_elapsed << "\n";
             ofile.close();
             return;
         }
         // else
-        // First, check if the header is in the file
-        std::ifstream ifile(file_path);
-        assert(ifile.is_open() && "Invalid file to store timer results");
-        std::string line;
-        bool add_header = true;
-        while (add_header && std::getline(ifile, line)) {
-            if (line.find(header) != std::string::npos) {
-                add_header = false;
-            }
-        }
-        ifile.close();
 
         // Second, update the file
         std::ofstream ofile(file_path, std::ios::app);
         assert(ofile.is_open() && "Invalid file to store timer results");
-        if (add_header) {
-            ofile << header << ":" << std::endl;
-        }
-        ofile << "  - " << name << "\t wall-time: " << wall_elapsed << "ms";
-        ofile << "\t cpu-time: " << cpu_elapsed << "ms";
-        ofile << std::endl;
+        ofile << "        - " << name << "\n";
+        ofile << "          walltime: " << wall_elapsed << "\n";
+        ofile << "          cputime: " << cpu_elapsed << "\n";
         ofile.close();
     }
 
-    void dump(const std::string &name, const std::string &key)
+    void dump(const std::string &name)
     {
         if (!debug_timer) {
             return;
@@ -170,12 +150,11 @@ class Timer {
             return;
         }
         // else
-        store(name, key, std::filesystem::path{file});
+        store(name, std::filesystem::path{file});
     }
 
     template <typename Function, typename... Args>
-    static auto timer(Function func, const std::string &name, const std::string &key,
-                      Args &&...args)
+    static auto timer(Function func, const std::string &name, Args &&...args)
     {
         if (!enable_debug_timer()) {
             return func(std::forward<Args>(args)...);
@@ -185,7 +164,7 @@ class Timer {
 
         timer.start();
         auto &&result = func(std::forward<Args>(args)...);
-        timer.dump(name, key);
+        timer.dump(name);
 
         return result;
     }

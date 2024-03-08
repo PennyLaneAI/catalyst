@@ -226,7 +226,7 @@ void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
-    capi_timer.dump("device_init", "RuntimeCAPI");
+    capi_timer.dump("device_init");
 }
 
 void __catalyst__rt__device_release()
@@ -236,7 +236,7 @@ void __catalyst__rt__device_release()
     RT_FAIL_IF(!CTX, "Cannot release an ACTIVE device out of scope of the global driver");
     // TODO: This will be used for the async support
     deactivateDevice();
-    capi_timer.dump("device_release", "RuntimeCAPI");
+    capi_timer.dump("device_release");
 }
 
 void __catalyst__rt__print_state() { Catalyst::Runtime::getQuantumDevicePtr()->PrintState(); }
@@ -263,7 +263,7 @@ QUBIT *__catalyst__rt__qubit_allocate()
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
 
-    capi_timer.dump("qubit_allocate", "RuntimeCAPI");
+    capi_timer.dump("qubit_allocate");
     return reinterpret_cast<QUBIT *>(getQuantumDevicePtr()->AllocateQubit());
 }
 
@@ -284,7 +284,7 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
     // I don't like this copying.
     std::vector<QubitIdType> *qubit_vector_ptr =
         new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.end());
-    capi_timer.dump("qubit_allocate_array", "RuntimeCAPI");
+    capi_timer.dump("qubit_allocate_array");
 
     // Because this function is interfacing with C
     // I think we should return a trivial-type
@@ -305,7 +305,7 @@ void __catalyst__rt__qubit_release(QUBIT *qubit)
     using namespace Catalyst::Runtime;
     capi_timer.start();
     return getQuantumDevicePtr()->ReleaseQubit(reinterpret_cast<QubitIdType>(qubit));
-    capi_timer.dump("qubit_release", "RuntimeCAPI");
+    capi_timer.dump("qubit_release");
 }
 
 void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
@@ -316,7 +316,7 @@ void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
     delete qubit_array_ptr;
-    capi_timer.dump("qubit_release_array", "RuntimeCAPI");
+    capi_timer.dump("qubit_release_array");
 }
 
 int64_t __catalyst__rt__num_qubits()

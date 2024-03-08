@@ -54,18 +54,52 @@ using namespace catalyst::driver;
 
 namespace catalyst::utils {
 
-void bufferSizeCounts(const llvm::SourceMgr &sourceMgr)
+inline bool enable_debug_info()
 {
-    for (size_t i = 1; i <= sourceMgr.getNumBuffers(); i++) {
-        auto *buffer = sourceMgr.getMemoryBuffer(i);
-        if (buffer) {
-            llvm::StringRef bufferContent = buffer->getBuffer();
-            std::string bufferString = bufferContent.str();
-            auto num_lines = std::count(bufferString.begin(), bufferString.end(), '\n');
-            std::cerr << "BufferNo: " << i << "\n"
-                      << "BufferSize: " << num_lines << std::endl;
-        }
+    char *value = getenv("ENABLE_DEBUG_INFO");
+    if (!value || std::string(value) != "ON") {
+        return false;
     }
+    return true;
+}
+
+void opLinesCount(Operation *op, const std::string &pipelineName)
+{
+    if (!enable_debug_info()) {
+        return;
+    }
+    std::string opStrBef;
+    llvm::raw_string_ostream ofile{opStrBef};
+    ofile << *op;
+    auto num_lines = std::count(opStrBef.begin(), opStrBef.end(), '\n');
+    std::cerr << "[DEBUG] After " << pipelineName << "\t program-size: " << num_lines << std::endl;
+}
+
+void moduleOpLinesCount(const ModuleOp &op, const std::string &name)
+{
+    if (!enable_debug_info()) {
+        return;
+    }
+    std::string modStrBef;
+    llvm::raw_string_ostream rawStrBef{modStrBef};
+    op->print(rawStrBef);
+    modStrBef = rawStrBef.str();
+    auto num_lines = std::count(modStrBef.begin(), modStrBef.end(), '\n');
+    std::cerr << "[DEBUG] After " << name << "\t program-size: " << num_lines << std::endl;
+}
+
+void moduleLinesCount(const llvm::Module &llvmModule, const std::string &name)
+{
+    if (!enable_debug_info()) {
+        return;
+    }
+
+    std::string modStrBef;
+    llvm::raw_string_ostream rawStrBef{modStrBef};
+    llvmModule.print(rawStrBef, nullptr);
+    modStrBef = rawStrBef.str();
+    auto num_lines = std::count(modStrBef.begin(), modStrBef.end(), '\n');
+    std::cerr << "[DEBUG] After " << name << "\t program-size: " << num_lines << std::endl;
 }
 
 } // namespace catalyst::utils
@@ -368,10 +402,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     // For each pipeline-terminating pass, print the IR into the corresponding dump file and
     // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
-        if (!options.keepIntermediate)
-            return;
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
+            catalyst::utils::opLinesCount(op, res->second);
+        }
+
+        if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
             auto pipelineName = res->second;
             llvm::raw_string_ostream s{outputs[pipelineName]};
             s << *op;
@@ -409,7 +445,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
     using timer = catalyst::utils::Timer;
-    const std::string timer_key{"CompilerDriver"};
 
     DialectRegistry registry;
     static bool initialized = false;
@@ -441,26 +476,26 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
-    OwningOpRef<ModuleOp> op =
-        timer::timer(parseMLIRSource, "parseMLIRSource", timer_key, &ctx, *sourceMgr);
+    OwningOpRef<ModuleOp> op = timer::timer(parseMLIRSource, "parseMLIRSource", &ctx, *sourceMgr);
+    catalyst::utils::moduleOpLinesCount(op.get(), "parseMLIRSource");
 
     if (op) {
-        if (failed(
-                timer::timer(runLowering, "runLowering", timer_key, options, &ctx, *op, output))) {
+        if (failed(timer::timer(runLowering, "runPasses", options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
 
-        output.outIR.clear();
-        outIRStream << *op;
+        catalyst::utils::moduleOpLinesCount(op.get(), "runPasses");
 
         if (options.lowerToLLVM) {
-            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR", timer_key,
-                                      *op, llvmContext, "LLVMDialectModule");
+            llvmModule = timer::timer(translateModuleToLLVMIR, "ModuleToLLVMIR", *op, llvmContext,
+                                      "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
             }
+
+            catalyst::utils::moduleLinesCount(*llvmModule, "ModuleToLLVMIR");
 
             if (options.keepIntermediate) {
                 dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
@@ -471,8 +506,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent,
                "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
-        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", timer_key, llvmContext,
-                                  options.source, options.moduleName, err);
+        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", llvmContext, options.source,
+                                  options.moduleName, err);
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
@@ -482,15 +517,17 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", timer_key, options, llvmModule,
-                                output))) {
+        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", options, llvmModule, output))) {
             return failure();
         }
 
-        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", timer_key, options, llvmModule,
-                                output))) {
+        catalyst::utils::moduleLinesCount(*llvmModule.get(), "runLLVMPasses");
+
+        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", options, llvmModule, output))) {
             return failure();
         }
+
+        catalyst::utils::moduleLinesCount(*llvmModule.get(), "runEnzymePasses");
 
         output.outIR.clear();
         outIRStream << *llvmModule;
@@ -508,8 +545,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             // element type. This is because the LLVM pointer type is
             // opaque and requires looking into its uses to infer its type.
             SmallVector<RankedTensorType> returnTypes;
-            if (failed(inferMLIRReturnTypes(&ctx, function.value()->getReturnType(),
-                                            Float64Type::get(&ctx), returnTypes))) {
+            if (failed(timer::timer(inferMLIRReturnTypes, "inferMLIRReturn", &ctx,
+                                    function.value()->getReturnType(), Float64Type::get(&ctx),
+                                    returnTypes))) {
                 // Inferred return types are only required when compiling from textual IR. This
                 // inference failing is not a problem when compiling from Python.
                 CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");
@@ -529,7 +567,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         auto outfile = options.getObjectFile();
-        if (failed(compileObjectFile(options, std::move(llvmModule), outfile))) {
+        if (failed(timer::timer(compileObjectFile, "compileObjFile", options, std::move(llvmModule),
+                                outfile))) {
             return failure();
         }
         output.objectFilename = outfile;
