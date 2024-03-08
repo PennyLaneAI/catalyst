@@ -88,6 +88,11 @@ def test_qjit_device():
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
         device_qjit.execute(10, 2)
 
+    assert isinstance(device_qjit.operations, set)
+    assert len(device_qjit.operations) > 0
+    assert isinstance(device_qjit.observables, set)
+    assert len(device_qjit.observables) > 0
+
 
 @pytest.mark.skipif(
     not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
