@@ -252,7 +252,6 @@ jobs:
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
-    # TODO: Update git tag to v0.35.0 after the next lightning release.
     - name: Build Catalyst-Runtime
       run: |
         # Segfaults in computing Lightning's adjoint-jacobian when building with OMP

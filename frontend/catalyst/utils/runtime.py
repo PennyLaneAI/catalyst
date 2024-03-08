@@ -261,7 +261,11 @@ def extract_backend_info(device):
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        device_kwargs["shots"] = device.shots if device.shots else 0
+        if isinstance(device, qml.Device):
+            device_kwargs["shots"] = device.shots if device.shots else 0
+        else:
+            # TODO: support shot vectors
+            device_kwargs["shots"] = device.shots.total_shots if device.shots else 0
 
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname

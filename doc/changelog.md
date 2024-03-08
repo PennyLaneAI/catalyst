@@ -4,6 +4,34 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now supports devices built from the 
+  [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
+  [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
+
+* Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
+  functions.
+  [(#583)](https://github.com/PennyLaneAI/catalyst/pull/583)
+
+  The following is now possible:
+
+  ```py
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def f(x: float):
+    qml.RY(x, wires=0)
+
+    m = measure(0)
+    if not m:
+        return qml.expval(qml.PauliZ(0))
+
+    ...
+
+    return qml.expval(qml.PauliZ(0))
+  ```
+
+  Note that returning different *kinds* of results, like different observables or differently
+  shaped arrays, is not possible.
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -11,6 +39,9 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+David Ittah,
+Romain Moyard.
 
 # Release 0.5.0
 
@@ -220,6 +251,7 @@ This release contains contributions from (in alphabetical order):
       qml.ISWAP(wires=[1, 0])
       return qml.probs()
   ```
+
 * Add support for `GlobalPhase` gate in the runtime.
   [(#563)](https://github.com/PennyLaneAI/catalyst/pull/563)
 
