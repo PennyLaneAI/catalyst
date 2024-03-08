@@ -487,6 +487,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         catalyst::utils::moduleOpLinesCount(op.get(), "runPasses");
 
+        output.outIR.clear();
+        outIRStream << *op;
+
         if (options.lowerToLLVM) {
             llvmModule = timer::timer(translateModuleToLLVMIR, "ModuleToLLVMIR", *op, llvmContext,
                                       "LLVMDialectModule");
