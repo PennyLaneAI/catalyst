@@ -82,6 +82,27 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     }
 };
 
+struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PythonCallOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        // Add bufferized arguments
+        SmallVector<Value> bufferArgs;
+        ValueRange operands = adaptor.getOperands();
+        for (Value operand : operands) {
+            bufferArgs.push_back(operand);
+        }
+
+        // Create an updated custom call operation
+        auto newPythonCall = rewriter.create<PythonCallOp>(
+            op->getLoc(), bufferArgs, adaptor.getIdentifier(), adaptor.getNumberOriginalArg());
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -89,6 +110,7 @@ namespace catalyst {
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizePythonCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
 }
 

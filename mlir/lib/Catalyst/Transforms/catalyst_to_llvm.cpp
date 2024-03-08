@@ -449,10 +449,11 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
 
         auto identAttr = op.getIdentifier();
         auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
+        auto argcAttr = op.getNumberOriginalArg();
+        auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcAttr));
+
         SmallVector<Value> callArgs{ident};
-        size_t size = op.getInputs().size();
-        auto sizeVal = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(size));
-        callArgs.insert(callArgs.end(), sizeVal);
+        callArgs.insert(callArgs.end(), argc);
         callArgs.insert(callArgs.end(), adaptor.getInputs().begin(), adaptor.getInputs().end());
         rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
         rewriter.eraseOp(op);
