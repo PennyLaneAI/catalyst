@@ -96,8 +96,11 @@ struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
         }
 
         // Create an updated custom call operation
-        auto newPythonCall = rewriter.create<PythonCallOp>(
-            op->getLoc(), bufferArgs, adaptor.getIdentifier(), adaptor.getNumberOriginalArg());
+        // auto newPythonCall = rewriter.create<PythonCallOp>(
+        //    op->getLoc(), bufferArgs, adaptor.getIdentifier());
+        auto newCall =
+            rewriter.create<PythonCallOp>(op.getLoc(), bufferArgs, adaptor.getIdentifier());
+        op.emitRemark() << newCall;
         rewriter.eraseOp(op);
         return success();
     }

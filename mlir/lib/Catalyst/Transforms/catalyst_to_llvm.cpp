@@ -450,7 +450,8 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         auto identAttr = op.getIdentifier();
         auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
         auto argcAttr = op.getNumberOriginalArg();
-        auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcAttr));
+        auto argc = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(argcAttr ? argcAttr.value() : 0));
 
         SmallVector<Value> callArgs{ident};
         callArgs.insert(callArgs.end(), argc);

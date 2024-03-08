@@ -116,7 +116,7 @@ def PythonCallOp: Catalyst_Op<"pycallback",
   let arguments = (ins
         Variadic<AnyType>:$inputs,
         I64Attr: $identifier,
-        I64Attr: $number_original_arg
+        OptionalAttr<I64Attr>: $number_original_arg
   );
 
   let builders = [
