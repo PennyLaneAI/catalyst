@@ -173,7 +173,7 @@ def test_get_native_gates_schema2():
 def test_get_native_gates_schema2_optional_shots():
     """Test native gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:
-        test_deduced_gates = {"TestNativeGate"}
+        test_deduced_gates = {"TestNativeGate1"}
 
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
@@ -182,7 +182,8 @@ def test_get_native_gates_schema2_optional_shots():
                     r"""
                         schema = 2
                         [operators.gates.native]
-                        TestNativeGate = { condition = ['finiteshots'] }
+                        TestNativeGate1 = { condition = ['finiteshots'] }
+                        TestNativeGate2 = { condition = ['analytic'] }
                     """
                 )
             )
@@ -194,6 +195,7 @@ def test_get_native_gates_schema2_optional_shots():
 def test_get_native_gates_schema2_optional_noshots():
     """Test native gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:
+        test_deduced_gates = {"TestNativeGate2"}
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
             f.write(
@@ -201,13 +203,14 @@ def test_get_native_gates_schema2_optional_noshots():
                     r"""
                         schema = 2
                         [operators.gates.native]
-                        TestNativeGate = { condition = ['analytic'] }
+                        TestNativeGate1 = { condition = ['finiteshots'] }
+                        TestNativeGate2 = { condition = ['analytic'] }
                     """
                 )
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert set() == get_pennylane_operations(config, True)
+    assert test_deduced_gates == get_pennylane_operations(config, False)
 
 
 def test_get_decomp_gates_schema1():
