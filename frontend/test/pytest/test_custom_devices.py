@@ -21,6 +21,7 @@ import pytest
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -122,6 +123,7 @@ def test_custom_device_load():
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
+            self._option1 = 42
 
         def apply(self, operations, **kwargs):
             """Unused"""
@@ -135,8 +137,14 @@ def test_custom_device_load():
 
             return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
+    device = DummyDevice(wires=1)
+    config = device_get_toml_config(device)
+    backend_info = extract_backend_info(device, config)
+    assert backend_info.kwargs["option1"] == 42
+    assert "option2" not in backend_info.kwargs
+
     @qjit
-    @qml.qnode(DummyDevice(wires=1))
+    @qml.qnode(device)
     def f():
         """This function would normally return False.
         However, DummyDevice as defined in libdummy_device.so
