@@ -139,7 +139,7 @@ def test_get_native_gates_schema2():
                     r"""
                         schema = 2
                         [operators.gates.native]
-                        TestNativeGate1 = { controllable = true }
+                        TestNativeGate1 = { properties = [ 'controllable' ] }
                         TestNativeGate2 = { }
                     """
                 )
@@ -161,7 +161,7 @@ def test_get_native_gates_schema2_optional_shots():
                     r"""
                         schema = 2
                         [operators.gates.native]
-                        TestNativeGate = { condition = ['shots'] }
+                        TestNativeGate = { condition = ['finiteshots'] }
                     """
                 )
             )
@@ -180,7 +180,7 @@ def test_get_native_gates_schema2_optional_noshots():
                     r"""
                         schema = 2
                         [operators.gates.native]
-                        TestNativeGate = { condition = ['noshots'] }
+                        TestNativeGate = { condition = ['analytic'] }
                     """
                 )
             )
@@ -291,7 +291,55 @@ def test_check_full_overlap():
         check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "B", "Adjoint(Y)"})
 
 
-def test_config_finiteshots_analytic():
+def test_config_invalid_attr():
+    """Check the gate condition handling logic"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 2
+                        [operators.gates.native]
+                        TestGate = { unknown_attribute = 33 }
+                    """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+        with pytest.raises(
+            CompileError, match="Configuration for gate 'TestGate' has unknown attribute"
+        ):
+            get_native_gates(config, True)
+
+
+def test_config_invalid_condition_unknown():
+    """Check the gate condition handling logic"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 2
+                        [operators.gates.native]
+                        TestGate = { condition = ["unknown", "analytic"] }
+                    """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+        with pytest.raises(
+            CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
+        ):
+            get_native_gates(config, True)
+
+
+def test_config_invalid_condition_duplicate():
     """Check the gate condition handling logic"""
     with TemporaryDirectory() as d:
         toml_file = join(d, "test.toml")
@@ -309,10 +357,10 @@ def test_config_finiteshots_analytic():
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
 
-        with pytest.raises(CompileError, match="Gate 'TestGate' condition"):
+        with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
             get_native_gates(config, True)
 
-        with pytest.raises(CompileError, match="Gate 'TestGate' condition"):
+        with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
             get_native_gates(config, False)
 
 

@@ -75,11 +75,23 @@ def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dic
     iterable = reduce(lambda x, y: x[y], path, config)
     gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
     for g, values in gen:
+        unknown_props = set(values) - {"condition", "properties"}
+        if len(unknown_props) > 0:
+            raise CompileError(
+                f"Configuration for gate '{str(g)}' has unknown attribute: {list(unknown_props)}"
+            )
         if "condition" in values:
             conditions = values["condition"]
+            unknown_conditions = set(conditions) - {analytic, finiteshots}
+            if len(unknown_conditions) > 0:
+                raise CompileError(
+                    f"Configuration for gate '{str(g)}' has unknown conditions: "
+                    f"{list(unknown_conditions)}"
+                )
             if all(c in conditions for c in [analytic, finiteshots]):
                 raise CompileError(
-                    f"Gate '{g}' condition can not contain both `{finiteshots}` and `{analytic}`"
+                    f"Configuration for gate '{g}' can not contain both "
+                    f"`{finiteshots}` and `{analytic}` conditions simultaniosly"
                 )
             if analytic in conditions and not shots_present:
                 gates[g] = values

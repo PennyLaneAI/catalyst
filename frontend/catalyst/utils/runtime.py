@@ -116,7 +116,7 @@ def get_pennylane_operations(config: TOMLDocument, shots_present: bool) -> Set[s
         native_gates = get_native_gates(config, shots_present)
         for gate, attrs in native_gates.items():
             gates_PL.add(f"{gate}")
-            if attrs.get("controllable", False):
+            if "controllable" in attrs.get("properties", {}):
                 gates_PL.add(f"C({gate})")
 
     else:
