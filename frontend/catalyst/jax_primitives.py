@@ -235,7 +235,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    import registry  # # pylint: disable=import-outside-toplevel
+    import registry  # pylint: disable=import-outside-toplevel
 
     callback_id = registry.register(callback)
 
