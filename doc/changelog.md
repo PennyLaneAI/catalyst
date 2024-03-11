@@ -42,13 +42,21 @@
 * Fix return type for transforms. Instead of returning a 1-element tuple, return the element.
   [(#574)](https://github.com/PennyLaneAI/catalyst/pull/574)
 
+* Adds lowering pass for `shape` operations. This allows programs with `jnp.reshape` to succeed.
+  Some templates may use `jnp.reshape`.
+  [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
+
+* Fixes adjoint lowering bug that did not take into account control wires.
+  [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
-Romain Moyard.
+Romain Moyard,
+Erick Ochoa Lopez.
 
 # Release 0.5.0
 

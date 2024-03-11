@@ -557,5 +557,27 @@ def test_adjoint_wires_controlflow(backend):
     assert circuit() == qml.wires.Wires([0])
 
 
+def test_adjoint_ctrl_ctrl_subroutine(backend):
+    """https://github.com/PennyLaneAI/catalyst/issues/589"""
+
+    def subsubroutine():
+        qml.ctrl(qml.PhaseShift, control=2)(0.1, wires=3)
+
+    def subroutine():
+        subsubroutine()
+        qml.adjoint(qml.ctrl(subsubroutine, control=0))()
+
+    dev = qml.device(backend, wires=4, shots=500)
+
+    @qml.qnode(dev)
+    def circuit():
+        qml.adjoint(subroutine)()
+        return qml.probs(wires=dev.wires)
+
+    expected = circuit()
+    observed = qjit(circuit)()
+    assert_allclose(expected, observed)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
