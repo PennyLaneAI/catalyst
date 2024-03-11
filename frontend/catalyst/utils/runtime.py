@@ -246,7 +246,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         pass
 
 
-def device_get_toml_config(device, toml_file_name=None) -> Path:
+def device_get_toml_config(device) -> Path:
     """Temporary function. This function adds the `config` field to devices containing the path to
     it's TOML configuration file.
     TODO: Remove this function when `qml.Device`s are guaranteed to have their own
@@ -261,8 +261,7 @@ def device_get_toml_config(device, toml_file_name=None) -> Path:
 
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
-        if toml_file_name is None:
-            toml_file_name = name.replace(".", "_") + ".toml"
+        toml_file_name = name.replace(".", "_") + ".toml"
         # And they are currently saved in the following directory.
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
 
