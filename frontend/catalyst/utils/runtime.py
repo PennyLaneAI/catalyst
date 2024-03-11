@@ -225,10 +225,10 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     # Add missing Projector gate to the kokkos device.
     # TODO: remove once the PennyLane lightning toml files are updates
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.Device):  # pragma: nocover
         if device.short_name == "lightning.kokkos":
             observables.update({"Projector"})
-    else:
+    else:  # pragma: nocover
         if device.name == "lightning.kokkos":
             observables.update({"Projector"})
 
