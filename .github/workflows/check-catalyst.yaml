@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev python3 python3-pip
+          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           python3 -m pip install pybind11
 
       - name: Build Catalyst-Runtime
@@ -623,7 +623,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov python3 python3-pip
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
           python3 -m pip install pybind11
 
       - name: Build Runtime test suite for Lightning simulator
