@@ -32,7 +32,7 @@ except ImportError as e:
 
 parser = Lark(
     dedent(
-        '''
+        """
         start: schema_body \
                gates_native_section \
                gates_decomp_section \
@@ -65,7 +65,7 @@ parser = Lark(
         %import common.WS
         %ignore WS
         %ignore COMMENT
-        '''
+        """
     )
 )
 
