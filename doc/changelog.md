@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now validates quantum devices against their Toml configs. A new Toml config schema 2 is
+  recognized allowing device authors to describe their devices more accurately.
+  [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
+
 * Catalyst now supports devices built from the 
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
@@ -48,8 +52,9 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Erick Ochoa Lopez,
 Romain Moyard,
-Erick Ochoa Lopez.
+Sergei Mironov.
 
 # Release 0.5.0
 
