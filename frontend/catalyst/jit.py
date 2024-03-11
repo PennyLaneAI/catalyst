@@ -45,6 +45,7 @@ from catalyst.utils.c_template import mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
+from catalyst.utils.instruments import instrument
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -184,6 +185,7 @@ class QJIT:
 
     # Processing Stages #
 
+    @instrument
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         processed_fn = self.original_function
@@ -193,6 +195,7 @@ class QJIT:
 
         return processed_fn
 
+    @instrument
     def capture(self, args):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
@@ -223,6 +226,7 @@ class QJIT:
 
         return jaxpr, treedef, dynamic_sig
 
+    @instrument
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
 
@@ -246,6 +250,7 @@ class QJIT:
 
         return mlir_module, mlir_string
 
+    @instrument
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
 
@@ -273,6 +278,7 @@ class QJIT:
 
         return compiled_fn, llvm_ir
 
+    @instrument
     def run(self, args, kwargs):
         """Invoke a previously compiled function with the supplied arguments.
 
