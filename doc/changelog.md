@@ -44,6 +44,10 @@
 * Fix the issue of triggering the C++ compiler driver twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
+* Adds lowering pass for `shape` operations. This allows programs with `jnp.reshape` to succeed.
+  Some templates may use `jnp.reshape`.
+  [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
+
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
