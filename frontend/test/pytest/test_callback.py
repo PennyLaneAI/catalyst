@@ -30,6 +30,9 @@ def test_callback_no_returns_no_params(capsys):
         my_callback()
         return None
 
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
     cir()
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
@@ -47,6 +50,9 @@ def test_callback_twice(capsys):
         my_callback()
         return None
 
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
     cir()
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
@@ -55,6 +61,9 @@ def test_callback_twice(capsys):
     def cir2():
         my_callback()
         return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
 
     cir2()
     captured = capsys.readouterr()
