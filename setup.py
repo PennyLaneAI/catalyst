@@ -40,7 +40,7 @@ try:
         .decode()
         .strip()
     )
-except Exception:  # pylint: disable=broad-exception-caught
+except Exception:  # pylint: disable=broad-exception-caught  # pragma: no cover
     REVISION = None
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:

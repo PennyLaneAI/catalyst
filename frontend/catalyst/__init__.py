@@ -50,9 +50,9 @@ try:
             .decode()
             .strip()
         )
-except Exception:  # pylint: disable=broad-exception-caught
+except Exception:  # pylint: disable=broad-exception-caught  # pragma: no cover
     # Revision was not determined
-    __revision__ = None  # pragma: no cover
+    __revision__ = None
 
 if not INSTALLED:
     import os
