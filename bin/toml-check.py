@@ -32,36 +32,40 @@ except ImportError as e:
 
 parser = Lark(
     dedent(
-        """
-    start: schema_body \
-           gates_native_section \
-           gates_decomp_section \
-           gates_matrix_section \
-           gates_observables_section \
-           measurement_processes_section \
-           compilation_section
-    schema_body: schema_decl -> schema
-    gates_native_section: "[operators.gates.native]" gate_decls -> native
-    gates_decomp_section: "[operators.gates.decomp]" gate_decls -> decomp
-    gates_matrix_section: "[operators.gates.matrix]" gate_decls -> matrix
-    gates_observables_section: "[operators.observables]" gate_decls -> observables
-    measurement_processes_section: "[measurement_processes]" gate_decls -> measurement
-    compilation_section: "[compilation]" flag_decl* -> compilation
-    schema_decl: "schema" "=" "2"
-    gate_decls: (gate_decl)*
-    gate_decl: /[a-zA-Z0-9_]+/ "=" "{" (gate_trait ("," gate_trait)*)? "}"
-    gate_trait: gate_condition | gate_properties
-    gate_condition: "condition" "=" "[" ( "\\"finiteshots\\"" | "\\"analytic\\"" ) "]"
-    gate_properties: "properties" "=" "[" gate_property ("," gate_property)* "]"
-    gate_property: "\\"controllable\\"" | "\\"invertible\\"" | "\\"differentiable\\""
-    flag_decl: ( "qjit_compatible" | "runtime_code_generation" | \
-                 "mid_circuit_measurement" | "dynamic_qubit_management" ) "=" boolean
-    boolean: "true" | "false"
-    COMMENT: "#" /./*
-    %import common.WS
-    %ignore WS
-    %ignore COMMENT
-    """
+        '''
+        start: schema_body \
+               gates_native_section \
+               gates_decomp_section \
+               gates_matrix_section \
+               gates_observables_section \
+               measurement_processes_section \
+               compilation_section \
+               options_section?
+        schema_body: schema_decl
+        gates_native_section: "[operators.gates.native]" gate_decls
+        gates_decomp_section: "[operators.gates.decomp]" gate_decls
+        gates_matrix_section: "[operators.gates.matrix]" gate_decls
+        gates_observables_section: "[operators.observables]" gate_decls
+        measurement_processes_section: "[measurement_processes]" gate_decls
+        compilation_section: "[compilation]" flag_decl*
+        options_section: "[options]" option_decl*
+        schema_decl: "schema" "=" "2"
+        gate_decls: (gate_decl)*
+        gate_decl: name "=" "{" (gate_trait ("," gate_trait)*)? "}"
+        gate_trait: gate_condition | gate_properties
+        gate_condition: "condition" "=" "[" ( "\\"finiteshots\\"" | "\\"analytic\\"" ) "]"
+        gate_properties: "properties" "=" "[" gate_property ("," gate_property)* "]"
+        gate_property: "\\"controllable\\"" | "\\"invertible\\"" | "\\"differentiable\\""
+        flag_decl: ( "qjit_compatible" | "runtime_code_generation" | \
+                     "mid_circuit_measurement" | "dynamic_qubit_management" ) "=" boolean
+        option_decl: name "=" (name | "\\"" name "\\"")
+        name: /[a-zA-Z0-9_]+/
+        boolean: "true" | "false"
+        COMMENT: "#" /./*
+        %import common.WS
+        %ignore WS
+        %ignore COMMENT
+        '''
     )
 )
 

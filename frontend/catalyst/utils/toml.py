@@ -52,9 +52,20 @@ def check_mid_circuit_measurement_flag(config: TOMLDocument) -> bool:
     return bool(config.get("compilation", {}).get("mid_circuit_measurement", False))
 
 
-def check_adjoint_flag(config: TOMLDocument) -> bool:
-    """Check the global adjoint flag"""
-    return bool(config.get("compilation", {}).get("quantum_adjoint", False))
+def check_adjoint_flag(config: TOMLDocument, shots_present: bool) -> bool:
+    """Check the global adjoint flag for toml schema 1. For newer schemas the adjoint flag is
+    defined to be set if all native gates are inverible"""
+    schema = int(config["schema"])
+    if schema == 1:
+        return bool(config.get("compilation", {}).get("quantum_adjoint", False))
+
+    elif schema == 2:
+        return all(
+            "invertible" in v.get("properties", {})
+            for g, v in get_native_gates(config, shots_present).items()
+        )
+
+    raise CompileError("quantum_adjoint flag is not supported in TOMLs schema >= 3")
 
 
 def check_quantum_control_flag(config: TOMLDocument) -> bool:
@@ -63,7 +74,7 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
     if schema == 1:
         return bool(config.get("compilation", {}).get("quantum_control", False))
 
-    raise CompileError("quantum_control flag is deprecated in later TOMLs")
+    raise CompileError("quantum_control flag is not supported in TOMLs schema >= 2")
 
 
 def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
@@ -75,10 +86,16 @@ def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dic
     iterable = reduce(lambda x, y: x[y], path, config)
     gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
     for g, values in gen:
-        unknown_props = set(values) - {"condition", "properties"}
+        unknown_attrs = set(values) - {"condition", "properties"}
+        if len(unknown_attrs) > 0:
+            raise CompileError(
+                f"Configuration for gate '{str(g)}' has unknown attributes: {list(unknown_attrs)}"
+            )
+        properties = values.get("properties", {})
+        unknown_props = set(properties) - {"invertible", "controllable", "differentiable"}
         if len(unknown_props) > 0:
             raise CompileError(
-                f"Configuration for gate '{str(g)}' has unknown attribute: {list(unknown_props)}"
+                f"Configuration for gate '{str(g)}' has unknown properties: {list(unknown_props)}"
             )
         if "condition" in values:
             conditions = values["condition"]

@@ -117,7 +117,7 @@ class QJITDevice(qml.QubitDevice):
         if check_mid_circuit_measurement_flag(config):  # pragma: no branch
             supported_gates += ["MidCircuitMeasure"]
 
-        if check_adjoint_flag(config):
+        if check_adjoint_flag(config, shots_present):
             supported_gates += ["Adjoint"]
 
         supported_gates += ["ControlledQubitUnitary"]
@@ -253,7 +253,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         if check_mid_circuit_measurement_flag(config):  # pragma: no branch
             supported_gates += ["MidCircuitMeasure"]
 
-        if check_adjoint_flag(config):
+        if check_adjoint_flag(config, shots_present):
             supported_gates += ["Adjoint"]
 
         supported_gates += ["ControlledQubitUnitary"]

@@ -341,9 +341,9 @@ def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> Backe
                 device._s3_folder  # pylint: disable=protected-access
             )
 
-    if "options" in config.keys():
-        for k, v in config["options"].items():
-            if hasattr(device, v):
-                device_kwargs[k] = getattr(device, v)
+    options = config.get("options", {})
+    for k, v in options.items():
+        if hasattr(device, v):
+            device_kwargs[k] = getattr(device, v)
 
     return BackendInfo(device_name, device_lpath, device_kwargs)

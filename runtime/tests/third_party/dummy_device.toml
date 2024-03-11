@@ -94,13 +94,19 @@ Sample = {}
 Count = { condition = [ "finiteshots" ] }
 
 [compilation]
+
 # If the device is compatible with qjit
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = false
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = true
-
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
+
+[options]
+
+option1 = '_option1'
+option2 = '_option2'
+

@@ -32,7 +32,7 @@ from catalyst.utils.runtime import (  # check_device_config,
     get_pennylane_operations,
     validate_config_with_device,
 )
-from catalyst.utils.toml import toml_load
+from catalyst.utils.toml import check_adjoint_flag, toml_load
 
 
 class DummyDevice(qml.QubitDevice):
@@ -125,6 +125,27 @@ def test_get_native_gates_schema1_qcontrol():
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_operations(config, False)
+
+
+def test_get_adjoint_schema2():
+    """Test native gates are properly obtained from the toml."""
+    with TemporaryDirectory() as d:
+
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 2
+                        [operators.gates.native]
+                        TestNativeGate1 = { properties = [ 'invertible' ] }
+                        TestNativeGate2 = { properties = [ 'invertible' ] }
+                    """
+                )
+            )
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+    assert check_adjoint_flag(config, False)
 
 
 def test_get_native_gates_schema2():
@@ -310,7 +331,7 @@ def test_config_invalid_attr():
             config = toml_load(f)
 
         with pytest.raises(
-            CompileError, match="Configuration for gate 'TestGate' has unknown attribute"
+            CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
         ):
             get_native_gates(config, True)
 
@@ -335,6 +356,30 @@ def test_config_invalid_condition_unknown():
 
         with pytest.raises(
             CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
+        ):
+            get_native_gates(config, True)
+
+
+def test_config_invalid_property_unknown():
+    """Check the gate condition handling logic"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 2
+                        [operators.gates.native]
+                        TestGate = { properties = ["unknown", "invertible"] }
+                    """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+        with pytest.raises(
+            CompileError, match="Configuration for gate 'TestGate' has unknown properties"
         ):
             get_native_gates(config, True)
 
@@ -390,6 +435,8 @@ def test_config_unsupported_schema():
             get_matrix_decomposable_gates(config, False)
         with pytest.raises(CompileError):
             get_pennylane_operations(config, False)
+        with pytest.raises(CompileError):
+            check_adjoint_flag(config, False)
 
 
 if __name__ == "__main__":
