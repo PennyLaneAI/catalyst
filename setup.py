@@ -36,8 +36,9 @@ try:
     from subprocess import check_output
 
     REVISION = (
-        check_output(["/usr/bin/env", "git", "rev-parse", "HEAD"],
-                      cwd=path.dirname(__file__)).decode().strip()
+        check_output(["/usr/bin/env", "git", "rev-parse", "HEAD"], cwd=path.dirname(__file__))
+        .decode()
+        .strip()
     )
 except Exception:  # pylint: disable=broad-exception-caught
     REVISION = None
