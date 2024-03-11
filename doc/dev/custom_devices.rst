@@ -230,130 +230,124 @@ headers and fields are generally required, unless stated otherwise.
 .. code-block:: toml
 
         # Which version of the specification format is being used.
-        schema = 1
-
-        [device]
-        name = "dummy.device.qubit"
-
-        [operators]
-        # Observables supported by the device
-        observables = [
-                "PauliX",
-                "PauliY",
-                "PauliZ",
-                "Hadamard",
-                "Hermitian",
-                "Identity",
-                "Projector",
-                "SparseHamiltonian",
-                "Hamiltonian",
-                "Sum",
-                "SProd",
-                "Prod",
-                "Exp",
-        ]
+        schema = 2
 
         # The union of all gate types listed in this section must match what
         # the device considers "supported" through PennyLane's device API.
-        [[operators.gates]]
-        native = [
-                # Operators that shouldn't be decomposed.
-                "QubitUnitary",
-                "PauliX",
-                "PauliY",
-                "PauliZ",
-                "MultiRZ",
-                "Hadamard",
-                "S",
-                "T",
-                "CNOT",
-                "SWAP",
-                "CSWAP",
-                "Toffoli",
-                "CY",
-                "CZ",
-                "PhaseShift",
-                "ControlledPhaseShift",
-                "RX",
-                "RY",
-                "RZ",
-                "Rot",
-                "CRX",
-                "CRY",
-                "CRZ",
-                "CRot",
-                "Identity",
-                "IsingXX",
-                "IsingYY",
-                "IsingZZ",
-                "IsingXY",
-        ]
+        # The gate definition has the following format:
+        #
+        #   GATE = { properties = { PROPS }, condition = { COND } }
+        #
+        # Where:
+        #
+        #   PROPS: zero or more comma-separated quoted strings:
+        #          "controllable", "invertible", "differentiable"
+        #   COND: quoted string, on of:
+        #         "analytic", "finiteshots"
+        #
+        [operators.gates.native]
+
+        QubitUnitary = { properties = [ "controllable", "invertible"]  }
+        PauliX = { properties = [ "controllable", "invertible"] }
+        PauliY = { properties = [ "controllable", "invertible"] }
+        PauliZ = { properties = [ "controllable", "invertible"] }
+        MultiRZ = { properties = [ "controllable", "invertible" ] }
+        Hadamard = { properties = [ "controllable", "invertible"] }
+        S = { properties = [ "controllable", "invertible" ] }
+        T = { properties = [ "controllable", "invertible" ] }
+        CNOT = { properties = [ "invertible" ] }
+        SWAP = { properties = [ "controllable", "invertible" ] }
+        CSWAP = { properties = [ "invertible" ] }
+        Toffoli = { properties = [ "controllable", "invertible" ] }
+        CY = { properties = [ "invertible" ] }
+        CZ = { properties = [ "invertible" ] }
+        PhaseShift = { properties = [ "controllable", "invertible" ] }
+        ControlledPhaseShift = { properties = [ "controllable", "invertible" ] }
+        RX = { properties = [ "controllable", "invertible" ] }
+        RY = { properties = [ "controllable", "invertible" ] }
+        RZ = { properties = [ "controllable", "invertible" ] }
+        Rot = { properties = [ "controllable", "invertible" ] }
+        CRX = { properties = [ "invertible" ] }
+        CRY = { properties = [ "invertible" ] }
+        CRZ = { properties = [ "invertible" ] }
+        CRot = { properties = [ "invertible" ] }
+        Identity = { properties = [ "controllable", "invertible" ] }
+        IsingXX = { properties = [ "controllable", "invertible" ] }
+        IsingYY = { properties = [ "controllable", "invertible" ] }
+        IsingZZ = { properties = [ "controllable", "invertible" ] }
+        IsingXY = { properties = [ "controllable", "invertible" ] }
 
         # Operators that should be decomposed according to the algorithm used
         # by PennyLane's device API.
         # Optional, since gates not listed in this list will typically be decomposed by
         # default, but can be useful to express a deviation from this device's regular
         # strategy in PennyLane.
-        decomp = [
-                "SX",
-                "ISWAP",
-                "PSWAP",
-                "SISWAP",
-                "SQISW",
-                "CPhase",
-                "BasisState",
-                "QubitStateVector",
-                "StatePrep",
-                "ControlledQubitUnitary",
-                "DiagonalQubitUnitary",
-                "SingleExcitation",
-                "SingleExcitationPlus",
-                "SingleExcitationMinus",
-                "DoubleExcitation",
-                "DoubleExcitationPlus",
-                "DoubleExcitationMinus",
-                "QubitCarry",
-                "QubitSum",
-                "OrbitalRotation",
-                "QFT",
-                "ECR",
-        ]
+        [operators.gates.decomp]
+
+        SX = {}
+        ISWAP = {}
+        PSWAP = {}
+        SISWAP = {}
+        SQISW = {}
+        CPhase = {}
+        BasisState = {}
+        QubitStateVector = {}
+        StatePrep = {}
+        ControlledQubitUnitary = {}
+        DiagonalQubitUnitary = {}
+        SingleExcitation = {}
+        SingleExcitationPlus = {}
+        SingleExcitationMinus = {}
+        DoubleExcitation = {}
+        DoubleExcitationPlus = {}
+        DoubleExcitationMinus = {}
+        QubitCarry = {}
+        QubitSum = {}
+        OrbitalRotation = {}
+        QFT = {}
+        ECR = {}
 
         # Gates which should be translated to QubitUnitary
-        matrix = [
-                "MultiControlledX",
-        ]
+        [operators.gates.matrix]
+
+        MultiControlledX = {}
+
+        # Observables supported by the device
+        [operators.observables]
+
+        PauliX = {}
+        PauliY = {}
+        PauliZ = {}
+        Hadamard = {}
+        Hermitian = {}
+        Identity = {}
+        Projector = {}
+        SparseHamiltonian = {}
+        Hamiltonian = {}
+        Sum = {}
+        SProd = {}
+        Prod = {}
+        Exp = {}
 
         [measurement_processes]
-        exactshots = [
-                "Expval",
-                "Var",
-                "Probs",
-                "State",
-        ]
-        finiteshots = [
-                "Expval",
-                "Var",
-                "Probs",
-                "Sample",
-                "Counts",
-        ]
+
+        Expval = {}
+        Var = {}
+        Probs = {}
+        Sample = {}
+        Count = { condition = [ "finiteshots" ] }
 
         [compilation]
+
         # If the device is compatible with qjit
         qjit_compatible = true
         # If the device requires run time generation of the quantum circuit.
         runtime_code_generation = false
-        # If the device supports adjoint
-        quantum_adjoint = true
-        # If the device supports quantum control instructions natively
-        quantum_control = false
         # If the device supports mid circuit measurements natively
         mid_circuit_measurement = true
-
         # This field is currently unchecked but it is reserved for the purpose of
         # determining if the device supports dynamic qubit allocation/deallocation.
-        dynamic_qubit_management = false 
+        dynamic_qubit_management = false
 
         [options]
         # Options is an optional field.
