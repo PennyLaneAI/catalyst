@@ -291,6 +291,31 @@ def test_check_full_overlap():
         check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "B", "Adjoint(Y)"})
 
 
+def test_config_finiteshots_analytic():
+    """Check the gate condition handling logic"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 2
+                        [operators.gates.native]
+                        TestGate = { condition = ["finiteshots", "analytic"] }
+                    """
+                )
+            )
+
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+
+        with pytest.raises(CompileError, match="Gate 'TestGate' condition"):
+            get_native_gates(config, True)
+
+        with pytest.raises(CompileError, match="Gate 'TestGate' condition"):
+            get_native_gates(config, False)
+
+
 def test_config_unsupported_schema():
     """Test native matrix gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:

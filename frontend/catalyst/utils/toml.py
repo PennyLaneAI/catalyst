@@ -67,16 +67,26 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
 
 
 def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
-    """Read the toml config section specified by `path`. Filters-out gates which don't match the
-    condition"""
+    """Read the toml config section specified by `path`. Filters-out gates which don't match
+    condition. For now the only condition we support is `shots_present`."""
     gates = {}
+    analytic = "analytic"
+    finiteshots = "finiteshots"
     iterable = reduce(lambda x, y: x[y], path, config)
     gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
     for g, values in gen:
         if "condition" in values:
-            if "noshots" in values["condition"] and shots_present:
-                continue
-        gates[g] = values
+            conditions = values["condition"]
+            if all(c in conditions for c in [analytic, finiteshots]):
+                raise CompileError(
+                    f"Gate '{g}' condition can not contain both `{finiteshots}` and `{analytic}`"
+                )
+            if analytic in conditions and not shots_present:
+                gates[g] = values
+            elif finiteshots in conditions and shots_present:
+                gates[g] = values
+        else:
+            gates[g] = values
     return gates
 
 

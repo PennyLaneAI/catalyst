@@ -59,7 +59,7 @@ Hermitian = {}
 # Tensor,
 Projector = {}
 Sprod = {}
-Hamiltonian = { condition = [ "finiteshots" ] }
+Hamiltonian = { condition = [ "analytic" ] }
 Sum = {}
 Prod = {}
 
