@@ -2,6 +2,11 @@
 
 <h3>New features</h3>
 
+* Catalyst publishes Git revision string seen at the time of the packaging as
+  `catalyst.__revision__` . For editable installations, the revision is read at the time of
+  module import.
+  [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
+
 <h3>Improvements</h3>
 
 * Catalyst now supports devices built from the 
