@@ -248,7 +248,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     check_no_overlap(native, decomposable, matrix)
 
-    if hasattr(device, "operations") and hasattr(device, "observables"):  # pragma: nocover
+    if hasattr(device, "operations") and hasattr(device, "observables"):
         device_gates = set.union(set(device.operations), set(device.observables))
         device_gates = filter_out_adjoint(device_gates)
         spec_gates = set.union(native, observables, matrix, decomposable)
