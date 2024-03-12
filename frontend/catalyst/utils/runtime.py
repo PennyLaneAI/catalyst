@@ -22,6 +22,7 @@ import pathlib
 import platform
 import re
 from dataclasses import dataclass
+from os import environ
 from pathlib import Path
 from typing import Any, Dict, Set
 
@@ -128,7 +129,13 @@ def get_pennylane_operations(
         for gate, attrs in native_gates.items():
             gates_PL.add(f"{gate}")
             if "controllable" in attrs.get("properties", {}):
-                gates_PL.add(f"C({gate})")
+                if gate == "QubitUnitary":
+                    gates_PL.add(f"Controlled{gate}")
+                elif gate == "PhaseShift":
+                    gates_PL.add(f"Controlled{gate}")
+                    gates_PL.add(f"C({gate})")
+                else:
+                    gates_PL.add(f"C({gate})")
 
     else:
         raise CompileError("Device configuration schema {schema} is not supported")
@@ -241,8 +248,9 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     # Filter-out ControlledQubitUnitary because some devices are known to support it.
     # TODO: Should we ignore this ambiguity instead?
-    if "ControlledQubitUnitary" in native and check_quantum_control_flag(config):
+    if "ControlledQubitUnitary" in native:
         matrix = matrix - {"ControlledQubitUnitary"}
+        decomposable = decomposable - {"ControlledQubitUnitary"}
 
     check_no_overlap(native, decomposable, matrix)
 
@@ -259,13 +267,15 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
 
 def device_get_toml_config(device) -> Path:
-    """Temporary function. This function adds the `config` field to devices containing the path to
-    it's TOML configuration file.
-    TODO: Remove this function when `qml.Device`s are guaranteed to have their own
-    config file field."""
-    if hasattr(device, "config"):
+    """Get the path of the device config file."""
+    if toml_file_forced := environ.get("CATALYST_FORCE_DEVICE_CONFIG"):  # pragma: nocover
+        # This section is required for future config testing
+        toml_file = toml_file_forced
+    elif hasattr(device, "config"):
         toml_file = device.config
     else:
+        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
         name = device.name
         if isinstance(device, qml.Device):
