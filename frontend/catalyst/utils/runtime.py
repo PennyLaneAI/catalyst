@@ -215,13 +215,16 @@ def check_full_overlap(device_gates: Set[str], spec_gates: Set[str]) -> None:
 
 def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -> None:
     """Validate configuration document against the device attributes.
-    Raise CompileError in case of mismatch.
-    * if configuration file does not exists
-    * if decomposable, matrix, and native gates have some overlap
-    * if decomposable, matrix, and native gates do not match gates in ``device.operations``
+    Raise CompileError in case of mismatch:
+    * If device is not qjit-compatible.
+    * If configuration file does not exists.
+    * If decomposable, matrix, and native gates have some overlap.
+    * If decomposable, matrix, and native gates do not match gates in ``device.operations`` and
+      ``device.observables``.
 
     Args:
         device (qml.Device): An instance of a quantum device.
+        config (TOMLDocument): A TOML document representation.
 
     Raises: CompileError
     """
