@@ -26,6 +26,7 @@ from collections.abc import Sequence, Sized
 from functools import cache, update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -2441,6 +2442,29 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
     return batch_size
 
+class CallbackClosure:
+
+    def __init__(self, *absargs, **abskwargs):
+        self.absargs = absargs
+        self.abskwargs = abskwargs
+
+    @property
+    @cache
+    def tree_flatten(self):
+        return tree_flatten((self.absargs, self.abskwargs))
+
+    @property
+    @cache
+    def getLowLevelSignature(self):
+        flat_params, in_tree = self.tree_flatten
+        low_level_flat_params = []
+        for param in flat_params:
+            empty_memref_descriptor = get_ranked_memref_descriptor(param)
+            memref_type = type(empty_memref_descriptor)
+            ptr_ty = ctypes.POINTER(memref_type)
+            low_level_flat_params.append(ptr_ty)
+        return low_level_flat_params
+            
 
 class CallbackClosure:
     """This is just a class containing data that is important for the callback."""
