@@ -30,7 +30,6 @@ from catalyst.utils.toml import (
     TOMLDocument,
     check_adjoint_flag,
     check_mid_circuit_measurement_flag,
-    get_observables,
 )
 
 RUNTIME_OPERATIONS = {
@@ -239,7 +238,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
         return {"MultiControlledX", "BlockEncode"}
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         original_device,
