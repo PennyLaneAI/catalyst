@@ -17,7 +17,7 @@ ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
-TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*toml')
+TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml')
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
