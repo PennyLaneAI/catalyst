@@ -2,7 +2,8 @@ schema = 2
 
 [operators.gates.native]
 
-QubitUnitary = { properties = [ "controllable", "invertible", "differentiable" ]  }
+QubitUnitary = { properties = [ "invertible", "differentiable" ]  }
+ControlledQubitUnitary = { properties = [ "invertible", "differentiable" ]  }
 PauliX = { properties = [ "controllable", "invertible", "differentiable" ] }
 PauliY = { properties = [ "controllable", "invertible", "differentiable" ] }
 PauliZ = { properties = [ "controllable", "invertible", "differentiable" ] }
@@ -17,6 +18,7 @@ Toffoli = { properties = [ "invertible", "differentiable" ] }
 CY = { properties = [ "invertible", "differentiable" ] }
 CZ = { properties = [ "invertible", "differentiable" ] }
 PhaseShift = { properties = [ "controllable", "invertible", "differentiable" ] }
+ControlledPhaseShift = { properties = [ "invertible", "differentiable" ] }
 RX = { properties = [ "controllable", "invertible", "differentiable" ] }
 RY = { properties = [ "controllable", "invertible", "differentiable" ] }
 RZ = { properties = [ "controllable", "invertible", "differentiable" ] }
@@ -31,7 +33,13 @@ IsingYY = { properties = [ "controllable", "invertible", "differentiable" ] }
 IsingZZ = { properties = [ "controllable", "invertible", "differentiable" ] }
 IsingXY = { properties = [ "controllable", "invertible", "differentiable" ] }
 GlobalPhase = { properties = [ "controllable", "invertible", "differentiable" ] }
-BlockEncode = {}
+BlockEncode = { properties = [ "invertible" ] }
+SingleExcitation = { properties = [ "invertible", "controllable"] }
+SingleExcitationPlus = { properties = [ "invertible", "controllable"] }
+SingleExcitationMinus = { properties = [ "invertible", "controllable"] }
+DoubleExcitation = { properties = [ "invertible", "controllable"] }
+DoubleExcitationPlus = { properties = [ "invertible", "controllable"] }
+DoubleExcitationMinus = { properties = [ "invertible", "controllable"] }
 
 [operators.gates.decomp]
 
@@ -51,12 +59,6 @@ QubitStateVector = {}
 StatePrep = {}
 ControlledQubitUnitary = {}
 DiagonalQubitUnitary = {}
-SingleExcitation = { properties = [ "controllable"] }
-SingleExcitationPlus = { properties = [ "controllable"] }
-SingleExcitationMinus = { properties = [ "controllable"] }
-DoubleExcitation = { properties = [ "controllable"] }
-DoubleExcitationPlus = { properties = [ "controllable"] }
-DoubleExcitationMinus = { properties = [ "controllable"] }
 QubitCarry = {}
 QubitSum = {}
 OrbitalRotation = {}

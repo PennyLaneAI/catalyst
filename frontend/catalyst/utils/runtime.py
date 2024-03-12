@@ -129,13 +129,13 @@ def get_pennylane_operations(
         for gate, attrs in native_gates.items():
             gates_PL.add(f"{gate}")
             if "controllable" in attrs.get("properties", {}):
-                if gate == "QubitUnitary":
-                    gates_PL.add(f"Controlled{gate}")
-                elif gate == "PhaseShift":
-                    gates_PL.add(f"Controlled{gate}")
-                    gates_PL.add(f"C({gate})")
-                else:
-                    gates_PL.add(f"C({gate})")
+                # if gate == "QubitUnitary":
+                #     gates_PL.add(f"Controlled{gate}")
+                # if gate == "PhaseShift":
+                #     gates_PL.add(f"Controlled{gate}")
+                #     gates_PL.add(f"C({gate})")
+                # else:
+                gates_PL.add(f"C({gate})")
 
     else:
         raise CompileError("Device configuration schema {schema} is not supported")

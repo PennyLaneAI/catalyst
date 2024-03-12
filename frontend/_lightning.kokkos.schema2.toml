@@ -38,7 +38,8 @@ DoubleExcitation = { properties = [ "invertible" ] }
 DoubleExcitationPlus = { properties = [ "invertible" ] }
 DoubleExcitationMinus = { properties = [ "invertible" ] }
 MultiRZ = { properties = [ "invertible" ] }
-QubitUnitary = { properties = [ "invertible", "controllable" ] }
+QubitUnitary = { properties = [ "invertible" ] }
+ControlledQubitUnitary = { properties = [ "invertible" ] }
 GlobalPhase = { properties = [ "invertible", "controllable" ] }
 
 # Operators that should be decomposed according to the algorithm used

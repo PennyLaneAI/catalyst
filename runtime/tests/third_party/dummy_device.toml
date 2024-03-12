@@ -2,7 +2,7 @@ schema = 2
 
 [operators.gates.native]
 
-QubitUnitary = { properties = [ "controllable", "invertible", "differentiable" ]  }
+QubitUnitary = { properties = [ "invertible", "differentiable" ]  }
 PauliX = { properties = [ "controllable", "invertible", "differentiable" ] }
 PauliY = { properties = [ "controllable", "invertible", "differentiable" ] }
 PauliZ = { properties = [ "controllable", "invertible", "differentiable" ] }
