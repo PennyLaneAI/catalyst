@@ -230,7 +230,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
-    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
+    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:  # pragma: no cover
         # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
