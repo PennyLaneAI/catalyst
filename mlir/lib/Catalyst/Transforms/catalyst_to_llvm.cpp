@@ -456,11 +456,10 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto memref : adaptor.getInputs()) {
             Type ptrTy = LLVM::LLVMPointerType::get(ctx);
-            // allocate a memref descriptor on the stack
+            // allocate a pointer in the stack.
             Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, memref.getType(), c1);
-            // store the memref descriptor on the pointer
             rewriter.create<LLVM::StoreOp>(loc, memref, ptr);
-            // add the ptr to the arguments
+            // push the pointer to the stack.
             callArgs.push_back(ptr);
         }
         rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
