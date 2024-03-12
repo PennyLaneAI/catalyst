@@ -85,7 +85,6 @@ OPERATIONS = [
     "C(PauliY)",
     "C(Identity)",
     "C(RY)",
-    "C(QubitUnitary)",
     "C(PauliX)",
     "C(RX)",
     "C(IsingXX)",

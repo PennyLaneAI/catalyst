@@ -1,0 +1,109 @@
+schema = 2
+
+# The union of all gate types listed in this section must match what
+# the device considers "supported" through PennyLane's device API.
+[operators.gates.native]
+
+Identity = { properties = [ "invertible" ] }
+PauliX = { properties = [ "invertible" ] }
+PauliY = { properties = [ "invertible" ] }
+PauliZ = { properties = [ "invertible" ] }
+Hadamard = { properties = [ "invertible" ] }
+S = { properties = [ "invertible" ] }
+T = { properties = [ "invertible" ] }
+PhaseShift = { properties = [ "invertible" ] }
+RX = { properties = [ "invertible" ] }
+RY = { properties = [ "invertible" ] }
+RZ = { properties = [ "invertible" ] }
+Rot = { properties = [ "invertible" ] }
+CNOT = { properties = [ "invertible" ] }
+CY = { properties = [ "invertible" ] }
+CZ = { properties = [ "invertible" ] }
+SWAP = { properties = [ "invertible" ] }
+CSWAP = { properties = [ "invertible" ] }
+Toffoli = { properties = [ "invertible" ] }
+IsingXX = { properties = [ "invertible" ] }
+IsingXY = { properties = [ "invertible" ] }
+IsingYY = { properties = [ "invertible" ] }
+IsingZZ = { properties = [ "invertible" ] }
+ControlledPhaseShift = { properties = [ "invertible" ] }
+CRX = { properties = [ "invertible" ] }
+CRY = { properties = [ "invertible" ] }
+CRZ = { properties = [ "invertible" ] }
+CRot = { properties = [ "invertible" ] }
+SingleExcitation = { properties = [ "invertible" ] }
+SingleExcitationPlus = { properties = [ "invertible" ] }
+SingleExcitationMinus = { properties = [ "invertible" ] }
+DoubleExcitation = { properties = [ "invertible" ] }
+DoubleExcitationPlus = { properties = [ "invertible" ] }
+DoubleExcitationMinus = { properties = [ "invertible" ] }
+MultiRZ = { properties = [ "invertible" ] }
+QubitUnitary = { properties = [ "invertible", "controllable" ] }
+GlobalPhase = { properties = [ "invertible", "controllable" ] }
+
+# Operators that should be decomposed according to the algorithm used
+# by PennyLane's device API.
+# Optional, since gates not listed in this list will typically be decomposed by
+# default, but can be useful to express a deviation from this device's regular
+# strategy in PennyLane.
+[operators.gates.decomp]
+
+BasisState = {}
+QubitStateVector = {}
+StatePrep = {}
+QFT = {}
+MultiControlledX = {}
+
+# Gates which should be translated to QubitUnitary
+[operators.gates.matrix]
+
+# ControlledQubitUnitary = {}
+ECR = {}
+SX = {}
+ISWAP = {}
+PSWAP = {}
+SISWAP = {}
+SQISW = {}
+CPhase = {}
+OrbitalRotation = {}
+QubitCarry = {}
+QubitSum = {}
+DiagonalQubitUnitary = {}
+BlockEncode = {}
+
+# Observables supported by the device
+[operators.observables]
+
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
+Hermitian = {}
+Identity = {}
+SparseHamiltonian = {}
+Hamiltonian = {}
+Sum = {}
+SProd = {}
+Prod = {}
+Exp = {}
+
+[measurement_processes]
+
+Expval = {}
+Var = {}
+Probs = {}
+State = { condition = [ "analytic" ] }
+Sample = { condition = [ "finiteshots" ] }
+Counts = { condition = [ "finiteshots" ] }
+
+[compilation]
+
+# If the device is compatible with qjit
+qjit_compatible = true
+# If the device requires run time generation of the quantum circuit.
+runtime_code_generation = false
+# If the device supports mid circuit measurements natively
+mid_circuit_measurement = true
+# This field is currently unchecked but it is reserved for the purpose of
+# determining if the device supports dynamic qubit allocation/deallocation.
+dynamic_qubit_management = false
