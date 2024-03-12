@@ -85,7 +85,7 @@ def test_callback_send_param(capsys):
     import jax
 
     @callback
-    def my_callback(n : jax.core.ShapedArray([], int)) -> None:
+    def my_callback(n) -> None:
         print(n)
 
     @qml.qjit(keep_intermediate=True)

@@ -19,11 +19,13 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
+import ctypes
 import inspect
 import numbers
 from collections.abc import Sequence, Sized
-from functools import update_wrapper, wraps
+from functools import cache, update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
+
 
 import jax
 import jax.numpy as jnp
@@ -99,10 +101,11 @@ from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
     extract_backend_info,
+    get_lib_path,
     validate_config_with_device,
 )
 from catalyst.utils.toml import TOMLDocument
-
+from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
@@ -2435,6 +2438,29 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
     return batch_size
 
+class CallbackClosure:
+
+    def __init__(self, *absargs, **abskwargs):
+        self.absargs = absargs
+        self.abskwargs = abskwargs
+
+    @property
+    @cache
+    def tree_flatten(self):
+        return tree_flatten((self.absargs, self.abskwargs))
+
+    @property
+    @cache
+    def getLowLevelSignature(self):
+        flat_params, in_tree = self.tree_flatten
+        low_level_flat_params = []
+        for param in flat_params:
+            empty_memref_descriptor = get_ranked_memref_descriptor(param)
+            memref_type = type(empty_memref_descriptor)
+            ptr_ty = ctypes.POINTER(memref_type)
+            low_level_flat_params.append(ptr_ty)
+        return low_level_flat_params
+            
 
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
@@ -2468,19 +2494,30 @@ def callback_implementation(
     """
 
     flat_args, in_tree = tree_flatten((args, kwargs))
+    metadata = CallbackClosure(args, kwargs)
 
-    def _flat_callback(*flat_args):
-        """This function packages flat arguments back into the shapes expected by the function."""
-        _args, _kwargs = tree_unflatten(in_tree, flat_args)
-        assert not _args, "Args are not yet expected here."
-        assert not _kwargs, "Kwargs are not yet supported here."
-        return tree_leaves(cb())
+    def _flat_callback(flat_args):
+        """Each flat_arg is a pointer. Yes a pointer.
+
+        It is actually a pointer to a memref object.
+        To find out which element type it has, we use the signature obtained previously.
+        """
+        jnpargs = []
+        for void_ptr, ty in zip(flat_args, metadata.getLowLevelSignature):
+            memref_ty = ctypes.cast(void_ptr, ty)
+            nparray = ranked_memref_to_numpy(memref_ty)
+            jnparray = jnp.asarray(nparray)
+            jnpargs.append(jnparray)
+
+        _args, _kwargs = tree_unflatten(in_tree, jnpargs)
+        return tree_leaves(cb(*_args, **_kwargs))
 
     # TODO(@erick-xanadu): Change back once we support arguments.
     # I am leaving this as a to-do because otherwise the coverage will complain.
     # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
     results_aval = []
     flat_results_aval, out_tree = tree_flatten(results_aval)
+    # TODO: This reminds me of the code in jit.py where we infer the signature.
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )

@@ -9,14 +9,18 @@
 import ctypes
 
 from jax import numpy as jnp
-from jax.core import ShapedArray
+import numpy as np
+from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
 from mlir_quantum.runtime import as_ctype
 from mlir_quantum.runtime import (
     get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor,
 )
+from mlir_quantum.runtime import ranked_memref_to_numpy as mlir_ranked_memref_to_numpy
 from mlir_quantum.runtime import (
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
+    move_aligned_ptr_by_offset,
+    to_numpy,
 )
 
 
@@ -38,8 +42,22 @@ def get_ranked_memref_descriptor_from_shaped_array(array: ShapedArray):
 def get_ranked_memref_descriptor(array):
     """Wrapper around MLIR's get_ranked_memref_descriptor."""
 
+    if isinstance(array, DynamicJaxprTracer):
+        array = array.aval
+
     if not isinstance(array, ShapedArray):
         # If input is not ShapedArray, use default implementation.
         return mlir_get_ranked_memref_descriptor(array)
 
     return get_ranked_memref_descriptor_from_shaped_array(array)
+
+def ranked_memref_to_numpy(ranked_memref):
+    try:
+        mlir_ranked_memref_to_numpy(ranked_memref)
+    except AttributeError:
+        # zero dimensional tensor...
+        content_ptr = move_aligned_ptr_by_offset(
+            ranked_memref[0].aligned, ranked_memref[0].offset
+        )
+        np_arr = np.ctypeslib.as_array(content_ptr, shape=[])
+        return to_numpy(np_arr)

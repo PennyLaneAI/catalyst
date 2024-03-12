@@ -24,11 +24,16 @@ extern "C" {
     }
     auto lambda = it->second;
 
+    py::list flat_args;
+    for (int i = 0; i < count; i++) {
+        int64_t ptr = va_arg(args, int64_t);
+        flat_args.append(ptr);
+    }
     // We have access to lambda here...
     // Lambda is a callback...
     // we also have access to memref pointer...
     // We need a memref pointer...
-    lambda();
+    lambda(flat_args);
 }
 }
 
