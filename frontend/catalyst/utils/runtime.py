@@ -243,8 +243,12 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     decomposable = set(get_decomposable_gates(config, shots_present))
     matrix = set(get_matrix_decomposable_gates(config, shots_present))
 
-    # Filter-out ControlledQubitUnitary because some devices are known to support it.
-    # TODO: Should we ignore this ambiguity instead?
+    # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
+    # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
+    # listed in either matrix or decomposable sections. This is a contradiction, because condition
+    # (1) means that `ControlledQubitUnitary` is also in the native set. We solve it here by
+    # applying a fixup.
+    # TODO: Remove when the transition to the toml schema 2 is complete.
     if "ControlledQubitUnitary" in native:
         matrix = matrix - {"ControlledQubitUnitary"}
         decomposable = decomposable - {"ControlledQubitUnitary"}
