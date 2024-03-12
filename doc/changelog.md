@@ -9,8 +9,9 @@
 
 <h3>Improvements</h3>
 
-* Catalyst now validates quantum devices against their Toml configs. A new Toml config schema 2 is
-  recognized allowing device authors to describe their devices more accurately.
+* An updated quanutm device specification format is not supported by Catalyst. The toml schema 2
+  configs allow device autors to specify individual gate properties such as native quantum control
+  support, gate invertibility or differentiability.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
 * Catalyst now supports devices built from the 
