@@ -92,12 +92,16 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
     return native_controlled_gates
 
 
-def get_pennylane_operations(config: TOMLDocument, shots_present: bool) -> Set[str]:
+def get_pennylane_operations(
+    config: TOMLDocument, shots_present: bool, device_name: str
+) -> Set[str]:
     """Get gates that are natively supported by the device and therefore do not need to be
     decomposed.
 
     Args:
         config (Dict[Str, Any]): Configuration dictionary
+        shots_present (bool): True is exact shots is specified in the current top-level program
+        device_name (str): Name of quantum device. Used for ad-hoc patching.
 
     Returns:
         Set[str]: List of gate names in the PennyLane format.
@@ -113,6 +117,10 @@ def get_pennylane_operations(config: TOMLDocument, shots_present: bool) -> Set[s
         native_controlled_gates = (
             deduce_native_controlled_gates(native_gates) if supports_controlled else set()
         )
+
+        if device_name == "lightning.kokkos":  # pragma: nocover
+            native_gates.update({"C(GlobalPhase)"})
+
         gates_PL = set.union(native_gates, native_controlled_gates)
 
     elif schema == 2:
@@ -126,6 +134,19 @@ def get_pennylane_operations(config: TOMLDocument, shots_present: bool) -> Set[s
         raise CompileError("Device configuration schema {schema} is not supported")
 
     return gates_PL
+
+
+def get_pennylane_observables(
+    config: TOMLDocument, shots_present: bool, device_name: str
+) -> Set[str]:
+    """Get observables in PennyLane format. Apply ad-hoc patching"""
+
+    observables = set(get_observables(config, shots_present))
+
+    if device_name == "lightning.kokkos":  # pragma: nocover
+        observables.update({"Projector"})
+
+    return observables
 
 
 def check_no_overlap(*args):
@@ -210,9 +231,11 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
             f"Config is not marked as qjit-compatible"
         )
 
+    device_name = device.short_name if isinstance(device, qml.Device) else device.name
+
     shots_present = device.shots is not None
-    native = get_pennylane_operations(config, shots_present)
-    observables = set(get_observables(config, shots_present))
+    native = get_pennylane_operations(config, shots_present, device_name)
+    observables = get_pennylane_observables(config, shots_present, device_name)
     decomposable = set(get_decomposable_gates(config, shots_present))
     matrix = set(get_matrix_decomposable_gates(config, shots_present))
 
@@ -220,17 +243,6 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     # TODO: Should we ignore this ambiguity instead?
     if "ControlledQubitUnitary" in native and check_quantum_control_flag(config):
         matrix = matrix - {"ControlledQubitUnitary"}
-
-    # Add missing Projector gate to the kokkos device.
-    # TODO: remove once the PennyLane lightning toml files are updates
-    if isinstance(device, qml.Device):  # pragma: nocover
-        if device.short_name == "lightning.kokkos":
-            observables.update({"Projector"})
-            native.update({"C(GlobalPhase)"})
-    else:  # pragma: nocover
-        if device.name == "lightning.kokkos":
-            observables.update({"Projector"})
-            native.update({"C(GlobalPhase)"})
 
     check_no_overlap(native, decomposable, matrix)
 
@@ -281,7 +293,8 @@ def device_get_toml_config(device) -> Path:
 class BackendInfo:
     """Backend information"""
 
-    name: str
+    device_name: str
+    c_interface_name: str
     lpath: str
     kwargs: Dict[str, Any]
 
@@ -345,4 +358,4 @@ def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> Backe
         if hasattr(device, v):
             device_kwargs[k] = getattr(device, v)
 
-    return BackendInfo(device_name, device_lpath, device_kwargs)
+    return BackendInfo(dname, device_name, device_lpath, device_kwargs)

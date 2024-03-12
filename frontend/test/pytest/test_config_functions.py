@@ -29,6 +29,7 @@ from catalyst.utils.runtime import (  # check_device_config,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
     get_native_gates,
+    get_pennylane_observables,
     get_pennylane_operations,
     validate_config_with_device,
 )
@@ -81,6 +82,48 @@ def test_validate_config_with_device(schema):
             validate_config_with_device(device, config)
 
 
+def test_get_observables_schema1():
+    """Test observables are properly obtained from the toml schema 1."""
+    with TemporaryDirectory() as d:
+        test_deduced_gates = {"TestNativeGate"}
+
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 1
+                        [operators]
+                        observables = [ "TestNativeGate" ]
+                    """
+                )
+            )
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+    assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
+
+
+def test_get_observables_schema2():
+    """Test observables are properly obtained from the toml schema 2."""
+    with TemporaryDirectory() as d:
+        test_deduced_gates = {"TestNativeGate1"}
+
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(
+                dedent(
+                    r"""
+                        schema = 2
+                        [operators.observables]
+                        TestNativeGate1 = { }
+                    """
+                )
+            )
+        with open(toml_file, encoding="utf-8") as f:
+            config = toml_load(f)
+    assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
+
+
 def test_get_native_gates_schema1_no_qcontrol():
     """Test native gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:
@@ -101,7 +144,7 @@ def test_get_native_gates_schema1_no_qcontrol():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_pennylane_operations(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
 
 def test_get_native_gates_schema1_qcontrol():
@@ -124,7 +167,7 @@ def test_get_native_gates_schema1_qcontrol():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_pennylane_operations(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
 
 def test_get_adjoint_schema2():
@@ -167,7 +210,7 @@ def test_get_native_gates_schema2():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_pennylane_operations(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
 
 def test_get_native_gates_schema2_optional_shots():
@@ -189,7 +232,7 @@ def test_get_native_gates_schema2_optional_shots():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_pennylane_operations(config, True)
+    assert test_deduced_gates == get_pennylane_operations(config, True, "device_name")
 
 
 def test_get_native_gates_schema2_optional_noshots():
@@ -210,7 +253,7 @@ def test_get_native_gates_schema2_optional_noshots():
             )
         with open(toml_file, encoding="utf-8") as f:
             config = toml_load(f)
-    assert test_deduced_gates == get_pennylane_operations(config, False)
+    assert test_deduced_gates == get_pennylane_operations(config, False, "device")
 
 
 def test_get_decomp_gates_schema1():
@@ -437,7 +480,7 @@ def test_config_unsupported_schema():
         with pytest.raises(CompileError):
             get_matrix_decomposable_gates(config, False)
         with pytest.raises(CompileError):
-            get_pennylane_operations(config, False)
+            get_pennylane_operations(config, False, "device_name")
         with pytest.raises(CompileError):
             check_adjoint_flag(config, False)
 

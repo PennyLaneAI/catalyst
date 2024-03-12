@@ -23,6 +23,7 @@ from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
     BackendInfo,
     deduce_native_controlled_gates,
+    get_pennylane_observables,
     get_pennylane_operations,
 )
 from catalyst.utils.toml import (
@@ -67,6 +68,30 @@ RUNTIME_OPERATIONS = {
 }
 
 
+def get_qjit_pennylane_operations(config: TOMLDocument, shots_present, device_name) -> Set[str]:
+    """Get set of supported operations for the QJIT device in the PennyLane format. Take the target
+    device's config into account."""
+    # Supported gates of the target PennyLane's device
+    native_gates = get_pennylane_operations(config, shots_present, device_name)
+    qir_gates = set.union(
+        QJITDeviceNewAPI.operations_supported_by_QIR_runtime,
+        deduce_native_controlled_gates(QJITDeviceNewAPI.operations_supported_by_QIR_runtime),
+    )
+    supported_gates = list(set.intersection(native_gates, qir_gates))
+
+    # These are added unconditionally.
+    supported_gates += ["Cond", "WhileLoop", "ForLoop"]
+
+    if check_mid_circuit_measurement_flag(config):  # pragma: no branch
+        supported_gates += ["MidCircuitMeasure"]
+
+    if check_adjoint_flag(config, shots_present):
+        supported_gates += ["Adjoint"]
+
+    supported_gates += ["ControlledQubitUnitary"]
+    return set(supported_gates)
+
+
 class QJITDevice(qml.QubitDevice):
     """QJIT device.
 
@@ -100,29 +125,6 @@ class QJITDevice(qml.QubitDevice):
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
         return {"MultiControlledX", "BlockEncode"}
 
-    @staticmethod
-    def _get_supported_operations(config: TOMLDocument, shots_present) -> Set[str]:
-        """Override the set of supported operations."""
-        # Supported gates of the target PennyLane's device
-        native_gates = get_pennylane_operations(config, shots_present)
-        qir_gates = set.union(
-            QJITDevice.operations_supported_by_QIR_runtime,
-            deduce_native_controlled_gates(QJITDevice.operations_supported_by_QIR_runtime),
-        )
-        supported_gates = list(set.intersection(native_gates, qir_gates))
-
-        # These are added unconditionally.
-        supported_gates += ["Cond", "WhileLoop", "ForLoop"]
-
-        if check_mid_circuit_measurement_flag(config):  # pragma: no branch
-            supported_gates += ["MidCircuitMeasure"]
-
-        if check_adjoint_flag(config, shots_present):
-            supported_gates += ["Adjoint"]
-
-        supported_gates += ["ControlledQubitUnitary"]
-        return set(supported_gates)
-
     def __init__(
         self,
         target_config: TOMLDocument,
@@ -133,13 +135,18 @@ class QJITDevice(qml.QubitDevice):
         super().__init__(wires=wires, shots=shots)
 
         self.target_config = target_config
-        self.backend_name = backend.name if backend else "default"
+        self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
+        device_name = backend.device_name if backend else "default"
 
         shots_present = shots is not None
-        self._operations = set(QJITDevice._get_supported_operations(target_config, shots_present))
-        self._observables = set(get_observables(target_config, shots_present))
+        self._operations = get_qjit_pennylane_operations(
+            target_config, shots_present, device_name
+        )
+        self._observables = get_pennylane_observables(
+            target_config, shots_present, device_name
+        )
 
     @property
     def operations(self) -> Set[str]:
@@ -236,29 +243,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
         return {"MultiControlledX", "BlockEncode"}
 
-    @staticmethod
-    def _get_supported_operations(config: TOMLDocument, shots_present) -> Set[str]:
-        """Override the set of supported operations."""
-        # Supported gates of the target PennyLane's device
-        native_gates = get_pennylane_operations(config, shots_present)
-        qir_gates = set.union(
-            QJITDeviceNewAPI.operations_supported_by_QIR_runtime,
-            deduce_native_controlled_gates(QJITDeviceNewAPI.operations_supported_by_QIR_runtime),
-        )
-        supported_gates = list(set.intersection(native_gates, qir_gates))
-
-        # These are added unconditionally.
-        supported_gates += ["Cond", "WhileLoop", "ForLoop"]
-
-        if check_mid_circuit_measurement_flag(config):  # pragma: no branch
-            supported_gates += ["MidCircuitMeasure"]
-
-        if check_adjoint_flag(config, shots_present):
-            supported_gates += ["Adjoint"]
-
-        supported_gates += ["ControlledQubitUnitary"]
-        return set(supported_gates)
-
     # pylint: disable=too-many-arguments
     def __init__(
         self,
@@ -273,13 +257,18 @@ class QJITDeviceNewAPI(qml.devices.Device):
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         self.target_config = target_config
-        self.backend_name = backend.name if backend else "default"
+        self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
+        device_name = backend.device_name if backend else "default"
 
         shots_present = original_device.shots is not None
-        self._operations = set(self._get_supported_operations(target_config, shots_present))
-        self._observables = set(get_observables(target_config, shots_present))
+        self._operations = get_qjit_pennylane_operations(
+            target_config, shots_present, device_name
+        )
+        self._observables = get_pennylane_observables(
+            target_config, shots_present, device_name
+        )
 
     @property
     def operations(self) -> Set[str]:
