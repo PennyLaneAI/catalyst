@@ -22,7 +22,7 @@ import pennylane as qml
 import pytest
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import (  # check_device_config,
+from catalyst.utils.runtime import (
     check_full_overlap,
     check_no_overlap,
     check_quantum_control_flag,

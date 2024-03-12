@@ -326,8 +326,8 @@ def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> Backe
     elif hasattr(device, "get_c_interface"):
         # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
-    else:  # pragma: no cover
-        raise CompileError(f"The {dname} device is not supported for compilation at the moment.")
+    else:
+        raise CompileError(f"The {dname} device does not provide C interface for compilation.")
 
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")

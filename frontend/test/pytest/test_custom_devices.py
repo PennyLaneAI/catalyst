@@ -213,3 +213,35 @@ def test_custom_device_bad_directory():
         @qml.qnode(DummyDevice(wires=1))
         def f():
             return measure(0)
+
+
+def test_custom_device_no_c_interface():
+    """Test that custom device error."""
+
+    class DummyDevice(qml.QubitDevice):
+        """Dummy Device"""
+
+        name = "Dummy Device"
+        short_name = "dummy.device"
+        pennylane_requires = "0.33.0"
+        version = "0.0.1"
+        author = "Dummy"
+
+        operations = OPERATIONS
+        observables = OBSERVABLES
+
+        def __init__(self, shots=None, wires=None):
+            super().__init__(wires=wires, shots=shots)
+
+        def apply(self, operations, **kwargs):
+            """Unused."""
+            raise RuntimeError("Dummy device")
+
+    with pytest.raises(
+        CompileError, match="The dummy.device device does not provide C interface for compilation."
+    ):
+
+        @qjit
+        @qml.qnode(DummyDevice(wires=1))
+        def f():
+            return measure(0)
