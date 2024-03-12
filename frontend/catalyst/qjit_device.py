@@ -141,12 +141,8 @@ class QJITDevice(qml.QubitDevice):
         device_name = backend.device_name if backend else "default"
 
         shots_present = shots is not None
-        self._operations = get_qjit_pennylane_operations(
-            target_config, shots_present, device_name
-        )
-        self._observables = get_pennylane_observables(
-            target_config, shots_present, device_name
-        )
+        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
+        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
 
     @property
     def operations(self) -> Set[str]:
@@ -263,12 +259,8 @@ class QJITDeviceNewAPI(qml.devices.Device):
         device_name = backend.device_name if backend else "default"
 
         shots_present = original_device.shots is not None
-        self._operations = get_qjit_pennylane_operations(
-            target_config, shots_present, device_name
-        )
-        self._observables = get_pennylane_observables(
-            target_config, shots_present, device_name
-        )
+        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
+        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
 
     @property
     def operations(self) -> Set[str]:
