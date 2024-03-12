@@ -68,8 +68,9 @@ Prod = {}
 Expval = {}
 Var = {}
 Probs = {}
-Sample = {}
-Counts = { condition = [ "finiteshots" ] }
+State = { condition = [ "analytic" ] }
+Sample = { condition = [ "finiteshots" ] }
+Count = { condition = [ "finiteshots" ] }
 
 [compilation]
 # If the device is compatible with qjit

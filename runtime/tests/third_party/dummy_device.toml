@@ -90,7 +90,8 @@ Exp = {}
 Expval = {}
 Var = {}
 Probs = {}
-Sample = {}
+State = { condition = [ "analytic" ] }
+Sample = { condition = [ "finiteshots" ] }
 Count = { condition = [ "finiteshots" ] }
 
 [compilation]
@@ -107,6 +108,6 @@ dynamic_qubit_management = false
 
 [options]
 
-option1 = '_option1'
-option2 = '_option2'
+option1 = "_option1"
+option2 = "_option2"
 
