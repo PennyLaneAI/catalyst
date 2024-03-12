@@ -35,7 +35,7 @@ def test_callback_no_returns_no_params(capsys):
     def my_callback() -> None:
         print("Hello erick")
 
-    @qml.qjit
+    @qml.qjit(keep_intermediate=True)
     def cir():
         my_callback()
         return None
@@ -78,3 +78,21 @@ def test_callback_twice(capsys):
     cir2()
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
+
+def test_callback_send_param(capsys):
+    """Test callback no parameters no returns"""
+
+    import jax
+
+    @callback
+    def my_callback(n : jax.core.ShapedArray([], int)) -> None:
+        print(n)
+
+    @qml.qjit(keep_intermediate=True)
+    def cir(n):
+        my_callback(n)
+        return None
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"

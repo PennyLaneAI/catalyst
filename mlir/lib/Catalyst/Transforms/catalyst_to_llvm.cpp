@@ -455,7 +455,16 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
 
         SmallVector<Value> callArgs{ident};
         callArgs.insert(callArgs.end(), argc);
-        callArgs.insert(callArgs.end(), adaptor.getInputs().begin(), adaptor.getInputs().end());
+
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        for (auto memref : adaptor.getInputs()) {
+            Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+            // allocate a pointer in the stack.
+            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, memref.getType(), c1);
+            rewriter.create<LLVM::StoreOp>(loc, memref, ptr);
+            // push the pointer to the stack.
+            callArgs.push_back(ptr);
+        }
         rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
         rewriter.eraseOp(op);
         return success();

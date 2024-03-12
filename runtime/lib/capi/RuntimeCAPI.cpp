@@ -123,10 +123,7 @@ void pyregistry(int64_t identifier, int64_t argc, ...)
     //
     // This function cannot be tested from the runtime tests because there would be no valid python
     // function to callback...
-
-    std::string libpath = LIBREGISTRY;
-
-    void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
+    void *handle = dlopen(LIBREGISTRY, RTLD_LAZY);
     if (!handle) {
         char *err_msg = dlerror();
         RT_FAIL(err_msg);
