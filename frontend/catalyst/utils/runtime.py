@@ -81,6 +81,9 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
         "CRY",
         "CRZ",
         "CRot",
+        "ControlledPhaseShift",
+        "QubitUnitary",
+        "Toffoli",
     ]
     native_controlled_gates = set(
         [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
@@ -149,8 +152,8 @@ def check_no_overlap(*args):
     raise CompileError(msg)
 
 
-def filter_out_adjoint_and_control(operations):
-    """Remove Adjoint and C strings from operations.
+def filter_out_adjoint(operations):
+    """Remove Adjoint from operations.
 
     Args:
         operations (List[Str]): List of strings with names of supported operations
@@ -160,17 +163,12 @@ def filter_out_adjoint_and_control(operations):
         removed.
     """
     adjoint = re.compile(r"^Adjoint\(.*\)$")
-    control = re.compile(r"^C\(.*\)$")
 
     def is_not_adj(op):
         return not re.match(adjoint, op)
 
-    def is_not_ctrl(op):
-        return not re.match(control, op)
-
     operations_no_adj = filter(is_not_adj, operations)
-    operations_no_adj_no_ctrl = filter(is_not_ctrl, operations_no_adj)
-    return set(operations_no_adj_no_ctrl)
+    return set(operations_no_adj)
 
 
 def check_full_overlap(device_gates: Set[str], spec_gates: Set[str]) -> None:
@@ -228,17 +226,19 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     if isinstance(device, qml.Device):  # pragma: nocover
         if device.short_name == "lightning.kokkos":
             observables.update({"Projector"})
+            native.update({"C(GlobalPhase)"})
     else:  # pragma: nocover
         if device.name == "lightning.kokkos":
             observables.update({"Projector"})
+            native.update({"C(GlobalPhase)"})
 
     check_no_overlap(native, decomposable, matrix)
 
     if hasattr(device, "operations") and hasattr(device, "observables"):  # pragma: nocover
         device_gates = set.union(set(device.operations), set(device.observables))
-        device_gates = filter_out_adjoint_and_control(device_gates)
+        device_gates = filter_out_adjoint(device_gates)
         spec_gates = set.union(native, observables, matrix, decomposable)
-        spec_gates = filter_out_adjoint_and_control(spec_gates)
+        spec_gates = filter_out_adjoint(spec_gates)
         check_full_overlap(device_gates, spec_gates)
     else:  # pragma: nocover
         # TODO: How to check the validity for the new device API of PennyLane?  The new device API
