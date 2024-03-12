@@ -53,7 +53,7 @@ def get_ranked_memref_descriptor(array):
 
 def ranked_memref_to_numpy(ranked_memref):
     try:
-        mlir_ranked_memref_to_numpy(ranked_memref)
+        return mlir_ranked_memref_to_numpy(ranked_memref)
     except AttributeError:
         # zero dimensional tensor...
         content_ptr = move_aligned_ptr_by_offset(
