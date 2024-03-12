@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This program checks the syntax of quantum device configuration files. It is a strict parser of
-# TOML format, narrowed down to match our requirements.  For the Lark's EBNF dialect syntax, see the
-# Lark grammar reference:
-#
-# * https://lark-parser.readthedocs.io/en/latest/grammar.html
+"""
+This program checks the syntax of quantum device configuration files. It is a strict parser of
+TOML format, narrowed down to match our requirements.  For the Lark's EBNF dialect syntax, see the
+Lark grammar reference:
+ * https://lark-parser.readthedocs.io/en/latest/grammar.html
+"""
 
 import sys
 from argparse import ArgumentParser
