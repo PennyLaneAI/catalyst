@@ -236,7 +236,7 @@ headers and fields are generally required, unless stated otherwise.
         # the device considers "supported" through PennyLane's device API.
         # The gate definition has the following format:
         #
-        #   GATE = { properties = { PROPS }, condition = { COND } }
+        #   GATE = { properties = [ PROPS ], condition = [ COND ] }
         #
         # Where:
         #
