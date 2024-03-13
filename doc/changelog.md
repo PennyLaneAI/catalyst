@@ -9,7 +9,7 @@
 
 <h3>Improvements</h3>
 
-* An updated quanutm device specification format is now supported by Catalyst. The toml schema 2
+* An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
   support, gate invertibility or differentiability.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
