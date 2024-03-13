@@ -62,23 +62,6 @@ std::string joinPasses(const Pipeline::PassList &passes)
     return joined;
 }
 
-struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
-    typedef std::function<LogicalResult(Pass *, PrintCallbackFn print)> PrintHandler;
-    PrintHandler printHandler;
-
-    CatalystIRPrinterConfig(PrintHandler printHandler)
-        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler)
-    {
-    }
-
-    void printAfterIfEnabled(Pass *pass, Operation *operation, PrintCallbackFn printCallback) final
-    {
-        if (failed(printHandler(pass, printCallback))) {
-            operation->emitError("IR printing failed");
-        }
-    }
-};
-
 struct CatalystPassInstrumentation : public PassInstrumentation {
     typedef std::function<void(Pass *pass, Operation *operation)> Callback;
     Callback afterPassCallback;
@@ -404,9 +387,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
-    // TODO: FIXME:
-    // Let's try to enable multithreading. Do not forget to protect the printing.
-    ctx.disableMultithreading();
+    ctx.enableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
