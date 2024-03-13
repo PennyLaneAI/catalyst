@@ -19,6 +19,7 @@
 #include <iostream>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -67,27 +68,17 @@ namespace catalyst::utils {
  * `llvm::Module` using the static methods in this class.
  *
  * To display results, run the driver with the `ENABLE_DIAGNOSTICS=ON` variable.
- * To store results in YAML format, use `PROFILING_RESULTS_PATH=/path/to/file.yml`
+ * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
  * along with `ENABLE_DIAGNOSTICS=ON`.
- *
- * Note that using both `ENABLE_DIAGNOSTICS=ON` and `ENABLE_TIME_PROFILING=ON` will
- * introduce noise to the timing results.
  */
 class LinesCount {
   private:
-    [[nodiscard]] inline static bool enable_debug_info()
-    {
-        char *value = getenv("ENABLE_DIAGNOSTICS");
-        if (!value || std::string(value) != "ON") {
-            return false;
-        }
-        return true;
-    }
-
     inline static void print(const std::string &opStrBuf, const std::string &name)
     {
         const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
-        std::cerr << "[DEBUG] After " << std::setw(23) << std::left << name;
+        if (!name.empty()) {
+            std::cerr << "[DIAGNOSTICS]\t After " << std::setw(18) << std::left << name;
+        }
         std::cerr << "\t" << std::fixed << "program-size: " << num_lines << std::fixed << " lines";
         std::cerr << std::endl;
     }
@@ -120,7 +111,7 @@ class LinesCount {
 
     inline static void dump(const std::string &opStrBuf, const std::string &name = {})
     {
-        char *file = getenv("PROFILING_RESULTS_PATH");
+        char *file = getenv("DIAGNOSTICS_RESULTS_PATH");
         if (!file) {
             print(opStrBuf, name);
             return;
@@ -130,9 +121,18 @@ class LinesCount {
     }
 
   public:
+    [[nodiscard]] inline static bool is_diagnostics_enabled()
+    {
+        char *value = getenv("ENABLE_DIAGNOSTICS");
+        if (!value || std::string(value) != "ON") {
+            return false;
+        }
+        return true;
+    }
+
     static void Operation(Operation *op, const std::string &name = {})
     {
-        if (!enable_debug_info()) {
+        if (!is_diagnostics_enabled()) {
             return;
         }
 
@@ -145,7 +145,7 @@ class LinesCount {
 
     static void ModuleOp(const ModuleOp &op, const std::string &name = {})
     {
-        if (!enable_debug_info()) {
+        if (!is_diagnostics_enabled()) {
             return;
         }
 
@@ -158,7 +158,7 @@ class LinesCount {
 
     static void Module(const llvm::Module &llvmModule, const std::string &name = {})
     {
-        if (!enable_debug_info()) {
+        if (!is_diagnostics_enabled()) {
             return;
         }
 
@@ -200,12 +200,22 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
 };
 
 struct CatalystPassInstrumentation : public PassInstrumentation {
-    typedef std::function<void(Pass *pass, Operation *operation)> Callback;
-    Callback afterPassCallback;
-    Callback afterPassFailedCallback;
+    typedef std::function<void(Pass *pass, Operation *operation)> PassCallback;
+    typedef std::function<void(std::optional<OperationName> name,
+                               const PipelineParentInfo &parentInfo)>
+        PipelineCallback;
+    PassCallback afterPassCallback;
+    PassCallback afterPassFailedCallback;
+    PipelineCallback beforePipelineCallback;
+    PipelineCallback afterPipelineCallback;
 
-    CatalystPassInstrumentation(Callback afterPassCallback, Callback afterPassFailedCallback)
-        : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback)
+    CatalystPassInstrumentation(PassCallback afterPassCallback,
+                                PassCallback afterPassFailedCallback,
+                                PipelineCallback beforePipelineCallback,
+                                PipelineCallback afterPipelineCallback)
+        : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback),
+          beforePipelineCallback(beforePipelineCallback),
+          afterPipelineCallback(afterPipelineCallback)
     {
     }
 
@@ -217,6 +227,18 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     void runAfterPassFailed(Pass *pass, Operation *operation) override
     {
         this->afterPassFailedCallback(pass, operation);
+    }
+
+    void runBeforePipeline(std::optional<OperationName> name,
+                           const PipelineParentInfo &parentInfo) override
+    {
+        this->beforePipelineCallback(name, parentInfo);
+    }
+
+    void runAfterPipeline(std::optional<OperationName> name,
+                          const PipelineParentInfo &parentInfo) override
+    {
+        this->afterPipelineCallback(name, parentInfo);
     }
 };
 
@@ -498,9 +520,35 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     };
 
+    catalyst::utils::Timer timer{};
+
+    auto beforePipelineCallback =
+        [&](std::optional<OperationName> name,
+            const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
+            std::cerr << ">>>>>>>>>>>>>>>>>>>>>" << std::endl;
+            Pass *pass = parentInfo.parentPass;
+            auto res = passPipelineNames.find(pass);
+            if (res != passPipelineNames.end()) {
+                timer.start();
+            }
+        };
+
+    auto afterPipelineCallback =
+        [&](std::optional<OperationName> name,
+            const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
+            Pass *pass = parentInfo.parentPass;
+            auto res = passPipelineNames.find(pass);
+            if (res != passPipelineNames.end()) {
+                timer.dump(res->second);
+                // catalyst::utils::LinesCount::Operation(op, res->second);
+            }
+            std::cerr << "<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+        };
+
     // Output pipeline names on failures
     pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(
-        new CatalystPassInstrumentation(afterPassCallback, afterPassFailedCallback)));
+        new CatalystPassInstrumentation(afterPassCallback, afterPassFailedCallback,
+                                        beforePipelineCallback, afterPipelineCallback)));
 
     // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
@@ -544,11 +592,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
-    OwningOpRef<ModuleOp> op = timer::timer(parseMLIRSource, "parseMLIRSource", &ctx, *sourceMgr);
-    catalyst::utils::LinesCount::ModuleOp(op.get());
+    OwningOpRef<ModuleOp> op =
+        timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
+    catalyst::utils::LinesCount::ModuleOp(*op);
 
     if (op) {
-        if (failed(timer::timer(runLowering, "runMLIRPasses", options, &ctx, *op, output))) {
+        if (failed(timer::timer(runLowering, "runMLIRPasses", /* add_endl */ true, options, &ctx,
+                                *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
@@ -557,8 +607,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
-            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR", *op,
-                                      llvmContext, "LLVMDialectModule");
+            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
+                                      /* add_endl */ false, *op, llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
@@ -575,9 +625,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent,
                "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
-        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", llvmContext, options.source,
-                                  options.moduleName, err);
+        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", /* add_endl */ false,
+                                  llvmContext, options.source, options.moduleName, err);
         if (!llvmModule) {
+            catalyst::utils::LinesCount::Module(*llvmModule);
+
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
             CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM source\n");
@@ -586,13 +638,15 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", options, llvmModule, output))) {
+        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", /* add_endl */ false, options,
+                                llvmModule, output))) {
             return failure();
         }
 
         catalyst::utils::LinesCount::Module(*llvmModule.get());
 
-        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", options, llvmModule, output))) {
+        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false, options,
+                                llvmModule, output))) {
             return failure();
         }
 
@@ -614,8 +668,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             // element type. This is because the LLVM pointer type is
             // opaque and requires looking into its uses to infer its type.
             SmallVector<RankedTensorType> returnTypes;
-            if (failed(timer::timer(inferMLIRReturnTypes, "inferMLIRReturn", &ctx,
-                                    function.value()->getReturnType(), Float64Type::get(&ctx),
+            if (failed(timer::timer(inferMLIRReturnTypes, "inferMLIRReturn", /* add_endl */ true,
+                                    &ctx, function.value()->getReturnType(), Float64Type::get(&ctx),
                                     returnTypes))) {
                 // Inferred return types are only required when compiling from textual IR. This
                 // inference failing is not a problem when compiling from Python.
@@ -636,8 +690,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         auto outfile = options.getObjectFile();
-        if (failed(timer::timer(compileObjectFile, "compileObjFile", options, std::move(llvmModule),
-                                outfile))) {
+        if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
+                                std::move(llvmModule), outfile))) {
             return failure();
         }
         output.objectFilename = outfile;
