@@ -112,7 +112,7 @@ class TestPreprocess:
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
-        assert "quantum.blockencode" not in mlir
+        assert "BlockEncode" not in mlir
 
     @pytest.mark.skipif(
         not pathlib.Path(
@@ -125,9 +125,12 @@ class TestPreprocess:
         dev = DummyDevice(wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
+            """Op without matrix."""
+
             num_wires = qml.operation.AnyWires
 
-            def matrix(self):
+            def matrix(self, wire_order=None):
+                """Matrix is overriden."""
                 raise NotImplementedError()
 
         @qml.qnode(dev)
