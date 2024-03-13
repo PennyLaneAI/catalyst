@@ -108,6 +108,7 @@ class TestPreprocess:
             num_wires = qml.operation.AnyWires
 
             def matrix(self, wire_order=None):
+                """Matrix is overriden."""
                 raise NotImplementedError()
 
         @qml.qnode(dev)
