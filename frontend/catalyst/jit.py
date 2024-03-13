@@ -435,7 +435,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
-):  # pylint: disable=too-many-arguments
+):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -724,39 +724,10 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
 
-    argnums = static_argnums
-    axes = abstracted_axes
-    if fn is not None:
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
+    if fn is None:
+        return functools.partial(qjit, **kwargs)
 
-    def wrap_fn(fn):
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
-
-    return wrap_fn
+    return QJIT(fn, CompileOptions(**kwargs))
