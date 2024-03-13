@@ -87,7 +87,7 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
     ]
     native_controlled_gates = set(
         [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
-        #TODO: remove after PR #642 is merged in lightning
+        # TODO: remove after PR #642 is merged in lightning
         + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
     )
     return native_controlled_gates
@@ -119,7 +119,7 @@ def get_pennylane_operations(
             deduce_native_controlled_gates(native_gates) if supports_controlled else set()
         )
 
-        #TODO: remove after PR #642 is merged in lightning
+        # TODO: remove after PR #642 is merged in lightning
         if device_name == "lightning.kokkos":  # pragma: nocover
             native_gates.update({"C(GlobalPhase)"})
 
@@ -145,7 +145,7 @@ def get_pennylane_observables(
 
     observables = set(get_observables(config, shots_present))
 
-    #TODO: remove after PR #642 is merged in lightning
+    # TODO: remove after PR #642 is merged in lightning
     if device_name == "lightning.kokkos":  # pragma: nocover
         observables.update({"Projector"})
 

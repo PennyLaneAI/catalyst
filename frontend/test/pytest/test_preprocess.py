@@ -72,6 +72,12 @@ class TestPreprocess:
         assert isinstance(decomposed_ops[0], qml.QubitUnitary)
         assert isinstance(decomposed_ops[1], qml.RX)
 
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = DummyDevice(wires=4)
@@ -86,6 +92,12 @@ class TestPreprocess:
         assert "quantum.unitary" in mlir
         assert "quantum.blockencode" not in mlir
 
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
     def test_no_matrix(self):
         """Test that controlling an operation without a matrix method raises an error."""
         dev = DummyDevice(wires=4)
