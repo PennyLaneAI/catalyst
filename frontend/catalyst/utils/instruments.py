@@ -125,8 +125,8 @@ def measure_program_size(results, size_from):
 ## REPORTING ##
 def print_result(stage, wall_time, cpu_time, program_size=None):
     print(f"[TIMER] Running {stage.ljust(23)}", end="\t")
-    print(f"walltime: {wall_time / 1e6}ms", end="\t")
-    print(f"cputime: {cpu_time / 1e6}ms", end="\t")
+    print(f"walltime: {(str(wall_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
+    print(f"cputime: {(str(cpu_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
     if program_size is not None:
         print(f"programsize: {program_size} lines", end="")
     print(end="\n")
