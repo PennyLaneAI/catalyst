@@ -107,6 +107,7 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import TOMLDocument
 from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
+
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
@@ -2438,7 +2439,9 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 
     return batch_size
 
+
 class CallbackClosure:
+    """This is just a class containing data that is important for the callback."""
 
     def __init__(self, *absargs, **abskwargs):
         self.absargs = absargs
@@ -2447,11 +2450,13 @@ class CallbackClosure:
     @property
     @cache
     def tree_flatten(self):
+        """Flatten args and kwargs."""
         return tree_flatten((self.absargs, self.abskwargs))
 
     @property
     @cache
     def getLowLevelSignature(self):
+        """Get the memref descriptor types"""
         flat_params, in_tree = self.tree_flatten
         low_level_flat_params = []
         for param in flat_params:
@@ -2460,7 +2465,16 @@ class CallbackClosure:
             ptr_ty = ctypes.POINTER(memref_type)
             low_level_flat_params.append(ptr_ty)
         return low_level_flat_params
-            
+
+    def getArgsAsJAXArrays(self, flat_args):
+        jnpargs = []
+        for void_ptr, ty in zip(flat_args, self.getLowLevelSignature):
+            memref_ty = ctypes.cast(void_ptr, ty)
+            nparray = ranked_memref_to_numpy(memref_ty)
+            jnparray = jnp.asarray(nparray)
+            jnpargs.append(jnparray)
+        return jnpargs
+
 
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
@@ -2502,17 +2516,12 @@ def callback_implementation(
         It is actually a pointer to a memref object.
         To find out which element type it has, we use the signature obtained previously.
         """
-        jnpargs = []
-        for void_ptr, ty in zip(flat_args, metadata.getLowLevelSignature):
-            memref_ty = ctypes.cast(void_ptr, ty)
-            nparray = ranked_memref_to_numpy(memref_ty)
-            jnparray = jnp.asarray(nparray)
-            jnpargs.append(jnparray)
+        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
 
-        _args, _kwargs = tree_unflatten(in_tree, jnpargs)
-        return tree_leaves(cb(*_args, **_kwargs))
+        args, kwargs = tree_unflatten(in_tree, jnpargs)
+        return tree_leaves(cb(*args, **kwargs))
 
-    # TODO(@erick-xanadu): Change back once we support arguments.
+    # TODO(@erick-xanadu): Change back once we support return values.
     # I am leaving this as a to-do because otherwise the coverage will complain.
     # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
     results_aval = []
