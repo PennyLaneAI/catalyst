@@ -265,12 +265,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
 def device_get_toml_config(device) -> Path:
     """Get the path of the device config file."""
-    name = device.short_name if isinstance(device, qml.Device) else device.name
-    toml_file_forced = environ.get(f"CATALYST_FORCE_{name.upper().replace('.', '_')}_CONFIG")
-    if toml_file_forced:  # pragma: nocover
-        # This section is required for future config testing
-        toml_file = toml_file_forced
-    elif hasattr(device, "config"):
+    if hasattr(device, "config"):
         # The expected case: device specifies its own config.
         toml_file = device.config
     else:
@@ -278,6 +273,7 @@ def device_get_toml_config(device) -> Path:
         # field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
+        name = device.short_name if isinstance(device, qml.Device) else device.name
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
         toml_file_name = name.replace(".", "_") + ".toml"
