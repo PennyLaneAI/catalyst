@@ -26,7 +26,6 @@ from collections.abc import Sequence, Sized
 from functools import cache, update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
-
 import jax
 import jax.numpy as jnp
 import numpy as np
