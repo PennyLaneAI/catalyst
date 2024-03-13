@@ -61,6 +61,28 @@ class DummyDevice(Device):
 class TestPreprocess:
     """Test the preprocessing transforms implemented in Catalyst."""
 
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
+    def test_decompose_integration(self):
+        """Test the decompose transform as part of the Catalyst pipeline."""
+        dev = DummyDevice(wires=4)
+
+        @qml.qjit
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.SingleExcitationPlus(theta, wires=[0, 1])
+            return qml.state()
+
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        assert "PauliX" in mlir
+        assert "CNOT" in mlir
+        assert "ControlledPhaseShift" in mlir
+        assert "SingleExcitationPlus" not in mlir
+
     def test_decompose_ops_to_unitary(self):
         """Test the decompose ops to unitary transform."""
         operations = [qml.CNOT(wires=[0, 1]), qml.RX(0.1, wires=0)]
