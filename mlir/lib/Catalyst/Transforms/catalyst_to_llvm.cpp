@@ -438,9 +438,7 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         // The argument convention is as follows:
         // arg0 = identifier
         // arg1 = length of varargs
-        // arg2..N+2 varargs can be any scalar type?
-        // will later be put into a Python list
-        // and this python list will be unflatten in python.
+        // arg2..N+2 varargs pointers to memrefs
         bool isVarArg = true;
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
             mod, "pyregistry", {/*args=*/i64, i64}, /*ret_type=*/voidType, isVarArg);
@@ -458,10 +456,11 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto memref : adaptor.getInputs()) {
             Type ptrTy = LLVM::LLVMPointerType::get(ctx);
-            // allocate a pointer in the stack.
+            // allocate a memref descriptor on the stack
             Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, memref.getType(), c1);
+            // store the memref descriptor on the pointer
             rewriter.create<LLVM::StoreOp>(loc, memref, ptr);
-            // push the pointer to the stack.
+            // add the ptr to the arguments
             callArgs.push_back(ptr);
         }
         rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
