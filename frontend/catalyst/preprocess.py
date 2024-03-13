@@ -1,31 +1,44 @@
-# def stopping_condition(op: qml.operation.Operator) -> bool:
-#     """Specify whether or not an Operator object is supported by the device."""
-#     if op.name == "QFT" and len(op.wires) >= 6:
-#         return False
-#     if op.name == "GroverOperator" and len(op.wires) >= 13:
-#         return False
-#     if op.name == "Snapshot":
-#         return True
-#     if op.__class__.__name__[:3] == "Pow" and qml.operation.is_trainable(op):
-#         return False
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
-#     return op.has_matrix
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 
-# def stopping_condition_shots(op: qml.operation.Operator) -> bool:
-#     """Specify whether or not an Operator object is supported by the device with shots."""
-#     return isinstance(op, (Conditional, MidMeasureMP)) or stopping_condition(op)
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""This module contains the preprocessing functions.
+"""
 
 import pennylane as qml
 from pennylane import transform
+
+import catalyst
 from catalyst.utils.exceptions import CompileError
+
 
 @transform
 def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
-    """
+    r"""Quantum transform to combine rotation gates of the same type that act sequentially.
+
+    If the combination of two rotation produces an angle that is close to 0,
+    neither gate will be applied.
+
+    Args:
+        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        ops (list[str]): The list of operation names to be converted to unitary.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
     """
     new_operations = []
+
     for op in tape.operations:
-        if op in convert_to_matrix_ops or type(op) == qml.ops.Controlled:
+        if op.name in convert_to_matrix_ops or isinstance(op, catalyst.pennylane_extensions.QCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -42,4 +55,5 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
         into a result for a single ``QuantumTape``.
         """
         return results[0]
+
     return [new_tape], null_postprocessing

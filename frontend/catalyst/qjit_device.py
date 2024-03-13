@@ -18,6 +18,7 @@ from typing import Optional, Set
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 
+from catalyst.preprocess import decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
@@ -31,7 +32,6 @@ from catalyst.utils.toml import (
     check_adjoint_flag,
     check_mid_circuit_measurement_flag,
 )
-from catalyst.preprocess import decompose_ops_to_unitary
 
 RUNTIME_OPERATIONS = {
     "Identity",
