@@ -35,7 +35,7 @@ def test_callback_no_returns_no_params(capsys):
     def my_callback() -> None:
         print("Hello erick")
 
-    @qml.qjit(keep_intermediate=True)
+    @qml.qjit
     def cir():
         my_callback()
         return None
