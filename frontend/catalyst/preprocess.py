@@ -23,14 +23,11 @@ from catalyst.utils.exceptions import CompileError
 
 @transform
 def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
-    r"""Quantum transform to combine rotation gates of the same type that act sequentially.
-
-    If the combination of two rotation produces an angle that is close to 0,
-    neither gate will be applied.
+    r"""Quantum transform that decompose operations to unitary given a list of operations name.
 
     Args:
         tape (QNode or QuantumTape or Callable): A quantum circuit.
-        ops (list[str]): The list of operation names to be converted to unitary.
+        convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
