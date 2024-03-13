@@ -51,6 +51,7 @@ def test_as_ctype(inp, exp):
 @pytest.mark.parametrize(
     "inp, exp",
     [
+        (1, make_zero_d_memref_descriptor(ctypes.c_long)),
         (ShapedArray([], float), make_zero_d_memref_descriptor(ctypes.c_double)),
         (ShapedArray([1], float), make_nd_memref_descriptor(1, ctypes.c_double)),
         (ShapedArray([2,2], float), make_nd_memref_descriptor(2, ctypes.c_double)),
