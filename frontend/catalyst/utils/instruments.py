@@ -44,13 +44,17 @@ def instrumentation(session_name, filename=None, detailed=False):
         del session
 
 
-def instrument(fn):
+def instrument(fn=None, *, size_from=None):
     """Decorator that marks functions as targets for instrumentation. Instrumentation is only
     performed when enabled by a session.
 
     Args:
         fn (Callable): function to instrument
+        size_from (int | None): optional index indicating from which result to measure program size
+                                by number of newlines in the string representation of the result
     """
+    if fn is None:
+        return functools.partial(instrument, size_from=size_from)
 
     stage_name = getattr(fn, "__name__", "UNKNOWN")
 
@@ -60,10 +64,12 @@ def instrument(fn):
             return fn(*args, **kwargs)
 
         fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+        program_size = measure_program_size(fn_results, size_from)
+
         if InstrumentSession.filename:
-            dump_result(stage_name, wall_time, cpu_time)
+            dump_result(stage_name, wall_time, cpu_time, program_size)
         else:
-            print_result(stage_name, wall_time, cpu_time)
+            print_result(stage_name, wall_time, cpu_time, program_size)
 
         return fn_results
 
@@ -95,11 +101,35 @@ def time_function(fn, args, kwargs):
     return results, stop_wall - start_wall, stop_cpu - start_cpu
 
 
+def measure_peak_memory(): ...
+
+
+def measure_program_size(results, size_from):
+    """Collect program size information by counting the number of newlines in the textual form
+    of a given program representation. The representation is assumed to be provided in the
+    instrumented function results at the provided index.
+
+    Args:
+        results (Sequence): instrumented function results
+        size_from (int | None): result index to use for size measurement
+
+    Returns:
+        int: program size
+    """
+    if size_from is None:
+        return None
+
+    return str(results[size_from]).count("\n")
+
+
 ## REPORTING ##
-def print_result(stage, wall_time, cpu_time):
+def print_result(stage, wall_time, cpu_time, program_size=None):
     print(f"[TIMER] Running {stage.ljust(23)}", end="\t")
     print(f"walltime: {wall_time / 1e6}ms", end="\t")
-    print(f"cputime: {cpu_time / 1e6}ms", end="\n")
+    print(f"cputime: {cpu_time / 1e6}ms", end="\t")
+    if program_size is not None:
+        print(f"programsize: {program_size} lines", end="")
+    print(end="\n")
 
 
 def dump_header(session_name):
@@ -117,7 +147,7 @@ def dump_header(session_name):
         file.write(f"  results:\n")
 
 
-def dump_result(stage_name, wall_time, cpu_time):
+def dump_result(stage_name, wall_time, cpu_time, program_size=None):
     """Write single stage results to file."""
     filename = InstrumentSession.filename
 
@@ -125,8 +155,8 @@ def dump_result(stage_name, wall_time, cpu_time):
         file.write(f"    - {stage_name}:\n")
         file.write(f"        walltime: {wall_time / 1e6}\n")
         file.write(f"        cputime: {cpu_time / 1e6}\n")
-        # if InstrumentSession.finegrained:
-        #     file.write(f"        finegrained:\n")
+        if program_size is not None:
+            file.write(f"        programsize: {program_size}\n")
 
 
 def dump_footer():
