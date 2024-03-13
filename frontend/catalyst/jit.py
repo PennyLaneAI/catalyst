@@ -195,7 +195,7 @@ class QJIT:
 
         return processed_fn
 
-    @instrument
+    @instrument(size_from=0)
     def capture(self, args):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
@@ -226,7 +226,7 @@ class QJIT:
 
         return jaxpr, treedef, dynamic_sig
 
-    @instrument
+    @instrument(size_from=0)
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
 
@@ -250,7 +250,7 @@ class QJIT:
 
         return mlir_module, mlir_string
 
-    @instrument
+    @instrument(size_from=1)
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
 
