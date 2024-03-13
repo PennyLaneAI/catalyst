@@ -31,6 +31,7 @@ from catalyst.utils.toml import (
     check_adjoint_flag,
     check_mid_circuit_measurement_flag,
 )
+from catalyst.preprocess import decompose_ops_to_unitary
 
 RUNTIME_OPERATIONS = {
     "Identity",
@@ -229,15 +230,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
     operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
-    @staticmethod
-    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:  # pragma: no cover
-        # We currently override and only set a few gates to preserve existing behaviour.
-        # We could choose to read from config and use the "matrix" gates.
-        # However, that affects differentiability.
-        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
-        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX", "BlockEncode"}
-
     def __init__(
         self,
         original_device,
@@ -276,6 +268,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
     ):
         """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
+
+        convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
+        program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
         # TODO: Add Catalyst program verification and validation
         return program, config
 
