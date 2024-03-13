@@ -117,6 +117,6 @@ func.func @python_call () {
     // CHECK: [[identifier:%.+]] = llvm.mlir.constant(0 : i64)
     // CHECK: [[argcount:%.+]] = llvm.mlir.constant(0 : i64)
     // CHECK: llvm.call @pyregistry([[identifier]], [[argcount]])
-    catalyst.pycallback() { identifier = 0, number_original_arg = 0 } : () -> ()
+    catalyst.pycallback() { identifier = 0} : () -> ()
     return
 }
