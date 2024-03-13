@@ -88,19 +88,7 @@ struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
     LogicalResult matchAndRewrite(PythonCallOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        // Add bufferized arguments
-        SmallVector<Value> bufferArgs;
-        ValueRange operands = adaptor.getOperands();
-        for (Value operand : operands) {
-            bufferArgs.push_back(operand);
-        }
-
-        // Create an updated custom call operation
-        // auto newPythonCall = rewriter.create<PythonCallOp>(
-        //    op->getLoc(), bufferArgs, adaptor.getIdentifier());
-        auto newCall =
-            rewriter.create<PythonCallOp>(op.getLoc(), bufferArgs, adaptor.getIdentifier());
-        op.emitRemark() << newCall;
+        rewriter.create<PythonCallOp>(op.getLoc(), adaptor.getOperands(), adaptor.getIdentifier());
         rewriter.eraseOp(op);
         return success();
     }
