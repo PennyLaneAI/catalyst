@@ -30,7 +30,8 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
         convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
 
     Returns:
-        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
     """
     new_operations = []
 

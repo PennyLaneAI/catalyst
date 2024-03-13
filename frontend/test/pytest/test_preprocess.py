@@ -103,9 +103,11 @@ class TestPreprocess:
         dev = DummyDevice(wires=4)
 
         class OpWithNoMatrix(qml.operation.Operation):
+            """Op without matrix."""
+
             num_wires = qml.operation.AnyWires
 
-            def matrix(self):
+            def matrix(self, wire_order=None):
                 raise NotImplementedError()
 
         @qml.qnode(dev)
