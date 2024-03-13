@@ -19,41 +19,37 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <ios>
 #include <iostream>
 #include <string>
 #include <thread>
 
-#ifdef __linux__
 #include <ctime>
-#include <sys/time.h>
 
-static inline double _getCPUTime()
+// Note that this method returns CPU time on Linux/Unix-like systems,
+// and returns wall-clock time on Windows.
+static inline double getClock()
 {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts)) {
-        return .0;
-    }
-    return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9;
+    // Convert results in ms
+    return static_cast<double>(1000.0 * std::clock() / CLOCKS_PER_SEC) * 0.001;
 }
-#else
-static inline double _getCPUTime() { return .0 }
-#endif
 
 namespace catalyst::utils {
 
 /**
  * Timer: A utility class to measure the wall-time and CPU-time of code blocks.
  *
- * To display results, run the driver with the `ENABLE_DEBUG_TIMER=ON` variable.
- * To store results in YAML format, use `DEBUG_RESULTS_FILE=/path/to/file.yml`
- * along with `ENABLE_DEBUG_TIMER=ON`.
+ * To display results, run the driver with the `ENABLE_TIME_PROFILING=ON` variable.
+ * To store results in YAML format, use `PROFILING_RESULTS_PATH=/path/to/file.yml`
+ * along with `ENABLE_TIME_PROFILING=ON`.
  *
- * Note that using both `ENABLE_DEBUG_INFO=ON` and `ENABLE_DEBUG_TIMER=ON` will
+ * Note that using both `ENABLE_DIAGNOSTICS=ON` and `ENABLE_TIME_PROFILING=ON` will
  * introduce noise to the timing results.
  */
 class Timer {
   private:
-    // Toggle the support w.r.t. the value of `ENABLE_DEBUG_TIMER`
+    // Toggle the support w.r.t. the value of `ENABLE_TIME_PROFILING`
     bool debug_timer;
 
     // Manage the call order of `start` and `stop` methods
@@ -69,7 +65,7 @@ class Timer {
 
     static inline bool enable_debug_timer() noexcept
     {
-        char *value = getenv("ENABLE_DEBUG_TIMER");
+        char *value = getenv("ENABLE_TIME_PROFILING");
         if (value && std::string(value) == "ON") {
             return true;
         }
@@ -83,7 +79,7 @@ class Timer {
     {
         if (debug_timer) {
             start_time_ = std::chrono::steady_clock::now();
-            start_cpu_time_ = _getCPUTime();
+            start_cpu_time_ = getClock();
             running = true;
         }
     }
@@ -91,7 +87,7 @@ class Timer {
     void stop() noexcept
     {
         if (debug_timer && running) {
-            stop_cpu_time_ = _getCPUTime();
+            stop_cpu_time_ = getClock();
             stop_time_ = std::chrono::steady_clock::now();
             running = false;
         }
@@ -116,9 +112,11 @@ class Timer {
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
         const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
 
-        std::cerr << "[TIMER] Running " << name;
-        std::cerr << "\t walltime: " << wall_elapsed << "ms";
-        std::cerr << "\t cputime: " << cpu_elapsed << "ms";
+        std::cerr << "[TIMER] Running " << std::setw(23) << std::left << name;
+        std::cerr << "\t" << std::fixed << "walltime: " << std::setprecision(3) << wall_elapsed
+                  << std::fixed << " ms";
+        std::cerr << "\t" << std::fixed << "cputime: " << std::setprecision(3) << cpu_elapsed
+                  << std::fixed << " ms";
         std::cerr << std::endl;
     }
 
@@ -131,9 +129,9 @@ class Timer {
         if (!std::filesystem::exists(file_path)) {
             std::ofstream ofile(file_path);
             assert(ofile.is_open() && "Invalid file to store timer results");
-            ofile << "        - " << name << "\n";
-            ofile << "          walltime: " << wall_elapsed << "\n";
-            ofile << "          cputime: " << cpu_elapsed << "\n";
+            ofile << "        - " << name << ":\n";
+            ofile << "            walltime: " << wall_elapsed << "\n";
+            ofile << "            cputime: " << cpu_elapsed << "\n";
             ofile.close();
             return;
         }
@@ -142,9 +140,9 @@ class Timer {
         // Second, update the file
         std::ofstream ofile(file_path, std::ios::app);
         assert(ofile.is_open() && "Invalid file to store timer results");
-        ofile << "        - " << name << "\n";
-        ofile << "          walltime: " << wall_elapsed << "\n";
-        ofile << "          cputime: " << cpu_elapsed << "\n";
+        ofile << "        - " << name << ":\n";
+        ofile << "            walltime: " << wall_elapsed << "\n";
+        ofile << "            cputime: " << cpu_elapsed << "\n";
         ofile.close();
     }
 
@@ -154,7 +152,7 @@ class Timer {
             return;
         }
 
-        char *file = getenv("DEBUG_RESULTS_FILE");
+        char *file = getenv("PROFILING_RESULTS_PATH");
         if (!file) {
             print(name);
             return;

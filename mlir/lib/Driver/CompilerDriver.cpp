@@ -66,18 +66,18 @@ namespace catalyst::utils {
  * You can dump the program-size embedded in an `Operation`, `ModuleOp`, or
  * `llvm::Module` using the static methods in this class.
  *
- * To display results, run the driver with the `ENABLE_DEBUG_INFO=ON` variable.
- * To store results in YAML format, use `DEBUG_RESULTS_FILE=/path/to/file.yml`
- * along with `ENABLE_DEBUG_INFO=ON`.
+ * To display results, run the driver with the `ENABLE_DIAGNOSTICS=ON` variable.
+ * To store results in YAML format, use `PROFILING_RESULTS_PATH=/path/to/file.yml`
+ * along with `ENABLE_DIAGNOSTICS=ON`.
  *
- * Note that using both `ENABLE_DEBUG_INFO=ON` and `ENABLE_DEBUG_TIMER=ON` will
+ * Note that using both `ENABLE_DIAGNOSTICS=ON` and `ENABLE_TIME_PROFILING=ON` will
  * introduce noise to the timing results.
  */
 class LinesCount {
   private:
     [[nodiscard]] inline static bool enable_debug_info()
     {
-        char *value = getenv("ENABLE_DEBUG_INFO");
+        char *value = getenv("ENABLE_DIAGNOSTICS");
         if (!value || std::string(value) != "ON") {
             return false;
         }
@@ -87,7 +87,9 @@ class LinesCount {
     inline static void print(const std::string &opStrBuf, const std::string &name)
     {
         const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
-        std::cerr << "[DEBUG] After " << name << "\t program-size: " << num_lines << std::endl;
+        std::cerr << "[DEBUG] After " << std::setw(23) << std::left << name;
+        std::cerr << "\t" << std::fixed << "program-size: " << num_lines << std::fixed << " lines";
+        std::cerr << std::endl;
     }
 
     inline static void store(const std::string &opStrBuf, const std::string &name,
@@ -97,8 +99,10 @@ class LinesCount {
         if (!std::filesystem::exists(file_path)) {
             std::ofstream ofile(file_path);
             assert(ofile.is_open() && "Invalid file to store timer results");
-            ofile << "        - " << name << "\n";
-            ofile << "          program size: " << num_lines << "\n";
+            if (!name.empty()) {
+                ofile << "        - " << name << ":\n";
+            }
+            ofile << "            program size: " << num_lines << "\n";
             ofile.close();
             return;
         }
@@ -107,14 +111,16 @@ class LinesCount {
         // Second, update the file
         std::ofstream ofile(file_path, std::ios::app);
         assert(ofile.is_open() && "Invalid file to store timer results");
-        ofile << "        - " << name << "\n";
-        ofile << "          program size: " << num_lines << "\n";
+        if (!name.empty()) {
+            ofile << "        - " << name << ":\n";
+        }
+        ofile << "            program size: " << num_lines << "\n";
         ofile.close();
     }
 
-    inline static void dump(const std::string &opStrBuf, const std::string &name)
+    inline static void dump(const std::string &opStrBuf, const std::string &name = {})
     {
-        char *file = getenv("DEBUG_RESULTS_FILE");
+        char *file = getenv("PROFILING_RESULTS_PATH");
         if (!file) {
             print(opStrBuf, name);
             return;
@@ -124,7 +130,7 @@ class LinesCount {
     }
 
   public:
-    static void Operation(Operation *op, const std::string &name)
+    static void Operation(Operation *op, const std::string &name = {})
     {
         if (!enable_debug_info()) {
             return;
@@ -137,7 +143,7 @@ class LinesCount {
         dump(opStrBuf, name);
     }
 
-    static void ModuleOp(const ModuleOp &op, const std::string &name)
+    static void ModuleOp(const ModuleOp &op, const std::string &name = {})
     {
         if (!enable_debug_info()) {
             return;
@@ -150,7 +156,7 @@ class LinesCount {
         dump(modStrBef, name);
     }
 
-    static void Module(const llvm::Module &llvmModule, const std::string &name)
+    static void Module(const llvm::Module &llvmModule, const std::string &name = {})
     {
         if (!enable_debug_info()) {
             return;
@@ -539,7 +545,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
     OwningOpRef<ModuleOp> op = timer::timer(parseMLIRSource, "parseMLIRSource", &ctx, *sourceMgr);
-    catalyst::utils::LinesCount::ModuleOp(op.get(), "parseMLIRSource");
+    catalyst::utils::LinesCount::ModuleOp(op.get());
 
     if (op) {
         if (failed(timer::timer(runLowering, "runMLIRPasses", options, &ctx, *op, output))) {
@@ -558,7 +564,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
 
-            catalyst::utils::LinesCount::Module(*llvmModule, "translateModuleToLLVMIR");
+            catalyst::utils::LinesCount::Module(*llvmModule);
 
             if (options.keepIntermediate) {
                 dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
@@ -584,13 +590,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
 
-        catalyst::utils::LinesCount::Module(*llvmModule.get(), "runLLVMPasses");
+        catalyst::utils::LinesCount::Module(*llvmModule.get());
 
         if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", options, llvmModule, output))) {
             return failure();
         }
 
-        catalyst::utils::LinesCount::Module(*llvmModule.get(), "runEnzymePasses");
+        catalyst::utils::LinesCount::Module(*llvmModule.get());
 
         output.outIR.clear();
         outIRStream << *llvmModule;
