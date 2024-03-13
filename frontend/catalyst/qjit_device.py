@@ -20,7 +20,7 @@ import pennylane as qml
 from pennylane.devices.preprocess import decompose
 from pennylane.measurements import MidMeasureMP
 
-from catalyst.preprocess import catalyst_ops, decompose_ops_to_unitary
+from catalyst.preprocess import catalyst_acceptance, decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
@@ -273,7 +273,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
         program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
-        ops_acceptance = partial(catalyst_ops, operations=self.operations)
+        ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(
             decompose, stopping_condition=ops_acceptance, name=self.original_device.name
         )
