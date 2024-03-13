@@ -21,12 +21,23 @@ import os
 import pathlib
 import platform
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Set
 
 import pennylane as qml
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import toml_load
+from catalyst.utils.toml import (
+    TOMLDocument,
+    check_quantum_control_flag,
+    get_decomposable_gates,
+    get_matrix_decomposable_gates,
+    get_native_gates,
+    get_observables,
+    toml_load,
+)
 
 package_root = os.path.dirname(__file__)
 
@@ -56,67 +67,89 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
-def check_qjit_compatibility(device, config):
-    """Check that the device is qjit compatible.
-
-    Args:
-        device (qml.Device): An instance of a quantum device.
-        config (Dict[Str, Any]): Configuration dictionary.
-
-    Raises:
-        CompileError
+def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
+    """Return the set of controlled gates given the set of nativly supported gates. This function
+    is used with the toml config schema 1. Later schemas provide the required information directly
     """
-    if config["compilation"]["qjit_compatible"]:
-        return
-
-    name = device.name
-    msg = f"Attempting to compile program for incompatible device {name}."
-    raise CompileError(msg)
-
-
-def check_device_config(device):
-    """Check that the device configuration exists.
-
-    Args:
-        device (qml.Device): An instance of a quantum device.
-
-    Raises:
-        CompileError
-    """
-    if hasattr(device, "config") and device.config.exists():
-        return
-
-    name = device.name
-    msg = f"Attempting to compile program for incompatible device {name}."
-    raise CompileError(msg)
+    gates_to_be_decomposed_if_controlled = [
+        "Identity",
+        "CNOT",
+        "CY",
+        "CZ",
+        "CSWAP",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "ControlledPhaseShift",
+        "QubitUnitary",
+        "Toffoli",
+    ]
+    native_controlled_gates = set(
+        [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
+        # TODO: remove after PR #642 is merged in lightning
+        + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
+    )
+    return native_controlled_gates
 
 
-def get_native_gates(config):
+def get_pennylane_operations(
+    config: TOMLDocument, shots_present: bool, device_name: str
+) -> Set[str]:
     """Get gates that are natively supported by the device and therefore do not need to be
     decomposed.
 
     Args:
         config (Dict[Str, Any]): Configuration dictionary
+        shots_present (bool): True is exact shots is specified in the current top-level program
+        device_name (str): Name of quantum device. Used for ad-hoc patching.
+
+    Returns:
+        Set[str]: List of gate names in the PennyLane format.
     """
-    return config["operators"]["gates"][0]["native"]
+    gates_PL = set()
+    schema = int(config["schema"])
+
+    if schema == 1:
+        native_gates_attrs = get_native_gates(config, shots_present)
+        assert all(len(v) == 0 for v in native_gates_attrs.values())
+        native_gates = set(native_gates_attrs)
+        supports_controlled = check_quantum_control_flag(config)
+        native_controlled_gates = (
+            deduce_native_controlled_gates(native_gates) if supports_controlled else set()
+        )
+
+        # TODO: remove after PR #642 is merged in lightning
+        if device_name == "lightning.kokkos":  # pragma: nocover
+            native_gates.update({"C(GlobalPhase)"})
+
+        gates_PL = set.union(native_gates, native_controlled_gates)
+
+    elif schema == 2:
+        native_gates = get_native_gates(config, shots_present)
+        for gate, attrs in native_gates.items():
+            gates_PL.add(f"{gate}")
+            if "controllable" in attrs.get("properties", {}):
+                gates_PL.add(f"C({gate})")
+
+    else:
+        raise CompileError("Device configuration schema {schema} is not supported")
+
+    return gates_PL
 
 
-def get_decomposable_gates(config):
-    """Get gates that will be decomposed according to PL's decomposition rules.
+def get_pennylane_observables(
+    config: TOMLDocument, shots_present: bool, device_name: str
+) -> Set[str]:
+    """Get observables in PennyLane format. Apply ad-hoc patching"""
 
-    Args:
-        config (Dict[Str, Any]): Configuration dictionary
-    """
-    return config["operators"]["gates"][0]["decomp"]
+    observables = set(get_observables(config, shots_present))
 
+    # TODO: remove after PR #642 is merged in lightning
+    if device_name == "lightning.kokkos":  # pragma: nocover
+        observables.update({"Projector"})
 
-def get_matrix_decomposable_gates(config):
-    """Get gates that will be decomposed to QubitUnitary.
-
-    Args:
-        config (Dict[Str, Any]): Configuration dictionary
-    """
-    return config["operators"]["gates"][0]["matrix"]
+    return observables
 
 
 def check_no_overlap(*args):
@@ -134,12 +167,17 @@ def check_no_overlap(*args):
     if sum(len_of_sets) == len(union):
         return
 
-    msg = "Device has overlapping gates in native and decomposable sets."
+    overlaps = set()
+    for s in set_of_sets:
+        overlaps.update(s - union)
+        union = union - s
+
+    msg = f"Device has overlapping gates: {overlaps}"
     raise CompileError(msg)
 
 
-def filter_out_adjoint_and_control(operations):
-    """Remove Adjoint and C strings from operations.
+def filter_out_adjoint(operations):
+    """Remove Adjoint from operations.
 
     Args:
         operations (List[Str]): List of strings with names of supported operations
@@ -149,87 +187,126 @@ def filter_out_adjoint_and_control(operations):
         removed.
     """
     adjoint = re.compile(r"^Adjoint\(.*\)$")
-    control = re.compile(r"^C\(.*\)$")
 
     def is_not_adj(op):
         return not re.match(adjoint, op)
 
-    def is_not_ctrl(op):
-        return not re.match(control, op)
-
     operations_no_adj = filter(is_not_adj, operations)
-    operations_no_adj_no_ctrl = filter(is_not_ctrl, operations_no_adj)
-    return list(operations_no_adj_no_ctrl)
+    return set(operations_no_adj)
 
 
-def check_full_overlap(device, *args):
+def check_full_overlap(device_gates: Set[str], spec_gates: Set[str]) -> None:
     """Check that device.operations is equivalent to the union of *args
 
     Args:
-        device (qml.Device): An instance of a quantum device.
-        *args (List[Str]): List of strings.
+        device_gates (Set[str]): device gates
+        spec_gates (Set[str]): spec gates
 
     Raises: CompileError
     """
-    operations = filter_out_adjoint_and_control(device.operations)
-    gates_in_device = set(operations)
-    set_of_sets = [set(arg) for arg in args]
-    union = set.union(*set_of_sets)
-    if gates_in_device == union:
+    if device_gates == spec_gates:
         return
 
-    msg = "Gates in qml.device.operations and specification file do not match"
+    msg = (
+        "Gates in qml.device.operations and specification file do not match.\n"
+        f"Gates that present only in the device: {device_gates - spec_gates}\n"
+        f"Gates that present only in spec: {spec_gates - device_gates}\n"
+    )
     raise CompileError(msg)
 
 
-def check_gates_are_compatible_with_device(device, config):
-    """Validate configuration dictionary against device.
+def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -> None:
+    """Validate configuration document against the device attributes.
+    Raise CompileError in case of mismatch:
+    * If device is not qjit-compatible.
+    * If configuration file does not exists.
+    * If decomposable, matrix, and native gates have some overlap.
+    * If decomposable, matrix, and native gates do not match gates in ``device.operations`` and
+      ``device.observables``.
 
     Args:
         device (qml.Device): An instance of a quantum device.
-        config (Dict[Str, Any]): Configuration dictionary
+        config (TOMLDocument): A TOML document representation.
 
     Raises: CompileError
     """
 
-    native = get_native_gates(config)
-    decomposable = get_decomposable_gates(config)
-    matrix = get_matrix_decomposable_gates(config)
+    if not config["compilation"]["qjit_compatible"]:
+        raise CompileError(
+            f"Attempting to compile program for incompatible device '{device.name}': "
+            f"Config is not marked as qjit-compatible"
+        )
+
+    device_name = device.short_name if isinstance(device, qml.Device) else device.name
+
+    shots_present = device.shots is not None
+    native = get_pennylane_operations(config, shots_present, device_name)
+    observables = get_pennylane_observables(config, shots_present, device_name)
+    decomposable = set(get_decomposable_gates(config, shots_present))
+    matrix = set(get_matrix_decomposable_gates(config, shots_present))
+
+    # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
+    # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
+    # listed in either matrix or decomposable sections. This is a contradiction, because condition
+    # (1) means that `ControlledQubitUnitary` is also in the native set. We solve it here by
+    # applying a fixup.
+    # TODO: Remove when the transition to the toml schema 2 is complete.
+    if "ControlledQubitUnitary" in native:
+        matrix = matrix - {"ControlledQubitUnitary"}
+        decomposable = decomposable - {"ControlledQubitUnitary"}
+
     check_no_overlap(native, decomposable, matrix)
-    if not hasattr(device, "operations"):  # pragma: nocover
-        # The new device API has no "operations" field
-        # so we cannot check that there's an overlap or not.
-        return
 
-    check_full_overlap(device, native, decomposable, matrix)
-
-
-def validate_config_with_device(device):
-    """Validate configuration file against device.
-    Will raise a CompileError
-    * if device does not contain ``config`` attribute
-    * if configuration file does not exists
-    * if decomposable, matrix, and native gates have some overlap
-    * if decomposable, matrix, and native gates do not match gates in ``device.operations``
-
-    Args:
-        device (qml.Device): An instance of a quantum device.
-
-    Raises: CompileError
-    """
-    check_device_config(device)
-
-    with open(device.config, "rb") as f:
-        config = toml_load(f)
-
-    check_qjit_compatibility(device, config)
-    check_gates_are_compatible_with_device(device, config)
+    if hasattr(device, "operations") and hasattr(device, "observables"):
+        device_gates = set.union(set(device.operations), set(device.observables))
+        device_gates = filter_out_adjoint(device_gates)
+        spec_gates = set.union(native, observables, matrix, decomposable)
+        spec_gates = filter_out_adjoint(spec_gates)
+        check_full_overlap(device_gates, spec_gates)
 
 
-def extract_backend_info(device):
-    """Extract the backend info as a tuple of (name, lib, kwargs)."""
+def device_get_toml_config(device) -> Path:
+    """Get the path of the device config file."""
+    if hasattr(device, "config"):
+        # The expected case: device specifies its own config.
+        toml_file = device.config
+    else:
+        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # field.
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
-    validate_config_with_device(device)
+        name = device.short_name if isinstance(device, qml.Device) else device.name
+        # The toml files name convention we follow is to replace
+        # the dots with underscores in the device short name.
+        toml_file_name = name.replace(".", "_") + ".toml"
+        # And they are currently saved in the following directory.
+        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+
+    try:
+        with open(toml_file, "rb") as f:
+            config = toml_load(f)
+    except FileNotFoundError as e:
+        raise CompileError(
+            "Attempting to compile program for incompatible device: "
+            f"Config file ({toml_file}) does not exist"
+        ) from e
+
+    return config
+
+
+@dataclass
+class BackendInfo:
+    """Backend information"""
+
+    device_name: str
+    c_interface_name: str
+    lpath: str
+    kwargs: Dict[str, Any]
+
+
+def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
+    """Extract the backend info from a quantum device. The device is expected to carry a reference
+    to a valid TOML config file."""
 
     dname = device.name
     if isinstance(device, qml.Device):
@@ -255,7 +332,7 @@ def extract_backend_info(device):
         # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
     else:
-        raise CompileError(f"The {dname} device is not supported for compilation at the moment.")
+        raise CompileError(f"The {dname} device does not provide C interface for compilation.")
 
     if not pathlib.Path(device_lpath).is_file():
         raise CompileError(f"Device at {device_lpath} cannot be found!")
@@ -281,12 +358,9 @@ def extract_backend_info(device):
                 device._s3_folder  # pylint: disable=protected-access
             )
 
-    with open(device.config, "rb") as f:
-        config = toml_load(f)
+    options = config.get("options", {})
+    for k, v in options.items():
+        if hasattr(device, v):
+            device_kwargs[k] = getattr(device, v)
 
-    if "options" in config.keys():
-        for k, v in config["options"].items():
-            if hasattr(device, v):
-                device_kwargs[k] = getattr(device, v)
-
-    return config, device_name, device_lpath, device_kwargs
+    return BackendInfo(dname, device_name, device_lpath, device_kwargs)
