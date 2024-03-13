@@ -2471,8 +2471,14 @@ def callback(func):
 def callback_implementation(
     cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
 ):
-    """TODO: Attribution. I looked into
-    https://jax.readthedocs.io/en/latest/_modules/jax/_src/callback.html#pure_callback"""
+    """
+    This function has been modified from its original form in the JAX project at
+    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2022 The JAX Authors.
+    """
+
     flat_args, in_tree = tree_flatten((args, kwargs))
 
     def _flat_callback(*flat_args):
