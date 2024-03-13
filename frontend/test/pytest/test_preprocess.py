@@ -90,7 +90,7 @@ class TestPreprocess:
 
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "quantum.unitary" in mlir
-        assert "quantum.blockencode" not in mlir
+        assert "BlockEncode" not in mlir
 
     @pytest.mark.skipif(
         not pathlib.Path(
