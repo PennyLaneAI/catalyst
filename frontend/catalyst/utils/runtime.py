@@ -22,7 +22,6 @@ import pathlib
 import platform
 import re
 from dataclasses import dataclass
-from os import environ
 from pathlib import Path
 from typing import Any, Dict, Set
 
