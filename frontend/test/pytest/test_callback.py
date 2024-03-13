@@ -79,16 +79,15 @@ def test_callback_twice(capsys):
     captured = capsys.readouterr()
     assert captured.out.strip() == "Hello erick"
 
-def test_callback_send_param(capsys):
-    """Test callback no parameters no returns"""
 
-    import jax
+def test_callback_send_param(capsys):
+    """Test callback with parameters no returns"""
 
     @callback
     def my_callback(n) -> None:
         print(n)
 
-    @qml.qjit(keep_intermediate=True)
+    @qml.qjit
     def cir(n):
         my_callback(n)
         return None
@@ -96,3 +95,25 @@ def test_callback_send_param(capsys):
     cir(0)
     captured = capsys.readouterr()
     assert captured.out.strip() == "0"
+
+
+def test_kwargs(capsys):
+    """Test callback no parameters no returns"""
+
+    @callback
+    def my_callback(*args, **kwargs) -> None:
+        for k, v in kwargs.items():
+            print(k, v)
+
+    @qml.qjit
+    def cir(a, b, c):
+        my_callback(a=a, b=b, c=c, d=3, e=4)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0, 1, 2)
+    captured = capsys.readouterr()
+    for string in {"a 0", "b 1", "c 2", "d 3", "e 4"}:
+        assert string in captured.out

@@ -45,19 +45,23 @@ def get_ranked_memref_descriptor(array):
     if isinstance(array, DynamicJaxprTracer):
         array = array.aval
 
-    if not isinstance(array, ShapedArray):
-        # If input is not ShapedArray, use default implementation.
-        return mlir_get_ranked_memref_descriptor(array)
+    if isinstance(array, (int, float, bool, complex)):
+        # This is necessary for keyword arguments
+        array = np.array(array)
 
-    return get_ranked_memref_descriptor_from_shaped_array(array)
+    if isinstance(array, ShapedArray):
+        # If input is ShapedArray
+        return get_ranked_memref_descriptor_from_shaped_array(array)
+
+    # Use default implementation from MLIR's library.
+    return mlir_get_ranked_memref_descriptor(array)
+
 
 def ranked_memref_to_numpy(ranked_memref):
     try:
         return mlir_ranked_memref_to_numpy(ranked_memref)
     except AttributeError:
         # zero dimensional tensor...
-        content_ptr = move_aligned_ptr_by_offset(
-            ranked_memref[0].aligned, ranked_memref[0].offset
-        )
+        content_ptr = move_aligned_ptr_by_offset(ranked_memref[0].aligned, ranked_memref[0].offset)
         np_arr = np.ctypeslib.as_array(content_ptr, shape=[])
         return to_numpy(np_arr)
