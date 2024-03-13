@@ -82,8 +82,9 @@ class TestPreprocess:
             qml.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qml.state()
 
-        print(circuit())
-        assert None
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        assert "quantum.unitary" in mlir
+        assert "quantum.blockencode" not in mlir
 
     def test_no_matrix(self):
         """Test that controlling an operation without a matrix method raises an error."""
