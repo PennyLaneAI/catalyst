@@ -23,7 +23,7 @@ from catalyst.utils.exceptions import CompileError
 
 @transform
 def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
-    r"""Quantum transform that decompose operations to unitary given a list of operations name.
+    r"""Quantum transform that decomposes operations to unitary given a list of operations name.
 
     Args:
         tape (QNode or QuantumTape or Callable): A quantum circuit.
