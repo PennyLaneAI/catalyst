@@ -73,9 +73,9 @@ class CompileOptions:
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     async_qnodes: Optional[bool] = False
-    lower_to_llvm: Optional[bool] = True
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+    lower_to_llvm: Optional[bool] = True
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
