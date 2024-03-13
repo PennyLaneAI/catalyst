@@ -3,8 +3,6 @@
 #include <pybind11/pybind11.h>
 #include <unordered_map>
 
-#include "Types.h"
-
 namespace py = pybind11;
 
 // From PyBind11's documentation:
@@ -35,6 +33,7 @@ auto registerImpl(py::function f)
     // Does python reuse id's? Yes.
     // But only after they have been garbaged collected.
     // So as long as we maintain a reference to it, then they won't be garbage collected.
+    // Inserting the function into the unordered map increases the reference by one.
     int64_t id = (int64_t)f.ptr();
     references->insert({id, f});
     return id;
