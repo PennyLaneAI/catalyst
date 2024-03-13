@@ -84,6 +84,7 @@ class Mock(MagicMock):
 MOCK_MODULES = [
     "mlir_quantum",
     "mlir_quantum.runtime",
+    "mlir_quantum.runtime.np_to_memref",
     "mlir_quantum.dialects",
     "mlir_quantum.dialects.arith",
     "mlir_quantum.dialects.tensor",
