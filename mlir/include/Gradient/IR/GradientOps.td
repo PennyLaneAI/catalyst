@@ -153,7 +153,7 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
 
 def BackpropWithValueOp : Gradient_Op<"backprop_with_value", [
         AttrSizedOperandSegments,
-        SameVariadicResultSize,
+        AttrSizedResultSegments,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>
         ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";

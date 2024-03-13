@@ -625,13 +625,13 @@ func::FuncOp HybridValueAndGradientLoweringExperimental::genFullGradFunction(
         Block *entryBlock = fullGradFn.addEntryBlock();
         rewriter.setInsertionPointToStart(entryBlock);
 
-        // The number of backpropagation results is the same as the number of gradients.
-        // For the GradOp the gradients are exactly the GradOp operation results.
-        // But for the ValueAndGradOp, the ValueAndGradOp results are the values and the gradients
-        // combined. So, instead of using gradOp.getNumResults(), we have to use
-        // gradOp.getGradients().size() specifically.
+        SmallVector<Type> valTypes;
+        for (auto &&val : gradOp.getVals()) {
+            valTypes.push_back(val.getType());
+        }
 
-        SmallVector<Value> backpropResults{gradOp.getGradients().size()};
+        SmallVector<Value> backpropValResults;
+        SmallVector<Value> backpropGradResults{gradOp.getGradients().size()};
         // Iterate over the primal results
         for (const auto &[cotangentIdx, primalResult] : llvm::enumerate(callee.getResultTypes())) {
             // There is one Jacobian per distinct differential argument.
@@ -661,18 +661,22 @@ func::FuncOp HybridValueAndGradientLoweringExperimental::genFullGradFunction(
                                              rewriter, loc, cotangents);
 
                         auto backpropOp = rewriter.create<gradient::BackpropWithValueOp>(
-                            loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
-                            entryBlock->getArguments(),
+                            loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
+                            callee.getName(), entryBlock->getArguments(),
                             /*arg_shadows=*/ValueRange{},
                             /*primal results=*/ValueRange{}, cotangents,
                             gradOp.getDiffArgIndicesAttr());
+
+                        backpropValResults.insert(backpropValResults.end(),
+                                                  backpropOp.getVals().begin(),
+                                                  backpropOp.getVals().end());
 
                         // Backprop gives a gradient of a single output entry w.r.t.
                         // all active inputs. Catalyst gives transposed Jacobians,
                         // such that the Jacobians have shape
                         // [...shape_outputs, ...shape_inputs,].
                         for (const auto &[backpropIdx, jacobianSlice] :
-                             llvm::enumerate(backpropOp.getResults())) {
+                             llvm::enumerate(backpropOp.getGradients())) {
                             if (auto sliceType =
                                     dyn_cast<RankedTensorType>(jacobianSlice.getType())) {
                                 size_t sliceRank = sliceType.getRank();
@@ -711,7 +715,8 @@ func::FuncOp HybridValueAndGradientLoweringExperimental::genFullGradFunction(
                                 jacobians[backpropIdx] = rewriter.create<tensor::InsertOp>(
                                     loc, jacobianSlice, jacobians[backpropIdx], indices);
                             }
-                            backpropResults[backpropIdx + cotangentIdx * diffArgIndices.size()] =
+                            backpropGradResults[backpropIdx +
+                                                cotangentIdx * diffArgIndices.size()] =
                                 jacobians[backpropIdx];
                         }
                     });
@@ -723,26 +728,36 @@ func::FuncOp HybridValueAndGradientLoweringExperimental::genFullGradFunction(
                                      loc, cotangents);
 
                 auto backpropOp = rewriter.create<gradient::BackpropWithValueOp>(
-                    loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
+                    loc, valTypes, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
                     entryBlock->getArguments(),
                     /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                     gradOp.getDiffArgIndicesAttr());
+
+                backpropValResults.insert(backpropValResults.end(), backpropOp.getVals().begin(),
+                                          backpropOp.getVals().end());
+
                 for (const auto &[backpropIdx, jacobianSlice] :
                      llvm::enumerate(backpropOp.getResults())) {
                     size_t resultIdx = backpropIdx * callee.getNumResults() + cotangentIdx;
-                    backpropResults[resultIdx] = jacobianSlice;
+                    backpropGradResults[resultIdx] = jacobianSlice;
                     if (jacobianSlice.getType() != gradOp.getResultTypes()[resultIdx]) {
                         // For ergonomics, if the backprop result is a point tensor and the
                         // user requests a scalar, give it to them.
                         if (isa<RankedTensorType>(jacobianSlice.getType()) &&
                             isa<FloatType>(gradOp.getResultTypes()[resultIdx])) {
-                            backpropResults[resultIdx] = rewriter.create<tensor::ExtractOp>(
+                            backpropGradResults[resultIdx] = rewriter.create<tensor::ExtractOp>(
                                 loc, jacobianSlice, ValueRange{});
                         }
                     }
                 }
             }
         }
+
+        SmallVector<Value> backpropResults;
+        backpropResults.insert(backpropResults.end(), backpropValResults.begin(),
+                               backpropValResults.end());
+        backpropResults.insert(backpropResults.end(), backpropGradResults.begin(),
+                               backpropGradResults.end());
 
         rewriter.create<func::ReturnOp>(loc, backpropResults);
     }
