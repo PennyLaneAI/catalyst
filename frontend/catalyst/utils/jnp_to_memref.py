@@ -16,7 +16,7 @@ from mlir_quantum.runtime import (
     get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor,
 )
 from mlir_quantum.runtime import ranked_memref_to_numpy as mlir_ranked_memref_to_numpy
-from mlir_quantum.runtime import (
+from mlir_quantum.runtime.np_to_memref import (
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
     move_aligned_ptr_by_offset,
