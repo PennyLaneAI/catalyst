@@ -26,7 +26,6 @@ from collections.abc import Sequence, Sized
 from functools import cache, update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -97,6 +96,10 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.jnp_to_memref import (
+    get_ranked_memref_descriptor,
+    ranked_memref_to_numpy,
+)
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
@@ -105,7 +108,6 @@ from catalyst.utils.runtime import (
     validate_config_with_device,
 )
 from catalyst.utils.toml import TOMLDocument
-from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
