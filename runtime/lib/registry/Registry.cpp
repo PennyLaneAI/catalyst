@@ -29,7 +29,7 @@ extern "C" {
 
 auto registerImpl(py::function f)
 {
-    // Do we need to see if it is already present or can we just override it?
+    // Do we need to see if it is already present or can we just override it? Just override is fine.
     // Does python reuse id's? Yes.
     // But only after they have been garbaged collected.
     // So as long as we maintain a reference to it, then they won't be garbage collected.
@@ -39,7 +39,7 @@ auto registerImpl(py::function f)
     return id;
 }
 
-PYBIND11_MODULE(registry, m)
+PYBIND11_MODULE(catalyst_callback_registry, m)
 {
     if (references == nullptr) {
         references = new std::unordered_map<int64_t, py::function>();
