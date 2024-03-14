@@ -22,7 +22,6 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
     BackendInfo,
-    deduce_native_controlled_gates,
     get_pennylane_observables,
     get_pennylane_operations,
 )
@@ -33,37 +32,57 @@ from catalyst.utils.toml import (
 )
 
 RUNTIME_OPERATIONS = {
-    "Identity",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "Hadamard",
-    "S",
-    "T",
-    "PhaseShift",
-    "RX",
-    "RY",
-    "RZ",
-    "Rot",
     "CNOT",
-    "CY",
-    "CZ",
-    "SWAP",
-    "IsingXX",
-    "IsingYY",
-    "IsingXY",
     "ControlledPhaseShift",
+    "CRot",
     "CRX",
     "CRY",
     "CRZ",
-    "CRot",
     "CSWAP",
-    "Toffoli",
-    "MultiRZ",
-    "QubitUnitary",
+    "CY",
+    "CZ",
+    "Hadamard",
+    "Identity",
+    "IsingXX",
+    "IsingXY",
+    "IsingYY",
     "ISWAP",
+    "MultiRZ",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "PhaseShift",
     "PSWAP",
+    "QubitUnitary",
+    "Rot",
+    "RX",
+    "RY",
+    "RZ",
+    "S",
+    "SWAP",
+    "T",
+    "Toffoli",
     "GlobalPhase",
+    "C(GlobalPhase)",
+    "C(Hadamard)",
+    "C(IsingXX)",
+    "C(IsingXY)",
+    "C(IsingYY)",
+    "C(ISWAP)",
+    "C(MultiRZ)",
+    "ControlledQubitUnitary",
+    "C(PauliX)",
+    "C(PauliY)",
+    "C(PauliZ)",
+    "C(PhaseShift)",
+    "C(PSWAP)",
+    "C(Rot)",
+    "C(RX)",
+    "C(RY)",
+    "C(RZ)",
+    "C(S)",
+    "C(SWAP)",
+    "C(T)",
 }
 
 
@@ -75,10 +94,7 @@ def get_qjit_pennylane_operations(
     # Supported gates of the target PennyLane's device
     native_gates = get_pennylane_operations(config, shots_present, device_name)
     # Gates that Catalyst runtime supports
-    qir_gates = set.union(
-        QJITDeviceNewAPI.operations_supported_by_QIR_runtime,
-        deduce_native_controlled_gates(QJITDeviceNewAPI.operations_supported_by_QIR_runtime),
-    )
+    qir_gates = RUNTIME_OPERATIONS
     supported_gates = set.intersection(native_gates, qir_gates)
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
@@ -116,8 +132,6 @@ class QJITDevice(qml.QubitDevice):
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
-
-    operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
@@ -230,8 +244,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
             devices by the runtime
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
-
-    operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:  # pragma: no cover
