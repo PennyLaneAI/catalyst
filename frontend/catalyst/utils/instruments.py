@@ -153,9 +153,9 @@ class ResultReporter:
 
     def print_results(self, wall_time, cpu_time, program_size=None):
         """Print the provided results to console with some minor formatting."""
-        print(f"[TIMER] Running {self.stage_name.ljust(23)}", end="\t")
-        print(f"walltime: {(str(wall_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
-        print(f"cputime: {(str(cpu_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
+        print(f"[DIAGNOSTICS] Running {self.stage_name.ljust(23)}", end="\t")
+        print(f"walltime: {(str(wall_time // 1e3 / 1e3) + ' ms').ljust(12)}", end="\t")
+        print(f"cputime: {(str(cpu_time // 1e3 / 1e3) + ' ms').ljust(12)}", end="\t")
         if program_size is not None:
             print(f"programsize: {program_size} lines", end="")
         print(end="\n")
@@ -201,29 +201,23 @@ class InstrumentSession:
     finegrained = False
 
     def __init__(self, session_name, filename, detailed):
-        self.enable_timer_flag = os.environ.pop("ENABLE_DEBUG_TIMER", None)
-        self.enable_info_flag = os.environ.pop("ENABLE_DEBUG_INFO", None)
-        self.path_flag = os.environ.pop("DEBUG_RESULTS_FILE", None)
+        self.enable_flag = os.environ.pop("ENABLE_DIAGNOSTICS", None)
+        self.path_flag = os.environ.pop("DIAGNOSTICS_RESULTS_PATH", None)
 
         self.open(session_name, filename, detailed)
 
     def __del__(self):
         self.close()
 
-        if self.enable_timer_flag is None:
-            os.environ.pop("ENABLE_DEBUG_TIMER", None)  # safely delete
+        if self.enable_flag is None:
+            os.environ.pop("ENABLE_DIAGNOSTICS", None)  # safely delete
         else:
-            os.environ["ENABLE_DEBUG_TIMER"] = self.enable_timer_flag
-
-        if self.enable_info_flag is None:
-            os.environ.pop("ENABLE_DEBUG_TIMER", None)  # safely delete
-        else:
-            os.environ["ENABLE_DEBUG_INFO"] = self.enable_info_flag
+            os.environ["ENABLE_DIAGNOSTICS"] = self.enable_flag
 
         if self.path_flag is None:
-            os.environ.pop("ENABLE_DEBUG_TIMER", None)  # safely delete
+            os.environ.pop("ENABLE_DIAGNOSTICS", None)  # safely delete
         else:
-            os.environ["DEBUG_RESULTS_FILE"] = self.path_flag
+            os.environ["DIAGNOSTICS_RESULTS_PATH"] = self.path_flag
 
     @staticmethod
     def open(session_name, filename, detailed):
@@ -232,10 +226,9 @@ class InstrumentSession:
         InstrumentSession.finegrained = detailed
 
         if detailed:
-            os.environ["ENABLE_DEBUG_TIMER"] = "ON"
-            os.environ["ENABLE_DEBUG_INFO"] = "ON"
+            os.environ["ENABLE_DIAGNOSTICS"] = "ON"
         if filename:
-            os.environ["DEBUG_RESULTS_FILE"] = filename
+            os.environ["DIAGNOSTICS_RESULTS_PATH"] = filename
             ResultReporter.dump_header(session_name)
 
     @staticmethod
