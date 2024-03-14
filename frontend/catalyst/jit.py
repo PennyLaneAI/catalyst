@@ -226,7 +226,7 @@ class QJIT:
 
         return jaxpr, treedef, dynamic_sig
 
-    @instrument(size_from=0)
+    @instrument(size_from=0, has_finegrained=True)
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
 
@@ -250,7 +250,7 @@ class QJIT:
 
         return mlir_module, mlir_string
 
-    @instrument(size_from=1)
+    @instrument(size_from=1, has_finegrained=True)
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
 
@@ -278,7 +278,7 @@ class QJIT:
 
         return compiled_fn, llvm_ir
 
-    @instrument
+    @instrument(has_finegrained=True)
     def run(self, args, kwargs):
         """Invoke a previously compiled function with the supplied arguments.
 

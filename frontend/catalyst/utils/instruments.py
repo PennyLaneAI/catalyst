@@ -44,7 +44,7 @@ def instrumentation(session_name, filename=None, detailed=False):
         del session
 
 
-def instrument(fn=None, *, size_from=None):
+def instrument(fn=None, *, size_from=None, has_finegrained=False):
     """Decorator that marks functions as targets for instrumentation. Instrumentation is only
     performed when enabled by a session.
 
@@ -54,7 +54,7 @@ def instrument(fn=None, *, size_from=None):
                                 by number of newlines in the string representation of the result
     """
     if fn is None:
-        return functools.partial(instrument, size_from=size_from)
+        return functools.partial(instrument, size_from=size_from, has_finegrained=has_finegrained)
 
     stage_name = getattr(fn, "__name__", "UNKNOWN")
 
@@ -63,7 +63,7 @@ def instrument(fn=None, *, size_from=None):
         if not InstrumentSession.active:
             return fn(*args, **kwargs)
 
-        with ResultReporter(stage_name) as reporter:
+        with ResultReporter(stage_name, has_finegrained) as reporter:
             fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)
@@ -128,8 +128,9 @@ class ResultReporter:
     position to insert the results after the function was measured.
     """
 
-    def __init__(self, stage_name):
+    def __init__(self, stage_name, has_finegrained):
         self.stage_name = stage_name
+        self.has_finegrained = has_finegrained
         self.insertion_point = None
         self.filename = InstrumentSession.filename
 
@@ -172,6 +173,8 @@ class ResultReporter:
             file.write(f"        cputime: {cpu_time / 1e6}\n")
             if program_size is not None:
                 file.write(f"        programsize: {program_size}\n")
+            if self.has_finegrained:
+                file.write(f"        finegrained:\n")
 
             file.write(existing_text)
 
