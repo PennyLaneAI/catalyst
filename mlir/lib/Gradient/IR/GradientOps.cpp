@@ -490,18 +490,23 @@ LogicalResult BackpropWithValueOp::verifySymbolUses(SymbolTableCollection &symbo
     if (hasTensorSemantics(getOperandTypes(), getResultTypes())) {
         // Verify the types of the outputs
         std::vector<Type> backpropTypes = computeBackpropTypes(fn, diffArgIndices);
-        TypeRange resultTypes = this->getResultTypes();
-        if (backpropTypes.size() != resultTypes.size()) {
-            return emitOpError("incorrect number of results in the backprop of the callee, ")
-                   << "expected " << backpropTypes.size() << " results "
-                   << "but got " << resultTypes.size();
+
+        std::vector<Type> gradientTypes;
+        for (auto &&grad : this->getGradients()) {
+            gradientTypes.push_back(grad.getType());
+        }
+
+        if (backpropTypes.size() != gradientTypes.size()) {
+            return emitOpError("incorrect number of gradients in the backprop of the callee, ")
+                   << "expected " << backpropTypes.size() << " gradients "
+                   << "but got " << gradientTypes.size();
         }
 
         for (unsigned i = 0; i < backpropTypes.size(); ++i) {
-            if (backpropTypes[i] != resultTypes[i]) {
-                return emitOpError("result type mismatch: expected operand type ")
-                       << backpropTypes[i] << ", but provided " << resultTypes[i]
-                       << " for result number " << i;
+            if (backpropTypes[i] != gradientTypes[i]) {
+                return emitOpError("gradient type mismatch: expected operand type ")
+                       << backpropTypes[i] << ", but provided " << gradientTypes[i]
+                       << " for gradient number " << i;
             }
         }
     }
@@ -530,10 +535,10 @@ LogicalResult BackpropWithValueOp::verify()
                << ", expected " << this->getCotangents().size() << " but got "
                << this->getCalleeResults().size();
 
-    if (this->getDiffArgShadows().size() + this->getNumResults() != numDiffArgs)
+    if (this->getDiffArgShadows().size() + this->getGradients().size() != numDiffArgs)
         return emitOpError("number of gradient results did not match number of differentiable")
                << " arguments, expected " << numDiffArgs << " but got "
-               << this->getDiffArgShadows().size() + this->getNumResults();
+               << this->getDiffArgShadows().size() + this->getGradients().size();
 
     return success();
 }
