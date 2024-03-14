@@ -95,20 +95,25 @@ def expval_from_counts(tape):
     def postprocessing_counts_to_expval(results):
         """A processing function to get expecation values from counts."""
         processed_results = []
-        for i, is_expval in enumerate(expval_position):
-            if is_expval:
-                prob_vector = []
-                _, values = results[i]
-                num_shots = jax.numpy.sum(values)
-                for value in values:
-                    prob = value / num_shots
-                    prob_vector.append(prob)
-                expval = jax.numpy.dot(
-                    jax.numpy.array(expval_eigvals[i]), jax.numpy.array(prob_vector)
-                )
-                processed_results.append(expval)
-            else:
-                processed_results.append(results[i])
+        for r in results:
+            process_tape_results(r)
         return processed_results
 
     return [new_tape], postprocessing_counts_to_expval
+
+def process_results():
+    for i, is_expval in enumerate(expval_position):
+        if is_expval:
+            prob_vector = []
+            _, values = r[i]
+            num_shots = jax.numpy.sum(values)
+            for value in values:
+                prob = value / num_shots
+                prob_vector.append(prob)
+            expval = jax.numpy.dot(
+                jax.numpy.array(expval_eigvals[i]), jax.numpy.array(prob_vector)
+            )
+            processed_results.append(expval)
+        else:
+            processed_results.append(results[i])
+    return processed_results
