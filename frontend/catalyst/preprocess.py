@@ -18,7 +18,7 @@ import pennylane as qml
 from pennylane import transform
 
 import catalyst
-from pennylane.measurements import ExpectationMP
+from pennylane.measurements import ExpectationMP, ProbabilityMP
 from catalyst.utils.exceptions import CompileError
 
 
@@ -78,26 +78,37 @@ def expval_from_counts(tape):
     # Add diagonalizing gates
     news_operations = tape.operations
     expval_position = [False * len(tape.measurements)]
+    expval_eigvals = [False * len(tape.measurements)]
     for i, m in enumerate(tape.measurements):
         if m.obs:
             news_operations.extend(m.obs.diagonalizing_gates())
         if isinstance(m, ExpectationMP):
             expval_position[i] = True
-    # Change measurements
-    new_measurements = [qml.counts(wires=m.obs.wires.tolist()) if isinstance(m, ExpectationMP) else m for m in tape.measurements]
-    print(news_operations, new_measurements)
+            expval_eigvals[i] = m.eigvals()
+    # Transform tape
+    new_measurements = [
+        qml.counts(wires=m.obs.wires.tolist()) if isinstance(m, ExpectationMP) else m
+        for m in tape.measurements
+    ]
     new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+
     def postprocessing_counts_to_expval(results):
-        """A postprocesing function returned by a transform that only converts the batch of results
-        into a result for a single ``QuantumTape``.
-        """
-        # Get probs
-        num_shots = tape.shots
-        num_wires = tape.wires
-        dim = 2**num_wires
-        prob_vector = jax.numpy.zeros((dim), dtype="float64")
-        # Get eigvals
-        # Multiply
-        return results
+        """A processing function to get expecation values from counts."""
+        processed_results = []
+        for i, is_expval in enumerate(expval_position):
+            if is_expval:
+                prob_vector = []
+                _, values = results[i]
+                num_shots = jax.numpy.sum(values)
+                for value in values:
+                    prob = value / num_shots
+                    prob_vector.append(prob)
+                expval = jax.numpy.dot(
+                    jax.numpy.array(expval_eigvals[i]), jax.numpy.array(prob_vector)
+                )
+                processed_results.append(expval)
+            else:
+                processed_results.append(results[i])
+        return processed_results
 
     return [new_tape], postprocessing_counts_to_expval
