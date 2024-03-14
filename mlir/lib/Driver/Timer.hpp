@@ -131,12 +131,15 @@ class Timer {
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
         const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
 
+        const std::string_view key_padding = "          ";
+        const std::string_view val_padding = "              ";
+
         if (!std::filesystem::exists(file_path)) {
             std::ofstream ofile(file_path);
             assert(ofile.is_open() && "Invalid file to store timer results");
-            ofile << "        - " << name << ":\n";
-            ofile << "            walltime: " << wall_elapsed << "\n";
-            ofile << "            cputime: " << cpu_elapsed << "\n";
+            ofile << key_padding << "- " << name << ":\n";
+            ofile << val_padding << "walltime: " << wall_elapsed << "\n";
+            ofile << val_padding << "cputime: " << cpu_elapsed << "\n";
             ofile.close();
             return;
         }
@@ -145,9 +148,9 @@ class Timer {
         // Second, update the file
         std::ofstream ofile(file_path, std::ios::app);
         assert(ofile.is_open() && "Invalid file to store timer results");
-        ofile << "        - " << name << ":\n";
-        ofile << "            walltime: " << wall_elapsed << "\n";
-        ofile << "            cputime: " << cpu_elapsed << "\n";
+        ofile << key_padding << "- " << name << ":\n";
+        ofile << val_padding << "walltime: " << wall_elapsed << "\n";
+        ofile << val_padding << "cputime: " << cpu_elapsed << "\n";
         ofile.close();
     }
 

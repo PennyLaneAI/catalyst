@@ -79,7 +79,7 @@ class LinesCount {
         if (!name.empty()) {
             std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
         }
-        std::cerr << "\t" << std::fixed << "program-size: " << num_lines << std::fixed << " lines";
+        std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines";
         std::cerr << std::endl;
     }
 
@@ -87,13 +87,17 @@ class LinesCount {
                              const std::filesystem::path &file_path)
     {
         const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
+
+        const std::string_view key_padding = "          ";
+        const std::string_view val_padding = "              ";
+
         if (!std::filesystem::exists(file_path)) {
             std::ofstream ofile(file_path);
             assert(ofile.is_open() && "Invalid file to store timer results");
             if (!name.empty()) {
-                ofile << "        - " << name << ":\n";
+                ofile << key_padding << "- " << name << ":\n";
             }
-            ofile << "            program size: " << num_lines << "\n";
+            ofile << val_padding << "programsize: " << num_lines << "\n";
             ofile.close();
             return;
         }
@@ -103,9 +107,9 @@ class LinesCount {
         std::ofstream ofile(file_path, std::ios::app);
         assert(ofile.is_open() && "Invalid file to store timer results");
         if (!name.empty()) {
-            ofile << "        - " << name << ":\n";
+            ofile << key_padding << "- " << name << ":\n";
         }
-        ofile << "            program size: " << num_lines << "\n";
+        ofile << val_padding << "programsize: " << num_lines << "\n";
         ofile.close();
     }
 
@@ -539,6 +543,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto beforePipelineCallback =
         [&](std::optional<OperationName> name,
             const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
+            // TODO: Investigate the issue with multiple calls to PassPipelines
             // std::cerr << ">>>>>>>>>>>>>>>>>>>>>" << std::endl;
             // Pass *pass = parentInfo.parentPass;
             // std::cerr << "pass.name: " << pass->getName().str() << std::endl;
@@ -555,6 +560,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPipelineCallback =
         [&](std::optional<OperationName> name,
             const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
+            // TODO: Investigate the issue with multiple calls to PassPipelines
             // Pass *pass = parentInfo.parentPass;
             // auto res = passPipelineNames.find(pass);
             // if (res != passPipelineNames.end()) {
