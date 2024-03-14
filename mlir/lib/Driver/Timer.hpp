@@ -75,6 +75,8 @@ class Timer {
   public:
     explicit Timer() : debug_timer(enable_debug_timer()), running(false) {}
 
+    [[nodiscard]] bool is_active() const noexcept { return running; }
+
     void start() noexcept
     {
         if (debug_timer) {

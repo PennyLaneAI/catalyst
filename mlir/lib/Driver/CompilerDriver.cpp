@@ -77,7 +77,7 @@ class LinesCount {
     {
         const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
         if (!name.empty()) {
-            std::cerr << "[DIAGNOSTICS]\t After " << std::setw(18) << std::left << name;
+            std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
         }
         std::cerr << "\t" << std::fixed << "program-size: " << num_lines << std::fixed << " lines";
         std::cerr << std::endl;
@@ -204,19 +204,26 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     typedef std::function<void(std::optional<OperationName> name,
                                const PipelineParentInfo &parentInfo)>
         PipelineCallback;
+    PassCallback beforePassCallback;
     PassCallback afterPassCallback;
     PassCallback afterPassFailedCallback;
     PipelineCallback beforePipelineCallback;
     PipelineCallback afterPipelineCallback;
 
-    CatalystPassInstrumentation(PassCallback afterPassCallback,
+    CatalystPassInstrumentation(PassCallback beforePassCallback, PassCallback afterPassCallback,
                                 PassCallback afterPassFailedCallback,
                                 PipelineCallback beforePipelineCallback,
                                 PipelineCallback afterPipelineCallback)
-        : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback),
+        : beforePassCallback(beforePassCallback), afterPassCallback(afterPassCallback),
+          afterPassFailedCallback(afterPassFailedCallback),
           beforePipelineCallback(beforePipelineCallback),
           afterPipelineCallback(afterPipelineCallback)
     {
+    }
+
+    void runBeforePass(Pass *pass, Operation *operation) override
+    {
+        this->beforePassCallback(pass, operation);
     }
 
     void runAfterPass(Pass *pass, Operation *operation) override
@@ -489,12 +496,21 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                    tmp);
     }
 
+    catalyst::utils::Timer timer{};
+
+    auto beforePassCallback = [&](Pass *pass, Operation *op) {
+        if (!timer.is_active()) {
+            timer.start();
+        }
+    };
+
     // For each pipeline-terminating pass, print the IR into the corresponding dump file and
     // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
-            catalyst::utils::LinesCount::Operation(op, res->second);
+            timer.dump(res->second, /*add_endl */ false);
+            catalyst::utils::LinesCount::Operation(op);
         }
 
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
@@ -520,35 +536,37 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     };
 
-    catalyst::utils::Timer timer{};
-
     auto beforePipelineCallback =
         [&](std::optional<OperationName> name,
             const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
-            std::cerr << ">>>>>>>>>>>>>>>>>>>>>" << std::endl;
-            Pass *pass = parentInfo.parentPass;
-            auto res = passPipelineNames.find(pass);
-            if (res != passPipelineNames.end()) {
-                timer.start();
-            }
+            // std::cerr << ">>>>>>>>>>>>>>>>>>>>>" << std::endl;
+            // Pass *pass = parentInfo.parentPass;
+            // std::cerr << "pass.name: " << pass->getName().str() << std::endl;
+            // std::cerr << "pass.description: " << pass->getDescription().str() << std::endl;
+            // std::cerr << "pass.pipeline_info: ";
+            // pass->printAsTextualPipeline(llvm::outs());
+            // std::cerr << std::endl;
+            // auto res = passPipelineNames.find(pass);
+            // if (res != passPipelineNames.end()) {
+            //     timer.start();
+            // }
         };
 
     auto afterPipelineCallback =
         [&](std::optional<OperationName> name,
             const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
-            Pass *pass = parentInfo.parentPass;
-            auto res = passPipelineNames.find(pass);
-            if (res != passPipelineNames.end()) {
-                timer.dump(res->second);
-                // catalyst::utils::LinesCount::Operation(op, res->second);
-            }
-            std::cerr << "<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+            // Pass *pass = parentInfo.parentPass;
+            // auto res = passPipelineNames.find(pass);
+            // if (res != passPipelineNames.end()) {
+            //     timer.dump(res->second);
+            // }
+            // std::cerr << "<<<<<<<<<<<<<<<<<<<<<" << std::endl;
         };
 
     // Output pipeline names on failures
-    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(
-        new CatalystPassInstrumentation(afterPassCallback, afterPassFailedCallback,
-                                        beforePipelineCallback, afterPipelineCallback)));
+    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
+        beforePassCallback, afterPassCallback, afterPassFailedCallback, beforePipelineCallback,
+        afterPipelineCallback)));
 
     // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
