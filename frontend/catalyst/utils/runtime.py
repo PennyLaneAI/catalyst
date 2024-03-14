@@ -36,7 +36,7 @@ from catalyst.utils.toml import (
     get_matrix_decomposable_gates,
     get_native_gates,
     get_observables,
-    toml_load,
+    read_toml_file,
 )
 
 package_root = os.path.dirname(__file__)
@@ -291,8 +291,7 @@ def device_get_toml_config(device) -> Path:
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
 
     try:
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     except FileNotFoundError as e:
         raise CompileError(
             "Attempting to compile program for incompatible device: "
