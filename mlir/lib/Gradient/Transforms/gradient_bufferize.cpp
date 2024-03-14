@@ -55,6 +55,9 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
         target.addDynamicallyLegalOp<BackpropOp>(
             [&](BackpropOp op) { return typeConverter.isLegal(op); });
 
+        target.addDynamicallyLegalOp<BackpropWithValueOp>(
+            [&](BackpropWithValueOp op) { return typeConverter.isLegal(op); });
+
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
