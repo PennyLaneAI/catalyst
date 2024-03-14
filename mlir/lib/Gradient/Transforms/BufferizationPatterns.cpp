@@ -153,6 +153,73 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
     }
 };
 
+class BufferizeBackpropWithValueOp : public OpConversionPattern<BackpropWithValueOp> {
+  public:
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(BackpropWithValueOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        SmallVector<Value> gradients;
+        SmallVector<Value> argShadows;
+        // Conceptually a map from scalar result indices (w.r.t. other scalars) to the position in
+        // the overall list of returned gradients.
+        // For instance, a backprop with value op that returns (tensor, f64, tensor, f64, f64) will
+        // have scalarIndices = {1, 3, 4}.
+        SmallVector<unsigned> scalarIndices;
+        SmallVector<Type> scalarReturnTypes;
+        std::vector<Value> diffArgs =
+            computeDiffArgs(adaptor.getArgs(), op.getDiffArgIndicesAttr());
+        for (const auto &[idx, diffArg] : llvm::enumerate(diffArgs)) {
+            // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers
+            // to these as shadow arguments. There is one result for each differentiable MemRef
+            // argument, with a matching shape and type.
+            if (isa<MemRefType>(diffArg.getType())) {
+                Value shadow = generateAllocation(rewriter, loc, diffArg);
+                gradients.push_back(shadow);
+                argShadows.push_back(shadow);
+            }
+            else if (isa<FloatType>(diffArg.getType())) {
+                scalarReturnTypes.push_back(diffArg.getType());
+                scalarIndices.push_back(idx);
+                // Put a null placeholder value that will be filled in with the result of the
+                // bufferized BackpropWithValueOp.
+                gradients.push_back(Value());
+            }
+        }
+
+        // Enzyme requires buffers for the primal outputs as well, even though we don't need their
+        // values. We'll mark them dupNoNeed later on to allow Enzyme to optimize away their
+        // computation.
+        SmallVector<Value> calleeResults, resShadows;
+        ValueRange cotangents = adaptor.getCotangents();
+        generateAllocations(rewriter, loc, calleeResults, cotangents);
+        // Enzyme mutates the result shadows but the cotangent tensors must be immutable, so we
+        // create copies to pass into Enzyme. Concretely, this issue pops up with multiple
+        // BackpropWithValueOps that have the same cotangent tensor due to a CSE effect from
+        // one-shot bufferization.
+        generateAllocations(rewriter, loc, resShadows, cotangents);
+        for (const auto &[cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
+            rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
+        }
+
+        DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
+        auto bufferizedBackpropWithValueOp = rewriter.create<BackpropWithValueOp>(
+            loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
+            calleeResults, resShadows, diffArgIndicesAttr);
+
+        // Fill in the null placeholders.
+        for (const auto &[idx, scalarResult] :
+             llvm::enumerate(bufferizedBackpropWithValueOp.getGradients())) {
+            gradients[scalarIndices[idx]] = scalarResult;
+        }
+
+        rewriter.replaceOp(op, gradients);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -162,6 +229,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeBackpropWithValueOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient
