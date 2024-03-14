@@ -67,28 +67,32 @@ RUNTIME_OPERATIONS = {
 }
 
 
-def get_qjit_pennylane_operations(config: TOMLDocument, shots_present, device_name) -> Set[str]:
-    """Get set of supported operations for the QJIT device in the PennyLane format. Take the target
-    device's config into account."""
+def get_qjit_pennylane_operations(
+    config: TOMLDocument, shots_present: bool, device_name: str
+) -> Set[str]:
+    """Calculate the set of supported quantum gates for the QJIT device from the gates
+    allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
     native_gates = get_pennylane_operations(config, shots_present, device_name)
+    # Gates that Catalyst runtime supports
     qir_gates = set.union(
         QJITDeviceNewAPI.operations_supported_by_QIR_runtime,
         deduce_native_controlled_gates(QJITDeviceNewAPI.operations_supported_by_QIR_runtime),
     )
-    supported_gates = list(set.intersection(native_gates, qir_gates))
+    supported_gates = set.intersection(native_gates, qir_gates)
 
-    # These are added unconditionally.
-    supported_gates += ["Cond", "WhileLoop", "ForLoop"]
+    # Control-flow gates to be lowered down to the LLVM control-flow instructions
+    supported_gates.update({"Cond", "WhileLoop", "ForLoop"})
 
+    # Optionally enable runtime-powered mid-circuit measurments
     if check_mid_circuit_measurement_flag(config):  # pragma: no branch
-        supported_gates += ["MidCircuitMeasure"]
+        supported_gates.update({"MidCircuitMeasure"})
 
+    # Optionally enable runtime-powered quantum gate adjointing (inversions)
     if check_adjoint_flag(config, shots_present):
-        supported_gates += ["Adjoint"]
+        supported_gates.update({"Adjoint"})
 
-    supported_gates += ["ControlledQubitUnitary"]
-    return set(supported_gates)
+    return supported_gates
 
 
 class QJITDevice(qml.QubitDevice):
