@@ -2641,13 +2641,15 @@ def callback_implementation(
         To find out which element type it has, we use the signature obtained previously.
         """
         jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retval = tree_leaves(cb(*args, **kwargs))
-        breakpoint()
         return retval
 
-    results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
+    has_results = not result_shape_dtypes or not (result_shape_dtypes == inspect.Signature.empty)
+    if has_results:
+        results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
+    else:
+        results_aval = None
     flat_results_aval, out_tree = tree_flatten(results_aval)
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)

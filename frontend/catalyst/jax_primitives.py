@@ -250,7 +250,15 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
-    return PythonCallOp(args, identifier).results
+
+    mlir_ty = []
+    for aval in results_aval:
+        # TODO: Change results_aval from a ShapedArray to an MLIR Type.
+        # Let's assume integer for now
+        i64_type = ir.IntegerType.get_signless(64, ctx)
+        res_i_ty = ir.RankedTensorType.get((), i64_type)
+        mlir_ty.append(res_i_ty)
+    return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
 #
