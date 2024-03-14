@@ -13,11 +13,12 @@
 # limitations under the License.
 """This module contains the preprocessing functions.
 """
-
+import jax
 import pennylane as qml
 from pennylane import transform
 
 import catalyst
+from pennylane.measurements import ExpectationMP
 from catalyst.utils.exceptions import CompileError
 
 
@@ -60,3 +61,43 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
     return op.name in operations
+
+
+@transform
+def expval_from_counts(tape):
+    r"""Replace expval from a tape with counts and postprocessing.
+
+    Args:
+        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+    """
+    # Add diagonalizing gates
+    news_operations = tape.operations
+    expval_position = [False * len(tape.measurements)]
+    for i, m in enumerate(tape.measurements):
+        if m.obs:
+            news_operations.extend(m.obs.diagonalizing_gates())
+        if isinstance(m, ExpectationMP):
+            expval_position[i] = True
+    # Change measurements
+    new_measurements = [qml.counts(wires=m.obs.wires.tolist()) if isinstance(m, ExpectationMP) else m for m in tape.measurements]
+    print(news_operations, new_measurements)
+    new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+    def postprocessing_counts_to_expval(results):
+        """A postprocesing function returned by a transform that only converts the batch of results
+        into a result for a single ``QuantumTape``.
+        """
+        # Get probs
+        num_shots = tape.shots
+        num_wires = tape.wires
+        dim = 2**num_wires
+        prob_vector = jax.numpy.zeros((dim), dtype="float64")
+        # Get eigvals
+        # Multiply
+        return results
+
+    return [new_tape], postprocessing_counts_to_expval
