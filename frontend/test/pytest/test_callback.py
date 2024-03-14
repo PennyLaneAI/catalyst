@@ -120,3 +120,20 @@ def test_kwargs(capsys):
     captured = capsys.readouterr()
     for string in ["a 0", "b 1", "c 2", "d 3", "e 4"]:
         assert string in captured.out
+
+@pytest.mark.parametrize("x", [0])
+def test_callback_with_return_values(x):
+    """Test callback with return values"""
+
+    import jax
+
+    @callback
+    def my_callback(x) -> jax.core.ShapedArray([], int):
+        return x
+
+    @qml.qjit
+    def cir(x):
+        x = my_callback(x)
+        return x
+
+    assert cir(x) == x

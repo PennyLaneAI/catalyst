@@ -36,6 +36,7 @@ from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_leaves,
+    tree_map,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
@@ -2614,13 +2615,13 @@ def callback(func):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        callback_implementation(func, retty, *args, **kwargs)
+        return callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
 
 
 def callback_implementation(
-    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -2642,12 +2643,11 @@ def callback_implementation(
         jnpargs = metadata.getArgsAsJAXArrays(flat_args)
 
         args, kwargs = tree_unflatten(in_tree, jnpargs)
-        return tree_leaves(cb(*args, **kwargs))
+        retval = tree_leaves(cb(*args, **kwargs))
+        breakpoint()
+        return retval
 
-    # TODO(@erick-xanadu): Change back once we support return values.
-    # I am leaving this as a to-do because otherwise the coverage will complain.
-    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
-    results_aval = []
+    results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
