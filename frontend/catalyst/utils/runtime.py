@@ -150,9 +150,12 @@ def get_pennylane_observables(
 
     observables = set(get_observables(config, shots_present))
 
-    # TODO: remove after PR #642 is merged in lightning
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        observables.update({"Projector"})
+    schema = int(config["schema"])
+
+    if schema == 1:
+        # TODO: remove after PR #642 is merged in lightning
+        if device_name == "lightning.kokkos":  # pragma: nocover
+            observables.update({"Projector"})
 
     return observables
 
