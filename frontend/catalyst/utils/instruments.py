@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Instrucmentation functions to report Catalyst & program performance.
+Instrumentation module to report Catalyst & program performance.
 """
 
 import datetime
@@ -98,9 +98,6 @@ def time_function(fn, args, kwargs):
     return results, stop_wall - start_wall, stop_cpu - start_cpu
 
 
-def measure_peak_memory(): ...
-
-
 def measure_program_size(results, size_from):
     """Collect program size information by counting the number of newlines in the textual form
     of a given program representation. The representation is assumed to be provided in the
@@ -120,21 +117,6 @@ def measure_program_size(results, size_from):
 
 
 ## REPORTING ##
-def dump_header(session_name):
-    """Write the session header to file, contains the timestamp, session name, and system info."""
-    filename = InstrumentSession.filename
-    current_time = datetime.datetime.now()
-
-    with open(filename, mode="a", encoding="UTF-8") as file:
-        file.write(f"\n{current_time}:\n")
-        file.write(f"  name: {session_name}\n")
-        file.write(f"  system:\n")
-        file.write(f"    os: {platform.platform(terse=True)}\n")
-        file.write(f"    arch: {platform.machine()}\n")
-        file.write(f"    python: {platform.python_version()}\n")
-        file.write(f"  results:\n")
-
-
 class ResultReporter:
     """Report the result of a single instrumentation stage. Reporting is done either to the console
     or to a specified file obtained from the instrumentation session. The report is appended to the
@@ -158,7 +140,7 @@ class ResultReporter:
                 self.insertion_point = file.tell()
         return self
 
-    def __exit__(self, *_args, **_kwargs):
+    def __exit__(self, *_):
         return False
 
     def commit_results(self, wall_time, cpu_time, program_size):
@@ -193,13 +175,20 @@ class ResultReporter:
 
             file.write(existing_text)
 
+    @staticmethod
+    def dump_header(session_name):
+        """Write the session header to file, contains the timestamp, session name, and system info."""
+        filename = InstrumentSession.filename
+        current_time = datetime.datetime.now()
 
-def dump_footer():
-    """Write the session footer to file."""
-    filename = InstrumentSession.filename
-
-    with open(filename, mode="a", encoding="UTF-8") as file:
-        file.write("")
+        with open(filename, mode="a", encoding="UTF-8") as file:
+            file.write(f"\n{current_time}:\n")
+            file.write(f"  name: {session_name}\n")
+            file.write(f"  system:\n")
+            file.write(f"    os: {platform.platform(terse=True)}\n")
+            file.write(f"    arch: {platform.machine()}\n")
+            file.write(f"    python: {platform.python_version()}\n")
+            file.write(f"  results:\n")
 
 
 ## SESSION ##
@@ -213,10 +202,10 @@ class InstrumentSession:
         self.enable_info_flag = os.environ.pop("ENABLE_DEBUG_INFO", None)
         self.path_flag = os.environ.pop("DEBUG_RESULTS_FILE", None)
 
-        InstrumentSession.open(session_name, filename, detailed)
+        self.open(session_name, filename, detailed)
 
     def __del__(self):
-        InstrumentSession.close()
+        self.close()
 
         if self.enable_timer_flag is None:
             os.environ.pop("ENABLE_DEBUG_TIMER", None)  # safely delete
@@ -244,13 +233,10 @@ class InstrumentSession:
             os.environ["ENABLE_DEBUG_INFO"] = "ON"
         if filename:
             os.environ["DEBUG_RESULTS_FILE"] = filename
-            dump_header(session_name)
+            ResultReporter.dump_header(session_name)
 
     @staticmethod
     def close():
-        if InstrumentSession.filename:
-            dump_footer()
-
         InstrumentSession.active = False
         InstrumentSession.filename = None
         InstrumentSession.finegrained = False
