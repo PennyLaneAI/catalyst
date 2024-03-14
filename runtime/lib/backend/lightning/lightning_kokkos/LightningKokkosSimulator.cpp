@@ -389,9 +389,9 @@ void LightningKokkosSimulator::Counts(DataView<double, 1> &eigvals, DataView<int
     // into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
-        size_t idx = 0;
+        size_t idx = numQubits - 1;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[idx--] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -433,9 +433,9 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     // corresponding to the input wires into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
-        size_t idx = 0;
+        size_t idx = numQubits - 1;
         for (auto wire : dev_wires) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[idx--] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
