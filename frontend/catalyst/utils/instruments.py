@@ -63,13 +63,10 @@ def instrument(fn=None, *, size_from=None):
         if not InstrumentSession.active:
             return fn(*args, **kwargs)
 
-        fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
-        program_size = measure_program_size(fn_results, size_from)
-
-        if InstrumentSession.filename:
-            dump_result(stage_name, wall_time, cpu_time, program_size)
-        else:
-            print_result(stage_name, wall_time, cpu_time, program_size)
+        with ResultReporter(stage_name) as reporter:
+            fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            program_size = measure_program_size(fn_results, size_from)
+            reporter.commit_results(wall_time, cpu_time, program_size)
 
         return fn_results
 
@@ -123,15 +120,6 @@ def measure_program_size(results, size_from):
 
 
 ## REPORTING ##
-def print_result(stage, wall_time, cpu_time, program_size=None):
-    print(f"[TIMER] Running {stage.ljust(23)}", end="\t")
-    print(f"walltime: {(str(wall_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
-    print(f"cputime: {(str(cpu_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
-    if program_size is not None:
-        print(f"programsize: {program_size} lines", end="")
-    print(end="\n")
-
-
 def dump_header(session_name):
     """Write the session header to file, contains the timestamp, session name, and system info."""
     filename = InstrumentSession.filename
@@ -147,16 +135,63 @@ def dump_header(session_name):
         file.write(f"  results:\n")
 
 
-def dump_result(stage_name, wall_time, cpu_time, program_size=None):
-    """Write single stage results to file."""
-    filename = InstrumentSession.filename
+class ResultReporter:
+    """Report the result of a single instrumentation stage. Reporting is done either to the console
+    or to a specified file obtained from the instrumentation session. The report is appended to the
+    file in that case.
 
-    with open(filename, mode="a", encoding="UTF-8") as file:
-        file.write(f"    - {stage_name}:\n")
-        file.write(f"        walltime: {wall_time / 1e6}\n")
-        file.write(f"        cputime: {cpu_time / 1e6}\n")
+    The functionality is implemented as a stateful context manager since the (high-level)
+    instrumentation results are only available after the compiler has reported the low-level
+    instrumentation results. We thus need to open the report file first to obtain to correct
+    position to insert the results after the function was measured.
+    """
+
+    def __init__(self, stage_name):
+        self.stage_name = stage_name
+        self.insertion_point = None
+        self.filename = InstrumentSession.filename
+
+    def __enter__(self):
+        """Save the report file insertion point before low-level results are written to it."""
+        if self.filename:
+            with open(self.filename, mode="a", encoding="UTF-8") as file:
+                self.insertion_point = file.tell()
+        return self
+
+    def __exit__(self, *_args, **_kwargs):
+        return False
+
+    def commit_results(self, wall_time, cpu_time, program_size):
+        """Report the provided results to either the console or file."""
+        if self.filename:
+            self.dump_results(wall_time, cpu_time, program_size)
+        else:
+            self.print_results(wall_time, cpu_time, program_size)
+
+    def print_results(self, wall_time, cpu_time, program_size=None):
+        """Print the provided results to console with some minor formatting."""
+        print(f"[TIMER] Running {self.stage_name.ljust(23)}", end="\t")
+        print(f"walltime: {(str(wall_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
+        print(f"cputime: {(str(cpu_time // 1e3 / 1e3) + 'ms').ljust(12)}", end="\t")
         if program_size is not None:
-            file.write(f"        programsize: {program_size}\n")
+            print(f"programsize: {program_size} lines", end="")
+        print(end="\n")
+
+    def dump_results(self, wall_time, cpu_time, program_size=None):
+        """Dump the provided results to file accounting for (potential) low-level instrumentation
+        results for the same stage."""
+        with open(self.filename, mode="r+", encoding="UTF-8") as file:
+            file.seek(self.insertion_point)
+            existing_text = file.read()  # from low-level instrumentation
+            file.seek(self.insertion_point)
+
+            file.write(f"    - {self.stage_name}:\n")
+            file.write(f"        walltime: {wall_time / 1e6}\n")
+            file.write(f"        cputime: {cpu_time / 1e6}\n")
+            if program_size is not None:
+                file.write(f"        programsize: {program_size}\n")
+
+            file.write(existing_text)
 
 
 def dump_footer():
