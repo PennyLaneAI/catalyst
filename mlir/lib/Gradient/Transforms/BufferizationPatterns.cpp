@@ -208,27 +208,15 @@ class BufferizeBackpropWithValueOp : public OpConversionPattern<BackpropWithValu
         auto bufferizedBackpropWithValueOp = rewriter.create<BackpropWithValueOp>(
             loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
             calleeResults, resShadows, diffArgIndicesAttr);
-        
-
 
         // Fill in the null placeholders.
         for (const auto &[idx, scalarResult] :
              llvm::enumerate(bufferizedBackpropWithValueOp.getGradients())) {
             gradients[scalarIndices[idx]] = scalarResult;
-            std::cout << "Grad: ";
-            scalarResult.dump();
-        }
-        
-        auto vals = op.getCalleeResults();
-
-        for(auto &&val : vals){
-            std::cout << "Val: ";
-            val.dump();
         }
 
         SmallVector<Value> results;
-
-        results.insert(results.end(), vals.begin(), vals.end());
+        results.insert(results.end(), calleeResults.begin(), calleeResults.end());
         results.insert(results.end(), gradients.begin(), gradients.end());
 
         rewriter.replaceOp(op, results);
