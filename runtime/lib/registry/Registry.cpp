@@ -16,7 +16,7 @@ namespace py = pybind11;
 std::unordered_map<int64_t, py::function> *references;
 
 extern "C" {
-[[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, va_list args)
+[[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc, va_list args)
 {
     auto it = references->find(identifier);
     if (it == references->end()) {
