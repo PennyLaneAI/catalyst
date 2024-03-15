@@ -28,11 +28,11 @@ This module also uses the CUDA-quantum API. Here is the reference:
   https://nvidia.github.io/cuda-quantum/latest/api/languages/python_api.html
 """
 
-import functools
 import json
 import operator
-from functools import reduce, wraps
+from functools import reduce
 from typing import Hashable
+import warnings
 
 import cudaq
 import jax
@@ -72,7 +72,6 @@ from catalyst.jax_primitives import (
     while_p,
     zne_p,
 )
-from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
@@ -796,6 +795,12 @@ def interpret_impl(ctx, jaxpr):
 
 
 class QJIT_CUDAQ(catalyst.QJIT):
+    """Class representing a CUDA Quantum hybrid quantum-classical function.
+
+    Args:
+        fn (Callable): the quantum or classical function to compile
+        compile_options (CompileOptions): compilation options to use
+    """
 
     def capture(self, args):
         # Need to override the capture method for two reasons:
@@ -824,9 +829,10 @@ class QJIT_CUDAQ(catalyst.QJIT):
     def jit_compile(self, args):
         # JIT compile needs to be overridden from the base class, for a couple of reasons:
         #
-        # - It calls self.generate_ir() and self.compile(), none of which are applicable here (for now)
-        # - It tries to create a function cache and a CompiledFunction object, which will fail in this case,
-        #   because we have no compiled binary nor shared library
+        # - It calls self.generate_ir() and self.compile(), none of which are applicable here
+        #   (for now).
+        # - It tries to create a function cache and a CompiledFunction object, which will fail in
+        #   this case, because we have no compiled binary nor shared library.
 
         if self.jaxpr is None:
             if self.user_sig and not self.compile_options.static_argnums:

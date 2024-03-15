@@ -21,6 +21,7 @@ from pathlib import Path
 import cudaq
 import pennylane as qml
 
+from catalyst.jit import CompileOptions
 from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
 
 
