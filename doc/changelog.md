@@ -9,11 +9,6 @@
 
 <h3>Improvements</h3>
 
-* An updated quantum device specification format is now supported by Catalyst. The toml schema 2
-  configs allow device autors to specify individual gate properties such as native quantum control
-  support, gate invertibility or differentiability.
-  [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
-
 * Catalyst now supports devices built from the 
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
@@ -62,9 +57,8 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
-Erick Ochoa Lopez,
 Romain Moyard,
-Sergei Mironov.
+Erick Ochoa Lopez.
 
 # Release 0.5.0
 

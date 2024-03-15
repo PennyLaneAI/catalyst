@@ -76,7 +76,7 @@ def test_unsupported_device():
     def func():
         return qml.probs()
 
-    regex = "Attempting to compile program for incompatible device.*"
+    regex = "Attempting to compile program for incompatible device .*"
     with pytest.raises(CompileError, match=regex):
         qjit(func)
 
