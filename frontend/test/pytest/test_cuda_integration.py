@@ -518,10 +518,8 @@ class TestCudaQ:
             qml.RX(y, wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        spy = mocker.spy(circuit1, "capture")
         circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
-        spy.assert_called()
 
         p = jnp.array([0.1, 0.2])
         spy = mocker.spy(circuit1, "capture")
