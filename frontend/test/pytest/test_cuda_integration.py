@@ -521,16 +521,16 @@ class TestCudaQ:
         circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
 
-        p = jnp.array([0.1, 0.2])
+        x, y = 0.1, 0.2
         spy = mocker.spy(circuit1, "capture")
-        res1 = circuit1(p)
+        res1 = circuit1(x, y)
         spy.assert_not_called()
-        assert_allclose(res1, circuit2(p))
+        assert_allclose(res1, circuit2(x, y))
 
-        p = jnp.array([0.3, 0.4])
-        res2 = circuit1(p)
+        x, y = 0.3, 0.4
+        res2 = circuit1(x, y)
         spy.assert_not_called()
-        assert_allclose(res2, circuit2(p))
+        assert_allclose(res2, circuit2(x, y))
 
     def test_autograph(self):
         """Test that autograph can be invoked"""
