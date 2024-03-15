@@ -47,14 +47,37 @@ class TestCudaQ:
         with pytest.raises(ValueError, match="Unavailable target"):
             circuit_foo()
 
+    def test_qjit_cuda_remove_host_context(self):
+        """Test removing the host context."""
+
+        from catalyst.cuda.catalyst_to_cuda_interpreter import (
+            QJIT_CUDAQ,
+            remove_host_context,
+        )
+
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
+        def circuit_foo():
+            return qml.state()
+
+        observed_jaxpr, _ = QJIT_CUDAQ(circuit_foo).get_jaxpr()
+        jaxpr = remove_host_context(observed_jaxpr)
+        assert jaxpr
+
+    def test_qjit_catalyst_to_cuda_jaxpr(self):
+        """Assert that catalyst_to_cuda returns something."""
+        @catalyst.cuda.cudaqjit
+        @qml.qnode(qml.device("softwareq.qpp", wires=1))
+        def circuit_foo():
+            return qml.state()
+
+        circuit_foo()
+        assert cuda_jaxpr
+
     def test_measurement_return(self):
         """Test the measurement code is added."""
-
-        from catalyst.third_party.cuda import cudaqjit as cjit
-
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
-            @cjit
+            @catalyst.cuda.cudaqjit
             @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
@@ -65,9 +88,7 @@ class TestCudaQ:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalyst.third_party.cuda import cudaqjit as cjit
-
-        @cjit
+        @catalyst.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
