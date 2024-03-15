@@ -20,6 +20,7 @@ import datetime
 import functools
 import os
 import platform
+import sys
 import time
 from contextlib import contextmanager
 
@@ -154,12 +155,14 @@ class ResultReporter:
 
     def print_results(self, wall_time, cpu_time, program_size=None):
         """Print the provided results to console with some minor formatting."""
-        print(f"[DIAGNOSTICS] Running {self.stage_name.ljust(23)}", end="\t")
-        print(f"walltime: {(str(wall_time // 1e3 / 1e3) + ' ms').ljust(12)}", end="\t")
-        print(f"cputime: {(str(cpu_time // 1e3 / 1e3) + ' ms').ljust(12)}", end="\t")
+        print(f"[DIAGNOSTICS] Running {self.stage_name.ljust(23)}", end="\t", file=sys.stderr)
+        formatted_wall_time = (str(wall_time // 1e3 / 1e3) + " ms").ljust(12)
+        print(f"walltime: {formatted_wall_time}", end="\t", file=sys.stderr)
+        formatted_cpu_time = (str(wall_time // 1e3 / 1e3) + " ms").ljust(12)
+        print(f"cputime: {formatted_cpu_time}", end="\t", file=sys.stderr)
         if program_size is not None:
-            print(f"programsize: {program_size} lines", end="")
-        print(end="\n")
+            print(f"programsize: {program_size} lines", end="", file=sys.stderr)
+        print(end="\n", file=sys.stderr)
 
     def dump_results(self, wall_time, cpu_time, program_size=None):
         """Dump the provided results to file accounting for (potential) low-level instrumentation
