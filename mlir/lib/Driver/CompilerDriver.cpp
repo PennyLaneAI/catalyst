@@ -602,13 +602,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", /* add_endl */ false,
                                   llvmContext, options.source, options.moduleName, err);
         if (!llvmModule) {
-            catalyst::utils::LinesCount::Module(*llvmModule);
-
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
             CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM source\n");
             return failure();
         }
+
+        catalyst::utils::LinesCount::Module(*llvmModule);
     }
 
     if (llvmModule) {
