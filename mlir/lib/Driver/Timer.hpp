@@ -44,9 +44,6 @@ namespace catalyst::utils {
  * To display results, run the driver with the `ENABLE_DIAGNOSTICS=ON` variable.
  * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
  * along with `ENABLE_DIAGNOSTICS=ON`.
- *
- * Note that using both `ENABLE_DIAGNOSTICS=ON` and `ENABLE_DIAGNOSTICS=ON` will
- * introduce noise to the timing results.
  */
 class Timer {
   private:
