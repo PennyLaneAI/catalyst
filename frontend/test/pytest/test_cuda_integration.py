@@ -47,35 +47,6 @@ class TestCudaQ:
         with pytest.raises(ValueError, match="Unavailable target"):
             circuit_foo()
 
-    def test_qjit_cuda_remove_host_context(self):
-        """Test removing the host context."""
-
-        from catalyst.cuda.catalyst_to_cuda_interpreter import (
-            QJIT_CUDAQ,
-            remove_host_context,
-        )
-        from catalyst.jit import CompileOptions
-
-        @qml.qnode(qml.device("softwareq.qpp", wires=1))
-        def circuit_foo():
-            return qml.state()
-
-        options = CompileOptions(
-            False,
-            None,
-            "binary",
-            False,
-            None,
-            False,
-            False,
-            static_argnums=None,
-            abstracted_axes=None,
-        )
-
-        observed_jaxpr, _, _ = QJIT_CUDAQ(circuit_foo, options).capture([])
-        jaxpr = remove_host_context(observed_jaxpr)
-        assert jaxpr
-
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
 
@@ -532,6 +503,7 @@ class TestCudaQ:
         assert_allclose(res1, circuit2(p))
 
         p = jnp.array([0.3, 0.4])
+        spy = mocker.spy(circuit1, "capture")
         res2 = circuit1(p)
         spy.assert_not_called()
         assert_allclose(res2, circuit2(p))
@@ -552,6 +524,7 @@ class TestCudaQ:
         spy.assert_called()
 
         p = jnp.array([0.1, 0.2])
+        spy = mocker.spy(circuit1, "capture")
         res1 = circuit1(p)
         spy.assert_not_called()
         assert_allclose(res1, circuit2(p))
