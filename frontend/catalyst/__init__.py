@@ -20,7 +20,6 @@ This package contains the Catalyst Python interface.
 import sys
 import types
 from os.path import dirname
-from typing import Optional
 
 import jaxlib as _jaxlib
 
@@ -103,6 +102,7 @@ from catalyst.pennylane_extensions import (
     while_loop,
 )
 from catalyst.utils.exceptions import AutoGraphError, CompileError
+from catalyst.utils.instruments import instrumentation
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -207,4 +207,5 @@ __all__ = (
     "AutoGraphError",
     "CompileError",
     "CompileOptions",
+    "instrumentation",
 )
