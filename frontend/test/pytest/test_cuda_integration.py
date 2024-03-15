@@ -65,41 +65,37 @@ class TestCudaQ:
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
-        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
-
+        @catalyst.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit_foo():
             return qml.state()
 
-        cuda_jaxpr = jax.make_jaxpr(interpret(circuit_foo))
+        circuit_foo()
         assert cuda_jaxpr
 
     def test_measurement_return(self):
         """Test the measurement code is added."""
-
-        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
-
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
+            @catalyst.cuda.cudaqjit
             @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
             def circuit():
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
 
-            jax.make_jaxpr(interpret(circuit))()
+            circuit()
 
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
-
+        @catalyst.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
         def circuit():
             qml.RX(jnp.pi / 4, wires=[0])
             measure(0)
             return qml.state()
 
-        jax.make_jaxpr(interpret(circuit))()
+        circuit()
 
     def test_pytrees(self):
         """Test that we can return a dictionary."""

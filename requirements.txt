@@ -17,6 +17,7 @@ lit
 pytest
 pytest-xdist
 pytest-cov
+pytest-mock
 nbmake
 
 # optional rt/test dependencies
