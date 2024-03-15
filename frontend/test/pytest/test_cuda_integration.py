@@ -487,7 +487,7 @@ class TestCudaQ:
             qml.RX(y[0], wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        circuit1 = cjit(qml.QNode(circuit, dev1))
+        circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
         spy = mocker.spy(circuit1, "capture")
 
@@ -501,7 +501,7 @@ class TestCudaQ:
         spy.assert_not_called()
         assert_allclose(res2, circuit2(p))
 
-    def test_aot_capture(self):
+    def test_aot_capture(self, mocker):
         """Test that JAXPR capture can occur AOT"""
         dev1 = qml.device("softwareq.qpp", wires=2)
         dev2 = qml.device("default.qubit", wires=2)
@@ -511,7 +511,7 @@ class TestCudaQ:
             qml.RX(y, wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        circuit1 = cjit(qml.QNode(circuit, dev1))
+        circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
         spy = mocker.spy(circuit1, "capture")
         spy.assert_called()
@@ -533,16 +533,16 @@ class TestCudaQ:
         @qml.qnode(dev)
         def circuit(x: float, y: float):
 
-            for i in range(10):
+            for _ in range(10):
                 qml.RX(x, wires=[0])
 
             qml.RX(y, wires=[0])
             return qml.state()
 
-        circuit1 = cjit(circuit, autograph=True)
+        circuit1 = catalyst.cuda.cudaqjit(circuit, autograph=True)
         assert "for_loop" in str(circuit1.jaxpr)
 
-        circuit2 = cjit(circuit, autograph=False)
+        circuit2 = catalyst.cuda.cudaqjit(circuit, autograph=False)
         assert "for_loop" not in str(circuit2.jaxpr)
 
 
