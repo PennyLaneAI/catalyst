@@ -1,3 +1,19 @@
+// Copyright 2024 Xanadu Quantum Technologies Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#define NPY_NO_DEPRECATED_API NPY_1_22_API_VERSION
+
 #include <cstdint>
 #include <cstdio>
 #include <pybind11/pybind11.h>
@@ -15,6 +31,16 @@ namespace py = pybind11;
 // https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
 std::unordered_map<int64_t, py::function> *references;
 
+void sanitizeResult(py::object obj) {
+    
+}
+
+void sanitizeResults(py::list results) {
+    for (py::object obj : results) {
+        sanitizeResult(obj);
+    }
+}
+
 extern "C" {
 [[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc, va_list args)
 {
@@ -29,11 +55,20 @@ extern "C" {
         int64_t ptr = va_arg(args, int64_t);
         flat_args.append(ptr);
     }
-    // We have access to lambda here...
-    // Lambda is a callback...
-    // we also have access to memref pointer...
-    // We need a memref pointer...
-    lambda(flat_args);
+
+    py::list flat_results = lambda(flat_args);
+
+    // We have a flat list of return values.
+    // These returns **may** be array views to
+    // the very same memrefs that we passed as inputs.
+    // As a first prototype, let's copy these values.
+    // I think it is best to always copy them because
+    // of aliasing. Let's just copy them to guarantee
+    // no aliasing issues. We can revisit this as an optimization
+    // and allowing these to alias.
+    for (py::handle obj : flat_results) {
+        
+    }
 }
 }
 
