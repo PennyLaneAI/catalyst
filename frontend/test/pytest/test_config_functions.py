@@ -173,7 +173,6 @@ def test_get_native_gates_schema1_qcontrol():
 def test_get_adjoint_schema2():
     """Test native gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:
-
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
             f.write(

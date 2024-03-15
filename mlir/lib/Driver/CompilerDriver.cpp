@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 #include "mhlo/IR/register.h"
@@ -205,23 +206,14 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
 
 struct CatalystPassInstrumentation : public PassInstrumentation {
     typedef std::function<void(Pass *pass, Operation *operation)> PassCallback;
-    typedef std::function<void(std::optional<OperationName> name,
-                               const PipelineParentInfo &parentInfo)>
-        PipelineCallback;
     PassCallback beforePassCallback;
     PassCallback afterPassCallback;
     PassCallback afterPassFailedCallback;
-    PipelineCallback beforePipelineCallback;
-    PipelineCallback afterPipelineCallback;
 
     CatalystPassInstrumentation(PassCallback beforePassCallback, PassCallback afterPassCallback,
-                                PassCallback afterPassFailedCallback,
-                                PipelineCallback beforePipelineCallback,
-                                PipelineCallback afterPipelineCallback)
+                                PassCallback afterPassFailedCallback)
         : beforePassCallback(beforePassCallback), afterPassCallback(afterPassCallback),
-          afterPassFailedCallback(afterPassFailedCallback),
-          beforePipelineCallback(beforePipelineCallback),
-          afterPipelineCallback(afterPipelineCallback)
+          afterPassFailedCallback(afterPassFailedCallback)
     {
     }
 
@@ -238,18 +230,6 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     void runAfterPassFailed(Pass *pass, Operation *operation) override
     {
         this->afterPassFailedCallback(pass, operation);
-    }
-
-    void runBeforePipeline(std::optional<OperationName> name,
-                           const PipelineParentInfo &parentInfo) override
-    {
-        this->beforePipelineCallback(name, parentInfo);
-    }
-
-    void runAfterPipeline(std::optional<OperationName> name,
-                          const PipelineParentInfo &parentInfo) override
-    {
-        this->afterPipelineCallback(name, parentInfo);
     }
 };
 
@@ -540,39 +520,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     };
 
-    auto beforePipelineCallback =
-        [&](std::optional<OperationName> name,
-            const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
-            // TODO: Investigate the issue with multiple calls to PassPipelines
-            // std::cerr << ">>>>>>>>>>>>>>>>>>>>>" << std::endl;
-            // Pass *pass = parentInfo.parentPass;
-            // std::cerr << "pass.name: " << pass->getName().str() << std::endl;
-            // std::cerr << "pass.description: " << pass->getDescription().str() << std::endl;
-            // std::cerr << "pass.pipeline_info: ";
-            // pass->printAsTextualPipeline(llvm::outs());
-            // std::cerr << std::endl;
-            // auto res = passPipelineNames.find(pass);
-            // if (res != passPipelineNames.end()) {
-            //     timer.start();
-            // }
-        };
-
-    auto afterPipelineCallback =
-        [&](std::optional<OperationName> name,
-            const CatalystPassInstrumentation::PipelineParentInfo &parentInfo) {
-            // TODO: Investigate the issue with multiple calls to PassPipelines
-            // Pass *pass = parentInfo.parentPass;
-            // auto res = passPipelineNames.find(pass);
-            // if (res != passPipelineNames.end()) {
-            //     timer.dump(res->second);
-            // }
-            // std::cerr << "<<<<<<<<<<<<<<<<<<<<<" << std::endl;
-        };
-
     // Output pipeline names on failures
     pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
-        beforePassCallback, afterPassCallback, afterPassFailedCallback, beforePipelineCallback,
-        afterPipelineCallback)));
+        beforePassCallback, afterPassCallback, afterPassFailedCallback)));
 
     // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
