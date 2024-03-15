@@ -131,6 +131,7 @@ class ResultReporter:
     def __init__(self, stage_name, has_finegrained):
         self.stage_name = stage_name
         self.has_finegrained = has_finegrained
+        self.enable_finegrained = InstrumentSession.finegrained
         self.insertion_point = None
         self.filename = InstrumentSession.filename
 
@@ -173,7 +174,7 @@ class ResultReporter:
             file.write(f"        cputime: {cpu_time / 1e6}\n")
             if program_size is not None:
                 file.write(f"        programsize: {program_size}\n")
-            if self.has_finegrained:
+            if self.has_finegrained and self.enable_finegrained:
                 file.write(f"        finegrained:\n")
 
             file.write(existing_text)
