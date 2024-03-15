@@ -78,6 +78,7 @@ class TestCudaQ:
 
     def test_qjit_catalyst_to_cuda_jaxpr(self):
         """Assert that catalyst_to_cuda returns something."""
+
         @catalyst.cuda.cudaqjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1))
         def circuit_foo():
