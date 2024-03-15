@@ -72,7 +72,7 @@ class TestCudaQ:
             abstracted_axes=None,
         )
 
-        observed_jaxpr, _, _ = QJIT_CUDAQ(circuit_foo, options).capture()
+        observed_jaxpr, _, _ = QJIT_CUDAQ(circuit_foo, options).capture([])
         jaxpr = remove_host_context(observed_jaxpr)
         assert jaxpr
 
@@ -85,7 +85,7 @@ class TestCudaQ:
             return qml.state()
 
         res = circuit_foo()
-        assert res
+        assert isinstance(res, jax.Array)
 
     def test_measurement_return(self):
         """Test the measurement code is added."""
@@ -514,7 +514,7 @@ class TestCudaQ:
     def test_jit_capture(self, mocker):
         """Test that JAXPR capture only happens on first execution"""
         dev1 = qml.device("softwareq.qpp", wires=2)
-        dev2 = qml.device("default.qubit", wires=2)
+        dev2 = qml.device("lightning.qubit", wires=2)
 
         def circuit(params):
             x, y = jax.numpy.array_split(params, 2)
@@ -539,7 +539,7 @@ class TestCudaQ:
     def test_aot_capture(self, mocker):
         """Test that JAXPR capture can occur AOT"""
         dev1 = qml.device("softwareq.qpp", wires=2)
-        dev2 = qml.device("default.qubit", wires=2)
+        dev2 = qml.device("lightning.qubit", wires=2)
 
         def circuit(x: float, y: float):
             qml.RX(x, wires=[0])
