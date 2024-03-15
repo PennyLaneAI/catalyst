@@ -30,9 +30,9 @@ This module also uses the CUDA-quantum API. Here is the reference:
 
 import json
 import operator
+import warnings
 from functools import reduce
 from typing import Hashable
-import warnings
 
 import cudaq
 import jax

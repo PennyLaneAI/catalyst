@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pennylane as qml
 
-from catalyst.jit import CompileOptions
 from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
+from catalyst.jit import CompileOptions
 
 def _check_version_compatibility():
     installed_version = version("cuda_quantum")
