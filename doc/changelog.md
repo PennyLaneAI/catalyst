@@ -44,6 +44,14 @@
 
 <h3>Breaking changes</h3>
 
+<h3>Internal changes</h3>
+
+* The `catalyst.cuda.cudaqjit` decorator has been refactored to inherit from the main
+  `catalyst.QJIT` class. This enables the functionality provided by the `QJIT` class to be
+  supported by the CUDA quantum QJIT, while reducing code duplication. Longer term, this will help
+  enable autograph support for `catalyst.cuda.cudaqjit`.
+  [(#602)](https://github.com/PennyLaneAI/catalyst/pull/602)
+
 <h3>Bug fixes</h3>
 
 * Fix the issue of triggering the C++ compiler driver twice.
@@ -62,6 +70,7 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Josh Izaac,
 Erick Ochoa Lopez,
 Romain Moyard,
 Sergei Mironov.
