@@ -50,6 +50,7 @@ class TestCudaQ:
     def test_qjit_cuda_remove_host_context(self):
         """Test removing the host context."""
 
+        from catalyst.jit import CompileOptions
         from catalyst.cuda.catalyst_to_cuda_interpreter import (
             QJIT_CUDAQ,
             remove_host_context,
@@ -59,7 +60,19 @@ class TestCudaQ:
         def circuit_foo():
             return qml.state()
 
-        observed_jaxpr, _ = QJIT_CUDAQ(circuit_foo).get_jaxpr()
+        options = CompileOptions(
+            False,
+            None,
+            "binary",
+            False,
+            None,
+            False,
+            False,
+            static_argnums=None,
+            abstracted_axes=None,
+        )
+
+        observed_jaxpr, _, _ = QJIT_CUDAQ(circuit_foo, options).capture()
         jaxpr = remove_host_context(observed_jaxpr)
         assert jaxpr
 
