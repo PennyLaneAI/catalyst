@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pennylane as qml
 
+from catalyst.cuda.catalyst_to_cuda_interpreter import QJIT_CUDAQ
 
 def _check_version_compatibility():
     installed_version = version("cuda_quantum")
@@ -31,7 +32,8 @@ def _check_version_compatibility():
         raise ModuleNotFoundError(msg)
 
 
-def cudaqjit(fn=None, **kwargs):
+
+def cudaqjit(fn=None, *, autograph=False, static_argnums=None):
     """A decorator for compiling PennyLane and JAX programs using CUDA Quantum.
 
     .. important::
@@ -50,6 +52,13 @@ def cudaqjit(fn=None, **kwargs):
 
     Args:
         fn (Callable): the quantum or classical function to compile
+        autograph (bool): Experimental support for automatically converting Python control
+            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
+            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
+            available TensorFlow installation. For more details, see the
+            :doc:`AutoGraph guide </dev/autograph>`.
+        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+            positions of static arguments.
 
     Returns:
         QJIT object.
@@ -83,14 +92,39 @@ def cudaqjit(fn=None, **kwargs):
     statistics (such as probabilities and variance) are not yet supported.
     """
     _check_version_compatibility()
-    # pylint: disable-next=import-outside-toplevel
-    from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import interpret
+    argnums = static_argnums
 
     if fn is not None:
-        return interpret(fn, **kwargs)
+        return QJIT_CUDAQ(
+            fn,
+            CompileOptions(
+                False,
+                None,
+                "binary",
+                False,
+                None,
+                autograph,
+                False,
+                static_argnums=argnums,
+                abstracted_axes=None,
+            ),
+        )
 
     def wrap_fn(fn):
-        return interpret(fn, **kwargs)
+        return QJIT_CUDAQ(
+            fn,
+            CompileOptions(
+                False,
+                None,
+                "binary",
+                False,
+                None,
+                autograph,
+                False,
+                static_argnums=argnums,
+                abstracted_axes=None,
+            ),
+        )
 
     return wrap_fn
 
