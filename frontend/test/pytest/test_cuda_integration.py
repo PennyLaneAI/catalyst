@@ -84,8 +84,8 @@ class TestCudaQ:
         def circuit_foo():
             return qml.state()
 
-        circuit_foo()
-        assert cuda_jaxpr
+        res = circuit_foo()
+        assert res
 
     def test_measurement_return(self):
         """Test the measurement code is added."""
