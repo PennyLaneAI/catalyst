@@ -518,9 +518,9 @@ class TestCudaQ:
             qml.RX(y, wires=[0])
             return qml.expval(qml.PauliZ(0))
 
+        spy = mocker.spy(circuit1, "capture")
         circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
         circuit2 = qjit(qml.QNode(circuit, dev2))
-        spy = mocker.spy(circuit1, "capture")
         spy.assert_called()
 
         p = jnp.array([0.1, 0.2])
@@ -552,6 +552,28 @@ class TestCudaQ:
 
         circuit2 = catalyst.cuda.cudaqjit(circuit, autograph=False)
         assert "for_loop" not in str(circuit2.jaxpr)
+
+    @pytest.mark.skip(reason="kwargs currently not supported")
+    def test_kwargs(self):
+        """Test passing kwargs to an qjit"""
+        dev1 = qml.device("softwareq.qpp", wires=2)
+        dev2 = qml.device("lightning.qubit", wires=2)
+
+        def circuit(x, y=0.2):
+            qml.RX(x, wires=[0])
+            qml.RX(y, wires=[0])
+            return qml.expval(qml.PauliZ(0))
+
+        circuit1 = catalyst.cuda.cudaqjit(qml.QNode(circuit, dev1))
+        circuit2 = qjit(qml.QNode(circuit, dev2))
+
+        # test using default values
+        res1 = circuit1(0.1)
+        assert_allclose(res1, circuit2(0.1))
+
+        # test passing kwargs
+        res1 = circuit1(x=0.1, y=0.3)
+        assert_allclose(res1, circuit2(x=0.1, y=0.3))
 
 
 if __name__ == "__main__":
