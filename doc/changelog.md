@@ -38,6 +38,14 @@
 * Return values are `jax.Array` typed instead of `numpy.array`.
   [(#895)](https://github.com/PennyLaneAI/catalyst/pull/895)
 
+<h3>Internal changes</h3>
+
+* The `catalyst.cuda.cudaqjit` decorator has been refactored to inherit from the main
+  `catalyst.QJIT` class. This enables the functionality provided by the `QJIT` class to be
+  supported by the CUDA quantum QJIT, while reducing code duplication. Longer term, this will help
+  enable autograph support for `catalyst.cuda.cudaqjit`.
+  [(#602)](https://github.com/PennyLaneAI/catalyst/pull/602)
+
 <h3>Bug fixes</h3>
 
 * Make Autograph copy `QNode` instead of creating new one from scratch to preserve information such as transforms and `mcm_method`. [(#900)](https://github.com/PennyLaneAI/catalyst/pull/900)
