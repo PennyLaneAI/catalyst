@@ -18,7 +18,11 @@ import pennylane as qml
 from pennylane import transform
 
 import catalyst
-from pennylane.measurements import ExpectationMP, ProbabilityMP
+from pennylane.measurements import ExpectationMP, ProbabilityMP, VarianceMP, CountsMP
+from pennylane.tape.tape import (
+    _validate_computational_basis_sampling,
+    rotations_and_diagonal_measurements,
+)
 from catalyst.utils.exceptions import CompileError
 
 
@@ -64,7 +68,7 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
 
 
 @transform
-def expval_from_counts(tape):
+def measurements_from_counts(tape):
     r"""Replace expval from a tape with counts and postprocessing.
 
     Args:
@@ -75,45 +79,78 @@ def expval_from_counts(tape):
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
         transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
     """
+    if tape.samples_computational_basis and len(tape.measurements) > 1:
+        _validate_computational_basis_sampling(tape.measurements)
+    diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
+    for i, m in enumerate(diagonal_measurements):
+        if m.obs is not None:
+            diagonalizing_gates.extend(m.obs.diagonalizing_gates())
+            diagonal_measurements[i] = type(m)(eigvals=m.eigvals(), wires=m.wires)
     # Add diagonalizing gates
     news_operations = tape.operations
-    expval_position = [False * len(tape.measurements)]
-    expval_eigvals = [False * len(tape.measurements)]
-    for i, m in enumerate(tape.measurements):
-        if m.obs:
-            news_operations.extend(m.obs.diagonalizing_gates())
-        if isinstance(m, ExpectationMP):
-            expval_position[i] = True
-            expval_eigvals[i] = m.eigvals()
+    news_operations.extend(diagonalizing_gates)
     # Transform tape
-    new_measurements = [
-        qml.counts(wires=m.obs.wires.tolist()) if isinstance(m, ExpectationMP) else m
-        for m in tape.measurements
-    ]
+    measured_wires = set()
+    for m in diagonal_measurements:
+        measured_wires.update(m.wires.tolist())
+
+    new_measurements = [qml.counts(wires=list(measured_wires))]
     new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
 
     def postprocessing_counts_to_expval(results):
         """A processing function to get expecation values from counts."""
-        processed_results = []
-        for r in results:
-            process_tape_results(r)
-        return processed_results
+        keys = results[0][0]
+        counts = results[0][1]
+        results_processed = []
+        for m in tape.measurements:
+            sub_counts = _map_counts(counts, m.wires, qml.wires.Wires(list(measured_wires)))
+            if isinstance(m, ExpectationMP):
+                probs = _get_probs(sub_counts)
+                results_processed.append(_get_expval(eigvals=m.eigvals(), probs=probs))
+            elif isinstance(m, VarianceMP):
+                probs = _get_probs(sub_counts)
+                results_processed.append(_get_var(eigvals=m.eigvals(), probs=probs))
+            elif isinstance(m, ProbabilityMP):
+                probs = _get_probs(sub_counts)
+                results_processed.append(probs)
+            elif isinstance(m, CountsMP):
+                results_processed.append(tuple([keys[0 : 2 ** len(m.wires)], sub_counts]))
+        if len(tape.measurements) == 1:
+            results_processed = results_processed[0]
+        else:
+            results_processed = tuple(results_processed)
+        return results_processed
 
     return [new_tape], postprocessing_counts_to_expval
 
-def process_results():
-    for i, is_expval in enumerate(expval_position):
-        if is_expval:
-            prob_vector = []
-            _, values = r[i]
-            num_shots = jax.numpy.sum(values)
-            for value in values:
-                prob = value / num_shots
-                prob_vector.append(prob)
-            expval = jax.numpy.dot(
-                jax.numpy.array(expval_eigvals[i]), jax.numpy.array(prob_vector)
-            )
-            processed_results.append(expval)
-        else:
-            processed_results.append(results[i])
-    return processed_results
+
+def _get_probs(counts):
+    prob_vector = []
+    num_shots = jax.numpy.sum(counts)
+    for count in counts:
+        prob = count / num_shots
+        prob_vector.append(prob)
+    return jax.numpy.array(prob_vector)
+
+
+def _get_expval(eigvals, probs):
+    expval = jax.numpy.dot(jax.numpy.array(eigvals), probs)
+    return expval
+
+
+def _get_var(eigvals, probs):
+    var = jax.numpy.dot(probs, (eigvals**2)) - qml.math.dot(probs, eigvals)
+    return var
+
+
+def _map_counts(counts, sub_wires, wire_order):
+    wire_map = dict(zip(wire_order, range(len(wire_order))))
+    mapped_wires = [wire_map[w] for w in sub_wires]
+
+    mapped_counts = {}
+    for outcome, occurrence in enumerate(counts):
+        binary_outcome = format(outcome, "0{}b".format(len(wire_order)))
+        mapped_outcome = "".join(binary_outcome[i] for i in mapped_wires)
+        mapped_counts[mapped_outcome] = mapped_counts.get(mapped_outcome, 0) + occurrence
+
+    return jax.numpy.array(list(mapped_counts.values()))
