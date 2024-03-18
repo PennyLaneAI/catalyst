@@ -103,7 +103,7 @@ def measurements_from_counts(tape):
 
     def postprocessing_counts_to_expval(results):
         """A processing function to get expecation values from counts."""
-        keys = results[0][0]
+        states = results[0][0]
         counts_outcomes = results[0][1]
         results_processed = []
         for m in tape.measurements:
@@ -121,7 +121,7 @@ def measurements_from_counts(tape):
                 results_processed.append(probs)
             elif isinstance(m, CountsMP):
                 results_processed.append(
-                    tuple([keys[0 : 2 ** len(m.wires)], mapped_counts_outcome])
+                    tuple([states[0 : 2 ** len(m.wires)], mapped_counts_outcome])
                 )
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
