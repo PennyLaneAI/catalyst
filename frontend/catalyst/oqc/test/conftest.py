@@ -14,6 +14,7 @@
 """
 Pytest configuration file for OQC test suite.
 """
+# pylint: disable=unused-import
 import os
 
 import pytest
@@ -40,7 +41,7 @@ def set_dummy_oqc_env():
     del os.environ["OQC_URL"]
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(items):
     """A pytest items modifier method"""
     if not oqc_available:
         # If OQC QCAAS is not installed, mark all collected tests to be skipped.
