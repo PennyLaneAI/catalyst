@@ -104,6 +104,10 @@ void deactivateDevice()
 }
 } // namespace Catalyst::Runtime
 
+std::mutex python_mutex;
+
+std::mutex &getPythonMutex() { return python_mutex; }
+
 extern "C" {
 
 void __catalyst__host__rt__unrecoverable_error()
