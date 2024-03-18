@@ -73,7 +73,10 @@ void convertResult(py::handle tuple)
         int64_t rank;
         void *descriptor;
     };
-    UnrankedMemrefType destAsUnranked = {0, destAsPtr};
+
+    UnrankedMemrefType *tempptr = (UnrankedMemrefType *)unranked_memref_ptr;
+
+    UnrankedMemrefType destAsUnranked = {tempptr->rank, destAsPtr};
     memrefCopy(e_size, unranked_memref_ptr, &destAsUnranked);
     dlclose(handle);
 }
