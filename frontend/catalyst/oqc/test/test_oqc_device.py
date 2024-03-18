@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test for the OQC device.
 """
+# pylint: disable='unused-argument'
 import os
 import pathlib
 
@@ -23,20 +24,6 @@ from catalyst.compiler import get_lib_path
 from catalyst.oqc import OQCDevice
 
 
-@pytest.fixture
-def set_dummy_oqc_env():
-    """Set OQC env var."""
-    os.environ["OQC_EMAIL"] = "a"
-    os.environ["OQC_PASSWORD"] = "b"
-    os.environ["OQC_URL"] = "c"
-
-    yield
-
-    del os.environ["OQC_EMAIL"]
-    del os.environ["OQC_PASSWORD"]
-    del os.environ["OQC_URL"]
-
-
 # TODO: replace when the OQC CPP layer is available.
 @pytest.mark.skipif(
     not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
@@ -44,6 +31,19 @@ def set_dummy_oqc_env():
 )
 class TestOQCDevice:
     """Test the OQC device python layer for Catalyst."""
+
+    @pytest.fixture()
+    def set_dummy_oqc_env(self):
+        """Set OQC env var."""
+        os.environ["OQC_EMAIL"] = "a"
+        os.environ["OQC_PASSWORD"] = "b"
+        os.environ["OQC_URL"] = "c"
+
+        yield
+
+        del os.environ["OQC_EMAIL"]
+        del os.environ["OQC_PASSWORD"]
+        del os.environ["OQC_URL"]
 
     def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""
