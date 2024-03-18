@@ -119,6 +119,9 @@ void pyregistry(int64_t identifier)
     //
     // This function cannot be tested from the runtime tests because there would be no valid python
     // function to callback...
+    static std::mutex python_lock;
+    std::lock_guard<std::mutex> lock(python_lock);
+
     std::string libpath = LIBREGISTRY;
 
     void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
