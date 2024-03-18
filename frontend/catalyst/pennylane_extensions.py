@@ -2443,17 +2443,15 @@ def callback(func):
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
+    # We just disable inconsistent return statements
+    # Since we are building this feature step by step.
     @wraps(func)
-    def bind_callback(*args, **kwargs):
+    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        # We just disable inconsistent return statements
-        # Since we are building this feature step by step.
-        callback_implementation(
-            func, retty, *args, **kwargs
-        )  # pylint: disable=inconsistent-return-statements
+        callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
 
