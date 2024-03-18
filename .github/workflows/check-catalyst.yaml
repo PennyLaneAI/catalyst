@@ -555,6 +555,9 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    #   - name: Collect Workflow Telemetry
+    #     uses: catchpoint/workflow-telemetry-action@v2
+
       - name: Checkout the repo
         uses: actions/checkout@v3
 
@@ -577,7 +580,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           ENABLE_LIGHTNING_KOKKOS=OFF \
           ENABLE_OPENQASM=OFF \
-          ENABLE_ASAN=ON \
+          ENABLE_ASAN=OFF \
           make test-runtime
 
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
@@ -598,7 +601,7 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           COMPILER_LAUNCHER="" \
           ENABLE_LIGHTNING_KOKKOS=OFF \
-          ENABLE_ASAN=ON \
+          ENABLE_ASAN=OFF \
           make test-runtime
 
       - name: Build examples

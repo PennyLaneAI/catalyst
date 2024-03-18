@@ -608,7 +608,10 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
-            m_wires = o.wires if o.wires else range(device.num_wires)
+            if isinstance(device, qml.Device):
+                m_wires = o.wires if o.wires else range(device.num_wires)
+            else:
+                m_wires = o.wires if o.wires else range(len(tape.wires))
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p

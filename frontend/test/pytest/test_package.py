@@ -22,6 +22,8 @@ import sys
 
 import pytest
 
+from catalyst._configuration import INSTALLED
+
 
 def test_jaxlib_mismatch(monkeypatch):
     """Test import warning if jaxlib package version doesn't match expected."""
@@ -32,6 +34,28 @@ def test_jaxlib_mismatch(monkeypatch):
 
     with pytest.warns(UserWarning, match="version mismatch for the installed 'jaxlib' package"):
         import catalyst  # pylint: disable=unused-import
+
+
+@pytest.mark.skipif(INSTALLED, reason="For INSTALLED modules, see test_revision_installed")
+def test_revision_source(monkeypatch):
+    """Check the presence of the __revision__ attribute (source verison). Revision might be None is
+    `git` is not available"""
+    monkeypatch.delitem(sys.modules, "catalyst")
+
+    import catalyst  # pylint: disable=unused-import
+
+    assert hasattr(catalyst, "__revision__")
+
+
+@pytest.mark.skipif(not INSTALLED, reason="For not INSTALLED modules, see test_revision_source")
+def test_revision_installed(monkeypatch):
+    """Check the correctness of the __revision__ attribute. Revision must present as a string"""
+    monkeypatch.delitem(sys.modules, "catalyst")
+
+    import catalyst  # pylint: disable=unused-import
+
+    assert isinstance(catalyst.__revision__, str)
+    assert len(catalyst.__revision__) > 0
 
 
 if __name__ == "__main__":
