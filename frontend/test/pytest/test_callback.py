@@ -14,6 +14,7 @@
 """Test callbacks"""
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
@@ -125,31 +126,23 @@ def test_kwargs(capsys):
         assert string in captured.out
 
 
-@pytest.mark.parametrize("x", [0, 1, 2, 3, 4])
-def test_identity(x):
+@pytest.mark.parametrize(
+    "arg",
+    [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
+)
+def test_identity_types(arg):
     """Test callback with return values"""
 
     @callback
-    def identity(x) -> jax.core.ShapedArray([], int):
-        return x
+    def identity(arg) -> arg:
+        """Weird trick, if it is the identity function, we can just pass arg
+        as the return type. arg will be abstracted to find the type. This
+        just avoids writing out the explicit type once you have a value
+        that you know will be the same type as the return type."""
+        return arg
 
     @qml.qjit
     def cir(x):
         return identity(x)
 
-    assert cir(x) == x
-
-
-@pytest.mark.parametrize("x", [0, 1, 2, 3, 4])
-def test_identity_builtin_type(x):
-    """Test callback with return values"""
-
-    @callback
-    def identity(x) -> int:
-        return x
-
-    @qml.qjit
-    def cir(x):
-        return identity(x)
-
-    assert cir(x) == x
+    assert np.allclose(cir(arg), arg)

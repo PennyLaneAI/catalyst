@@ -244,6 +244,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+
     from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
     callback_id = registry.register(callback)
