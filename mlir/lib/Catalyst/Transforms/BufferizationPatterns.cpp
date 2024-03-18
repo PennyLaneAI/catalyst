@@ -110,7 +110,8 @@ struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
             bufferArgs.push_back(newBuffer);
         }
 
-        rewriter.create<PythonCallOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(), op.getOperands().size());
+        rewriter.create<PythonCallOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(),
+                                      op.getOperands().size());
         size_t startIndex = bufferArgs.size() - op.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         rewriter.replaceOp(op, bufferResults);
