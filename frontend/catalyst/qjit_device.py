@@ -277,6 +277,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         program.add_transform(
             decompose, stopping_condition=ops_acceptance, name=self.original_device.name
         )
+
         # TODO: Add Catalyst program verification and validation
         return program, config
 

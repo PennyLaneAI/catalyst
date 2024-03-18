@@ -89,6 +89,7 @@ def test_qjit_device():
 
     t = transform_program[2].transform.__name__
     assert t == "decompose"
+
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
         device_qjit.execute(10, 2)
