@@ -29,7 +29,7 @@
 namespace Catalyst::Runtime::Device::OpenQasm {
 
 // To protect the py::exec calls concurrently
-std::mutex runner_mu;
+std::mutex &getOpenQasmRunnerMutex();
 
 /**
  * The OpenQasm circuit runner interface.
@@ -108,7 +108,7 @@ struct BraketRunner : public OpenQasmRunner {
                                   size_t shots, const std::string &kwargs = "") const
         -> std::string override
     {
-        std::lock_guard<std::mutex> lock(runner_mu);
+        std::lock_guard<std::mutex> lock(getOpenQasmRunnerMutex());
 
         namespace py = pybind11;
         using namespace py::literals;
@@ -164,7 +164,7 @@ struct BraketRunner : public OpenQasmRunner {
                              size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<double> override
     {
-        std::lock_guard<std::mutex> lock(runner_mu);
+        std::lock_guard<std::mutex> lock(getOpenQasmRunnerMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
@@ -231,7 +231,7 @@ struct BraketRunner : public OpenQasmRunner {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t> override
     {
-        std::lock_guard<std::mutex> lock(runner_mu);
+        std::lock_guard<std::mutex> lock(getOpenQasmRunnerMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
@@ -294,7 +294,7 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Expval(const std::string &circuit, const std::string &device, size_t shots,
                               const std::string &kwargs = "") const -> double override
     {
-        std::lock_guard<std::mutex> lock(runner_mu);
+        std::lock_guard<std::mutex> lock(getOpenQasmRunnerMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
@@ -350,7 +350,7 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Var(const std::string &circuit, const std::string &device, size_t shots,
                            const std::string &kwargs = "") const -> double override
     {
-        std::lock_guard<std::mutex> lock(runner_mu);
+        std::lock_guard<std::mutex> lock(getOpenQasmRunnerMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
