@@ -18,6 +18,7 @@ import pennylane as qml
 
 from catalyst.pennylane_extensions import callback
 
+
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):
     @callback
