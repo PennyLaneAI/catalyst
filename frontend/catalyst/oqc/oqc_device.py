@@ -19,6 +19,7 @@ import pathlib
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
+from qcaas_client.client import OQCClient
 
 from catalyst.compiler import get_lib_path
 
@@ -38,7 +39,7 @@ class OQCDevice(Device):
         """
 
         # TODO: Replace with the oqc shared library
-        return "oqc.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "oqc", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     def __init__(self, wires, backend, shots=1024, **kwargs):
         self._backend = backend
@@ -66,6 +67,17 @@ class OQCDevice(Device):
         """Non-implemented python execution."""
         # Check availability
         raise NotImplementedError("The OQC device only supports Catalyst.")
+
+
+def _authenticate():  # pragma: no-cover
+    """Function that authenticates a user to the QCaas (OQC cloud)."""
+    url = os.getenv("OQC_URL")
+    email = os.getenv("OQC_EMAIL")
+    password = os.getenv("OQC_PASSWORD")
+
+    client = OQCClient(url=url, email=email, password=password)
+    client.authenticate()
+    return client
 
 
 def _check_backend(backend):

@@ -35,9 +35,9 @@ class TestOQCDevice:
     @pytest.fixture()
     def set_dummy_oqc_env(self):
         """Set OQC env var."""
-        os.environ["OQC_EMAIL"] = "a"
-        os.environ["OQC_PASSWORD"] = "b"
-        os.environ["OQC_URL"] = "c"
+        os.environ["OQC_EMAIL"] = "hello@world.com"
+        os.environ["OQC_PASSWORD"] = "abcd"
+        os.environ["OQC_URL"] = "https://qcaas.oqc.app/"
 
         yield
 
@@ -80,7 +80,7 @@ class TestOQCDevice:
         """Test the device get_c_interface method."""
         dev = OQCDevice(backend="lucy", shots=1000, wires=8)
         name, _ = dev.get_c_interface()
-        assert name == "oqc.remote"
+        assert name == "oqc"
 
     def test_no_envvar(self):
         """Test the device get_c_interface method."""
