@@ -704,7 +704,6 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 def apply_transform(transform_program, tape, flat_results):
     """Apply transform."""
-    print(transform_program)
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
