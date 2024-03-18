@@ -33,7 +33,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 cache_dir='/tmp/.pytest_cache'
-testpaths='frontend/tests/pytest'
+testpaths='frontend/test/pytest, frontend/catalyst/oqc/test'
 
 [tool.coverage.run]
 branch = true

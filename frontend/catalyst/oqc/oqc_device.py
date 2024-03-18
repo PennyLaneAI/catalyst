@@ -19,7 +19,13 @@ import pathlib
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
-from qcaas_client.client import OQCClient
+
+try:  # pragma: no-cover
+    from qcaas_client.client import OQCClient
+except ImportError as e:  # pragma: no-cover
+    raise ImportError(  # pragma: no-cover
+        "oqc qcaas not found. Please install the latest "  # pragma: no-cover
+    ) from e
 
 from catalyst.compiler import get_lib_path
 
