@@ -69,9 +69,9 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
-Erick Ochoa Lopez,
 Romain Moyard,
-Sergei Mironov.
+Sergei Mironov,
+Erick Ochoa Lopez.
 
 # Release 0.5.0
 
