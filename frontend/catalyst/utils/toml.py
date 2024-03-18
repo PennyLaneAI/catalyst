@@ -18,6 +18,7 @@ Module for abstracting which toml_load to use.
 import importlib.util
 from functools import reduce
 from itertools import repeat
+from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from catalyst.utils.exceptions import CompileError
@@ -52,12 +53,18 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
     return config
 
 
+@dataclass
+class ProgramFeatures:
+    """ Program features, obtained from the user """
+    shots_present: bool
+
+
 def check_mid_circuit_measurement_flag(config: TOMLDocument) -> bool:
     """Check the global mid-circuit measurement flag"""
     return bool(config.get("compilation", {}).get("mid_circuit_measurement", False))
 
 
-def check_adjoint_flag(config: TOMLDocument, shots_present: bool) -> bool:
+def check_adjoint_flag(config: TOMLDocument, program_features) -> bool:
     """Check the global adjoint flag for toml schema 1. For newer schemas the adjoint flag is
     defined to be set if all native gates are inverible"""
     schema = int(config["schema"])
@@ -67,7 +74,7 @@ def check_adjoint_flag(config: TOMLDocument, shots_present: bool) -> bool:
     elif schema == 2:
         return all(
             "invertible" in v.get("properties", {})
-            for g, v in get_native_gates(config, shots_present).items()
+            for g, v in get_native_gates(config, program_features).items()
         )
 
     raise CompileError("quantum_adjoint flag is not supported in TOMLs schema >= 3")
@@ -82,7 +89,8 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
     raise CompileError("quantum_control flag is not supported in TOMLs schema >= 2")
 
 
-def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
+def get_gates(config: TOMLDocument, path: List[str],
+              program_features: ProgramFeatures) -> Dict[str, dict]:
     """Read the toml config section specified by `path`. Filters-out gates which don't match
     condition. For now the only condition we support is `shots_present`."""
     gates = {}
@@ -115,33 +123,34 @@ def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dic
                     f"Configuration for gate '{g}' can not contain both "
                     f"`{finiteshots}` and `{analytic}` conditions simultaniosly"
                 )
-            if analytic in conditions and not shots_present:
+            if analytic in conditions and not program_features.shots_present:
                 gates[g] = values
-            elif finiteshots in conditions and shots_present:
+            elif finiteshots in conditions and program_features.shots_present:
                 gates[g] = values
         else:
             gates[g] = values
     return gates
 
 
-def get_observables(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+def get_observables(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Override the set of supported observables."""
-    return get_gates(config, ["operators", "observables"], shots_present)
+    return get_gates(config, ["operators", "observables"], program_features)
 
 
-def get_native_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+def get_native_gates(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Get the gates from the `native` section of the config."""
 
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "native"], shots_present)
+        return get_gates(config, ["operators", "gates", 0, "native"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "native"], shots_present)
+        return get_gates(config, ["operators", "gates", "native"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
 
-def get_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+def get_decomposable_gates(config: TOMLDocument,
+                           program_features: ProgramFeatures) -> Dict[str, dict]:
     """Get gates that will be decomposed according to PL's decomposition rules.
 
     Args:
@@ -149,14 +158,15 @@ def get_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[st
     """
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "decomp"], shots_present)
+        return get_gates(config, ["operators", "gates", 0, "decomp"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "decomp"], shots_present)
+        return get_gates(config, ["operators", "gates", "decomp"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
 
-def get_matrix_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+def get_matrix_decomposable_gates(config: TOMLDocument,
+                                  program_features: ProgramFeatures) -> Dict[str, dict]:
     """Get gates that will be decomposed to QubitUnitary.
 
     Args:
@@ -164,8 +174,8 @@ def get_matrix_decomposable_gates(config: TOMLDocument, shots_present: bool) -> 
     """
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "matrix"], shots_present)
+        return get_gates(config, ["operators", "gates", 0, "matrix"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "matrix"], shots_present)
+        return get_gates(config, ["operators", "gates", "matrix"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")

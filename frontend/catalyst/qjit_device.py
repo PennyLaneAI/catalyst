@@ -27,6 +27,7 @@ from catalyst.utils.runtime import (
 )
 from catalyst.utils.toml import (
     TOMLDocument,
+    ProgramFeatures,
     check_adjoint_flag,
     check_mid_circuit_measurement_flag,
 )
@@ -87,12 +88,12 @@ RUNTIME_OPERATIONS = {
 
 
 def get_qjit_pennylane_operations(
-    config: TOMLDocument, shots_present: bool, device_name: str
+    config: TOMLDocument, program_features, device_name: str
 ) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
-    native_gates = get_pennylane_operations(config, shots_present, device_name)
+    native_gates = get_pennylane_operations(config, program_features, device_name)
     # Gates that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
     supported_gates = set.intersection(native_gates, qir_gates)
@@ -105,7 +106,7 @@ def get_qjit_pennylane_operations(
         supported_gates.update({"MidCircuitMeasure"})
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if check_adjoint_flag(config, shots_present):
+    if check_adjoint_flag(config, program_features):
         supported_gates.update({"Adjoint"})
 
     return supported_gates
@@ -157,9 +158,9 @@ class QJITDevice(qml.QubitDevice):
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
-        shots_present = shots is not None
-        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
-        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        pf = ProgramFeatures(shots is not None)
+        self._operations = get_qjit_pennylane_operations(target_config, pf, device_name)
+        self._observables = get_pennylane_observables(target_config, pf, device_name)
 
     @property
     def operations(self) -> Set[str]:
@@ -272,9 +273,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
-        shots_present = original_device.shots is not None
-        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
-        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        pf = ProgramFeatures(original_device.shots is not None)
+        self._operations = get_qjit_pennylane_operations(target_config, pf, device_name)
+        self._observables = get_pennylane_observables(target_config, pf, device_name)
 
     @property
     def operations(self) -> Set[str]:

@@ -31,6 +31,7 @@ from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     TOMLDocument,
+    ProgramFeatures,
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
@@ -99,7 +100,7 @@ def deduce_schema1_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
 
 
 def get_pennylane_operations(
-    config: TOMLDocument, shots_present: bool, device_name: str
+    config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> Set[str]:
     """Get gates that are natively supported by the device and therefore do not need to be
     decomposed.
@@ -116,7 +117,7 @@ def get_pennylane_operations(
     schema = int(config["schema"])
 
     if schema == 1:
-        native_gates_attrs = get_native_gates(config, shots_present)
+        native_gates_attrs = get_native_gates(config, program_features)
         assert all(len(v) == 0 for v in native_gates_attrs.values())
         native_gates = set(native_gates_attrs)
         supports_controlled = check_quantum_control_flag(config)
@@ -131,7 +132,7 @@ def get_pennylane_operations(
         gates_PL = set.union(native_gates, native_controlled_gates)
 
     elif schema == 2:
-        native_gates = get_native_gates(config, shots_present)
+        native_gates = get_native_gates(config, program_features)
         for gate, attrs in native_gates.items():
             gates_PL.add(f"{gate}")
             if "controllable" in attrs.get("properties", {}):
@@ -144,11 +145,11 @@ def get_pennylane_operations(
 
 
 def get_pennylane_observables(
-    config: TOMLDocument, shots_present: bool, device_name: str
+    config: TOMLDocument, program_features, device_name: str
 ) -> Set[str]:
     """Get observables in PennyLane format. Apply ad-hoc patching"""
 
-    observables = set(get_observables(config, shots_present))
+    observables = set(get_observables(config, program_features))
 
     schema = int(config["schema"])
 
@@ -247,11 +248,11 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     device_name = device.short_name if isinstance(device, qml.Device) else device.name
 
-    shots_present = device.shots is not None
-    native = get_pennylane_operations(config, shots_present, device_name)
-    observables = get_pennylane_observables(config, shots_present, device_name)
-    decomposable = set(get_decomposable_gates(config, shots_present))
-    matrix = set(get_matrix_decomposable_gates(config, shots_present))
+    pf = ProgramFeatures(device.shots is not None)
+    native = get_pennylane_operations(config, pf, device_name)
+    observables = get_pennylane_observables(config, pf, device_name)
+    decomposable = set(get_decomposable_gates(config, pf))
+    matrix = set(get_matrix_decomposable_gates(config, pf))
 
     # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
     # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
