@@ -1,9 +1,0 @@
-pennylane>=0.35
-pennylane-lightning>=0.35
-jax==0.4.23
-jaxlib==0.4.23
-scipy
-diastatic-malt>=2.15.1
-
-[:python_version < "3.11"]
-tomlkit
