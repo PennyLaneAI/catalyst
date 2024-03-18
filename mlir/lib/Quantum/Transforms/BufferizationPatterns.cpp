@@ -29,9 +29,10 @@ struct BufferizeQubitUnitaryOp : public OpConversionPattern<QubitUnitaryOp> {
     LogicalResult matchAndRewrite(QubitUnitaryOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        rewriter.replaceOpWithNewOp<QubitUnitaryOp>(op, op.getResultTypes(), adaptor.getMatrix(),
-                                                    adaptor.getInQubits(),
-                                                    adaptor.getAdjointAttr());
+        rewriter.replaceOpWithNewOp<QubitUnitaryOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), adaptor.getMatrix(),
+            adaptor.getInQubits(), adaptor.getAdjointAttr(), adaptor.getInCtrlQubits(),
+            adaptor.getInCtrlValues());
         return success();
     }
 };

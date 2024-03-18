@@ -31,20 +31,35 @@ config.test_source_root = path.dirname(__file__)
 # Define where to execute tests (and produce the output).
 config.test_exec_root = getattr(config, "frontend_test_dir", ".lit")
 
-# Enable test files to use %PYTHON instead of a specific executable name.
-config.substitutions.append(("%PYTHON", getattr(config, "python_executable", "python3.10")))
+# TODO: Ideally we would test with leak detection, but this may not be possible from Python.
+# TODO: Find out why we have container overflow on macOS.
+config.environment["ASAN_OPTIONS"] = "detect_leaks=0,detect_container_overflow=0"
 
-# TODO: find out why we have odr violations
-config.environment["ASAN_OPTIONS"] = "detect_odr_violation=0"
+# Define substitutions used at the top of lit test files, e.g. %PYTHON.
+python_executable = getattr(config, "python_executable", "python3.10")
+
+if "Address" in getattr(config, "llvm_use_sanitizer", ""):
+    # With sanitized builds, Python tests require some preloading magic to run.
+    if "Linux" in config.host_os:
+        python_executable = f"LD_PRELOAD=$({config.host_cxx} -print-file-name=libclang_rt.asan-{config.host_arch}.so) {python_executable}"
+    elif "Darwin" in config.host_os:
+        # It's important that the python executable discovered by CMake is the true interpreter
+        # binary. On macOS, it appears that there can be multiple "python" executables which are
+        # just wrappers around the actual interpreter. In that case, the DYLD_INSERT_LIBRARIES trick
+        # will not work, as it will not be forwarded to the final process.
+        # See https://stackoverflow.com/a/47853433 for more information.
+        python_executable = f"DYLD_INSERT_LIBRARIES=$({config.host_cxx} -print-file-name=libclang_rt.asan_osx_dynamic.dylib) {python_executable}"
+    else:
+        assert False, "Testing with sanitized builds requires Linux or MacOS"
+
+config.substitutions.append(("%PYTHON", python_executable))
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
-    # Access to FileCheck, mlir-translate, opt
+    # Access to FileCheck
     llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
     # Access to quantum-opt
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
-    # Access to mlir-hlo-opt
-    llvm_config.with_environment("PATH", config.mhlo_bin_dir, append_path=True)
 
     # Define the location of runtime libraries when running frontend tests
     llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)

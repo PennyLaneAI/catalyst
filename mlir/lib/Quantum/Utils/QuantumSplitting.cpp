@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -216,6 +217,22 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         }
         else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
+        }
+        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
+            auto results = callOp.getResultTypes();
+
+            bool multiReturns = results.size() > 1;
+
+            bool quantum = std::any_of(results.begin(), results.end(),
+                                       [](const auto &value) { return isa<QuregType>(value); });
+
+            // Classical call operations are cloned for the backward pass
+            if (!quantum) {
+                builder.clone(op, oldToCloned);
+            }
+
+            assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
+                                                 "returns that contain a quantum register.");
         }
         else {
             // Purely classical ops are deeply cloned as-is.

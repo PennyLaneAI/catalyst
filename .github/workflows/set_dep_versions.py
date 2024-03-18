@@ -15,6 +15,10 @@
 This module computes commit hashes for LLVM and MLIR-HLO based on a given JAX version.
 """
 
+# pylint: disable=line-too-long
+# pylint: disable=anomalous-backslash-in-string
+# pylint: disable=consider-using-with
+
 import os
 import re
 import sys
@@ -22,10 +26,19 @@ import sys
 import requests
 
 jax_version = sys.argv[1]
+dep_versions_path = os.path.join(os.path.dirname(__file__), "../../.dep-versions")
+catalyst_init_path = os.path.join(os.path.dirname(__file__), "../../frontend/catalyst/__init__.py")
+
+assert os.path.isfile(dep_versions_path)
+assert os.path.isfile(catalyst_init_path)
 
 url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
 response = requests.get(url)
 match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
+if not match:
+    url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/third_party/xla/workspace.bzl"
+    response = requests.get(url)
+    match = re.search(r'XLA_COMMIT = "([a-zA-Z0-9]*)"', response.text)
 xla_commit = match.group(1)
 
 url = f"https://raw.githubusercontent.com/openxla/xla/{xla_commit}/third_party/llvm/workspace.bzl"
@@ -43,14 +56,21 @@ url = f"https://api.github.com/search/commits?q=repo:tensorflow/mlir-hlo+{piper_
 response = requests.get(url).json()
 hlo_commit = response["items"][0]["sha"]
 
-with open(
-    os.path.join(os.path.dirname(__file__), "../../.dep-versions"), "w", encoding="UTF-8"
-) as f:
+existing_text = open(dep_versions_path, "r", encoding="UTF-8").read()
+match = re.search(r"enzyme=([a-zA-Z0-9]*)", existing_text)
+enzyme_commit = match.group(1)
+
+with open(dep_versions_path, "w", encoding="UTF-8") as f:
     f.write(
         f"""\
-# Update the version check in catalyst.__init__ when changing the JAX version.
 jax={jax_version}
 mhlo={hlo_commit}
 llvm={llvm_commit}
+enzyme={enzyme_commit}
 """
     )
+
+quote = '"'
+cmd = f"sed -i 's/_jaxlib_version = {quote}\([0-9.]\+\){quote}/_jaxlib_version = {quote}{jax_version}{quote}/g' {catalyst_init_path}"
+res = os.system(cmd)
+assert res == 0

@@ -14,12 +14,14 @@
 
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
+#include "Mitigation/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
 
 void catalyst::registerAllCatalystPasses()
 {
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
+    mlir::registerPass(catalyst::createCatalystBufferizationPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
@@ -27,7 +29,13 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createAdjointLoweringPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
+    mlir::registerPass(catalyst::createMitigationLoweringPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
+    mlir::registerPass(catalyst::createCatalystConversionPass);
+    mlir::registerPass(catalyst::createQnodeToAsyncLoweringPass);
     mlir::registerPass(catalyst::createTestPass);
+    mlir::registerPass(catalyst::createHloCustomCallLoweringPass);
+    mlir::registerPass(catalyst::createAddExceptionHandlingPass);
+    mlir::registerPass(catalyst::createGEPInboundsPass);
 }

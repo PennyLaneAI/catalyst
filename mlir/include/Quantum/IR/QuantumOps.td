@@ -64,7 +64,7 @@ def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_obser
 class Quantum_Op<string mnemonic, list<Trait> traits = []> : Op<QuantumDialect, mnemonic, traits>;
 
 def InitializeOp : Quantum_Op<"init"> {
-    let summary = "Initialize the quantum device in the runtime.";
+    let summary = "Initialize the quantum runtime.";
 
     let assemblyFormat = [{
         attr-dict
@@ -72,22 +72,32 @@ def InitializeOp : Quantum_Op<"init"> {
 }
 
 def FinalizeOp : Quantum_Op<"finalize"> {
-    let summary = "Teardown the quantum device in the runtime.";
+    let summary = "Teardown the quantum runtime.";
 
     let assemblyFormat = [{
         attr-dict
     }];
 }
 
-def DeviceOp : Quantum_Op<"device"> {
-    let summary = "Set device specifications in the runtime.";
+def DeviceInitOp : Quantum_Op<"device"> {
+    let summary = "Initialize a quantum device.";
 
     let arguments = (ins
-        OptionalAttr<StrArrayAttr>:$specs
+        StrAttr:$lib,
+        StrAttr:$name,
+        StrAttr:$kwargs
     );
 
     let assemblyFormat = [{
-      $specs attr-dict
+      `[` $lib `,` $name `,` $kwargs `]` attr-dict
+    }];
+}
+
+def DeviceReleaseOp : Quantum_Op<"device_release"> {
+    let summary = "Release the active quantum device.";
+
+    let assemblyFormat = [{
+        attr-dict
     }];
 }
 
@@ -95,7 +105,9 @@ def DeviceOp : Quantum_Op<"device"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterface, ["buildDealloc"]>]> {
+// The operation has no memory effect and is pure, therefore two similar alloc would be removed
+// by a CSE pass. This needs to be changed in the future.
+def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -106,7 +118,7 @@ def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterfac
     );
 
     let results = (outs
-        Res<QuregType, "", [MemAlloc<QuantumMemory>]>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
@@ -120,7 +132,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        Arg<QuregType, "", [MemFree<QuantumMemory>]>:$qreg
+        QuregType:$qreg
     );
 
     let assemblyFormat = [{
@@ -181,15 +193,25 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
+        Quantum_Op<mnemonic, traits # [NoMemoryEffect, QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
-        mlir::ValueRange getQubitOperands() {
-            return getInQubits();
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInQubits().begin(),
+                          getInQubits().end());
+            values.insert(values.end(), getInCtrlQubits().begin(),
+                          getInCtrlQubits().end());
+            return values;
         }
 
-        mlir::ValueRange getQubitResults() {
-            return getOutQubits();
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutQubits().begin(),
+                          getOutQubits().end());
+            values.insert(values.end(), getOutCtrlQubits().begin(),
+                          getOutCtrlQubits().end());
+            return values;
         }
 
         bool getAdjointFlag() {
@@ -198,12 +220,29 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         void setAdjointFlag(bool adjoint) {
             setAdjoint(adjoint);
         };
+
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return getInQubits();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getNonCtrlQubitResults() {
+            return getOutQubits();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
+        }
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
+def CustomOp : Gate_Op<"custom", [DifferentiableGate,
+                                  AttrSizedOperandSegments, AttrSizedResultSegments ]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -212,15 +251,18 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
+        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -230,7 +272,74 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
+def GlobalPhaseOp : Quantum_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+    let summary = "Global Phase.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        F64:$params,
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $params `)` attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    code extraBaseClassDeclaration = [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+
+        std::vector<mlir::Value> getQubitOperands() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getInCtrlQubits().begin(),
+                          getInCtrlQubits().end());
+            return values;
+        }
+
+        std::vector<mlir::Value> getQubitResults() {
+            std::vector<mlir::Value> values;
+            values.insert(values.end(), getOutCtrlQubits().begin(),
+                          getOutCtrlQubits().end());
+            return values;
+        }
+
+        bool getAdjointFlag() {
+            return getAdjoint().has_value() ? getAdjoint().value() : false;
+        }
+        void setAdjointFlag(bool adjoint) {
+            setAdjoint(adjoint);
+        };
+
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return mlir::ValueRange();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getNonCtrlQubitResults() {
+            return mlir::ValueRange();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+
+}
+
+def MultiRZOp : Gate_Op<"multirz", [DifferentiableGate, AttrSizedOperandSegments, AttrSizedResultSegments ]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -240,15 +349,18 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     let arguments = (ins
         F64:$theta,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+        `(` $theta `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -258,7 +370,10 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [ParametrizedGate
+        , AttrSizedOperandSegments
+        , AttrSizedResultSegments
+        ]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -271,15 +386,18 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
+        `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -293,9 +411,51 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
 
 // -----
 
-class Observable_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
+class Region_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [NoMemoryEffect]>;
 
-def ComputationalBasisOp : Observable_Op<"compbasis", [Pure]> {
+def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "Calculate the adjoint of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        QuregType:$qreg
+    );
+
+    let results = (outs
+        QuregType:$out_qreg
+    );
+
+    let assemblyFormat = [{
+        `(` $qreg `)` attr-dict `:` type(operands) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+    let summary = "Return results from quantum program regions";
+
+    let arguments = (ins
+        Variadic<AnyTypeOf<[QuregType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        attr-dict ($results^ `:` type($results))?
+    }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
+}
+
+// -----
+
+class Observable_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [Pure]>;
+
+def ComputationalBasisOp : Observable_Op<"compbasis"> {
     let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
@@ -327,7 +487,7 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [Pure]> {
     }];
 }
 
-def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
+def NamedObsOp : Observable_Op<"namedobs"> {
     let summary = "Define a Named observable for use in measurements";
     let description = [{
         The `quantum.namedobs` operation defines a quantum observable to be used by measurement
@@ -360,7 +520,7 @@ def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
     }];
 }
 
-def HermitianOp : Observable_Op<"hermitian", [Pure]> {
+def HermitianOp : Observable_Op<"hermitian"> {
     let summary = "Define a Hermitian observable for use in measurements";
     let description = [{
         The `quantum.hermitian` operation defines a quantum observable to be used by measurement
@@ -386,7 +546,7 @@ def HermitianOp : Observable_Op<"hermitian", [Pure]> {
     let hasVerifier = 1;
 }
 
-def TensorOp : Observable_Op<"tensor", [Pure]> {
+def TensorOp : Observable_Op<"tensor"> {
     let summary = "Define a tensor product of observables for use in measurements";
     let description = [{
         The `quantum.tensor` operation defines a quantum observable to be used by other
@@ -420,7 +580,7 @@ def TensorOp : Observable_Op<"tensor", [Pure]> {
     }];
 }
 
-def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
+def HamiltonianOp : Observable_Op<"hamiltonian"> {
     let summary = "Define a Hamiltonian observable for use in measurements";
     let description = [{
         The `quantum.hamiltonian` operation defines a quantum observable to be used by other
@@ -468,7 +628,8 @@ def MeasureOp : Quantum_Op<"measure"> {
     }];
 
     let arguments = (ins
-        QubitType:$in_qubit
+        QubitType:$in_qubit,
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );
 
     let results = (outs
@@ -761,43 +922,6 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let hasVerifier = 1;
-}
-
-def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
-    let summary = "Calculate the adjoint of the enclosed operations";
-
-    let regions = (region SizedRegion<1>:$region);
-
-    let arguments = (ins
-        QuregType:$qreg
-    );
-
-    let results = (outs
-        QuregType:$out_qreg
-    );
-
-    let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
-    }];
-
-    let hasVerifier = 1;
-}
-
-def YieldOp : Op<QuantumDialect, "yield",
-                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
-    let summary = "Return results from quantum program regions";
-
-    let arguments = (ins
-        Variadic<AnyTypeOf<[QuregType]>>:$results
-    );
-
-    let assemblyFormat = [{
-        attr-dict ($results^ `:` type($results))?
-    }];
-
-    let builders = [
-        OpBuilder<(ins), [{ /* nothing to do */ }]>
-    ];
 }
 
 #endif // QUANTUM_OPS

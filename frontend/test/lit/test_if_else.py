@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# RUN: %PYTHON %s | FileCheck %s
+# RUN: %PYTHON %s | FileCheck --implicit-check-not convert_element_type %s
 
 import pennylane as qml
 
@@ -29,7 +29,7 @@ def circuit(n: int):
     # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = quantum.alloc
     # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]]
     @cond(n <= 5)
-    # CHECK:       scf.if [[b]]
+    # CHECK:       [[qreg_2:%.+]]:2 = scf.if [[b]]
     def cond_fn():
         # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = quantum.extract
         # CHECK-DAG:   [[q1:%[a-zA-Z0-9_]+]] = quantum.custom "PauliX"() [[q0]]
@@ -47,9 +47,66 @@ def circuit(n: int):
         return n**3
 
     out = cond_fn()
-    # CHECK:       quantum.dealloc [[qreg_0]]
+    # CHECK:       [[qreg_3:%.+]] = quantum.insert [[qreg_2]]#1[ 0], %out_qubit : !quantum.reg, !quantum.bit
+    # CHECK:       quantum.dealloc [[qreg_3]]
     # CHECK:       return
     return out, measure(wires=0)
 
 
 print(circuit.mlir)
+
+# -----
+
+
+# CHECK-LABEL: test_convert_element_type
+@qjit
+def test_convert_element_type(i: int, f: float):
+    """Test the presence of convert_element_type JAX primitive when the type conversion is
+    required."""
+
+    # CHECK: cond[
+    @cond(i <= 3)
+    def cond_fn():
+        # CHECK: convert_element_type
+        return i
+
+    @cond_fn.otherwise
+    def otherwise():
+        # CHECK: add {{[a-z]+}} 2
+        return f + 2
+
+    # CHECK: ]
+
+    return cond_fn()
+
+
+print("test_convert_element_type")
+print(test_convert_element_type.jaxpr)
+
+
+# -----
+
+
+# CHECK-LABEL: test_no_convert_element_type
+@qjit
+def test_no_convert_element_type(i: int):
+    """Test the absense of convert_element_type JAX primitive when no type conversion is required"""
+
+    # CHECK: cond[
+    @cond(i <= 3)
+    def cond_fn():
+        # CHECK: add {{[a-z]+}} 1
+        return i + 1
+
+    @cond_fn.otherwise
+    def otherwise():
+        # CHECK: add {{[a-z]+}} 2
+        return i + 2
+
+    # CHECK: ]
+
+    return cond_fn()
+
+
+print("test_no_convert_element_type")
+print(test_no_convert_element_type.jaxpr)

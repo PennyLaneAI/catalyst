@@ -28,7 +28,7 @@
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "Quantum/Utils/RemoveQuantum.h"
 
 namespace catalyst {
 namespace gradient {
@@ -156,7 +156,10 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             Value gradientSubview =
                 rewriter.create<memref::SubViewOp>(loc, resultType, gradientBuffer, dynOffsets,
                                                    dynSizes, dynStrides, offsets, sizes, strides);
-            rewriter.create<memref::TensorStoreOp>(loc, derivative, gradientSubview);
+
+            auto materializeOp = rewriter.create<bufferization::MaterializeInDestinationOp>(
+                loc, derivative, gradientSubview);
+            materializeOp.setWritable(true);
         }
         else if (isDerivativeScalarTensor) {
             Value extracted = rewriter.create<tensor::ExtractOp>(loc, derivative);
@@ -290,18 +293,27 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
 
         // Finally erase all quantum operations.
         gradientFn.walk([&](Operation *op) {
-            if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            if (isa<quantum::DeviceInitOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 // We are undoing the def-use chains of this gate's return values
                 // so that we can safely delete it (all quantum ops must be eliminated).
                 rewriter.replaceOp(gate, gate.getQubitOperands());
             }
-            else if (isa<quantum::DeviceOp>(op)) {
-                // Erase redundant device specifications.
+            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
+                rewriter.replaceOp(op, region.getRegisterOperand());
+            }
+            else if (isa<quantum::DeallocOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            else if (isa<quantum::DeviceReleaseOp>(op)) {
                 rewriter.eraseOp(op);
             }
         });
 
         quantum::removeQuantumMeasurements(gradientFn);
+        gradientFn->setAttr("QuantumFree", rewriter.getUnitAttr());
     }
 
     return gradientFn;

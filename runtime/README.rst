@@ -1,12 +1,12 @@
 .. runtime-start-inclusion-marker-do-not-remove
 
-Catalyst Runtime
-################
+Catalyst Quantum Runtime
+########################
 
 The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
 quantum programs, and is currently backed by `PennyLane-Lightning <https://docs.pennylane.ai/projects/lightning/en/stable>`_
 state-vector simulators, and `Amazon Braket <https://amazon-braket-pennylane-plugin-python.readthedocs.io>`_
-devices. Additional hardware support, including QPUs to come.
+devices. Additional hardware support, including QPUs, to come.
 
 The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
 public interface to support an extensible list of backend devices. This interface comprises two collections of abstract methods:
@@ -27,17 +27,10 @@ The directory is structured as follows:
     This contains the public header files of the runtime including the ``QuantumDevice`` API
     for backend quantum devices and the runtime CAPI.
 
-- `extensions <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions>`_:
-    A collection of extensions for backend simulators to fit into the
-    `QIR programming model <https://github.com/qir-alliance/qir-spec/blob/main/specification/v0.1/4_Quantum_Runtime.md#qubits>`_.
-    The `StateVectorLQubitDynamic <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorLQubitDynamic.hpp>`_
-    class extends the state-vector class of `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ providing
-    dynamic allocation and deallocation of qubits.
-
 - `lib <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib>`_:
     The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
-    `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the bridge between
-    QIR instructions in LLVM-IR and C++ device backends. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
+    `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the semantics for
+    QIR instructions lowered to our custom runtime. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
     contains implementations of the ``QuantumDevice`` API for backend simulators.
 
 - `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_:
@@ -70,16 +63,16 @@ The following table shows the available devices along with supported features:
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, and Tensor Product of Observables
    * - Expectation Value
-     - All observables; Finite-shots not supported
-     - All observables; Finite-shots not supported
+     - All observables; Finite-shots supported except for ``Hermitian``
+     - All observables; Finite-shots supported except for ``Hermitian``
      - All observables; Finite-shots supported
    * - Variance
-     - All observables; Finite-shots not supported
-     - All observables; Finite-shots not supported
+     - All observables; Finite-shots supported except for ``Hermitian``
+     - All observables; Finite-shots supported except for ``Hermitian``
      - All observables; Finite-shots supported
    * - Probability
-     - Only for the computational basis on the supplied qubits; Finite-shots not supported
-     - Only for the computational basis on the supplied qubits; Finite-shots not supported
+     - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
+     - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
      - The computational basis on all active qubits; Finite-shots supported
    * - Sampling
      - Only for the computational basis on the supplied qubits
@@ -98,53 +91,43 @@ Requirements
 ============
 
 To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc or clang
-with support for the C++20 standard library and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner>`_.
+with support for the C++20 standard library.
 
 Installation
 ============
 
-By default, the runtime leverages `lightning.qubit <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`_ as the backend simulator.
-You can build the runtime with multiple devices from the list of Backend Devices.
-You can use ``ENABLE_LIGHTNING_KOKKOS=ON`` to build the runtime with `lightning.kokkos <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`_:
+By default, the runtime builds all supported backend devices.
+You can build the runtime with custom devices from the list of Backend Devices.
+You can use ``ENABLE_LIGHTNING_KOKKOS=OFF`` to disable building the runtime with
+`lightning.kokkos <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`_:
 
 .. code-block:: console
 
-    ENABLE_LIGHTNING_KOKKOS=ON make runtime
+    make runtime ENABLE_LIGHTNING_KOKKOS=OFF
 
 Lightning-Kokkos provides support for other Kokkos backends including OpenMP, HIP and CUDA.
 Please refer to `the installation guideline <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/installation.html>`_ for the requirements.
 You can further use the ``CMAKE_ARGS`` flag to issue any additional compiler arguments or override the preset ones in the make commands.
-To build the runtime with Lightning-Kokkos and the ``Kokkos::OpenMP`` backend execution space:
+To build the runtime with the ``Kokkos::OpenMP`` backend execution space:
 
 .. code-block:: console
 
-    ENABLE_LIGHTNING_KOKKOS=ON CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" make runtime
+    make runtime CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON"
 
-You can also use ``ENABLE_OPENQASM=ON`` to build the runtime with `Amazon-Braket-OpenQasm <https://aws.amazon.com/braket/>`_:
+You can also use ``ENABLE_OPENQASM=OFF`` to disable building the runtime with `Amazon-Braket-OpenQasm <https://aws.amazon.com/braket/>`_:
 
 .. code-block:: console
 
-    ENABLE_OPENQASM=ON make runtime
+    make runtime ENABLE_OPENQASM=OFF
 
 This device currently offers generators for the `OpenQasm3 <https://openqasm.com/versions/3.0/index.html>`_ specification and
 `Amazon Braket <https://docs.aws.amazon.com/braket/latest/developerguide/braket-openqasm-supported-features.html>`_ assembly extension.
 Moreover, the generated assembly can be executed on Amazon Braket devices leveraging `amazon-braket-sdk-python <https://github.com/aws/amazon-braket-sdk-python>`_.
 
-The runtime leverages the ``qir-stdlib`` pre-built artifacts from `qir-runner <https://github.com/qir-alliance/qir-runner>`_ by default.
-To build this package from source, a `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup``
-is required. You can build the runtime with ``BUILD_QIR_STDLIB_FROM_SRC=ON`` after installing the ``llvm-tools-preview`` component:
+To check the runtime test suite from the root directory:
 
 .. code-block:: console
 
-  rustup component add llvm-tools-preview
-  BUILD_QIR_STDLIB_FROM_SRC=ON make runtime
-
-To check the runtime test suite:
-
-.. code-block:: console
-
-    make test
-
-You can also build and test the runtime (and ``qir-stdlib``) from the top level directory via ``make runtime`` and ``make test-runtime``.
+    make test-runtime
 
 .. runtime-end-inclusion-marker-do-not-remove

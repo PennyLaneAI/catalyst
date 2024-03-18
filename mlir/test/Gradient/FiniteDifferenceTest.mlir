@@ -133,23 +133,23 @@ func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // -----
 
 // Check tensor to tensor case
-func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32> attributes {qnode, diff_method = "finite-diff"}
+func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64> attributes {qnode, diff_method = "finite-diff"}
 
-// CHECK-LABEL: @funcTensorTensor.finitediff0(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
-    // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<4.000000e+00> : tensor<7x3x2x1x2xf32>
+// CHECK-LABEL: @funcTensorTensor.finitediff0(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
+    // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<4.000000e+00> : tensor<2x7x3x2x1xf64>
     // CHECK:        [[BASETYPECONST:%.+]] = arith.constant 4.000000e+00 : f64
-    // CHECK:        [[CALLPOS:%.+]] = call @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<2xf32>
+    // CHECK:        [[CALLPOS:%.+]] = call @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<2xf64>
     // CHECK:        [[ABSDIFF:%.+]] = tensor.generate
-    // CHECK:        [[RESULT:%.+]] = arith.divf [[ABSDIFF]], [[RESULTCONST]] : tensor<7x3x2x1x2xf32>
+    // CHECK:        [[RESULT:%.+]] = arith.divf [[ABSDIFF]], [[RESULTCONST]] : tensor<2x7x3x2x1xf64>
     // CHECK-NEXT:   return [[RESULT]]
 // }
 
 // CHECK-LABEL: @gradCallTensorTensor
-func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32> {
-    // CHECK:   [[GRAD:%.+]] = call @funcTensorTensor.finitediff0(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
-    %2 = gradient.grad "fd"  @funcTensorTensor(%arg0) { finiteDiffParam = 4.000000e+00 : f64 } : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
+func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64> {
+    // CHECK:   [[GRAD:%.+]] = call @funcTensorTensor.finitediff0(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
+    %2 = gradient.grad "fd"  @funcTensorTensor(%arg0) { finiteDiffParam = 4.000000e+00 : f64 } : (tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
     // CHECK:   return [[GRAD]]
-    func.return %2 : tensor<7x3x2x1x2xf32>
+    func.return %2 : tensor<2x7x3x2x1xf64>
 }
 
 // -----
@@ -157,16 +157,16 @@ func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2x
 // Check multiple arguments case
 func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf64> attributes {qnode, diff_method = "finite-diff"}
 
-// CHECK-LABEL: @funcMultiArg.finitediff0(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<7x2xf64>
+// CHECK-LABEL: @funcMultiArg.finitediff0(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2x7xf64>
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg2: index, %arg3: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg3]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg3]
     // CHECK:            [[EVAL:%.+]] = func.call @funcMultiArg([[SHIFTED]], %arg1)
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg3]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[RESULT:%.+]] = arith.divf [[DIFF]]
     // CHECK-NEXT:   return [[RESULT]]
@@ -181,16 +181,16 @@ func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf6
     // CHECK-NEXT:   return [[RESULT]]
 // }
 
-// CHECK-LABEL: @funcMultiArg.finitediff01(%arg0: tensor<7xf64>, %arg1: f64) -> (tensor<7x2xf64>, tensor<2xf64>)
+// CHECK-LABEL: @funcMultiArg.finitediff01(%arg0: tensor<7xf64>, %arg1: f64) -> (tensor<2x7xf64>, tensor<2xf64>)
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg2: index, %arg3: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg3]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg3]
     // CHECK:            [[EVAL:%.+]] = func.call @funcMultiArg([[SHIFTED]], %arg1)
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg3]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[R0:%.+]] = arith.divf [[DIFF]]
     // CHECK:        [[SHIFTED:%.+]] = arith.addf %arg1
@@ -201,15 +201,15 @@ func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf6
 // }
 
 // CHECK-LABEL: @gradCallMultiArg
-func.func @gradCallMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> (tensor<7x2xf64>, tensor<2xf64>, tensor<7x2xf64>, tensor<2xf64>)  {
-    // CHECK:   [[GRAD0:%.+]] = call @funcMultiArg.finitediff0(%arg0, %arg1) : (tensor<7xf64>, f64) -> tensor<7x2xf64>
-    %0 = gradient.grad "fd"  @funcMultiArg(%arg0, %arg1) : (tensor<7xf64>, f64) -> tensor<7x2xf64>
+func.func @gradCallMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> (tensor<2x7xf64>, tensor<2xf64>, tensor<2x7xf64>, tensor<2xf64>)  {
+    // CHECK:   [[GRAD0:%.+]] = call @funcMultiArg.finitediff0(%arg0, %arg1) : (tensor<7xf64>, f64) -> tensor<2x7xf64>
+    %0 = gradient.grad "fd"  @funcMultiArg(%arg0, %arg1) : (tensor<7xf64>, f64) -> tensor<2x7xf64>
     // CHECK:   [[GRAD1:%.+]] = call @funcMultiArg.finitediff1(%arg0, %arg1) : (tensor<7xf64>, f64) -> tensor<2xf64>
     %1 = gradient.grad "fd"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (tensor<7xf64>, f64) -> tensor<2xf64>
-    // CHECK:   [[GRAD2:%.+]]:2 = call @funcMultiArg.finitediff01(%arg0, %arg1) : (tensor<7xf64>, f64) -> (tensor<7x2xf64>, tensor<2xf64>)
-    %2:2 = gradient.grad "fd"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (tensor<7xf64>, f64) -> (tensor<7x2xf64>, tensor<2xf64>)
+    // CHECK:   [[GRAD2:%.+]]:2 = call @funcMultiArg.finitediff01(%arg0, %arg1) : (tensor<7xf64>, f64) -> (tensor<2x7xf64>, tensor<2xf64>)
+    %2:2 = gradient.grad "fd"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (tensor<7xf64>, f64) -> (tensor<2x7xf64>, tensor<2xf64>)
     // CHECK:   return [[GRAD0]], [[GRAD1]], [[GRAD2]]#0, [[GRAD2]]#1
-    func.return %0, %1, %2#0, %2#1 : tensor<7x2xf64>, tensor<2xf64>, tensor<7x2xf64>, tensor<2xf64>
+    func.return %0, %1, %2#0, %2#1 : tensor<2x7xf64>, tensor<2xf64>, tensor<2x7xf64>, tensor<2xf64>
 }
 
 // -----
@@ -217,7 +217,7 @@ func.func @gradCallMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> (tensor<7x2xf64
 // Check multiple results case
 func.func private @funcMultiRes(%arg0: tensor<7xf64>) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "finite-diff"}
 
-// CHECK-LABEL: @funcMultiRes.finitediff0(%arg0: tensor<7xf64>) -> (tensor<7xf64>, tensor<7x2xf64>)
+// CHECK-LABEL: @funcMultiRes.finitediff0(%arg0: tensor<7xf64>) -> (tensor<7xf64>, tensor<2x7xf64>)
     // CHECK:        [[BASE:%.+]]:2 = call @funcMultiRes(%arg0)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg1: index):
@@ -230,50 +230,49 @@ func.func private @funcMultiRes(%arg0: tensor<7xf64>) -> (f64, tensor<2xf64>) at
     // CHECK:        [[R0:%.+]] = arith.divf [[DIFF]]
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg1: index, %arg2: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg1]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg1]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
     // CHECK:            [[EVAL:%.+]]:2 = func.call @funcMultiRes([[SHIFTED]])
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]]#1, [[BASE]]#1
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg1]
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[R1:%.+]] = arith.divf [[DIFF]]
     // CHECK:        return [[R0]], [[R1]]
 // }
 
 // CHECK-LABEL: @gradCallMultiRes
-func.func @gradCallMultiRes(%arg0: tensor<7xf64>) -> (tensor<7xf64>, tensor<7x2xf64>)  {
-    // CHECK:   [[GRAD:%.+]]:2 = call @funcMultiRes.finitediff0(%arg0) : (tensor<7xf64>) -> (tensor<7xf64>, tensor<7x2xf64>)
-    %0:2 = gradient.grad "fd"  @funcMultiRes(%arg0) : (tensor<7xf64>) -> (tensor<7xf64>, tensor<7x2xf64>)
+func.func @gradCallMultiRes(%arg0: tensor<7xf64>) -> (tensor<7xf64>, tensor<2x7xf64>)  {
+    // CHECK:   [[GRAD:%.+]]:2 = call @funcMultiRes.finitediff0(%arg0) : (tensor<7xf64>) -> (tensor<7xf64>, tensor<2x7xf64>)
+    %0:2 = gradient.grad "fd"  @funcMultiRes(%arg0) : (tensor<7xf64>) -> (tensor<7xf64>, tensor<2x7xf64>)
     // CHECK:   return [[GRAD]]#0, [[GRAD]]#1
-    func.return %0#0, %0#1 : tensor<7xf64>, tensor<7x2xf64>
+    func.return %0#0, %0#1 : tensor<7xf64>, tensor<2x7xf64>
 }
 
 // -----
 
 // Check dynamic tensor shape case
-func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf32> attributes {qnode, diff_method = "finite-diff"}
+func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf64> attributes {qnode, diff_method = "finite-diff"}
 
-// CHECK-LABEL: @funcDynamicTensor.finitediff0(%arg0: tensor<?x3xf64>) -> tensor<?x3x2x?xf32>
+// CHECK-LABEL: @funcDynamicTensor.finitediff0(%arg0: tensor<?x3xf64>) -> tensor<2x?x?x3xf64>
     // CHECK-DAG:    [[C0:%.+]] = arith.constant 0 : index
     // CHECK-DAG:    [[C1:%.+]] = arith.constant 1 : index
-    // CHECK-DAG:    [[F32:%.+]] = arith.constant 1.000000e+00 : f32
     // CHECK-DAG:    [[F64:%.+]] = arith.constant 1.000000e+00 : f64
     // CHECK-DAG:    [[BASE:%.+]] = call @funcDynamicTensor(%arg0)
-
-    // CHECK:        [[DDIM0:%.+]] = tensor.dim %arg0, [[C0]]
-    // CHECK:        [[DDIM1:%.+]] = tensor.dim [[BASE]], [[C1]]
+    
+    // CHECK:        [[DDIM0:%.+]] = tensor.dim [[BASE]], [[C1]]
+    // CHECK:        [[DDIM1:%.+]] = tensor.dim %arg0, [[C0]]
     // CHECK:        [[INIT:%.+]] = tensor.empty([[DDIM0]], [[DDIM1]])
-    // CHECK:        [[H:%.+]] = linalg.fill ins([[F32]] : f32) outs([[INIT]] : tensor<?x3x2x?xf32>)
+    // CHECK:        [[H:%.+]] = linalg.fill ins([[F64]] : f64) outs([[INIT]] : tensor<2x?x?x3xf64>)
 
     // CHECK:        [[DIFF:%.+]] = tensor.generate [[DDIM0]], [[DDIM1]]
     // CHECK-NEXT:   ^bb0([[i0:%.+]]: index, [[i1:%.+]]: index, [[i2:%.+]]: index, [[i3:%.+]]: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[[[i0]], [[i1]]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[[[i2]], [[i3]]]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]], [[F64]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[[[i0]], [[i1]]]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[[[i2]], [[i3]]]
     // CHECK:            [[EVAL:%.+]] = func.call @funcDynamicTensor([[SHIFTED]])
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][[[i2]], [[i3]]]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][[[i0]], [[i1]]]
     // CHECK:            tensor.yield [[RES]]
 
     // CHECK:        [[RESULT:%.+]] = arith.divf [[DIFF]], [[H]]
@@ -281,11 +280,11 @@ func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf32> 
 // }
 
 // CHECK-LABEL: @gradCallDynamicTensor
-func.func @gradCallDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<?x3x2x?xf32> {
-    // CHECK:   [[GRAD:%.+]] = call @funcDynamicTensor.finitediff0(%arg0) : (tensor<?x3xf64>) -> tensor<?x3x2x?xf32>
-    %0 = gradient.grad "fd"  @funcDynamicTensor(%arg0) { finiteDiffParam = 1.000000e+00 : f64 } : (tensor<?x3xf64>) -> tensor<?x3x2x?xf32>
+func.func @gradCallDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?x?x3xf64> {
+    // CHECK:   [[GRAD:%.+]] = call @funcDynamicTensor.finitediff0(%arg0) : (tensor<?x3xf64>) -> tensor<2x?x?x3xf64>
+    %0 = gradient.grad "fd"  @funcDynamicTensor(%arg0) { finiteDiffParam = 1.000000e+00 : f64 } : (tensor<?x3xf64>) -> tensor<2x?x?x3xf64>
     // CHECK:   return [[GRAD]]
-    func.return %0 : tensor<?x3x2x?xf32>
+    func.return %0 : tensor<2x?x?x3xf64>
 }
 
 // -----

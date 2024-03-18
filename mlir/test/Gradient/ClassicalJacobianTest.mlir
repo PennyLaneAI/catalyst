@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients --split-input-file | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients --split-input-file --allow-unregistered-dialect --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: @simple_circuit.preprocess(%arg0: tensor<3xf64>, %arg1: index) -> f64
 func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
@@ -158,7 +158,7 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
     // CHECK: memref.store [[c0]], [[count]]
     // CHECK: [[e0:%.+]] = tensor.extract %arg0[%c0]
 
-    %idx = arith.constant 0 : i64  
+    %idx = arith.constant 0 : i64
     %c0 = arith.constant 0 : index
     %f0 = tensor.extract %arg0[%c0] : tensor<1xf64>
 
@@ -257,4 +257,19 @@ func.func @all_ops_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_
 func.func @gradCall(%arg0: tensor<1xf64>) -> tensor<1xf64> {
     %0 = gradient.grad "auto" @all_ops_circuit(%arg0) : (tensor<1xf64>) -> tensor<1xf64>
     func.return %0 : tensor<1xf64>
+}
+
+// -----
+
+// expected-error@+1 {{'func.func' op cloned during the gradient pass is not free of quantum ops}}
+func.func @new_quantum_op_type(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
+    %r = quantum.alloc(5) : !quantum.reg
+    "prevent.quantum-op-removal"(%r) : (!quantum.reg) -> ()
+    quantum.dealloc %r : !quantum.reg
+    return %arg0 : f64
+}
+
+func.func @gradCallNewOp(%arg0: f64) -> f64 {
+    %0 = gradient.grad "auto" @new_quantum_op_type(%arg0) : (f64) -> f64
+    func.return %0 : f64
 }

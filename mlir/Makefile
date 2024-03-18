@@ -1,18 +1,37 @@
+PYTHON?=$(shell which python3)
+C_COMPILER?=$(shell which clang)
+CXX_COMPILER?=$(shell which clang++)
+COMPILER_LAUNCHER?=$(shell which ccache)
 
-PYTHON?=python3
-C_COMPILER?=clang
-CXX_COMPILER?=clang++
-COMPILER_LAUNCHER?=ccache
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
-MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/bazel-build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
-ENABLE_LLD?=ON
-ENABLE_ZLIB?=ON
+ENABLE_ASAN?=OFF
+BUILD_TYPE?=Release
+
+ifeq ($(shell uname), Darwin)
+DEFAULT_ENABLE_LLD := OFF
+SYMBOL_VISIBILITY := hidden
+else
+DEFAULT_ENABLE_LLD := ON
+SYMBOL_VISIBILITY := protected
+endif
+
+ENABLE_LLD?=$(DEFAULT_ENABLE_LLD)
+ENABLE_ZLIB?=OFF
 ENABLE_ZSTD?=ON
+
+ifeq ($(ENABLE_ASAN), ON)
+USE_SANITIZER_NAMES="Address"
+USE_SANITIZER_FLAGS="-fsanitize=address"
+else
+USE_SANITIZER_NAMES=""
+USE_SANITIZER_FLAGS=""
+endif
 
 .PHONY: help
 help:
@@ -34,7 +53,7 @@ all: llvm mhlo enzyme dialects
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
 		-DLLVM_TARGETS_TO_BUILD="host" \
 		-DLLVM_ENABLE_PROJECTS="mlir" \
@@ -46,28 +65,32 @@ llvm:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DLLVM_USE_SANITIZER=$(USE_SANITIZER_NAMES) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
-		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
+		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter
-	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer opt
+	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
 
 .PHONY: mhlo
 mhlo:
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_EXE_LINKER_FLAGS=$(USE_SANITIZER_FLAGS) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
-		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD) \
+		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
@@ -76,12 +99,14 @@ enzyme:
 	@echo "build enzyme"
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER)
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_EXE_LINKER_FLAGS=$(USE_SANITIZER_FLAGS) \
+		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
 	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-18
 
@@ -90,7 +115,7 @@ dialects:
 
 	@echo "build quantum-lsp compiler_driver and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
 		-DPython3_EXECUTABLE=$$(which $(PYTHON)) \
@@ -106,6 +131,7 @@ dialects:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DLLVM_USE_SANITIZER=$(USE_SANITIZER_NAMES) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
 		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)

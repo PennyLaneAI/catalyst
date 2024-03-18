@@ -18,18 +18,24 @@ import jax
 import pennylane as qml
 
 from catalyst import cond, for_loop, measure, qjit, while_loop
+from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
 
 
 def get_custom_device_without(num_wires, discards):
+    """Generate a custom device without gates in discards."""
+
     lightning = qml.device("lightning.qubit", wires=3)
     copy = lightning.operations.copy()
+    observables_copy = lightning.observables.copy()
     for discard in discards:
         copy.discard(discard)
 
     class CustomDevice(qml.QubitDevice):
+        """Custom Device"""
+
         name = "Device without some operations"
         short_name = "dummy.device"
         pennylane_requires = "0.1.0"
@@ -37,20 +43,30 @@ def get_custom_device_without(num_wires, discards):
         author = "CV quantum"
 
         operations = copy
-        observables = discard
+        observables = observables_copy
 
-        def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+        # pylint: disable=too-many-arguments
+        def __init__(
+            self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+        ):
             self.backend_name = backend_name if backend_name else "default"
+            self.backend_lib = backend_lib if backend_lib else "default"
             self.backend_kwargs = backend_kwargs if backend_kwargs else ""
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
             pass
 
+        @staticmethod
+        def get_c_interface():
+            """Location to shared object with C/C++ implementation"""
+            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
     return CustomDevice(wires=num_wires)
 
 
 def test_decompose_multicontrolledx():
+    """Test decomposition of MultiControlledX."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -78,6 +94,7 @@ test_decompose_multicontrolledx()
 
 
 def test_decompose_multicontrolledx_in_conditional():
+    """Test decomposition of MultiControlledX in conditional."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -99,7 +116,6 @@ def test_decompose_multicontrolledx_in_conditional():
         @cond(n > 1)
         def cond_fn():
             qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
-            return
 
         cond_fn()
         return qml.state()
@@ -111,6 +127,7 @@ test_decompose_multicontrolledx_in_conditional()
 
 
 def test_decompose_multicontrolledx_in_while_loop():
+    """Test decomposition of MultiControlledX in while loop."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -121,13 +138,13 @@ def test_decompose_multicontrolledx_in_while_loop():
 
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
+        # CHECK: [[state0:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
+        # CHECK: [[state1:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
+        # CHECK: [[state2:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
+        # CHECK: [[state3:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @while_loop(lambda v: v[0] < 10)
         def loop(v):
@@ -144,6 +161,7 @@ test_decompose_multicontrolledx_in_while_loop()
 
 
 def test_decompose_multicontrolledx_in_for_loop():
+    """Test decomposition of MultiControlledX in for loop."""
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
@@ -154,16 +172,16 @@ def test_decompose_multicontrolledx_in_for_loop():
 
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
+        # CHECK: [[state0:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
+        # CHECK: [[state1:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
+        # CHECK: [[state2:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
+        # CHECK: [[state3:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @for_loop(0, n, 1)
-        def loop(i):
+        def loop(_):
             qml.MultiControlledX(wires=[0, 1, 2, 3], work_wires=[4])
 
         loop()
@@ -176,6 +194,7 @@ test_decompose_multicontrolledx_in_for_loop()
 
 
 def test_decompose_rot():
+    """Test decomposition of Rot gate."""
     dev = get_custom_device_without(1, {"Rot"})
 
     @qjit(target="mlir")
@@ -205,6 +224,7 @@ test_decompose_rot()
 
 
 def test_decompose_s():
+    """Test decomposition of S gate."""
     dev = get_custom_device_without(1, {"S"})
 
     @qjit(target="mlir")
@@ -226,6 +246,7 @@ test_decompose_s()
 
 
 def test_decompose_qubitunitary():
+    """Test decomposition of QubitUnitary"""
     dev = get_custom_device_without(1, {"QubitUnitary"})
 
     @qjit(target="mlir")
@@ -247,6 +268,7 @@ test_decompose_qubitunitary()
 
 
 def test_decompose_singleexcitationplus():
+    """Test decomposition of single excitation plus."""
     dev = get_custom_device_without(2, {"SingleExcitationPlus"})
 
     @qjit(target="mlir")
@@ -257,21 +279,21 @@ def test_decompose_singleexcitationplus():
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q0:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_theta_div_2_scalar:%.+]] = tensor.extract [[a_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s1:%.+]]:2 = quantum.custom "ControlledPhaseShift"([[a_theta_div_2_scalar]]) [[s0q0]], [[s0q1]]
+        # CHECK: [[s1:%.+]]:2 = quantum.custom "ControlledPhaseShift"([[a_theta_div_2_scalar]]) [[s0q1]], [[s0q0]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q1:%.+]] = quantum.custom "PauliX"() [[s1]]#1
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q0:%.+]] = quantum.custom "PauliX"() [[s1]]#0
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[b_theta_div_2_scalar:%.+]] = tensor.extract [[b_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"

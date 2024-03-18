@@ -1,10 +1,12 @@
 # build dependencies
+pip>=22.3 # Due to a bug in `pip install -e .` vs read-only system-wide site-packages
+
 numpy
 pybind11>=2.8.0
 PyYAML
 
 # formatting/linting
-black[jupyter]
+black
 clang-format==14.*
 clang-tidy==14.*
 pylint
@@ -17,5 +19,7 @@ pytest-xdist
 pytest-cov
 nbmake
 
-# optional rt dependencies
-tensorflow-cpu
+# optional rt/test dependencies
+pennylane-lightning[kokkos]
+amazon-braket-pennylane-plugin>=1.23.0
+lark

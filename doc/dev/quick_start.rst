@@ -249,15 +249,15 @@ are supported in Catalyst, although not all features are supported for all measu
    :header-rows: 0
 
    * - :func:`qml.expval() <pennylane.expval>`
-     - The expectation value of all observables is supported.
+     - The expectation value of observables is supported analytically as well as with finite-shots.
    * - :func:`qml.var() <pennylane.var>`
-     - The variance of all observables is supported.
+     - The variance of observables is supported analytically as well as with finite-shots.
    * - :func:`qml.sample() <pennylane.sample>`
      - Samples in the computational basis only are supported.
    * - :func:`qml.counts() <pennylane.counts>`
      - Sample counts in the computational basis only are supported.
    * - :func:`qml.probs() <pennylane.probs>`
-     - Probabilities in the computational basis only are supported.
+     - The probabilities is supported in the computational basis as well as with finite-shots.
    * - :func:`qml.state() <pennylane.state>`
      - The state in the computational basis only is supported.
    * - :func:`.measure`
@@ -382,7 +382,7 @@ array(0.)
 >>> circuit(0.5)  # the precompiled quantum function is called
 array(0.)
 
-.. _ahead_of_time
+.. _ahead_of_time:
 
 Ahead-of-time
 -------------
@@ -582,7 +582,7 @@ to the ``grad`` function:
   the classical computation is differentiated using traditional autodiff.
 
   With this strategy, Catalyst only currently supports QNodes with
-  ``diff_method="param-shift"`` and ``diff_method="adjoint"``.
+  ``diff_method="parameter-shift"`` and ``diff_method="adjoint"``.
 
 - ``method="fd"``: First-order finite-differences for the entire hybrid
   function. The ``diff_method`` argument for each QNode is ignored.
@@ -636,8 +636,8 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
         return g(x)
 
 >>> workflow(jnp.array([2.0, 1.0]))
-array([[-1.32116540e-07,  1.33781874e-07],
-       [-4.20735506e-01,  4.20735506e-01]])
+array([[ 3.48786850e-16 -4.20735492e-01]
+       [-8.71967125e-17  4.20735492e-01]])
 
 This decorator has the same methods and API as `grad`. See the documentation for more details.
 
@@ -666,17 +666,19 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
     import jaxopt
     from jax.lax import fori_loop
 
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qml.qnode(dev)
     def circuit(param):
         qml.Hadamard(0)
-        qml.CRX(param, wires=[0, 1])
+        qml.RY(param, wires=0)
         return qml.expval(qml.PauliZ(0))
 
     @qjit
     def workflow():
         def gd_fun(param):
             diff = grad(circuit, argnum=0)
-            return circuit(param), diff(param)[0]
+            return circuit(param), diff(param)
 
         opt = jaxopt.GradientDescent(gd_fun, stepsize=0.4, value_and_grad=True)
 
@@ -684,13 +686,13 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
             (param, state) = opt.update(*args)
             return (param, state)
 
-        param = 0.0
+        param = 0.1
         state = opt.init_state(param)
-        (param, _) = fori_loop(0, 10, gd_update, (param, state))
+        (param, _) = jax.lax.fori_loop(0, 100, gd_update, (param, state))
         return param
 
 >>> workflow()
-array(4.94807684e-09)
+array(1.57079633)
 
 JAX Integration
 ===============
@@ -699,7 +701,7 @@ Catalyst programs can also be used inside of a larger JAX workflow which uses
 JIT compilation, automatic differentiation, and other JAX transforms.
 
 .. note::
-    
+
     Note that, in general, best performance will be seen when the Catalyst
     ``@qjit`` decorator is used to JIT the entire hybrid workflow. However, there
     may be cases where you may want to delegate only the quantum part of your

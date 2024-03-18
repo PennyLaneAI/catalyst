@@ -1,25 +1,47 @@
-PYTHON := python3
-C_COMPILER?=clang
-CXX_COMPILER?=clang++
-COMPILER_LAUNCHER?=ccache
+PYTHON := $(shell which python3)
+C_COMPILER?=$(shell which clang)
+CXX_COMPILER?=$(shell which clang++)
+COMPILER_LAUNCHER?=$(shell which ccache)
+
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
-BUILD_TYPE?=Release
+BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
-ENABLE_LIGHTNING_KOKKOS?=OFF
-ENABLE_OPENQASM?=OFF
-BUILD_QIR_STDLIB_FROM_SRC?=OFF
-# TODO: Update to latest_release after v0.33.0
-LIGHTNING_GIT_TAG_VALUE?="master"
-NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+ENABLE_LIGHTNING?=ON
+ENABLE_LIGHTNING_KOKKOS?=ON
+ENABLE_OPENQASM?=ON
+ENABLE_ASAN?=OFF
+LIGHTNING_GIT_TAG_VALUE?=v0.35.0
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+
+BUILD_TARGETS := rt_capi
+TEST_TARGETS := ""
+
+ifeq ($(ENABLE_LIGHTNING), ON)
+	BUILD_TARGETS += rtd_lightning
+	TEST_TARGETS += runner_tests_lightning
+else ifeq ($(ENABLE_LIGHTNING_KOKKOS), ON)
+	BUILD_TARGETS += rtd_lightning
+	TEST_TARGETS += runner_tests_lightning
+endif
+
+ifeq ($(ENABLE_OPENQASM), ON)
+	BUILD_TARGETS += rtd_openqasm
+	TEST_TARGETS += runner_tests_openqasm
+endif
+
+LIGHTNING_ENABLE_OPENMP?=OFF
+KOKKOS_ENABLE_OPENMP?=ON
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=Release
+test: BUILD_TYPE?=RelWithDebInfo
 
 .PHONY: help
 help:
@@ -36,50 +58,95 @@ help:
 .PHONY: all
 all: runtime
 
-
 .PHONY: configure
 configure:
 	@echo "Configure Catalyst Runtime"
+
+	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
+	# is always built with proper cmake values. There is currently an issue with caching the
+	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
+	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
+
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
-		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
-		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_LIGHTNING=$(ENABLE_LIGHTNING) \
+		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
+		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
+		-DENABLE_OPENMP=$(LIGHTNING_ENABLE_OPENMP) \
+		-DKokkos_ENABLE_OPENMP=$(KOKKOS_ENABLE_OPENMP) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DBUILD_QIR_STDLIB_FROM_SRC=$(BUILD_QIR_STDLIB_FROM_SRC) \
+		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_WARNINGS=OFF \
+		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
+		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
 
-$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
+lq_configure:
+	@echo "Configure Catalyst Runtime"
+
+	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
+	# is always built with proper cmake values. There is currently an issue with caching the
+	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
+	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
+
+	cmake -G Ninja -B $(RT_BUILD_DIR) . \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DENABLE_OPENMP=$(LIGHTNING_ENABLE_OPENMP) \
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
+		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		-DENABLE_WARNINGS=OFF \
+		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
+		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		$(CMAKE_ARGS)
+
+$(RT_BUILD_DIR)/lib/librt_capi.so: configure
+	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
+
+lq_target: lq_configure
+	cmake --build $(RT_BUILD_DIR) --target rt_capi rtd_lightning -j$(NPROC)
 
 .PHONY: runtime
-runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
+runtime: $(RT_BUILD_DIR)/lib/librt_capi.so
 
-$(RT_BUILD_DIR)/tests/runner_tests: configure
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
+$(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
+	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
+
+.PHONY: dummy_device
+dummy_device:
+	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
 
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests
+test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
 	@echo "test the Catalyst runtime test suite"
-	$(RT_BUILD_DIR)/tests/runner_tests
+ifeq ($(ENABLE_OPENQASM), ON)
+	# Test the OpenQasm devices C++ tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
+endif
+	# Test the Lightning suite C++ tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
 
 .PHONY: coverage
-coverage: $(RT_BUILD_DIR)/tests/runner_tests
+coverage: lq_target
 	@echo "check C++ code coverage"
 
-	$(RT_BUILD_DIR)/tests/runner_tests
+	cmake --build $(RT_BUILD_DIR) --target runner_tests_lightning -j$(NPROC)
+	$(RT_BUILD_DIR)/tests/runner_tests_lightning
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' --output-file $(RT_BUILD_DIR)/coverage.info
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples
-examples: runtime
+examples: lq_target
 	$(MAKE) -C examples all
 
 .PHONY: clean

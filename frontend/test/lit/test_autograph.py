@@ -17,12 +17,98 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 from catalyst import qjit
-from catalyst.ag_utils import AutoGraphError, print_code
-from catalyst.autograph import autograph
+from catalyst.autograph import AutoGraphError, autograph_source, run_autograph
 
 
-# CHECK-LABEL: def if_simple
-@autograph
+def print_code(fn):
+    """Print autograph generated code for a function."""
+    print(autograph_source(fn))
+
+
+# CHECK-LABEL: def ag__while_simple
+@run_autograph
+def while_simple(x: float):
+    """Test a simple while-loop statement."""
+
+    # CHECK:   def loop_body
+    # CHECK:   def loop_test
+    # CHECK:   ag__.while_stmt(loop_test, loop_body
+    while x < 1.0:
+        x *= 1.5
+    return x
+
+
+print_code(while_simple)
+
+
+# -----
+
+
+# CHECK-LABEL: def while_default_jax
+@qjit(autograph=True)
+def while_default_jax(a: int):
+    """Checks that failure during the while-loop tracing is detected and the fallback unrolling is
+    executed."""
+    i = 0
+    acc = 0
+    # CHECK: while
+    while i < 5:
+        acc += a
+        i += 1
+    return acc
+
+
+print("def while_default_jax")
+print(while_default_jax.jaxpr)
+
+# -----
+
+
+class Failing:
+    """Test class that emulates failures in user-code"""
+
+    triggered = False
+
+    def __init__(self, ref):
+        self.ref = ref
+
+    @property
+    def val(self):
+        """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
+        if not Failing.triggered:
+            Failing.triggered = True
+            raise Exception("Emulated failure")
+        return self.ref
+
+
+# CHECK-LABEL: def while_fallback_jax
+@qjit(autograph=True)
+def while_fallback_jax(a: int):
+    """Checks that failure during the while-loop tracing is detected and the fallback unrolling is
+    executed."""
+    i = 0
+    acc = 0
+    # CHECK: add
+    # CHECK: add
+    # CHECK: add
+    # CHECK: add
+    # CHECK: add
+    while Failing(i).val < 5:
+        acc += a
+        i += 1
+    return acc
+
+
+print("def while_fallback_jax")
+print(while_fallback_jax.jaxpr)
+
+
+# -----
+
+
+# CHECK-LABEL: def ag__if_simple
+@run_autograph
 def if_simple(x: float):
     """Test a simple conditional with a single branch."""
 
@@ -33,7 +119,7 @@ def if_simple(x: float):
     # CHECK:   def else_body():
     # CHECK:       pass
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, (), 0)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, (), 0)
 
     return x
 
@@ -43,8 +129,8 @@ print_code(if_simple)
 # -----
 
 
-# CHECK-LABEL: def if_else
-@autograph
+# CHECK-LABEL: def ag__if_else
+@run_autograph
 def if_else(x: float):
     """Test a simple conditional with two branches."""
 
@@ -57,7 +143,7 @@ def if_else(x: float):
     else:
         pass
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, (), 0)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, (), 0)
 
     return x
 
@@ -67,8 +153,8 @@ print_code(if_else)
 # -----
 
 
-# CHECK-LABEL: def if_assign
-@autograph
+# CHECK-LABEL: def ag__if_assign
+@run_autograph
 def if_assign(x: float):
     """Test a conditional creates a new variable."""
 
@@ -83,9 +169,12 @@ def if_assign(x: float):
     else:
         y = 5
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, ('y',), 1)
 
-    # CHECK:   return y
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y
 
 
@@ -94,22 +183,48 @@ print_code(if_assign)
 # -----
 
 
+# CHECK-LABEL: def ag__if_assign_no_type_mismatch
+@qjit  # needed to trigger Catalyst type checks during tracing
+@run_autograph
+def if_assign_no_type_mismatch(x: float):
+    """Verify the absense of error from a conditional that doesn't produce the same type across
+    branches."""
+
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4.0
+    if x < 3:
+        y = 4.0
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 5
+    else:
+        y = 5
+
+    return y
+
+
+print_code(if_assign_no_type_mismatch)
+
+# -----
+
+
 try:
 
-    @qjit  # needed to trigger Catalyst type checks during tracing
-    @autograph
-    def if_assign_type_mismatch(x: float):
-        """Verify error from a conditional that doesn't produce the same type across branches."""
+    @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
+    @run_autograph
+    def if_assign_pytree_shape_mismatch(x: float):
+        """Verify error from a conditional that doesn't produce a value in all branches."""
 
         if x < 3:
-            y = 4.0
+            y = (4, 4)
         else:
-            y = 5
+            y = 4
 
         return y
 
 except TypeError as e:
-    # CHECK:   Conditional requires consistent return types across all branches
+    # CHECK:   Conditional requires a consistent return structure across all branches
     print(e)
 
 # -----
@@ -118,7 +233,7 @@ except TypeError as e:
 try:
 
     @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
-    @autograph
+    @run_autograph
     def if_assign_partial(x: float):
         """Verify error from a conditional that doesn't produce a value in all branches."""
 
@@ -134,8 +249,8 @@ except AutoGraphError as e:
 # -----
 
 
-# CHECK-LABEL: def if_assign_existing
-@autograph
+# CHECK-LABEL: def ag__if_assign_existing
+@run_autograph
 def if_assign_existing(x: float):
     """Test a conditional that assigns to an existing variable in all branches."""
 
@@ -153,9 +268,12 @@ def if_assign_existing(x: float):
     else:
         y = 5
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, ('y',), 1)
 
-    # CHECK:   return y
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y
 
 
@@ -164,8 +282,8 @@ print_code(if_assign_existing)
 # -----
 
 
-# CHECK-LABEL: def if_assign_existing_type_mismatch
-@autograph
+# CHECK-LABEL: def ag__if_assign_existing_type_mismatch
+@run_autograph
 def if_assign_existing_type_mismatch(x: float):
     """Test a conditional that assigns to an existing variable with a different type, while being
     consistent across all branches."""
@@ -184,9 +302,12 @@ def if_assign_existing_type_mismatch(x: float):
     else:
         y = 5.0
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, ('y',), 1)
 
-    # CHECK:   return y
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y
 
 
@@ -195,8 +316,8 @@ print_code(if_assign_existing_type_mismatch)
 # -----
 
 
-# CHECK-LABEL: def if_assign_existing_partial
-@autograph
+# CHECK-LABEL: def ag__if_assign_existing_partial
+@run_autograph
 def if_assign_existing_partial(x: float):
     """Test a conditional that assigns to an existing variable in some branches only."""
 
@@ -212,9 +333,12 @@ def if_assign_existing_partial(x: float):
     # CHECK:       nonlocal y
     # CHECK:       pass
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, ('y',), 1)
 
-    # CHECK:   return y
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y
 
 
@@ -222,35 +346,41 @@ print_code(if_assign_existing_partial)
 
 # -----
 
-try:
 
-    @qjit
-    @autograph
-    def if_assign_existing_partial_type_mismatch(x: float):
-        """Verify error from a conditional that assigns to an existing value with different type,
-        without defining a value in all branches. This should lead to a type mismatch error."""
+# CHECK-LABEL: def ag__if_assign_existing_partial_no_type_mismatch
+@qjit
+@run_autograph
+def if_assign_existing_partial_no_type_mismatch(x: float):
+    """Verify error from a conditional that assigns to an existing value with different type,
+    without defining a value in all branches. This should lead to a type mismatch error."""
 
-        y = 0
+    # CHECK: y = 0
+    y = 0
 
-        if x < 3:
-            y = 4.0
+    # CHECK:       def if_body():
+    # CHECK:           nonlocal y
+    # CHECK:           y = 4.0
+    if x < 3:
+        y = 4.0
 
-        return y
+    # CHECK:       def else_body():
+    # CHECK:           nonlocal y
+    # CHECK:           pass
 
-except TypeError as e:
-    # CHECK:   Conditional requires consistent return types across all branches
-    print(e)
+    return y
 
+
+print_code(if_assign_existing_partial_no_type_mismatch)
 
 # -----
 
 
-# CHECK-LABEL: def if_assign_multiple
-@autograph
+# CHECK-LABEL: def ag__if_assign_multiple
+@run_autograph
 def if_assign_multiple(x: float):
     """Test a conditional that assigns to multiple existing variables."""
 
-    # CHECK:   (y, z) = (0, False)
+    # CHECK:   {{\(?}}y, z{{\)?}} = (0, False)
     y, z = 0, False
 
     # CHECK:       def if_body():
@@ -266,9 +396,12 @@ def if_assign_multiple(x: float):
         y = 5
         z = True
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y', 'z'), 2)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, ('y', 'z'), 2)
 
-    # CHECK:   return y * z
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y) * ag__.ld(z)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y * z
 
 
@@ -280,7 +413,7 @@ print_code(if_assign_multiple)
 try:
 
     @qjit
-    @autograph
+    @run_autograph
     def if_assign_invalid_type(x: float):
         """Verify error from a conditional that produces a type invalid for tracing."""
 
@@ -298,8 +431,8 @@ except TypeError as e:
 # -----
 
 
-# CHECK-LABEL: def if_elif
-@autograph
+# CHECK-LABEL: def ag__if_elif
+@run_autograph
 def if_elif(x: float):
     """Test a conditional with more than two branches."""
 
@@ -318,13 +451,16 @@ def if_elif(x: float):
     # CHECK:       def else_body():
     # CHECK:           nonlocal y
     # CHECK:           pass
-    # CHECK:       ag__.if_stmt(x < 5, if_body, else_body, get_state, set_state, ('y',), 1)
+    # CHECK:       ag__.if_stmt(ag__.ld(x) < 5, if_body, else_body, get_state, set_state, ('y',), 1)
     elif x < 5:
         y = 7
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body_1, else_body_1, get_state_1, set_state_1, ('y',), 1)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body_1, else_body_1, get_state_1, set_state_1, ('y',), 1)
 
-    # CHECK:   return y
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y
 
 
@@ -333,7 +469,7 @@ print_code(if_elif)
 # -----
 
 
-# CHECK-LABEL: def nested_call
+# CHECK-LABEL: def ag__nested_call
 def nested_call(x, y):
     """Nested function with conditional."""
 
@@ -346,14 +482,17 @@ def nested_call(x, y):
     # CHECK:       nonlocal y
     # CHECK:       pass
 
-    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+    # CHECK:   ag__.if_stmt(ag__.ld(x) < 3, if_body, else_body, get_state, set_state, ('y',), 1)
 
-    # CHECK:   return y
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.ld(y)
+    # CHECK:   return fscope.ret(retval_, do_return)
     return y
 
 
-# CHECK-LABEL: def if_call
-@autograph
+# CHECK-LABEL: def ag__if_call
+@run_autograph
 def if_call(x: float):
     """Test a conditional that is nested inside another function. All (user) functions invoked by
     the explicitly transformed function should also be transformed."""
@@ -361,7 +500,10 @@ def if_call(x: float):
     # CHECK:   y = 0
     y = 0
 
-    # CHECK:   return ag__.converted_call(nested_call, (x, y)
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.converted_call(ag__.ld(nested_call), (ag__.ld(x), ag__.ld(y))
+    # CHECK:   return fscope.ret(retval_, do_return)
     return nested_call(x, y)
 
 
@@ -369,3 +511,44 @@ if_call(0.1)  # needed to generate the source code for nested functions
 
 print_code(nested_call)
 print_code(if_call)
+
+# -----
+
+
+# CHECK-LABEL: def ag__logical_calls
+@run_autograph
+def logical_calls(x: float, y: float):
+    """Check that catalyst can handle ``and``, ``or`` and ``not`` using autograph."""
+    # pylint: disable=chained-comparison
+
+    # CHECK:   a = ag__.and_
+    a = x >= 0.0 and x <= 1.0
+
+    # CHECK:   b = ag__.not_
+    b = not y >= 1.0
+
+    # CHECK:   try:
+    # CHECK:     do_return = True
+    # CHECK:     retval_ = ag__.or_(lambda{{\ ?}}: ag__.ld(a), lambda{{\ ?}}: ag__.ld(b))
+    # CHECK:   return fscope.ret(retval_, do_return)
+    return a or b
+
+
+print_code(logical_calls)
+
+
+# -----
+
+
+# CHECK-LABEL: def ag__chain_logical_call
+@run_autograph
+def chain_logical_call(x: float):
+    """Check that catalyst can handle chained-``and`` using autograph."""
+
+    # CHECK:        ag__.and_
+    # CHECK-SAME:     0.0 <= ag__.ld(x)
+    # CHECK-SAME:     ag__.ld(x) <= 1.0
+    return 0.0 <= x <= 1.0
+
+
+print_code(chain_logical_call)

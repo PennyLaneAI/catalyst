@@ -18,7 +18,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "gml_st/transforms/passes.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -42,6 +41,8 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
+#include "Mitigation/IR/MitigationDialect.h"
+#include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
@@ -99,6 +100,15 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     }
 };
 
+// Run the callback with stack printing disabled
+void withoutStackTrace(MLIRContext *ctx, std::function<void()> callback)
+{
+    auto old = ctx->shouldPrintStackTraceOnDiagnostic();
+    ctx->printStackTraceOnDiagnostic(false);
+    callback();
+    ctx->printStackTraceOnDiagnostic(old);
+}
+
 } // namespace
 
 namespace {
@@ -136,19 +146,26 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<CatalystDialect>();
     registry.insert<quantum::QuantumDialect>();
     registry.insert<gradient::GradientDialect>();
+    registry.insert<mitigation::MitigationDialect>();
 }
 } // namespace
 
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
+    std::list<StringRef> visited;
     for (auto &function : llvmModule.functions()) {
-        emitRemark(loc) << "Found LLVM function: " << function.getName() << "\n";
+        visited.push_back(function.getName());
         if (function.getName().starts_with("catalyst.entry_point")) {
             return &function;
         }
     }
-    emitError(loc, "Failed to find JIT function");
+    withoutStackTrace(ctx, [&]() {
+        auto noteStream =
+            emitRemark(loc, "Failed to find entry-point function among the following: ");
+        llvm::interleaveComma(visited, noteStream, [&](StringRef t) { noteStream << t; });
+    });
+
     return failure();
 }
 
@@ -349,7 +366,14 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPassFailedCallback = [&](Pass *pass, Operation *op) {
         auto res = passPipelineNames.find(pass);
         assert(res != passPipelineNames.end() && "Unexpected pass");
-        options.diagnosticStream << "While processing pipeline: " << res->second << "\n";
+        options.diagnosticStream << "While processing '" << pass->getName() << "' pass "
+                                 << "of the '" << res->second << "' pipeline\n";
+        llvm::raw_string_ostream s{outputs[res->second]};
+        s << *op;
+        if (options.keepIntermediate) {
+            dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"),
+                       outputs[res->second]);
+        }
     };
 
     // Output pipeline names on failures
@@ -374,7 +398,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     initialized |= true;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
-    gml_st::registerGmlStPasses();
 
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
@@ -474,7 +497,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
         }
         else {
-            CO_MSG(options, Verbosity::Urgent, "Unable to infer jit_* function attributes\n");
+            CO_MSG(options, Verbosity::Urgent,
+                   "Unable to infer catalyst.entry_point* function attributes\n");
         }
 
         auto outfile = options.getObjectFile();

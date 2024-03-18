@@ -478,6 +478,65 @@ TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
     CHECK(state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
+// TODO: Uncomment these tests after `PSWAP` and `ISWAP` are natively supported by Lightning
+// simulators.
+/*
+TEMPLATE_LIST_TEST_CASE("ISWAP test", "[GateSet]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+
+    for (size_t i = 0; i < n; i++) {
+        Qs[i] = sim->AllocateQubit();
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("ISWAP", {}, {Qs[0], Qs[1]}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 1});
+    CHECK(state.at(2) == std::complex<double>{0, 0});
+    CHECK(state.at(3) == std::complex<double>{0, 0});
+}
+
+TEMPLATE_LIST_TEST_CASE("PSWAP test", "[GateSet]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+
+    for (size_t i = 0; i < n; i++) {
+        Qs[i] = sim->AllocateQubit();
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
+    sim->NamedOperation("PSWAP", {M_PI_2}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(state[0].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.5).epsilon(1e-5));
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state[2].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(-0.5).epsilon(1e-5));
+    CHECK(state.at(3) == std::complex<double>{0, 0});
+}
+*/
+
 TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -766,4 +825,87 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSi
 
     CHECK(state[14].real() == Approx(0.0756372).epsilon(1e-5));
     CHECK(state[14].imag() == Approx(-0.226334).epsilon(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
+{
+    const size_t N = 3;
+    __catalyst__rt__initialize();
+
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        // TODO: remove when other devices support controlled gates
+        if (rtd_name != "lightning.qubit")
+            continue;
+
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        std::vector<QUBIT *> Q;
+        for (size_t i = 0; i < N; i++) {
+            Q.push_back(__catalyst__rt__qubit_allocate());
+        }
+
+        __catalyst__rt__toggle_recorder(/* activate_cm */ true);
+
+        /* qml.Hadamard(wires=0) */
+        /* qml.Hadamard(wires=1) */
+        /* qml.Hadamard(wires=2) */
+        for (size_t i = 0; i < N; i++) {
+            __catalyst__qis__Hadamard(Q[i], NO_MODIFIERS);
+        }
+
+        /* qml.ctrl(qml.PauliX, control=(1,2), control_values=(False, False))(wires=0) */
+        {
+            QUBIT *ctrls[] = {Q[1], Q[2]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
+            __catalyst__qis__PauliX(Q[0], &mod);
+        }
+
+        /* qml.ctrl(qml.PauliY, control=(0,1), control_values=(False, False))(wires=2) */
+        {
+            QUBIT *ctrls[] = {Q[0], Q[1]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
+            __catalyst__qis__PauliY(Q[2], &mod);
+        }
+
+        /* qml.ctrl(qml.PauliZ, control=(2,0), control_values=(False, False))(wires=1) */
+        {
+            QUBIT *ctrls[] = {Q[2], Q[0]};
+            bool values[] = {false, false};
+            Modifiers mod = {false, 2, (QUBIT *)ctrls, (bool *)values};
+            __catalyst__qis__PauliZ(Q[1], &mod);
+        }
+        __catalyst__rt__toggle_recorder(/* activate_cm */ false);
+
+        {
+            MemRefT_CplxT_double_1d state = getState(1 << N);
+            __catalyst__qis__State(&state, 0);
+            CplxT_double *buffer = state.data_allocated;
+
+            CHECK(buffer[0].real == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[0].imag == Approx(-0.353553).epsilon(1e-5));
+            CHECK(buffer[1].real == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[1].imag == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[2].real == Approx(-0.353553).epsilon(1e-5));
+            CHECK(buffer[2].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[3].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[3].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[4].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[4].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[5].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[5].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[6].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[6].imag == Approx(0.000000).epsilon(1e-5));
+            CHECK(buffer[7].real == Approx(0.353553).epsilon(1e-5));
+            CHECK(buffer[7].imag == Approx(0.000000).epsilon(1e-5));
+
+            freeState(state);
+        }
+
+        __catalyst__rt__qubit_release_array(nullptr);
+        __catalyst__rt__device_release();
+    }
+    __catalyst__rt__finalize();
 }

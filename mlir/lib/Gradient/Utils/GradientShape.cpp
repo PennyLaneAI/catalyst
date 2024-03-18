@@ -36,34 +36,32 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
     // the number of function results) for each differentiable argument.
     size_t numDiffArgs = diffArgIndices.size();
     size_t numFnResults = fnType.getNumResults();
-    size_t numGradResults = numDiffArgs * numFnResults;
+    size_t numGradResults = numFnResults * numDiffArgs;
     gradResultTypes.reserve(numGradResults);
+    for (size_t j = 0; j < numFnResults; j++) {
+        Type fnResType = fnType.getResult(j);
 
-    // The numeric type of a grad result should match the numeric type of the corresponding
-    // function result. The shape is given by grouping the differentiated argument shape with
-    // the corresponding function result shape.
-    for (size_t i = 0; i < numDiffArgs; i++) {
-        assert(diffArgIndices[i] < callee.getNumArguments() && "invalid diff argument index");
-
-        Type diffArgType = fnType.getInput(diffArgIndices[i]);
-
-        std::vector<int64_t> diffArgShape;
-        if (auto tensorType = diffArgType.dyn_cast<TensorType>()) {
-            diffArgShape.reserve(tensorType.getRank());
-            diffArgShape.insert(diffArgShape.end(), tensorType.getShape().begin(),
-                                tensorType.getShape().end());
+        std::vector<int64_t> resShape;
+        auto tensorType = fnResType.dyn_cast<TensorType>();
+        if (tensorType) {
+            resShape.reserve(tensorType.getRank());
+            resShape.insert(resShape.end(), tensorType.getShape().begin(),
+                            tensorType.getShape().end());
         }
 
-        for (size_t j = 0; j < numFnResults; j++) {
-            Type fnResType = fnType.getResult(j);
+        for (size_t i = 0; i < numDiffArgs; i++) {
+            assert(diffArgIndices[i] < callee.getNumArguments() && "invalid diff argument index");
 
-            std::vector<int64_t> gradResShape = diffArgShape;
-            auto tensorType = fnResType.dyn_cast<TensorType>();
-            if (tensorType) {
-                gradResShape.reserve(diffArgShape.size() + tensorType.getRank());
+            std::vector<int64_t> gradResShape = resShape;
+            Type diffArgType = fnType.getInput(diffArgIndices[i]);
+            if (auto tensorType = diffArgType.dyn_cast<TensorType>()) {
+                gradResShape.reserve(resShape.size() + tensorType.getRank());
                 gradResShape.insert(gradResShape.end(), tensorType.getShape().begin(),
                                     tensorType.getShape().end());
                 fnResType = tensorType.getElementType();
+            }
+            else {
+                fnResType = diffArgType;
             }
 
             Type gradResType = !gradResShape.empty() || tensorType

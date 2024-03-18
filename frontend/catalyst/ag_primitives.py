@@ -21,42 +21,66 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-
-# Use tensorflow implementations for handling function scopes and calls,
-# as well as various utility objects.
 import pennylane as qml
-import tensorflow.python.autograph.impl.api as tf_autograph_api
-from tensorflow.python.autograph.core import config
-from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
-from tensorflow.python.autograph.core.converter import ConversionOptions
-from tensorflow.python.autograph.core.function_wrappers import (
-    FunctionScope,
-    with_function_scope,
-)
-from tensorflow.python.autograph.impl.api import autograph_artifact
-from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
-from tensorflow.python.autograph.operators.variables import (
-    Undefined,
-    UndefinedReturnValue,
-)
-from tensorflow.python.autograph.pyct.origin_info import LineLocation
+from malt.core import config as ag_config
+from malt.impl import api as ag_api
+from malt.impl.api import converted_call as ag_converted_call
+from malt.operators import py_builtins as ag_py_builtins
+from malt.operators.variables import Undefined
+from malt.pyct.origin_info import LineLocation
+from pennylane.queuing import AnnotatedQueue
 
 import catalyst
-from catalyst.ag_utils import AutoGraphError
+from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
+from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
 __all__ = [
-    "STD",
-    "ConversionOptions",
-    "Undefined",
-    "UndefinedReturnValue",
-    "autograph_artifact",
-    "FunctionScope",
-    "with_function_scope",
     "if_stmt",
     "for_stmt",
+    "while_stmt",
     "converted_call",
+    "and_",
+    "or_",
+    "not_",
 ]
+
+
+def get_program_length(reference_tracers):
+    """Get the current number of instructions of the quantum and classical program."""
+
+    num_jaxpr_eqns, num_tape_ops = 0, 0
+
+    if EvaluationContext.is_tracing():  # pragma: no branch
+        jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
+        num_jaxpr_eqns = len(jaxpr_frame.eqns)
+
+    if EvaluationContext.is_quantum_tracing():
+        quantum_queue = EvaluationContext.find_quantum_queue()
+        # Using the the class methods directly allows this to work for both
+        # QuantumTape & AnnotatedQueue instances.
+        # pylint: disable=unnecessary-dunder-call
+        num_tape_ops = AnnotatedQueue.__len__(quantum_queue)
+
+    return num_jaxpr_eqns, num_tape_ops
+
+
+def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
+    """Reset the quantum and classical program back to a given length."""
+
+    if EvaluationContext.is_tracing():  # pragma: no branch
+        jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
+        while len(jaxpr_frame.eqns) > num_jaxpr_eqns:
+            jaxpr_frame.eqns.pop()
+
+    if EvaluationContext.is_quantum_tracing():
+        quantum_queue = EvaluationContext.find_quantum_queue()
+        # Using the the class methods directly allows this to work for both
+        # QuantumTape & AnnotatedQueue instances.
+        # pylint: disable=unnecessary-dunder-call
+        while AnnotatedQueue.__len__(quantum_queue) > num_tape_ops:
+            AnnotatedQueue.popitem(quantum_queue)
 
 
 def assert_results(results, var_names):
@@ -102,15 +126,11 @@ def if_stmt(
         results = get_state()
         return assert_results(results, symbol_names)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
     results = functional_cond()
-    if not isinstance(results, tuple):
-        results = (results,)
     set_state(results)
 
 
-def assert_for_loop_inputs(inputs, iterate_names):
+def assert_iteration_inputs(inputs, symbol_names):
     """All loop carried values, variables that are updated each iteration or accessed after the
     loop terminates, need to be initialized prior to entering the loop.
 
@@ -137,7 +157,7 @@ def assert_for_loop_inputs(inputs, iterate_names):
             jax.api_util.shaped_abstractify(inp)
         except TypeError as e:
             raise AutoGraphError(
-                f"The variable '{iterate_names[i]}' was initialized with type {type(inp)}, "
+                f"The variable '{symbol_names[i]}' was initialized with type {type(inp)}, "
                 "which is not compatible with JAX. Typically, this is the case for non-numeric "
                 "values.\n"
                 "You may still use such a variable as a constant inside a loop, but it cannot "
@@ -146,7 +166,7 @@ def assert_for_loop_inputs(inputs, iterate_names):
             ) from e
 
 
-def assert_for_loop_results(inputs, outputs, iterate_names):
+def assert_iteration_results(inputs, outputs, symbol_names):
     """The results of a for loop should have the identical type as the inputs, since they are
     "passed" as inputs to the next iteration. A mismatch here may indicate that a loop carried
     variable was initialized with wrong type.
@@ -156,20 +176,29 @@ def assert_for_loop_results(inputs, outputs, iterate_names):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
-                f"The variable '{iterate_names[i]}' was initialized with the wrong type. "
+                f"The variable '{symbol_names[i]}' was initialized with the wrong type, or you may "
+                f"be trying to change its type from one iteration to the next. "
                 f"Expected: {out_t}, Got: {inp_t}"
             )
 
 
 def _call_catalyst_for(
-    start, stop, step, body_fn, get_state, set_state, opts, enum_start=None, array_iterable=None
+    start,
+    stop,
+    step,
+    body_fn,
+    get_state,
+    set_state,
+    symbol_names,
+    enum_start=None,
+    array_iterable=None,
 ):
     """Dispatch to a Catalyst implementation of for loops."""
 
     # Ensure iteration arguments are properly initialized. We cannot process uninitialized
     # loop carried values as we need their type information for tracing.
     init_iter_args = get_state()
-    assert_for_loop_inputs(init_iter_args, opts["iterate_names"])
+    assert_iteration_inputs(init_iter_args, symbol_names)
 
     @catalyst.for_loop(start, stop, step)
     def functional_for(i, *iter_args):
@@ -193,7 +222,7 @@ def _call_catalyst_for(
         return get_state()
 
     final_iter_args = functional_for(*init_iter_args)
-    assert_for_loop_results(init_iter_args, final_iter_args, opts["iterate_names"])
+    assert_iteration_results(init_iter_args, final_iter_args, symbol_names)
     return final_iter_args
 
 
@@ -212,8 +241,8 @@ def for_stmt(
     body_fn: Callable[[int], None],
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
-    _symbol_names: Tuple[str],
-    opts: dict,
+    symbol_names: Tuple[str],
+    _opts: dict,
 ):
     """An implementation of the AutoGraph 'for .. in ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
@@ -239,6 +268,7 @@ def for_stmt(
     #      to succeed, for example because they forgot to use a list instead of an array
     fallback = False
     init_state = get_state()
+    assert len(init_state) == len(symbol_names)
 
     if isinstance(iteration_target, CRange):
         start, stop, step = iteration_target.get_raw_range()
@@ -274,20 +304,33 @@ def for_stmt(
 
     # Attempt to trace the Catalyst for loop.
     if not fallback:
+        reference_tracers = (start, stop, step, *init_state)
+        num_instructions = get_program_length(reference_tracers)
+
         try:
             set_state(init_state)
             results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, set_state, opts, enum_start, iteration_array
+                start,
+                stop,
+                step,
+                body_fn,
+                get_state,
+                set_state,
+                symbol_names,
+                enum_start,
+                iteration_array,
             )
+
         except Exception as e:  # pylint: disable=broad-exception-caught
             if catalyst.autograph_strict_conversion:
                 raise e
 
+            fallback = True
+            reset_program_to_length(reference_tracers, *num_instructions)
+
             # pylint: disable=import-outside-toplevel
             import inspect
             import textwrap
-
-            fallback = True
 
             for_loop_info = get_source_code_info(inspect.stack()[1])
 
@@ -315,11 +358,96 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-    if not isinstance(results, tuple):
-        results = (results,)
     set_state(results)
+
+
+def _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names):
+    """Dispatch to a Catalyst implementation of while loops."""
+
+    init_iter_args = get_state()
+    assert_iteration_inputs(init_iter_args, symbol_names)
+
+    def test(state):
+        old = get_state()
+        set_state(state)
+        res = loop_test()
+        set_state(old)
+        return res
+
+    @catalyst.while_loop(test)
+    def functional_while(iter_args):
+        set_state(iter_args)
+        loop_body()
+        return get_state()
+
+    final_iter_args = functional_while(init_iter_args)
+    assert_iteration_results(init_iter_args, final_iter_args, symbol_names)
+    return final_iter_args
+
+
+def _call_python_while(loop_test, loop_body, get_state, _set_state):
+    """Fallback to a Python implementation of while loops."""
+
+    while loop_test():
+        loop_body()
+
+    return get_state()
+
+
+def while_stmt(loop_test, loop_body, get_state, set_state, symbol_names, _opts):
+    """An implementation of the AutoGraph 'while ..' statement. The interface is defined by
+    AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
+
+    fallback = False
+    init_state = get_state()
+
+    reference_tracers = init_state
+    num_instructions = get_program_length(reference_tracers)
+
+    try:
+        results = _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names)
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if catalyst.autograph_strict_conversion:
+            raise e
+
+        fallback = True
+        reset_program_to_length(reference_tracers, *num_instructions)
+
+    if fallback:
+        set_state(init_state)
+        results = _call_python_while(loop_test, loop_body, get_state, set_state)
+
+    set_state(results)
+
+
+def _logical_op(*args, jax_fn, python_fn):
+    values = [f() for f in args]
+
+    def _is_array_tracer(x: Any) -> bool:
+        return isinstance(x, DynamicJaxprTracer) and isinstance(x.aval, ShapedArray)
+
+    if all(_is_array_tracer(val) for val in values):
+        result = jax_fn(*values)
+    else:
+        result = python_fn(*values)
+
+    return result
+
+
+def and_(a, b):
+    """An implementation of the AutoGraph '.. and ..' statement."""
+    return _logical_op(a, b, jax_fn=jnp.logical_and, python_fn=lambda a, b: a and b)
+
+
+def or_(a, b):
+    """An implementation of the AutoGraph '.. or ..' statement."""
+    return _logical_op(a, b, jax_fn=jnp.logical_or, python_fn=lambda a, b: a or b)
+
+
+def not_(arg):
+    """An implementation of the AutoGraph '.. not ..' statement."""
+    return _logical_op(lambda: arg, jax_fn=jnp.logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):
@@ -375,28 +503,45 @@ def get_source_code_info(tb_frame):
 # issues such as always tracing through code that should only be executed conditionally. We might
 # have to be even more restrictive in the future to prevent issues if necessary.
 module_allowlist = (
-    config.DoNotConvert("pennylane"),
-    config.DoNotConvert("catalyst"),
-    config.DoNotConvert("jax"),
-) + config.CONVERSION_RULES
+    ag_config.DoNotConvert("pennylane"),
+    ag_config.DoNotConvert("catalyst"),
+    ag_config.DoNotConvert("jax"),
+    *ag_config.CONVERSION_RULES,
+)
 
 
 def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
     """We want AutoGraph to use our own instance of the AST transformer when recursively
     transforming functions, but otherwise duplicate the same behaviour."""
 
+    # TODO: eliminate the need for patching by improving the autograph interface
     with Patcher(
-        (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
-        (config, "CONVERSION_RULES", module_allowlist),
+        (ag_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
+        (ag_config, "CONVERSION_RULES", module_allowlist),
+        (ag_py_builtins, "BUILTIN_FUNCTIONS_MAP", py_builtins_map),
     ):
-        # Dispatch range calls to a custom range class that enables constructs like
-        # `for .. in range(..)` to be converted natively to `for_loop` calls. This is beneficial
-        # since the Python range function does not allow tracers as arguments.
-        if fn is range:
-            return CRange(*args, **(kwargs if kwargs is not None else {}))
-        elif fn is enumerate:
-            return CEnumerate(*args, **(kwargs if kwargs is not None else {}))
+        # HOTFIX: pass through calls of known Catalyst wrapper functions
+        if fn in (
+            catalyst.adjoint,
+            catalyst.ctrl,
+            catalyst.grad,
+            catalyst.jacobian,
+            catalyst.vjp,
+            catalyst.jvp,
+        ):
+            assert args and callable(args[0])
+            wrapped_fn = args[0]
 
+            def passthrough_wrapper(*args, **kwargs):
+                return converted_call(wrapped_fn, args, kwargs, caller_fn_scope, options)
+
+            return fn(
+                passthrough_wrapper,
+                *args[1:],
+                **(kwargs if kwargs is not None else {}),
+            )
+
+        # TODO: find a way to handle custom decorators more effectively with autograph
         # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
         # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
         # than the QNode or QJIT call method.
@@ -412,12 +557,12 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
             @functools.wraps(fn.func)
             def qnode_call_wrapper():
-                return tf_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
+                return ag_converted_call(fn.func, args, kwargs, caller_fn_scope, options)
 
             new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
             return new_qnode()
 
-        return tf_converted_call(fn, args, kwargs, caller_fn_scope, options)
+        return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
 
 class CRange:
@@ -506,3 +651,10 @@ class CEnumerate(enumerate):
     def __init__(self, iterable, start=0):
         self.iteration_target = iterable
         self.start_idx = start
+
+
+py_builtins_map = {
+    **ag_py_builtins.BUILTIN_FUNCTIONS_MAP,
+    "range": CRange,
+    "enumerate": CEnumerate,
+}

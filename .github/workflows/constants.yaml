@@ -2,6 +2,15 @@ name: Set constants
 
 on:
   workflow_call:
+    inputs:
+      multiple_compilers:
+        required: false
+        default: false
+        type: boolean
+      use_release_tag:
+        required: false
+        default: false
+        type: boolean
     outputs:
       llvm_version:
         description: "LLVM version"
@@ -21,6 +30,17 @@ on:
       rt_backends:
         description: "List of backends."
         value: ${{ jobs.set-constants.outputs.rt_backends }}
+      compilers:
+        description: "List of compilers to test Catalyst builds with."
+        value: ${{ jobs.set-constants.outputs.compilers }}
+      c_compiler.gcc:
+        value: gcc
+      c_compiler.clang:
+        value: clang
+      cxx_compiler.gcc:
+        value: g++
+      cxx_compiler.clang:
+        value: clang++
 
 jobs:
   set-constants:
@@ -29,6 +49,11 @@ jobs:
     steps:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - if: ${{ inputs.use_release_tag }}
+        run: |
+          git checkout $(git tag | sort -V | tail -1)
 
       - name: LLVM version
         id: llvm_version
@@ -45,7 +70,7 @@ jobs:
       - name: Python versions
         id: python_versions
         run: |
-          echo 'python_versions=["3.9", "3.10", "3.11"]' >> $GITHUB_OUTPUT
+          echo 'python_versions=["3.9", "3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
 
       - name: Primary Python version
         id: primary_python_version
@@ -56,6 +81,18 @@ jobs:
         id: rt_backends
         run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm"]' >> $GITHUB_OUTPUT
 
+      - name: Compilers (All)
+        id: compilers
+        run: |
+          # TODO: add Clang after https://github.com/actions/runner-images/issues/8659 is fixed
+          if [[ $MULTIPLE ]]; then
+            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
+          else
+            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
+          fi
+        env:
+          MULTIPLE: ${{ inputs.multiple_compilers }}
+
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
       mhlo_version: ${{ steps.mhlo_version.outputs.mhlo_version }}
@@ -63,3 +100,4 @@ jobs:
       python_versions: ${{ steps.python_versions.outputs.python_versions }}
       primary_python_version: ${{ steps.primary_python_version.outputs.primary_python_version }}
       rt_backends: ${{ steps.rt_backends.outputs.rt_backends }}
+      compilers: ${{ steps.compilers.outputs.compilers }}

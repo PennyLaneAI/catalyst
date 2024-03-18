@@ -18,6 +18,7 @@ import pennylane as qml
 from pennylane.operation import Operation
 
 from catalyst import measure, qjit
+from catalyst.compiler import get_lib_path
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
@@ -49,13 +50,23 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     operations = lightning.operations.copy()
     observables = lightning.observables.copy()
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+    ):
         self.backend_name = backend_name if backend_name else "default"
+        self.backend_lib = backend_lib if backend_lib else "default"
         self.backend_kwargs = backend_kwargs if backend_kwargs else ""
-        super().__init__(wires=wires, shots=shots)
+        self.backend_path = CustomDeviceWithoutSupport.get_c_interface()
+        super().__init__(shots=shots, wires=wires)
 
     def apply(self, operations, **kwargs):
         pass
+
+    @staticmethod
+    def get_c_interface():
+        """Location to shared object with C/C++ implementation"""
+        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
 operations = lightning.operations.copy()
@@ -68,6 +79,9 @@ class CustomDeviceWithSupport(CustomDeviceWithoutSupport):
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
+        self.backend_name = "default"
+        self.backend_kwargs = ""
+        self.backend_path = CustomDeviceWithoutSupport.get_c_interface()
 
 
 # lightning does not support PauliRot, so it will be decomposed

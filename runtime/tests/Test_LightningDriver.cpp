@@ -57,7 +57,7 @@ TEST_CASE("Test parse_kwargs coverage", "[Utils]")
 
 TEST_CASE("Test Driver", "[Driver]")
 {
-    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>();
 
     // check the scope of memory-manager
     CHECK(driver->getMemoryManager() != nullptr);
@@ -66,11 +66,7 @@ TEST_CASE("Test Driver", "[Driver]")
     CHECK(driver->getDeviceRecorderStatus() == false);
 
     // check device specs update
-    driver->setDeviceRecorder(true);
-    driver->setDeviceKwArgs("execute=openmp;");
-    CHECK(driver->initDevice("default") == false);
-    CHECK(driver->getDevice() == nullptr);
-    CHECK(driver->getDeviceKwArgs() == "execute=openmp;");
+    driver->setDeviceRecorderStatus(true);
     CHECK(driver->getDeviceRecorderStatus() == true);
 }
 
@@ -156,11 +152,25 @@ TEMPLATE_LIST_TEST_CASE("test AllocateQubits", "[Driver]", SimTypes)
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("test multiple AllocateQubits", "[Driver]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    auto &&q1 = sim->AllocateQubits(2);
+    CHECK(q1[0] == 0);
+    CHECK(q1[1] == 1);
+
+    auto &&q2 = sim->AllocateQubits(3);
+    CHECK(q2.size() == 3);
+    CHECK(q2[0] == 2);
+    CHECK(q2[2] == 4);
+}
+
 TEMPLATE_LIST_TEST_CASE("test DeviceShots", "[Driver]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-    CHECK(sim->GetDeviceShots() == 1000);
+    CHECK(sim->GetDeviceShots() == 0);
 
     sim->SetDeviceShots(500);
 
@@ -254,4 +264,28 @@ TEMPLATE_TEST_CASE("QuantumDevice object test [lightning.qubit]", "[Driver]", Li
         CHECK(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 20, 21, ..., 29
     }
+}
+
+TEMPLATE_LIST_TEST_CASE("Check re-AllocateQubit", "[Driver]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    sim->AllocateQubit();
+    sim->NamedOperation("Hadamard", {}, {0}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+    CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(0.707107).epsilon(1e-5));
+
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+    sim->AllocateQubit();
+
+    state = std::vector<std::complex<double>>(1U << sim->GetNumQubits());
+    view = DataView<std::complex<double>, 1>(state);
+    sim->State(view);
+    CHECK(state[0].real() == Approx(0.707107).epsilon(1e-5));
+    CHECK(state[8].real() == Approx(0.707107).epsilon(1e-5));
 }

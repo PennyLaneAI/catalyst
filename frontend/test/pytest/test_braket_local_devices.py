@@ -17,6 +17,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from numpy.testing import assert_allclose
 
 from catalyst import grad, qjit
 
@@ -113,30 +114,6 @@ class TestBraketGates:
             ),
         ],
     )
-    def test_unsupported_gate_braket(self, device):
-        """Test an unsupported gate on braket devices."""
-
-        def circuit():
-            qml.MultiRZ(np.pi / 2, wires=[0, 1, 2])
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
-
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
-
-        with pytest.raises(
-            RuntimeError, match="The given QIR gate name is not supported by the OpenQASM builder."
-        ):
-            qjit_fn()
-
-    @pytest.mark.parametrize(
-        "device",
-        [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=3,
-            ),
-        ],
-    )
     def test_param_braket(self, device):
         """Test param operations on braket devices."""
 
@@ -153,6 +130,8 @@ class TestBraketGates:
 
             qml.PhaseShift(x, wires=0)
             qml.PhaseShift(y, wires=1)
+
+            qml.PSWAP(x, wires=[0, 2])
 
             return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 
@@ -821,7 +800,7 @@ class TestBraketGradient:
             i = qml.grad(h, argnum=0)
             return i(x)
 
-        assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp), rtol=0.1)
+        assert_allclose(compiled_grad_default(inp), interpretted_grad_default(inp), rtol=0.1)
 
 
 if __name__ == "__main__":

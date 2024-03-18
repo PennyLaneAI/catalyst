@@ -24,6 +24,7 @@
 #include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -82,7 +83,10 @@ class AdjointGenerator {
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
             LLVM_DEBUG(dbgs() << "generating adjoint for: " << op << "\n");
-            if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+            if (auto callOp = dyn_cast<func::CallOp>(op)) {
+                visitOperation(callOp, builder);
+            }
+            else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 visitOperation(forOp, builder);
             }
             else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
@@ -161,14 +165,16 @@ class AdjointGenerator {
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
             OpBuilder::InsertionGuard insertionGuard(builder);
             builder.setInsertionPoint(clone);
-            SmallVector<Value> cachedParams;
             ValueRange params = parametrizedGate.getAllParams();
-            for (Value param : params) {
+            size_t numParams = params.size();
+            SmallVector<Value> cachedParams(numParams);
+            // popping gives the parameters in reverse
+            for (auto [idx, param] : llvm::enumerate(llvm::reverse(params))) {
                 Type paramType = param.getType();
                 verifyTypeIsCacheable(paramType, operation);
                 if (paramType.isF64()) {
-                    cachedParams.push_back(
-                        builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector));
+                    cachedParams[numParams - 1 - idx] =
+                        builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector);
                     continue;
                 }
 
@@ -252,7 +258,7 @@ class AdjointGenerator {
                 }
 
                 Value recreatedTensor = iForLoop.getResult(0);
-                cachedParams.push_back(recreatedTensor);
+                cachedParams[numParams - 1 - idx] = recreatedTensor;
             }
             MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
                 .assign(cachedParams);
@@ -262,6 +268,103 @@ class AdjointGenerator {
              llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
             remappedValues.map(qubitOperand, qubitResult);
         }
+    }
+
+    void visitOperation(func::CallOp callOp, OpBuilder &builder)
+    {
+        // Get the the original function
+        SymbolRefAttr symbol = dyn_cast_if_present<SymbolRefAttr>(callOp.getCallableForCallee());
+        func::FuncOp funcOp =
+            dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupNearestSymbolFrom(callOp, symbol));
+        assert(funcOp != nullptr && "The funcOp is null and therefore not supported.");
+
+        auto resultTypes = funcOp.getResultTypes();
+        bool multiReturns = resultTypes.size() > 1;
+
+        bool quantum = std::any_of(resultTypes.begin(), resultTypes.end(),
+                                   [](const auto &value) { return isa<QuregType>(value); });
+        assert(!(quantum && multiReturns) && "Adjoint does not support functions with multiple "
+                                             "returns that contain a quantum register.");
+
+        if (!quantum) {
+            // This operation is purely classical
+            return;
+        }
+
+        // Save the insertion point to come back to it after creating the adjoint of the function
+        auto insertionSaved = builder.saveInsertionPoint();
+        MLIRContext *ctx = builder.getContext();
+
+        // Create the adjoint of the original function at the module level
+        ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
+        builder.setInsertionPointToStart(moduleOp.getBody());
+
+        Block *originalBlock = &funcOp.front();
+        Operation *originalTerminator = originalBlock->getTerminator();
+        ValueRange originalArguments = originalBlock->getArguments();
+
+        // Get the arguments and outputs types from the original function (same signature)
+        FunctionType adjointFnType =
+            FunctionType::get(ctx, /*inputs=*/
+                              originalArguments.getTypes(),
+                              /*outputs=*/originalTerminator->getOperandTypes());
+        std::string adjointName = funcOp.getName().str() + ".adjoint";
+        Location loc = funcOp.getLoc();
+        func::FuncOp adjointFnOp = builder.create<func::FuncOp>(loc, adjointName, adjointFnType);
+        adjointFnOp.setPrivate();
+
+        // Create the block of the adjoint function
+        Block *adjointFnBlock = adjointFnOp.addEntryBlock();
+        builder.setInsertionPointToStart(adjointFnBlock);
+        Type qregType = quantum::QuregType::get(builder.getContext());
+        auto argumentsSize = adjointFnOp.getArguments().size();
+
+        // The last argument is the quantum register
+        Value lastArg = adjointFnOp.getArgument(argumentsSize - 1);
+        assert(isa<QuregType>(lastArg.getType()) &&
+               "The last argument of the function must be the quantum register.");
+        quantum::AdjointOp adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, lastArg);
+
+        Region *adjointRegion = &adjointOp.getRegion();
+        Region &originalRegion = funcOp.getRegion();
+
+        // Map the arguments with the original function
+        IRMapping map;
+        for (size_t i = 0; i < funcOp.getArguments().size() - 1; i++) {
+            Value arg = adjointFnOp.front().getArgument(i);
+            Value argBlock = originalRegion.front().getArgument(i);
+            map.map(argBlock, arg);
+        }
+
+        // Copy the original region in the adjoint region
+        originalRegion.cloneInto(adjointRegion, map);
+
+        // Replace the return of the quantum register with a quantum yield
+        auto terminator = adjointRegion->front().getTerminator();
+        ValueRange res = terminator->getOperands();
+        TypeRange resTypes = terminator->getResultTypes();
+        builder.setInsertionPointAfter(terminator);
+        builder.create<quantum::YieldOp>(loc, resTypes, res);
+
+        // Return the adjoint operation in the adjoint function
+        IRRewriter rewriter(builder);
+        rewriter.eraseOp(terminator);
+        builder.setInsertionPointAfter(adjointOp);
+        builder.create<func::ReturnOp>(loc, adjointOp.getResult());
+
+        // Leave the adjoint func op to go back at the saved insertion
+        builder.restoreInsertionPoint(insertionSaved);
+
+        // Get the reversed result
+        Value reversedResult = remappedValues.lookup(getQuantumReg(callOp.getResults()).value());
+        std::vector<Value> args = {callOp.getArgOperands().begin(), callOp.getArgOperands().end()};
+        args.pop_back();
+        args.push_back(reversedResult);
+        // Call the adjoint func op
+        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
+        ValueRange initQreg = callOp.getArgOperands();
+        // Map the initial quantum register with the adjoint result
+        remappedValues.map(getQuantumReg(initQreg).value(), adjointCallOp.getResult(0));
     }
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder)
@@ -391,7 +494,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
     {
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
         auto cache = QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());
-
         // First, copy the classical computations directly to the target insertion point.
         IRMapping oldToCloned;
         AugmentedCircuitGenerator augmentedGenerator{oldToCloned, cache};
@@ -410,7 +512,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
         // Explicitly free the memory of the caches.
         cache.emitDealloc(rewriter, adjoint.getLoc());
-
         // The final register is the re-mapped region argument of the original adjoint op.
         SmallVector<Value> reversedOutputs;
         for (BlockArgument arg : adjoint.getRegion().getArguments()) {

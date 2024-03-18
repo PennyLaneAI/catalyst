@@ -34,7 +34,9 @@ def f(arg0: float, arg1: int, arg2: int):
     # CHECK:   [[q_w1_0:%.+]] = quantum.extract [[reg1]][[[w1_0]]]
     # CHECK:   [[mres:%.+]], [[out_qubit:%.+]] = quantum.measure [[q_w1_0]]
     m = measure(wires=[arg2])
-    # CHECK:   quantum.dealloc [[reg0]]
+    # CHECK:   [[w2:%.+]] = tensor.extract %arg2
+    # CHECK:   [[reg2:%.+]] = quantum.insert [[reg1]][[[w2]]], [[out_qubit]] : !quantum.reg, !quantum.bit
+    # CHECK:   quantum.dealloc [[reg2]]
     # CHECK:   return
     return m
 

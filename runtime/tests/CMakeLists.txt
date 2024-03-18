@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(lightning_qir_runtime_tests)
 
+
 set(CMAKE_CXX_STANDARD 20)
 
 Include(FetchContent)
@@ -14,16 +15,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-# Required for catch_discover_tests().
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
-
-# Modify `ctest` to only run the supported subset of tests.
-include(CTest)
-include(Catch)
-
-add_executable(runner_tests runner_main.cpp)
-
-if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
 
 if(pybind11_FOUND)
@@ -43,48 +34,84 @@ else()
     FetchContent_MakeAvailable(pybind11)
 endif()
 
-# To avoid link to libpython, we use pybind11::module interface library.
-target_link_libraries(runner_tests PRIVATE pybind11::embed)
+# Required for catch_discover_tests().
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
 
+# Modify `ctest` to only run the supported subset of tests.
+include(CTest)
+include(Catch)
+
+if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
+    add_executable(runner_tests_lightning runner_main.cpp)
+
+    add_subdirectory(third_party)
+
+    # Skip dynamic device loading test when sanitizers are enabled or when building on mac,
+    # due to the fact that our current support is not fully compatible on macOS.
+    # RTLD_DEEPBIND incompatibility.
+    if (ENABLE_ADDRESS_SANITIZER OR APPLE)
+        set(dl_manager_tests "")
+    else()
+        # Tests which use dlopen and RTLD_DEEPBIND are incompatible with sanitizers.
+        # All tests which go through dlopen need to be tested without sanitizers.
+        # They produce the following error message:
+        # You are trying to dlopen a this-file-does-not-exist.so shared
+        # library with RTLD_DEEPBIND flag which is incompatible with sanitizer
+        # runtime (see https://github.com/google/sanitizers/issues/611 for
+        # details). If you want to run this-file-does-not-exist.so library under
+        # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
+        add_dependencies(runner_tests_lightning dummy_device)
+        set(dl_manager_tests 
+            Test_DLManager.cpp
+            )
+    endif()
+
+    target_link_libraries(runner_tests_lightning PRIVATE
+        Catch2::Catch2
+        pybind11::embed
+        catalyst_qir_runtime
+        )
+
+    target_sources(runner_tests_lightning PRIVATE ${cov_helper_src}
+        ${dl_manager_tests}
+        Test_QubitManager.cpp
+        Test_CacheManager.cpp
+        Test_LightningDriver.cpp
+        Test_LightningGateSet.cpp
+        Test_LightningCoreQIS.cpp
+        Test_LightningMeasures.cpp
+        Test_LightningGradient.cpp
+        Test_SVDynamicCPU_Core.cpp
+        Test_SVDynamicCPU_Allocation.cpp
+        )
+
+    if(KOKKOS_ENABLE_OPENMP)
+        find_package(OpenMP REQUIRED)
+        target_link_libraries(runner_tests_lightning INTERFACE OpenMP::OpenMP_CXX)
+    endif()
+
+    if(PLKOKKOS_ENABLE_NATIVE)
+        message(STATUS "ENABLE_NATIVE is ON. Use -march=native for cpptests.")
+        target_compile_options(runner_tests_lightning PRIVATE -march=native)
+    endif()
+
+    catch_discover_tests(runner_tests_lightning)
 endif()
 
-target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
-            rt_interfaces
-            Catch2::Catch2)
+if(ENABLE_OPENQASM)
+    add_executable(runner_tests_openqasm runner_main.cpp)
 
-if(ENABLE_CODE_COVERAGE)
-    set(cov_helper_src  coverage_helper.cpp)
-else()
-    set(cov_helper_src  "")
+    # To avoid link to libpython, we use pybind11::module interface library.
+    target_link_libraries(runner_tests_openqasm PRIVATE
+        Catch2::Catch2
+        pybind11::embed
+        catalyst_qir_runtime
+        )
+
+    target_sources(runner_tests_openqasm PRIVATE
+        Test_OpenQasmBuilder.cpp
+        Test_OpenQasmDevice.cpp
+        )
+
+    catch_discover_tests(runner_tests_openqasm)
 endif()
-
-if (ENABLE_OPENQASM)
-    set(openqasm_tests  Test_OpenQasmBuilder.cpp
-            Test_OpenQasmDevice.cpp)
-else()
-    set(openqasm_tests "")
-endif()
-
-target_sources(runner_tests PRIVATE ${cov_helper_src}
-            ${openqasm_tests}
-            Test_QubitManager.cpp
-            Test_CacheManager.cpp
-            Test_LightningDriver.cpp
-            Test_LightningGateSet.cpp
-            Test_LightningCoreQIS.cpp
-            Test_LightningMeasures.cpp
-            Test_LightningGradient.cpp
-            Test_SVDynamicCPU_Core.cpp
-            Test_SVDynamicCPU_Allocation.cpp)
-
-if(KOKKOS_ENABLE_OPENMP)
-    find_package(OpenMP REQUIRED)
-    target_link_libraries(runner_tests INTERFACE OpenMP::OpenMP_CXX)
-endif()
-
-if(PLKOKKOS_ENABLE_NATIVE)
-    message(STATUS "ENABLE_NATIVE is ON. Use -march=native for cpptests.")
-    target_compile_options(runner_tests PRIVATE -march=native)
-endif()
-
-catch_discover_tests(runner_tests)

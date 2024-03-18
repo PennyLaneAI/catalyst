@@ -14,17 +14,33 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
-import sys
 import traceback
+from collections import defaultdict
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.errors import TracerBoolConversionError
+from numpy.testing import assert_allclose
 
-from catalyst import cond, for_loop, measure, qjit
-from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
+from catalyst import (
+    adjoint,
+    cond,
+    ctrl,
+    debug,
+    for_loop,
+    grad,
+    jacobian,
+    jvp,
+    measure,
+    qjit,
+    vjp,
+)
+from catalyst.autograph import TRANSFORMER, AutoGraphError, autograph_source
+
+check_cache = TRANSFORMER.has_cache
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
@@ -32,15 +48,23 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=too-many-lines
 
 
-def test_unavailable(monkeypatch):
-    """Check the error produced in the absence of tensorflow."""
-    monkeypatch.setitem(sys.modules, "tensorflow", None)
+class Failing:
+    """Test class that emulates failures in user-code"""
 
-    def fn(x):
-        return x**2
+    triggered = defaultdict(bool)
 
-    with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
-        qjit(autograph=True)(fn)
+    def __init__(self, ref, label: str = "default"):
+        self.label = label
+        self.ref = ref
+
+    @property
+    def val(self):
+        """Get a reference to a variable or fail if programmed so."""
+        # pylint: disable=broad-exception-raised
+        if not Failing.triggered[self.label]:
+            Failing.triggered[self.label] = True
+            raise Exception(f"Emulated failure with label {self.label}")
+        return self.ref
 
 
 @pytest.mark.tf
@@ -135,6 +159,8 @@ class TestIntegration:
 
         class FN:
             """Test object."""
+
+            __name__ = "unknown"
 
             def __call__(self, x):
                 return x**2
@@ -275,6 +301,97 @@ class TestIntegration:
         assert check_cache(fn.original_function)
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
+
+    def test_adjoint_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
+
+        def inner(x):
+            qml.RY(x, wires=0)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def fn(x: float):
+            adjoint(inner)(x)
+            return qml.probs()
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(np.pi), [0.0, 1.0])
+
+    def test_ctrl_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
+
+        def inner(x):
+            qml.RY(x, wires=0)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def fn(x: float):
+            ctrl(inner, control=1)(x)
+            return qml.probs()
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(np.pi), [1.0, 0.0, 0.0, 0.0])
+
+    def test_grad_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'grad'."""
+
+        def inner(x):
+            return 2 * x
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return grad(inner)(x)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == 2.0
+
+    def test_jacobian_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jacobian'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return jacobian(inner)(x)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
+
+    def test_vjp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return vjp(inner, (x,), (1.0, 1.0))
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+        assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
+        assert np.allclose(fn(3)[1], jnp.array(8.0))
+
+    def test_jvp_wrapper(self):
+        """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
+
+        def inner(x):
+            return 2 * x, x**2
+
+        @qjit(autograph=True)
+        def fn(x: float):
+            return jvp(inner, (x,), (1.0,))
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(inner)
+
+        assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
+        assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
 
 @pytest.mark.tf
@@ -503,24 +620,74 @@ class TestConditionals:
         ):
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_mismatch(self, backend):
-        """Test that an exception is raised when the return types of all branches do not match."""
+    def test_branch_no_multi_return_mismatch(self, backend):
+        """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
 
+        @qjit(autograph=True)
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             if True:
                 res = measure(wires=0)
             elif False:
-                res = 0
+                res = 0.0
             else:
                 res = measure(wires=0)
 
             return res
 
-        with pytest.raises(
-            TypeError, match="Conditional requires consistent return types across all branches"
-        ):
-            qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+        assert 0.0 == circuit()
+
+    def test_multiple_return(self):
+        """Test return statements from different branches with autograph."""
+
+        @qjit(autograph=True)
+        def f(x: int):
+            if x > 0:
+                return 25
+            else:
+                return 60
+
+        assert f(1) == 25
+        assert f(0) == 60
+
+    def test_multiple_return_early(self, backend, capfd):
+        """Test that returning early is possible."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RY(x, wires=0)
+
+            m = measure(0)
+            if not m:
+                return 0
+
+            debug.print("illegal fruit")
+            return 1
+
+        assert capfd.readouterr() == ("", "")
+
+        assert f(0) == 0
+
+        assert capfd.readouterr() == ("", "")
+
+        assert f(np.pi) == 1
+
+        assert capfd.readouterr() == ("illegal fruit\n", "")
+
+    def test_multiple_return_mismatched_type(self):
+        """Test that different obervables cannot be used in different branches."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(switch: bool):
+            if switch:
+                return qml.expval(qml.PauliY(0))
+
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(TypeError, match="requires a consistent return structure"):
+            qjit(autograph=True)(f)
 
 
 @pytest.mark.tf
@@ -1078,8 +1245,392 @@ class TestForLoops:
 
 
 @pytest.mark.tf
+class TestWhileLoops:
+    """Test that the autograph transformations produce correct results on while loops."""
+
+    @pytest.mark.parametrize(
+        "init,inc,expected", [(0, 1, 3), (0.0, 1.0, 3.0), (0.0 + 0j, 1.0 + 0j, 3.0 + 0j)]
+    )
+    def test_whileloop_basic(self, monkeypatch, init, inc, expected):
+        """Test basic while-loop functionality"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(limit):
+            i = init
+            while i < limit:
+                i += inc
+            return i
+
+        result = f(expected)
+        assert result == expected
+
+    def test_whileloop_multiple_variables(self, monkeypatch):
+        """Test while-loop with a multiple state variables"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            a = 0
+            b = 0
+            while a < param:
+                a += 1
+                b += 1
+            return b
+
+        result = f(3)
+        assert result == 3
+
+    def test_whileloop_qjit(self, monkeypatch):
+        """Test while-loop used with qml calls"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(p):
+            w = int(0)
+            while w < 4:
+                qml.RY(p, wires=w)
+                p *= 0.5
+                w += 1
+            return qml.probs()
+
+        result = f(2.0**4)
+        expected = jnp.array(
+            # fmt:off
+            [
+                0.00045727, 0.00110912, 0.0021832, 0.0052954,
+                0.000613, 0.00148684, 0.00292669, 0.00709874,
+                0.02114249, 0.0512815, 0.10094267, 0.24483834,
+                0.02834256, 0.06874542, 0.13531871, 0.32821807,
+            ]
+            # fmt:on
+        )
+        assert_allclose(result, expected, rtol=1e-6, atol=1e-6)
+
+    def test_whileloop_temporary_variable(self, monkeypatch):
+        """Test that temporary (local) variables can be initialized inside a while loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 3:
+                c = 2
+                acc = acc + c
+
+            return acc
+
+        assert f1() == 4
+
+    def test_whileloop_forloop_interop(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = acc + 1
+                for x in [1, 2, 3]:
+                    acc += x
+            return acc
+
+        assert f1() == 0 + 1 + sum([1, 2, 3])
+
+    def test_whileloop_cond_interop(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            while acc < 5:
+                if acc < 2:
+                    acc += 1
+                else:
+                    acc += 2
+            return acc
+
+        assert f1() == sum([1, 1, 2, 2])
+
+    @pytest.mark.xfail(reason="this won't run warning-free until we fix the resource warning issue")
+    @pytest.mark.filterwarnings("error")
+    def test_whileloop_no_warning(self, monkeypatch):
+        """Test the absence of warnings if fallbacks are ignored."""
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+
+        @qjit(autograph=True)
+        def f():
+            acc = 0
+            while Failing(acc).val < 5:
+                acc = acc + 1
+            return acc
+
+        assert f() == 5
+
+    def test_whileloop_exception(self, monkeypatch):
+        """Test for-loop error if strict-conversion is enabled."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f1():
+            acc = 0
+            while acc < 5:
+                raise RuntimeError("Test failure")
+            return acc
+
+        with pytest.raises(RuntimeError):
+            qjit(autograph=True)(f1)()
+
+    def test_uninitialized_variables(self, monkeypatch):
+        """Verify errors for (potentially) uninitialized loop variables."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_invalid_jax_type(self, monkeypatch):
+        """Test loop carried values initialized with an invalid JAX type."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            x = ""
+
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_mismatched_type(self, monkeypatch):
+        """Test loop carried values initialized with a mismatched type compared to the values used
+        inside the loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f(pred: bool):
+            x = 0.0
+
+            while pred:
+                x = 3
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
+            qjit(autograph=True)(f)
+
+
+@pytest.mark.tf
+@pytest.mark.parametrize(
+    "execution_context", (lambda fn: fn, qml.qnode(qml.device("lightning.qubit", wires=1)))
+)
+class TestFallback:
+    """Test that Python fallbacks still produce correct results."""
+
+    def test_postbinding_errors_for(self, execution_context):
+        """Test that errors are handled correctly if they trigger after the JAX primitive binding
+        step (e.g. during result verification), and that no errors occur after the AG tracing step
+        (e.g. during lowering) because of malformed primitives in the JAXPR.
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case, the loop primitive should be removed since the exception happens after binding.
+        """
+
+        @execution_context
+        def f():
+            arr = jnp.array([1, 2])
+            for _ in range(2):
+                # fails result verification, will trigger fallback
+                # would raise an error during lowering if left in the JAXPR
+                arr = jnp.kron(arr, arr)
+            return arr
+
+        with pytest.warns(
+            UserWarning, match="Tracing of an AutoGraph converted for loop failed with an exception"
+        ):
+            f_jit = qjit(autograph=True)(f)
+
+        arr = jnp.array([1, 2])
+        expected = jnp.kron(*([jnp.kron(arr, arr)] * 2))
+        assert np.allclose(f_jit(), expected)
+
+    def test_prebinding_errors_for(self, execution_context):
+        """Test that errors are handled correctly if they trigger before the JAX primitive binding
+        step (e.g. during argument verification).
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case no primitive should be removed since the exception happens before binding.
+        """
+
+        @execution_context
+        def f():
+            string = "hi"
+            arr = jnp.array([1, 2])
+            for _ in range(2):
+                arr = arr + 3
+            for i in range(1, 4):
+                string = string * i  # fails return type verification, triggers fallback
+            return arr, len(string)
+
+        with pytest.warns(
+            UserWarning, match="Tracing of an AutoGraph converted for loop failed with an exception"
+        ):
+            f_jit = qjit(autograph=True)(f)
+
+        results = f_jit()
+        assert np.allclose(results[0], [7, 8])
+        assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
+
+    def test_postbinding_errors_while(self, execution_context):
+        """Test that errors are handled correctly if they trigger after the JAX primitive binding
+        step (e.g. during result verification), and that no errors occur after the AG tracing step
+        (e.g. during lowering) because of malformed primitives in the JAXPR.
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case, the loop primitive should be removed since the exception happens after binding.
+        """
+
+        @qjit(autograph=True)
+        @execution_context
+        def f():
+            arr = jnp.array([1, 2])
+            while len(arr) < 16:
+                # fails result verification, will trigger fallback
+                # would raise an error during lowering if left in the JAXPR
+                arr = jnp.kron(arr, arr)
+            return arr
+
+        arr = jnp.array([1, 2])
+        result = f()
+        expected = jnp.kron(*([jnp.kron(arr, arr)] * 2))
+        assert np.allclose(result, expected)
+
+    def test_prebinding_errors_while(self, execution_context):
+        """Test that errors are handled correctly if they trigger before the JAX primitive binding
+        step (e.g. during argument verification).
+        This test ensures the primitive identification and removal works correctly on fallback. In
+        this case no primitive should be removed since the exception happens before binding.
+        """
+
+        @qjit(autograph=True)
+        @execution_context
+        def f():
+            string = "hi"
+            arr = jnp.array([1, 2])
+            i = 1
+
+            while arr[0] < 7:
+                arr = arr + 3
+
+            while len(string) < 12:
+                string = string * i  # fails return type verification, triggers fallback
+                i += 1
+
+            return arr, len(string)
+
+        results = f()
+        assert np.allclose(results[0], [7, 8])
+        assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
+
+
+@pytest.mark.tf
+class TestLogicalOps:
+    """Test logical operations: and, or, not"""
+
+    def test_logical_basics(self):
+        """Test basic logical and behavior."""
+        # pylint: disable=chained-comparison
+
+        def f1(param):
+            return param > 0.0 and param < 1.0 and param <= 2.0
+
+        def f2(param):
+            return param > 1.0 or param < 0.0 or param == 0.5
+
+        def f3(param):
+            return not param > 1.0
+
+        assert qjit(autograph=True)(f1)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f2)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f3)(0.5) == np.array(True)
+
+    # fmt:off
+    @pytest.mark.parametrize("python_object",["string", [0, 1, 2], [], {1: 2}, {}, ],)
+    # fmt:on
+    def test_logical_with_python_objects(self, python_object):
+        """Test that logical ops still work with python objects."""
+
+        @qjit(autograph=True)
+        def f():
+            r1 = True and python_object
+            assert r1 is python_object
+            r2 = False or python_object
+            assert r2 is python_object
+            r3 = not python_object
+            assert isinstance(r3, bool)
+            return 1
+
+        assert 1 == f()
+
+    def test_logical_accepts_non_scalars(self):
+        """Test that we accept logic with non-scalar tensors if both are traced"""
+
+        def f_and(a, b):
+            return a and b
+
+        def f_or(a, b):
+            return a or b
+
+        def f_not(a):
+            return not a
+
+        a, b = jnp.array([0, 1]), jnp.array([1, 1])
+        assert_allclose(qjit(autograph=True)(f_and)(a, b), jnp.logical_and(a, b))
+        assert_allclose(qjit(autograph=True)(f_or)(a, b), jnp.logical_or(a, b))
+        assert_allclose(qjit(autograph=True)(f_not)(a), jnp.logical_not(a))
+
+    @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
+    def test_logical_mixture_static_dynamic_default(self, s, d):
+        """Test the useage of a mixture of static(s) and dynamic(d) variables."""
+
+        # Here we either return bool or the dynamic object
+        assert qjit(autograph=True)(lambda d: s and d)(d) == (s and d)
+        assert qjit(autograph=True)(lambda d: s or d)(d) == (s or d)
+
+        # Here we perform boolean conversion of a tracer object
+        assert qjit(autograph=True)(lambda d: not d)(d) == (not d)
+        assert qjit(autograph=True)(lambda: not s)() == (not s)
+
+        # Cases where `d` is 1-st argument are going to fail
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d and s)(d) == (d and s)
+        with pytest.raises(TracerBoolConversionError):
+            assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
+
+
+@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
+
+    def test_force_python_fallbacks(self):
+        """Test fallback modes of control-flow primitives."""
+
+        with pytest.warns(UserWarning):
+
+            @qjit(autograph=True)
+            def f1():
+                acc = 0
+                while acc < 5:
+                    acc = Failing(acc, "while").val + 1
+                    for x in [1, 2, 3]:
+                        acc += Failing(x, "for").val
+                return acc
+
+            assert f1() == 0 + 1 + sum([1, 2, 3])
 
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
@@ -1132,6 +1683,39 @@ class TestMixed:
 
         assert f(2) == 18
         assert f(3) == 0
+
+    def test_cond_or(self, monkeypatch):
+        """Test Python conditionals in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(x):
+            if x <= 0.0 or x >= 1.0:
+                y = 1
+            else:
+                y = 0
+            return y
+
+        assert f(0) == 1
+        assert f(1) == 1
+        assert f(0.5) == 0
+
+    def test_while_and(self, monkeypatch):
+        """Test Python while-loops in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            n = 0
+            while param < 0.5 and n < 3:
+                param *= 1.5
+                n += 1
+            return n
+
+        assert f(0.4) == 1
+        assert f(0.1) == 3
 
 
 if __name__ == "__main__":

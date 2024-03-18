@@ -1,32 +1,8 @@
-if(RUNTIME_CLANG_TIDY)
-    if(NOT DEFINED CLANG_TIDY_BINARY)
-        set(CLANG_TIDY_BINARY clang-tidy)
-    endif()
-    message(STATUS "Using CLANG_TIDY_BINARY=${CLANG_TIDY_BINARY}")
-    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_BINARY};
-                         -extra-arg=-std=c++20;
-                         --use-color;
-    )
+if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
+add_subdirectory(lightning)
 endif()
-
-if(ENABLE_LIGHTNING)
-list(APPEND source_files lightning/LightningSimulator.cpp)
-endif()
-
-if(ENABLE_LIGHTNING_KOKKOS)
-    list(APPEND source_files lightning-kokkos/LightningKokkosSimulator.cpp)
-endif()
-
 if(ENABLE_OPENQASM)
-    list(APPEND source_files openqasm/OpenQasmDevice.cpp)
+add_subdirectory(openqasm)
+configure_file(openqasm/braket_local_qubit.toml braket_local_qubit.toml)
+configure_file(openqasm/braket_aws_qubit.toml braket_aws_qubit.toml)
 endif()
-
-add_library(rt_backend SHARED ${source_files})
-
-target_include_directories(rt_backend PRIVATE   ${backend_includes}
-                                                ${runtime_includes} 
-                                                ${extensions_includes})
-
-target_link_libraries(rt_backend PUBLIC ${CMAKE_DL_LIBS} rt_interfaces)
-
-set_property(TARGET rt_backend PROPERTY POSITION_INDEPENDENT_CODE ON)

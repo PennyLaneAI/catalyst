@@ -151,6 +151,8 @@ LogicalResult GradOp::verify()
     return success();
 }
 
+MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
+
 //===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -226,10 +228,12 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 LogicalResult JVPOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj")
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
+
+MutableOperandRange JVPOp::getArgOperandsMutable() { return getParamsMutable(); }
 
 //===----------------------------------------------------------------------===//
 // VJPOp, CallOpInterface
@@ -306,10 +310,12 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 LogicalResult VJPOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj")
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
+
+MutableOperandRange VJPOp::getArgOperandsMutable() { return getParamsMutable(); }
 
 //===----------------------------------------------------------------------===//
 // Backprop SymbolUserOpInterface

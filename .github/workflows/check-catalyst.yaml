@@ -14,10 +14,16 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    with:
+      multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
 
   runtime:
     name: Catalyst-Runtime Build
+    needs: [constants]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
       - name: Checkout Catalyst repo
@@ -25,29 +31,44 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          ENABLE_LIGHTNING_KOKKOS=ON \
-          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
-          ENABLE_OPENQASM=ON \
+          ENABLE_ASAN=OFF \
           make runtime
+
+          # This is needed in the artifact for the pytests
+          # Note the lack of sanitizers.
+          # Left other flags the same.
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          make dummy_device
+
 
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: runtime-build
+          name: runtime-build-${{ matrix.compiler }}
           path: |
             runtime-build/lib/*.so
+            runtime-build/lib/backend/*.toml
           retention-days: 1
 
   llvm:
     name: LLVM Build
     needs: [constants]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -77,11 +98,12 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
@@ -93,6 +115,8 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         make llvm
@@ -101,6 +125,9 @@ jobs:
     name: MHLO Dialect Build
     needs: [constants, llvm]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -127,7 +154,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -145,17 +172,20 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         COMPILER_LAUNCHER="" \
@@ -165,6 +195,9 @@ jobs:
     name: Enzyme Build
     needs: [constants, llvm]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -191,7 +224,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -209,17 +242,20 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
@@ -229,6 +265,9 @@ jobs:
     name: Quantum Dialects Build
     needs: [constants, llvm, mhlo, enzyme]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -236,6 +275,7 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
@@ -254,7 +294,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -271,7 +311,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -288,7 +328,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -305,6 +345,8 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+        CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
@@ -314,7 +356,7 @@ jobs:
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: |
           quantum-build/bin
           quantum-build/lib/lib*.so*
@@ -325,6 +367,9 @@ jobs:
     name: Frontend Tests
     needs: [constants, llvm, runtime, quantum]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -332,29 +377,34 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        # cuda-quantum is added manually here.
+        # It can't be in requirements.txt as that will break
+        # macOS requirements.txt
+        python3 -m pip install cuda-quantum
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
-        name: runtime-build
+        name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
     - name: Add Frontend Dependencies to PATH
@@ -370,7 +420,6 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        # export ASAN_OPTIONS=detect_odr_violation=0
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
         make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
@@ -390,36 +439,44 @@ jobs:
     name: Frontend Tests (backend="lightning.kokkos")
     needs: [constants, llvm, runtime, quantum]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Install lightning.kokkos used in Python tests
+      run: |
+        pip install PennyLane-Lightning-Kokkos
+
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
-        name: runtime-build
+        name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
     - name: Add Frontend Dependencies to PATH
@@ -427,10 +484,6 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-
-    - name: Install lightning.kokkos used in Python tests
-      run: |
-        pip install PennyLane-Lightning-Kokkos
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -440,6 +493,9 @@ jobs:
     name: Frontend Tests (backend="openqasm3")
     needs: [constants, llvm, runtime, quantum]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -447,36 +503,35 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev ninja-build make cmake clang
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
-        name: quantum-build
+        name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
-        name: runtime-build
+        name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
 
     - name: Install additional dependencies (OpenQasm device)
       run: |
-        # TODO: Use the latest version of boto3 after fixing the issue with
-        # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
-        pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
+        pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Add Frontend Dependencies to PATH
@@ -489,7 +544,7 @@ jobs:
       run: |
         make pytest TEST_BRAKET=LOCAL
 
-  runtime-tests:
+  runtime-device-tests:
     name: Runtime Tests (Linux)
     needs: [constants]
     runs-on: ubuntu-latest
@@ -497,13 +552,18 @@ jobs:
       fail-fast: false
       matrix:
         backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    #   - name: Collect Workflow Telemetry
+    #     uses: catchpoint/workflow-telemetry-action@v2
+
       - name: Checkout the repo
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
@@ -515,42 +575,67 @@ jobs:
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            make coverage-runtime
-            mv runtime/build/coverage.info coverage-${{ github.job }}.info
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          ENABLE_LIGHTNING_KOKKOS=OFF \
+          ENABLE_OPENQASM=OFF \
+          ENABLE_ASAN=OFF \
+          make test-runtime
 
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
-            make test-runtime
+          # ASAN fails w/ leaks, odr-violation, and double-free from Kokkos_Profiling.cpp
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          ENABLE_OPENQASM=OFF \
+          ENABLE_ASAN=OFF \
+          make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            ENABLE_OPENQASM=ON \
-            make test-runtime
-
-      - name: Upload to Codecov
-        if: ${{ matrix.backend == 'lightning' }}
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          ENABLE_LIGHTNING_KOKKOS=OFF \
+          ENABLE_ASAN=OFF \
+          make test-runtime
 
       - name: Build examples
         if: ${{ matrix.backend == 'lightning' }}
         run: |
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          COMPILER_LAUNCHER="" \
+          make examples-runtime
+
+  runtime-code-cov:
+    name: Runtime Code Coverage (Linux)
+    needs: [constants]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
+
+      - name: Build Runtime test suite for Lightning simulator
+        run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
-          make examples-runtime
+          make coverage-runtime
+          mv runtime/build/coverage.info coverage-${{ github.job }}.info
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -21,10 +21,10 @@ func.func @test_alloc_dce() {
     return
 }
 
-// CHECK-LABEL: test_alloc_no_cse
-func.func @test_alloc_no_cse() -> (!quantum.reg, !quantum.reg){
+// CHECK-LABEL: test_alloc_cse
+func.func @test_alloc_cse() -> (!quantum.reg, !quantum.reg){
     // CHECK: quantum.alloc
-    // CHECK: quantum.alloc
+    // CHECK-NOT: quantum.alloc
     %r1 = quantum.alloc(4) : !quantum.reg
     %r2 = quantum.alloc(4) : !quantum.reg
     return %r1, %r2 : !quantum.reg, !quantum.reg
@@ -105,4 +105,16 @@ func.func @test_extract_insert_constant(%r1: !quantum.reg) -> !quantum.reg {
     // CHECK: quantum.insert %{{.*}}[ 2]
     %r2 = quantum.insert %r1[%c2], %q1 : !quantum.reg, !quantum.bit
     return %r2 : !quantum.reg
+}
+
+// CHECK-LABEL: test_insert_canonicalize
+func.func @test_insert_canonicalize(%r1: !quantum.reg, %i: i64) -> !quantum.bit {
+    // CHECK:  quantum.extract
+    %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
+    // CHECK:  quantum.insert
+    %r2 = quantum.insert %r1[0], %q1 : !quantum.reg, !quantum.bit
+    %4 = quantum.custom "Hadamard"() %q1 : !quantum.bit
+    // CHECK:  quantum.dealloc
+    quantum.dealloc %r2 : !quantum.reg
+    return %4 : !quantum.bit
 }

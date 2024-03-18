@@ -10,7 +10,7 @@ extension-pkg-allow-list=catalyst.utils.wrapper
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis. It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=pennylane.ops,jaxlib.mlir.ir,jaxlib.xla_extension,tensorflow
+ignored-modules=pennylane.ops,jaxlib.mlir.ir,jaxlib.xla_extension
 
 # List of classes names for which member attributes should not be checked
 # (useful for classes with attributes dynamically set). This supports can work
@@ -18,7 +18,7 @@ ignored-modules=pennylane.ops,jaxlib.mlir.ir,jaxlib.xla_extension,tensorflow
 ; ignored-classes=
 
 # List of file/directory patters to ignore.
-ignore=test,llvm-project,mlir-hlo,.git,__pycache__,build,doc
+ignore=test,llvm-project,mlir-hlo,Enzyme,.git,__pycache__,build,doc
 
 # List of decorators that change a function's signature. Will ignore certain errors
 # like 'no-value-for-parameter' on functions with these decorators.

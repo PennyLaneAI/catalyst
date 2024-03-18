@@ -1,6 +1,8 @@
 PennyLane Python Frontend
 =========================
 
+Module: catalyst
+----------------
 
 .. currentmodule:: catalyst
 
@@ -8,3 +10,20 @@ PennyLane Python Frontend
     :no-heading:
     :include-all-objects:
     :no-inheritance-diagram:
+
+
+Module: catalyst.debug
+----------------------
+
+.. automodapi:: catalyst.debug
+    :no-heading:
+    :no-inheritance-diagram:
+    :fullname:
+
+Module: catalyst.cuda
+---------------------
+
+.. automodapi:: catalyst.cuda
+    :no-heading:
+    :no-inheritance-diagram:
+    :fullname:

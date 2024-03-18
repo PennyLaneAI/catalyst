@@ -67,4 +67,38 @@ def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
     let assemblyFormat = [{ $list attr-dict `:` type($list) `->` type($data) }];
 }
 
+def PrintOp : Catalyst_Op<"print"> {
+    let summary = "Prints numeric values or constant strings at runtime.";
+
+    let arguments = (ins
+        Optional<AnyType>:$val,
+        OptionalAttr<StrAttr>:$const_val,
+        UnitAttr:$print_descriptor
+    );
+}
+
+def CustomCallOp: Catalyst_Op<"custom_call"> {
+  let summary = "CustomCall operation";
+  let description = [{
+    Encapsulates an implementation-defined operation `call_target_name` that
+    takes `inputs` and and produces `results`.
+
+    A custom call invokes code external to Catalyst. The `inputs` are passed to the
+    external code, and the external code is expected to produce a result of the
+    given type.
+    ```
+  }];
+  let arguments = (ins
+    Variadic<AnyType>:$inputs,
+    StrAttr:$call_target_name,
+    OptionalAttr<DenseI32ArrayAttr>: $number_original_arg
+  );
+  let results = (outs Variadic<AnyType>);
+
+  let assemblyFormat = [{
+    `fn` `(`$call_target_name`)` `(` $inputs `)`
+      attr-dict `:` functional-type(operands, results)
+  }];
+}
+
 #endif // GRADIENT_OPS

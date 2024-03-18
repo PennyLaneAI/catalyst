@@ -297,19 +297,19 @@ The runtime essentially acts as a bridge between two public interfaces:
 
   .. code-block:: c
 
-    void __quantum__rt__initialize();
-    void __quantum__rt__device(int8_t *, int8_t *);
-    QUBIT *__quantum__rt__qubit_allocate();
+    void __catalyst__rt__initialize();
+    void __catalyst__rt__device(int8_t *, int8_t *);
+    QUBIT *__catalyst__rt__qubit_allocate();
 
-    void __quantum__qis__PauliX(QUBIT *);
-    void __quantum__qis__CRZ(double /*angle*/, QUBIT *, QUBIT *);
-    RESULT *__quantum__qis__Measure(QUBIT *);
+    void __catalyst__qis__PauliX(QUBIT *);
+    void __catalyst__qis__CRZ(double /*angle*/, QUBIT *, QUBIT *);
+    RESULT *__catalyst__qis__Measure(QUBIT *);
 
-    ObsIdType __quantum__qis__NamedObs(int64_t /*name_id*/, QUBIT *);
-    double __quantum__qis__Expval(ObsIdType);
-    void __quantum__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
+    ObsIdType __catalyst__qis__NamedObs(int64_t /*name_id*/, QUBIT *);
+    double __catalyst__qis__Expval(ObsIdType);
+    void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
 
-    void __quantum__qis__Gradient(int64_t, /*results*/...);
+    void __catalyst__qis__Gradient(int64_t, /*results*/...);
 
 
 - The **QuantumDevice** interface is a C++ abstract base class that devices can implement in

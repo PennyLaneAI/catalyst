@@ -22,7 +22,6 @@ func.func private @foo(%arg0: f64) -> f64
 
 gradient.grad "fd" @foo(%0) : (f64) -> f64
 gradient.grad "auto" @foo(%0) : (f64) -> f64
-gradient.grad "auto" @foo(%0) : (f64) -> f64
 
 // expected-error@+1 {{got invalid differentiation method: none}}
 gradient.grad "none" @foo(%0) : (f64) -> f64
@@ -38,8 +37,9 @@ func.func private @integer(%arg0: i64) -> f64
 
 %i0 = arith.constant 3 : i64
 
-// expected-error@+1 {{invalid numeric base type: callee operand at position 0 must be floating point to be differentiable}}
 gradient.grad "fd" @integer(%i0) : (i64) -> f64
+// expected-error@-1 {{invalid numeric base type: callee operand at position 0 must be floating point to be differentiable}}
+// expected-error@-2 {{invalid result type: grad result at position 0 must be 'i64' but got 'f64'}}
 
 // -----
 
@@ -69,9 +69,7 @@ func.func private @scalar_tensor(%arg0: f16) -> tensor<2x3xf64>
 %f1 = arith.constant 1.2 : f16
 
 gradient.grad "fd" @scalar_tensor(%f1) : (f16) -> tensor<2x3xf64>
-
-// expected-error@+1 {{invalid result type: grad result at position 0 must be 'tensor<2x3xf64>' but got 'tensor<2x3xf16>'}}
-gradient.grad "fd" @scalar_tensor(%f1) : (f16) -> tensor<2x3xf16>
+// expected-error@-1 {{invalid result type: grad result at position 0 must be 'tensor<2x3xf16>' but got 'tensor<2x3xf64>'}}
 
 // -----
 
@@ -81,8 +79,8 @@ func.func private @tensor_scalar(%arg0: tensor<3xf64>) -> f32
 %t0 = tensor.from_elements %f0, %f0, %f0 : tensor<3xf64>
 
 gradient.grad "fd" @tensor_scalar(%t0) : (tensor<3xf64>) -> tensor<3xf32>
+// expected-error@-1 {{invalid result type: grad result at position 0 must be 'tensor<3xf64>' but got 'tensor<3xf32>}}
 
-// expected-error@+1 {{invalid result type: grad result at position 0 must be 'tensor<3xf32>' but got 'f32'}}
 gradient.grad "fd" @tensor_scalar(%t0) : (tensor<3xf64>) -> f32
 
 // -----
@@ -93,8 +91,9 @@ func.func private @tensor_tensor(%arg0: tensor<3xf64>) -> tensor<2xf64>
 %t0 = tensor.from_elements %f0, %f0, %f0 : tensor<3xf64>
 
 gradient.grad "fd" @tensor_tensor(%t0) : (tensor<3xf64>) -> tensor<3x2xf64>
+// expected-error@-1 {{op invalid result type: grad result at position 0 must be 'tensor<2x3xf64>' but got 'tensor<3x2xf64>}}
 
-// expected-error@+1 {{invalid result type: grad result at position 0 must be 'tensor<3x2xf64>' but got 'tensor<2x3xf64>'}}
+
 gradient.grad "fd" @tensor_tensor(%t0) : (tensor<3xf64>) -> tensor<2x3xf64>
 
 // -----
@@ -108,7 +107,7 @@ gradient.grad "fd" @multiple_args_res(%f0, %t0)
     : (f64, tensor<3xf64>) -> (f64, tensor<2x3xf64>)
 
 gradient.grad "fd" @multiple_args_res(%f0, %t0) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>}
-    : (f64, tensor<3xf64>) -> (f64, tensor<2x3xf64>, tensor<3xf64>, tensor<3x2x3xf64>)
+    : (f64, tensor<3xf64>) -> (f64, tensor<3xf64>, tensor<2x3xf64>, tensor<2x3x3xf64>)
 
 // expected-error@+1 {{incorrect number of results in the gradient of the callee, expected 4 results but got 2}}
 gradient.grad "fd" @multiple_args_res(%f0, %t0) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>}

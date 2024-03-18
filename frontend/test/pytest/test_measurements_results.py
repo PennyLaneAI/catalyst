@@ -96,6 +96,24 @@ class TestCounts:
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
 
+    def test_count_on_2qbits_endianness(self, backend):
+        """Test counts on 2 qubits with check for endianness."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        def counts_2qbit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            return qml.counts()
+
+        expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 1000, 0])]
+        observed = counts_2qbit(np.pi, 0)
+        assert np.array_equal(observed, expected)
+
+        expected = [np.array([0, 1, 2, 3]), np.array([0, 1000, 0, 0])]
+        observed = counts_2qbit(0, np.pi)
+        assert np.array_equal(observed, expected)
+
 
 class TestExpval:
     def test_named(self, backend):
@@ -622,50 +640,6 @@ class TestOtherMeasurements:
         expected = np.array([complex(1.0, 0.0), complex(0.0, 0.0)])
         observed = state(0.0)
         assert np.array_equal(observed, expected)
-
-    def test_multiple_return_values(self, backend):
-        """Test multiple return values."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2, shots=100))
-        def all_measurements(x):
-            qml.RY(x, wires=0)
-            return (
-                qml.sample(),
-                qml.counts(),
-                qml.expval(qml.PauliZ(0)),
-                qml.var(qml.PauliZ(0)),
-                qml.probs(wires=[0, 1]),
-                qml.state(),
-            )
-
-        @qml.qnode(qml.device("default.qubit", wires=2))
-        def expected(x, measurement):
-            qml.RY(x, wires=0)
-            return qml.apply(measurement)
-
-        x = 0.7
-        result = all_measurements(x)
-
-        # qml.sample
-        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=100).shape
-
-        # qml.counts
-        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True), shots=100).keys()):
-            assert format(int(r), "02b") == e
-        assert sum(result[1][1]) == 100
-
-        # qml.expval
-        assert np.allclose(result[2], expected(x, qml.expval(qml.PauliZ(0))))
-
-        # qml.var
-        assert np.allclose(result[3], expected(x, qml.var(qml.PauliZ(0))))
-
-        # qml.probs
-        assert np.allclose(result[4], expected(x, qml.probs(wires=[0, 1])))
-
-        # qml.state
-        assert np.allclose(result[5], expected(x, qml.state()))
 
 
 class TestNewArithmeticOps:

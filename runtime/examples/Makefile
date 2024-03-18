@@ -4,7 +4,7 @@ BUILD_DIR := $(if ,$(BUILD_DIR),../build)
 
 QIR_LINK := -L$(BUILD_DIR)/lib
 QIR_RPATH := -Wl,-rpath,$(BUILD_DIR)/lib
-QIR_LIBS := -lrt_capi -lrt_backend
+QIR_LIBS := -lrt_capi
 
 .PHONY: all
 all: grad_qfunc probs_qfunc state_qfunc

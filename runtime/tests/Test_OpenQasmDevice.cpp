@@ -14,16 +14,18 @@
 
 #include "MemRefUtils.hpp"
 
+#include "ExecutionContext.hpp"
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmDevice.hpp"
 #include "OpenQasmRunner.hpp"
+#include "RuntimeCAPI.h"
+
+Catalyst::Runtime::PythonInterpreterGuard guard{};
 
 #include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime::Device;
 using BType = OpenQasm::BuilderType;
-
-OpenQasm::PythonInterpreterGuard guard{};
 
 TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
 {
@@ -78,7 +80,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 {
     SECTION("Common")
     {
-        auto device = OpenQasmDevice(false, "{shots : 100}");
+        auto device = OpenQasmDevice("{shots : 100}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -88,8 +90,8 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 
     SECTION("Braket SV1")
     {
-        auto device = OpenQasmDevice(
-            false, "{shots: 100, device_type : braket.local.qubit, backend : default}");
+        auto device =
+            OpenQasmDevice("{shots: 100, device_type : braket.local.qubit, backend : default}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -100,24 +102,21 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device =
-        std::make_unique<OpenQasmDevice>(false, "{shots : 100}");
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
 
     constexpr size_t n = 3;
     device->AllocateQubits(1);
     CHECK(device->GetNumQubits() == 1);
 
-    auto wires = device->AllocateQubits(n - 1);
-    CHECK(device->GetNumQubits() == n);
-    CHECK(wires.size() == n);
-    CHECK(wires[0] == 1);
-    CHECK(wires[n - 1] == n);
+    REQUIRE_THROWS_WITH(
+        device->AllocateQubits(n - 1),
+        Catch::Contains("[Function:AllocateQubits] Error in Catalyst Runtime: Partial qubits "
+                        "allocation is not supported by OpenQasmDevice"));
 }
 
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device =
-        std::make_unique<OpenQasmDevice>(false, "{shots : 100}");
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>("{shots : 100}");
 
     constexpr size_t n = 2;
     auto wires = device->AllocateQubits(n);
@@ -142,9 +141,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
           "[openqasm]")
 {
     constexpr size_t shots{1000};
-    constexpr bool status{false};
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        status, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{2};
     constexpr size_t size{1UL << n};
@@ -277,9 +275,10 @@ TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::B
 
 TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
-
     constexpr size_t shots{1000};
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+
     constexpr size_t n{5};
     constexpr size_t size{1UL << n};
     auto wires = device->AllocateQubits(n);
@@ -454,7 +453,8 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
 
 TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{5};
     constexpr size_t size{1UL << n};
@@ -497,9 +497,26 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
     }
 }
 
+TEST_CASE("Test PSWAP and ISWAP with BuilderType::Braket", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
+        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+
+    constexpr size_t n{2};
+    auto wires = device->AllocateQubits(n);
+
+    device->NamedOperation("Hadamard", {}, {wires[0]}, false);
+    device->NamedOperation("ISWAP", {}, {wires[0], wires[1]}, false);
+    device->NamedOperation("PSWAP", {0}, {wires[0], wires[1]}, false);
+
+    auto obs = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{1});
+    auto expval = device->Expval(obs);
+    CHECK(expval == Approx(1).margin(1e-5));
+}
+
 TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
 {
-    auto device = OpenQasmDevice(false, "{shots : 100}");
+    auto device = OpenQasmDevice("{shots : 100}");
     auto wires = device.AllocateQubits(2);
     std::vector<std::complex<double>> matrix{
         {0, 0},
@@ -510,4 +527,33 @@ TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[
 
     REQUIRE_THROWS_WITH(device.MatrixOperation(matrix, {wires[0]}, false),
                         Catch::Contains("Unsupported functionality"));
+}
+
+TEST_CASE("Test __catalyst__rt__device_init registering the OpenQasm device", "[CoreQIS]")
+{
+    __catalyst__rt__initialize();
+
+    char device_aws[30] = "braket.aws.qubit";
+
+#if __has_include("OpenQasmDevice.hpp")
+    __catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr);
+#else
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)device_aws, nullptr, nullptr),
+                        Catch::Contains("cannot open shared object file"));
+#endif
+
+    __catalyst__rt__finalize();
+
+    __catalyst__rt__initialize();
+
+    char device_local[30] = "braket.local.qubit";
+
+#if __has_include("OpenQasmDevice.hpp")
+    __catalyst__rt__device_init((int8_t *)device_local, nullptr, nullptr);
+#else
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_init((int8_t *)(int8_t *), nullptr, nullptr),
+                        Catch::Contains("cannot open shared object file"));
+#endif
+
+    __catalyst__rt__finalize();
 }

@@ -26,11 +26,30 @@ declare_mlir_dialect_python_bindings(
   dialects/gradient.py
   DIALECT_NAME gradient)
 
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/CatalystOps.td
+  SOURCES
+  dialects/catalyst.py
+  DIALECT_NAME catalyst)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/MitigationOps.td
+  SOURCES
+  dialects/mitigation.py
+  DIALECT_NAME mitigation)
+
 declare_mlir_python_extension(QuantumPythonSources.Extension
   MODULE_NAME _quantumDialects
   ADD_TO_PARENT QuantumPythonSources
   SOURCES
     QuantumExtension.cpp
+  PRIVATE_LINK_LIBS
+    LLVMSupport
+    MLIRIR
   EMBED_CAPI_LINK_LIBS
     QuantumCAPI
 )

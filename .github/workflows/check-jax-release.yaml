@@ -10,13 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  constants:
-    name: "Set build matrix"
-    uses: ./.github/workflows/constants.yaml
-
   check-jax:
     name: Build/Test Catalyst against JAX
-    needs: [constants]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -29,8 +24,10 @@ jobs:
 
     - name: Install deps
       run: |
+        sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld libomp-dev
         python3 -m pip install -r requirements.txt
+        echo "COMPILER_LAUNCHER=" >> $GITHUB_ENV
 
     - name: Discover JAX dep hashes
       if: matrix.interop
@@ -38,46 +35,56 @@ jobs:
         python3 -m pip install --upgrade jaxlib
         python3 .github/workflows/set_dep_versions.py $(python3 -c "import jaxlib; print(jaxlib.__version__)")
 
+    - name: Re-read versions
+      run: |
+        echo "LLVM_REVISION=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+        echo "MHLO_REVISION=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+        echo "ENZYME_REVISION=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+
     - name: Clone LLVM repo
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: ${{ needs.constants.outputs.llvm_version }}
+        ref: ${{ env.LLVM_REVISION }}
         path: mlir/llvm-project
-
-    - name: Build LLVM
-      run: |
-        COMPILER_LAUNCHER="" make llvm
-
-    - name: Build MLIR Dialects
-      run: |
-        COMPILER_LAUNCHER="" make dialects
 
     - name: Clone MHLO repo
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
-        ref: ${{ needs.constants.outputs.mhlo_version }}
+        ref: ${{ env.MHLO_REVISION }}
         path: mlir/mlir-hlo
 
-    - name: Build MHLO
-      run: |
-        COMPILER_LAUNCHER="" make mhlo
-
-    - name: Build Frontend
-      run: |
-        make frontend
-        python3 -m pip install --upgrade jax jaxlib
-
-    - name: Install rustup with llvm-tools-preview
-      uses: actions-rs/toolchain@v1
+    - name: Clone Enzyme repo
+      uses: actions/checkout@v3
       with:
-        toolchain: stable
-        components: llvm-tools-preview
+        repository: EnzymeAD/Enzyme
+        ref: ${{ env.ENZYME_REVISION }}
+        path: mlir/Enzyme
 
     - name: Build Runtime
       run: |
         make runtime
+
+    - name: Build LLVM
+      run: |
+        make llvm
+
+    - name: Build MHLO
+      run: |
+        make mhlo
+
+    - name: Build Enzyme
+      run: |
+        make enzyme
+
+    - name: Build MLIR Dialects
+      run: |
+        make dialects
+
+    - name: Build Frontend
+      run: |
+        make frontend
 
     - name: Run Frontend LIT suite
       run: |

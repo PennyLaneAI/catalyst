@@ -21,6 +21,8 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    with:
+      use_release_tag: ${{ inputs.catalyst == 'stable' }}
 
   check-config:
     name: Build Configuration
@@ -38,17 +40,15 @@ jobs:
 
     - name: Install deps
       run: |
-        sudo apt-get install -y cmake ninja-build ccache clang lld libomp-dev
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        pip install amazon-braket-pennylane-plugin
+        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
       uses: actions/cache@v3
-      with:
-        path: qir-stdlib-build
-        key: Linux-qir-stdlib-build
-        fail-on-cache-miss: True
-    - uses: actions/cache@v3
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
@@ -57,7 +57,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-gcc
         fail-on-cache-miss: True
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
@@ -70,12 +70,12 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
@@ -93,77 +93,84 @@ jobs:
     - name: Install Catalyst (latest/stable)
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
+        C_COMPILER=$(which gcc }}) \
+        CXX_COMPILER=$(which g++ }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        ENABLE_LLD=ON \
         make dialects
-        pip install --upgrade .
+        make frontend
 
-
-    - name: Build Lightning Runtime (latest)
+    - name: Build Catalyst Runtime (latest)
       if: ${{ inputs.lightning == 'latest' }}
       run: |
         COMPILER_LAUNCHER="" \
+        C_COMPILER=$(which gcc }}) \
+        CXX_COMPILER=$(which g++ }}) \
+        ENABLE_LLD=OFF \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
         LIGHTNING_GIT_TAG_VALUE=master \
         make runtime
 
-    - name: Build Lightning Runtime (stable)
+    - name: Build Catalyst Runtime (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
         COMPILER_LAUNCHER="" \
+        C_COMPILER=$(which gcc }}) \
+        CXX_COMPILER=$(which g++ }}) \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
         LIGHTNING_GIT_TAG_VALUE=latest_release \
+        ENABLE_LIGHTNING_KOKKOS=ON \
+        ENABLE_OPENQASM=ON \
         make runtime
 
     - name: Install PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'latest' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        path: pennylane-lightning
-    - if: ${{ inputs.lightning == 'latest' }}
       run: |
-        pip install --upgrade ./pennylane-lightning
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
+        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
         pip install --upgrade pennylane-lightning
+        pip install --upgrade pennyLane-lightning-kokkos
 
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane
-        path: pennylane
-    - if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --upgrade ./pennylane
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}
       run: |
         pip install --upgrade pennylane
 
+    - name: Install PennyLane (release-candidate)
+      if: ${{ inputs.pennylane == 'release-candidate' }}
+      run: |
+        pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.35.0-rc0
+
 
     - name: Add Frontend Dependencies to PATH
       run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
 
     - name: Run Frontend Tests
       run: |
         make pytest
+
+    - name: Run Frontend Tests (Kokkos)
+      run: |
+        make pytest TEST_BACKEND="lightning.kokkos"
+
+    - name: Run Frontend Tests (Braket)
+      run: |
+        make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
       run: |

@@ -40,7 +40,7 @@ frontends.**
 
 - Support for [PennyLane-Lightning](https://github.com/PennyLaneAI/pennylane-lightning) high performance
   simulators, and [Amazon Braket](https://amazon-braket-pennylane-plugin-python.readthedocs.io)
-  devices. Additional hardware support, including QPUs to come.
+  devices. Additional hardware support, including QPUs, to come.
 
 ## Overview
 

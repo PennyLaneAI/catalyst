@@ -71,15 +71,4 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let constructor = "catalyst::createAdjointLoweringPass()";
 }
 
-def ScatterLoweringPass : Pass<"scatter-lowering"> {
-    let summary = "Lower scatter op from Stable HLO to loops.";
-
-    let dependentDialects = [
-        "index::IndexDialect",
-        "mhlo::MhloDialect"
-    ];
-
-    let constructor = "catalyst::createScatterLoweringPass()";
-}
-
 #endif // QUANTUM_PASSES

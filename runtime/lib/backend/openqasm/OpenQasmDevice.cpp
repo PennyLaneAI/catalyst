@@ -14,6 +14,14 @@
 
 #include "OpenQasmDevice.hpp"
 
+namespace Catalyst::Runtime::Device::OpenQasm {
+
+std::mutex runner_mu;
+
+std::mutex &getOpenQasmRunnerMutex() { return runner_mu; }
+
+} // namespace Catalyst::Runtime::Device::OpenQasm
+
 namespace Catalyst::Runtime::Device {
 
 auto OpenQasmDevice::AllocateQubit() -> QubitIdType
@@ -24,11 +32,13 @@ auto OpenQasmDevice::AllocateQubit() -> QubitIdType
 
 auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
     const size_t cur_num_qubits = builder->getNumQubits();
+    RT_FAIL_IF(cur_num_qubits, "Partial qubits allocation is not supported by OpenQasmDevice");
+
     const size_t new_num_qubits = cur_num_qubits + num_qubits;
     if (cur_num_qubits) {
         builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
@@ -36,12 +46,18 @@ auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdTyp
 
     builder->Register(OpenQasm::RegisterType::Qubit, "qubits", new_num_qubits);
 
-    return qubit_manager.AllocateRange(cur_num_qubits, new_num_qubits);
+    return qubit_manager.AllocateRange(cur_num_qubits, num_qubits);
 }
 
 void OpenQasmDevice::ReleaseAllQubits()
 {
-    // do nothing
+    // refresh the builder for device re-use.
+    if (builder_type != OpenQasm::BuilderType::Common) {
+        builder = std::make_unique<OpenQasm::BraketBuilder>();
+    }
+    else {
+        builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
+    }
 }
 
 void OpenQasmDevice::ReleaseQubit([[maybe_unused]] QubitIdType q)
@@ -112,8 +128,13 @@ auto OpenQasmDevice::Zero() const -> Result
 auto OpenQasmDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
 
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                    const std::vector<QubitIdType> &wires, bool inverse)
+                                    const std::vector<QubitIdType> &wires, bool inverse,
+                                    const std::vector<QubitIdType> &controlled_wires,
+                                    const std::vector<bool> &controlled_values)
 {
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "OpenQasm device does not support native quantum control.");
+
     using namespace Catalyst::Runtime::Simulator::Lightning;
 
     // First, check operation specifications
@@ -131,9 +152,14 @@ void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<d
 
 void OpenQasmDevice::MatrixOperation(
     [[maybe_unused]] const std::vector<std::complex<double>> &matrix,
-    [[maybe_unused]] const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse)
+    [[maybe_unused]] const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse,
+    [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires,
+    [[maybe_unused]] const std::vector<bool> &controlled_values)
 {
     RT_FAIL_IF(builder_type == OpenQasm::BuilderType::Common, "Unsupported functionality");
+    // TODO: Remove when controlled wires API is supported
+    RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
+               "OpenQasm device does not support native quantum control.");
 
     // Convert wires to device wires
     // with checking validity of wires
@@ -184,8 +210,7 @@ auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
 
     // update tape caching
     if (tape_recording) {
-        cache_manager.addObservable(obsKey,
-                                    Catalyst::Runtime::Simulator::Lightning::Measurements::Expval);
+        cache_manager.addObservable(obsKey, Catalyst::Runtime::MeasurementsT::Expval);
     }
 
     std::string s3_folder_str{};
@@ -218,8 +243,7 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
 
     // update tape caching
     if (tape_recording) {
-        cache_manager.addObservable(obsKey,
-                                    Catalyst::Runtime::Simulator::Lightning::Measurements::Var);
+        cache_manager.addObservable(obsKey, Catalyst::Runtime::MeasurementsT::Var);
     }
 
     std::string s3_folder_str{};
@@ -416,9 +440,9 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
 
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
-        size_t idx = 0;
+        size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -459,16 +483,19 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
 
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
-        size_t idx = 0;
+        size_t idx = dev_wires.size();
         for (auto wire : dev_wires) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
 }
 
-auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire) -> Result
+auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire, std::optional<int32_t> postselect)
+    -> Result
 {
+    RT_FAIL_IF(postselect, "Post-selection is not supported yet");
+
     if (builder_type != OpenQasm::BuilderType::Common) {
         RT_FAIL("Unsupported functionality");
         return Result{};
@@ -495,3 +522,5 @@ void OpenQasmDevice::Gradient([[maybe_unused]] std::vector<DataView<double, 1>> 
 }
 
 } // namespace Catalyst::Runtime::Device
+
+GENERATE_DEVICE_FACTORY(OpenQasmDevice, Catalyst::Runtime::Device::OpenQasmDevice);

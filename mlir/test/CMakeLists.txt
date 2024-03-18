@@ -14,7 +14,9 @@ set(TEST_SUITES
     Catalyst
     Quantum
     Gradient
-)
+    Mitigation
+    Catalyst)
+
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)
     list(APPEND DIALECT_TESTS_DEPEND QuantumPythonModules)

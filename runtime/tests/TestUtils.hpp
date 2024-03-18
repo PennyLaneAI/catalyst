@@ -38,17 +38,38 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
 
 /**
- * Get available device names in the compatible format for `__quantum__rt__device`
+ * Get available device names in the compatible format for `__catalyst__rt__device`
  *
  * This is a utility function used in Catch2 tests.
  *
  * @return `std::vector<std::pair<std::string, std::string>>`
  */
-static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>>
+static inline auto getDevices() -> std::vector<std::tuple<std::string, std::string, std::string>>
 {
-    std::vector<std::pair<std::string, std::string>> devices{{"backend", "lightning.qubit"}};
+    std::vector<std::tuple<std::string, std::string, std::string>> devices{
+        {"lightning.qubit", "lightning.qubit", "{shots: 0}"}};
 #ifdef __device_lightning_kokkos
-    devices.emplace_back("backend", "lightning.kokkos");
+    devices.emplace_back("lightning.kokkos", "lightning.kokkos", "{shots: 0}");
 #endif
     return devices;
 }
+
+inline auto get_dylib_ext() -> std::string
+{
+#ifdef __linux__
+    return ".so";
+#elif defined(__APPLE__)
+    return ".dylib";
+#endif
+}
+
+#define NO_MODIFIERS ((const Modifiers *)NULL)
+
+static inline MemRefT_CplxT_double_1d getState(size_t buffer_len)
+{
+    CplxT_double *buffer = new CplxT_double[buffer_len];
+    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    return result;
+}
+
+static inline void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }

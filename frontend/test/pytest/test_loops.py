@@ -30,7 +30,7 @@ class TestLoopToJaxpr:
 
         expected = """\
 { lambda ; a:f64[]. let
-    b:i64[] c:f64[] = qwhile[
+    b:i64[] c:f64[] = while_loop[
       body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
       body_nconsts=0
       cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
@@ -54,7 +54,7 @@ class TestLoopToJaxpr:
 
         expected = """\
 { lambda ; a:f64[] b:i64[]. let
-    c:i64[] d:f64[] = qfor[
+    c:i64[] d:f64[] = for_loop[
       apply_reverse_transform=False
       body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
           h:i64[] = add f 1

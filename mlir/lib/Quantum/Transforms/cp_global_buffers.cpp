@@ -81,6 +81,35 @@ llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
     return memrefs;
 }
 
+/**
+ * Allocate memref similar to the given one and copy the contents to a new location. Take dynamic
+ * dimentions into account. Return the newly-allocated memref.
+ */
+Value allocCopyMemrefDyn(Location loc, Value memref, PatternRewriter &rewriter)
+{
+    auto memrefType = memref.getType().cast<MemRefType>();
+    llvm::SmallVector<Value> dynDims;
+    {
+        llvm::SmallVector<int64_t> dynIndices;
+        int64_t ndim = 0;
+        for (auto dim : memrefType.getShape()) {
+            if (dim < 0) {
+                Value dynValue = rewriter.create<memref::DimOp>(loc, memref, ndim);
+                dynDims.push_back(dynValue);
+            }
+            ndim++;
+        }
+    }
+
+    Value newMemRef = rewriter.create<memref::AllocOp>(loc, memrefType, dynDims);
+    rewriter.create<memref::CopyOp>(loc, memref, newMemRef);
+    return newMemRef;
+}
+
+/**
+ * Take a function and wrap all the memrefs it returns with an alloc-copy wrappers. The wrappers
+ * would handle the memory-allocation errors by returning the original memrefs instead of new ones.
+ */
 void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter)
 {
     llvm::SmallVector<Value> memrefs = getReturnMemRefs(op);
@@ -110,9 +139,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
         scf::IfOp ifOp = rewriter.create<scf::IfOp>(
             op->getLoc(), comparison,
             [&](OpBuilder &builder, Location loc) { // then
-                Value newMemRef =
-                    rewriter.create<memref::AllocOp>(op->getLoc(), ty.cast<MemRefType>());
-                rewriter.create<memref::CopyOp>(op->getLoc(), memref, newMemRef);
+                Value newMemRef = allocCopyMemrefDyn(loc, memref, rewriter);
                 builder.create<scf::YieldOp>(loc, newMemRef);
             },
             [&](OpBuilder &builder, Location loc) { // else
