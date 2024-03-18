@@ -13,9 +13,9 @@
 # limitations under the License.
 """Test for the OQC device.
 """
+import pennylane as qml
 import pytest
 
-import pennylane as qml
 from catalyst.oqc import OQCDevice
 
 
