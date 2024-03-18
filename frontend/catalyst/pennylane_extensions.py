@@ -2453,11 +2453,18 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
-
-    At the moment, this is a stub.
-    We can also use here isTracing to only bind with the callback while it is tracing,
-    otherwise, call the function itself.
     """
+    breakpoint()
+    if not EvaluationContext.is_tracing():
+        """In case the callback decorator is used in a non-callback context, simply evaluate
+        the function. Since the callback wrapperdoes not have access to the parameters,
+        we provide a wrapper that will defer the actual execution until a little bit later."""
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapper
+
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
