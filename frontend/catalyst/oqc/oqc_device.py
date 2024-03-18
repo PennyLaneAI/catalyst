@@ -61,6 +61,7 @@ class OQCDevice(Device):
         return transform_program, execution_config
 
     def execute(self, circuits, execution_config):
+        """Non-implemented python execution."""
         # Check availability
         raise NotImplementedError("The OQC device only supports Catalyst.")
 
