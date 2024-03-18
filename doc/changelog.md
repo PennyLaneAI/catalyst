@@ -2,6 +2,26 @@
 
 <h3>New features</h3>
 
+* Support for callbacks in Catalyst.
+  [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
+
+  Catalyst now supports callbacks without parameters nor return values.
+  This is the very first step in supporting callbacks.
+  The following is now possible.
+
+  ```py
+
+  @callback
+  def foo():
+    print("Hello world")
+
+  @qjit
+  def circuit(*args, **kwargs):
+    ...
+    foo()
+    ...
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst now supports devices built from the 
