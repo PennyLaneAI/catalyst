@@ -20,6 +20,13 @@ import pathlib
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
+try:
+    from qcaas_client.client import OQCClient  # pylint: disable=unused-import
+except ImportError as e:
+    raise ImportError(
+        "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
+    ) from e
+
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["lucy", "toshiko"]
@@ -37,8 +44,8 @@ class OQCDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        return "oqc", str(pathlib.Path(__file__).parent.joinpath("src/build/librtd_oqc.so"))
-
+        # TODO: Replace with the oqc shared library
+        return "oqc", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     def __init__(self, wires, backend, shots=1024, **kwargs):
         self._backend = backend
