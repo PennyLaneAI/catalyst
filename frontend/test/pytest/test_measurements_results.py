@@ -96,6 +96,24 @@ class TestCounts:
         observed = counts_2qbit(np.pi)
         assert np.array_equal(observed, expected)
 
+    def test_count_on_2qbits_endianness(self, backend):
+        """Test counts on 2 qubits with check for endianness."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        def counts_2qbit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            return qml.counts()
+
+        expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 1000, 0])]
+        observed = counts_2qbit(np.pi, 0)
+        assert np.array_equal(observed, expected)
+
+        expected = [np.array([0, 1, 2, 3]), np.array([0, 1000, 0, 0])]
+        observed = counts_2qbit(0, np.pi)
+        assert np.array_equal(observed, expected)
+
 
 class TestExpval:
     def test_named(self, backend):

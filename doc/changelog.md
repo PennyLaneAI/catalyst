@@ -46,6 +46,9 @@
 
 <h3>Bug fixes</h3>
 
+* Fix the endianness of counts in Catalyst and matches PennyLane.
+  [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
+
 * Fix the issue of triggering the C++ compiler driver twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
