@@ -16,13 +16,13 @@
 import jax
 import pennylane as qml
 from pennylane import transform
-
-import catalyst
-from pennylane.measurements import ExpectationMP, ProbabilityMP, VarianceMP, CountsMP
+from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, VarianceMP
 from pennylane.tape.tape import (
     _validate_computational_basis_sampling,
     rotations_and_diagonal_measurements,
 )
+
+import catalyst
 from catalyst.utils.exceptions import CompileError
 
 
@@ -69,15 +69,19 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
 
 @transform
 def measurements_from_counts(tape):
-    r"""Replace expval from a tape with counts and postprocessing.
+    r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
+    functions for each original measurement.
 
     Args:
         tape (QNode or QuantumTape or Callable): A quantum circuit.
-        convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
         transformed circuit as described in :func:`qml.transform <pennylane.transform>`.
+
+    .. note::
+
+        Samples are not supported.
     """
     if tape.samples_computational_basis and len(tape.measurements) > 1:
         _validate_computational_basis_sampling(tape.measurements)
@@ -100,21 +104,25 @@ def measurements_from_counts(tape):
     def postprocessing_counts_to_expval(results):
         """A processing function to get expecation values from counts."""
         keys = results[0][0]
-        counts = results[0][1]
+        counts_outcomes = results[0][1]
         results_processed = []
         for m in tape.measurements:
-            sub_counts = _map_counts(counts, m.wires, qml.wires.Wires(list(measured_wires)))
+            mapped_counts_outcome = _map_counts(
+                counts_outcomes, m.wires, qml.wires.Wires(list(measured_wires))
+            )
             if isinstance(m, ExpectationMP):
-                probs = _get_probs(sub_counts)
-                results_processed.append(_get_expval(eigvals=m.eigvals(), probs=probs))
+                probs = _get_probs(mapped_counts_outcome)
+                results_processed.append(_get_expval(eigvals=m.eigvals(), prob_vector=probs))
             elif isinstance(m, VarianceMP):
-                probs = _get_probs(sub_counts)
-                results_processed.append(_get_var(eigvals=m.eigvals(), probs=probs))
+                probs = _get_probs(mapped_counts_outcome)
+                results_processed.append(_get_var(eigvals=m.eigvals(), prob_vector=probs))
             elif isinstance(m, ProbabilityMP):
-                probs = _get_probs(sub_counts)
+                probs = _get_probs(mapped_counts_outcome)
                 results_processed.append(probs)
             elif isinstance(m, CountsMP):
-                results_processed.append(tuple([keys[0 : 2 ** len(m.wires)], sub_counts]))
+                results_processed.append(
+                    tuple([keys[0 : 2 ** len(m.wires)], mapped_counts_outcome])
+                )
         if len(tape.measurements) == 1:
             results_processed = results_processed[0]
         else:
@@ -124,32 +132,39 @@ def measurements_from_counts(tape):
     return [new_tape], postprocessing_counts_to_expval
 
 
-def _get_probs(counts):
+def _get_probs(counts_outcome):
+    """From the counts outcome, calculate the probability vector."""
     prob_vector = []
-    num_shots = jax.numpy.sum(counts)
-    for count in counts:
+    num_shots = jax.numpy.sum(counts_outcome)
+    for count in counts_outcome:
         prob = count / num_shots
         prob_vector.append(prob)
     return jax.numpy.array(prob_vector)
 
 
-def _get_expval(eigvals, probs):
-    expval = jax.numpy.dot(jax.numpy.array(eigvals), probs)
+def _get_expval(eigvals, prob_vector):
+    """From the observable eigenvalues and the probability vector
+    it calculates the expectation value."""
+    expval = jax.numpy.dot(jax.numpy.array(eigvals), prob_vector)
     return expval
 
 
-def _get_var(eigvals, probs):
-    var = jax.numpy.dot(probs, (eigvals**2)) - qml.math.dot(probs, eigvals)
+def _get_var(eigvals, prob_vector):
+    """From the observable eigenvalues and the probability vector
+    it calculates the variance."""
+    var = jax.numpy.dot(prob_vector, (eigvals**2)) - qml.math.dot(prob_vector, eigvals)
     return var
 
 
 def _map_counts(counts, sub_wires, wire_order):
+    """Map the count outcome given a wires and wire order."""
     wire_map = dict(zip(wire_order, range(len(wire_order))))
     mapped_wires = [wire_map[w] for w in sub_wires]
 
     mapped_counts = {}
+    num_wires = len(wire_order)
     for outcome, occurrence in enumerate(counts):
-        binary_outcome = format(outcome, "0{}b".format(len(wire_order)))
+        binary_outcome = format(outcome, f"0{num_wires}b")
         mapped_outcome = "".join(binary_outcome[i] for i in mapped_wires)
         mapped_counts[mapped_outcome] = mapped_counts.get(mapped_outcome, 0) + occurrence
 
