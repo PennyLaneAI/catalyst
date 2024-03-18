@@ -90,40 +90,6 @@ def get_qjit_pennylane_operations(config: TOMLDocument, shots_present, device_na
     supported_gates += ["ControlledQubitUnitary"]
     return set(supported_gates)
 
-RUNTIME_OPERATIONS = {
-    "Identity",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "Hadamard",
-    "S",
-    "T",
-    "PhaseShift",
-    "RX",
-    "RY",
-    "RZ",
-    "Rot",
-    "CNOT",
-    "CY",
-    "CZ",
-    "SWAP",
-    "IsingXX",
-    "IsingYY",
-    "IsingXY",
-    "ControlledPhaseShift",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "CRot",
-    "CSWAP",
-    "Toffoli",
-    "MultiRZ",
-    "QubitUnitary",
-    "ISWAP",
-    "PSWAP",
-    "GlobalPhase",
-}
-
 
 class QJITDevice(qml.QubitDevice):
     """QJIT device.
@@ -260,6 +226,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
             devices by the runtime
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
+
     operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
