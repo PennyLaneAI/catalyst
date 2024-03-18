@@ -1,8 +1,7 @@
 import pathlib
 
-from pennylane.devices import Device
+from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
-from pennylane.devices import ExecutionConfig, DefaultExecutionConfig
 
 from catalyst.compiler import get_lib_path
 
@@ -50,4 +49,4 @@ class OQCDevice(Device):
 
 def _check_backend(backend):
     if backend not in BACKENDS:
-        raise (ValueError, "Backend not supported.")
+        raise ValueError(f"The backend {backend} is not supported. Valid devices are {BACKENDS}")
