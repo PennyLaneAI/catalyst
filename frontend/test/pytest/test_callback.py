@@ -13,8 +13,8 @@
 # limitations under the License.
 """Test callbacks"""
 
-import pytest
 import pennylane as qml
+import pytest
 
 from catalyst.pennylane_extensions import callback
 
