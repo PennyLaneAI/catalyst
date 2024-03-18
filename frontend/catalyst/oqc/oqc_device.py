@@ -21,7 +21,7 @@ from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
 try:
-    from qcaas_client.client import OQCClient
+    from qcaas_client.client import OQCClient  # pylint: disable=unused-import
 except ImportError as e:
     raise ImportError(
         "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
