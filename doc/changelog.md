@@ -63,7 +63,6 @@
 
 This release contains contributions from (in alphabetical order):
 
-David Ittah,
 Ali Asadi,
 David Ittah,
 Erick Ochoa Lopez,
