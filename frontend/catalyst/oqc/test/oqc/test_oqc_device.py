@@ -15,10 +15,10 @@
 """
 # pylint: disable=unused-argument,import-outside-toplevel
 import pathlib
+import sys
 
 import pennylane as qml
 import pytest
-import sys
 
 from catalyst.compiler import get_lib_path
 
