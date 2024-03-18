@@ -13,8 +13,8 @@
 # limitations under the License.
 """Test for the OQC device.
 """
-import pathlib
 import os
+import pathlib
 
 import pennylane as qml
 import pytest

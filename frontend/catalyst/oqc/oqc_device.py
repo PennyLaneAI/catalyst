@@ -14,8 +14,8 @@
 
 """This module contains the OQC device."""
 
-import pathlib
 import os
+import pathlib
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
