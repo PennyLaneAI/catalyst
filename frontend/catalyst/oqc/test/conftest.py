@@ -41,7 +41,6 @@ def set_dummy_oqc_env():
 
 def pytest_collection_modifyitems(config, items):
     """A pytest items modifier method"""
-    print(oqc_available, items)
     if not oqc_available:
         # If OQC QCAAS is not installed, mark all collected tests to be skipped.
         for item in items:
