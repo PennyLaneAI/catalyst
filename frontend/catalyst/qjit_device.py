@@ -18,6 +18,7 @@ from typing import Optional, Set
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 
+from catalyst.preprocess import decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
@@ -229,15 +230,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
     operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
-    @staticmethod
-    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:  # pragma: no cover
-        # We currently override and only set a few gates to preserve existing behaviour.
-        # We could choose to read from config and use the "matrix" gates.
-        # However, that affects differentiability.
-        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
-        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX", "BlockEncode"}
-
     def __init__(
         self,
         original_device,
@@ -276,6 +268,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
     ):
         """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
+
+        convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
+        program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
 
         # TODO: Add Catalyst program verification and validation
         return program, config
