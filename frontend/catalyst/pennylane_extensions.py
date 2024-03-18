@@ -2454,22 +2454,15 @@ def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
-    breakpoint()
-    if not EvaluationContext.is_tracing():
-        """In case the callback decorator is used in a non-callback context, simply evaluate
-        the function. Since the callback wrapperdoes not have access to the parameters,
-        we provide a wrapper that will defer the actual execution until a little bit later."""
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return wrapper
-
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
     @wraps(func)
     def bind_callback(*args, **kwargs):
+        if not EvaluationContext.is_tracing():
+            """If we are not in the tracing context, just evaluate the function."""
+            return func(*args, **kwargs)
+
         callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
