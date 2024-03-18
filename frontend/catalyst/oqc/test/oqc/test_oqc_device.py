@@ -41,6 +41,7 @@ def test_unavailable(monkeypatch, set_dummy_oqc_env):
 
         OQCDevice(backend="lucy", shots=1000, wires=8)
 
+
 # TODO: replace when the OQC CPP layer is available.
 @pytest.mark.skipif(
     not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
