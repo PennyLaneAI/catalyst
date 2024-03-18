@@ -152,7 +152,7 @@ def _get_expval(eigvals, prob_vector):
 def _get_var(eigvals, prob_vector):
     """From the observable eigenvalues and the probability vector
     it calculates the variance."""
-    var = jax.numpy.dot(prob_vector, (eigvals**2)) - qml.math.dot(prob_vector, eigvals)
+    var = jax.numpy.dot(prob_vector, (eigvals**2)) - jax.numpy.dot(prob_vector, eigvals)
     return var
 
 
