@@ -2446,10 +2446,14 @@ def callback(func):
     @wraps(func)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
-            """If we are not in the tracing context, just evaluate the function."""
+            # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        callback_implementation(func, retty, *args, **kwargs)
+        # We just disable inconsistent return statements
+        # Since we are building this feature step by step.
+        callback_implementation(
+            func, retty, *args, **kwargs
+        )  # pylint: disable=inconsistent-return-statements
 
     return bind_callback
 
