@@ -28,7 +28,6 @@ PhaseShift = { }
 U1 = { }
 U2 = { }
 U3 = { }
->>>>>>> python_oqc
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
