@@ -30,9 +30,7 @@ from catalyst.compiler import get_lib_path
 )
 def test_unavailable(monkeypatch, set_dummy_oqc_env):
     """Check the error produced in the absence of qcaas."""
-
-    monkeypatch.setitem(sys.modules, "qcaas_client.client", None)
-
+    monkeypatch.setitem(sys.modules, "qcaas_client", None)
     with pytest.raises(
         ImportError,
         match="Oqc qcaas client not found. Please install: pip install oqc-qcaas-client",
