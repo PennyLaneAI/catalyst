@@ -15,6 +15,7 @@
 """This module contains the OQC device."""
 
 import pathlib
+import os
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
@@ -42,6 +43,7 @@ class OQCDevice(Device):
     def __init__(self, wires, backend, shots=1024, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
+        _check_envvar()
         super().__init__(wires=wires, shots=shots, **kwargs)
 
     @property
@@ -70,3 +72,12 @@ def _check_backend(backend):
     """Helper function to check the backend."""
     if backend not in BACKENDS:
         raise ValueError(f"The backend {backend} is not supported. Valid devices are {BACKENDS}")
+
+
+def _check_envvar():
+    """Helper function to check the environment variables are set for authentification."""
+    url = os.getenv("OQC_URL")
+    email = os.getenv("OQC_EMAIL")
+    password = os.getenv("OQC_PASSWORD")
+    if not all((url, email, password)):
+        raise ValueError("You must set url, email and password as environment variables.")

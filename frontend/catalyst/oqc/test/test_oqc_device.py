@@ -14,12 +14,27 @@
 """Test for the OQC device.
 """
 import pathlib
+import os
 
 import pennylane as qml
 import pytest
 
 from catalyst.compiler import get_lib_path
 from catalyst.oqc import OQCDevice
+
+
+@pytest.fixture
+def set_dummy_oqc_env():
+    """Set OQC env var."""
+    os.environ["OQC_EMAIL"] = "a"
+    os.environ["OQC_PASSWORD"] = "b"
+    os.environ["OQC_URL"] = "c"
+
+    yield
+
+    del os.environ["OQC_EMAIL"]
+    del os.environ["OQC_PASSWORD"]
+    del os.environ["OQC_URL"]
 
 
 # TODO: replace when the OQC CPP layer is available.
@@ -30,7 +45,7 @@ from catalyst.oqc import OQCDevice
 class TestOQCDevice:
     """Test the OQC device python layer for Catalyst."""
 
-    def test_initialization(self):
+    def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""
         device = OQCDevice(backend="lucy", shots=1000, wires=8)
 
@@ -44,28 +59,35 @@ class TestOQCDevice:
         assert device.shots == qml.measurements.Shots(1000)
         assert device.wires == qml.wires.Wires(range(0, 32))
 
-    def test_wrong_backend(self):
+    def test_wrong_backend(self, set_dummy_oqc_env):
         """Test the backend check."""
         with pytest.raises(ValueError, match="The backend falcon is not supported."):
             OQCDevice(backend="falcon", shots=1000, wires=8)
 
-    def test_execute_not_implemented(self):
+    def test_execute_not_implemented(self, set_dummy_oqc_env):
         """Test the python execute is not implemented."""
         with pytest.raises(NotImplementedError, match="The OQC device only supports Catalyst."):
             dev = OQCDevice(backend="lucy", shots=1000, wires=8)
             dev.execute([], [])
 
-    def test_preprocess(self):
+    def test_preprocess(self, set_dummy_oqc_env):
         """Test the device preprocessing"""
         dev = OQCDevice(backend="lucy", shots=1000, wires=8)
         tranform_program, _ = dev.preprocess()
         assert tranform_program == qml.transforms.core.TransformProgram()
 
-    def test_get_c_interface(self):
+    def test_get_c_interface(self, set_dummy_oqc_env):
         """Test the device get_c_interface method."""
         dev = OQCDevice(backend="lucy", shots=1000, wires=8)
         name, _ = dev.get_c_interface()
         assert name == "oqc.remote"
+
+    def test_no_envvar(self):
+        """Test the device get_c_interface method."""
+        with pytest.raises(
+            ValueError, match="You must set url, email and password as environment variables."
+        ):
+            OQCDevice(backend="lucy", shots=1000, wires=8)
 
 
 if __name__ == "__main__":
