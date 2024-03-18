@@ -2635,13 +2635,14 @@ def callback_implementation(
     flat_args, in_tree = tree_flatten((args, kwargs))
     metadata = CallbackClosure(args, kwargs)
 
-    has_results = not result_shape_dtypes or not (result_shape_dtypes == inspect.Signature.empty)
-    if has_results:
-        results_aval = tree_map(
-            lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes
-        )
-    else:
-        results_aval = None
+    def to_shaped_array(ty):
+        if ty == inspect.Signature.empty:
+            return None
+        if isinstance(ty, ShapedArray):
+            return ty
+        return shaped_abstractify(ty)
+
+    results_aval = tree_map(to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
 
     def _flat_callback(flat_args):

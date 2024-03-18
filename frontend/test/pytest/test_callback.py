@@ -138,3 +138,18 @@ def test_identity(x):
         return identity(x)
 
     assert cir(x) == x
+
+
+@pytest.mark.parametrize("x", [0, 1, 2, 3, 4])
+def test_identity_builtin_type(x):
+    """Test callback with return values"""
+
+    @callback
+    def identity(x) -> int:
+        return x
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert cir(x) == x

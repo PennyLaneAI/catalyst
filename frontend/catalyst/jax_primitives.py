@@ -244,6 +244,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+    from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
     callback_id = registry.register(callback)
 
@@ -251,13 +252,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
-    mlir_ty = []
-    for aval in results_aval:
-        # TODO: Change results_aval from a ShapedArray to an MLIR Type.
-        # Let's assume integer for now
-        i64_type = ir.IntegerType.get_signless(64, ctx)
-        res_i_ty = ir.RankedTensorType.get((), i64_type)
-        mlir_ty.append(res_i_ty)
+    mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
     return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
