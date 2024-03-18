@@ -26,10 +26,10 @@
 
 #include <pybind11/embed.h>
 
-namespace Catalyst::Runtime::Device::OpenQasm {
-
 // To protect the py::exec calls concurrently
 extern std::mutex &getPythonMutex();
+
+namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
  * The OpenQasm circuit runner interface.
