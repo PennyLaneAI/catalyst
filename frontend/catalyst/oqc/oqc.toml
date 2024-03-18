@@ -1,85 +1,66 @@
-schema = 1
-
-[device]
-name = "oqc.remote"
-
-[operators]
-# Observables supported by the device
-observables = [
-	"PauliX",
-	"PauliY",
-	"PauliZ",
-	"Hadamard",
-	"Hermitian",
-	"Tensor",
-]
+schema = 2
 
 # The union of all gate types listed in this section must match what
 # the device considers "supported" through PennyLane's device API.
-[[operators.gates]]
-native = [
-        "ISWAP",
-        "PSWAP",
-	"Hadamard",
-        "PauliX",
-        "PauliY",
-        "PauliZ",
-        "S",
-        "T",
-        "CNOT",
-        "CZ",
-        "SWAP",
-        "PhaseShift",
-        "RX",
-        "RY",
-        "RZ",
-        "CSWAP",
-	"MS",
-	"CY",
-	"SX",
-	"AAMS",
-	"ECR",
-	"GPi",
-	"GPi2",
-	"CPhaseShift00",
-	"CPhaseShift01",
-	"CPhaseShift10",
-	"Identity",
-	"IsingXX",
-	"IsingXY",
-	"IsingYY",
-	"IsingZZ",
-	"Toffoli",
-	"ControlledPhaseShift",
-]
+[operators.gates.native]
+
+Identity = { }
+Hadamard = { }
+PauliX = { }
+PauliY = { }
+PauliZ = { }
+S = { }
+T = { }
+CNOT = { }
+Identity = { }
+Toffoli = { }
+CY = { }
+CZ = { }
+SWAP = { }
+CSWAP = { }
+RX = { }
+RY = { }
+RZ = { }
+CRX = { }
+CRY = { }
+CRZ = { }
+PhaseShift = { }
+U1 = { }
+U2 = { }
+U3 = { }
+>>>>>>> python_oqc
 
 # Operators that should be decomposed according to the algorithm used
 # by PennyLane's device API.
 # Optional, since gates not listed in this list will typically be decomposed by
 # default, but can be useful to express a deviation from this device's regular
 # strategy in PennyLane.
-decomp = []
+
+[operators.gates.decomp]
 
 # Gates which should be translated to QubitUnitary
-matrix = [
-]
+[operators.gates.matrix]
+
+[operators.observables]
+# Observables supported by the device
+PauliX = {}
+PauliY = {}
+PauliZ = {}
+Hadamard = {}
 
 [measurement_processes]
-exactshots = [
-]
-finiteshots = [
-	"Counts",
-]
+Expval = { condition = [ "finiteshots" ] }
+Var = { condition = [ "finiteshots" ] }
+Probs = { condition = [ "finiteshots" ] }
+Count = { condition = [ "finiteshots" ] }
+
 
 [compilation]
 # If the device is compatible with qjit
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = true
-# If the device supports adjoint
-quantum_adjoint = false
-# If the device supports quantum control instructions natively
-quantum_control = false
+
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = false
 

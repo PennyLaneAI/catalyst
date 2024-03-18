@@ -76,7 +76,7 @@ from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.toml import toml_load
+from catalyst.utils.runtime import BackendInfo
 
 from .primitives import (
     cuda_inst,
@@ -821,14 +821,12 @@ class QJIT_CUDAQ:
             an MLIR module
         """
 
-        def cudaq_backend_info(device):
+        def cudaq_backend_info(device, _config) -> BackendInfo:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
-            with open(device.config, "rb") as f:
-                config = toml_load(f)
-
-            return config, device.name, None, None
+            device_name = device.short_name if isinstance(device, qml.Device) else device.name
+            return BackendInfo(device_name, device.name, "", {})
 
         with Patcher(
             (catalyst.pennylane_extensions.QFunc, "extract_backend_info", cudaq_backend_info),

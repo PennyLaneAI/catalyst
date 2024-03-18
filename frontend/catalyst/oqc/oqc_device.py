@@ -1,22 +1,33 @@
-import pathlib
-from qcaas_client.client import OQCClient, QPUTask, CompilerConfig
-from scc.compiler.config import QuantumResultsFormat
+# Copyright 2024 Xanadu Quantum Technologies Inc.
 
-import pennylane as qml
-from pennylane.devices import Device
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""This module contains the OQC device."""
+
+import os
+import pathlib
+
+from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
-from pennylane.devices.preprocess import decompose, validate_measurements, validate_observables
-from pennylane.devices import ExecutionConfig, DefaultExecutionConfig
 
 from catalyst.compiler import get_lib_path
 
-default_execution_config = ExecutionConfig()
-
 BACKENDS = ["lucy", "toshiko"]
-RES_FORMAT = QuantumResultsFormat().binary_count
 
 
 class OQCDevice(Device):
+    """The OQC device allows to access the hardware devices from OQC using
+    Catalyst."""
 
     config = pathlib.Path(__file__).parent.joinpath("oqc.toml")
 
@@ -25,57 +36,49 @@ class OQCDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
+
         return "oqc", str(pathlib.Path(__file__).parent.joinpath("src/build/librtd_oqc.so"))
 
-    def __init__(self, wires, backend, credentials, shots=1024, **kwargs):
+
+    def __init__(self, wires, backend, shots=1024, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
-        # self._client = self._authenticate(credentials)
-        super().__init__(wires=wires, shots=shots)
-
-    def _authenticate(self, credentials: dict):
-        """Function that authenticates a user to the QCaas (OQC cloud)."""
-        url = credentials.get("url")
-        email = credentials.get("email")
-        password = credentials.get("password")
-        if url is None or email is None or password is None:
-            raise (ValueError, "Wrong credentials format.")
-        client = OQCClient(url=url, email=email, password=password)
-        client.authenticate()
-        return client
+        _check_envvar()
+        super().__init__(wires=wires, shots=shots, **kwargs)
 
     @property
     def backend(self):
+        """Backend property of the device."""
         return self._backend
 
     def preprocess(
         self,
         execution_config: ExecutionConfig = DefaultExecutionConfig,
     ):
-        """This function defines the device transform program to be applied and an updated device configuration."""
+        """This function defines the device transform program to be applied and an
+        updated device configuration."""
         transform_program = TransformProgram()
-
-        # Expand hamiltonian
-        # Split non commuting
-        # Decompose
-        # Validate shots
-        # Validate observables
-        # Validate measurements
-
+        # TODO: Add transforms (check wires, check shots, no sample, only commuting measurements,
+        # measurement from counts)
         return transform_program, execution_config
 
     def execute(self, circuits, execution_config):
+        """Non-implemented python execution."""
         # Check availability
-        oqc_tasks = []
-        for circuit in circuits:
-            oqc_config = CompilerConfig(
-                repeats=circuit.shots, results_format=RES_FORMAT, optimizations=None
-            )
-            oqc_tasks.append(QPUTask(circuit.to_openqasm(), oqc_config))
-        results = self._client.execute_tasks(oqc_tasks)
-        return results
+        raise NotImplementedError("The OQC device only supports Catalyst.")
+
 
 
 def _check_backend(backend):
+    """Helper function to check the backend."""
     if backend not in BACKENDS:
-        raise (ValueError, "Backend not supported.")
+        raise ValueError(f"The backend {backend} is not supported. Valid devices are {BACKENDS}")
+
+
+def _check_envvar():
+    """Helper function to check the environment variables are set for authentification."""
+    url = os.getenv("OQC_URL")
+    email = os.getenv("OQC_EMAIL")
+    password = os.getenv("OQC_PASSWORD")
+    if not all((url, email, password)):
+        raise ValueError("You must set url, email and password as environment variables.")

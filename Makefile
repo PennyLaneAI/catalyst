@@ -17,6 +17,7 @@ ENABLE_OPENQASM?=ON
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
+TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml')
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -112,7 +113,10 @@ oqc:
 	$(MAKE) -C frontend/catalyst/oqc/src oqc
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
-test: test-runtime test-frontend test-demos
+test: test-runtime test-frontend test-demos test-toml-spec
+
+test-toml-spec:
+	$(PYTHON) ./bin/toml-check.py $(TOML_SPECS)
 
 test-runtime:
 	$(MAKE) -C runtime test
@@ -208,6 +212,7 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/catalyst/oqc/test/ $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif
