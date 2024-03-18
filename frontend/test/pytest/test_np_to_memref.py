@@ -18,6 +18,10 @@ import ctypes
 import jax.numpy as jnp
 import pytest
 from jax.core import ShapedArray
+from mlir_quantum.runtime import C64, C128, F16, as_ctype
+from mlir_quantum.runtime import (
+    get_unranked_memref_descriptor as mlir_get_unranked_memref_descriptor,
+)
 from mlir_quantum.runtime import (
     C64,
     C128,
@@ -26,7 +30,10 @@ from mlir_quantum.runtime import (
     make_zero_d_memref_descriptor,
 )
 
-from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
+from catalyst.utils.jnp_to_memref import (
+    get_ranked_memref_descriptor,
+    get_unranked_memref_descriptor,
+)
 
 
 @pytest.mark.parametrize(
@@ -59,3 +66,15 @@ def test_get_ranked_memref_descriptor(inp, exp):
     """Tests that the structure has the expected fields."""
     obs = get_ranked_memref_descriptor(inp)
     assert exp._fields_ == obs._fields_  # pylint: disable=protected-access
+
+
+@pytest.mark.parametrize(
+    "inp, exp",
+    [
+        (1, mlir_get_unranked_memref_descriptor(np.array(1))),
+        (np.array(1), mlir_get_unranked_memref_descriptor(np.array(1))),
+    ],
+)
+def test_get_unranked_meref_descriptor(inp, exp):
+    obs = get_unranked_memref_descriptor(inp)
+    assert exp._fields_ == obs._fields_
