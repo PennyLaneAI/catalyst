@@ -13,7 +13,7 @@ extend-exclude = '''
 
 [tool.isort]
 profile = "black"
-skip = ["frontend/test/conftest.py"]
+skip = ["frontend/test/conftest.py", "frontend/catalyst/oqc/test/conftest.py"]
 extend_skip_glob = [
   "mlir/llvm-project/*",
   "mlir/mlir-hlo/*",

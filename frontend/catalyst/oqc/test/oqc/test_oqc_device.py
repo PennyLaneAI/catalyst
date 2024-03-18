@@ -14,7 +14,6 @@
 """Test for the OQC device.
 """
 # pylint: disable=unused-argument,import-outside-toplevel
-import os
 import pathlib
 
 import pennylane as qml
