@@ -93,7 +93,7 @@ def test_callback_send_param(capsys):
     def my_callback(n) -> None:
         print(n)
 
-    @qml.qjit(keep_intermediate=True)
+    @qml.qjit
     def cir(n):
         my_callback(n)
         return None
