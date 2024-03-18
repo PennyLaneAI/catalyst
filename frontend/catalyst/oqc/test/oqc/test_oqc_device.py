@@ -18,6 +18,7 @@ import pathlib
 
 import pennylane as qml
 import pytest
+import sys
 
 from catalyst.compiler import get_lib_path
 
@@ -29,6 +30,20 @@ from catalyst.compiler import get_lib_path
 )
 class TestOQCDevice:
     """Test the OQC device python layer for Catalyst."""
+
+    def test_unavailable(self, monkeypatch):
+        """Check the error produced in the absence of qcaas."""
+
+        print(sys.modules)
+        monkeypatch.setitem(sys.modules, "qcaas_client.client", None)
+
+        with pytest.raises(
+            ImportError,
+            match="Oqc qcaas client not found. Please install: pip install oqc-qcaas-client",
+        ):
+            from catalyst.oqc import OQCDevice
+
+            OQCDevice(backend="lucy", shots=1000, wires=8)
 
     def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""

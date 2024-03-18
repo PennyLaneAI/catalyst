@@ -20,11 +20,11 @@ import pathlib
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
 
-try:  # pragma: no-cover
+try:
     from qcaas_client.client import OQCClient
-except ImportError as e:  # pragma: no-cover
-    raise ImportError(  # pragma: no-cover
-        "oqc qcaas not found. Please install the latest "  # pragma: no-cover
+except ImportError as e:
+    raise ImportError(
+        "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
     ) from e
 
 from catalyst.compiler import get_lib_path
@@ -73,17 +73,6 @@ class OQCDevice(Device):
         """Non-implemented python execution."""
         # Check availability
         raise NotImplementedError("The OQC device only supports Catalyst.")
-
-
-def _authenticate():  # pragma: no-cover
-    """Function that authenticates a user to the QCaas (OQC cloud)."""
-    url = os.getenv("OQC_URL")
-    email = os.getenv("OQC_EMAIL")
-    password = os.getenv("OQC_PASSWORD")
-
-    client = OQCClient(url=url, email=email, password=password)
-    client.authenticate()
-    return client
 
 
 def _check_backend(backend):
