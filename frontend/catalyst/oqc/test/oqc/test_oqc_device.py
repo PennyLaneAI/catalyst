@@ -13,7 +13,7 @@
 # limitations under the License.
 """Test for the OQC device.
 """
-# pylint: disable='unused-argument'
+# pylint: disable=unused-argument,import-outside-toplevel
 import os
 import pathlib
 

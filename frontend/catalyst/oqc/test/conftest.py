@@ -14,8 +14,9 @@
 """
 Pytest configuration file for OQC test suite.
 """
-import pytest
 import os
+
+import pytest
 
 try:
     import qcaas_client
