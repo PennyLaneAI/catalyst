@@ -2,7 +2,17 @@
 
 <h3>New features</h3>
 
+* Catalyst publishes Git revision string seen at the time of the packaging as
+  `catalyst.__revision__` . For editable installations, the revision is read at the time of
+  module import.
+  [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
+
 <h3>Improvements</h3>
+
+* An updated quantum device specification format is now supported by Catalyst. The toml schema 2
+  configs allow device autors to specify individual gate properties such as native quantum control
+  support, gate invertibility or differentiability.
+  [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
 * Catalyst now supports devices built from the 
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
@@ -36,12 +46,29 @@
 
 <h3>Bug fixes</h3>
 
+* Fix the endianness of counts in Catalyst and matches PennyLane.
+  [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
+
+* Fix the issue of triggering the C++ compiler driver twice.
+  [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
+
+* Adds lowering pass for `shape` operations. This allows programs with `jnp.reshape` to succeed.
+  Some templates may use `jnp.reshape`.
+  [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
+
+* Fixes adjoint lowering bug that did not take into account control wires.
+  [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
-Romain Moyard.
+Ali Asadi,
+David Ittah,
+Erick Ochoa Lopez,
+Romain Moyard,
+Sergei Mironov.
 
 # Release 0.5.0
 

@@ -16,6 +16,11 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
+from functools import reduce
+from itertools import repeat
+from typing import Any, Dict, List
+
+from catalyst.utils.exceptions import CompileError
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
@@ -31,9 +36,131 @@ if tomllib is None and tomlkit is None:  # pragma: nocover
     raise ImportError(msg)
 
 # Give preference to tomllib
-if tomllib:
-    from tomllib import load as toml_load  # pragma: nocover
-else:
-    from tomlkit import load as toml_load  # pragma: nocover
+if tomllib:  # pragma: nocover
+    from tomllib import load as toml_load
 
-__all__ = ["toml_load"]
+    TOMLDocument = Any
+else:  # pragma: nocover
+    from tomlkit import TOMLDocument
+    from tomlkit import load as toml_load
+
+__all__ = ["toml_load", "TOMLDocument"]
+
+
+def check_mid_circuit_measurement_flag(config: TOMLDocument) -> bool:
+    """Check the global mid-circuit measurement flag"""
+    return bool(config.get("compilation", {}).get("mid_circuit_measurement", False))
+
+
+def check_adjoint_flag(config: TOMLDocument, shots_present: bool) -> bool:
+    """Check the global adjoint flag for toml schema 1. For newer schemas the adjoint flag is
+    defined to be set if all native gates are inverible"""
+    schema = int(config["schema"])
+    if schema == 1:
+        return bool(config.get("compilation", {}).get("quantum_adjoint", False))
+
+    elif schema == 2:
+        return all(
+            "invertible" in v.get("properties", {})
+            for g, v in get_native_gates(config, shots_present).items()
+        )
+
+    raise CompileError("quantum_adjoint flag is not supported in TOMLs schema >= 3")
+
+
+def check_quantum_control_flag(config: TOMLDocument) -> bool:
+    """Check the control flag. Only exists in toml config schema 1"""
+    schema = int(config["schema"])
+    if schema == 1:
+        return bool(config.get("compilation", {}).get("quantum_control", False))
+
+    raise CompileError("quantum_control flag is not supported in TOMLs schema >= 2")
+
+
+def get_gates(config: TOMLDocument, path: List[str], shots_present: bool) -> Dict[str, dict]:
+    """Read the toml config section specified by `path`. Filters-out gates which don't match
+    condition. For now the only condition we support is `shots_present`."""
+    gates = {}
+    analytic = "analytic"
+    finiteshots = "finiteshots"
+    iterable = reduce(lambda x, y: x[y], path, config)
+    gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
+    for g, values in gen:
+        unknown_attrs = set(values) - {"condition", "properties"}
+        if len(unknown_attrs) > 0:
+            raise CompileError(
+                f"Configuration for gate '{str(g)}' has unknown attributes: {list(unknown_attrs)}"
+            )
+        properties = values.get("properties", {})
+        unknown_props = set(properties) - {"invertible", "controllable", "differentiable"}
+        if len(unknown_props) > 0:
+            raise CompileError(
+                f"Configuration for gate '{str(g)}' has unknown properties: {list(unknown_props)}"
+            )
+        if "condition" in values:
+            conditions = values["condition"]
+            unknown_conditions = set(conditions) - {analytic, finiteshots}
+            if len(unknown_conditions) > 0:
+                raise CompileError(
+                    f"Configuration for gate '{str(g)}' has unknown conditions: "
+                    f"{list(unknown_conditions)}"
+                )
+            if all(c in conditions for c in [analytic, finiteshots]):
+                raise CompileError(
+                    f"Configuration for gate '{g}' can not contain both "
+                    f"`{finiteshots}` and `{analytic}` conditions simultaniosly"
+                )
+            if analytic in conditions and not shots_present:
+                gates[g] = values
+            elif finiteshots in conditions and shots_present:
+                gates[g] = values
+        else:
+            gates[g] = values
+    return gates
+
+
+def get_observables(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+    """Override the set of supported observables."""
+    return get_gates(config, ["operators", "observables"], shots_present)
+
+
+def get_native_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+    """Get the gates from the `native` section of the config."""
+
+    schema = int(config["schema"])
+    if schema == 1:
+        return get_gates(config, ["operators", "gates", 0, "native"], shots_present)
+    elif schema == 2:
+        return get_gates(config, ["operators", "gates", "native"], shots_present)
+
+    raise CompileError(f"Unsupported config schema {schema}")
+
+
+def get_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+    """Get gates that will be decomposed according to PL's decomposition rules.
+
+    Args:
+        config (TOMLDocument): Configuration dictionary
+    """
+    schema = int(config["schema"])
+    if schema == 1:
+        return get_gates(config, ["operators", "gates", 0, "decomp"], shots_present)
+    elif schema == 2:
+        return get_gates(config, ["operators", "gates", "decomp"], shots_present)
+
+    raise CompileError(f"Unsupported config schema {schema}")
+
+
+def get_matrix_decomposable_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
+    """Get gates that will be decomposed to QubitUnitary.
+
+    Args:
+        config (TOMLDocument): Configuration dictionary
+    """
+    schema = int(config["schema"])
+    if schema == 1:
+        return get_gates(config, ["operators", "gates", 0, "matrix"], shots_present)
+    elif schema == 2:
+        return get_gates(config, ["operators", "gates", "matrix"], shots_present)
+
+    raise CompileError(f"Unsupported config schema {schema}")

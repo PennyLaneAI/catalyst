@@ -656,6 +656,31 @@ def test_quantum_montecarlo():
     assert np.allclose(jitted_fn(), interpreted_fn())
 
 
+def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
+    """https://discuss.pennylane.ai/t/error-faced-in-training-the-quantum-network-for-estimating-parameters/3624/22"""
+
+    n_dset = 10
+    n_qubits = 3
+    layers = 2
+
+    dev = qml.device(backend, wires=n_qubits)
+
+    @qml.qnode(dev, diff_method="adjoint")
+    def qnn(weights, inputs):
+        qml.AmplitudeEmbedding(inputs, wires=range(n_qubits), pad_with=0.5)
+        qml.BasicEntanglerLayers(weights, wires=range(n_qubits))
+        for i in range(n_qubits - 1):
+            if i % 2 == 0:
+                qml.CNOT(wires=[i, i + 1])
+        return [qml.expval(qml.PauliZ(i)) for i in range(n_qubits)[1::2]]
+
+    x_train = np.random.rand(n_dset, 2**n_qubits)
+    weights = np.random.rand(layers, n_qubits)
+    expected = qnn(weights, x_train[0])
+    observed = qjit(qnn)(weights, x_train[0])
+    assert np.allclose(expected, observed)
+
+
 # Hilbert Schmidt templates take a quantum tape as a parameter.
 # Therefore unsuitable for JIT compilation
 

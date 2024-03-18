@@ -20,7 +20,6 @@ while using :func:`~.qjit`.
 
 import copy
 import numbers
-import pathlib
 from collections.abc import Sequence, Sized
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
@@ -94,7 +93,13 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.utils.runtime import extract_backend_info, get_lib_path
+from catalyst.utils.runtime import (
+    BackendInfo,
+    device_get_toml_config,
+    extract_backend_info,
+    validate_config_with_device,
+)
+from catalyst.utils.toml import TOMLDocument
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -130,41 +135,22 @@ class QFunc:
         update_wrapper(self, fn)
 
     @staticmethod
-    def _add_toml_file(device):
-        """Temporary function. This function adds the config field to devices.
-        TODO: Remove this function when `qml.Device`s are guaranteed to have their own
-        config file field."""
-        if hasattr(device, "config"):  # pragma: no cover
-            # Devices that already have a config field do not need it to be overwritten.
-            return
-        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-        name = device.name
-        if isinstance(device, qml.Device):
-            name = device.short_name
-
-        # The toml files name convention we follow is to replace
-        # the dots with underscores in the device short name.
-        toml_file_name = name.replace(".", "_") + ".toml"
-        # And they are currently saved in the following directory.
-        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
-        device.config = toml_file
-
-    @staticmethod
-    def extract_backend_info(device):
+    def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device)
+        return extract_backend_info(device, config)
 
     def __call__(self, *args, **kwargs):
         qnode = None
         if isinstance(self, qml.QNode):
             qnode = self
-            QFunc._add_toml_file(self.device)
-            dev_args = QFunc.extract_backend_info(self.device)
-            config, rest = dev_args[0], dev_args[1:]
+            config = device_get_toml_config(self.device)
+            validate_config_with_device(self.device, config)
+            backend_info = QFunc.extract_backend_info(self.device, config)
+
             if isinstance(self.device, qml.devices.Device):
-                device = QJITDeviceNewAPI(self.device, config, *rest)
+                device = QJITDeviceNewAPI(self.device, config, backend_info)
             else:
-                device = QJITDevice(config, self.device.shots, self.device.wires, *rest)
+                device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
         else:  # pragma: nocover
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -824,7 +810,6 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         results = (func_res, vjps)
 
     else:
-
         if isinstance(params, jax.numpy.ndarray) and params.ndim == 0:
             primal_outputs, vjp_fn = jax.vjp(f, params)
         else:
