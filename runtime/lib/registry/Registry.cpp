@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define NPY_NO_DEPRECATED_API NPY_1_22_API_VERSION
-
 #include <cstdint>
 #include <cstdio>
+#include <dlfcn.h>
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <unordered_map>
+
+#include <iostream>
 
 namespace py = pybind11;
 
@@ -31,18 +33,63 @@ namespace py = pybind11;
 // https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
 std::unordered_map<int64_t, py::function> *references;
 
-void sanitizeResult(py::object obj) {
-    
+std::string libmlirpath;
+
+void convertResult(py::handle tuple)
+{
+
+    py::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
+
+    py::object unranked_memref = unrankedMemrefPtrSizeTuple.attr("__getitem__")(0);
+    py::object element_size = unrankedMemrefPtrSizeTuple.attr("__getitem__")(1);
+    py::object unranked_memref_ptr_int = unranked_memref.attr("value");
+
+    void *unranked_memref_ptr = (void *)(py::cast<long>(unranked_memref_ptr_int));
+    long e_size = py::cast<long>(element_size);
+
+    std::string libpath = libmlirpath + "/libmlir_c_runner_utils.so";
+    void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
+    if (!handle) {
+        throw py::value_error(dlerror());
+    }
+
+    void *f_ptr = dlsym(handle, "memrefCopy");
+    if (!handle) {
+        throw py::value_error(dlerror());
+    }
+
+    void (*memrefCopy)(int64_t, void *, void *);
+    typedef void (*memrefCopy_t)(int64_t, void *, void *);
+    memrefCopy = (memrefCopy_t)(f_ptr);
+
+    py::object dest = tuple.attr("__getitem__")(1);
+
+    long destAsLong = py::cast<long>(dest);
+    void *destAsPtr = (void *)(destAsLong);
+
+    // destAsPtr is a rankedMemref...
+    // we need to cast it into an unranked memref...
+    struct UnrankedMemrefType {
+        int64_t rank;
+        void *descriptor;
+    };
+    UnrankedMemrefType destAsUnranked = {0, destAsPtr};
+    memrefCopy(e_size, unranked_memref_ptr, &destAsUnranked);
+    dlclose(handle);
 }
 
-void sanitizeResults(py::list results) {
-    for (py::object obj : results) {
-        sanitizeResult(obj);
+void convertResults(py::list results, py::list allocated)
+{
+    auto builtins = py::module_::import("builtins");
+    auto zip = builtins.attr("zip");
+    for (py::handle obj : zip(results, allocated)) {
+        convertResult(obj);
     }
 }
 
 extern "C" {
-[[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc, va_list args)
+[[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc,
+                                                 va_list args)
 {
     auto it = references->find(identifier);
     if (it == references->end()) {
@@ -66,11 +113,16 @@ extern "C" {
     // of aliasing. Let's just copy them to guarantee
     // no aliasing issues. We can revisit this as an optimization
     // and allowing these to alias.
-    for (py::handle obj : flat_results) {
-        
+    py::list flat_returns_allocated_compiler;
+    for (int i = 0; i < retc; i++) {
+        int64_t ptr = va_arg(args, int64_t);
+        flat_returns_allocated_compiler.append(ptr);
     }
+    convertResults(flat_results, flat_returns_allocated_compiler);
 }
 }
+
+void setMLIRLibPath(std::string path) { libmlirpath = path; }
 
 auto registerImpl(py::function f)
 {
@@ -91,4 +143,5 @@ PYBIND11_MODULE(catalyst_callback_registry, m)
     }
     m.doc() = "Callbacks";
     m.def("register", &registerImpl, "Call a python function registered in a map.");
+    m.def("set_mlir_lib_path", &setMLIRLibPath, "Set location of mlir's libraries.");
 }
