@@ -13,9 +13,12 @@
 # limitations under the License.
 """Test callbacks"""
 
+import jax
+import numpy as np
 import pennylane as qml
 import pytest
 
+from catalyst import debug
 from catalyst.pennylane_extensions import callback
 
 
@@ -121,19 +124,17 @@ def test_kwargs(capsys):
     for string in ["a 0", "b 1", "c 2", "d 3", "e 4"]:
         assert string in captured.out
 
-@pytest.mark.parametrize("x", [0])
-def test_callback_with_return_values(x):
+
+@pytest.mark.parametrize("x", [0, 1, 2, 3, 4])
+def test_identity(x):
     """Test callback with return values"""
 
-    import jax
-
     @callback
-    def my_callback(x) -> jax.core.ShapedArray([], int):
+    def identity(x) -> jax.core.ShapedArray([], int):
         return x
 
     @qml.qjit
     def cir(x):
-        x = my_callback(x)
-        return x
+        return identity(x)
 
     assert cir(x) == x

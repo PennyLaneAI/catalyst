@@ -99,6 +99,7 @@ from catalyst.tracing.contexts import (
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
+    get_unranked_memref_descriptor,
     ranked_memref_to_numpy,
 )
 from catalyst.utils.runtime import (
@@ -2634,6 +2635,15 @@ def callback_implementation(
     flat_args, in_tree = tree_flatten((args, kwargs))
     metadata = CallbackClosure(args, kwargs)
 
+    has_results = not result_shape_dtypes or not (result_shape_dtypes == inspect.Signature.empty)
+    if has_results:
+        results_aval = tree_map(
+            lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes
+        )
+    else:
+        results_aval = None
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+
     def _flat_callback(flat_args):
         """Each flat_arg is a pointer.
 
@@ -2642,15 +2652,20 @@ def callback_implementation(
         """
         jnpargs = metadata.getArgsAsJAXArrays(flat_args)
         args, kwargs = tree_unflatten(in_tree, jnpargs)
-        retval = tree_leaves(cb(*args, **kwargs))
-        return retval
+        retvals = tree_leaves(cb(*args, **kwargs))
+        return_values = []
+        for retval, result_shape_dtype in zip(retvals, flat_results_aval):
+            ranked_memref = get_ranked_memref_descriptor(retval)
+            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
+            unranked_memref = get_unranked_memref_descriptor(retval)
+            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
+            # We need to keep a value of retval around
+            # Otherwise, Python's garbage collection will collect the memory
+            # before we run the memory copy in the runtime.
+            # We need to copy the unranked_memref_ptr and we need to know the element size.
+            return_values.append((unranked_memref_ptr, element_size, retval))
+        return return_values
 
-    has_results = not result_shape_dtypes or not (result_shape_dtypes == inspect.Signature.empty)
-    if has_results:
-        results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
-    else:
-        results_aval = None
-    flat_results_aval, out_tree = tree_flatten(results_aval)
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )
