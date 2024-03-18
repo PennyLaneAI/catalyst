@@ -89,6 +89,7 @@ Catalyst
    demos/magic_distillation_demo
    demos/adaptive_circuits_demo
    demos/qml/tutorial_qubit_rotation
+   demos/qml_optimization
 
 .. toctree::
    :maxdepth: 1
