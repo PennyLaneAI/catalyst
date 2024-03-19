@@ -753,7 +753,7 @@ class TestVectorizeMap:
             match="Invalid batch size; it must be a non-zero integer, but got 0.",
         ):
             qjit(workflow)(x)
-    
+
     def test_vmap_worflow_derivation(self, backend):
         """Check the gradient of a vmap workflow"""
         n_wires = 5
@@ -761,7 +761,6 @@ class TestVectorizeMap:
         targets = jnp.array([-0.2, 0.4, 0.35, 0.2])
 
         dev = qml.device(backend, wires=n_wires)
-            
 
         @qml.qnode(dev)
         def circuit(data, weights):
@@ -785,8 +784,6 @@ class TestVectorizeMap:
             return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
 
         circuit = qml.qjit(vmap(circuit, in_axes=(1, None)), autograph=False)
-            
-
 
         def my_model(data, weights, bias):
             return circuit(data, weights) + bias
@@ -797,9 +794,8 @@ class TestVectorizeMap:
             loss = jnp.sum((targets - predictions) ** 2 / len(data))
             return loss
 
-
         weights = jnp.ones([n_wires, 3])
-        bias = jnp.array(0.)
+        bias = jnp.array(0.0)
         params = {"weights": weights, "bias": bias}
 
         results_enzyme = qml.qjit(grad(loss_fn))(params, data, targets)
