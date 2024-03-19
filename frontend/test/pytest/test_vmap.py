@@ -799,11 +799,11 @@ class TestVectorizeMap:
         params = {"weights": weights, "bias": bias}
 
         results_enzyme = qml.qjit(grad(loss_fn))(params, data, targets)
-        results_fd = qml.qjit(grad(loss_fn, method="fd"))(params, data, targets)
+        results_fd = jax.grad(loss_fn)(params, data, targets)
 
         data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
         data_fd, pytree_fd = tree_flatten(results_fd)
 
         assert pytree_enzyme == pytree_fd
-        assert jnp.allclose(data_enzyme[0], data_fd[0], atol=1e-1)
-        assert jnp.allclose(data_enzyme[1], data_fd[1], atol=1e-1)
+        assert jnp.allclose(data_enzyme[0], data_fd[0])
+        assert jnp.allclose(data_enzyme[1], data_fd[1])
