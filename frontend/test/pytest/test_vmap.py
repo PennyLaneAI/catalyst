@@ -762,7 +762,7 @@ class TestVectorizeMap:
 
         dev = qml.device(backend, wires=n_wires)
 
-        @qml.qnode(dev)
+        @qml.qnode(dev, diff_method="adjoint")
         def circuit(data, weights):
             """Quantum circuit ansatz"""
 
@@ -799,10 +799,10 @@ class TestVectorizeMap:
         params = {"weights": weights, "bias": bias}
 
         results_enzyme = qjit(grad(loss_fn))(params, data, targets)
-        results_fd = jax.grad(loss_fn)(params, data, targets)
+        results_jax = jax.grad(loss_fn)(params, data, targets)
 
         data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
-        data_fd, pytree_fd = tree_flatten(results_fd)
+        data_fd, pytree_fd = tree_flatten(results_jax)
 
         assert pytree_enzyme == pytree_fd
         assert jnp.allclose(data_enzyme[0], data_fd[0])
