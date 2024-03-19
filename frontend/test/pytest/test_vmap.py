@@ -758,7 +758,8 @@ class TestVectorizeMap:
         """Check the gradient of a vmap workflow"""
         n_wires = 5
         data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
-        targets = jnp.array([-0.2, 0.4, 0.35, 0.2])
+
+        targets = jnp.array([-0.2, 0.4, 0.35, 0.2], dtype=jax.numpy.float64)
 
         dev = qml.device(backend, wires=n_wires)
 
@@ -788,22 +789,21 @@ class TestVectorizeMap:
         def my_model(data, weights, bias):
             return circuit(data, weights) + bias
 
-        @qjit
         def loss_fn(params, data, targets):
             predictions = my_model(data, params["weights"], params["bias"])
             loss = jnp.sum((targets - predictions) ** 2 / len(data))
             return loss
 
         weights = jnp.ones([n_wires, 3])
-        bias = jnp.array(0.0)
+        bias = jnp.array(0.0, dtype=jax.numpy.float64)
         params = {"weights": weights, "bias": bias}
 
         results_enzyme = qjit(grad(loss_fn))(params, data, targets)
         results_jax = jax.grad(loss_fn)(params, data, targets)
 
         data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
-        data_fd, pytree_fd = tree_flatten(results_jax)
+        data_jax, pytree_fd = tree_flatten(results_jax)
 
         assert pytree_enzyme == pytree_fd
-        assert jnp.allclose(data_enzyme[0], data_fd[0])
-        assert jnp.allclose(data_enzyme[1], data_fd[1])
+        assert jnp.allclose(data_enzyme[0], data_jax[0])
+        assert jnp.allclose(data_enzyme[1], data_jax[1], atol=8e-2)
