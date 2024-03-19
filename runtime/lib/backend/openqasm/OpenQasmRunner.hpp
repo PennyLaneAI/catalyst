@@ -23,11 +23,9 @@
 #include <vector>
 
 #include "Exception.hpp"
+#include "Python.hpp"
 
 #include <pybind11/embed.h>
-
-// To protect the py::exec calls concurrently
-extern std::mutex &getPythonMutex();
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
