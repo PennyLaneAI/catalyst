@@ -337,8 +337,8 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                                              rewriter, loc, cotangents);
 
                         auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                            loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
-                            entryBlock->getArguments(),
+                            loc, TypeRange{}, computeBackpropTypes(callee, diffArgIndices),
+                            callee.getName(), entryBlock->getArguments(),
                             /*arg_shadows=*/ValueRange{},
                             /*primal results=*/ValueRange{}, cotangents,
                             gradOp.getDiffArgIndicesAttr());
@@ -399,8 +399,8 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                                      loc, cotangents);
 
                 auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                    loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
-                    entryBlock->getArguments(),
+                    loc, TypeRange{}, computeBackpropTypes(callee, diffArgIndices),
+                    callee.getName(), entryBlock->getArguments(),
                     /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                     gradOp.getDiffArgIndicesAttr());
                 for (const auto &[backpropIdx, jacobianSlice] :

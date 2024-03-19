@@ -117,8 +117,11 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     }];
 }
 
-def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def BackpropOp : Gradient_Op<"backprop", [
+        AttrSizedOperandSegments,
+        AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
@@ -134,6 +137,10 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
     );
 
     let results = (outs
+        Variadic<AnyTypeOf<[
+            AnyFloat,
+            RankedTensorOf<[AnyFloat]>
+        ]>>:$vals,
         Variadic<AnyTypeOf<[
             AnyFloat,
             RankedTensorOf<[AnyFloat]>

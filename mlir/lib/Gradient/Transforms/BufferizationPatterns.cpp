@@ -138,17 +138,40 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
         }
 
+        // Collect the value types
+        SmallVector<Type> valTypes;
+        {
+            for (auto &&val : op.getVals()) {
+                valTypes.push_back(val.getType());
+            }
+        }
+
+        // Infer if we are lowering a value_and_grad operation
+        bool isValueAndGradOp = !valTypes.empty();
+
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
-            loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
+            loc, valTypes, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
             calleeResults, resShadows, diffArgIndicesAttr);
 
         // Fill in the null placeholders.
-        for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
+        for (const auto &[idx, scalarResult] :
+                llvm::enumerate(bufferizedBackpropOp.getGradients())) {
             gradients[scalarIndices[idx]] = scalarResult;
         }
+        
+        // BackpropOp can return two results for value_and_grad: values and gradients
+        // or only one for grad: gradients
+        SmallVector<Value> results;
+        {
+            // The values are the calleeResults
+            if (isValueAndGradOp) {
+                results.insert(results.end(), calleeResults.begin(), calleeResults.end());
+            }
+            results.insert(results.end(), gradients.begin(), gradients.end());
+        }
 
-        rewriter.replaceOp(op, gradients);
+        rewriter.replaceOp(op, results);
         return success();
     }
 };
