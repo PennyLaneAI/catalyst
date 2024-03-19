@@ -788,6 +788,7 @@ class TestVectorizeMap:
         def my_model(data, weights, bias):
             return circuit(data, weights) + bias
 
+        @qjit
         def loss_fn(params, data, targets):
             predictions = my_model(data, params["weights"], params["bias"])
             loss = jnp.sum((targets - predictions) ** 2 / len(data))
