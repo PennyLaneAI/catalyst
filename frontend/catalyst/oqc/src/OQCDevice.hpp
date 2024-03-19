@@ -39,7 +39,7 @@
 #include "OQCRunner.hpp" // <pybind11/embed.h>
 #include "OpenQASM2Builder.hpp"
 
-using namespace Catalyst::Runtime::OpenQasm2;
+using namespace Catalyst::Runtime::OpenQASM2;
 using namespace Catalyst::Runtime::Device::OQC;
 
 namespace Catalyst::Runtime::Device {
@@ -75,7 +75,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OQCDevice(const std::string &kwargs = "{device_type : oqc.remote, backend : default}")
+    explicit OQCDevice(const std::string &kwargs = "{device_type : oqc, backend : default}")
     {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
@@ -89,8 +89,5 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
 
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
-
-    // Circuit RT
-    // [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQasm(); }
 };
 } // namespace Catalyst::Runtime::Device

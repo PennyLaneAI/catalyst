@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@
 
 #include "Exception.hpp"
 
-namespace Catalyst::Runtime::OpenQasm2 {
+namespace Catalyst::Runtime::OpenQASM2 {
 
 /**
- * Supported OpenQasm register modes by the builder.
+ * Supported OpenQASM register modes by the builder.
  */
 enum class RegisterMode : uint8_t {
     Alloc, // = 0
@@ -38,7 +38,7 @@ enum class RegisterMode : uint8_t {
 };
 
 /**
- * Supported OpenQasm register types by the builder.
+ * Supported OpenQASM register types by the builder.
  */
 enum class RegisterType : uint8_t {
     Qubit, // = 0
@@ -48,7 +48,7 @@ enum class RegisterType : uint8_t {
 using GateNameT = std::string_view;
 
 /**
- * The map of supported quantum gate names by OpenQasm devices.
+ * The map of supported quantum gate names by the OQC device.
  */
 constexpr std::array rt_qasm_gate_map = {
     // (RT-GateName, Qasm-GateName)
@@ -157,12 +157,8 @@ class QASMRegister {
  * @param name The name of the gate to apply from the list of supported gates
  * (`rt_qasm_gate_map`)
  * @param params_val Optional list of parameter values for parametric gates
- * @param params_str Optional list of parameter names for parametric gates
  * @param wires Wires to apply gate to
- * @param inverse Indicates whether to use inverse of gate
  *
- * @note Parametric gates are currently supported via either their values or names
- * but not both.
  */
 class QASMGate {
   private:
@@ -212,8 +208,8 @@ class QASMGate {
 /**
  * The OpenQasm measure type.
  *
+ * @param qubit Qubit to apply `measure` to
  * @param bit The measurement bit result
- * @param wire Wire to apply `measure` to
  */
 class QASMMeasure {
   private:
@@ -247,14 +243,13 @@ std::string MeasureAll(const QASMRegister &qregister, const QASMRegister &cregis
 };
 
 /**
- * The OpenQasm circuit builder interface.
+ * The OpenQASM2 circuit builder interface.
  *
- * @note Only one user-specified quantum register is currently supported.
- * @note User-specified measurement results registers are supported.
  *
  * @param qregs Quantum registers
  * @param cregs Measurement results registers
  * @param gates Quantum gates
+ * @param measurements Quantum measurements
  */
 class OpenQASM2Builder {
   protected:

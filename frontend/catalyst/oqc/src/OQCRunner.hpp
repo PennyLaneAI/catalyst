@@ -52,8 +52,8 @@ struct OQCRunnerBase {
 };
 
 /**
- * The OpenQasm circuit runner to execute an OpenQasm circuit on Braket Devices backed by
- * Amazon Braket Python SDK.
+ * The OpenQASM circuit runner to execute an OpenQASM circuit on OQC devices thanks to
+ * OQC qcaas client.
  */
 struct OQCRunner : public OQCRunnerBase {
 

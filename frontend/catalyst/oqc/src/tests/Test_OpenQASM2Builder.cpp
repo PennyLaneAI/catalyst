@@ -22,7 +22,7 @@
 
 #define TYPE_INFO(x) std::string(typeid(x).name())
 
-using namespace Catalyst::Runtime::OpenQasm2;
+using namespace Catalyst::Runtime::OpenQASM2;
 
 TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
 {
