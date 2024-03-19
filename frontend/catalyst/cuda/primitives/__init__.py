@@ -18,6 +18,7 @@ This module implements JAXPR primitives for CUDA-quantum.
 
 import cudaq
 import jax
+from cudaq import QuakeValue
 from jax import numpy as jnp
 
 # We disable protected access in particular to avoid warnings with
@@ -56,7 +57,7 @@ class AbsCudaQbit(jax.core.AbstractValue):
         return self.hash_value  # pragma: nocover
 
 
-class CudaQbit(cudaq._pycudaq.QuakeValue):
+class CudaQbit(QuakeValue):
     "Concrete CUDA-quantum qbit."
     aval = AbsCudaQbit
 
@@ -72,7 +73,7 @@ class AbsCudaQReg(jax.core.AbstractValue):
         return self.hash_value  # pragma: nocover
 
 
-class CudaQReg(cudaq._pycudaq.QuakeValue):
+class CudaQReg(QuakeValue):
     "Concrete CUDA-quantum quantum register."
     aval = AbsCudaQReg
 
@@ -88,7 +89,7 @@ class AbsCudaValue(jax.core.AbstractValue):
         return self.hash_value  # pragma: nocover
 
 
-class CudaValue(cudaq._pycudaq.QuakeValue):
+class CudaValue(QuakeValue):
     "Concrete CUDA-quantum value."
     aval = AbsCudaValue
 
@@ -104,7 +105,7 @@ class AbsCudaKernel(jax.core.AbstractValue):
         return self.hash_value  # pragma: nocover
 
 
-class CudaKernel(cudaq._pycudaq.QuakeValue):
+class CudaKernel(QuakeValue):
     "Concrete CUDA-quantum kernel."
     aval = AbsCudaKernel
 
