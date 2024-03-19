@@ -183,6 +183,7 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
                 funcOp.walk([&](func::CallOp callOp) {
                     if (callOp.getCallee() == qnode.getName()) {
                         PatternRewriter::InsertionGuard insertionGuard(rewriter);
+                        # TODO: optimize the placement of the param count call (e.g. loop hoisting)
                         rewriter.setInsertionPoint(callOp);
                         Value paramCount =
                             rewriter
