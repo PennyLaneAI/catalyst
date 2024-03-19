@@ -384,6 +384,8 @@ jobs:
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
+        # TODO: Remove version condition when https://github.com/PennyLaneAI/catalyst/pull/618
+        # is merged.
         python3 -m pip install 'cuda-quantum<0.7'
         make frontend
 
