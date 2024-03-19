@@ -18,6 +18,7 @@ from typing import Optional, Set
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 
+from catalyst.preprocess import decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
@@ -292,6 +293,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
     ):
         """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
+
+        convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
+        program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
         # TODO: Add Catalyst program verification and validation
         return program, config
 
