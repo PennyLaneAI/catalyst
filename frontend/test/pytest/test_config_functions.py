@@ -71,7 +71,7 @@ def test_validate_config_with_device(schema):
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
         device = DummyDevice()
@@ -98,7 +98,7 @@ def test_get_observables_schema1():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
 
@@ -119,7 +119,7 @@ def test_get_observables_schema2():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
 
@@ -142,7 +142,7 @@ def test_get_native_gates_schema1_no_qcontrol():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
@@ -165,7 +165,7 @@ def test_get_native_gates_schema1_qcontrol():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
@@ -185,7 +185,7 @@ def test_get_adjoint_schema2():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert check_adjoint_flag(config, False)
 
@@ -207,7 +207,7 @@ def test_get_native_gates_schema2():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
@@ -229,7 +229,7 @@ def test_get_native_gates_schema2_optional_shots():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_operations(config, True, "device_name")
 
@@ -250,7 +250,7 @@ def test_get_native_gates_schema2_optional_noshots():
                     """
                 )
             )
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device")
 
@@ -271,7 +271,7 @@ def test_get_decomp_gates_schema1():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
     assert test_gates == get_decomposable_gates(config, False)
@@ -293,7 +293,7 @@ def test_get_decomp_gates_schema2():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
     assert test_gates == get_decomposable_gates(config, False)
@@ -315,7 +315,7 @@ def test_get_matrix_decomposable_gates_schema1():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
     assert test_gates == get_matrix_decomposable_gates(config, False)
@@ -336,7 +336,7 @@ def test_get_matrix_decomposable_gates_schema2():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
     assert {"TestMatrixGate": {}} == get_matrix_decomposable_gates(config, False)
@@ -372,7 +372,7 @@ def test_config_invalid_attr():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
         with pytest.raises(
@@ -396,7 +396,7 @@ def test_config_invalid_condition_unknown():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
         with pytest.raises(
@@ -420,7 +420,7 @@ def test_config_invalid_property_unknown():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
         with pytest.raises(
@@ -444,7 +444,7 @@ def test_config_invalid_condition_duplicate():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
         with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
@@ -467,7 +467,7 @@ def test_config_unsupported_schema():
                 )
             )
 
-        with open(toml_file, encoding="utf-8") as f:
+        with open(toml_file, "rb") as f:
             config = toml_load(f)
 
         with pytest.raises(CompileError):
