@@ -783,12 +783,11 @@ class TestVectorizeMap:
 
             return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
 
-        circuit = qml.qjit(vmap(circuit, in_axes=(1, None)), autograph=False)
+        circuit = vmap(circuit, in_axes=(1, None))
 
         def my_model(data, weights, bias):
             return circuit(data, weights) + bias
 
-        @qml.qjit
         def loss_fn(params, data, targets):
             predictions = my_model(data, params["weights"], params["bias"])
             loss = jnp.sum((targets - predictions) ** 2 / len(data))
@@ -798,7 +797,7 @@ class TestVectorizeMap:
         bias = jnp.array(0.0)
         params = {"weights": weights, "bias": bias}
 
-        results_enzyme = qml.qjit(grad(loss_fn))(params, data, targets)
+        results_enzyme = qjit(grad(loss_fn))(params, data, targets)
         results_fd = jax.grad(loss_fn)(params, data, targets)
 
         data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
