@@ -14,8 +14,7 @@
 """Test for the OQC device.
 """
 # pylint: disable=unused-argument,import-outside-toplevel
-import pathlib
-import sys
+from unittest.mock import patch
 
 import pennylane as qml
 import pytest
@@ -23,28 +22,18 @@ import pytest
 from catalyst.compiler import get_lib_path
 
 
-# TODO: replace when the OQC CPP layer is available.
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 def test_unavailable(monkeypatch, set_dummy_oqc_env):
     """Check the error produced in the absence of qcaas."""
-    monkeypatch.setitem(sys.modules, "qcaas_client", None)
-    with pytest.raises(
-        ImportError,
-        match="Oqc qcaas client not found. Please install: pip install oqc-qcaas-client",
-    ):
-        from catalyst.oqc import OQCDevice
+    with patch.dict("sys.modules", {"qcaas_client": None, "qcaas_client.client": None}):
+        with pytest.raises(
+            ImportError,
+            match="Oqc qcaas client not found. Please install: pip install oqc-qcaas-client",
+        ):
+            from catalyst.oqc import OQCDevice
 
-        OQCDevice(backend="lucy", shots=1000, wires=8)
+            OQCDevice(backend="lucy", shots=1000, wires=8)
 
 
-# TODO: replace when the OQC CPP layer is available.
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 class TestOQCDevice:
     """Test the OQC device python layer for Catalyst."""
 
