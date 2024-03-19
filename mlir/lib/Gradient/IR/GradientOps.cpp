@@ -154,6 +154,81 @@ LogicalResult GradOp::verify()
 MutableOperandRange GradOp::getArgOperandsMutable() { return getOperandsMutable(); }
 
 //===----------------------------------------------------------------------===//
+// ValueAndGradOp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable ValueAndGradOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void ValueAndGradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
+Operation::operand_range ValueAndGradOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp callee = ({
+        auto cattr = this->getCalleeAttr();
+        auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << cattr;
+        fn;
+    });
+
+    auto diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
+    auto r1 = ::verifyGradInputs(this, callee, this->getOperands(), diffArgIndices);
+    if (r1.failed()) {
+        return r1;
+    }
+
+    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
+        return this->emitOpError(
+                   "invalid number of results: must be twice the number of callee results")
+               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
+               << this->getNumResults();
+    }
+
+    std::vector<Type> grad_types;
+    {
+        for (auto s : this->getGradients()) {
+            grad_types.push_back(s.getType());
+        }
+    }
+
+    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
+        auto calleeRtype = callee.getFunctionType().getResult(i);
+        auto gradRtype = grad_types[i];
+        if (calleeRtype != gradRtype) {
+            return this->emitOpError("result types do not match")
+                   << " result " << i << " should match "
+                   << " was expected to match the type " << gradRtype << " but got " << calleeRtype;
+        }
+    }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ValueAndGradOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult ValueAndGradOp::verify()
+{
+    StringRef method = this->getMethod();
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
+        return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
+MutableOperandRange ValueAndGradOp::getArgOperandsMutable() { return getOperandsMutable(); }
+
+//===----------------------------------------------------------------------===//
 // JVPOp, CallOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -390,6 +465,80 @@ LogicalResult BackpropOp::verify()
         return emitOpError("number of gradient results did not match number of differentiable")
                << " arguments, expected " << numDiffArgs << " but got "
                << this->getDiffArgShadows().size() + this->getNumResults();
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BackpropWithValue SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropWithValueOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(),
+                                                                        this->getCalleeAttr());
+    if (!fn) {
+        return this->emitOpError("invalid function name specified: ") << this->getCallee();
+    }
+
+    std::vector<size_t> diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
+    if (failed(::verifyGradInputs(this, fn, this->getArgs(), diffArgIndices))) {
+        return failure();
+    }
+
+    if (hasTensorSemantics(getOperandTypes(), getResultTypes())) {
+        // Verify the types of the outputs
+        std::vector<Type> backpropTypes = computeBackpropTypes(fn, diffArgIndices);
+
+        std::vector<Type> gradientTypes;
+        for (auto &&grad : this->getGradients()) {
+            gradientTypes.push_back(grad.getType());
+        }
+
+        if (backpropTypes.size() != gradientTypes.size()) {
+            return emitOpError("incorrect number of gradients in the backprop of the callee, ")
+                   << "expected " << backpropTypes.size() << " gradients "
+                   << "but got " << gradientTypes.size();
+        }
+
+        for (unsigned i = 0; i < backpropTypes.size(); ++i) {
+            if (backpropTypes[i] != gradientTypes[i]) {
+                return emitOpError("gradient type mismatch: expected operand type ")
+                       << backpropTypes[i] << ", but provided " << gradientTypes[i]
+                       << " for gradient number " << i;
+            }
+        }
+    }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BackpropWithValueOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropWithValueOp::verify()
+{
+    size_t numDiffArgs =
+        this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
+    bool tensorSemantics = hasTensorSemantics(getOperandTypes(), getResultTypes());
+
+    if (this->getDiffArgShadows().size() && tensorSemantics)
+        return emitOpError("cannot have both tensor results and memref output arguments");
+
+    if (this->getCalleeResults().size() && tensorSemantics)
+        return emitOpError("cannot have callee result buffers before bufferization");
+
+    if (!tensorSemantics && this->getCalleeResults().size() != this->getCotangents().size())
+        return emitOpError("need as many callee result buffers as there are cotangents")
+               << ", expected " << this->getCotangents().size() << " but got "
+               << this->getCalleeResults().size();
+
+    if (this->getDiffArgShadows().size() + this->getGradients().size() != numDiffArgs)
+        return emitOpError("number of gradient results did not match number of differentiable")
+               << " arguments, expected " << numDiffArgs << " but got "
+               << this->getDiffArgShadows().size() + this->getGradients().size();
 
     return success();
 }
