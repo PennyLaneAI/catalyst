@@ -16,10 +16,6 @@
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
-std::mutex runner_mu;
-
-std::mutex &getOpenQasmRunnerMutex() { return runner_mu; }
-
 } // namespace Catalyst::Runtime::Device::OpenQasm
 
 namespace Catalyst::Runtime::Device {
