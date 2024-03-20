@@ -5,7 +5,7 @@ project(catalyst_oqc)
 set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/include")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/backend/common")
 set(util_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/utils")
-set(runtime_lib "${PROJECT_SOURCE_DIR}/../../../../runtime/build/lib/libcatalyst_python_interpreter.so")
+set(runtime_lib "${RUNTIME_BUILD_DIR}/lib/libcatalyst_python_interpreter.so")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
