@@ -5,27 +5,25 @@
 * Support for callbacks in Catalyst.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
+  [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
 
-  Catalyst now supports callbacks with parameters but no return values.
-  This is the very first step in supporting callbacks.
+  Catalyst now supports callbacks with parameters return values.
   The following is now possible:
 
   ```py
   @callback
   def foo(val):
-    print("Hello world", val)
+    return val
 
   @qjit
-  def circuit(*args, **kwargs):
-    ...
-    foo(123)
-    ...
+  def circuit(param):
+    return foo(param)
 
   ```
 
   ```pycon
-  >>> circuit()
-  Hello world 123
+  >>> print(circuit(123))
+  123
   ```
 
 * The python layer of the OQC-Catalyst device is now available.
