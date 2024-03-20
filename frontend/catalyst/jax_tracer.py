@@ -827,10 +827,8 @@ def trace_quantum_function(
 
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
-        if isinstance(device, qml.devices.Device):
-            quantum_tape = QuantumTape(shots=device.shots)
-        else:
-            quantum_tape = QuantumTape()
+        quantum_tape = QuantumTape(shots=device.shots)
+
         with EvaluationContext.frame_tracing_context(ctx) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
