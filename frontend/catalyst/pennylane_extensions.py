@@ -112,7 +112,6 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import TOMLDocument
 
 
-
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 

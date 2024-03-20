@@ -33,7 +33,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
-from mlir_quantum.dialects.catalyst import PrintOp, PythonCallOp
+from mlir_quantum.dialects.catalyst import PythonCallOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -213,8 +213,6 @@ vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
 adjoint_p = jax.core.Primitive("adjoint")
 adjoint_p.multiple_results = True
-print_p = jax.core.Primitive("debug_print")
-print_p.multiple_results = True
 python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
 
@@ -247,25 +245,6 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
     return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
-
-
-#
-# print
-#
-@print_p.def_abstract_eval
-def _print_abstract_eval(*args, string=None, memref=False):
-    return ()
-
-
-@print_p.def_impl
-def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
-    raise NotImplementedError()
-
-
-def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
-    val = args[0] if args else None
-    const_val = ir.StringAttr.get(string + "\0") if string else None
-    return PrintOp(val=val, const_val=const_val, print_descriptor=memref).results
 
 
 #
@@ -1710,7 +1689,6 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
-mlir.register_lowering(print_p, _print_lowering)
 mlir.register_lowering(python_callback_p, _python_callback_lowering)
 
 

@@ -14,58 +14,6 @@
 
 // RUN: quantum-opt --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
-//////////////////////
-// Catalyst PrintOp //
-//////////////////////
-
-// CHECK-DAG: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr, i1)
-
-// CHECK-LABEL: @dbprint_val
-func.func @dbprint_val(%arg0 : memref<1xi64>) {
-    // CHECK: [[memref:%.+]] = builtin.unrealized_conversion_cast %arg0
-    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(5 : i8)
-    // CHECK: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[struct:%.+]] = llvm.mlir.undef : !llvm.struct<(i64, ptr, i8)>
-
-    // CHECK: [[struct0:%.+]] = llvm.insertvalue [[rank]], [[struct]][0]
-
-    // CHECK: [[memref_ptr:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    // CHECK: llvm.store [[memref]], [[memref_ptr]]
-    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr]], [[struct0]][1]
-
-    // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
-
-    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} : (i64) -> !llvm.ptr
-    // CHECK: llvm.store [[struct2]], [[struct_ptr]]
-    // CHECK: [[memref_flag:%.+]] = llvm.mlir.constant(false)
-    // CHECK: llvm.call @__catalyst__rt__print_tensor([[struct_ptr]], [[memref_flag]])
-    "catalyst.print"(%arg0) : (memref<1xi64>) -> ()
-
-    // CHECK: [[memref_flag2:%.+]] = llvm.mlir.constant(true)
-    // CHECK: llvm.call @__catalyst__rt__print_tensor({{%.+}}, [[memref_flag2]])
-    "catalyst.print"(%arg0) {print_descriptor} : (memref<1xi64>) -> ()
-
-    return
-}
-
-// -----
-
-// CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Hello, Catalyst")
-// CHECK-DAG: llvm.func @__catalyst__rt__print_string(!llvm.ptr)
-
-// CHECK-LABEL: @dbprint_str
-func.func @dbprint_str() {
-
-    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
-    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr inbounds [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<15 x i8>
-    // CHECK: llvm.call @__catalyst__rt__print_string([[char_ptr]])
-    "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
-
-    return
-}
-
-// -----
-
 func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     // CHECK: [[convertedArg:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<3x3xf64> to !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK-NEXT: [[alloc:%.+]] = memref.alloc() : memref<3x3xf64>

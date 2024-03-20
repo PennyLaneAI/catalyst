@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import debug
+import catalyst.debug
 from catalyst.pennylane_extensions import callback
 
 
@@ -143,3 +144,21 @@ def test_identity_types(arg):
         return identity(x)
 
     assert np.allclose(cir(arg), arg)
+
+
+def test_fprintf_debug(capsys):
+    """Test fstring printing."""
+
+    fstr = "You can do a lot with ${price:.2f} American dollars!"
+
+    @qml.qjit
+    def song_lyric(x: float):
+        debug.print(fstr, price=x)
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    song_lyric(4.0)
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "You can do a lot with $4.00 American dollars!"

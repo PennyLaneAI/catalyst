@@ -54,7 +54,6 @@ from catalyst.jax_primitives import (
     hermitian_p,
     jvp_p,
     namedobs_p,
-    print_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -757,7 +756,6 @@ INST_IMPL = {
     func_p: unimplemented_impl,
     jvp_p: unimplemented_impl,
     vjp_p: unimplemented_impl,
-    print_p: unimplemented_impl,
 }
 
 

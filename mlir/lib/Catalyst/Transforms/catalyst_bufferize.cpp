@@ -46,8 +46,6 @@ struct CatalystBufferizationPass : impl::CatalystBufferizationPassBase<CatalystB
         ConversionTarget target(*context);
         bufferization::populateBufferizeMaterializationLegality(target);
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        target.addDynamicallyLegalOp<PrintOp>(
-            [&](PrintOp op) { return typeConverter.isLegal(op); });
         target.addDynamicallyLegalOp<CustomCallOp>(
             [&](CustomCallOp op) { return typeConverter.isLegal(op); });
         target.addDynamicallyLegalOp<PythonCallOp>(

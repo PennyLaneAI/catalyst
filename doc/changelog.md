@@ -6,6 +6,7 @@
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
   Catalyst now supports callbacks with parameters return values.
   The following is now possible:
@@ -24,6 +25,20 @@
   ```pycon
   >>> print(circuit(123))
   123
+  ```
+
+  There is also a callback to improve the interface for printing.
+  It is equivalent to JAX's `debug_print` function. E.g.,
+
+  ```py
+  @qml.qjit
+  def func(*args, **kwargs):
+     debug_print("{arg1}, {arg0}, arg1=args[1], arg0=args[0])
+  ```
+
+  ```pycon
+  >>> func(1, 2)
+  2 1
   ```
 
 * Catalyst publishes Git revision string seen at the time of the packaging as
