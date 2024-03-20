@@ -28,10 +28,22 @@
   Hello world 123
   ```
 
+* The python layer of the OQC-Catalyst device is now available.
+  [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
+>>>>>>> main
+
 * Catalyst publishes Git revision string seen at the time of the packaging as
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
   module import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
+
+* Catalyst compiler and runtime have now the capability to provide detailed profiling information.
+  This includes insights such as the program size at various stages within the compilation pipeline
+  and the respective time durations spent in each of these stages.
+  You can print the results by enabling the `ENABLE_DIAGNOSTICS=ON` environment variable,
+  or you can save them to a file by specifying an additional environment variable,
+  `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`.
+  [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
 
 <h3>Improvements</h3>
 
@@ -73,6 +85,11 @@
   [(#615)](https://github.com/PennyLaneAI/catalyst/pull/615)
 
   This change allows any part of the runtime to start executing Python code through pybind.
+
+* Fix runtime tests to be compatible with amazon-braket-sdk==1.73.3
+  [(#620)](https://github.com/PennyLaneAI/catalyst/pull/620)
+
+  After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
 <h3>Breaking changes</h3>
 

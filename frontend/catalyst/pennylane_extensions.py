@@ -328,6 +328,7 @@ def _check_grad_params(
     argnum: Optional[Union[int, List[int]]],
     len_flatten_args: int,
     in_tree: PyTreeDef,
+    with_value: bool = False,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -358,7 +359,9 @@ def _check_grad_params(
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
     argnum_expanded, _ = tree_flatten(argnum_selected)
     scalar_argnum = isinstance(argnum, int) or argnum is None
-    return GradParams(method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded)
+    return GradParams(
+        method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded, with_value
+    )
 
 
 def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
@@ -408,6 +411,10 @@ class Grad:
         """
 
         if EvaluationContext.is_tracing():
+            assert (
+                not self.grad_params.with_value
+            ), "Tracing of value_and_grad is not implemented yet"
+
             fn = _ensure_differentiable(self.fn)
 
             args_data, in_tree = tree_flatten(args)
@@ -418,6 +425,7 @@ class Grad:
                 self.grad_params.argnum,
                 len(args_data),
                 in_tree,
+                self.grad_params.with_value,
             )
             jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
             args_argnum = tuple(args[i] for i in grad_params.argnum)
@@ -433,8 +441,14 @@ class Grad:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
             if self.grad_params.scalar_out:
-                results = jax.grad(self.fn, argnums=argnums)(*args)
+                if self.grad_params.with_value:
+                    results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
+                else:
+                    results = jax.grad(self.fn, argnums=argnums)(*args)
             else:
+                assert (
+                    not self.grad_params.with_value
+                ), "value_and_grad cannot be used with a Jacobian"
                 results = jax.jacobian(self.fn, argnums=argnums)(*args)
 
         return results
@@ -568,6 +582,111 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """
     scalar_out = True
     return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+
+def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+    """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
+
+    This function allows the value and the gradient of a hybrid quantum-classical function to be
+    computed within the compiled program. Outside of a compiled function, this function will
+    simply dispatch to its JAX counterpart ``jax.value_and_grad``. The function ``f`` can return
+    any pytree-like shape.
+
+    .. warning::
+
+        Currently, higher-order differentiation is only supported by the finite-difference
+        method.
+
+    Args:
+        f (Callable): a function or a function object to differentiate
+        method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
+                      where:
+
+                      - ``"auto"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff. Catalyst supports ``"parameter-shift"`` and
+                        ``"adjoint"`` on internal QNodes. Notably, QNodes with
+                        ``diff_method="finite-diff"`` is not supported with ``"auto"``.
+
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        function.
+
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+
+    Returns:
+        Callable: A callable object that computes the value and gradient of the wrapped function
+        for the given arguments.
+
+    Raises:
+        ValueError: Invalid method or step size parameters.
+        DifferentiableCompilerError: Called on a function that doesn't return a single scalar.
+
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``value_and_grad`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
+
+    .. seealso:: :func:`~.jacobian`
+
+    **Example 1 (Classical preprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(jnp.pi * x, wires=0)
+                return qml.expval(qml.PauliY(0))
+
+            g = value_and_grad(circuit)
+            return g(x)
+
+    >>> workflow(2.0)
+    (array(0.2), array(-3.14159265))
+
+    **Example 2 (Classical preprocessing and postprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def value_and_grad_loss(theta):
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit(theta):
+                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(theta):
+                return jnp.pi / jnp.tanh(circuit(theta))
+
+            return catalyst.value_and_grad(loss, method="auto")(theta)
+
+    >>> value_and_grad_loss(1.0)
+    (array(-4.12502201), array(4.34374983))
+
+    **Example 3 (Purely classical functions)**
+
+    .. code-block:: python
+
+        def square(x: float):
+            return x ** 2
+
+        @qjit
+        def dsquare(x: float):
+            return catalyst.value_and_grad(square)(x)
+
+    >>> dsquare(2.3)
+    (array(5.29), array(4.6))
+    """
+    scalar_out = True
+    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
@@ -2528,7 +2647,6 @@ def callback_implementation(
     # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
     results_aval = []
     flat_results_aval, out_tree = tree_flatten(results_aval)
-    # TODO: This reminds me of the code in jit.py where we infer the signature.
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )
