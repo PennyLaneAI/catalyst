@@ -228,7 +228,6 @@ class RTDevice {
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
             f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                   : nullptr);
-
         return rtd_qdevice;
     }
 
