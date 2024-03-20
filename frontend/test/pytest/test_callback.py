@@ -20,7 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import debug
-from catalyst.debug import debug_print
+import catalyst.debug
 from catalyst.pennylane_extensions import callback
 
 
@@ -153,7 +153,7 @@ def test_fprintf_debug(capsys):
 
     @qml.qjit
     def song_lyric(x: float):
-        debug_print(fstr, price=x)
+        debug.print(fstr, price=x)
 
     captured = capsys.readouterr()
     assert captured.out.strip() == ""
