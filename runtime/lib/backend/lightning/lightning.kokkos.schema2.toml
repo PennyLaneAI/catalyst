@@ -83,6 +83,7 @@ PauliX = {}
 PauliY = {}
 PauliZ = {}
 Prod = {}
+Projector = {}
 SparseHamiltonian = {}
 SProd = {}
 Sum = {}
