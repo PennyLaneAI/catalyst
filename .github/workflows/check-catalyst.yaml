@@ -589,6 +589,14 @@ jobs:
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
+      - name: Build Runtime test suite for OQC device
+  
+        if: ${{ matrix.backend == 'oqc' }}
+        run: |
+          C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
+          CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
+          make test-oqc
+  
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |

@@ -17,5 +17,11 @@ oqc:
 
 .PHONY: test
 test:
-	@echo "test the Catalyst oqc test suite"
+	@echo "build oqc and test the Catalyst oqc test suite"
+	cmake -G Ninja -B $(OQC_BUILD_DIR) \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DRUNTIME_BUILD_DIR=$(RUNTIME_BUILD_DIR) \
+
+	cmake --build $(OQC_BUILD_DIR)
 	$(OQC_BUILD_DIR)/tests/runner_tests_oqc
