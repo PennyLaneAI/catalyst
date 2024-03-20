@@ -589,6 +589,12 @@ jobs:
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
+      - name: Download Catalyst-Runtime Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: runtime-build-${{ matrix.compiler }}
+          path: runtime-build/lib
+
       - name: Build Runtime test suite for OQC device
   
         if: ${{ matrix.backend == 'oqc' }}
