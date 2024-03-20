@@ -14,6 +14,7 @@
 
 #include <dlfcn.h>
 
+#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -26,8 +27,13 @@
 #include "Exception.hpp"
 #include "Python.hpp"
 #include "QuantumDevice.hpp"
+#include "Types.h"
+
+extern void callbackCall(int64_t);
 
 namespace Catalyst::Runtime {
+
+extern "C" void pyregistry(int64_t identifier);
 
 class MemoryManager final {
   private:
@@ -222,7 +228,6 @@ class RTDevice {
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
             f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                   : nullptr);
-
         return rtd_qdevice;
     }
 

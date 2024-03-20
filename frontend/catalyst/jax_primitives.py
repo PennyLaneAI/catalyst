@@ -15,6 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import sys
 from dataclasses import dataclass
 from itertools import chain
 from typing import Dict, Iterable, List, Union
@@ -32,7 +33,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
-from mlir_quantum.dialects.catalyst import PrintOp
+from mlir_quantum.dialects.catalyst import PrintOp, PythonCallOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -62,6 +63,7 @@ from mlir_quantum.dialects.quantum import (
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 
+from catalyst.compiler import get_lib_path
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 
@@ -213,6 +215,34 @@ adjoint_p = jax.core.Primitive("adjoint")
 adjoint_p.multiple_results = True
 print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
+python_callback_p = core.Primitive("python_callback")
+python_callback_p.multiple_results = True
+
+
+@python_callback_p.def_abstract_eval
+def _python_callback_abstract_eval(*avals, callback, results_aval):
+    """Abstract evaluation"""
+    return results_aval
+
+
+@python_callback_p.def_impl
+def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cover
+    """Concrete evaluation"""
+    raise NotImplementedError()
+
+
+def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
+    """Callback lowering"""
+
+    sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+
+    callback_id = registry.register(callback)
+
+    ctx = jax_ctx.module_context.context
+    i64_type = ir.IntegerType.get_signless(64, ctx)
+    identifier = ir.IntegerAttr.get(i64_type, callback_id)
+    return PythonCallOp(identifier).results
 
 
 #
@@ -1677,6 +1707,7 @@ mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
 mlir.register_lowering(print_p, _print_lowering)
+mlir.register_lowering(python_callback_p, _python_callback_lowering)
 
 
 def _scalar_abstractify(t):
