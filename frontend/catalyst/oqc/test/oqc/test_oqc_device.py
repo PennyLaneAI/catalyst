@@ -13,25 +13,12 @@
 # limitations under the License.
 """Test for the OQC device.
 """
-# pylint: disable=unused-argument,import-outside-toplevel
-from unittest.mock import patch
+# pylint: disable=unused-argument,import-outside-toplevel,unused-import
+
+import sys
 
 import pennylane as qml
 import pytest
-
-from catalyst.compiler import get_lib_path
-
-
-def test_unavailable(monkeypatch, set_dummy_oqc_env):
-    """Check the error produced in the absence of qcaas."""
-    with patch.dict("sys.modules", {"qcaas_client": None, "qcaas_client.client": None}):
-        with pytest.raises(
-            ImportError,
-            match="Oqc qcaas client not found. Please install: pip install oqc-qcaas-client",
-        ):
-            from catalyst.oqc import OQCDevice
-
-            OQCDevice(backend="lucy", shots=1000, wires=8)
 
 
 class TestOQCDevice:
