@@ -14,26 +14,28 @@
 """This module contains for program verification.
 """
 
-from typing import List
 from dataclasses import dataclass
-from pennylane import QuantumTape
-from catalyst.utils.toml import TOMLDocument, ProgramFeatures
-from catalyst.utils.exceptions import CompileError
+from typing import List
+
+from pennylane.tape import QuantumTape
+
 from catalyst.jax_extras import DynamicJaxprTrace
+from catalyst.utils.exceptions import CompileError
+from catalyst.utils.toml import ProgramFeatures, TOMLDocument
+
 
 @dataclass
 class ProgramRepresentation:
-    """ Hybrid quantum program representation used in Catalyst """
+    """Hybrid quantum program representation used in Catalyst"""
+
     jax_trace: DynamicJaxprTrace
     quantum_tape: QuantumTape
 
 
 def verify_program(
-    config: TOMLDocument,
-    program_features: ProgramFeatures,
-    program: ProgramRepresentation
+    config: TOMLDocument, program_features: ProgramFeatures, program: ProgramRepresentation
 ):
-    """ Verify quantum program against the device capabilities.
+    """Verify quantum program against the device capabilities.
 
     Raises: CompileError
     """
@@ -42,11 +44,9 @@ def verify_program(
 
 
 def verify_inverses(
-    config: TOMLDocument,
-    program_features: ProgramFeatures,
-    program: ProgramRepresentation
+    config: TOMLDocument, program_features: ProgramFeatures, program: ProgramRepresentation
 ) -> None:
-    """ Verify quantum program against the device capabilities.
+    """Verify quantum program against the device capabilities.
 
     Raises: CompileError
     """
@@ -54,15 +54,10 @@ def verify_inverses(
 
 
 def verify_control(
-    config: TOMLDocument,
-    program_features: ProgramFeatures,
-    program: ProgramRepresentation
+    config: TOMLDocument, program_features: ProgramFeatures, program: ProgramRepresentation
 ) -> None:
-    """ Verify quantum program against the device capabilities.
+    """Verify quantum program against the device capabilities.
 
     Raises: CompileError
     """
     pass
-
-
-

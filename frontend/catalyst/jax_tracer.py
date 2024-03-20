@@ -77,6 +77,7 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
+from catalyst.programs.verification import verify_program
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -84,7 +85,6 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
-from catalyst.programs.verification import verify_program
 
 class Function:
     """An object that represents a compiled function.

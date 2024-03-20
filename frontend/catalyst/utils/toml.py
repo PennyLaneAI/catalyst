@@ -16,10 +16,13 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
+from dataclasses import dataclass
 from functools import reduce
 from itertools import repeat
-from dataclasses import dataclass
 from typing import Any, Dict, List
+
+import pennylane as qml
+from pennylane.operation import Observable, Operation
 
 from catalyst.utils.exceptions import CompileError
 
@@ -55,21 +58,21 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
 
 @dataclass
 class OperationProperties:
-    invertible:bool
-    controllable:bool
-    differentiable:bool
+    invertible: bool
+    controllable: bool
+    differentiable: bool
 
 
 @dataclass
 class DeviceConfig:
-    native_gates: Dict[qml.Operation, OperationProperties]
-    observables: Dict[qml.Observable, OperationProperties]
-
+    native_gates: Dict[Operation, OperationProperties]
+    observables: Dict[Observable, OperationProperties]
 
 
 @dataclass
 class ProgramFeatures:
-    """ Program features, obtained from the user """
+    """Program features, obtained from the user"""
+
     shots_present: bool
 
 
@@ -103,8 +106,9 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
     raise CompileError("quantum_control flag is not supported in TOMLs schema >= 2")
 
 
-def get_gates(config: TOMLDocument, path: List[str],
-              program_features: ProgramFeatures) -> Dict[str, dict]:
+def get_gates(
+    config: TOMLDocument, path: List[str], program_features: ProgramFeatures
+) -> Dict[str, dict]:
     """Read the toml config section specified by `path`. Filters-out gates which don't match
     condition. For now the only condition we support is `shots_present`."""
     gates = {}
@@ -163,8 +167,9 @@ def get_native_gates(config: TOMLDocument, program_features: ProgramFeatures) ->
     raise CompileError(f"Unsupported config schema {schema}")
 
 
-def get_decomposable_gates(config: TOMLDocument,
-                           program_features: ProgramFeatures) -> Dict[str, dict]:
+def get_decomposable_gates(
+    config: TOMLDocument, program_features: ProgramFeatures
+) -> Dict[str, dict]:
     """Get gates that will be decomposed according to PL's decomposition rules.
 
     Args:
@@ -179,8 +184,9 @@ def get_decomposable_gates(config: TOMLDocument,
     raise CompileError(f"Unsupported config schema {schema}")
 
 
-def get_matrix_decomposable_gates(config: TOMLDocument,
-                                  program_features: ProgramFeatures) -> Dict[str, dict]:
+def get_matrix_decomposable_gates(
+    config: TOMLDocument, program_features: ProgramFeatures
+) -> Dict[str, dict]:
     """Get gates that will be decomposed to QubitUnitary.
 
     Args:
@@ -199,7 +205,7 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
     return OperationProperties(
         invertible=config_props.get("invertible", False),
         controllable=config_props.get("controllable", False),
-        differentiable=config_props.get("differentiable", False)
+        differentiable=config_props.get("differentiable", False),
     )
 
 
@@ -211,7 +217,3 @@ def get_device_config(config: TOMLDocument, program_features: ProgramFeatures) -
 
     # TODO: observable_props
     return DeviceConfig(gate_props, observable_props)
-
-
-
-

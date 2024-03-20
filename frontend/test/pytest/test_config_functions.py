@@ -33,7 +33,7 @@ from catalyst.utils.runtime import (
     get_pennylane_operations,
     validate_config_with_device,
 )
-from catalyst.utils.toml import check_adjoint_flag, read_toml_file
+from catalyst.utils.toml import ProgramFeatures, check_adjoint_flag, read_toml_file
 
 
 class DummyDevice(qml.QubitDevice):
@@ -225,7 +225,9 @@ def test_get_native_gates_schema2_optional_shots():
                 )
             )
         config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, True, "device_name")
+    assert test_deduced_gates == get_pennylane_operations(
+        config, ProgramFeatures(True), "device_name"
+    )
 
 
 def test_get_native_gates_schema2_optional_noshots():
@@ -245,7 +247,7 @@ def test_get_native_gates_schema2_optional_noshots():
                 )
             )
         config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, False, "device")
+    assert test_deduced_gates == get_pennylane_operations(config, ProgramFeatures(False), "device")
 
 
 def test_get_decomp_gates_schema1():
@@ -266,7 +268,7 @@ def test_get_decomp_gates_schema1():
 
         config = read_toml_file(toml_file)
 
-    assert test_gates == get_decomposable_gates(config, False)
+    assert test_gates == get_decomposable_gates(config, ProgramFeatures(False))
 
 
 def test_get_decomp_gates_schema2():
@@ -287,7 +289,7 @@ def test_get_decomp_gates_schema2():
 
         config = read_toml_file(toml_file)
 
-    assert test_gates == get_decomposable_gates(config, False)
+    assert test_gates == get_decomposable_gates(config, ProgramFeatures(False))
 
 
 def test_get_matrix_decomposable_gates_schema1():
@@ -308,7 +310,7 @@ def test_get_matrix_decomposable_gates_schema1():
 
         config = read_toml_file(toml_file)
 
-    assert test_gates == get_matrix_decomposable_gates(config, False)
+    assert test_gates == get_matrix_decomposable_gates(config, ProgramFeatures(False))
 
 
 def test_get_matrix_decomposable_gates_schema2():
@@ -328,7 +330,7 @@ def test_get_matrix_decomposable_gates_schema2():
 
         config = read_toml_file(toml_file)
 
-    assert {"TestMatrixGate": {}} == get_matrix_decomposable_gates(config, False)
+    assert {"TestMatrixGate": {}} == get_matrix_decomposable_gates(config, ProgramFeatures(False))
 
 
 def test_check_overlap_msg():
@@ -366,7 +368,7 @@ def test_config_invalid_attr():
         with pytest.raises(
             CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
         ):
-            get_native_gates(config, True)
+            get_native_gates(config, ProgramFeatures(True))
 
 
 def test_config_invalid_condition_unknown():
@@ -412,7 +414,7 @@ def test_config_invalid_property_unknown():
         with pytest.raises(
             CompileError, match="Configuration for gate 'TestGate' has unknown properties"
         ):
-            get_native_gates(config, True)
+            get_native_gates(config, ProgramFeatures(True))
 
 
 def test_config_invalid_condition_duplicate():
@@ -433,10 +435,10 @@ def test_config_invalid_condition_duplicate():
         config = read_toml_file(toml_file)
 
         with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
-            get_native_gates(config, True)
+            get_native_gates(config, ProgramFeatures(True))
 
         with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
-            get_native_gates(config, False)
+            get_native_gates(config, ProgramFeatures(False))
 
 
 def test_config_unsupported_schema():
@@ -457,15 +459,15 @@ def test_config_unsupported_schema():
         with pytest.raises(CompileError):
             check_quantum_control_flag(config)
         with pytest.raises(CompileError):
-            get_native_gates(config, False)
+            get_native_gates(config, ProgramFeatures(False))
         with pytest.raises(CompileError):
-            get_decomposable_gates(config, False)
+            get_decomposable_gates(config, ProgramFeatures(False))
         with pytest.raises(CompileError):
-            get_matrix_decomposable_gates(config, False)
+            get_matrix_decomposable_gates(config, ProgramFeatures(False))
         with pytest.raises(CompileError):
-            get_pennylane_operations(config, False, "device_name")
+            get_pennylane_operations(config, ProgramFeatures(False), "device_name")
         with pytest.raises(CompileError):
-            check_adjoint_flag(config, False)
+            check_adjoint_flag(config, ProgramFeatures(False))
 
 
 if __name__ == "__main__":

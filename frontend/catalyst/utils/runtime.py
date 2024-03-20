@@ -30,8 +30,8 @@ import pennylane as qml
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
-    TOMLDocument,
     ProgramFeatures,
+    TOMLDocument,
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
@@ -144,9 +144,7 @@ def get_pennylane_operations(
     return gates_PL
 
 
-def get_pennylane_observables(
-    config: TOMLDocument, program_features, device_name: str
-) -> Set[str]:
+def get_pennylane_observables(config: TOMLDocument, program_features, device_name: str) -> Set[str]:
     """Get observables in PennyLane format. Apply ad-hoc patching"""
 
     observables = set(get_observables(config, program_features))
