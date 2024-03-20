@@ -42,6 +42,10 @@ include(Catch)
 
 add_executable(runner_tests_oqc runner_main.cpp)
 
+target_include_directories(runner_tests_oqc PRIVATE
+    ${OQC_LIBRARIES}
+    )
+
 # To avoid link to libpython, we use pybind11::module interface library.
 target_link_libraries(runner_tests_oqc PRIVATE
     Catch2::Catch2
