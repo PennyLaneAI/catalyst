@@ -2568,13 +2568,13 @@ class CallbackClosure:
         self.abskwargs = abskwargs
 
     @property
-    @cache(maxsize=1)
+    @cache
     def tree_flatten(self):
         """Flatten args and kwargs."""
         return tree_flatten((self.absargs, self.abskwargs))
 
     @property
-    @cache(maxsize=1)
+    @cache
     def getLowLevelSignature(self):
         """Get the memref descriptor types"""
         flat_params, _ = self.tree_flatten
