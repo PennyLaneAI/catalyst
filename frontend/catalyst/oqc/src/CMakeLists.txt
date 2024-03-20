@@ -4,6 +4,7 @@ project(catalyst_oqc)
 
 set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/include")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/backend/common")
+set(util_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/utils")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,9 +37,10 @@ add_library(rtd_oqc SHARED OQCDevice.cpp)
 target_include_directories(rtd_oqc PUBLIC .
     ${runtime_includes}
     ${backend_includes}
+    ${util_includes}
     )
 
-target_link_libraries(rtd_oqc PRIVATE pybind11::module)
+target_link_libraries(rtd_oqc PRIVATE pybind11::module catalyst_python_interpreter)
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
 

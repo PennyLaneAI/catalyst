@@ -26,13 +26,11 @@
 #include <iostream>
 
 #include "Exception.hpp"
+#include "Python.hpp"
 
 #include <pybind11/embed.h>
 
 namespace Catalyst::Runtime::Device::OQC {
-
-// To protect the py::exec calls concurrently
-std::mutex runner_mu;
 
 /**
  * The OpenQasm circuit runner interface.
@@ -61,7 +59,7 @@ struct OQCRunner : public OQCRunnerBase {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-        std::lock_guard<std::mutex> lock(runner_mu);
+        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
 
