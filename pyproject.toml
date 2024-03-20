@@ -13,7 +13,7 @@ extend-exclude = '''
 
 [tool.isort]
 profile = "black"
-skip = ["frontend/test/conftest.py"]
+skip = ["frontend/test/conftest.py", "frontend/catalyst/oqc/test/conftest.py"]
 extend_skip_glob = [
   "mlir/llvm-project/*",
   "mlir/mlir-hlo/*",
@@ -33,7 +33,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 cache_dir='/tmp/.pytest_cache'
-testpaths='frontend/tests/pytest'
+testpaths='frontend/test/pytest, frontend/catalyst/oqc/test'
 
 [tool.coverage.run]
 branch = true
