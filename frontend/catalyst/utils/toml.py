@@ -54,6 +54,20 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
 
 
 @dataclass
+class OperationProperties:
+    invertible:bool
+    controllable:bool
+    differentiable:bool
+
+
+@dataclass
+class DeviceConfig:
+    native_gates: Dict[qml.Operation, OperationProperties]
+    observables: Dict[qml.Observable, OperationProperties]
+
+
+
+@dataclass
 class ProgramFeatures:
     """ Program features, obtained from the user """
     shots_present: bool
@@ -179,3 +193,25 @@ def get_matrix_decomposable_gates(config: TOMLDocument,
         return get_gates(config, ["operators", "gates", "matrix"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
+
+
+def get_operation_properties(config_props: dict) -> OperationProperties:
+    return OperationProperties(
+        invertible=config_props.get("invertible", False),
+        controllable=config_props.get("controllable", False),
+        differentiable=config_props.get("differentiable", False)
+    )
+
+
+def get_device_config(config: TOMLDocument, program_features: ProgramFeatures) -> DeviceConfig:
+    gate_props = {}
+    observable_props = {}
+    for g, props in get_native_gates(config, program_features).items():
+        gate_props[g] = get_operation_properties(props)
+
+    # TODO: observable_props
+    return DeviceConfig(gate_props, observable_props)
+
+
+
+

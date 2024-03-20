@@ -84,6 +84,7 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
+from catalyst.programs.verification import verify_program
 
 class Function:
     """An object that represents a compiled function.
@@ -863,6 +864,8 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 transform_program, quantum_tape, return_values_flat
             )
+
+            verify_program(device.config)
 
         # (2) - Quantum tracing
         transformed_results = []

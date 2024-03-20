@@ -19,12 +19,12 @@ from dataclasses import dataclass
 from pennylane import QuantumTape
 from catalyst.utils.toml import TOMLDocument, ProgramFeatures
 from catalyst.utils.exceptions import CompileError
-
+from catalyst.jax_extras import DynamicJaxprTrace
 
 @dataclass
 class ProgramRepresentation:
     """ Hybrid quantum program representation used in Catalyst """
-    jax_eqns: List[Any]
+    jax_trace: DynamicJaxprTrace
     quantum_tape: QuantumTape
 
 
