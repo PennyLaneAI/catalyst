@@ -36,7 +36,7 @@ from catalyst.utils.toml import (
     get_matrix_decomposable_gates,
     get_native_gates,
     get_observables,
-    toml_load,
+    read_toml_file,
 )
 
 package_root = os.path.dirname(__file__)
@@ -67,10 +67,16 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
-def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
-    """Return the set of controlled gates given the set of nativly supported gates. This function
-    is used with the toml config schema 1. Later schemas provide the required information directly
+def deduce_schema1_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
+    """Calculate the set of controlled gates given the set of natively supported gates. This
+    function is used with the toml config schema 1 which did not support per-gate control
+    specifications. Later schemas provide the required information directly.
     """
+    # The deduction logic is the following:
+    # * Most of the gates have their `C(Gate)` controlled counterparts.
+    # * Some gates have to be decomposed if controlled version is used. Typically these are gates
+    #   which are already controlled but have well-known names.
+    # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
     gates_to_be_decomposed_if_controlled = [
         "Identity",
         "CNOT",
@@ -87,7 +93,6 @@ def deduce_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
     ]
     native_controlled_gates = set(
         [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
-        # TODO: remove after PR #642 is merged in lightning
         + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
     )
     return native_controlled_gates
@@ -116,7 +121,7 @@ def get_pennylane_operations(
         native_gates = set(native_gates_attrs)
         supports_controlled = check_quantum_control_flag(config)
         native_controlled_gates = (
-            deduce_native_controlled_gates(native_gates) if supports_controlled else set()
+            deduce_schema1_native_controlled_gates(native_gates) if supports_controlled else set()
         )
 
         # TODO: remove after PR #642 is merged in lightning
@@ -145,9 +150,12 @@ def get_pennylane_observables(
 
     observables = set(get_observables(config, shots_present))
 
-    # TODO: remove after PR #642 is merged in lightning
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        observables.update({"Projector"})
+    schema = int(config["schema"])
+
+    if schema == 1:
+        # TODO: remove after PR #642 is merged in lightning
+        if device_name == "lightning.kokkos":  # pragma: nocover
+            observables.update({"Projector"})
 
     return observables
 
@@ -250,7 +258,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     # listed in either matrix or decomposable sections. This is a contradiction, because condition
     # (1) means that `ControlledQubitUnitary` is also in the native set. We solve it here by
     # applying a fixup.
-    # TODO: Remove when the transition to the toml schema 2 is complete.
+    # TODO: remove after PR #642 is merged in lightning
     if "ControlledQubitUnitary" in native:
         matrix = matrix - {"ControlledQubitUnitary"}
         decomposable = decomposable - {"ControlledQubitUnitary"}
@@ -283,8 +291,7 @@ def device_get_toml_config(device) -> Path:
         toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
 
     try:
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     except FileNotFoundError as e:
         raise CompileError(
             "Attempting to compile program for incompatible device: "
