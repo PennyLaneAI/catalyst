@@ -27,7 +27,6 @@ from mlir_quantum.runtime import (
     make_zero_d_memref_descriptor,
 )
 
-from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,

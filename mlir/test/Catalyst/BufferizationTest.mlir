@@ -14,40 +14,6 @@
 
 // RUN: quantum-opt --catalyst-bufferize --split-input-file %s | FileCheck %s
 
-//////////////////////
-// Catalyst PrintOp //
-//////////////////////
-
-func.func @dbprint_val(%arg0: tensor<?xf64>) {
-
-    // CHECK: "catalyst.print"(%0) : (memref<?xf64>) -> ()
-    "catalyst.print"(%arg0) : (tensor<?xf64>) -> ()
-
-    return
-}
-
-// -----
-
-func.func @dbprint_memref(%arg0: tensor<?xf64>) {
-
-    // CHECK: "catalyst.print"(%0) <{print_descriptor}> : (memref<?xf64>) -> ()
-    "catalyst.print"(%arg0) {print_descriptor} : (tensor<?xf64>) -> ()
-
-    return
-}
-
-// -----
-
-func.func @dbprint_str() {
-
-    // CHECK: "catalyst.print"() <{const_val = "Hello, Catalyst"}> : () -> ()
-    "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
-
-    return
-}
-
-// -----
-
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[memrefArg:%.+]] = bufferization.to_memref %arg0 : memref<3x3xf64>
     // CHECK: [[alloc:%.+]] = bufferization.alloc_tensor() {{.*}}: tensor<3x3xf64>

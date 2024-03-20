@@ -24,20 +24,6 @@ using namespace catalyst;
 
 namespace {
 
-struct BufferizePrintOp : public OpConversionPattern<PrintOp> {
-    using OpConversionPattern::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(PrintOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        if (op.getVal()) {
-            rewriter.replaceOpWithNewOp<PrintOp>(op, adaptor.getVal(), adaptor.getConstValAttr(),
-                                                 adaptor.getPrintDescriptorAttr());
-        }
-        return success();
-    }
-};
-
 struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -127,7 +113,6 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePythonCallOp>(typeConverter, patterns.getContext());
-    patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace catalyst

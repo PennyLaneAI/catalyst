@@ -186,77 +186,6 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     return memref;
 }
 
-struct PrintOpPattern : public OpConversionPattern<PrintOp> {
-    using OpConversionPattern::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(PrintOp op, PrintOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-
-        Location loc = op.getLoc();
-        MLIRContext *ctx = this->getContext();
-
-        Type voidType = LLVM::LLVMVoidType::get(ctx);
-        Type voidPtrType = LLVM::LLVMPointerType::get(ctx);
-
-        if (op.getConstVal().has_value()) {
-            ModuleOp mod = op->getParentOfType<ModuleOp>();
-
-            StringRef qirName = "__catalyst__rt__print_string";
-
-            Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-            Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
-            LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
-            StringRef stringValue = op.getConstVal().value();
-            std::string symbolName = std::to_string(std::hash<std::string>()(stringValue.str()));
-            Value global = getGlobalString(loc, rewriter, symbolName, stringValue, mod);
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, global);
-            rewriter.eraseOp(op);
-        }
-        else {
-            StringRef qirName = "__catalyst__rt__print_tensor";
-
-            // C interface for the print function is an unranked & opaque memref descriptor:
-            // {
-            //    i64 rank,
-            //    void* memref_descriptor,
-            //    i8 type_encoding
-            // }
-            // Where the type_encoding is a simple enum for all supported numeric types:
-            //   i1, i16, i32, i64, f32, f64, c64, c128 (see runtime Types.h)
-            Type structType = LLVM::LLVMStructType::getLiteral(
-                ctx, {IntegerType::get(ctx, 64), voidPtrType, IntegerType::get(ctx, 8)});
-            Type structPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-            SmallVector<Type> argTypes{structPtrType, IntegerType::get(ctx, 1)};
-            Type qirSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
-            LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
-            Value memref = op.getVal();
-            MemRefType memrefType = cast<MemRefType>(memref.getType());
-            Value llvmMemref = adaptor.getVal();
-            Type llvmMemrefType = llvmMemref.getType();
-            Value structValue =
-                EncodeOpaqueMemRef(loc, rewriter, memrefType, llvmMemrefType, llvmMemref);
-
-            Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
-            Value structPtr = rewriter.create<LLVM::AllocaOp>(
-                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
-            rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
-
-            Value printDescriptor = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
-                                                                      op.getPrintDescriptor());
-            SmallVector<Value> callArgs{structPtr, printDescriptor};
-            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, callArgs);
-        }
-
-        return success();
-    }
-};
-
 // Encodes memref as LLVM struct value:
 //
 // {
@@ -496,7 +425,6 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PythonCallOpPattern>(typeConverter, context);
-        patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<CatalystDialect>();

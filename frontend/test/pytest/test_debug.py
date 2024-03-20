@@ -16,6 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
@@ -28,25 +29,22 @@ class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
     @pytest.mark.parametrize(
-        ("arg", "expected"),
+        "arg",
         [
-            (True, "1\n"),  # TODO: True/False would be nice
-            (3, "3\n"),
-            (3.5, "3.5\n"),
-            (3 + 4j, "(3,4)\n"),
-            (np.array(3), "3\n"),
-            (jnp.array(3), "3\n"),
-            (jnp.array(3.000001), "3\n"),  # TODO: show more precision
-            (jnp.array(3.1 + 4j), "(3.1,4)\n"),
-            (jnp.array([3]), "[3]\n"),
-            (jnp.array([3, 4, 5]), "[3,  4,  5]\n"),
-            (
-                jnp.array([[3, 4], [5, 6], [7, 8]]),
-                "[[3,   4], \n [5,   6], \n [7,   8]]\n",
-            ),
+            True,
+            3,
+            3.5,
+            3 + 4j,
+            np.array(3),
+            jnp.array(3),
+            jnp.array(3.000001),
+            jnp.array(3.1 + 4j),
+            jnp.array([3]),
+            jnp.array([3, 4, 5]),
+            jnp.array([[3, 4], [5, 6], [7, 8]]),
         ],
     )
-    def test_function_arguments(self, capfd, arg, expected):
+    def test_function_arguments(self, capfd, arg):
         """Test printing of arbitrary JAX tracer values."""
 
         @qjit
@@ -61,32 +59,7 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert expected == out
-
-    def test_optional_descriptor(self, capfd):
-        """Test the optional memref descriptor functionality."""
-
-        @qjit
-        def test(x):
-            debug.print(x, memref=True)
-
-        out, err = capfd.readouterr()
-        assert err == ""
-        assert out == ""
-
-        test(jnp.array([[1, 2, 3], [4, 5, 6]]))
-
-        memref = (
-            r"MemRef: base\@ = [0-9a-fx]+ rank = 2 offset = 0 "
-            r"sizes = \[2, 3\] strides = \[3, 1\] data ="
-            "\n"
-        ) + re.escape("[[1,   2,   3], \n [4,   5,   6]]\n")
-
-        regex = re.compile("^" + memref + "$")  # match exactly: ^ - start, $ - end
-
-        out, err = capfd.readouterr()
-        assert err == ""
-        assert regex.match(out)
+        assert str(arg) == out.strip()
 
     @pytest.mark.parametrize(
         ("arg", "expected"),
@@ -117,6 +90,7 @@ class TestDebugPrint:
         assert err == ""
         assert expected == out
 
+    @register_pytree_node_class
     class MyObject:
         def __init__(self, string):
             self.string = string
@@ -124,10 +98,19 @@ class TestDebugPrint:
         def __str__(self):
             return f"MyObject({self.string})"
 
-    @pytest.mark.parametrize(
-        ("arg", "expected"), [(3, "3\n"), ("hi", "hi\n"), (MyObject("hello"), "MyObject(hello)\n")]
-    )
-    def test_compile_time_values(self, capfd, arg, expected):
+        def __repr__(self):
+            return f"MyObject({self.string})"
+
+        def tree_flatten(self):
+            aux_data = self.string
+            return ([], aux_data)
+
+        @classmethod
+        def tree_unflatten(cls, aux_data, children):
+            return cls(aux_data)
+
+    @pytest.mark.parametrize("arg", [3, "hi", MyObject("hello")])
+    def test_compile_time_values(self, capfd, arg):
         """Test printing of arbitrary Python objects, including strings."""
 
         @qjit
@@ -142,32 +125,32 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert out == expected
+        assert out.strip() == str(arg)
 
     @pytest.mark.parametrize(
-        ("arg", "expected"),
+        "arg",
         [
-            (True, "True\n"),
-            (3, "3\n"),
-            (3.5, "3.5\n"),
-            (3 + 4j, "(3+4j)\n"),
-            (np.array(3), "3\n"),
-            (np.array([3]), "[3]\n"),
-            (jnp.array(3), "3\n"),
-            (jnp.array([3]), "[3]\n"),
-            (jnp.array([[3, 4], [5, 6], [7, 8]]), "[[3 4]\n [5 6]\n [7 8]]\n"),
-            ("hi", "hi\n"),
-            (MyObject("hello"), "MyObject(hello)\n"),
+            True,
+            3,
+            3.5,
+            3 + 4j,
+            np.array(3),
+            np.array([3]),
+            jnp.array(3),
+            jnp.array([3]),
+            jnp.array([[3, 4], [5, 6], [7, 8]]),
+            "hi",
+            MyObject("hello"),
         ],
     )
-    def test_no_qjit(self, capfd, arg, expected):
+    def test_no_qjit(self, capfd, arg):
         """Test printing in interpreted mode."""
 
         debug.print(arg)
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert out == expected
+        assert out.strip() == str(arg)
 
     def test_multiple_prints(self, capfd):
         "Test printing strings in multiple prints"
