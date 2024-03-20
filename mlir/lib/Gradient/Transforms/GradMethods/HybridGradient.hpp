@@ -24,10 +24,20 @@ namespace gradient {
 
 /// A pattern responsible for common transformations required when differentiating hybrid circuits
 /// with Enzyme.
+
+// grad lowering
 struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
     using OpRewritePattern<GradOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
+};
+
+// value_and_grad lowering
+struct HybridValueAndGradientLowering : public mlir::OpRewritePattern<ValueAndGradOp> {
+    using OpRewritePattern<ValueAndGradOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(ValueAndGradOp op,
+                                        mlir::PatternRewriter &rewriter) const override;
 };
 
 } // namespace gradient
