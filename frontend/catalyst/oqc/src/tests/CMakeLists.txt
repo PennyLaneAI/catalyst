@@ -46,13 +46,8 @@ add_executable(runner_tests_oqc runner_main.cpp)
 target_link_libraries(runner_tests_oqc PRIVATE
     Catch2::Catch2
     pybind11::embed
-    rtd_oqc
+    ${OQC_LIBRARIES}
     )
-
-#     message(${PROJECT_SOURCE_DIR})
-# target_include_directories(runner_tests_oqc PRIVATE
-#     "${PROJECT_SOURCE_DIR}/../"
-# )
 
 target_sources(runner_tests_oqc PRIVATE
     Test_OpenQASM2Builder.cpp
