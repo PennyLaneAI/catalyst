@@ -101,7 +101,7 @@ from catalyst.utils.jnp_to_memref import (
     ranked_memref_to_numpy,
 )
 from catalyst.utils.runtime import (
-    backendInfo,
+    BackendInfo,
     device_get_toml_config,
     extract_backend_info,
     validate_config_with_device,
@@ -2568,13 +2568,13 @@ class CallbackClosure:
         self.abskwargs = abskwargs
 
     @property
-    @cache
+    @cache(maxsize=1)
     def tree_flatten(self):
         """Flatten args and kwargs."""
         return tree_flatten((self.absargs, self.abskwargs))
 
     @property
-    @cache
+    @cache(maxsize=1)
     def getLowLevelSignature(self):
         """Get the memref descriptor types"""
         flat_params, _ = self.tree_flatten
