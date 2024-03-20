@@ -22,7 +22,7 @@ from pennylane.transforms.core import TransformProgram
 
 try:
     from qcaas_client.client import OQCClient  # pylint: disable=unused-import
-except ImportError as e:
+except ImportError as e:  # pragma: no cover
     raise ImportError(
         "Oqc qcaas client not found. Please install: pip install oqc-qcaas-client"
     ) from e
