@@ -67,6 +67,13 @@ jobs:
           path: |
             runtime-build/lib/*.so
             runtime-build/lib/backend/*.toml
+          retention-days: 1
+
+      - name: Upload OQC-Runtime Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: oqc-build-${{ matrix.compiler }}
+          path: |
             oqc-build/*.so
             oqc-build/*.toml
           retention-days: 1
