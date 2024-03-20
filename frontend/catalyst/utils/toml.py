@@ -44,7 +44,12 @@ else:  # pragma: nocover
     from tomlkit import TOMLDocument
     from tomlkit import load as toml_load
 
-__all__ = ["toml_load", "TOMLDocument"]
+
+def read_toml_file(toml_file: str) -> TOMLDocument:
+    """Helper function opening toml file properly and reading it into a document"""
+    with open(toml_file, "rb") as f:
+        config = toml_load(f)
+    return config
 
 
 def check_mid_circuit_measurement_flag(config: TOMLDocument) -> bool:
