@@ -25,3 +25,23 @@ using namespace catalyst;
 
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.cpp.inc"
+
+void CustomCallOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    // Assume all effects
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
+    effects.emplace_back(mlir::MemoryEffects::Free::get());
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
+    effects.emplace_back(mlir::MemoryEffects::Read::get());
+}
+
+void PythonCallOp::getEffects(
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
+{
+    // Assume all effects
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get());
+    effects.emplace_back(mlir::MemoryEffects::Free::get());
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
+    effects.emplace_back(mlir::MemoryEffects::Read::get());
+}
