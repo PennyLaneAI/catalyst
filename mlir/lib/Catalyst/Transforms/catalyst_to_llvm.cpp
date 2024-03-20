@@ -319,7 +319,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
             mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
-
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
@@ -420,6 +419,36 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
+struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PythonCallOp op, PythonCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = op.getContext();
+        Location loc = op.getLoc();
+
+        // Create function
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        auto point = rewriter.saveInsertionPoint();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        Type i64 = rewriter.getI64Type();
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, "pyregistry", {/*args=*/i64}, /*ret_type=*/voidType);
+        customCallFnOp.setPrivate();
+        rewriter.restoreInsertionPoint(point);
+
+        auto identAttr = op.getIdentifier();
+        auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
+        SmallVector<Value> callArgs{ident};
+        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -437,6 +466,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
 
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
+        patterns.add<PythonCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);

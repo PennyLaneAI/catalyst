@@ -19,9 +19,10 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
+import inspect
 import numbers
 from collections.abc import Sequence, Sized
-from functools import update_wrapper
+from functools import update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -71,6 +72,7 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
+    python_callback_p,
     qmeasure_p,
     vjp_p,
     while_p,
@@ -2551,3 +2553,54 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
         )
 
     return batch_size
+
+
+def callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+    """
+    signature = inspect.signature(func)
+    retty = signature.return_annotation
+
+    # We just disable inconsistent return statements
+    # Since we are building this feature step by step.
+    @wraps(func)
+    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
+        if not EvaluationContext.is_tracing():
+            # If we are not in the tracing context, just evaluate the function.
+            return func(*args, **kwargs)
+
+        callback_implementation(func, retty, *args, **kwargs)
+
+    return bind_callback
+
+
+def callback_implementation(
+    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
+):
+    """
+    This function has been modified from its original form in the JAX project at
+    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2022 The JAX Authors.
+    """
+
+    flat_args, in_tree = tree_flatten((args, kwargs))
+
+    def _flat_callback(*flat_args):
+        """This function packages flat arguments back into the shapes expected by the function."""
+        _args, _kwargs = tree_unflatten(in_tree, flat_args)
+        assert not _args, "Args are not yet expected here."
+        assert not _kwargs, "Kwargs are not yet supported here."
+        return tree_leaves(cb())
+
+    # TODO(@erick-xanadu): Change back once we support arguments.
+    # I am leaving this as a to-do because otherwise the coverage will complain.
+    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
+    results_aval = []
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+    out_flat = python_callback_p.bind(
+        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
+    )
+    return tree_unflatten(out_tree, out_flat)
