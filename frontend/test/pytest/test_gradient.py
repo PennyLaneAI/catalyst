@@ -21,7 +21,7 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import cond, for_loop, grad, jacobian, qjit
+from catalyst import cond, for_loop, grad, jacobian, qjit, value_and_grad
 from catalyst.pennylane_extensions import DifferentiableCompileError
 
 # pylint: disable=too-many-lines
@@ -67,6 +67,21 @@ def test_grad_outside_qjit():
     assert np.allclose(expected, result)
 
 
+def test_value_and_grad_outside_qjit():
+    """Test that value_and_grad can be used outside of a jitting context."""
+
+    def f(x):
+        return x**2
+
+    x = 4.0
+
+    expected_val, expected_grad = jax.value_and_grad(f)(x)
+    result_val, result_grad = value_and_grad(f)(x)
+
+    assert np.allclose(expected_val, result_val)
+    assert np.allclose(expected_grad, result_grad)
+
+
 @pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
 def test_grad_outside_qjit_argnum(argnum):
     """Test that argnums work correctly outside of a jitting context."""
@@ -80,6 +95,24 @@ def test_grad_outside_qjit_argnum(argnum):
     result = grad(f, argnum=argnum)(x, y)
 
     assert np.allclose(expected, result)
+
+
+@pytest.mark.parametrize("argnum", (None, 0, [1], (0, 1)))
+def test_value_and_grad_outside_qjit_argnum(argnum):
+    """Test that argnums work correctly outside of a jitting context."""
+
+    def f(x, y):
+        return x**2 + y**2
+
+    x, y = 4.0, 4.0
+
+    expected_val, expected_grad = jax.value_and_grad(
+        f, argnums=argnum if argnum is not None else 0
+    )(x, y)
+    result_val, result_grad = value_and_grad(f, argnum=argnum)(x, y)
+
+    assert np.allclose(expected_val, result_val)
+    assert np.allclose(expected_grad, result_grad)
 
 
 def test_jacobian_outside_qjit():
