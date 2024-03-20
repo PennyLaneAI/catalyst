@@ -1,7 +1,6 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.20)
 
 project(catalyst_oqc)
-option(ENABLE_OQC "Build OQC backend device" ON)
 
 set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/include")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/backend/common")
@@ -10,17 +9,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
-
-if(RUNTIME_CLANG_TIDY)
-    if(NOT DEFINED CLANG_TIDY_BINARY)
-        set(CLANG_TIDY_BINARY clang-tidy)
-    endif()
-    message(STATUS "Using CLANG_TIDY_BINARY=${CLANG_TIDY_BINARY}")
-    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_BINARY};
-        -extra-arg=-std=c++20;
-        --use-color;
-    )
-endif()
 
 find_package(pybind11 CONFIG)
 
@@ -40,6 +28,8 @@ else()
 
     FetchContent_MakeAvailable(pybind11)
 endif()
+
+message(STATUS "Building the OQC device.")
 
 add_library(rtd_oqc SHARED OQCDevice.cpp)
 

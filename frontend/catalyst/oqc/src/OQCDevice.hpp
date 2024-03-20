@@ -1,5 +1,4 @@
-
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,12 +65,6 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
         std::transform(wires.begin(), wires.end(), std::back_inserter(res),
                        [this](auto w) { return qubit_manager.getDeviceId(w); });
         return res;
-    }
-
-    inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool
-    {
-        return std::all_of(wires.begin(), wires.end(),
-                           [this](QubitIdType w) { return qubit_manager.isValidQubitId(w); });
     }
 
   public:
