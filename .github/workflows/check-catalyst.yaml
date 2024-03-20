@@ -384,7 +384,8 @@ jobs:
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
-        python3 -m pip install cuda-quantum
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
         make frontend
 
     - name: Get Cached LLVM Build
