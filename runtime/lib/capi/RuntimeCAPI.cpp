@@ -113,6 +113,44 @@ extern "C" {
 
 using namespace Catalyst::Runtime;
 
+void pyregistry(int64_t identifier)
+{
+    // We need to guard calls to callback.
+    // These are implemented in Python.
+    std::lock_guard<std::mutex> lock(getPythonMutex());
+
+    // LIBREGISTRY is a compile time macro.
+    // It is the name of the library that contains the callbackCall implementation.
+    // The reason why this is using dlopen is because we have historically wanted
+    // to avoid a dependency of python in the runtime.
+    // With dlopen, we leave the possibility of linking against the runtime without
+    // linking with LIBREGISTRY which is implemented as a pybind11 module.
+    //
+    // The only restriction is that there should be no calls to pyregsitry.
+    //
+    // This function cannot be tested from the runtime tests because there would be no valid python
+    // function to callback...
+
+    std::string libpath = LIBREGISTRY;
+
+    void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
+    if (!handle) {
+        char *err_msg = dlerror();
+        RT_FAIL(err_msg);
+    }
+
+    void (*callbackCall)(uintptr_t);
+    typedef void (*func_ptr_t)(uintptr_t);
+    callbackCall = (func_ptr_t)dlsym(handle, "callbackCall");
+    if (!callbackCall) {
+        char *err_msg = dlerror();
+        RT_FAIL(err_msg);
+    }
+
+    callbackCall(identifier);
+    dlclose(handle);
+}
+
 void __catalyst__host__rt__unrecoverable_error()
 {
     RT_FAIL("Unrecoverable error from asynchronous execution of multiple quantum programs.");
