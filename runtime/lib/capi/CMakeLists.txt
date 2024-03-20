@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(MLIRRunnerUtils)
 FetchContent_MakeAvailable(MLIRCRunnerUtils)
 
 # link to rt_backend
-target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS})
+target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS} catalyst_python_interpreter)
 
 if(ENABLE_OPENQASM)
     include(FetchContent)
@@ -43,6 +43,7 @@ target_link_libraries(catalyst_qir_qis_obj
 target_include_directories(catalyst_qir_qis_obj PUBLIC .
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${runtime_includes}
+    ${util_includes}
     ${mlirrunnerutils_SOURCE_DIR}/../..  # includes are relative to mlir/ExecutionEngine
     )
 
