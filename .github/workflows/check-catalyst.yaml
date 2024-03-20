@@ -563,7 +563,7 @@ jobs:
 
   runtime-device-tests:
     name: Runtime Tests (Linux)
-    needs: [constants]
+    needs: [constants, runtime]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
