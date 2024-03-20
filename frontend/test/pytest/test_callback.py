@@ -21,6 +21,9 @@ from catalyst.pennylane_extensions import callback
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
 def test_callback_no_tracing(arg):
+    """Test that when there's no tracing the behaviour of identity
+    stays the same."""
+
     @callback
     def identity(x):
         return x
@@ -98,10 +101,10 @@ def test_callback_send_param(capsys):
 
 
 def test_kwargs(capsys):
-    """Test callback no parameters no returns"""
+    """Test kwargs returns"""
 
     @callback
-    def my_callback(*args, **kwargs) -> None:
+    def my_callback(**kwargs) -> None:
         for k, v in kwargs.items():
             print(k, v)
 
@@ -115,5 +118,5 @@ def test_kwargs(capsys):
 
     cir(0, 1, 2)
     captured = capsys.readouterr()
-    for string in {"a 0", "b 1", "c 2", "d 3", "e 4"}:
+    for string in ["a 0", "b 1", "c 2", "d 3", "e 4"]:
         assert string in captured.out

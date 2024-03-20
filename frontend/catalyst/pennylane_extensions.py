@@ -101,10 +101,9 @@ from catalyst.utils.jnp_to_memref import (
     ranked_memref_to_numpy,
 )
 from catalyst.utils.runtime import (
-    BackendInfo,
+    backendInfo,
     device_get_toml_config,
     extract_backend_info,
-    get_lib_path,
     validate_config_with_device,
 )
 from catalyst.utils.toml import TOMLDocument
@@ -2578,7 +2577,7 @@ class CallbackClosure:
     @cache
     def getLowLevelSignature(self):
         """Get the memref descriptor types"""
-        flat_params, in_tree = self.tree_flatten
+        flat_params, _ = self.tree_flatten
         low_level_flat_params = []
         for param in flat_params:
             empty_memref_descriptor = get_ranked_memref_descriptor(param)
@@ -2588,6 +2587,8 @@ class CallbackClosure:
         return low_level_flat_params
 
     def getArgsAsJAXArrays(self, flat_args):
+        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
+        it is best for the user if we continue with that idea and forward JAX arrays."""
         jnpargs = []
         for void_ptr, ty in zip(flat_args, self.getLowLevelSignature):
             memref_ty = ctypes.cast(void_ptr, ty)

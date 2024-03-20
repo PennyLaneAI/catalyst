@@ -6,11 +6,12 @@
 
 #  This file contains functions to convert between Memrefs and NumPy arrays and vice-versa.
 
-import ctypes
+"""
+This file is a wrapper around MLIR's np_to_memref to allow for abstract types and JAX arrays
+to be converted to and from memrefs.
+"""
 
-from jax import numpy as jnp
 import numpy as np
-from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
 from mlir_quantum.runtime import as_ctype
 from mlir_quantum.runtime import (
     get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor,
@@ -22,6 +23,8 @@ from mlir_quantum.runtime.np_to_memref import (
     move_aligned_ptr_by_offset,
     to_numpy,
 )
+
+from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
 
 
 def get_ranked_memref_descriptor_from_shaped_array(array: ShapedArray):
@@ -58,6 +61,10 @@ def get_ranked_memref_descriptor(array):
 
 
 def ranked_memref_to_numpy(ranked_memref):
+    """Wrapper around MLIR's ranked_memref_to_numpy.
+
+    This wrapper succeeds when the ranked_memref is a scalar tensor.
+    """
     try:
         return mlir_ranked_memref_to_numpy(ranked_memref)
     except AttributeError:

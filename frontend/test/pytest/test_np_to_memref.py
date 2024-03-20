@@ -16,13 +16,11 @@
 import ctypes
 
 import jax.numpy as jnp
-import numpy as np
 import pytest
 from jax.core import ShapedArray
 from mlir_quantum.runtime import (
     C64,
     C128,
-    F16,
     as_ctype,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
@@ -54,10 +52,10 @@ def test_as_ctype(inp, exp):
         (1, make_zero_d_memref_descriptor(ctypes.c_long)),
         (ShapedArray([], float), make_zero_d_memref_descriptor(ctypes.c_double)),
         (ShapedArray([1], float), make_nd_memref_descriptor(1, ctypes.c_double)),
-        (ShapedArray([2,2], float), make_nd_memref_descriptor(2, ctypes.c_double)),
+        (ShapedArray([2, 2], float), make_nd_memref_descriptor(2, ctypes.c_double)),
     ],
 )
 def test_get_ranked_memref_descriptor(inp, exp):
     """Tests that the structure has the expected fields."""
     obs = get_ranked_memref_descriptor(inp)
-    assert exp._fields_ == obs._fields_
+    assert exp._fields_ == obs._fields_  # pylint: disable=protected-access
