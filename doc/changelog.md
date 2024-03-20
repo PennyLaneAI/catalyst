@@ -33,11 +33,11 @@
   ```py
   @qml.qjit
   def func(*args, **kwargs):
-     debug_print("{arg2}, {arg1}, arg2=args[1], args1=[0])
+     debug_print("{arg1}, {arg0}, arg1=args[1], arg0=args[0])
   ```
 
   ```pycon
-  >>> print(func(1, 2))
+  >>> func(1, 2)
   2 1
   ```
 
