@@ -296,6 +296,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
         program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
+
         # TODO: Add Catalyst program verification and validation
         return program, config
 
