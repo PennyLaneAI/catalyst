@@ -23,7 +23,7 @@ import ctypes
 import inspect
 import numbers
 from collections.abc import Sequence, Sized
-from functools import cache, update_wrapper, wraps
+from functools import cached_property, update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -2568,13 +2568,13 @@ class CallbackClosure:
         self.abskwargs = abskwargs
 
     @property
-    @cache(maxsize=1)
+    @cached_property
     def tree_flatten(self):
         """Flatten args and kwargs."""
         return tree_flatten((self.absargs, self.abskwargs))
 
     @property
-    @cache(maxsize=1)
+    @cached_property
     def getLowLevelSignature(self):
         """Get the memref descriptor types"""
         flat_params, _ = self.tree_flatten
