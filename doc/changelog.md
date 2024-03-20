@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* The python layer of the OQC-Catalyst device is now available.
+  [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
+
 * Catalyst publishes Git revision string seen at the time of the packaging as
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
   module import.
@@ -43,6 +46,16 @@
 
   Note that returning different *kinds* of results, like different observables or differently
   shaped arrays, is not possible.
+
+* The Python interpreter is now a shared resource across the runtime.
+  [(#615)](https://github.com/PennyLaneAI/catalyst/pull/615)
+
+  This change allows any part of the runtime to start executing Python code through pybind.
+
+* Fix runtime tests to be compatible with amazon-braket-sdk==1.73.3
+  [(#620)](https://github.com/PennyLaneAI/catalyst/pull/620)
+
+  After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
 <h3>Breaking changes</h3>
 
