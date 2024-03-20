@@ -30,7 +30,6 @@
 
 * The python layer of the OQC-Catalyst device is now available.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
->>>>>>> main
 
 * Catalyst publishes Git revision string seen at the time of the packaging as
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
