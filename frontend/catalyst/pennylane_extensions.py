@@ -2481,42 +2481,6 @@ class CallbackClosure:
         return jnpargs
 
 
-class CallbackClosure:
-    """This is just a class containing data that is important for the callback."""
-
-    def __init__(self, *absargs, **abskwargs):
-        self.absargs = absargs
-        self.abskwargs = abskwargs
-
-    @property
-    @cache
-    def tree_flatten(self):
-        """Flatten args and kwargs."""
-        return tree_flatten((self.absargs, self.abskwargs))
-
-    @property
-    @cache
-    def getLowLevelSignature(self):
-        """Get the memref descriptor types"""
-        flat_params, in_tree = self.tree_flatten
-        low_level_flat_params = []
-        for param in flat_params:
-            empty_memref_descriptor = get_ranked_memref_descriptor(param)
-            memref_type = type(empty_memref_descriptor)
-            ptr_ty = ctypes.POINTER(memref_type)
-            low_level_flat_params.append(ptr_ty)
-        return low_level_flat_params
-
-    def getArgsAsJAXArrays(self, flat_args):
-        jnpargs = []
-        for void_ptr, ty in zip(flat_args, self.getLowLevelSignature):
-            memref_ty = ctypes.cast(void_ptr, ty)
-            nparray = ranked_memref_to_numpy(memref_ty)
-            jnparray = jnp.asarray(nparray)
-            jnpargs.append(jnparray)
-        return jnpargs
-
-
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
