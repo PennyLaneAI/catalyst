@@ -55,3 +55,8 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
         return results[0]
 
     return [new_tape], null_postprocessing
+
+
+def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
+    """Specify whether or not an Operator is supported."""
+    return op.name in operations
