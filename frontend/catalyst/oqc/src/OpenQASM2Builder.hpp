@@ -313,4 +313,4 @@ class OpenQASM2Builder {
     }
 };
 
-} // namespace Catalyst::Runtime::OpenQasm2
+} // namespace Catalyst::Runtime::OpenQASM2

@@ -27,7 +27,7 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
-//catalyst/runtime/lib/backend/common/
+// catalyst/runtime/lib/backend/common/
 
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
