@@ -1831,7 +1831,7 @@ def while_loop(cond_fn):
 def measure(
     wires, reset: Optional[bool] = False, postselect: Optional[int] = None
 ) -> DynamicJaxprTracer:
-    """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
+    """A :func:`qjit` compatible mid-circuit measurement on 1 qubit for PennyLane/Catalyst.
 
     .. important::
 
@@ -1839,7 +1839,7 @@ def measure(
         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
-        wires (Wires): The wire of the qubit the measurement process applies to
+        wires (int): The wire the projective measurement applies to.
         reset (Optional[bool]): Whether to reset the wire to the |0⟩ state after measurement.
         postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
@@ -1911,7 +1911,11 @@ def measure(
     ctx = EvaluationContext.get_main_tracing_context()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
-        raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+        raise TypeError(f"Only one element is supported for the 'wires' parameter, got {wires}.")
+    if isinstance(wires[0], jax.Array) and wires[0].shape not in ((), (1,)):
+        raise TypeError(
+            f"Measure is only supported on 1 qubit, got array of shape {wires[0].shape}."
+        )
 
     # Copy, so wires remain unmodified
     in_classical_tracers = wires.copy()
@@ -1920,7 +1924,6 @@ def measure(
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
     in_classical_tracers.append(postselect)
 
-    # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,

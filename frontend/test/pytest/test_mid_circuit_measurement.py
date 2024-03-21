@@ -50,7 +50,7 @@ class TestMidCircuitMeasurement:
             qjit(circuit)()
 
     def test_invalid_arguments(self, backend):
-        """Test invalid arguments exception."""
+        """Test too many arguments to the wires parameter."""
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit():
@@ -58,7 +58,21 @@ class TestMidCircuitMeasurement:
             m = measure(wires=[1, 2])
             return m
 
-        with pytest.raises(TypeError, match=r"One classical argument \(a wire\) is expected"):
+        with pytest.raises(
+            TypeError, match="Only one element is supported for the 'wires' parameter"
+        ):
+            qjit(circuit)()
+
+    def test_invalid_arguments2(self, backend):
+        """Test too large array for the wires parameter."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            qml.RX(0.0, wires=0)
+            m = measure(wires=jnp.array([1, 2]))
+            return m
+
+        with pytest.raises(TypeError, match="Measure is only supported on 1 qubit"):
             qjit(circuit)()
 
     def test_basic(self, backend):
