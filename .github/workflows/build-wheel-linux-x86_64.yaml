@@ -304,9 +304,9 @@ jobs:
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
-          cmake -G Ninja -B oqc-build \
-                -DRUNTIME_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
-          cmake --build oqc-build --target rtd_oqc
+          OQC_BUILD_DIR="$(pwd)/oqc-build" \
+          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          make oqc
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
