@@ -39,7 +39,7 @@ struct OQCRunnerBase {
     explicit OQCRunnerBase() = default;
     virtual ~OQCRunnerBase() = default;
 
-        [[nodiscard]] virtual auto runCircuit([[maybe_unused]] const std::string &circuit,
+    [[nodiscard]] virtual auto runCircuit([[maybe_unused]] const std::string &circuit,
                                           [[maybe_unused]] const std::string &device,
                                           [[maybe_unused]] size_t shots,
                                           [[maybe_unused]] const std::string &kwargs = "") const
@@ -145,10 +145,9 @@ struct OQCRunner : public OQCRunnerBase {
                 client = OQCClient(url=url, email=email, password=password)
                 client.authenticate()
                 oqc_config = CompilerConfig(repeats=shots, results_format=RES_FORMAT, optimizations=optimisations)
-                #oqc_task = QPUTask(circuit, oqc_config)
-                #res = client.execute_tasks(oqc_task)
-                #counts = res[0].result["cbits"]
-                counts = {"00": 12}
+                oqc_task = QPUTask(circuit, oqc_config)
+                res = client.execute_tasks(oqc_task)
+                counts = res[0].result["cbits"]
 
             except Exception as e:
                 print(f"circuit: {circuit}")
