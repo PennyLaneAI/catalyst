@@ -25,8 +25,12 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#if __has_include("pybind11/embed.h")
+#include <pybind11/embed.h>
+#define __build_with_pybind11
+#endif
+
 #include "Exception.hpp"
-#include "Python.hpp"
 #include "QuantumDevice.hpp"
 #include "Types.h"
 

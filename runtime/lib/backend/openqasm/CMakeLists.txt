@@ -22,9 +22,8 @@ add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 target_include_directories(rtd_openqasm PRIVATE .
     ${runtime_includes}
     ${backend_includes}
-    ${util_includes}
     )
 
-target_link_libraries(rtd_openqasm pybind11::module catalyst_python_interpreter)
+target_link_libraries(rtd_openqasm pybind11::module)
 
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)

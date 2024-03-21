@@ -26,7 +26,6 @@ include(Catch)
 
 if(ENABLE_LIGHTNING)
     add_executable(runner_tests_lightning runner_main.cpp)
-    target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
 
     # Skip dynamic device loading test when sanitizers are enabled or when building on mac,
     # due to the fact that our current support is not fully compatible on macOS.

@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "Exception.hpp"
-#include "Python.hpp"
 
 #include <pybind11/embed.h>
 
@@ -106,10 +105,11 @@ struct BraketRunner : public OpenQasmRunner {
                                   size_t shots, const std::string &kwargs = "") const
         -> std::string override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
 
         namespace py = pybind11;
         using namespace py::literals;
+
+        py::gil_scoped_acquire lock;
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
@@ -162,9 +162,10 @@ struct BraketRunner : public OpenQasmRunner {
                              size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<double> override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
+
+        py::gil_scoped_acquire lock;
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
@@ -229,9 +230,9 @@ struct BraketRunner : public OpenQasmRunner {
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t> override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
+        py::gil_scoped_acquire lock;
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
@@ -292,9 +293,9 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Expval(const std::string &circuit, const std::string &device, size_t shots,
                               const std::string &kwargs = "") const -> double override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
+        py::gil_scoped_acquire lock;
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
@@ -348,9 +349,9 @@ struct BraketRunner : public OpenQasmRunner {
     [[nodiscard]] auto Var(const std::string &circuit, const std::string &device, size_t shots,
                            const std::string &kwargs = "") const -> double override
     {
-        std::lock_guard<std::mutex> lock(getPythonMutex());
         namespace py = pybind11;
         using namespace py::literals;
+        py::gil_scoped_acquire lock;
 
         RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
 
