@@ -39,7 +39,6 @@
 #include "OpenQASM2Builder.hpp"
 
 using namespace Catalyst::Runtime::OpenQASM2;
-using namespace Catalyst::Runtime::Device::OQC;
 
 namespace Catalyst::Runtime::Device {
 class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
@@ -74,6 +73,7 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
+        builder = std::make_unique<OpenQASM2Builder>();
         runner = std::make_unique<OQCRunner>();
     }
     ~OQCDevice() = default;
@@ -82,5 +82,8 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
 
     QUANTUM_DEVICE_RT_DECLARATIONS;
     QUANTUM_DEVICE_QIS_DECLARATIONS;
+
+    // Circuit RT
+    [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQASM2(); }
 };
 } // namespace Catalyst::Runtime::Device

@@ -16,12 +16,6 @@
 
 namespace Catalyst::Runtime::Device {
 
-auto OQCDevice::AllocateQubit() -> QubitIdType
-{
-    RT_FAIL("Unsupported functionality");
-    return QubitIdType{};
-}
-
 auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     if (!num_qubits) {
@@ -34,8 +28,6 @@ auto OQCDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 
     return qubit_manager.AllocateRange(0, num_qubits);
 }
-
-void OQCDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
 void OQCDevice::ReleaseAllQubits() { builder = std::make_unique<OpenQASM2Builder>(); }
 
@@ -108,6 +100,13 @@ void OQCDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1>
         i++;
     }
 }
+
+// After this poitn everything is unsupported
+auto OQCDevice::AllocateQubit() -> QubitIdType
+{
+    RT_FAIL("Unsupported functionality");
+}
+void OQCDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
 void OQCDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)
 {

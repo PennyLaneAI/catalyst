@@ -172,15 +172,6 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
     CHECK(mz2.toOpenQASM2(qubits, cbits) == mz2_res_toqasm);
 }
 
-TEST_CASE("Test MeasureAll from OpenQasmBuilder", "[openqasm]")
-{
-    auto qubits = QASMRegister(RegisterType::Qubit, "q", 5);
-    auto cbits = QASMRegister(RegisterType::Bit, "c", 5);
-
-    std::string measure_all = "measure q -> c;\n";
-    CHECK(MeasureAll(qubits, cbits) == measure_all);
-}
-
 TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure", "[openqasm]")
 {
     auto builder = OpenQASM2Builder();

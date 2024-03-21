@@ -234,13 +234,6 @@ class QASMMeasure {
     }
 };
 
-std::string MeasureAll(const QASMRegister &qregister, const QASMRegister &cregister)
-{
-    // measure wire
-    std::ostringstream oss;
-    oss << "measure " << qregister.getName() << " -> " << cregister.getName() << ";\n";
-    return oss.str();
-};
 
 /**
  * The OpenQASM2 circuit builder interface.
@@ -306,7 +299,7 @@ class OpenQASM2Builder {
             }
         }
         else {
-            oss << MeasureAll(qregs[0], cregs[0]);
+            oss << "measure " << qregs[0].getName() << " -> " << cregs[0].getName() << ";\n";
         }
 
         return oss.str();
