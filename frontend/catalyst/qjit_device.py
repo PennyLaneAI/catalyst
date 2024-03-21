@@ -59,6 +59,8 @@ RUNTIME_OPERATIONS = {
     'PhaseShift':   OperationProperties(invertible=True, controllable=True, differentiable=True),
     'PSWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
     'QubitUnitary': OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'ControlledQubitUnitary':
+                    OperationProperties(invertible=True, controllable=True, differentiable=True),
     'Rot':          OperationProperties(invertible=True, controllable=True, differentiable=True),
     'RX':           OperationProperties(invertible=True, controllable=True, differentiable=True),
     'RY':           OperationProperties(invertible=True, controllable=True, differentiable=True),

@@ -297,11 +297,16 @@ def get_device_config(
             "CRot",
             "ControlledPhaseShift",
             "QubitUnitary",
+            "ControlledQubitUnitary",
             "Toffoli",
         ]
 
         supports_controlled = check_quantum_control_flag(config)
         if supports_controlled:
+            if "QubitUnitary" in native_gate_props:
+                native_gate_props["ControlledQubitUnitary"] = OperationProperties(
+                    invertible=False, controllable=False, differentiable=True
+                )
             for op, props in native_gate_props.items():
                 props.controllable = op not in gates_to_be_decomposed_if_controlled
 
