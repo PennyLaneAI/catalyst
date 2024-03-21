@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
+# pylint: disable=unused-argument
 import pathlib
 
 import numpy as np
@@ -25,7 +26,7 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.compiler import get_lib_path
-from catalyst.preprocess import decompose_ops_to_unitary
+from catalyst.preprocess import decompose_ops_to_unitary, measurements_from_counts
 
 
 class DummyDevice(Device):
@@ -140,6 +141,102 @@ class TestPreprocess:
 
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             qml.qjit(f, target="jaxpr")
+
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
+    def test_measurement_from_counts_integration_multiple_measurements(self):
+        """Test the measurment from counts transform as part of the Catalyst pipeline."""
+        dev = DummyDevice(wires=4, shots=1000)
+
+        @qml.qjit
+        @measurements_from_counts
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.X(0)
+            qml.X(1)
+            qml.X(2)
+            qml.X(3)
+            return (
+                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+            )
+
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        assert "expval" not in mlir
+        assert "var" not in mlir
+        assert "counts" in mlir
+
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
+    def test_measurement_from_counts_integration_single_measurement(self):
+        """Test the measurment from counts transform with a single measurements as part of
+        the Catalyst pipeline."""
+        dev = DummyDevice(wires=4, shots=1000)
+
+        @qml.qjit
+        @measurements_from_counts
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.X(0)
+            qml.X(1)
+            qml.X(2)
+            qml.X(3)
+            return qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1))
+
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        assert "expval" not in mlir
+        assert "counts" in mlir
+
+
+class TestTransform:
+    """Test the transforms implemented in Catalyst."""
+
+    def test_measurements_from_counts(self):
+        """Test the transfom measurements_from_counts."""
+        device = qml.device("lightning.qubit", wires=4, shots=1000)
+
+        @qml.qjit
+        @measurements_from_counts
+        @qml.qnode(device=device)
+        def circuit(a: float):
+            qml.X(0)
+            qml.X(1)
+            qml.X(2)
+            qml.X(3)
+            return (
+                qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),
+                qml.var(qml.PauliX(wires=0) @ qml.PauliX(wires=2)),
+                qml.probs(wires=[3]),
+                qml.counts(qml.PauliX(wires=0) @ qml.PauliX(wires=1) @ qml.PauliX(wires=2)),
+            )
+
+        res = circuit(0.2)
+        results = res[0]
+
+        assert isinstance(results, tuple)
+        assert len(results) == 4
+
+        expval = results[0]
+        var = results[1]
+        probs = results[2]
+        counts = results[3]
+
+        assert expval.shape == ()
+        assert var.shape == ()
+        assert probs.shape == (2,)
+        assert isinstance(counts, tuple)
+        assert len(counts) == 2
+        assert counts[0].shape == (8,)
+        assert counts[1].shape == (8,)
 
 
 if __name__ == "__main__":
