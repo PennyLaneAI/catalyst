@@ -31,7 +31,12 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     ProgramFeatures,
     TOMLDocument,
+    check_quantum_control_flag,
+    get_decomposable_gates,
     get_device_config,
+    get_matrix_decomposable_gates,
+    get_native_gates,
+    get_observables,
     pennylane_operation_set,
     read_toml_file,
 )

@@ -15,32 +15,16 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-find_package(pybind11 CONFIG)
-
-if(pybind11_FOUND)
-    message(STATUS "Found pybind11")
-else()
-    message(STATUS "Cound not find existing pybind11-dev package. Building from source.")
-    set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
-
-    # https://cmake.org/cmake/help/latest/module/FindPython.html
-    find_package(Python COMPONENTS Interpreter Development)
-
-    FetchContent_Declare(pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG        v2.10.1
-    )
-
-    FetchContent_MakeAvailable(pybind11)
-endif()
+fetch_pybind11()
 
 add_library(rtd_openqasm SHARED OpenQasmDevice.cpp)
 
 target_include_directories(rtd_openqasm PRIVATE .
     ${runtime_includes}
     ${backend_includes}
+    ${util_includes}
     )
 
-target_link_libraries(rtd_openqasm pybind11::module)
+target_link_libraries(rtd_openqasm pybind11::module catalyst_python_interpreter)
 
 set_property(TARGET rtd_openqasm PROPERTY POSITION_INDEPENDENT_CODE ON)
