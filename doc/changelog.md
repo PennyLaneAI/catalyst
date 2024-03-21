@@ -56,6 +56,9 @@
   contain one element.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
+* Allow all Catalyst gates to receive `wire` values of less than 64 bitwidth.
+  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
+
 * Fix the endianness of counts in Catalyst and matches PennyLane.
   [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
 
