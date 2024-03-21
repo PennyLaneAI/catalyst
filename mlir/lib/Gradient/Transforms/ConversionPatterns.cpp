@@ -362,9 +362,15 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
+        // If we don't have any vals, it means we are coming from a GradOp, then we mark the results
+        // for being ignored by Enzime. But if we have vals, we are coming from a ValueAndGradOp,
+        // then we tell Enzime to keep them.
+        bool dupNoNeed = op.getVals().empty();
+
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc,
+                                  {.dupNoNeed = dupNoNeed});
         }
 
         // The results of backprop are in argShadows, except scalar derivatives which are in the
