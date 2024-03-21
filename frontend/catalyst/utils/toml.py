@@ -246,6 +246,7 @@ def get_device_config(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceConfig:
     """Load TOML document into the DeviceConfig structure"""
+    # pylint: disable=too-many-branches
 
     # supported_classes = map_supported_class_names()
     schema = int(config["schema"])
@@ -344,7 +345,6 @@ def get_device_config(
         decomp=decomp_props,
         matrix=matrix_decomp_props,
         observables=observable_props,
-        # measurement=measurement_props,
         mid_circuit_measurement_flag=check_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=check_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=check_compilation_flag(config, "dynamic_qubit_management"),
