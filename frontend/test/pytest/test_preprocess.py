@@ -147,7 +147,7 @@ class TestPreprocess:
         ).is_file(),
         reason="lib_dummydevice.so was not found.",
     )
-    def test_measurement_from_counts_integration(self):
+    def test_measurement_from_counts_integration_multiple_measurements(self):
         """Test the measurment from counts transform as part of the Catalyst pipeline."""
         dev = DummyDevice(wires=4, shots=1000)
 
@@ -168,6 +168,30 @@ class TestPreprocess:
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "var" not in mlir
+        assert "counts" in mlir
+    
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
+    def test_measurement_from_counts_integration_single_measurement(self):
+        """Test the measurment from counts transform with a single measurements as part of the Catalyst pipeline."""
+        dev = DummyDevice(wires=4, shots=1000)
+
+        @qml.qjit
+        @measurements_from_counts
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.X(0)
+            qml.X(1)
+            qml.X(2)
+            qml.X(3)
+            return qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1))
+
+        mlir = qml.qjit(circuit, target="mlir").mlir
+        assert "expval" not in mlir
         assert "counts" in mlir
 
 
