@@ -234,7 +234,6 @@ class QASMMeasure {
     }
 };
 
-
 /**
  * The OpenQASM2 circuit builder interface.
  *
