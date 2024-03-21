@@ -19,21 +19,19 @@ from typing import Optional, Set
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 
-import catalyst
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import (
+from catalyst.utils.runtime import (  # get_pennylane_observables,; get_pennylane_operations,
     BackendInfo,
-    get_pennylane_observables,
-    get_pennylane_operations,
 )
 from catalyst.utils.toml import (
     DeviceConfig,
     OperationProperties,
     ProgramFeatures,
     TOMLDocument,
-    check_adjoint_flag,
-    check_mid_circuit_measurement_flag,
+    get_device_config,
+    intersect_operations,
+    pennylane_operation_set,
 )
 
 # fmt:off
@@ -77,45 +75,45 @@ RUNTIME_OPERATIONS = {
 def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
+    # Supported gates of the target PennyLane's device
     qjit_config = deepcopy(target_config)
 
-    # Supported gates of the target PennyLane's device
-    # native_gates = get_pennylane_operations(config, program_features, device_name)
     # Gates that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
-    # supported_gates = set.intersection(native_gates, qir_gates)
-    qjit_config.native_gates = dict(qjit_config.native_gates.items() & qir_gates.items())
+
+    # Intersection of the above
+    qjit_config.native_gates = intersect_operations(target_config.native_gates, qir_gates)
+
+    from catalyst import pennylane_extensions as pe
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
     qjit_config.native_gates.update(
         {
-            catalyst.Cond: OperationProperties(
+            pe.Cond: OperationProperties(invertible=True, controllable=True, differentiable=True),
+            pe.WhileLoop: OperationProperties(
                 invertible=True, controllable=True, differentiable=True
             ),
-            catalyst.WhileLoop: OperationProperties(
-                invertible=True, controllable=True, differentiable=True
-            ),
-            catalyst.ForLoop: OperationProperties(
+            pe.ForLoop: OperationProperties(
                 invertible=True, controllable=True, differentiable=True
             ),
         }
     )
 
     # Optionally enable runtime-powered mid-circuit measurments
-    if check_mid_circuit_measurement_flag(config):  # pragma: no branch
+    if target_config.mid_circuit_measurement_flag:  # pragma: no branch
         qjit_config.native_gates.update(
             {
-                catalyst.MidCircuitMeasure: OperationProperties(
+                pe.MidCircuitMeasure: OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
         )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if check_adjoint_flag(config, program_features):
+    if all(ng.invertible for ng in target_config.native_gates.values()):
         qjit_config.native_gates.update(
             {
-                catalyst.Adjoint: OperationProperties(
+                pe.Adjoint: OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
@@ -171,26 +169,18 @@ class QJITDevice(qml.QubitDevice):
         device_name = backend.device_name if backend else "default"
 
         program_features = ProgramFeatures(shots is not None)
-        target_device_config = get_device_config(target_config, program_features)
+        target_device_config = get_device_config(target_config, program_features, device_name)
         self.caps = get_qjit_device_config(target_device_config)
-
-        # self._operations = get_qjit_pennylane_operations(target_config, pf, device_name)
-        self._observables = get_pennylane_observables(target_config, program_features, device_name)
 
     @property
     def operations(self) -> Set[str]:
-        """Get the device operations"""
-        ops = {}
-        for op, props in self.caps.native_ops.items():
-            ops.update({op.name})
-            if props.controllable:
-                ops.update({f"C({op.name})"})
-        return ops
+        """Print the device operations using PennyLane's syntax"""
+        return pennylane_operation_set(self.caps.native_gates)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return self._observables
+        return pennylane_operation_set(self.caps.observables)
 
     def apply(self, operations, **kwargs):
         """
@@ -294,18 +284,18 @@ class QJITDeviceNewAPI(qml.devices.Device):
         device_name = backend.device_name if backend else "default"
 
         pf = ProgramFeatures(original_device.shots is not None)
-        self._operations = get_qjit_pennylane_operations(target_config, pf, device_name)
-        self._observables = get_pennylane_observables(target_config, pf, device_name)
+        target_device_config = get_device_config(target_config, program_features, device_name)
+        self.caps = get_qjit_device_config(target_device_config)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return self._operations
+        return pennylane_operation_set(self.caps.native_gates)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return self._observables
+        return pennylane_operation_set(self.caps.observables)
 
     def preprocess(
         self,

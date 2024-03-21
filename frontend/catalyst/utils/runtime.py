@@ -32,11 +32,8 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     ProgramFeatures,
     TOMLDocument,
-    check_quantum_control_flag,
-    get_decomposable_gates,
-    get_matrix_decomposable_gates,
-    get_native_gates,
-    get_observables,
+    get_device_config,
+    pennylane_operation_set,
     read_toml_file,
 )
 
@@ -97,66 +94,6 @@ def deduce_schema1_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
         + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
     )
     return native_controlled_gates
-
-
-def get_pennylane_operations(
-    config: TOMLDocument, program_features: ProgramFeatures, device_name: str
-) -> Set[str]:
-    """Get gates that are natively supported by the device and therefore do not need to be
-    decomposed.
-
-    Args:
-        config (Dict[Str, Any]): Configuration dictionary
-        shots_present (bool): True is exact shots is specified in the current top-level program
-        device_name (str): Name of quantum device. Used for ad-hoc patching.
-
-    Returns:
-        Set[str]: List of gate names in the PennyLane format.
-    """
-    gates_PL = set()
-    schema = int(config["schema"])
-
-    if schema == 1:
-        native_gates_attrs = get_native_gates(config, program_features)
-        assert all(len(v) == 0 for v in native_gates_attrs.values())
-        native_gates = set(native_gates_attrs)
-        supports_controlled = check_quantum_control_flag(config)
-        native_controlled_gates = (
-            deduce_schema1_native_controlled_gates(native_gates) if supports_controlled else set()
-        )
-
-        # TODO: remove after PR #642 is merged in lightning
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            native_gates.update({"C(GlobalPhase)"})
-
-        gates_PL = set.union(native_gates, native_controlled_gates)
-
-    elif schema == 2:
-        native_gates = get_native_gates(config, program_features)
-        for gate, attrs in native_gates.items():
-            gates_PL.add(f"{gate}")
-            if "controllable" in attrs.get("properties", {}):
-                gates_PL.add(f"C({gate})")
-
-    else:
-        raise CompileError("Device configuration schema {schema} is not supported")
-
-    return gates_PL
-
-
-def get_pennylane_observables(config: TOMLDocument, program_features, device_name: str) -> Set[str]:
-    """Get observables in PennyLane format. Apply ad-hoc patching"""
-
-    observables = set(get_observables(config, program_features))
-
-    schema = int(config["schema"])
-
-    if schema == 1:
-        # TODO: remove after PR #642 is merged in lightning
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            observables.update({"Projector"})
-
-    return observables
 
 
 def check_no_overlap(*args):
@@ -245,22 +182,13 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         )
 
     device_name = device.short_name if isinstance(device, qml.Device) else device.name
+    program_features = ProgramFeatures(device.shots is not None)
+    device_config = get_device_config(config, program_features, device_name)
 
-    pf = ProgramFeatures(device.shots is not None)
-    native = get_pennylane_operations(config, pf, device_name)
-    observables = get_pennylane_observables(config, pf, device_name)
-    decomposable = set(get_decomposable_gates(config, pf))
-    matrix = set(get_matrix_decomposable_gates(config, pf))
-
-    # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
-    # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
-    # listed in either matrix or decomposable sections. This is a contradiction, because condition
-    # (1) means that `ControlledQubitUnitary` is also in the native set. We solve it here by
-    # applying a fixup.
-    # TODO: remove after PR #642 is merged in lightning
-    if "ControlledQubitUnitary" in native:
-        matrix = matrix - {"ControlledQubitUnitary"}
-        decomposable = decomposable - {"ControlledQubitUnitary"}
+    native = pennylane_operation_set(device_config.native_gates)
+    observables = pennylane_operation_set(device_config.observables)
+    decomposable = pennylane_operation_set(device_config.decomp)
+    matrix = pennylane_operation_set(device_config.matrix)
 
     check_no_overlap(native, decomposable, matrix)
 
@@ -272,8 +200,8 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         check_full_overlap(device_gates, spec_gates)
 
 
-def device_get_toml_config(device) -> Path:
-    """Get the path of the device config file."""
+def device_get_toml_config(device) -> TOMLDocument:
+    """Get the contents of the device config file."""
     if hasattr(device, "config"):
         # The expected case: device specifies its own config.
         toml_file = device.config

@@ -25,15 +25,15 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import (
     check_full_overlap,
     check_no_overlap,
-    check_quantum_control_flag,
-    get_decomposable_gates,
-    get_matrix_decomposable_gates,
-    get_native_gates,
-    get_pennylane_observables,
-    get_pennylane_operations,
+    get_device_config,
     validate_config_with_device,
 )
-from catalyst.utils.toml import ProgramFeatures, check_adjoint_flag, read_toml_file
+from catalyst.utils.toml import (
+    DeviceConfig,
+    ProgramFeatures,
+    check_adjoint_flag,
+    read_toml_file,
+)
 
 
 class DummyDevice(qml.QubitDevice):
@@ -54,6 +54,18 @@ class DummyDevice(qml.QubitDevice):
 
 
 ALL_SCHEMAS = [1, 2]
+
+
+def parse_test_config(program_features: ProgramFeatures, config_text: str) -> DeviceConfig:
+    """Parse test config into the DeviceConfig structure"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(config_text)
+        config = read_toml_file(toml_file)
+        device_config = get_device_config(config, program_features, "dummy")
+
+    return device_config
 
 
 @pytest.mark.parametrize("schema", ALL_SCHEMAS)
@@ -273,64 +285,52 @@ def test_get_decomp_gates_schema1():
 
 def test_get_decomp_gates_schema2():
     """Test native decomposition gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_gates = {"TestDecompGate": {}}
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    f"""
-                        schema = 2
-                        [operators.gates]
-                        decomp = {str(list(test_gates.keys()))}
-                    """
-                )
-            )
+    device_config = parse_test_config(
+        ProgramFeatures(False),
+        dedent(
+            f"""
+            schema = 2
+            [operators.gates]
+            decomp = ["PauliX", "PauliY"]
+        """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert test_gates == get_decomposable_gates(config, ProgramFeatures(False))
+    assert qml.PauliX in device_config.decomp
+    assert qml.PauliY in device_config.decomp
 
 
 def test_get_matrix_decomposable_gates_schema1():
     """Test native matrix gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_gates = {"TestMatrixGate": {}}
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    f"""
-                        schema = 1
-                        [[operators.gates]]
-                        matrix = {str(list(test_gates.keys()))}
-                    """
-                )
-            )
+    device_config = parse_test_config(
+        ProgramFeatures(False),
+        dedent(
+            f"""
+            schema = 1
+            [[operators.gates]]
+            matrix = ["PauliX", "PauliY"]
+        """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert test_gates == get_matrix_decomposable_gates(config, ProgramFeatures(False))
+    assert qml.PauliX in device_config.matrix
+    assert qml.PauliY in device_config.matrix
 
 
 def test_get_matrix_decomposable_gates_schema2():
     """Test native matrix gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.matrix]
-                        TestMatrixGate = {}
-                    """
-                )
-            )
+    device_config = parse_test_config(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+            schema = 2
+            [operators.gates.matrix]
+            PauliZ = {}
+        """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert {"TestMatrixGate": {}} == get_matrix_decomposable_gates(config, ProgramFeatures(False))
+    assert qml.PauliZ in device_config.matrix
 
 
 def test_check_overlap_msg():
@@ -456,8 +456,6 @@ def test_config_unsupported_schema():
 
         config = read_toml_file(toml_file)
 
-        with pytest.raises(CompileError):
-            check_quantum_control_flag(config)
         with pytest.raises(CompileError):
             get_native_gates(config, ProgramFeatures(False))
         with pytest.raises(CompileError):
