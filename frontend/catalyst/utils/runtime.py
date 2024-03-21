@@ -96,7 +96,7 @@ def deduce_schema1_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
     return native_controlled_gates
 
 
-def check_no_overlap(device_name, *args):
+def check_no_overlap(*args, device_name):
     """Check items in *args are mutually exclusive.
 
     Args:
@@ -190,15 +190,10 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     decomposable = pennylane_operation_set(device_config.decomp)
     matrix = pennylane_operation_set(device_config.matrix)
 
-    check_no_overlap(device_name, native, decomposable, matrix)
+    check_no_overlap(native, decomposable, matrix, device_name=device_name)
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
         device_gates = set.union(set(device.operations), set(device.observables))
-        # Remove synonims
-        if all(g in device_gates for g in ["ControlledPhaseShift", "CPhase"]):
-            device_gates = device_gates - {"ControlledPhaseShift"}
-        if all(g in device_gates for g in ["SISWAP", "SQISW"]):
-            device_gates = device_gates - {"SISWAP"}
         device_gates = filter_out_adjoint(device_gates)
         spec_gates = set.union(native, observables, matrix, decomposable)
         spec_gates = filter_out_adjoint(spec_gates)

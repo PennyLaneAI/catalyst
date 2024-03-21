@@ -76,11 +76,11 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 
 @dataclass
 class DeviceConfig:
-    native_gates: Dict[Operation, OperationProperties]
-    decomp: Dict[Operation, OperationProperties]
-    matrix: Dict[Operation, OperationProperties]
-    observables: Dict[Observable, OperationProperties]
-    # measurement: Dict[Operation, OperationProperties]
+    native_gates: Dict[str, OperationProperties]
+    decomp: Dict[str, OperationProperties]
+    matrix: Dict[str, OperationProperties]
+    observables: Dict[str, OperationProperties]
+    # measurement: Dict[str, OperationProperties]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
@@ -95,11 +95,11 @@ def intersect_operations(
 def pennylane_operation_set(config_ops: Dict[Operation, OperationProperties]) -> Set[str]:
     ops = set()
     # Back-mapping from class names to string names
-    supported_names = {v: k for k, v in map_supported_class_names().items()}
+    # supported_names = {v: k for k, v in map_supported_class_names().items()}
     for g, props in config_ops.items():
-        ops.update({supported_names[g]})
+        ops.update({g})
         if props.controllable:
-            ops.update({f"C({supported_names[g]})"})
+            ops.update({f"C({g})"})
     return ops
 
 
@@ -238,114 +238,31 @@ def _build_supported_classes(qml_classes):
     return acc
 
 
-def map_supported_class_names():
-    from catalyst import pennylane_extensions as pe
-
-    # fmt:off
-    acc = {
-        # PennyLane's gates
-        'BlockEncode'                :qml.BlockEncode,
-        'CNOT'                       :qml.CNOT,
-        'ControlledPhaseShift'       :qml.ControlledPhaseShift,
-        'ControlledQubitUnitary'     :qml.ControlledQubitUnitary,
-        'CRot'                       :qml.CRot,
-        'CRX'                        :qml.CRX,
-        'CRY'                        :qml.CRY,
-        'CRZ'                        :qml.CRZ,
-        'CSWAP'                      :qml.CSWAP,
-        'CY'                         :qml.CY,
-        'CZ'                         :qml.CZ,
-        'DoubleExcitationMinus'      :qml.DoubleExcitationMinus,
-        'DoubleExcitationPlus'       :qml.DoubleExcitationPlus,
-        'DoubleExcitation'           :qml.DoubleExcitation,
-        'GlobalPhase'                :qml.GlobalPhase,
-        'Hadamard'                   :qml.Hadamard,
-        'Identity'                   :qml.Identity,
-        'IsingXX'                    :qml.IsingXX,
-        'IsingXY'                    :qml.IsingXY,
-        'IsingYY'                    :qml.IsingYY,
-        'IsingZZ'                    :qml.IsingZZ,
-        'MultiRZ'                    :qml.MultiRZ,
-        'PauliX'                     :qml.PauliX,
-        'PauliY'                     :qml.PauliY,
-        'PauliZ'                     :qml.PauliZ,
-        'PhaseShift'                 :qml.PhaseShift,
-        'QubitUnitary'               :qml.QubitUnitary,
-        'Rot'                        :qml.Rot,
-        'RX'                         :qml.RX,
-        'RY'                         :qml.RY,
-        'RZ'                         :qml.RZ,
-        'SingleExcitationMinus'      :qml.SingleExcitationMinus,
-        'SingleExcitationPlus'       :qml.SingleExcitationPlus,
-        'SingleExcitation'           :qml.SingleExcitation,
-        'S'                          :qml.S,
-        'SWAP'                       :qml.SWAP,
-        'Toffoli'                    :qml.Toffoli,
-        'T'                          :qml.T,
-
-        # Observables/measurements
-        "BasisState"                 :qml.BasisState,
-        "ControlledQubitUnitary"     :qml.ControlledQubitUnitary,
-        "CPhase"                     :qml.CPhase,
-        "DiagonalQubitUnitary"       :qml.DiagonalQubitUnitary,
-        "ECR"                        :qml.ECR,
-        "Exp"                        :qml.ops.Exp,
-        "Hamiltonian"                :qml.Hamiltonian,
-        "Hermitian"                  :qml.Hermitian,
-        "ISWAP"                      :qml.ISWAP,
-        "MultiControlledX"           :qml.MultiControlledX,
-        "OrbitalRotation"            :qml.OrbitalRotation,
-        "Prod"                       :qml.ops.Prod,
-        "Projector"                  :qml.Projector,
-        "PSWAP"                      :qml.PSWAP,
-        "QFT"                        :qml.QFT,
-        "QubitCarry"                 :qml.QubitCarry,
-        "QubitStateVector"           :qml.QubitStateVector,
-        "QubitSum"                   :qml.QubitSum,
-        "SISWAP"                     :qml.SISWAP,
-        "SparseHamiltonian"          :qml.SparseHamiltonian,
-        "SProd"                      :qml.ops.SProd,
-        "SQISW"                      :qml.SQISW,
-        "StatePrep"                  :qml.StatePrep,
-        "Sum"                        :qml.ops.Sum,
-        "SX"                         :qml.SX,
-
-        # Catalyst extension ops
-        'Adjoint'                    :pe.Adjoint,
-        'Cond'                       :pe.Cond,
-        'ForLoop'                    :pe.ForLoop,
-        'MidCircuitMeasure'          :pe.MidCircuitMeasure,
-        'WhileLoop'                  :pe.WhileLoop,
-    }
-    # fmt:on
-    return acc
-
-
 def get_device_config(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceConfig:
 
-    supported_classes = map_supported_class_names()
+    # supported_classes = map_supported_class_names()
     schema = int(config["schema"])
 
     native_gate_props = {}
     for g, props in get_native_gates(config, program_features).items():
-        native_gate_props[supported_classes[g]] = get_operation_properties(props)
+        native_gate_props[g] = get_operation_properties(props)
 
     matrix_decomp_props = {}
     for g, props in get_matrix_decomposable_gates(config, program_features).items():
-        matrix_decomp_props[supported_classes[g]] = get_operation_properties(props)
+        matrix_decomp_props[g] = get_operation_properties(props)
 
     decomp_props = {}
     for g, props in get_decomposable_gates(config, program_features).items():
-        decomp_props[supported_classes[g]] = get_operation_properties(props)
+        decomp_props[g] = get_operation_properties(props)
 
     observable_props = {}
     for g, props in get_observables(config, program_features).items():
-        observable_props[supported_classes[g]] = get_operation_properties(props)
+        observable_props[g] = get_operation_properties(props)
 
+    # TODO: save measurements in config, not just load
     # if schema == 2:
-    #     # TODO: save in config, not just load
     #     measurement_props = {}
     #     for g, props in get_measurement_processes(config, program_features).items():
     #         measurement_props[supported_classes[g]] = get_operation_properties(props)
@@ -353,13 +270,13 @@ def get_device_config(
     if schema == 1:
         # TODO: remove after PR #642 is merged in lightning
         if device_name == "lightning.kokkos":  # pragma: nocover
-            native_gate_props[qml.GlobalPhase] = OperationProperties(
+            native_gate_props["GlobalPhase"] = OperationProperties(
                 invertible=False, controllable=False, differentiable=True
             )
 
         # TODO: remove after PR #642 is merged in lightning
         if device_name == "lightning.kokkos":  # pragma: nocover
-            observable_props[qml.Projector] = OperationProperties(
+            observable_props["Projector"] = OperationProperties(
                 invertible=False, controllable=False, differentiable=False
             )
 
@@ -399,18 +316,18 @@ def get_device_config(
         # condition (1) means that `ControlledQubitUnitary` is also in the native set. We solve it
         # here by applying a fixup.
         # TODO: remove after PR #642 is merged in lightning
-        if qml.ControlledQubitUnitary in native_gate_props:
-            if qml.ControlledQubitUnitary in matrix_decomp_props:
-                matrix_decomp_props.pop(qml.ControlledQubitUnitary)
-            if qml.ControlledQubitUnitary in decomp_props:
-                decomp_props.pop(qml.ControlledQubitUnitary)
+        if "ControlledQubitUnitary" in native_gate_props:
+            if "ControlledQubitUnitary" in matrix_decomp_props:
+                matrix_decomp_props.pop("ControlledQubitUnitary")
+            if "ControlledQubitUnitary" in decomp_props:
+                decomp_props.pop("ControlledQubitUnitary")
 
         # Fix a bug in device toml schema 1
-        if qml.ControlledPhaseShift in native_gate_props:
-            if qml.ControlledPhaseShift in matrix_decomp_props:
-                matrix_decomp_props.pop(qml.ControlledPhaseShift)
-            if qml.ControlledPhaseShift in decomp_props:
-                decomp_props.pop(qml.ControlledPhaseShift)
+        if "ControlledPhaseShift" in native_gate_props:
+            if "ControlledPhaseShift" in matrix_decomp_props:
+                matrix_decomp_props.pop("ControlledPhaseShift")
+            if "ControlledPhaseShift" in decomp_props:
+                decomp_props.pop("ControlledPhaseShift")
 
     return DeviceConfig(
         native_gates=native_gate_props,

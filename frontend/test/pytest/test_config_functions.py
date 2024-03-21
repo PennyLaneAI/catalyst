@@ -173,7 +173,7 @@ def test_get_native_gates_schema1_qadjoint(qadjoint):
             """
         ),
     )
-    assert device_config.native_gates[qml.PauliZ].invertible is qadjoint
+    assert device_config.native_gates["PauliZ"].invertible is qadjoint
 
 
 def test_get_native_gates_schema2():
@@ -189,8 +189,6 @@ def test_get_native_gates_schema2():
             """
         ),
     )
-
-    print(device_config.native_gates[qml.PauliX])
 
     assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(device_config.native_gates)
 
@@ -208,8 +206,8 @@ def test_get_native_gates_schema2_optional_shots():
             """
         ),
     )
-    assert qml.PauliX in device_config.native_gates
-    assert qml.PauliY not in device_config.native_gates
+    assert "PauliX" in device_config.native_gates
+    assert "PauliY" not in device_config.native_gates
 
 
 def test_get_native_gates_schema2_optional_noshots():
@@ -225,8 +223,8 @@ def test_get_native_gates_schema2_optional_noshots():
             """
         ),
     )
-    assert qml.PauliX not in device_config.native_gates
-    assert qml.PauliY in device_config.native_gates
+    assert "PauliX" not in device_config.native_gates
+    assert "PauliY" in device_config.native_gates
 
 
 def test_get_decomp_gates_schema1():
@@ -242,9 +240,9 @@ def test_get_decomp_gates_schema1():
         ),
     )
 
-    assert qml.PauliX in device_config.decomp
-    assert qml.PauliY in device_config.decomp
-    assert qml.PauliZ not in device_config.decomp
+    assert "PauliX" in device_config.decomp
+    assert "PauliY" in device_config.decomp
+    assert "PauliZ" not in device_config.decomp
 
 
 def test_get_decomp_gates_schema2():
@@ -260,8 +258,8 @@ def test_get_decomp_gates_schema2():
         ),
     )
 
-    assert qml.PauliX in device_config.decomp
-    assert qml.PauliY in device_config.decomp
+    assert "PauliX" in device_config.decomp
+    assert "PauliY" in device_config.decomp
 
 
 def test_get_matrix_decomposable_gates_schema1():
@@ -277,8 +275,8 @@ def test_get_matrix_decomposable_gates_schema1():
         ),
     )
 
-    assert qml.PauliX in device_config.matrix
-    assert qml.PauliY in device_config.matrix
+    assert "PauliX" in device_config.matrix
+    assert "PauliY" in device_config.matrix
 
 
 def test_get_matrix_decomposable_gates_schema2():
@@ -294,14 +292,14 @@ def test_get_matrix_decomposable_gates_schema2():
         ),
     )
 
-    assert qml.PauliZ in device_config.matrix
+    assert "PauliZ" in device_config.matrix
 
 
 def test_check_overlap_msg():
     """Test error is raised if there is an overlap in sets."""
-    msg = "Device has overlapping gates."
+    msg = "Device 'test' has overlapping gates."
     with pytest.raises(CompileError, match=msg):
-        check_no_overlap(["A"], ["A"], ["A"])
+        check_no_overlap(["A"], ["A"], ["A"], device_name="test")
 
 
 def test_check_full_overlap():
