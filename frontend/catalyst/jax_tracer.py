@@ -612,9 +612,11 @@ def trace_quantum_measurements(
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
                 m_wires = o.wires if o.wires else range(len(tape.wires))
+
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
+
             if o.return_type.value == "sample":
                 shape = (shots, nqubits) if using_compbasis else (shots,)
                 out_classical_tracers.append(sample_p.bind(obs_tracers, shots=shots, shape=shape))
@@ -702,7 +704,6 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 def apply_transform(transform_program, tape, flat_results):
     """Apply transform."""
-
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
