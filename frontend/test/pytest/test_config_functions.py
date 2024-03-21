@@ -250,7 +250,7 @@ def test_get_decomp_gates_schema2():
     device_config = parse_test_config(
         ProgramFeatures(False),
         dedent(
-            f"""
+            """
             schema = 2
             [operators.gates]
             decomp = ["PauliX", "PauliY"]

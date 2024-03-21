@@ -21,9 +21,6 @@ from functools import reduce
 from itertools import repeat
 from typing import Any, Dict, List, Set
 
-import pennylane as qml
-from pennylane.operation import Observable, Operation
-
 from catalyst.utils.exceptions import CompileError
 
 # TODO:
@@ -60,6 +57,8 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
 
 @dataclass(unsafe_hash=True)
 class OperationProperties:
+    """Capabilities of a single operation"""
+
     invertible: bool
     controllable: bool
     differentiable: bool
@@ -76,23 +75,25 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 
 @dataclass
 class DeviceConfig:
+    """Quantum device capabilities"""
+
     native_gates: Dict[str, OperationProperties]
     decomp: Dict[str, OperationProperties]
     matrix: Dict[str, OperationProperties]
     observables: Dict[str, OperationProperties]
-    # measurement: Dict[str, OperationProperties]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
 
 
 def intersect_operations(
-    a: Dict[Operation, OperationProperties], b: Dict[Operation, OperationProperties]
-) -> Dict[Operation, OperationProperties]:
+    a: Dict[str, OperationProperties], b: Dict[str, OperationProperties]
+) -> Dict[str, OperationProperties]:
     return {k: intersect_properties(a[k], b[k]) for k in (a.keys() & b.keys())}
 
 
-def pennylane_operation_set(config_ops: Dict[Operation, OperationProperties]) -> Set[str]:
+def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[str]:
+    """Prints a config section into a set of strings using PennyLane syntax"""
     ops = set()
     # Back-mapping from class names to string names
     # supported_names = {v: k for k, v in map_supported_class_names().items()}
@@ -241,6 +242,7 @@ def _build_supported_classes(qml_classes):
 def get_device_config(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceConfig:
+    """Load TOML document into the DeviceConfig structure"""
 
     # supported_classes = map_supported_class_names()
     schema = int(config["schema"])

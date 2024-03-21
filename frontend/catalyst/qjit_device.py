@@ -21,9 +21,7 @@ from pennylane.measurements import MidMeasureMP
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import (
-    BackendInfo,
-)
+from catalyst.utils.runtime import BackendInfo
 from catalyst.utils.toml import (
     DeviceConfig,
     OperationProperties,
