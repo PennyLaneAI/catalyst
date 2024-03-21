@@ -11,6 +11,7 @@ LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
 MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
+OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/oqc/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
@@ -170,6 +171,8 @@ wheel:
 	cp $(RT_BUILD_DIR)/lib/catalyst_callback_registry*.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
+	cp $(OQC_BUILD_DIR)/librtd_oqc* $(MK_DIR)/frontend/catalyst/lib
+	cp $(OQC_BUILD_DIR)/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib

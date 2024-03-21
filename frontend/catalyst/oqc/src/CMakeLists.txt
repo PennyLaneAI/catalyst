@@ -51,4 +51,6 @@ target_link_libraries(rtd_oqc PRIVATE pybind11::module)
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+file(COPY ${PROJECT_SOURCE_DIR}/oqc.toml DESTINATION .)
+
 add_subdirectory(tests)
