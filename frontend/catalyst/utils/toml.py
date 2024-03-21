@@ -80,7 +80,7 @@ class DeviceConfig:
     decomp: Dict[Operation, OperationProperties]
     matrix: Dict[Operation, OperationProperties]
     observables: Dict[Observable, OperationProperties]
-    measurement: Dict[Operation, OperationProperties]
+    # measurement: Dict[Operation, OperationProperties]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
@@ -326,6 +326,7 @@ def get_device_config(
 ) -> DeviceConfig:
 
     supported_classes = map_supported_class_names()
+    schema = int(config["schema"])
 
     native_gate_props = {}
     for g, props in get_native_gates(config, program_features).items():
@@ -343,11 +344,11 @@ def get_device_config(
     for g, props in get_observables(config, program_features).items():
         observable_props[supported_classes[g]] = get_operation_properties(props)
 
-    measurement_props = {}
-    for g, props in get_observables(config, program_features).items():
-        measurement_props[supported_classes[g]] = get_operation_properties(props)
-
-    schema = int(config["schema"])
+    # if schema == 2:
+    #     # TODO: save in config, not just load
+    #     measurement_props = {}
+    #     for g, props in get_measurement_processes(config, program_features).items():
+    #         measurement_props[supported_classes[g]] = get_operation_properties(props)
 
     if schema == 1:
         # TODO: remove after PR #642 is merged in lightning
@@ -362,15 +363,35 @@ def get_device_config(
                 invertible=False, controllable=False, differentiable=False
             )
 
+        # The deduction logic is the following:
+        # * Most of the gates have their `C(Gate)` controlled counterparts.
+        # * Some gates have to be decomposed if controlled version is used. Typically these are
+        #   gates which are already controlled but have well-known names.
+        # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
+        gates_to_be_decomposed_if_controlled = [
+            qml.Identity,
+            qml.CNOT,
+            qml.CY,
+            qml.CZ,
+            qml.CSWAP,
+            qml.CRX,
+            qml.CRY,
+            qml.CRZ,
+            qml.CRot,
+            qml.ControlledPhaseShift,
+            qml.QubitUnitary,
+            qml.Toffoli,
+        ]
+
         supports_controlled = check_quantum_control_flag(config)
         if supports_controlled:
-            for v in native_gate_props.values():
-                v.controllable = True
+            for op, props in native_gate_props.items():
+                props.controllable = op not in gates_to_be_decomposed_if_controlled
 
         supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
         if supports_adjoint:
-            for v in native_gate_props.values():
-                v.invertible = True
+            for props in native_gate_props.values():
+                props.invertible = True
 
         # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
         # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
@@ -379,15 +400,24 @@ def get_device_config(
         # here by applying a fixup.
         # TODO: remove after PR #642 is merged in lightning
         if qml.ControlledQubitUnitary in native_gate_props:
-            matrix.pop(qml.ControlledQubitUnitary)
-            decomposable.pop(qml.ControlledQubitUnitary)
+            if qml.ControlledQubitUnitary in matrix_decomp_props:
+                matrix_decomp_props.pop(qml.ControlledQubitUnitary)
+            if qml.ControlledQubitUnitary in decomp_props:
+                decomp_props.pop(qml.ControlledQubitUnitary)
+
+        # Fix a bug in device toml schema 1
+        if qml.ControlledPhaseShift in native_gate_props:
+            if qml.ControlledPhaseShift in matrix_decomp_props:
+                matrix_decomp_props.pop(qml.ControlledPhaseShift)
+            if qml.ControlledPhaseShift in decomp_props:
+                decomp_props.pop(qml.ControlledPhaseShift)
 
     return DeviceConfig(
         native_gates=native_gate_props,
         decomp=decomp_props,
         matrix=matrix_decomp_props,
         observables=observable_props,
-        measurement=measurement_props,
+        # measurement=measurement_props,
         mid_circuit_measurement_flag=check_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=check_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=check_compilation_flag(config, "dynamic_qubit_management"),

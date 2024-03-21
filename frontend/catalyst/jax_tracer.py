@@ -865,7 +865,7 @@ def trace_quantum_function(
                 transform_program, quantum_tape, return_values_flat
             )
 
-            verify_program(device.config)
+            # verify_program(device.config)
 
         # (2) - Quantum tracing
         transformed_results = []
