@@ -26,7 +26,6 @@ include(Catch)
 
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
     add_executable(runner_tests_lightning runner_main.cpp)
-    target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
 
     add_subdirectory(third_party)
 

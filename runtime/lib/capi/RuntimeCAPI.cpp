@@ -115,10 +115,6 @@ using namespace Catalyst::Runtime;
 
 void pyregistry(int64_t identifier)
 {
-    // We need to guard calls to callback.
-    // These are implemented in Python.
-    std::lock_guard<std::mutex> lock(getPythonMutex());
-
     // LIBREGISTRY is a compile time macro.
     // It is the name of the library that contains the callbackCall implementation.
     // The reason why this is using dlopen is because we have historically wanted

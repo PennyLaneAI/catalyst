@@ -21,7 +21,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
-set(util_includes "${PROJECT_SOURCE_DIR}/utils")
 
 
 # Get LLVM hash to target from source tree.
@@ -126,4 +125,3 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(tests)
-add_subdirectory(utils)

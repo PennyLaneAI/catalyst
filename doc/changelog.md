@@ -74,11 +74,6 @@
   Note that returning different *kinds* of results, like different observables or differently
   shaped arrays, is not possible.
 
-* The Python interpreter is now a shared resource across the runtime.
-  [(#615)](https://github.com/PennyLaneAI/catalyst/pull/615)
-
-  This change allows any part of the runtime to start executing Python code through pybind.
-
 * Fix runtime tests to be compatible with amazon-braket-sdk==1.73.3
   [(#620)](https://github.com/PennyLaneAI/catalyst/pull/620)
 

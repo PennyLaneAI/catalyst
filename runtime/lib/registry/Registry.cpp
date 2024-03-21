@@ -18,6 +18,7 @@ std::unordered_map<int64_t, py::function> *references;
 extern "C" {
 [[gnu::visibility("default")]] void callbackCall(int64_t identifier)
 {
+    py::gil_scoped_acquire lock;
     auto it = references->find(identifier);
     if (it == references->end()) {
         throw std::invalid_argument("Callback called with invalid identifier");
