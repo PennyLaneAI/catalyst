@@ -278,7 +278,6 @@ jobs:
       run: |
         	cmake -G Ninja -B oqc-build \
                 -DRUNTIME_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
-
         	cmake --build oqc-build --target rtd_oqc
 
     - name: Test Catalyst-Runtime
