@@ -63,38 +63,6 @@ def get_lib_path(project, env_var):
         return os.path.join(package_root, "..", "lib")  # pragma: no cover
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
-
-def deduce_schema1_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
-    """Calculate the set of controlled gates given the set of natively supported gates. This
-    function is used with the toml config schema 1 which did not support per-gate control
-    specifications. Later schemas provide the required information directly.
-    """
-    # The deduction logic is the following:
-    # * Most of the gates have their `C(Gate)` controlled counterparts.
-    # * Some gates have to be decomposed if controlled version is used. Typically these are gates
-    #   which are already controlled but have well-known names.
-    # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
-    gates_to_be_decomposed_if_controlled = [
-        "Identity",
-        "CNOT",
-        "CY",
-        "CZ",
-        "CSWAP",
-        "CRX",
-        "CRY",
-        "CRZ",
-        "CRot",
-        "ControlledPhaseShift",
-        "QubitUnitary",
-        "Toffoli",
-    ]
-    native_controlled_gates = set(
-        [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
-        + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
-    )
-    return native_controlled_gates
-
-
 def check_no_overlap(*args, device_name):
     """Check items in *args are mutually exclusive.
 
