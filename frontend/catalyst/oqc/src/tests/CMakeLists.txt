@@ -55,6 +55,7 @@ target_link_libraries(runner_tests_oqc PRIVATE
 
 target_sources(runner_tests_oqc PRIVATE
     Test_OpenQASM2Builder.cpp
+    Test_OQCDevice.cpp
     )
 
 catch_discover_tests(runner_tests_oqc)
