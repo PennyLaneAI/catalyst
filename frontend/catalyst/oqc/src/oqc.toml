@@ -12,7 +12,6 @@ PauliZ = { }
 S = { }
 T = { }
 CNOT = { }
-Identity = { }
 Toffoli = { }
 CY = { }
 CZ = { }
