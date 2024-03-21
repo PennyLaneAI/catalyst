@@ -31,7 +31,6 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import (
     DeviceConfig,
     ProgramFeatures,
-    check_adjoint_flag,
     pennylane_operation_set,
     read_toml_file,
 )
