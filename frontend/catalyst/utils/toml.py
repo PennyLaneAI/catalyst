@@ -286,18 +286,18 @@ def get_device_config(
         #   gates which are already controlled but have well-known names.
         # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
         gates_to_be_decomposed_if_controlled = [
-            qml.Identity,
-            qml.CNOT,
-            qml.CY,
-            qml.CZ,
-            qml.CSWAP,
-            qml.CRX,
-            qml.CRY,
-            qml.CRZ,
-            qml.CRot,
-            qml.ControlledPhaseShift,
-            qml.QubitUnitary,
-            qml.Toffoli,
+            "Identity",
+            "CNOT",
+            "CY",
+            "CZ",
+            "CSWAP",
+            "CRX",
+            "CRY",
+            "CRZ",
+            "CRot",
+            "ControlledPhaseShift",
+            "QubitUnitary",
+            "Toffoli",
         ]
 
         supports_controlled = check_quantum_control_flag(config)
