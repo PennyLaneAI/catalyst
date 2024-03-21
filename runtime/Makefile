@@ -14,8 +14,7 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 ENABLE_ASAN?=OFF
-ENABLE_LAPACK?=ON
-LIGHTNING_GIT_TAG_VALUE?="master"
+LIGHTNING_GIT_TAG_VALUE?="bbee87b"
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 ifeq ($(shell uname), Darwin)
