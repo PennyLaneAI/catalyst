@@ -379,6 +379,7 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
     - name: Install Catalyst
       run: |
@@ -390,3 +391,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/catalyst/oqc/test/oqc -n auto
