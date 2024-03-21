@@ -337,7 +337,7 @@ jobs:
         MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
-        OQC_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+        OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
         ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
         make wheel
 
