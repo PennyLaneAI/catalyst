@@ -366,6 +366,10 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+    
+    - name: Install PennyLane OQC
+      if: matrix.python_version < '3.11'
+      run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
     - name: Install Catalyst

@@ -304,6 +304,8 @@ jobs:
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
           make oqc
@@ -387,6 +389,10 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+
+    - name: Install OQC client
+      if: matrix.python_version < '3.11'
+      run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
     - name: Install Catalyst
