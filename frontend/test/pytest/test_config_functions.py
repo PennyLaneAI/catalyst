@@ -233,11 +233,11 @@ def test_get_decomp_gates_schema1():
     device_config = parse_test_config(
         ProgramFeatures(False),
         dedent(
-            f"""
-                    schema = 1
-                    [[operators.gates]]
-                    decomp = ["PauliX", "PauliY"]
-                """
+            """
+                schema = 1
+                [[operators.gates]]
+                decomp = ["PauliX", "PauliY"]
+            """
         ),
     )
 
@@ -268,7 +268,7 @@ def test_get_matrix_decomposable_gates_schema1():
     device_config = parse_test_config(
         ProgramFeatures(False),
         dedent(
-            f"""
+            """
             schema = 1
             [[operators.gates]]
             matrix = ["PauliX", "PauliY"]
