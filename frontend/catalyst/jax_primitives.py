@@ -36,10 +36,9 @@ from jaxlib.mlir.dialects.arith import (
     SubIOp,
 )
 from jaxlib.mlir.dialects.func import CallOp
-from jaxlib.mlir.dialects.mhlo import ConstantOp as MHLOConstantOp
-from jaxlib.mlir.dialects.mhlo import ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
+from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
@@ -376,7 +375,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
     # such constants to numpy array types.
     constants = [
-        MHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
         for const in jaxpr.consts
     ]
     args_and_consts = constants + list(args)
@@ -419,7 +418,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     constants = [
-        MHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
@@ -475,7 +474,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     constants = [
-        MHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
         for const in jaxpr.consts
     ]
     consts_and_args = constants + args
@@ -744,7 +743,7 @@ def _gphase_lowering(
         if not ir.F64Type.isinstance(baseType):
             baseType = ir.F64Type.get()
             resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = ConvertOp(resultTensorType, p).results
+            p = StableHLOConvertOp(resultTensorType, p).results
 
         p = TensorExtractOp(baseType, p, []).result
 
@@ -822,7 +821,7 @@ def _qinst_lowering(
         if not ir.F64Type.isinstance(baseType):
             baseType = ir.F64Type.get()
             resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = ConvertOp(resultTensorType, p).results
+            p = StableHLOConvertOp(resultTensorType, p).results
 
         p = TensorExtractOp(baseType, p, []).result
 
@@ -922,7 +921,7 @@ def _qunitary_lowering(
         f64_type = ir.F64Type.get()
         complex_f64_type = ir.ComplexType.get(f64_type)
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
-        matrix = ConvertOp(tensor_complex_f64_type, matrix).results
+        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).results
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -1114,7 +1113,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
     if not ir.F64Type.isinstance(baseType):
         baseType = ir.F64Type.get()
         resultTensorType = ir.RankedTensorType.get(shape, baseType)
-        coeffs = ConvertOp(resultTensorType, coeffs).results
+        coeffs = StableHLOConvertOp(resultTensorType, coeffs).results
 
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
