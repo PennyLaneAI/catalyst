@@ -214,7 +214,10 @@ py::list wrap(py::object func, py::tuple py_args, py::object result_desc, py::ob
     auto value1 = py_args.attr("__getitem__")(1);
     void *value1_ptr = *reinterpret_cast<void **>(ctypes.attr("addressof")(value1).cast<size_t>());
 
-    f_ptr(value0_ptr, value1_ptr);
+    {
+       py::gil_scoped_release lock;
+       f_ptr(value0_ptr, value1_ptr);
+    }
     returns = move_returns(value0_ptr, result_desc, transfer, numpy_arrays);
 
     return returns;
