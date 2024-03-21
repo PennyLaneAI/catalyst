@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
+# pylint: disable=unused-argument
 import pathlib
 
 import numpy as np
@@ -177,7 +178,8 @@ class TestPreprocess:
         reason="lib_dummydevice.so was not found.",
     )
     def test_measurement_from_counts_integration_single_measurement(self):
-        """Test the measurment from counts transform with a single measurements as part of the Catalyst pipeline."""
+        """Test the measurment from counts transform with a single measurements as part of 
+        the Catalyst pipeline."""
         dev = DummyDevice(wires=4, shots=1000)
 
         @qml.qjit
