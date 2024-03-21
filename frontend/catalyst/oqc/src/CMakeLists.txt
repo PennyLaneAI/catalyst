@@ -43,11 +43,11 @@ target_include_directories(rtd_oqc PUBLIC .
 
 set(OQC_LIBRARIES
     rtd_oqc
-    ${runtime_lib}
+    catalyst_python_interpreter
 )
 
 target_link_directories(rtd_oqc PRIVATE ${runtime_lib})
-target_link_libraries(rtd_oqc PRIVATE pybind11::module "catalyst_python_interpreter")
+target_link_libraries(rtd_oqc PRIVATE pybind11::module catalyst_python_interpreter)
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
 

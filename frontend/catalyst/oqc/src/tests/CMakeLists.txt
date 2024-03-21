@@ -46,6 +46,7 @@ target_include_directories(runner_tests_oqc PRIVATE
     ${OQC_LIBRARIES}
     )
 
+target_link_directories(runner_tests_oqc PRIVATE ${runtime_lib})
 # To avoid link to libpython, we use pybind11::module interface library.
 target_link_libraries(runner_tests_oqc PRIVATE
     Catch2::Catch2
