@@ -94,6 +94,9 @@
 * Fix the issue of triggering the C++ compiler driver twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
+* Fix return type for transforms. Instead of returning a 1-element tuple, return the element.
+  [(#574)](https://github.com/PennyLaneAI/catalyst/pull/574)
+
 * Adds lowering pass for `shape` operations. This allows programs with `jnp.reshape` to succeed.
   Some templates may use `jnp.reshape`.
   [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
