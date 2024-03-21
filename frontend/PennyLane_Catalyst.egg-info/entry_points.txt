@@ -1,0 +1,13 @@
+[pennylane.compilers]
+catalyst.context = catalyst.tracing.contexts:EvaluationContext
+catalyst.ops = catalyst:pennylane_extensions
+catalyst.qjit = catalyst:qjit
+cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext
+cuda_quantum.ops = catalyst:pennylane_extensions
+cuda_quantum.qjit = catalyst.cuda:cudaqjit
+
+[pennylane.plugins]
+nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec
+nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet
+softwareq.qpp = catalyst.cuda:SoftwareQQPP
+

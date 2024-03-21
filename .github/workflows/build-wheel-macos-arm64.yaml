@@ -308,6 +308,14 @@ jobs:
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
+  
+    # Build OQC-Runtime
+    - name: Build OQC-Runtime
+      run: |
+        	cmake -G Ninja -B oqc-build \
+                -DRUNTIME_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+
+        	cmake --build oqc-build --target rtd_oqc
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -337,6 +345,7 @@ jobs:
         MHLO_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build \
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+        OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
         ENZYME_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build \
         make wheel
 
