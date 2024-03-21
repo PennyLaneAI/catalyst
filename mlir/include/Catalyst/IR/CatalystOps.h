@@ -19,6 +19,9 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
+
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 

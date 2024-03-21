@@ -21,8 +21,9 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax._src.tree_util import tree_flatten
 
-from catalyst import cond, for_loop, grad, measure, qjit
+from catalyst import adjoint, cond, for_loop, grad, measure, qjit
 
 
 class TestPyTreesReturnValues:
@@ -422,7 +423,11 @@ class TestPyTreesFuncArgs:
             "b": [0.8, 0.6],
         }
         result = workflow1(params)
-        assert jnp.allclose(result, -0.32140087)
+        expected = {"a": [-0.32140083, 0.0], "b": [0.0, -0.52007016]}
+        result_flatten, tree = tree_flatten(result)
+        result_flatten_expected, tree_expected = tree_flatten(expected)
+        assert np.allclose(result_flatten, result_flatten_expected)
+        assert tree == tree_expected
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit2(params):
@@ -441,7 +446,11 @@ class TestPyTreesFuncArgs:
             "b": [0.6],
         }
         result = workflow2(params)
-        assert jnp.allclose(result, -0.32140087)
+        expected = {"a": (-0.32140083, 0.0), "b": [-0.52007016]}
+        result_flatten, tree = tree_flatten(result)
+        result_flatten_expected, tree_expected = tree_flatten(expected)
+        assert np.allclose(result_flatten, result_flatten_expected)
+        assert tree == tree_expected
 
     @pytest.mark.parametrize("inp", [(np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
     def test_args_control_flow(self, backend, inp):
@@ -489,6 +498,23 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(result, False)
         result = circuit({"wire": 1})
         assert jnp.allclose(result, True)
+
+    def test_dev_wires_have_pytree(self, backend):
+        """Device wires are pytree-compatible."""
+
+        def subroutine(wires):
+            for wire in wires:
+                qml.PauliX(wire)
+
+        dev = qml.device(backend, wires=3)
+
+        @qjit
+        @qml.qnode(dev)
+        def test_function():
+            adjoint(subroutine)(dev.wires)
+            return qml.probs()
+
+        test_function()
 
 
 class TestAuxiliaryData:

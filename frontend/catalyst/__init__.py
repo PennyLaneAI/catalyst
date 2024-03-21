@@ -19,10 +19,12 @@ This package contains the Catalyst Python interface.
 
 import sys
 import types
+from os.path import dirname
+from typing import Optional
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.4.14"
+_jaxlib_version = "0.4.23"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
@@ -35,6 +37,22 @@ if _jaxlib.__version__ != _jaxlib_version:
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
+
+try:
+    if INSTALLED:
+        # pylint: disable=no-name-in-module
+        from catalyst._revision import __revision__  # pragma: no cover
+    else:
+        from subprocess import check_output
+
+        __revision__ = (
+            check_output(["/usr/bin/env", "git", "rev-parse", "HEAD"], cwd=dirname(__file__))
+            .decode()
+            .strip()
+        )
+except Exception:  # pylint: disable=broad-exception-caught  # pragma: no cover
+    # Revision was not determined
+    __revision__ = None
 
 if not INSTALLED:
     import os
@@ -66,8 +84,9 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
 )
 
 from catalyst import debug
-from catalyst.ag_utils import AutoGraphError, autograph_source
-from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
+from catalyst.autograph import autograph_source
+from catalyst.compiler import CompileOptions
+from catalyst.jit import QJIT, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
     cond,
@@ -78,10 +97,12 @@ from catalyst.pennylane_extensions import (
     jvp,
     measure,
     mitigate_with_zne,
+    value_and_grad,
     vjp,
+    vmap,
     while_loop,
 )
-from catalyst.utils.exceptions import CompileError
+from catalyst.utils.exceptions import AutoGraphError, CompileError
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -172,10 +193,12 @@ __all__ = (
     "ctrl",
     "measure",
     "grad",
+    "value_and_grad",
     "jacobian",
     "vjp",
     "jvp",
     "adjoint",
+    "vmap",
     "mitigate_with_zne",
     "debug",
     "autograph_source",

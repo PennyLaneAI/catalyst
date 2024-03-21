@@ -142,6 +142,65 @@ TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", SimT
     CHECK(*m);
 }
 
+TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with postselect = 0", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    QubitIdType q;
+
+    q = sim->AllocateQubit();
+
+    sim->NamedOperation("Hadamard", {}, {q}, false);
+
+    auto m = sim->Measure(q, 0);
+
+    CHECK(*m == 0);
+}
+
+TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with postselect = 1", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    QubitIdType q;
+
+    q = sim->AllocateQubit();
+
+    sim->NamedOperation("Hadamard", {}, {q}, false);
+
+    auto m = sim->Measure(q, 1);
+
+    CHECK(*m == 1);
+}
+
+TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with invalid postselect value", "[Measures]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    QubitIdType q;
+
+    q = sim->AllocateQubit();
+
+    sim->NamedOperation("Hadamard", {}, {q}, false);
+
+    REQUIRE_THROWS_WITH(sim->Measure(q, 2), Catch::Contains("Invalid postselect value"));
+}
+
+TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement test with postselect value at zero probability",
+                        "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    QubitIdType q;
+
+    q = sim->AllocateQubit();
+
+    sim->NamedOperation("PauliX", {}, {q}, false);
+
+    REQUIRE_THROWS_WITH(sim->Measure(q, 0),
+                        Catch::Contains("Probability of postselect value is 0"));
+}
+
 TEMPLATE_LIST_TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[Measures]",
                         SimTypes)
 {

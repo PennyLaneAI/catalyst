@@ -18,16 +18,22 @@
 
 from typing import Callable
 
+import jax.numpy as jnp
 import pennylane as qml
+import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
 from pennylane import ctrl as PL_ctrl
+from pennylane.operation import Wires
+from pennylane.tape import QuantumTape
 
 from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
 from catalyst import for_loop, measure, qjit, while_loop
+from catalyst.jax_tracer import HybridOpRegion
+from catalyst.pennylane_extensions import QCtrl
 
 
 def verify_catalyst_ctrl_against_pennylane(
@@ -295,6 +301,191 @@ def test_control_outside_qjit():
     assert C_ctrl(
         qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3
     ) == PL_ctrl(qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3)
+
+
+def test_qctrl_wires(backend):
+    """Test the wires property of QCtrl"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(theta):
+        def func(theta):
+            qml.RX(theta, wires=[0])
+            qml.Hadamard(2)
+            qml.CNOT([0, 2])
+
+        qctrl = C_ctrl(func, control=[1])(theta)
+        return qctrl.wires
+
+    # Without the `wires` property, returns `[-1]`
+    assert circuit(0.3) == qml.wires.Wires([1, 0, 2])
+
+
+def test_qctrl_wires_arg_fun(backend):
+    """Test the wires property of QCtrl with argument wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=4))
+    def circuit():
+        def func(anc, wires):
+            qml.Hadamard(anc)
+            h = pnp.array([[1, 1], [1, -1]]) / pnp.sqrt(2)
+            qml.ctrl(qml.BlockEncode, control=anc)(h, wires=wires)
+            qml.Hadamard(anc)
+
+        qctrl = C_ctrl(func, control=[1])(0, [2, 3])
+        return qctrl.wires
+
+    assert circuit() == qml.wires.Wires([1, 0, 2, 3])
+
+
+def test_qctrl_var_wires(backend):
+    """Test the wires property of QCtrl with variable wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=4))
+    def circuit(anc, wires):
+        def func(anc, wires):
+            qml.Hadamard(anc)
+            h = pnp.array([[1, 1], [1, -1]]) / pnp.sqrt(2)
+            qml.ctrl(qml.BlockEncode, control=anc)(h, wires=wires)
+            qml.Hadamard(anc)
+
+        qctrl = C_ctrl(func, control=[1])(anc, wires)
+        return qctrl.wires
+
+    assert circuit(0, [2, 3]) == qml.wires.Wires([1, 0, 2, 3])
+
+
+def test_qctrl_wires_nested(backend):
+    """Test the wires property of QCtrl with nested branches"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=4))
+    def circuit(theta, w1, w2, cw1, cw2):
+        def _func1():
+            qml.RX(theta, wires=[w1])
+
+            def _func2():
+                qml.RY(theta, wires=[w2])
+
+            C_ctrl(_func2, control=[cw2], control_values=[True])()
+
+            qml.RZ(theta, wires=w1)
+
+        qctrl = C_ctrl(_func1, control=[cw1], control_values=[True])()
+        return qctrl.wires
+
+    assert circuit(0.1, 0, 1, 2, 3) == qml.wires.Wires([2, 0, 3, 1])
+
+
+def test_qctrl_work_wires(backend):
+    """Test the wires property of QCtrl with work-wires"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=5))
+    def circuit(theta):
+        def _func1():
+            qml.RX(theta, wires=[0])
+
+            def _func2():
+                qml.RY(theta, wires=[0])
+
+            C_ctrl(_func2, control=[3], work_wires=[4])()
+
+            qml.RZ(theta, wires=[0])
+
+        qctrl = C_ctrl(_func1, control=[1], work_wires=[2])()
+        return qctrl.wires
+
+    assert circuit(0.1) == qml.wires.Wires([1, 0, 3, 4, 2])
+
+
+@pytest.mark.xfail(reason="ctrl.wires fails in control-flow branches is not supported")
+def test_qctrl_wires_controlflow(backend):
+    """Test the wires property of QCtrl with control flow branches"""
+
+    @qml.qjit
+    @qml.qnode(qml.device(backend, wires=3))
+    def circuit(theta, w1, w2, cw):
+        def _func():
+            qml.RX(theta, wires=[w1])
+            s = 0
+
+            @for_loop(0, w2, 1)
+            def _for_loop(i, s):
+                qml.RY(theta, wires=i)
+                return s + 1
+
+            s = _for_loop(s)
+            qml.RZ(s * theta, wires=w1)
+
+        qctrl = C_ctrl(_func, control=[cw], control_values=[True])()
+        return qctrl.wires
+
+    # It returns `[2, 0, -1]`
+    assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
+
+
+def test_map_wires():
+    """Test map wires."""
+
+    X = HybridOpRegion(
+        quantum_tape=QuantumTape([qml.X(wires=[1])], []),
+        arg_classical_tracers=[],
+        res_classical_tracers=[],
+        trace=None,
+    )
+    qctrl = QCtrl(
+        control_wires=[0], regions=[X], in_classical_tracers=[], out_classical_tracers=[0]
+    )
+    new_qctrl = qctrl.map_wires({1: 0, 0: 1})
+    assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
+    assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
+
+
+def test_native_controlled_custom():
+    """Test native control of a custom operation."""
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qml.qnode(dev)
+    def native_controlled():
+        qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
+        return qml.state()
+
+    compiled = qjit()(native_controlled)
+    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+    result = compiled()
+    expected = native_controlled()
+    assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
+
+
+def test_native_controlled_unitary():
+    """Test native control of a custom operation."""
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qml.qnode(dev)
+    def native_controlled():
+        qml.ctrl(
+            qml.QubitUnitary(
+                jnp.array(
+                    [
+                        [0.70710678 + 0.0j, 0.70710678 + 0.0j],
+                        [0.70710678 + 0.0j, -0.70710678 + 0.0j],
+                    ],
+                    dtype=jnp.complex128,
+                ),
+                wires=[0],
+            ),
+            control=[1, 2, 3],
+        )
+        return qml.state()
+
+    compiled = qjit()(native_controlled)
+    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+    result = compiled()
+    expected = native_controlled()
+    assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
 
 if __name__ == "__main__":

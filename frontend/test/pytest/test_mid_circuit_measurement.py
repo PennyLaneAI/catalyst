@@ -18,6 +18,8 @@ import pytest
 
 from catalyst import CompileError, measure, qjit
 
+# TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
+
 
 class TestMidCircuitMeasurement:
     def test_pl_measure(self, backend):
@@ -62,7 +64,7 @@ class TestMidCircuitMeasurement:
     def test_basic(self, backend):
         """Test measure (basic)."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
             qml.RX(x, wires=0)
@@ -74,7 +76,7 @@ class TestMidCircuitMeasurement:
     def test_more_complex(self, backend):
         """Test measure (more complex)."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):
             qml.RX(x, wires=0)
@@ -86,6 +88,56 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
         assert not circuit(0.0)
+
+    def test_with_postselect_zero(self, backend):
+        """Test measure (postselect = 0)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+            qml.RX(x, wires=0)
+            m = measure(wires=0, postselect=0)
+            return m
+
+        assert not circuit(jnp.pi)  # m will be equal to False
+
+    def test_with_postselect_one(self, backend):
+        """Test measure (postselect = 1)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+            qml.RX(x, wires=0)
+            m = measure(wires=0, postselect=1)
+            return m
+
+        assert circuit(jnp.pi)  # m will be equal to True
+
+    def test_with_reset_false(self, backend):
+        """Test measure (reset = False)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            qml.Hadamard(wires=0)
+            m1 = measure(wires=0, reset=False, postselect=1)
+            m2 = measure(wires=0)
+            return m1 == m2
+
+        assert circuit()  # both measures are the same
+
+    def test_with_reset_true(self, backend):
+        """Test measure (reset = True)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            qml.Hadamard(wires=0)
+            m1 = measure(wires=0, reset=True, postselect=1)
+            m2 = measure(wires=0)
+            return m1 != m2
+
+        assert circuit()  # measures are different
 
 
 if __name__ == "__main__":

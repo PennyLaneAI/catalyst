@@ -14,7 +14,6 @@ option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
 option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos backend device" OFF)
 option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
-option(BUILD_QIR_STDLIB_FROM_SRC "Build qir-stdlib from source" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -22,9 +21,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
+set(util_includes "${PROJECT_SOURCE_DIR}/utils")
 
-set(QIRSTDLIB_VERSION "0.4.0")
-set(QIRSTDLIB_REPO "https://github.com/qir-alliance/qir-runner")
 
 # Get LLVM hash to target from source tree.
 file(READ ../.dep-versions DEPENDENCY_VERSIONS)
@@ -46,62 +44,30 @@ FetchContent_Declare(
     SOURCE_DIR          mlir/ExecutionEngine
 )
 
+function(fetch_pybind11)
+    find_package(pybind11 CONFIG)
+    if (pybind11_FOUND)
+        message(STATUS, "FOUND pybind11")
+    else()
+        message(STATUS "Could not find existing pybind11-dev package. Building from source.")
+        set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
+
+        # https://cmake.org/cmake/help/latest/module/FindPython.html
+        find_package(Python COMPONENTS Interpreter Development)
+
+        FetchContent_Declare(pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.10.1
+        )
+
+        FetchContent_MakeAvailable(pybind11)
+    endif()
+endfunction()
+
 if(RUNTIME_ENABLE_WARNINGS)
     message(STATUS "Building with compiler warnings as errors enabled.")
     add_compile_options(-Werror -Wall)
 endif()
-
-if(BUILD_QIR_STDLIB_FROM_SRC OR APPLE)
-    message(STATUS "Building qir-stdlib from source.")
-
-    include(FetchContent)
-
-    FetchContent_Declare(
-        qir_runner
-        GIT_REPOSITORY ${QIRSTDLIB_REPO}.git
-        GIT_TAG        v${QIRSTDLIB_VERSION}
-    )
-
-    FetchContent_MakeAvailable(qir_runner)
-
-    execute_process(
-        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR} RESULT_VARIABLE cargo_found_status
-        COMMAND ${CMAKE_COMMAND} -E copy ./stdlib/include/qir_stdlib.h ${qir_runner_BINARY_DIR}/release/qir_stdlib.h
-        WORKING_DIRECTORY ${qir_runner_SOURCE_DIR}
-    )
-
-    if(NOT cargo_found_status EQUAL "0")
-        message(FATAL_ERROR
-            "Missing cargo installation\n"
-            "Please install \"Rust\" and the \"llvm-tools-preview\" rustup component "
-            "for building qir-stdlib from source. See the installation guideline for details: "
-            "https://docs.pennylane.ai/projects/catalyst/en/stable/dev/installation.html"
-            )
-    endif()
-
-    set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
-elseif(NOT DEFINED QIR_STDLIB_PATH)
-    if(UNIX)
-        set(QIRSTDLIB_PLATFORM "ubuntu-20.04-amd64")
-    elseif(MSVC)
-        set(QIRSTDLIB_PLATFORM "windows-2019-amd64")
-    endif()
-
-    set(QIRSTDLIB_URL "${QIRSTDLIB_REPO}/releases/download/v${QIRSTDLIB_VERSION}/qir-stdlib-${QIRSTDLIB_VERSION}-${QIRSTDLIB_PLATFORM}.zip")
-    set(QIRSTDLIB_PATH "${CMAKE_BINARY_DIR}/qir-stdlib/lib.zip")
-
-    file(DOWNLOAD ${QIRSTDLIB_URL} ${QIRSTDLIB_PATH} STATUS QIRSTDLIB_STATUS)
-    message(STATUS "Downloading qir-stdlib status: ${QIRSTDLIB_STATUS}")
-
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -E tar xf ${CMAKE_BINARY_DIR}/qir-stdlib/lib.zip
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/qir-stdlib
-    )
-
-    set(QIR_STDLIB_PATH "${CMAKE_BINARY_DIR}/qir-stdlib")
-endif()
-
-message(STATUS "QIR_STDLIB: ${QIR_STDLIB_PATH}")
 
 message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
 message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
@@ -124,6 +90,17 @@ if(ENABLE_OPENQASM)
     list(APPEND devices_list rtd_openqasm)
 endif()
 
+# On macOS libomp is typically installed via brew, which doesn't make the package discoverable by
+# default to avoid conflicting with GCC's OpenMP library.
+if(APPLE)
+    execute_process (
+        COMMAND brew --prefix libomp
+        OUTPUT_VARIABLE BREW_OMP
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(OpenMP_ROOT ${BREW_OMP})
+endif()
+
 add_library(catalyst_qir_runtime INTERFACE)
 
 target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
@@ -131,7 +108,6 @@ target_link_libraries(catalyst_qir_runtime INTERFACE ${devices_list} rt_capi)
 target_include_directories(catalyst_qir_runtime INTERFACE
     ${runtime_includes}
     ${backend_includes}
-    ${QIR_STDLIB_PATH}
     )
 
 if(ENABLE_CODE_COVERAGE)
@@ -150,3 +126,4 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(utils)

@@ -29,12 +29,12 @@ auto LightningSimulator::AllocateQubit() -> QubitIdType
 
 auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (num_qubits == 0U) {
+    if (!num_qubits) {
         return {};
     }
 
     // at the first call when num_qubits == 0
-    if (this->GetNumQubits() == 0U) {
+    if (!this->GetNumQubits()) {
         this->device_sv = std::make_unique<StateVectorT>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
@@ -113,37 +113,65 @@ auto LightningSimulator::One() const -> Result
 }
 
 void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                        const std::vector<QubitIdType> &wires, bool inverse)
+                                        const std::vector<QubitIdType> &wires, bool inverse,
+                                        const std::vector<QubitIdType> &controlled_wires,
+                                        const std::vector<bool> &controlled_values)
 {
-    // First, check if operation `name` is supported by the simulator
-    auto &&[op_num_wires, op_num_params] =
-        Lightning::lookup_gates(Lightning::simulator_gate_info, name);
-
     // Check the validity of number of qubits and parameters
-    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
-    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
+    RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
+               "Controlled wires/values size mismatch");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
+    auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
 
     // Update the state-vector
-    this->device_sv->applyOperation(name, dev_wires, inverse, params);
+    if (controlled_wires.empty()) {
+        this->device_sv->applyOperation(name, dev_wires, inverse, params);
+    }
+    else {
+        this->device_sv->applyOperation(name, dev_controlled_wires, controlled_values, dev_wires,
+                                        inverse, params);
+    }
 
     // Update tape caching if required
     if (this->tape_recording) {
-        this->cache_manager.addOperation(name, params, dev_wires, inverse);
+        this->cache_manager.addOperation(name, params, dev_wires, inverse, {}, dev_controlled_wires,
+                                         controlled_values);
     }
 }
 
 void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                         const std::vector<QubitIdType> &wires, bool inverse)
+                                         const std::vector<QubitIdType> &wires, bool inverse,
+                                         const std::vector<QubitIdType> &controlled_wires,
+                                         const std::vector<bool> &controlled_values)
 {
+    RT_FAIL_IF(controlled_wires.size() != controlled_values.size(),
+               "Controlled wires/values size mismatch");
+    RT_FAIL_IF(!isValidQubits(wires), "Given wires do not refer to qubits");
+    RT_FAIL_IF(!isValidQubits(controlled_wires), "Given controlled wires do not refer to qubits");
+
     // Convert wires to device wires
     // with checking validity of wires
     auto &&dev_wires = getDeviceWires(wires);
+    auto &&dev_controlled_wires = getDeviceWires(controlled_wires);
 
     // Update the state-vector
-    this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
+    if (controlled_wires.empty()) {
+        this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
+    }
+    else {
+        this->device_sv->applyControlledMatrix(matrix.data(), dev_controlled_wires,
+                                               controlled_values, dev_wires, inverse);
+    }
+
+    // Update tape caching if required
+    if (this->tape_recording) {
+        this->cache_manager.addOperation("QubitUnitary", {}, dev_wires, inverse, matrix,
+                                         dev_controlled_wires, controlled_values);
+    }
 }
 
 auto LightningSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
@@ -346,9 +374,9 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
     // into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
-        size_t idx = 0;
+        size_t idx = numQubits;
         for (size_t wire = 0; wire < numQubits; wire++) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
@@ -384,15 +412,15 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     // corresponding to the input wires into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
         std::bitset<CHAR_BIT * sizeof(double)> basisState;
-        size_t idx = 0;
+        size_t idx = dev_wires.size();
         for (auto wire : dev_wires) {
-            basisState[idx++] = li_samples[shot * numQubits + wire];
+            basisState[--idx] = li_samples[shot * numQubits + wire];
         }
         counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
 }
 
-auto LightningSimulator::Measure(QubitIdType wire) -> Result
+auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result
 {
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
@@ -401,11 +429,8 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
     DataView<double, 1> buffer_view(probs);
     this->PartialProbs(buffer_view, wires);
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0., 1.);
-    float draw = dis(gen);
-    bool mres = draw > probs[0];
+    // It represents the measured result, true for 1, false for 0
+    bool mres = Lightning::simulateDraw(probs, postselect);
 
     const size_t numQubits = this->GetNumQubits();
 
@@ -473,10 +498,14 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     auto &&ops_names = this->cache_manager.getOperationsNames();
     auto &&ops_params = this->cache_manager.getOperationsParameters();
     auto &&ops_wires = this->cache_manager.getOperationsWires();
-
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
-                                                                    ops_wires, ops_inverses);
+    auto &&ops_matrices = this->cache_manager.getOperationsMatrices();
+    auto &&ops_controlled_wires = this->cache_manager.getOperationsControlledWires();
+    auto &&ops_controlled_values = this->cache_manager.getOperationsControlledValues();
+
+    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(
+        ops_names, ops_params, ops_wires, ops_inverses, ops_matrices, ops_controlled_wires,
+        ops_controlled_values);
 
     // create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();

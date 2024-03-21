@@ -27,21 +27,21 @@ target triple = "x86_64-pc-linux-gnu"
 @rtd_name = internal constant [19 x i8] c"LightningSimulator\00"
 @rtd_kwargs = internal constant [11 x i8] c"{shots: 0}\00"
 
-declare void @__quantum__rt__device_init(i8*, i8*, i8*)
+declare void @__catalyst__rt__device_init(i8*, i8*, i8*)
 
-declare void @__quantum__rt__initialize()
+declare void @__catalyst__rt__initialize()
 
-declare void @__quantum__rt__finalize()
+declare void @__catalyst__rt__finalize()
 
-declare void @__quantum__qis__RY(%Qubit*, double, i8)
+declare void @__catalyst__qis__RY(%Qubit*, double, i8)
 
-declare void @__quantum__qis__Hadamard(%Qubit*, i8)
+declare void @__catalyst__qis__Hadamard(%Qubit*, i8)
 
-declare i8* @__quantum__rt__array_get_element_ptr_1d(%Array*, i64)
+declare i8* @__catalyst__rt__array_get_element_ptr_1d(%Array*, i64)
 
-declare %Array* @__quantum__rt__qubit_allocate_array(i64)
+declare %Array* @__catalyst__rt__qubit_allocate_array(i64)
 
-declare void @__quantum__qis__Probs(%struct.MemRefT*, i64)
+declare void @__catalyst__qis__Probs(%struct.MemRefT*, i64)
 
 declare i8* @aligned_alloc(i64, i64)
 
@@ -59,18 +59,18 @@ define void @print_probs_at(double* %0, i64 %1) {
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__initialize()
-  call void @__quantum__rt__device_init(i8* getelementptr ([33 x i8], [33 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([11 x i8], [11 x i8]* @rtd_kwargs, i64 0, i64 0))
+  call void @__catalyst__rt__initialize()
+  call void @__catalyst__rt__device_init(i8* getelementptr ([33 x i8], [33 x i8]* @rtd_lib, i64 0, i64 0), i8* getelementptr ([19 x i8], [19 x i8]* @rtd_name, i64 0, i64 0), i8* getelementptr ([11 x i8], [11 x i8]* @rtd_kwargs, i64 0, i64 0))
 
   ; Allocate 2 qubits
-  %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)
-  %2 = call i8* @__quantum__rt__array_get_element_ptr_1d(%Array* %1, i64 0)
+  %1 = call %Array* @__catalyst__rt__qubit_allocate_array(i64 2)
+  %2 = call i8* @__catalyst__rt__array_get_element_ptr_1d(%Array* %1, i64 0)
   %3 = bitcast i8* %2 to %Qubit**
   %4 = load %Qubit*, %Qubit** %3, align 8
 
   ; Apply quantum operations
-  call void @__quantum__qis__Hadamard(%Qubit* %4, i8 0)
-  call void @__quantum__qis__RY(%Qubit* %4, double 0.7, i8 0)
+  call void @__catalyst__qis__Hadamard(%Qubit* %4, i8 0)
+  call void @__catalyst__qis__RY(%Qubit* %4, double 0.7, i8 0)
 
   ; Allocate buffers
   %buffer_allocated = call i8* @aligned_alloc(i64 32, i64 32)
@@ -86,7 +86,7 @@ define i32 @main() {
   store %struct.MemRefT %memref, %struct.MemRefT* %memref_ptr, align 8
 
   ; Apply the measurement process (probability)
-  call void @__quantum__qis__Probs(%struct.MemRefT* %memref_ptr, i64 0)
+  call void @__catalyst__qis__Probs(%struct.MemRefT* %memref_ptr, i64 0)
 
   ; Print results
   %5 = getelementptr %struct.MemRefT, %struct.MemRefT* %memref_ptr, i32 0, i32 0
@@ -98,6 +98,6 @@ define i32 @main() {
 
   ; Close the context and free memory
   call void @free(i8* %buffer_allocated)
-  call void @__quantum__rt__finalize()
+  call void @__catalyst__rt__finalize()
   ret i32 0
 }

@@ -310,10 +310,62 @@ array(0.16996714)
 However, deviating from this will result in recompilation and a warning message:
 
 >>> circuit(jnp.array([1.4, 1.4, 0.3, 0.1]))
-catalyst/compilation_pipelines.py:592:
 UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 array(0.16996714)
+
+Specifying compile-time constants
+---------------------------------
+
+The ``@qjit`` decorator argument ``static_argnums`` allows positional arguments
+to be specified which should be treated as compile-time static arguments.
+
+This allows any hashable Python object to be passed to the function during compilation;
+the function will only be re-compiled if the hash value of the static arguments change.
+Otherwise, re-using previous static argument values will result in no re-compilation:
+
+>>> @qjit(static_argnums=(1,))
+... def f(x, y):
+...   print(f"Compiling with y={y}")
+...   return x + y
+>>> f(0.5, 0.3)
+Compiling with y=0.3
+array(0.8)
+>>> f(0.1, 0.3)  # no re-compilation occurs
+array(0.4)
+>>> f(0.1, 0.4)  # y changes, re-compilation
+Compiling with y=0.4
+array(0.5)
+
+This functionality can be used to support passing arbitrary Python objects to QJIT-compiled
+functions, as long as they are hashable:
+
+.. code-block:: python
+
+    from dataclasses import dataclass
+
+    @dataclass
+    class MyClass:
+      val: int
+
+      def __hash__(self):
+          return hash(str(self))
+
+    @qjit(static_argnums=(1,))
+    def f(x: int, y: MyClass):
+      return x + y.val
+
+>>> f(1, MyClass(5))
+array(6)
+>>> f(1, MyClass(6))  # re-compilation
+array(7)
+>>> f(2, MyClass(5))  # no re-compilation
+array(7)
+
+Note that when ``static_argnums`` is used in conjunction with type hinting,
+ahead-of-time compilation will not be possible since the static argument values
+are not yet available. Instead, compilation will be just-in-time.
+
 
 Try and compile the full workflow
 ---------------------------------
@@ -430,7 +482,7 @@ optimization to take place within Catalyst:
     @qjit
     def optimize(init_weights, data, steps):
         def loss(x):
-            dy = grad(cost, argnum=0)(x, data)[0]
+            dy = grad(cost, argnum=0)(x, data)
             return (cost(x, data), dy)
 
         opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
@@ -439,7 +491,7 @@ optimization to take place within Catalyst:
         params = init_weights
         state = opt.init_state(params)
 
-        return for_loop(0, steps, 1)(update_step)(params, state)[0]
+        return for_loop(0, steps, 1)(update_step)(params, state)
 
 The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
 Note that, to compute hybrid quantum-classical gradients within a qjit-compiled function,
@@ -754,6 +806,108 @@ a single RX gate is being applied due to the rotation gate merger:
   in (b,) }
 
 Note that currently PennyLane transforms **cannot** be applied when ``autograph=True``.
+
+Compatibility with PennyLane decompositions
+-------------------------------------------
+
+When defining decompositions of PennyLane operations, any control flow depending on dynamic
+variables will fail, since decompositions are applied at compile time:
+
+.. code-block:: python
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+            ops = []
+
+            if theta == 0.3:
+                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+            else:
+                ops.append(qml.PauliRot(theta / 2 * 2, 'XX', wires=wires))
+
+            return ops
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(theta):
+        RXX(theta, wires=[0, 1])
+        qml.Hadamard(1)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.3)
+TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
+See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+
+Instead, Catalyst control flow (such as :func:`~.cond` and :func:`.for_loop`) must be used in order to support control flow on dynamic variables:
+
+.. code-block:: python
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+
+            with qml.tape.QuantumTape() as tape:
+
+                @cond(params[0] == 0.3)
+                def branch_fn():
+                    qml.PauliRot(theta, 'XX', wires=wires)
+
+                @branch_fn.otherwise
+                def branch_fn():
+                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+
+                branch_fn()
+
+            return tape.operations
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(theta):
+        RXX(theta, wires=[0, 1])
+        qml.Hadamard(1)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.3)
+array(0.95533649)
+
+Note that here we make sure to include the Catalyst control flow within a ``QuantumTape`` context.
+This is because :func:`~.cond` cannot return operations, only capture queued/instantiated
+operations, but the ``Operation.compute_decomposition`` API requires that a list of operations is
+returned.
+
+If preferred, AutoGraph can be experimentally enabled on a subset of code within
+the decomposition as follows:
+
+.. code-block:: python
+
+    from catalyst.autograph import autograph
+
+    class RXX(qml.operation.Operation):
+        num_params = 1
+        num_wires = 2
+
+        def compute_decomposition(self, *params, wires=None):
+            theta = params[0]
+
+            @autograph
+            def f(params):
+                if params[0] == 0.3:
+                    qml.PauliRot(theta, 'XX', wires=wires)
+                else:
+                    qml.PauliRot(theta / 2 * 2, 'XX', wires=wires)
+
+            with qml.tape.QuantumTape() as tape:
+                f(params)
+
+            return tape.operations
 
 Function argument restrictions
 ------------------------------

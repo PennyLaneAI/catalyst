@@ -20,12 +20,10 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <random>
 #include <span>
 #include <stdexcept>
 
 #include "AdjointJacobianKokkos.hpp"
-#include "LinearAlgebra.hpp"
 #include "MeasurementsKokkos.hpp"
 #include "StateVectorKokkos.hpp"
 
@@ -46,7 +44,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
-    Catalyst::Runtime::CacheManager cache_manager{};
+    Catalyst::Runtime::CacheManager<Kokkos::complex<double>> cache_manager{};
     bool tape_recording{false};
 
     size_t device_shots;

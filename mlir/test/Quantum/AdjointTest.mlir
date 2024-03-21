@@ -191,7 +191,7 @@ func.func private @circuit(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
 // CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
 // CHECK:   call @circuit.adjoint(%arg0, {{%.+}}) : (f64, !quantum.reg) -> !quantum.reg
 // CHECK:   quantum.custom "PauliZ"() {{%.+}} {adjoint} : !quantum.bit
-// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+// CHECK:   quantum.custom "RX"({{%.+}}) {{%.+}} {adjoint} : !quantum.bit
 // CHECK:   quantum.custom "PauliX"() {{%.+}} {adjoint} : !quantum.bit
 // CHECK:   quantum.custom "RY"({{%.+}}) {{%.+}} : !quantum.bit
 

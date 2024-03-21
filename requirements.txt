@@ -20,6 +20,7 @@ pytest-cov
 nbmake
 
 # optional rt/test dependencies
-tensorflow
-amazon-braket-pennylane-plugin>=1.23.0
 pennylane-lightning[kokkos]
+amazon-braket-pennylane-plugin>=1.23.0
+lark
+optax

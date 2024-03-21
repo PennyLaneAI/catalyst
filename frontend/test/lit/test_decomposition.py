@@ -138,13 +138,13 @@ def test_decompose_multicontrolledx_in_while_loop():
 
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
+        # CHECK: [[state0:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
+        # CHECK: [[state1:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
+        # CHECK: [[state2:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
+        # CHECK: [[state3:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @while_loop(lambda v: v[0] < 10)
         def loop(v):
@@ -172,13 +172,13 @@ def test_decompose_multicontrolledx_in_for_loop():
 
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
+        # CHECK: [[state0:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%.+]], [[q4:%.+]], [[q3:%.+]]
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
+        # CHECK: [[state1:%.+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%.+]], [[q1:%.+]], [[state0]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
+        # CHECK: [[state2:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
+        # CHECK: [[state3:%.+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @for_loop(0, n, 1)
         def loop(_):
@@ -279,21 +279,21 @@ def test_decompose_singleexcitationplus():
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q1:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q0:%.+]] = quantum.custom "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_theta_div_2_scalar:%.+]] = tensor.extract [[a_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s1:%.+]]:2 = quantum.custom "ControlledPhaseShift"([[a_theta_div_2_scalar]]) [[s0q0]], [[s0q1]]
+        # CHECK: [[s1:%.+]]:2 = quantum.custom "ControlledPhaseShift"([[a_theta_div_2_scalar]]) [[s0q1]], [[s0q0]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q1:%.+]] = quantum.custom "PauliX"() [[s1]]#1
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q0:%.+]] = quantum.custom "PauliX"() [[s1]]#0
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[b_theta_div_2_scalar:%.+]] = tensor.extract [[b_theta_div_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"

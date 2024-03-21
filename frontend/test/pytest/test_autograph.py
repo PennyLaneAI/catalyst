@@ -14,7 +14,6 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
-import sys
 import traceback
 from collections import defaultdict
 
@@ -30,6 +29,7 @@ from catalyst import (
     adjoint,
     cond,
     ctrl,
+    debug,
     for_loop,
     grad,
     jacobian,
@@ -38,7 +38,9 @@ from catalyst import (
     qjit,
     vjp,
 )
-from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
+from catalyst.autograph import TRANSFORMER, AutoGraphError, autograph_source
+
+check_cache = TRANSFORMER.has_cache
 
 # pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
@@ -63,17 +65,6 @@ class Failing:
             Failing.triggered[self.label] = True
             raise Exception(f"Emulated failure with label {self.label}")
         return self.ref
-
-
-def test_unavailable(monkeypatch):
-    """Check the error produced in the absence of tensorflow."""
-    monkeypatch.setitem(sys.modules, "tensorflow", None)
-
-    def fn(x):
-        return x**2
-
-    with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
-        qjit(autograph=True)(fn)
 
 
 @pytest.mark.tf
@@ -168,6 +159,8 @@ class TestIntegration:
 
         class FN:
             """Test object."""
+
+            __name__ = "unknown"
 
             def __call__(self, x):
                 return x**2
@@ -367,7 +360,7 @@ class TestIntegration:
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
-        assert fn(3) == [2.0, 6.0]
+        assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
     def test_vjp_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
@@ -381,7 +374,8 @@ class TestIntegration:
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
-        assert fn(3) == [6.0, 9.0, 8.0]  # unusual vjp return structure, vjp result is 3rd elem
+        assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
+        assert np.allclose(fn(3)[1], jnp.array(8.0))
 
     def test_jvp_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
@@ -395,7 +389,9 @@ class TestIntegration:
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
-        assert fn(3) == [6.0, 9.0, 2.0, 6.0]  # unusual jvp return structure, jvp results start 3rd
+
+        assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
+        assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
 
 @pytest.mark.tf
@@ -641,6 +637,57 @@ class TestConditionals:
             return res
 
         assert 0.0 == circuit()
+
+    def test_multiple_return(self):
+        """Test return statements from different branches with autograph."""
+
+        @qjit(autograph=True)
+        def f(x: int):
+            if x > 0:
+                return 25
+            else:
+                return 60
+
+        assert f(1) == 25
+        assert f(0) == 60
+
+    def test_multiple_return_early(self, backend, capfd):
+        """Test that returning early is possible."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RY(x, wires=0)
+
+            m = measure(0)
+            if not m:
+                return 0
+
+            debug.print("illegal fruit")
+            return 1
+
+        assert capfd.readouterr() == ("", "")
+
+        assert f(0) == 0
+
+        assert capfd.readouterr() == ("", "")
+
+        assert f(np.pi) == 1
+
+        assert capfd.readouterr() == ("illegal fruit\n", "")
+
+    def test_multiple_return_mismatched_type(self):
+        """Test that different obervables cannot be used in different branches."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(switch: bool):
+            if switch:
+                return qml.expval(qml.PauliY(0))
+
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(TypeError, match="requires a consistent return structure"):
+            qjit(autograph=True)(f)
 
 
 @pytest.mark.tf

@@ -29,19 +29,12 @@ restrictions and constraints you may discover.
 Using AutoGraph
 ---------------
 
-AutoGraph currently requires TensorFlow as a dependency; in most cases it can
-be installed via
+The AutoGraph feature in Catalyst is supported by the ``diastatic-malt`` package, a standalone
+fork of the AutoGraph module in TensorFlow (
+`official documentation <https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/autograph/g3doc/reference/index.md>`_
+).
 
-.. code-block:: console
-
-    pip install tensorflow
-
-but please refer to the
-`TensorFlow documentation <https://www.tensorflow.org/install>`__
-for specific details on installing TensorFlow for your platform.
-
-Once TensorFlow is available, AutoGraph can be enabled by passing
-``autograph=True`` to the ``@qjit`` decorator:
+To enable AutoGraph in Catalyst, simply pass ``autograph=True`` to the ``@qjit`` decorator:
 
 .. code-block:: python
 
@@ -180,40 +173,45 @@ converted, there are some important constraints and restrictions to be aware of.
 Return statements
 ~~~~~~~~~~~~~~~~~
 
-Return statements inside ``if``/``elif``/``else`` statements are not yet
-supported. No error will occur, but the resulting function will not have the
-expected behaviour.
+Return statements are generally supported inside of ``if``/``elif``/``else`` statements,
+however, the returned values require a matching shape and structure across branches.
 
-For example, consider the following pattern, where you return from an ``if``
-statement early,
-
-.. code-block:: python
-
-    def f(x):
-        if x > 5:
-            return x ** 2
-        return x ** 3
-
-This will not be correctly captured by AutoGraph, and instead will be
-interpreted as
+For example, consider the following pattern, where two different array dimensions are returned
+from each branch:
 
 .. code-block:: python
 
     def f(x):
         if x > 5:
-            x = x ** 2
-        return x ** 3
+            return jnp.array([1, 2])
+        return 0
 
-Instead of utilizing a return statement, use the following approach instead:
+This will generate the following error:
+
+>>> qjit(autograph=True)(f)
+TypeError: Conditional requires a consistent array shape per result across all branches!
+Got () for result #1 but expected (2,).
+
+Another example is the use of different *structure* across branches. The structure of a function
+output is defined by things like the number of results, the containers used like lists or
+dictionaries, or more generally any (compile-time) PyTree metadata. For PennyLane, this means
+returning different observables for example is not supported, as the observable class is
+compile-time information:
 
 .. code-block:: python
 
-    def f(x):
-        if x > 5:
-            y = x ** 2
-        else:
-            y = x ** 3
-        return y
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(switch: bool):
+
+        if switch:
+            return qml.expval(qml.PauliY(0))
+
+        return qml.expval(qml.PauliZ(0))
+
+>>> qjit(autograph=True)(f)
+TypeError: Conditional requires a consistent return structure across all branches!
+Got PyTreeDef((*, CustomNode(ExpectationMP[(('wires', None),)], [CustomNode(PauliZ[(<Wires = [0]>, ())], []), None])))
+and PyTreeDef((*, CustomNode(ExpectationMP[(('wires', None),)], [CustomNode(PauliY[(<Wires = [0]>, ())], []), None]))).
 
 Different branches must assign the same type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -661,7 +659,7 @@ of multiple measurements. For example,
         qml.RY(0.5, wires=1)
 
         m1 = measure(0)
-        m2 = measure(1)  
+        m2 = measure(1)
 
         if m1 and not m2:
             qml.Hadamard(wires=1)
@@ -713,8 +711,8 @@ Array arguments
 
 Note that, like with NumPy and JAX, logical operators apply elementwise to array arguments:
 
->>> @qjit(autograph=True)  
-... def f(x, y):  
+>>> @qjit(autograph=True)
+... def f(x, y):
 ...     return x and y
 >>> f(jnp.array([0, 1]), jnp.array([1, 1]))
 array([False,  True])
@@ -722,8 +720,8 @@ array([False,  True])
 Care must therefore be taken when using logical operators within conditional branches;
 ``jnp.all`` and ``jnp.any`` can be used to generate a single boolean for conditionals:
 
->>> @qjit(autograph=True)  
-... def f(x, y):  
+>>> @qjit(autograph=True)
+... def f(x, y):
 ...     if jnp.all(x and y):
 ...         z = 1
 ...     else:

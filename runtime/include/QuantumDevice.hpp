@@ -16,6 +16,7 @@
 
 #include <complex>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "DataView.hpp"
@@ -105,7 +106,7 @@ struct QuantumDevice {
     /**
      * @brief Start recording a quantum tape if provided.
      *
-     * @note This is backed by the `Catalyst::Runtime::CacheManager` property in
+     * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
      * the device implementation.
      */
     virtual void StartTapeRecording() = 0;
@@ -113,7 +114,7 @@ struct QuantumDevice {
     /**
      * @brief Stop recording a quantum tape if provided.
      *
-     * @note This is backed by the `Catalyst::Runtime::CacheManager` property in
+     * @note This is backed by the `Catalyst::Runtime::CacheManager<ComplexT>` property in
      * the device implementation.
      */
     virtual void StopTapeRecording() = 0;
@@ -145,9 +146,14 @@ struct QuantumDevice {
      * @param params Optional parameter list for parametric gates
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
+     * @param controlled_wires Optional controlled wires applied to the operation
+     * @param controlled_values Optional controlled values applied to the operation
      */
-    virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
-                                const std::vector<QubitIdType> &wires, bool inverse) = 0;
+    virtual void
+    NamedOperation(const std::string &name, const std::vector<double> &params,
+                   const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse = false,
+                   [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},
+                   [[maybe_unused]] const std::vector<bool> &controlled_values = {}) = 0;
 
     /**
      * @brief Apply a given matrix directly to the state vector of a device.
@@ -155,9 +161,14 @@ struct QuantumDevice {
      * @param matrix The matrix of data in row-major format
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
+     * @param controlled_wires Controlled wires applied to the operation
+     * @param controlled_values Controlled values applied to the operation
      */
-    virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                 const std::vector<QubitIdType> &wires, bool inverse) = 0;
+    virtual void
+    MatrixOperation(const std::vector<std::complex<double>> &matrix,
+                    const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse = false,
+                    [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},
+                    [[maybe_unused]] const std::vector<bool> &controlled_values = {}) = 0;
 
     /**
      * @brief Construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
@@ -284,10 +295,12 @@ struct QuantumDevice {
      * @brief A general measurement method that acts on a single wire.
      *
      * @param wire The wire to compute Measure on
+     * @param postselect Which basis state to postselect after a mid-circuit measurement (-1 denotes
+     no post-selection)
 
      * @return `Result` The measurement result
      */
-    virtual auto Measure(QubitIdType wire) -> Result = 0;
+    virtual auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result = 0;
 
     /**
      * @brief Compute the gradient of a quantum tape, that is cached using

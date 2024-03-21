@@ -14,6 +14,7 @@
 
 #include <dlfcn.h>
 
+#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -23,59 +24,16 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#if __has_include("pybind11/embed.h")
-#include <pybind11/embed.h>
-#define __build_with_pybind11
-#endif
-
 #include "Exception.hpp"
+#include "Python.hpp"
 #include "QuantumDevice.hpp"
+#include "Types.h"
+
+extern void callbackCall(int64_t);
 
 namespace Catalyst::Runtime {
 
-/**
- * A (RAII) class for `pybind11::initialize_interpreter` and `pybind11::finalize_interpreter`.
- *
- * @note This is not copyable or movable and used in C++ tests and the ExecutionContext manager
- * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
- * tests which also enables the runtime to reuse the same interpreter in the scope of the global
- * quantum device unique pointer.
- *
- * @note This is only required for OpenQasmDevice and when CAPI is built with pybind11.
- */
-#ifdef __build_with_pybind11
-// LCOV_EXCL_START
-struct PythonInterpreterGuard {
-    // This ensures the guard scope to avoid Interpreter
-    // conflicts with runtime calls from the frontend.
-    bool _init_by_guard = false;
-
-    PythonInterpreterGuard()
-    {
-        if (!Py_IsInitialized()) {
-            pybind11::initialize_interpreter();
-            _init_by_guard = true;
-        }
-    }
-    ~PythonInterpreterGuard()
-    {
-        if (_init_by_guard) {
-            pybind11::finalize_interpreter();
-        }
-    }
-
-    PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
-    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
-};
-// LCOV_EXCL_STOP
-#else
-struct PythonInterpreterGuard {
-    PythonInterpreterGuard() {}
-    ~PythonInterpreterGuard() {}
-};
-#endif
+extern "C" void pyregistry(int64_t identifier);
 
 class MemoryManager final {
   private:
@@ -122,11 +80,6 @@ class SharedLibraryManager final {
     SharedLibraryManager() = delete;
     explicit SharedLibraryManager(std::string filename)
     {
-        // RTLD_DEEPBIND is incompatible with sanitizers.
-        // If you have compiled this file with sanitizers and you reach this line
-        // you will get an error.
-        // Please re-compile without sanitizers.
-
 #ifdef __APPLE__
         auto rtld_flags = RTLD_LAZY;
 #else
@@ -275,7 +228,6 @@ class RTDevice {
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
             f_ptr ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                   : nullptr);
-
         return rtd_qdevice;
     }
 

@@ -56,10 +56,17 @@ Additionally, all measurements will always return ``true``.
             void StopTapeRecording() override {}
             void PrintState() override {}
             void NamedOperation(const std::string &, const std::vector<double> &,
-                                        const std::vector<QubitIdType> &, bool) override {}
+                                        const std::vector<QubitIdType> &,
+                                        bool,
+                                        const std::vector<QubitIdType> &,
+                                        const std::vector<bool> &
+                                        ) override {}
             void MatrixOperation(const std::vector<std::complex<double>> &,
-                                        const std::vector<QubitIdType> &, bool) override{}
-
+                                        const std::vector<QubitIdType> &,
+                                        bool,
+                                        const std::vector<QubitIdType> &,
+                                        const std::vector<bool> &
+                                        ) override{}
             auto Expval(ObsIdType) -> double override { return 0.0; }
             auto Var(ObsIdType) -> double override { return 0.0; }
             void State(DataView<std::complex<double>, 1> &) override {}
@@ -101,7 +108,7 @@ multiple devices into the same library. However, it is important that the device
 be unique, as best as possible, to avoid clashes with other plugins.
 
 Importantly, the ``<DeviceIdentifier>`` string in the entry point function needs to match
-exactly what is supplied to the ``__quantum__rt__device("rtd_name", "<DeviceIdentifier>")``
+exactly what is supplied to the ``__catalyst__rt__device("rtd_name", "<DeviceIdentifier>")``
 runtime instruction in compiled user programs, or what is returned from the ``get_c_interface``
 function when integrating the device into a PennyLane plugin. Please see the "Integration with
 Python devices" section further down for details.
@@ -145,7 +152,7 @@ Integration with Python devices
 
 There are two things that are needed in order to integrate with PennyLane devices:
 
-* Adding a ``get_c_interface`` method to your ``qml.QubitDevice`` class.
+* Adding a ``get_c_interface`` method to your ``qml.Device`` or  ``qml.devices.Device`` class.
 * Adding a ``config`` class variable pointing to your configuration file. This file should be a `toml file <https://toml.io/en/>`_ with fields that describe what gates and features are supported by your device.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
@@ -156,9 +163,11 @@ The ``get_c_interface`` method should be a static method that takes no parameter
     The first result of ``get_c_interface`` needs to match the ``<DeviceIdentifier>``
     as described in the first section.
 
+With the old device API, you can simply build a QJIT compatible device:
+
 .. code-block:: python
 
-    class CustomDevice(qml.QubitDevice):
+    class CustomDevice(qml.Device):
         """Dummy Device"""
 
         name = "Dummy Device"
@@ -187,6 +196,33 @@ The ``get_c_interface`` method should be a static method that takes no parameter
     def f():
         return measure(0)
 
+or with the new device API:
+
+.. code-block:: python
+
+    class CustomDevice(qml.devices.Device):
+        """Dummy Device"""
+
+        config = pathlib.Path("absolute/path/to/configuration/file.toml")
+
+        @staticmethod
+        def get_c_interface():
+            """ Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            return "CustomDevice", "absolute/path/to/libdummy_device.so"
+
+        def __init__(self, shots=None, wires=None):
+            super().__init__(wires=wires, shots=shots)
+
+        def execute(self, circuits, config):
+            """Your normal definitions"""
+
+    @qjit
+    @qml.qnode(CustomDevice(wires=1))
+    def f():
+        return measure(0)
 
 Below is an example configuration file with inline descriptions of how to fill out the fields. All
 headers and fields are generally required, unless stated otherwise.
@@ -194,130 +230,124 @@ headers and fields are generally required, unless stated otherwise.
 .. code-block:: toml
 
         # Which version of the specification format is being used.
-        schema = 1
-
-        [device]
-        name = "dummy.device.qubit"
-
-        [operators]
-        # Observables supported by the device
-        observables = [
-                "PauliX",
-                "PauliY",
-                "PauliZ",
-                "Hadamard",
-                "Hermitian",
-                "Identity",
-                "Projector",
-                "SparseHamiltonian",
-                "Hamiltonian",
-                "Sum",
-                "SProd",
-                "Prod",
-                "Exp",
-        ]
+        schema = 2
 
         # The union of all gate types listed in this section must match what
         # the device considers "supported" through PennyLane's device API.
-        [[operators.gates]]
-        native = [
-                # Operators that shouldn't be decomposed.
-                "QubitUnitary",
-                "PauliX",
-                "PauliY",
-                "PauliZ",
-                "MultiRZ",
-                "Hadamard",
-                "S",
-                "T",
-                "CNOT",
-                "SWAP",
-                "CSWAP",
-                "Toffoli",
-                "CY",
-                "CZ",
-                "PhaseShift",
-                "ControlledPhaseShift",
-                "RX",
-                "RY",
-                "RZ",
-                "Rot",
-                "CRX",
-                "CRY",
-                "CRZ",
-                "CRot",
-                "Identity",
-                "IsingXX",
-                "IsingYY",
-                "IsingZZ",
-                "IsingXY",
-        ]
+        # The gate definition has the following format:
+        #
+        #   GATE = { properties = [ PROPS ], condition = [ COND ] }
+        #
+        # Where:
+        #
+        #   PROPS: zero or more comma-separated quoted strings:
+        #          "controllable", "invertible", "differentiable"
+        #   COND: quoted string, on of:
+        #         "analytic", "finiteshots"
+        #
+        [operators.gates.native]
+
+        QubitUnitary = { properties = [ "controllable", "invertible"]  }
+        PauliX = { properties = [ "controllable", "invertible"] }
+        PauliY = { properties = [ "controllable", "invertible"] }
+        PauliZ = { properties = [ "controllable", "invertible"] }
+        MultiRZ = { properties = [ "controllable", "invertible" ] }
+        Hadamard = { properties = [ "controllable", "invertible"] }
+        S = { properties = [ "controllable", "invertible" ] }
+        T = { properties = [ "controllable", "invertible" ] }
+        CNOT = { properties = [ "invertible" ] }
+        SWAP = { properties = [ "controllable", "invertible" ] }
+        CSWAP = { properties = [ "invertible" ] }
+        Toffoli = { properties = [ "controllable", "invertible" ] }
+        CY = { properties = [ "invertible" ] }
+        CZ = { properties = [ "invertible" ] }
+        PhaseShift = { properties = [ "controllable", "invertible" ] }
+        ControlledPhaseShift = { properties = [ "controllable", "invertible" ] }
+        RX = { properties = [ "controllable", "invertible" ] }
+        RY = { properties = [ "controllable", "invertible" ] }
+        RZ = { properties = [ "controllable", "invertible" ] }
+        Rot = { properties = [ "controllable", "invertible" ] }
+        CRX = { properties = [ "invertible" ] }
+        CRY = { properties = [ "invertible" ] }
+        CRZ = { properties = [ "invertible" ] }
+        CRot = { properties = [ "invertible" ] }
+        Identity = { properties = [ "controllable", "invertible" ] }
+        IsingXX = { properties = [ "controllable", "invertible" ] }
+        IsingYY = { properties = [ "controllable", "invertible" ] }
+        IsingZZ = { properties = [ "controllable", "invertible" ] }
+        IsingXY = { properties = [ "controllable", "invertible" ] }
 
         # Operators that should be decomposed according to the algorithm used
         # by PennyLane's device API.
         # Optional, since gates not listed in this list will typically be decomposed by
         # default, but can be useful to express a deviation from this device's regular
         # strategy in PennyLane.
-        decomp = [
-                "SX",
-                "ISWAP",
-                "PSWAP",
-                "SISWAP",
-                "SQISW",
-                "CPhase",
-                "BasisState",
-                "QubitStateVector",
-                "StatePrep",
-                "ControlledQubitUnitary",
-                "DiagonalQubitUnitary",
-                "SingleExcitation",
-                "SingleExcitationPlus",
-                "SingleExcitationMinus",
-                "DoubleExcitation",
-                "DoubleExcitationPlus",
-                "DoubleExcitationMinus",
-                "QubitCarry",
-                "QubitSum",
-                "OrbitalRotation",
-                "QFT",
-                "ECR",
-        ]
+        [operators.gates.decomp]
+
+        SX = {}
+        ISWAP = {}
+        PSWAP = {}
+        SISWAP = {}
+        SQISW = {}
+        CPhase = {}
+        BasisState = {}
+        QubitStateVector = {}
+        StatePrep = {}
+        ControlledQubitUnitary = {}
+        DiagonalQubitUnitary = {}
+        SingleExcitation = {}
+        SingleExcitationPlus = {}
+        SingleExcitationMinus = {}
+        DoubleExcitation = {}
+        DoubleExcitationPlus = {}
+        DoubleExcitationMinus = {}
+        QubitCarry = {}
+        QubitSum = {}
+        OrbitalRotation = {}
+        QFT = {}
+        ECR = {}
 
         # Gates which should be translated to QubitUnitary
-        matrix = [
-                "MultiControlledX",
-        ]
+        [operators.gates.matrix]
+
+        MultiControlledX = {}
+
+        # Observables supported by the device
+        [operators.observables]
+
+        PauliX = {}
+        PauliY = {}
+        PauliZ = {}
+        Hadamard = {}
+        Hermitian = {}
+        Identity = {}
+        Projector = {}
+        SparseHamiltonian = {}
+        Hamiltonian = {}
+        Sum = {}
+        SProd = {}
+        Prod = {}
+        Exp = {}
 
         [measurement_processes]
-        exactshots = [
-                "Expval",
-                "Var",
-                "Probs",
-                "State",
-        ]
-        finiteshots = [
-                "Expval",
-                "Var",
-                "Probs",
-                "Sample",
-                "Counts",
-        ]
+
+        Expval = {}
+        Var = {}
+        Probs = {}
+        Sample = {}
+        Count = { condition = [ "finiteshots" ] }
 
         [compilation]
+
         # If the device is compatible with qjit
         qjit_compatible = true
         # If the device requires run time generation of the quantum circuit.
         runtime_code_generation = false
-        # If the device supports adjoint
-        quantum_adjoint = true
-        # If the device supports quantum control instructions natively
-        quantum_control = false
         # If the device supports mid circuit measurements natively
         mid_circuit_measurement = true
-
         # This field is currently unchecked but it is reserved for the purpose of
         # determining if the device supports dynamic qubit allocation/deallocation.
-        dynamic_qubit_management = false 
+        dynamic_qubit_management = false
 
         [options]
         # Options is an optional field.

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
@@ -51,7 +52,7 @@ class TestCondToJaxpr:
         def asline(text):
             return " ".join(map(lambda x: x.strip(), str(text).split("\n")))
 
-        assert asline(expected) == asline(circuit._jaxpr)  # pylint: disable=protected-access
+        assert asline(expected) == asline(circuit.jaxpr)
 
 
 class TestCond:
@@ -179,7 +180,7 @@ class TestCond:
         assert circuit(3) == False
         assert circuit(6) == True
 
-    def test_branch_return_pytree_mismatch(self, backend):
+    def test_branch_return_pytree_mismatch(self):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
@@ -196,11 +197,12 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional requires consistent return types across all branches"
+            TypeError,
+            match="Conditional requires a consistent return structure across all branches",
         ):
-            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
+            qjit(circuit)
 
-    def test_branch_return_mismatch(self, backend):
+    def test_branch_return_no_else(self, backend):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
@@ -213,7 +215,48 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional requires consistent return types across all branches"
+            TypeError,
+            match="Conditional requires a consistent return structure across all branches",
+        ):
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+    def test_branch_return_shape_mismatch_classical(self):
+        """Test that an exception is raised when the array shapes across branches don't match."""
+
+        def circuit(x: bool):
+            @cond(x)
+            def cond_fn():
+                return True
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return jnp.array([True, False])
+
+            return cond_fn()
+
+        with pytest.raises(
+            TypeError,
+            match="Conditional requires a consistent array shape per result across all branches",
+        ):
+            qjit(circuit)
+
+    def test_branch_return_shape_mismatch_quantum(self, backend):
+        """Test that an exception is raised when the array shapes across branches don't match."""
+
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return measure(wires=0)
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return jnp.array([True, False])
+
+            return cond_fn()
+
+        with pytest.raises(
+            TypeError,
+            match="Conditional requires a consistent array shape per result across all branches",
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
@@ -257,7 +300,8 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional requires consistent return types across all branches"
+            TypeError,
+            match="Conditional requires a consistent return structure across all branches",
         ):
             qjit(circuit)
 

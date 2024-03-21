@@ -383,7 +383,7 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     // CHECK: [[deriv:%[a-zA-Z0-9_]+]] = arith.divf [[diff]], [[divisor]]
     // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[gradIdx]]
     // CHECK: [[view:%[a-zA-Z0-9_]+]] = memref.subview [[grad]][[[idx]], 0, 0] [1, 2, 3] [1, 1, 1]
-    // CHECK: memref.tensor_store [[deriv]], [[view]]
+    // CHECK: bufferization.materialize_in_destination [[deriv]] in writable [[view]]
     // CHECK: [[newIdx:%[a-zA-Z0-9_]+]] = index.add [[idx]], [[c1]]
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
@@ -435,7 +435,7 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     // CHECK:         [[IDX:%.+]] = memref.load [[GRADIDX]]
     // CHECK:         memref.store [[DERIV0]], [[GRAD0]][[[IDX]]]
     // CHECK:         [[VIEW:%.+]] = memref.subview [[GRAD1]][[[IDX]], 0] [1, 2] [1, 1]
-    // CHECK:         memref.tensor_store [[DERIV1]], [[VIEW]]
+    // CHECK:         bufferization.materialize_in_destination [[DERIV1]] in writable [[VIEW]]
     // CHECK:         [[NEWIDX:%.+]] = index.add [[IDX]], [[C1]]
     // CHECK:         memref.store [[NEWIDX]], [[GRADIDX]]
     // CHECK-NOT: quantum.

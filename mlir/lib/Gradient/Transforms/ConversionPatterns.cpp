@@ -75,7 +75,7 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
-        TypeConverter *conv = getTypeConverter();
+        const TypeConverter *conv = getTypeConverter();
 
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
@@ -94,8 +94,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
 
-        StringRef cacheFnName = "__quantum__rt__toggle_recorder";
-        StringRef gradFnName = "__quantum__qis__Gradient";
+        StringRef cacheFnName = "__catalyst__rt__toggle_recorder";
+        StringRef gradFnName = "__catalyst__qis__Gradient";
         Type cacheFnSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
         Type gradFnSignature = LLVM::LLVMFunctionType::get(
@@ -125,8 +125,8 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
-            Value newArg =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+            Value newArg = rewriter.create<LLVM::AllocaOp>(
+                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             args.push_back(newArg);
         }
@@ -160,8 +160,8 @@ static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, PatternRewriter &rewriter,
-                    Location loc, bool volatileArgs = false)
+void wrapMemRefArgs(func::FuncOp func, const LLVMTypeConverter *typeConverter,
+                    PatternRewriter &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
@@ -179,7 +179,7 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
             BlockArgument memrefArg = func.getArgument(idx);
             func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
             Value wrappedMemref = func.getArgument(idx);
-            Type structType = typeConverter.convertType(memrefType);
+            Type structType = typeConverter->convertType(memrefType);
 
             // We potentially need all arguments for the custom quantum gradient, but not all of
             // them will be used by the primal. Mark the load of the wrapped memref as volatile and
@@ -212,7 +212,7 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
                 SmallVector<Value> operands;
                 SmallVector<Value> outputs;
                 auto wrapMemref = [&](Value memref) {
-                    Type convertedType = typeConverter.convertType(memref.getType());
+                    Type convertedType = typeConverter->convertType(memref.getType());
                     Value space =
                         rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
                                                         /*elementType=*/convertedType, c1);
@@ -280,7 +280,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 }
                 catalyst::convertToDestinationPassingStyle(func, rewriter);
 
-                wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
+                wrapMemRefArgs(func, getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -292,10 +292,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
-            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
-                moduleOp, getTypeConverter()->getIndexType(), options.useOpaquePointers);
-            LLVM::LLVMFuncOp freeFn =
-                LLVM::lookupOrCreateGenericFreeFn(moduleOp, options.useOpaquePointers);
+            LLVM::LLVMFuncOp allocFn =
+                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType());
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp);
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with
@@ -543,7 +542,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         builder.create<func::CallOp>(loc, qnode, arguments);
-        Value tape = builder.create<LLVM::NullOp>(loc, tapeType);
+        Value tape = builder.create<LLVM::ZeroOp>(loc, tapeType);
         builder.create<func::ReturnOp>(loc, tape);
         return augmentedForward;
     }

@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <array>
+#include <optional>
+#include <random>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -47,10 +49,17 @@
     [[nodiscard]] auto One() const->Result override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
-    void NamedOperation(const std::string &name, const std::vector<double> &params,                \
-                        const std::vector<QubitIdType> &wires, bool inverse) override;             \
-    void MatrixOperation(const std::vector<std::complex<double>> &matrix,                          \
-                         const std::vector<QubitIdType> &wires, bool inverse) override;            \
+    void NamedOperation(                                                                           \
+        const std::string &name, const std::vector<double> &params,                                \
+        const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse = false,              \
+        [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
+        [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
+    using Catalyst::Runtime::QuantumDevice::MatrixOperation;                                       \
+    void MatrixOperation(                                                                          \
+        const std::vector<std::complex<double>> &matrix, const std::vector<QubitIdType> &wires,    \
+        [[maybe_unused]] bool inverse = false,                                                     \
+        [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
+        [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
     auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,                     \
                     const std::vector<QubitIdType> &wires)                                         \
         ->ObsIdType override;                                                                      \
@@ -70,7 +79,8 @@
         override;                                                                                  \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
                        const std::vector<QubitIdType> &wires, size_t shots) override;              \
-    auto Measure(QubitIdType wire)->Result override;                                               \
+    auto Measure(QubitIdType wire, std::optional<int32_t> postselect = std::nullopt)               \
+        ->Result override;                                                                         \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
                   const std::vector<size_t> &trainParams) override;
 
@@ -152,6 +162,8 @@ enum class SimulatorGate : uint8_t {
     CY,
     CZ,
     SWAP,
+    ISWAP,
+    PSWAP,
     IsingXX,
     IsingYY,
     IsingXY,
@@ -198,6 +210,8 @@ constexpr std::array simulator_gate_info = {
     GateInfoTupleT{SimulatorGate::CY, "CY", 2, 0},
     GateInfoTupleT{SimulatorGate::CZ, "CZ", 2, 0},
     GateInfoTupleT{SimulatorGate::SWAP, "SWAP", 2, 0},
+    GateInfoTupleT{SimulatorGate::ISWAP, "ISWAP", 2, 0},
+    GateInfoTupleT{SimulatorGate::PSWAP, "PSWAP", 2, 1},
     GateInfoTupleT{SimulatorGate::IsingXX, "IsingXX", 2, 1},
     GateInfoTupleT{SimulatorGate::IsingYY, "IsingYY", 2, 1},
     GateInfoTupleT{SimulatorGate::IsingXY, "IsingXY", 2, 1},
@@ -255,6 +269,27 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
         }
     }
     return false;
+}
+
+static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect)
+    -> bool
+{
+    if (postselect) {
+        auto postselect_value = postselect.value();
+
+        RT_FAIL_IF(postselect_value < 0 || postselect_value > 1, "Invalid postselect value");
+        RT_FAIL_IF(probs[postselect_value] == 0, "Probability of postselect value is 0");
+
+        return postselect_value == 1 ? true : false;
+    }
+
+    // Normal flow, no post-selection
+    // Draw a number according to the given distribution
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(0., 1.);
+    float draw = dis(gen);
+    return draw > probs[0];
 }
 
 } // namespace Catalyst::Runtime::Simulator::Lightning
