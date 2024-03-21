@@ -5,7 +5,7 @@ project(catalyst_oqc)
 set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/include")
 set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/backend/common")
 set(util_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/utils")
-set(runtime_lib "${RUNTIME_BUILD_DIR}/lib/libcatalyst_python_interpreter.so")
+set(runtime_lib "${RUNTIME_BUILD_DIR}/lib")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,7 +47,7 @@ set(OQC_LIBRARIES
 )
 
 target_link_directories(rtd_oqc PRIVATE ${runtime_lib})
-target_link_libraries(rtd_oqc PRIVATE pybind11::module)
+target_link_libraries(rtd_oqc PRIVATE pybind11::module "catalyst_python_interpreter")
 
 set_property(TARGET rtd_oqc PROPERTY POSITION_INDEPENDENT_CODE ON)
 
