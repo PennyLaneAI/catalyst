@@ -31,6 +31,7 @@ from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
     ConstantOp,
+    ExtUIOp,
     IndexCastOp,
     MulIOp,
     SubIOp,
@@ -649,6 +650,10 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
             qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
     assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for extract op!"
 
+    if ir.IntegerType(qubit_idx.type).width < 64:
+        qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
+    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for extract op!"
+
     qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
     return ExtractOp(qubit_type, qreg, idx=qubit_idx).results
 
@@ -687,6 +692,10 @@ def _qinsert_lowering(
             c0 = ConstantOp(ir.IndexType.get(), 0)
             qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
     assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for insert op!"
+
+    if ir.IntegerType(qubit_idx.type).width < 64:
+        qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
+    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for insert op!"
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
     return InsertOp(qreg_type, qreg_old, qubit, idx=qubit_idx).results
