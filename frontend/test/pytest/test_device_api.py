@@ -79,13 +79,17 @@ def test_qjit_device():
     # Check the preprocess of the new device
     transform_program, _ = device_qjit.preprocess()
     assert transform_program
-    assert len(transform_program) == 2
+    assert len(transform_program) == 3
 
     t = transform_program[0].transform.__name__
     assert t == "split_non_commuting"
 
     t = transform_program[1].transform.__name__
     assert t == "decompose_ops_to_unitary"
+
+    t = transform_program[2].transform.__name__
+    assert t == "decompose"
+
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):
         device_qjit.execute(10, 2)

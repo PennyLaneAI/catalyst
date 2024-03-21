@@ -160,6 +160,7 @@ wheel:
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(RT_BUILD_DIR)/lib/librtd* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/catalyst_callback_registry*.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
@@ -205,6 +206,7 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/catalyst/oqc/test/ $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif

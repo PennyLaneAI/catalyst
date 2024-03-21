@@ -33,7 +33,7 @@ from catalyst.utils.runtime import (
     get_pennylane_operations,
     validate_config_with_device,
 )
-from catalyst.utils.toml import check_adjoint_flag, toml_load
+from catalyst.utils.toml import check_adjoint_flag, read_toml_file
 
 
 class DummyDevice(qml.QubitDevice):
@@ -71,8 +71,8 @@ def test_validate_config_with_device(schema):
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+
+        config = read_toml_file(toml_file)
 
         device = DummyDevice()
         with pytest.raises(
@@ -98,8 +98,7 @@ def test_get_observables_schema1():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
 
 
@@ -119,8 +118,7 @@ def test_get_observables_schema2():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
 
 
@@ -142,8 +140,7 @@ def test_get_native_gates_schema1_no_qcontrol():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
 
@@ -165,15 +162,13 @@ def test_get_native_gates_schema1_qcontrol():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
 
 def test_get_adjoint_schema2():
     """Test native gates are properly obtained from the toml."""
     with TemporaryDirectory() as d:
-
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
             f.write(
@@ -186,8 +181,7 @@ def test_get_adjoint_schema2():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert check_adjoint_flag(config, False)
 
 
@@ -208,8 +202,7 @@ def test_get_native_gates_schema2():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
 
 
@@ -230,8 +223,7 @@ def test_get_native_gates_schema2_optional_shots():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_operations(config, True, "device_name")
 
 
@@ -251,8 +243,7 @@ def test_get_native_gates_schema2_optional_noshots():
                     """
                 )
             )
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
     assert test_deduced_gates == get_pennylane_operations(config, False, "device")
 
 
@@ -272,8 +263,7 @@ def test_get_decomp_gates_schema1():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
     assert test_gates == get_decomposable_gates(config, False)
 
@@ -294,8 +284,7 @@ def test_get_decomp_gates_schema2():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
     assert test_gates == get_decomposable_gates(config, False)
 
@@ -316,8 +305,7 @@ def test_get_matrix_decomposable_gates_schema1():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
     assert test_gates == get_matrix_decomposable_gates(config, False)
 
@@ -337,8 +325,7 @@ def test_get_matrix_decomposable_gates_schema2():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
     assert {"TestMatrixGate": {}} == get_matrix_decomposable_gates(config, False)
 
@@ -373,8 +360,7 @@ def test_config_invalid_attr():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
         with pytest.raises(
             CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
@@ -397,8 +383,7 @@ def test_config_invalid_condition_unknown():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
         with pytest.raises(
             CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
@@ -421,8 +406,7 @@ def test_config_invalid_property_unknown():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
         with pytest.raises(
             CompileError, match="Configuration for gate 'TestGate' has unknown properties"
@@ -445,8 +429,7 @@ def test_config_invalid_condition_duplicate():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
         with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
             get_native_gates(config, True)
@@ -468,8 +451,7 @@ def test_config_unsupported_schema():
                 )
             )
 
-        with open(toml_file, "rb") as f:
-            config = toml_load(f)
+        config = read_toml_file(toml_file)
 
         with pytest.raises(CompileError):
             check_quantum_control_flag(config)

@@ -108,3 +108,14 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
     catalyst.custom_call fn("lapack_dgesdd") (%arg0, %alloc) {number_original_arg = array<i32: 1>} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
     return %alloc: memref<3x3xf64>
 }
+
+// -----
+
+// A python without parameters and without returns.
+
+func.func @python_call () {
+    // CHECK: [[identifier:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: llvm.call @pyregistry([[identifier]])
+    catalyst.pycallback { identifier = 0 }
+    return
+}

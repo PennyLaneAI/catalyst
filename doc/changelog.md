@@ -2,10 +2,40 @@
 
 <h3>New features</h3>
 
+* Support for callbacks in Catalyst.
+  [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
+
+  Catalyst now supports callbacks without parameters nor return values.
+  This is the very first step in supporting callbacks.
+  The following is now possible.
+
+  ```py
+  @callback
+  def foo():
+    print("Hello world")
+
+  @qjit
+  def circuit(*args, **kwargs):
+    ...
+    foo()
+    ...
+  ```
+
+* The python layer of the OQC-Catalyst device is now available.
+  [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
+
 * Catalyst publishes Git revision string seen at the time of the packaging as
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
   module import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
+
+* Catalyst compiler and runtime have now the capability to provide detailed profiling information.
+  This includes insights such as the program size at various stages within the compilation pipeline
+  and the respective time durations spent in each of these stages.
+  You can print the results by enabling the `ENABLE_DIAGNOSTICS=ON` environment variable,
+  or you can save them to a file by specifying an additional environment variable,
+  `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`.
+  [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
 
 <h3>Improvements</h3>
 
@@ -18,6 +48,7 @@
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
+  [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
@@ -47,6 +78,11 @@
   [(#615)](https://github.com/PennyLaneAI/catalyst/pull/615)
 
   This change allows any part of the runtime to start executing Python code through pybind.
+
+* Fix runtime tests to be compatible with amazon-braket-sdk==1.73.3
+  [(#620)](https://github.com/PennyLaneAI/catalyst/pull/620)
+
+  After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
 <h3>Breaking changes</h3>
 
