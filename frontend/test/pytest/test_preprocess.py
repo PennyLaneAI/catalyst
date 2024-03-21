@@ -169,7 +169,7 @@ class TestPreprocess:
         assert "expval" not in mlir
         assert "var" not in mlir
         assert "counts" in mlir
-    
+
     @pytest.mark.skipif(
         not pathlib.Path(
             get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
