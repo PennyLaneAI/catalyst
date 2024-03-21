@@ -87,6 +87,30 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
 
+    def test_scalar_array_wire(self, backend):
+        """Test a scalar array wire."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(w):
+            qml.PauliX(0)
+            m = measure(wires=w)
+            return m
+
+        assert circuit(jnp.array(0)) == 1
+
+    def test_1element_array_wire(self, backend):
+        """Test a 1D single-element array wire."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(w):
+            qml.PauliX(0)
+            m = measure(wires=w)
+            return m
+
+        assert circuit(jnp.array([0])) == 1
+
     def test_more_complex(self, backend):
         """Test measure (more complex)."""
 
