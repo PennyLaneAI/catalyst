@@ -63,6 +63,7 @@ def get_lib_path(project, env_var):
         return os.path.join(package_root, "..", "lib")  # pragma: no cover
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
+
 def check_no_overlap(*args, device_name):
     """Check items in *args are mutually exclusive.
 
