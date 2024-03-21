@@ -114,22 +114,6 @@ def check_compilation_flag(config: TOMLDocument, flag_name: str) -> bool:
     return bool(config.get("compilation", {}).get(flag_name, False))
 
 
-def check_adjoint_flag(config: TOMLDocument, program_features) -> bool:
-    """Check the global adjoint flag for toml schema 1. For newer schemas the adjoint flag is
-    defined to be set if all native gates are inverible"""
-    schema = int(config["schema"])
-    if schema == 1:
-        return bool(config.get("compilation", {}).get("quantum_adjoint", False))
-
-    elif schema == 2:
-        return all(
-            "invertible" in v.get("properties", {})
-            for g, v in get_native_gates(config, program_features).items()
-        )
-
-    raise CompileError("quantum_adjoint flag is not supported in TOMLs schema >= 3")
-
-
 def check_quantum_control_flag(config: TOMLDocument) -> bool:
     """Check the control flag. Only exists in toml config schema 1"""
     schema = int(config["schema"])
@@ -239,10 +223,11 @@ def get_matrix_decomposable_gates(
 
 
 def get_operation_properties(config_props: dict) -> OperationProperties:
+    properties = config_props.get("properties", {})
     return OperationProperties(
-        invertible=config_props.get("invertible", False),
-        controllable=config_props.get("controllable", False),
-        differentiable=config_props.get("differentiable", False),
+        invertible="invertible" in properties,
+        controllable="controllable" in properties,
+        differentiable="differentiable" in properties,
     )
 
 
@@ -365,23 +350,27 @@ def get_device_config(
     schema = int(config["schema"])
 
     if schema == 1:
-        supports_controlled = check_quantum_control_flag(config)
-
-        if supports_controlled:
-            for v in native_gate_props.values():
-                v.controlled = True
-
-            # TODO: remove after PR #642 is merged in lightning
-            if device_name == "lightning.kokkos":  # pragma: nocover
-                native_gate_props[qml.GlobalPhase] = OperationProperties(
-                    invertible=True, controllable=True, differentiable=True
-                )
+        # TODO: remove after PR #642 is merged in lightning
+        if device_name == "lightning.kokkos":  # pragma: nocover
+            native_gate_props[qml.GlobalPhase] = OperationProperties(
+                invertible=False, controllable=False, differentiable=True
+            )
 
         # TODO: remove after PR #642 is merged in lightning
         if device_name == "lightning.kokkos":  # pragma: nocover
             observable_props[qml.Projector] = OperationProperties(
                 invertible=False, controllable=False, differentiable=False
             )
+
+        supports_controlled = check_quantum_control_flag(config)
+        if supports_controlled:
+            for v in native_gate_props.values():
+                v.controllable = True
+
+        supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
+        if supports_adjoint:
+            for v in native_gate_props.values():
+                v.invertible = True
 
         # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
         # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
