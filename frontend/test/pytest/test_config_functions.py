@@ -158,6 +158,24 @@ def test_get_native_gates_schema1_qcontrol():
     assert {"PauliZ", "C(PauliZ)"} == pennylane_operation_set(device_config.native_gates)
 
 
+@pytest.mark.parametrize("qadjoint", [True, False])
+def test_get_native_gates_schema1_qadjoint(qadjoint):
+    """Test native gates are properly obtained from the toml."""
+    device_config = parse_test_config(
+        ProgramFeatures(False),
+        dedent(
+            rf"""
+                schema = 1
+                [[operators.gates]]
+                native = [ "PauliZ" ]
+                [compilation]
+                quantum_adjoint = {str(qadjoint).lower()}
+            """
+        ),
+    )
+    assert device_config.native_gates[qml.PauliZ].invertible is qadjoint
+
+
 def test_get_native_gates_schema2():
     """Test native gates are properly obtained from the toml."""
     device_config = parse_test_config(
