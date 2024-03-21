@@ -89,6 +89,7 @@ class DeviceConfig:
 def intersect_operations(
     a: Dict[str, OperationProperties], b: Dict[str, OperationProperties]
 ) -> Dict[str, OperationProperties]:
+    """Intersects two sets of oepration properties"""
     return {k: intersect_properties(a[k], b[k]) for k in (a.keys() & b.keys())}
 
 
@@ -112,6 +113,7 @@ class ProgramFeatures:
 
 
 def check_compilation_flag(config: TOMLDocument, flag_name: str) -> bool:
+    """Checks the flag in the toml document 'compilation' section."""
     return bool(config.get("compilation", {}).get(flag_name, False))
 
 
@@ -134,7 +136,7 @@ def get_gates(
     finiteshots = "finiteshots"
     try:
         iterable = reduce(lambda x, y: x[y], path, config)
-    except TOMLException as _:
+    except TOMLException as _:  # pylint: disable=broad-exception-caught
         return {}
     gen = iterable.items() if hasattr(iterable, "items") else zip(iterable, repeat({}))
     for g, values in gen:
@@ -224,6 +226,7 @@ def get_matrix_decomposable_gates(
 
 
 def get_operation_properties(config_props: dict) -> OperationProperties:
+    """Load operation properties from config"""
     properties = config_props.get("properties", {})
     return OperationProperties(
         invertible="invertible" in properties,
