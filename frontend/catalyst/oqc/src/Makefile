@@ -29,3 +29,9 @@ $(OQC_BUILD_DIR)/tests/runner_tests_oqc: configure
 test: $(OQC_BUILD_DIR)/tests/runner_tests_oqc
 	@echo "test the Catalyst runtime test suite"
 	$(OQC_BUILD_DIR)/tests/runner_tests_oqc
+
+
+.PHONY: clean
+clean:
+	@echo "clean build files"
+	rm -rf $(OQC_BUILD_DIR)

@@ -191,7 +191,7 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-mlir clean-runtime clean-all
+.PHONY: clean clean-mlir clean-runtime clean-oqc clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -205,7 +205,10 @@ clean-mlir:
 clean-runtime:
 	$(MAKE) -C runtime clean
 
-clean-all: clean-mlir clean-runtime
+clean-oqc:
+	$(MAKE) -C frontend/catalyst/oqc/src clean
+
+clean-all: clean-mlir clean-runtime clean-oqc
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
@@ -217,7 +220,7 @@ coverage: coverage-frontend coverage-runtime
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
-	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/catalyst/oqc/test/ $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/oqc $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/async_tests --tb=native --backend=$(TEST_BACKEND) --tb=native
 endif
