@@ -31,6 +31,7 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import (
     DeviceConfig,
     ProgramFeatures,
+    check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
     get_native_gates,
@@ -406,6 +407,9 @@ def test_config_unsupported_schema():
 
     with pytest.raises(CompileError):
         get_native_gates(config, program_features)
+
+    with pytest.raises(CompileError):
+        check_quantum_control_flag(config)
 
 
 if __name__ == "__main__":
