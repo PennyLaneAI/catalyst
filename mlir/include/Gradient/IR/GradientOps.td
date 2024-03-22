@@ -63,6 +63,35 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     }];
 }
 
+def ValueAndGradOp : Gradient_Op<"value_and_grad", [
+        SameVariadicResultSize,
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
+    let summary = "Compute the value and gradient of a function.";
+
+    let arguments = (ins
+        StrAttr:$method,
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$operands,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$vals,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$gradients
+    );
+
+    let assemblyFormat = [{
+        $method $callee `(` $operands `)`
+        attr-dict `:` functional-type(operands, results)
+    }];
+
+
+    let hasVerifier = 1;
+}
+
 def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
@@ -88,8 +117,11 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     }];
 }
 
-def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def BackpropOp : Gradient_Op<"backprop", [
+        AttrSizedOperandSegments,
+        AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
@@ -105,6 +137,10 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
     );
 
     let results = (outs
+        Variadic<AnyTypeOf<[
+            AnyFloat,
+            RankedTensorOf<[AnyFloat]>
+        ]>>:$vals,
         Variadic<AnyTypeOf<[
             AnyFloat,
             RankedTensorOf<[AnyFloat]>
