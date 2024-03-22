@@ -234,13 +234,6 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
     )
 
 
-def _build_supported_classes(qml_classes):
-    acc = {}
-    for cls in qml_classes:
-        acc[cls.name] = cls
-    return acc
-
-
 def get_device_config(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceConfig:
@@ -324,14 +317,14 @@ def get_device_config(
         # condition (1) means that `ControlledQubitUnitary` is also in the native set. We solve it
         # here by applying a fixup.
         # TODO: remove after PR #642 is merged in lightning
-        if "ControlledQubitUnitary" in native_gate_props:
+        if "ControlledQubitUnitary" in native_gate_props:  # pragma: nocover
             if "ControlledQubitUnitary" in matrix_decomp_props:
                 matrix_decomp_props.pop("ControlledQubitUnitary")
             if "ControlledQubitUnitary" in decomp_props:
                 decomp_props.pop("ControlledQubitUnitary")
 
         # Fix a bug in device toml schema 1
-        if "ControlledPhaseShift" in native_gate_props:
+        if "ControlledPhaseShift" in native_gate_props:  # pragma: nocover
             if "ControlledPhaseShift" in matrix_decomp_props:
                 matrix_decomp_props.pop("ControlledPhaseShift")
             if "ControlledPhaseShift" in decomp_props:

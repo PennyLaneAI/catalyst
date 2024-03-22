@@ -31,6 +31,9 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import (
     DeviceConfig,
     ProgramFeatures,
+    get_decomposable_gates,
+    get_matrix_decomposable_gates,
+    get_native_gates,
     pennylane_operation_set,
     read_toml_file,
 )
@@ -56,15 +59,20 @@ class DummyDevice(qml.QubitDevice):
 ALL_SCHEMAS = [1, 2]
 
 
-def parse_test_config(program_features: ProgramFeatures, config_text: str) -> DeviceConfig:
+def get_test_config(program_features: ProgramFeatures, config_text: str) -> DeviceConfig:
     """Parse test config into the DeviceConfig structure"""
     with TemporaryDirectory() as d:
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
             f.write(config_text)
         config = read_toml_file(toml_file)
-        device_config = get_device_config(config, program_features, "dummy")
+        return config
 
+
+def get_test_device_config(program_features: ProgramFeatures, config_text: str) -> DeviceConfig:
+    """Parse test config into the DeviceConfig structure"""
+    config = get_test_config(program_features, config_text)
+    device_config = get_device_config(config, program_features, "dummy")
     return device_config
 
 
@@ -96,7 +104,7 @@ def test_validate_config_with_device(schema):
 
 def test_get_observables_schema1():
     """Test observables are properly obtained from the toml schema 1."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -111,7 +119,7 @@ def test_get_observables_schema1():
 
 def test_get_observables_schema2():
     """Test observables are properly obtained from the toml schema 2."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -126,7 +134,7 @@ def test_get_observables_schema2():
 
 def test_get_native_gates_schema1_no_qcontrol():
     """Test native gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -143,7 +151,7 @@ def test_get_native_gates_schema1_no_qcontrol():
 
 def test_get_native_gates_schema1_qcontrol():
     """Test native gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -161,7 +169,7 @@ def test_get_native_gates_schema1_qcontrol():
 @pytest.mark.parametrize("qadjoint", [True, False])
 def test_get_native_gates_schema1_qadjoint(qadjoint):
     """Test native gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             rf"""
@@ -178,7 +186,7 @@ def test_get_native_gates_schema1_qadjoint(qadjoint):
 
 def test_get_native_gates_schema2():
     """Test native gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -195,7 +203,7 @@ def test_get_native_gates_schema2():
 
 def test_get_native_gates_schema2_optional_shots():
     """Test native gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(True),
         dedent(
             r"""
@@ -212,7 +220,7 @@ def test_get_native_gates_schema2_optional_shots():
 
 def test_get_native_gates_schema2_optional_noshots():
     """Test native gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -229,7 +237,7 @@ def test_get_native_gates_schema2_optional_noshots():
 
 def test_get_decomp_gates_schema1():
     """Test native decomposition gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             """
@@ -247,7 +255,7 @@ def test_get_decomp_gates_schema1():
 
 def test_get_decomp_gates_schema2():
     """Test native decomposition gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             """
@@ -264,7 +272,7 @@ def test_get_decomp_gates_schema2():
 
 def test_get_matrix_decomposable_gates_schema1():
     """Test native matrix gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             """
@@ -281,7 +289,7 @@ def test_get_matrix_decomposable_gates_schema1():
 
 def test_get_matrix_decomposable_gates_schema2():
     """Test native matrix gates are properly obtained from the toml."""
-    device_config = parse_test_config(
+    device_config = get_test_device_config(
         ProgramFeatures(False),
         dedent(
             r"""
@@ -315,7 +323,7 @@ def test_config_invalid_attr():
     with pytest.raises(
         CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
     ):
-        parse_test_config(
+        get_test_device_config(
             ProgramFeatures(False),
             dedent(
                 r"""
@@ -332,14 +340,14 @@ def test_config_invalid_condition_unknown():
     with pytest.raises(
         CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
     ):
-        parse_test_config(
+        get_test_device_config(
             ProgramFeatures(True),
             dedent(
                 r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { condition = ["unknown", "analytic"] }
-                    """
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { condition = ["unknown", "analytic"] }
+                """
             ),
         )
 
@@ -349,14 +357,14 @@ def test_config_invalid_property_unknown():
     with pytest.raises(
         CompileError, match="Configuration for gate 'TestGate' has unknown properties"
     ):
-        parse_test_config(
+        get_test_device_config(
             ProgramFeatures(True),
             dedent(
                 r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { properties = ["unknown", "invertible"] }
-                    """
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { properties = ["unknown", "invertible"] }
+                """
             ),
         )
 
@@ -365,30 +373,39 @@ def test_config_invalid_property_unknown():
 def test_config_invalid_condition_duplicate(shots):
     """Check the gate condition handling logic"""
     with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
-        parse_test_config(
+        get_test_device_config(
             ProgramFeatures(shots),
             dedent(
                 r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { condition = ["finiteshots", "analytic"] }
-                    """
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { condition = ["finiteshots", "analytic"] }
+                """
             ),
         )
 
 
 def test_config_unsupported_schema():
     """Test native matrix gates are properly obtained from the toml."""
+    program_features = ProgramFeatures(False)
+    config_text = dedent(
+        r"""
+            schema = 999
+        """
+    )
+    config = get_test_config(program_features, config_text)
 
     with pytest.raises(CompileError):
-        parse_test_config(
-            ProgramFeatures(False),
-            dedent(
-                r"""
-                        schema = 999
-                    """
-            ),
-        )
+        get_test_device_config(program_features, config_text)
+
+    with pytest.raises(CompileError):
+        get_matrix_decomposable_gates(config, program_features)
+
+    with pytest.raises(CompileError):
+        get_decomposable_gates(config, program_features)
+
+    with pytest.raises(CompileError):
+        get_native_gates(config, program_features)
 
 
 if __name__ == "__main__":
