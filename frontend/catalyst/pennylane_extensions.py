@@ -2655,7 +2655,7 @@ def callback_implementation(
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retvals = tree_leaves(cb(*args, **kwargs))
         return_values = []
-        for retval, result_shape_dtype in zip(retvals, flat_results_aval):
+        for retval in retvals:
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)
             unranked_memref = get_unranked_memref_descriptor(retval)

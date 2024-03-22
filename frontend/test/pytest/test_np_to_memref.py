@@ -19,14 +19,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from jax.core import ShapedArray
-from mlir_quantum.runtime import C64, C128, F16, as_ctype
+from mlir_quantum.runtime import C64, C128, as_ctype
 from mlir_quantum.runtime import (
     get_unranked_memref_descriptor as mlir_get_unranked_memref_descriptor,
 )
 from mlir_quantum.runtime import (
-    C64,
-    C128,
-    as_ctype,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
 )
@@ -77,5 +74,6 @@ def test_get_ranked_memref_descriptor(inp, exp):
     ],
 )
 def test_get_unranked_meref_descriptor(inp, exp):
+    """Test unranked_memref_descriptor"""
     obs = get_unranked_memref_descriptor(inp)
-    assert exp._fields_ == obs._fields_
+    assert exp._fields_ == obs._fields_  # pylint: disable=protected-access

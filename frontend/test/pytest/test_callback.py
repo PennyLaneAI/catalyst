@@ -13,13 +13,11 @@
 # limitations under the License.
 """Test callbacks"""
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import debug
 from catalyst.pennylane_extensions import callback
 
 

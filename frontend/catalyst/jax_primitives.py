@@ -74,6 +74,7 @@ from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 from catalyst.compiler import get_lib_path
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -244,8 +245,6 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
-
-    from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
     callback_id = registry.register(callback)
 
