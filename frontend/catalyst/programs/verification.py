@@ -21,7 +21,7 @@ from pennylane.tape import QuantumTape
 
 from catalyst.jax_extras import DynamicJaxprTrace
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import ProgramFeatures, TOMLDocument
+from catalyst.utils.toml import DeviceConfig
 
 
 @dataclass
@@ -32,20 +32,16 @@ class ProgramRepresentation:
     quantum_tape: QuantumTape
 
 
-def verify_program(
-    config: TOMLDocument, program_features: ProgramFeatures, program: ProgramRepresentation
-):
+def verify_program(config: DeviceConfig, program: ProgramRepresentation):
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
     """
-    verify_inverses(config, program_features, program)
-    verify_control(config, program_features, program)
+    verify_inverses(config, program)
+    verify_control(config, program)
 
 
-def verify_inverses(
-    config: TOMLDocument, program_features: ProgramFeatures, program: ProgramRepresentation
-) -> None:
+def verify_inverses(config: DeviceConfig, program: ProgramRepresentation) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
@@ -53,9 +49,7 @@ def verify_inverses(
     pass
 
 
-def verify_control(
-    config: TOMLDocument, program_features: ProgramFeatures, program: ProgramRepresentation
-) -> None:
+def verify_control(config: DeviceConfig, program: ProgramRepresentation) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
