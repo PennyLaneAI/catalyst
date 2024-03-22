@@ -436,22 +436,32 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
 
         Type i64 = rewriter.getI64Type();
         // The argument convention is as follows:
-        // arg0 = identifier
-        // arg1 = length of varargs
-        // arg2..N+2 varargs pointers to memrefs
+        // arg0 =        identifier
+        // arg1 =        length of operands
+        // arg2 =        length of results
+        // arg3..N+3     varargs pointers to memrefs
+        // argN+4..N+M+4 varargs pointers to result memrefs
+
         bool isVarArg = true;
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "pyregistry", {/*args=*/i64, i64}, /*ret_type=*/voidType, isVarArg);
+            mod, "pyregistry", {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
         auto identAttr = op.getIdentifier();
         auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
-        auto argcSize = op.getInputs().size();
-        auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcSize));
+
+        auto argcAttr = op.getNumberOriginalArg();
+        long argcint = argcAttr ? argcAttr.value() : 0;
+        auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
+
+        auto resultsSizeAttr = op.getOperands().size() - argcint;
+        auto resultsSizeVal =
+            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
 
         SmallVector<Value> callArgs{ident};
         callArgs.insert(callArgs.end(), argc);
+        callArgs.insert(callArgs.end(), resultsSizeVal);
 
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto memref : adaptor.getInputs()) {

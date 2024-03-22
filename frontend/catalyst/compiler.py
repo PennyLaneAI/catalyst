@@ -264,6 +264,11 @@ class LinkerDriver:
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
+        sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+
+        registry.set_mlir_lib_path(mlir_lib_path)
+
         lib_path_flags = [
             f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",

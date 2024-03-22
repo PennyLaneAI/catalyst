@@ -29,11 +29,11 @@
 #include "QuantumDevice.hpp"
 #include "Types.h"
 
-extern void callbackCall(int64_t, int64_t, va_list);
+extern void callbackCall(int64_t, int64_t, int64_t, va_list);
 
 namespace Catalyst::Runtime {
 
-extern "C" void pyregistry(int64_t identifier, int64_t argc, ...);
+extern "C" void pyregistry(int64_t identifier, int64_t argc, int64_t retc, ...);
 
 class MemoryManager final {
   private:
