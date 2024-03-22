@@ -115,7 +115,8 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
 
 func.func @python_call () {
     // CHECK: [[identifier:%.+]] = llvm.mlir.constant(0 : i64)
-    // CHECK: llvm.call @pyregistry([[identifier]])
-    catalyst.pycallback { identifier = 0 }
+    // CHECK: [[argcount:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: llvm.call @pyregistry([[identifier]], [[argcount]])
+    catalyst.pycallback() { identifier = 0} : () -> ()
     return
 }

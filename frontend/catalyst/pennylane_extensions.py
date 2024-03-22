@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
+import ctypes
 import inspect
 import numbers
 from collections.abc import Sequence, Sized
@@ -95,6 +96,10 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.jnp_to_memref import (
+    get_ranked_memref_descriptor,
+    ranked_memref_to_numpy,
+)
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
@@ -2558,6 +2563,42 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
     return batch_size
 
 
+class CallbackClosure:
+    """This is just a class containing data that is important for the callback."""
+
+    def __init__(self, *absargs, **abskwargs):
+        self.absargs = absargs
+        self.abskwargs = abskwargs
+
+    @property
+    def tree_flatten(self):
+        """Flatten args and kwargs."""
+        return tree_flatten((self.absargs, self.abskwargs))
+
+    @property
+    def low_level_sig(self):
+        """Get the memref descriptor types"""
+        flat_params, _ = self.tree_flatten
+        low_level_flat_params = []
+        for param in flat_params:
+            empty_memref_descriptor = get_ranked_memref_descriptor(param)
+            memref_type = type(empty_memref_descriptor)
+            ptr_ty = ctypes.POINTER(memref_type)
+            low_level_flat_params.append(ptr_ty)
+        return low_level_flat_params
+
+    def getArgsAsJAXArrays(self, flat_args):
+        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
+        it is best for the user if we continue with that idea and forward JAX arrays."""
+        jnpargs = []
+        for void_ptr, ty in zip(flat_args, self.low_level_sig):
+            memref_ty = ctypes.cast(void_ptr, ty)
+            nparray = ranked_memref_to_numpy(memref_ty)
+            jnparray = jnp.asarray(nparray)
+            jnpargs.append(jnparray)
+        return jnpargs
+
+
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
@@ -2590,15 +2631,20 @@ def callback_implementation(
     """
 
     flat_args, in_tree = tree_flatten((args, kwargs))
+    metadata = CallbackClosure(args, kwargs)
 
-    def _flat_callback(*flat_args):
-        """This function packages flat arguments back into the shapes expected by the function."""
-        _args, _kwargs = tree_unflatten(in_tree, flat_args)
-        assert not _args, "Args are not yet expected here."
-        assert not _kwargs, "Kwargs are not yet supported here."
-        return tree_leaves(cb())
+    def _flat_callback(flat_args):
+        """Each flat_arg is a pointer.
 
-    # TODO(@erick-xanadu): Change back once we support arguments.
+        It is a pointer to a memref object.
+        To find out which element type it has, we use the signature obtained previously.
+        """
+        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
+
+        args, kwargs = tree_unflatten(in_tree, jnpargs)
+        return tree_leaves(cb(*args, **kwargs))
+
+    # TODO(@erick-xanadu): Change back once we support return values.
     # I am leaving this as a to-do because otherwise the coverage will complain.
     # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
     results_aval = []

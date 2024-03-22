@@ -250,7 +250,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
-    return PythonCallOp(identifier).results
+    return PythonCallOp(args, identifier).results
 
 
 #
