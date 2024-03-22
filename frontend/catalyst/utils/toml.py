@@ -97,7 +97,6 @@ def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[s
     """Prints a config section into a set of strings using PennyLane syntax"""
     ops = set()
     # Back-mapping from class names to string names
-    # supported_names = {v: k for k, v in map_supported_class_names().items()}
     for g, props in config_ops.items():
         ops.update({g})
         if props.controllable:
