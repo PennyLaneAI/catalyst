@@ -47,6 +47,7 @@ set(OQC_LIBRARIES
     catalyst_python_interpreter
 )
 
+set_target_properties(rtd_oqc PROPERTIES BUILD_RPATH "$ORIGIN/../utils")
 target_link_directories(rtd_oqc PRIVATE ${runtime_lib})
 target_link_libraries(rtd_oqc PRIVATE pybind11::module catalyst_python_interpreter)
 
