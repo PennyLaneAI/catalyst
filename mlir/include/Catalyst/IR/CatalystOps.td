@@ -114,7 +114,7 @@ def PythonCallOp: Catalyst_Op<"pycallback",
   }];
 
   let arguments = (ins
-        Variadic<AnyType>:$inputs,
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
         I64Attr: $identifier
   );
 
