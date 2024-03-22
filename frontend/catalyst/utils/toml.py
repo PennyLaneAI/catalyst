@@ -248,7 +248,6 @@ def get_device_config(
     """Load TOML document into the DeviceConfig structure"""
     # pylint: disable=too-many-branches
 
-    # supported_classes = map_supported_class_names()
     schema = int(config["schema"])
 
     native_gate_props = {}
@@ -267,17 +266,13 @@ def get_device_config(
     for g, props in get_observables(config, program_features).items():
         observable_props[g] = get_operation_properties(props)
 
-    # TODO: save measurements in config, not just load
-    # if schema == 2:
-    #     measurement_props = {}
-    #     for g, props in get_measurement_processes(config, program_features).items():
-    #         measurement_props[supported_classes[g]] = get_operation_properties(props)
-
     if schema == 1:
         # TODO: remove after PR #642 is merged in lightning
+        # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
+        # is what actual device reports.
         if device_name == "lightning.kokkos":  # pragma: nocover
             native_gate_props["GlobalPhase"] = OperationProperties(
-                invertible=False, controllable=False, differentiable=True
+                invertible=False, controllable=True, differentiable=True
             )
 
         # TODO: remove after PR #642 is merged in lightning
@@ -309,15 +304,18 @@ def get_device_config(
 
         supports_controlled = check_quantum_control_flag(config)
         if supports_controlled:
+            # Add ControlledQubitUnitary as a controlled version of QubitUnitary
             if "QubitUnitary" in native_gate_props:
                 native_gate_props["ControlledQubitUnitary"] = OperationProperties(
                     invertible=False, controllable=False, differentiable=True
                 )
+            # By default, enable the `C(gate)` version for most `gates`.
             for op, props in native_gate_props.items():
                 props.controllable = op not in gates_to_be_decomposed_if_controlled
 
         supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
         if supports_adjoint:
+            # Makr all gates as invertibles
             for props in native_gate_props.values():
                 props.invertible = True
 
