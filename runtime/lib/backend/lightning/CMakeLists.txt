@@ -29,7 +29,6 @@ elseif(ENABLE_LIGHTNING)
 elseif(ENABLE_LIGHTNING_KOKKOS)
     set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
 endif()
-set(ENABLE_LAPACK ON CACHE BOOL "Enable LAPACK for PennyLane Lightning backend")
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 
 FetchContent_MakeAvailable(pennylane_lightning)
