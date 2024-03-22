@@ -2631,9 +2631,9 @@ def callback_implementation(
     metadata = CallbackClosure(args, kwargs)
 
     def _flat_callback(flat_args):
-        """Each flat_arg is a pointer. Yes a pointer.
+        """Each flat_arg is a pointer.
 
-        It is actually a pointer to a memref object.
+        It is a pointer to a memref object.
         To find out which element type it has, we use the signature obtained previously.
         """
         jnpargs = metadata.getArgsAsJAXArrays(flat_args)
