@@ -60,8 +60,8 @@ class DummyDevice(qml.QubitDevice):
 ALL_SCHEMAS = [1, 2]
 
 
-def get_test_config(program_features: ProgramFeatures, config_text: str) -> DeviceConfig:
-    """Parse test config into the DeviceConfig structure"""
+def get_test_config(config_text: str) -> TOMLDocument:
+    """Parse test config into the TOMLDocument structure"""
     with TemporaryDirectory() as d:
         toml_file = join(d, "test.toml")
         with open(toml_file, "w", encoding="utf-8") as f:
@@ -72,7 +72,7 @@ def get_test_config(program_features: ProgramFeatures, config_text: str) -> Devi
 
 def get_test_device_config(program_features: ProgramFeatures, config_text: str) -> DeviceConfig:
     """Parse test config into the DeviceConfig structure"""
-    config = get_test_config(program_features, config_text)
+    config = get_test_config(config_text)
     device_config = get_device_config(config, program_features, "dummy")
     return device_config
 
@@ -394,7 +394,7 @@ def test_config_unsupported_schema():
             schema = 999
         """
     )
-    config = get_test_config(program_features, config_text)
+    config = get_test_config(config_text)
 
     with pytest.raises(CompileError):
         get_test_device_config(program_features, config_text)
