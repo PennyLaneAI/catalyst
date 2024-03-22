@@ -31,6 +31,7 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import (
     DeviceConfig,
     ProgramFeatures,
+    TOMLDocument,
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
