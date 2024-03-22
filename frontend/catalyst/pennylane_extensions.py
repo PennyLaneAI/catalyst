@@ -2573,7 +2573,7 @@ class CallbackClosure:
         return tree_flatten((self.absargs, self.abskwargs))
 
     @property
-    def getLowLevelSignature(self):
+    def low_level_sig(self):
         """Get the memref descriptor types"""
         flat_params, _ = self.tree_flatten
         low_level_flat_params = []
@@ -2588,7 +2588,7 @@ class CallbackClosure:
         """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
         it is best for the user if we continue with that idea and forward JAX arrays."""
         jnpargs = []
-        for void_ptr, ty in zip(flat_args, self.getLowLevelSignature):
+        for void_ptr, ty in zip(flat_args, self.low_level_sig):
             memref_ty = ctypes.cast(void_ptr, ty)
             nparray = ranked_memref_to_numpy(memref_ty)
             jnparray = jnp.asarray(nparray)
