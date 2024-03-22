@@ -16,6 +16,7 @@
 import ctypes
 
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from jax.core import ShapedArray
 from mlir_quantum.runtime import C64, C128, F16, as_ctype
