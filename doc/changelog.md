@@ -4,21 +4,28 @@
 
 * Support for callbacks in Catalyst.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
+  [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
 
-  Catalyst now supports callbacks without parameters nor return values.
+  Catalyst now supports callbacks with parameters but no return values.
   This is the very first step in supporting callbacks.
-  The following is now possible.
+  The following is now possible:
 
   ```py
   @callback
-  def foo():
-    print("Hello world")
+  def foo(val):
+    print("Hello world", val)
 
   @qjit
   def circuit(*args, **kwargs):
     ...
-    foo()
+    foo(123)
     ...
+
+  ```
+
+  ```pycon
+  >>> circuit()
+  Hello world 123
   ```
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
@@ -67,7 +74,7 @@
   support, gate invertibility or differentiability.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
-* Catalyst now supports devices built from the 
+* Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
@@ -111,6 +118,13 @@
 
 <h3>Bug fixes</h3>
 
+* Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
+  contain one element.
+  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
+
+* Allow all Catalyst gates to receive `wire` values of less than 64 bitwidth.
+  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
+
 * Fix the endianness of counts in Catalyst and matches PennyLane.
   [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
 
@@ -148,12 +162,12 @@ Erick Ochoa Lopez.
   written to minimize usage of Python for loops (which can be slow and inefficient), and instead
   push as much of the computation through to the array manipulation library, by taking advantage of
   extra batch dimensions.
-  
+
   For example, consider the following QNode:
-  
+
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qml.qnode(dev)
   def circuit(x, y):
       qml.RX(jnp.pi * x[0] + y, wires=0)
@@ -161,15 +175,15 @@ Erick Ochoa Lopez.
       qml.RX(x[1] * x[2], wires=0)
       return qml.expval(qml.PauliZ(0))
   ```
-  
+
   ```pycon
   >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
   Array(-0.93005586, dtype=float64)
   ```
-  
+
   We can use `catalyst.vmap` to introduce additional batch dimensions to our input arguments,
   without needing to use a Python for loop:
-  
+
   ```pycon
   >>> x = jnp.array([[0.1, 0.2, 0.3],
   ...                [0.4, 0.5, 0.6],
@@ -178,7 +192,7 @@ Erick Ochoa Lopez.
   >>> qjit(vmap(cost))(x, y)
   array([-0.93005586, -0.97165424, -0.6987465 ])
   ```
-  
+
   `catalyst.vmap()` has been implemented to match the same behaviour of `jax.vmap`, so should be a drop-in
   replacement in most cases. Under-the-hood, it is automatically inserting Catalyst-compatible for loops,
   which will be compiled and executed outside of Python for increased performance.
@@ -202,7 +216,7 @@ Erick Ochoa Lopez.
   * `softwareq.qpp`: a modern C++ statevector simulator
   * `nvidia.custatevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
   * `nvidia.cutensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
-  
+
   For example:
 
   ```python
@@ -455,7 +469,7 @@ Erick Ochoa Lopez.
 
 * Remove redundant copies of TOML files for `lightning.kokkos` and `lightning.qubit`.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
-  
+
   `lightning.kokkos` and `lightning.qubit` now ship with their own TOML file. As such, we use the TOML file provided by them.
 
 * Capturing quantum circuits with many gates prior to compilation is now quadratically faster (up to
@@ -516,7 +530,7 @@ Erick Ochoa Lopez.
   To avoid this, two changes were necessary:
 
   * The Catalyst runtime now has a different API from QIR instructions.
-  
+
     The runtime has been modified such that QIR instructions are lowered to functions where
     the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
     the possibility of symbol conflicts with other libraries that implement QIR as a library.
@@ -549,7 +563,7 @@ Erick Ochoa Lopez.
   ```py
   def f(x):
     return jax.numpy.sum(x[::2])
-  
+
   x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
   ```
   ```pycon

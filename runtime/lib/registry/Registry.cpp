@@ -16,14 +16,24 @@ namespace py = pybind11;
 std::unordered_map<int64_t, py::function> *references;
 
 extern "C" {
-[[gnu::visibility("default")]] void callbackCall(int64_t identifier)
+[[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, va_list args)
 {
     auto it = references->find(identifier);
     if (it == references->end()) {
         throw std::invalid_argument("Callback called with invalid identifier");
     }
     auto lambda = it->second;
-    lambda();
+
+    py::list flat_args;
+    for (int i = 0; i < count; i++) {
+        int64_t ptr = va_arg(args, int64_t);
+        flat_args.append(ptr);
+    }
+    // We have access to lambda here...
+    // Lambda is a callback...
+    // we also have access to memref pointer...
+    // We need a memref pointer...
+    lambda(flat_args);
 }
 }
 

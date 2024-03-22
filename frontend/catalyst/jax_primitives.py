@@ -28,11 +28,19 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
-from jaxlib.mlir.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects.arith import (
+    AddIOp,
+    CeilDivSIOp,
+    ConstantOp,
+    ExtUIOp,
+    IndexCastOp,
+    MulIOp,
+    SubIOp,
+)
 from jaxlib.mlir.dialects.func import CallOp
-from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
+from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from mlir_quantum.dialects.catalyst import PrintOp, PythonCallOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
@@ -242,7 +250,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
-    return PythonCallOp(identifier).results
+    return PythonCallOp(args, identifier).results
 
 
 #
@@ -399,7 +407,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
     # such constants to numpy array types.
     constants = [
-        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        for const in jaxpr.consts
     ]
     args_and_consts = constants + list(args)
 
@@ -441,7 +450,8 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     constants = [
-        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        for const in jaxpr.consts
     ]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
@@ -496,7 +506,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     constants = [
-        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        for const in jaxpr.consts
     ]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
@@ -660,13 +671,18 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg.type).data == "reg"
 
-    if (
-        ir.RankedTensorType.isinstance(qubit_idx.type)
-        and ir.RankedTensorType(qubit_idx.type).shape == []
-    ):
+    if ir.RankedTensorType.isinstance(qubit_idx.type):
         baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
+        if ir.RankedTensorType(qubit_idx.type).shape == []:
+            qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
+        elif ir.RankedTensorType(qubit_idx.type).shape == [1]:
+            c0 = ConstantOp(ir.IndexType.get(), 0)
+            qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
     assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for extract op!"
+
+    if ir.IntegerType(qubit_idx.type).width < 64:
+        qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
+    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for extract op!"
 
     qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
     return ExtractOp(qubit_type, qreg, idx=qubit_idx).results
@@ -698,13 +714,18 @@ def _qinsert_lowering(
     assert ir.OpaqueType(qreg_old.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg_old.type).data == "reg"
 
-    if (
-        ir.RankedTensorType.isinstance(qubit_idx.type)
-        and ir.RankedTensorType(qubit_idx.type).shape == []
-    ):
+    if ir.RankedTensorType.isinstance(qubit_idx.type):
         baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
+        if ir.RankedTensorType(qubit_idx.type).shape == []:
+            qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
+        elif ir.RankedTensorType(qubit_idx.type).shape == [1]:
+            c0 = ConstantOp(ir.IndexType.get(), 0)
+            qubit_idx = TensorExtractOp(baseType, qubit_idx, [c0]).result
     assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for insert op!"
+
+    if ir.IntegerType(qubit_idx.type).width < 64:
+        qubit_idx = ExtUIOp(ir.IntegerType.get_signless(64), qubit_idx).result
+    assert ir.IntegerType(qubit_idx.type).width == 64, "64-bit integer required for insert op!"
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
     return InsertOp(qreg_type, qreg_old, qubit, idx=qubit_idx).results
@@ -761,7 +782,7 @@ def _gphase_lowering(
         if not ir.F64Type.isinstance(baseType):
             baseType = ir.F64Type.get()
             resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = ConvertOp(resultTensorType, p).results
+            p = StableHLOConvertOp(resultTensorType, p).results
 
         p = TensorExtractOp(baseType, p, []).result
 
@@ -839,7 +860,7 @@ def _qinst_lowering(
         if not ir.F64Type.isinstance(baseType):
             baseType = ir.F64Type.get()
             resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = ConvertOp(resultTensorType, p).results
+            p = StableHLOConvertOp(resultTensorType, p).results
 
         p = TensorExtractOp(baseType, p, []).result
 
@@ -939,7 +960,7 @@ def _qunitary_lowering(
         f64_type = ir.F64Type.get()
         complex_f64_type = ir.ComplexType.get(f64_type)
         tensor_complex_f64_type = ir.RankedTensorType.get(shape, complex_f64_type)
-        matrix = ConvertOp(tensor_complex_f64_type, matrix).results
+        matrix = StableHLOConvertOp(tensor_complex_f64_type, matrix).results
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -1131,7 +1152,7 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
     if not ir.F64Type.isinstance(baseType):
         baseType = ir.F64Type.get()
         resultTensorType = ir.RankedTensorType.get(shape, baseType)
-        coeffs = ConvertOp(resultTensorType, coeffs).results
+        coeffs = StableHLOConvertOp(resultTensorType, coeffs).results
 
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
@@ -1555,18 +1576,8 @@ def _for_loop_lowering(
         loop_operands.append(p)
 
     if apply_reverse_transform:
-        zero_np = np.array(0)
-        one_np = np.array(1)
-        zero_attr = ir.DenseIntElementsAttr.get(zero_np)
-        one_attr = ir.DenseIntElementsAttr.get(one_np)
-        zero_tensor = StableHLOConstantOp(zero_attr)
-        one_tensor = StableHLOConstantOp(one_attr)
-        ctx = jax_ctx.module_context.context
-        i64_type = ir.IntegerType.get_signless(64, ctx)
-        zero_i64 = TensorExtractOp(i64_type, zero_tensor, []).result
-        one_i64 = TensorExtractOp(i64_type, one_tensor, []).result
-        zero = IndexCastOp(ir.IndexType.get(), zero_i64).result
-        one = IndexCastOp(ir.IndexType.get(), one_i64).result
+        zero = ConstantOp(ir.IndexType.get(), 0).result
+        one = ConstantOp(ir.IndexType.get(), 1).result
 
         start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
 
