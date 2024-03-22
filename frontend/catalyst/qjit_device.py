@@ -13,6 +13,7 @@
 # limitations under the License.
 """This module contains the qjit device classes.
 """
+from copy import deepcopy
 from functools import partial
 from typing import Optional, Set
 
@@ -23,95 +24,101 @@ from pennylane.measurements import MidMeasureMP
 from catalyst.preprocess import catalyst_acceptance, decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import (
-    BackendInfo,
-    get_pennylane_observables,
-    get_pennylane_operations,
-)
+from catalyst.utils.runtime import BackendInfo
 from catalyst.utils.toml import (
+    DeviceConfig,
+    OperationProperties,
+    ProgramFeatures,
     TOMLDocument,
-    check_adjoint_flag,
-    check_mid_circuit_measurement_flag,
+    get_device_config,
+    intersect_operations,
+    pennylane_operation_set,
 )
 
+# fmt:off
 RUNTIME_OPERATIONS = {
-    "CNOT",
-    "ControlledPhaseShift",
-    "CRot",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "CSWAP",
-    "CY",
-    "CZ",
-    "Hadamard",
-    "Identity",
-    "IsingXX",
-    "IsingXY",
-    "IsingYY",
-    "ISWAP",
-    "MultiRZ",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "PhaseShift",
-    "PSWAP",
-    "QubitUnitary",
-    "Rot",
-    "RX",
-    "RY",
-    "RZ",
-    "S",
-    "SWAP",
-    "T",
-    "Toffoli",
-    "GlobalPhase",
-    "C(GlobalPhase)",
-    "C(Hadamard)",
-    "C(IsingXX)",
-    "C(IsingXY)",
-    "C(IsingYY)",
-    "C(ISWAP)",
-    "C(MultiRZ)",
-    "ControlledQubitUnitary",
-    "C(PauliX)",
-    "C(PauliY)",
-    "C(PauliZ)",
-    "C(PhaseShift)",
-    "C(PSWAP)",
-    "C(Rot)",
-    "C(RX)",
-    "C(RY)",
-    "C(RZ)",
-    "C(S)",
-    "C(SWAP)",
-    "C(T)",
+    'CNOT':         OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'ControlledPhaseShift':
+                  OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CRot':         OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CRX':          OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CRY':          OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CRZ':          OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CSWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CY':           OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'CZ':           OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'Hadamard':     OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'Identity':     OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'IsingXX':      OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'IsingXY':      OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'IsingYY':      OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'ISWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'MultiRZ':      OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'PauliX':       OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'PauliY':       OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'PauliZ':       OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'PhaseShift':   OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'PSWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'QubitUnitary': OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'ControlledQubitUnitary':
+                    OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'Rot':          OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'RX':           OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'RY':           OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'RZ':           OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'S':            OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'SWAP':         OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'T':            OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'Toffoli':      OperationProperties(invertible=True, controllable=True, differentiable=True),
+    'GlobalPhase':  OperationProperties(invertible=True, controllable=True, differentiable=True),
 }
+# fmt:on
 
 
-def get_qjit_pennylane_operations(
-    config: TOMLDocument, shots_present: bool, device_name: str
-) -> Set[str]:
+def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
-    native_gates = get_pennylane_operations(config, shots_present, device_name)
+    qjit_config = deepcopy(target_config)
+
     # Gates that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
-    supported_gates = set.intersection(native_gates, qir_gates)
+
+    # Intersection of the above
+    qjit_config.native_gates = intersect_operations(target_config.native_gates, qir_gates)
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
-    supported_gates.update({"Cond", "WhileLoop", "ForLoop"})
+    qjit_config.native_gates.update(
+        {
+            "Cond": OperationProperties(invertible=True, controllable=True, differentiable=True),
+            "WhileLoop": OperationProperties(
+                invertible=True, controllable=True, differentiable=True
+            ),
+            "ForLoop": OperationProperties(invertible=True, controllable=True, differentiable=True),
+        }
+    )
 
     # Optionally enable runtime-powered mid-circuit measurments
-    if check_mid_circuit_measurement_flag(config):  # pragma: no branch
-        supported_gates.update({"MidCircuitMeasure"})
+    if target_config.mid_circuit_measurement_flag:  # pragma: no branch
+        qjit_config.native_gates.update(
+            {
+                "MidCircuitMeasure": OperationProperties(
+                    invertible=True, controllable=True, differentiable=True
+                )
+            }
+        )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if check_adjoint_flag(config, shots_present):
-        supported_gates.update({"Adjoint"})
+    if all(ng.invertible for ng in target_config.native_gates.values()):
+        qjit_config.native_gates.update(
+            {
+                "Adjoint": OperationProperties(
+                    invertible=True, controllable=True, differentiable=True
+                )
+            }
+        )
 
-    return supported_gates
+    return qjit_config
 
 
 class QJITDevice(qml.QubitDevice):
@@ -160,19 +167,19 @@ class QJITDevice(qml.QubitDevice):
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
-        shots_present = shots is not None
-        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
-        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        program_features = ProgramFeatures(shots is not None)
+        target_device_config = get_device_config(target_config, program_features, device_name)
+        self.caps = get_qjit_device_config(target_device_config)
 
     @property
     def operations(self) -> Set[str]:
-        """Get the device operations"""
-        return self._operations
+        """Print the device operations using PennyLane's syntax"""
+        return pennylane_operation_set(self.caps.native_gates)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return self._observables
+        return pennylane_operation_set(self.caps.observables)
 
     def apply(self, operations, **kwargs):
         """
@@ -275,19 +282,19 @@ class QJITDeviceNewAPI(qml.devices.Device):
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
-        shots_present = original_device.shots is not None
-        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
-        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        program_features = ProgramFeatures(original_device.shots is not None)
+        target_device_config = get_device_config(target_config, program_features, device_name)
+        self.caps = get_qjit_device_config(target_device_config)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return self._operations
+        return pennylane_operation_set(self.caps.native_gates)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return self._observables
+        return pennylane_operation_set(self.caps.observables)
 
     def preprocess(
         self,
