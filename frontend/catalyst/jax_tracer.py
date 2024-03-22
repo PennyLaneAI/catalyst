@@ -77,6 +77,7 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
+from catalyst.programs.verification import ProgramRepresentation, verify_program
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -867,6 +868,10 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 transform_program, quantum_tape, return_values_flat
             )
+
+            # Verify the program against the device capabilities
+            for tape in tapes:
+                verify_program(device.caps, ProgramRepresentation(trace, tape))
 
         # (2) - Quantum tracing
         transformed_results = []
