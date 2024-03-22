@@ -405,4 +405,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/catalyst/oqc/test/oqc -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/test_oqc/oqc -n auto
