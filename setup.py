@@ -202,13 +202,6 @@ ext_modules.extend(intree_extension_list)
 # - `ops`: Path to the compiler operations module.
 # - `qjit`: Path to the JIT compiler decorator provided by the compiler.
 
-print(
-    find_namespace_packages(
-        where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum"],
-        exclude=["catalyst.oqc.*"],
-    )
-)
 setup(
     classifiers=classifiers,
     name="PennyLane-Catalyst",
