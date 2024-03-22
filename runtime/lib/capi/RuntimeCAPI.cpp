@@ -120,7 +120,10 @@ void pyregistry(int64_t identifier, int64_t argc, ...)
     // These are implemented in Python.
     std::lock_guard<std::mutex> lock(getPythonMutex());
 
-    // LIBREGISTRY is a compile time macro.
+    // LIBREGISTRY is a compile time macro. It is defined based on the output
+    // name of the callback library. And since it is stored in the same location
+    // as this library, it shares the ORIGIN variable. Do a `git grep LIBREGISTRY`
+    // to find its definition in the CMakeFiles.
     // It is the name of the library that contains the callbackCall implementation.
     // The reason why this is using dlopen is because we have historically wanted
     // to avoid a dependency of python in the runtime.
