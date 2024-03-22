@@ -20,6 +20,22 @@ import pytest
 from catalyst import cond, measure, qjit, while_loop
 
 
+class TestWireTypes:
+    """Test different forms in which wires could be specified."""
+
+    @pytest.mark.parametrize("dtype", (jnp.bool_, jnp.int8, jnp.int16, jnp.int32, jnp.int64))
+    def test_32bit_integer(self, backend, dtype):
+        """Test that wires can be a 32-bit integer."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(w):
+            qml.PauliX(0)
+            return measure(w)
+
+        assert circuit(jnp.array(0, dtype=dtype)) == 1
+
+
 class TestBasicCircuits:
     """Test gates and measurements with variable wires in basic circuits."""
 
