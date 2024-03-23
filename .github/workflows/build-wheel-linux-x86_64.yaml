@@ -43,11 +43,6 @@ jobs:
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
-    - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -141,7 +136,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML scipy
 
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
@@ -224,11 +219,6 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
-    - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -240,7 +230,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -366,12 +356,7 @@ jobs:
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
-    steps:
-    - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.9'
-    
+    steps:    
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -388,7 +373,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist scipy
 
     - name: Install PennyLane Plugins
       run: |
