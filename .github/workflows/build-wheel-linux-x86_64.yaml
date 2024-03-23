@@ -43,6 +43,11 @@ jobs:
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -219,6 +224,11 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -291,7 +301,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="18231b5" \
+              -DLIGHTNING_GIT_TAG="8fa1367" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
@@ -357,6 +367,11 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+    
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
