@@ -455,7 +455,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -505,7 +505,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -565,7 +565,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
-          python -m pip install scipy
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
