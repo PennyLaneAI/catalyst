@@ -571,6 +571,11 @@ jobs:
         run: |
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+      
+      - name: Install additional dependencies (lightning device)
+        if: ${{ matrix.backend != 'openqasm' }}
+        run: |
+          pip install scipy
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
