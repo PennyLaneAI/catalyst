@@ -26,6 +26,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+      - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
@@ -33,6 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+          python -m pip install scipy
 
       - name: Build Catalyst-Runtime
         run: |
@@ -71,6 +77,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -132,6 +143,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+    
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
@@ -200,6 +216,12 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -270,6 +292,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -278,7 +305,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11
+        python3 -m pip install numpy pybind11 scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -372,6 +399,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -445,6 +477,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -455,7 +492,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -499,13 +536,18 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        sudo apt-get install -y libomp-dev libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
@@ -558,6 +600,10 @@ jobs:
     steps:
     #   - name: Collect Workflow Telemetry
     #     uses: catchpoint/workflow-telemetry-action@v2
+      - uses: actions/setup-python@v4
+        name: Install Python
+        with:
+          python-version: '3.9'
 
       - name: Checkout the repo
         uses: actions/checkout@v3
@@ -566,6 +612,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
+          python -m pip install scipy
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
