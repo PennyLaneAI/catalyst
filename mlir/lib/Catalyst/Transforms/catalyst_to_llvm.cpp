@@ -319,7 +319,6 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
 
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
             mod, op.getCallTargetName(), {/*args=*/ptr, /*rets=*/ptr}, /*ret_type=*/voidType);
-
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
@@ -420,6 +419,56 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
+struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PythonCallOp op, PythonCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = op.getContext();
+        Location loc = op.getLoc();
+
+        // Create function
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        auto point = rewriter.saveInsertionPoint();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        Type i64 = rewriter.getI64Type();
+        // The argument convention is as follows:
+        // arg0 = identifier
+        // arg1 = length of varargs
+        // arg2..N+2 varargs pointers to memrefs
+        bool isVarArg = true;
+        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
+            mod, "pyregistry", {/*args=*/i64, i64}, /*ret_type=*/voidType, isVarArg);
+        customCallFnOp.setPrivate();
+        rewriter.restoreInsertionPoint(point);
+
+        auto identAttr = op.getIdentifier();
+        auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
+        auto argcSize = op.getInputs().size();
+        auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcSize));
+
+        SmallVector<Value> callArgs{ident};
+        callArgs.insert(callArgs.end(), argc);
+
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        for (auto memref : adaptor.getInputs()) {
+            Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+            // allocate a memref descriptor on the stack
+            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, memref.getType(), c1);
+            // store the memref descriptor on the pointer
+            rewriter.create<LLVM::StoreOp>(loc, memref, ptr);
+            // add the ptr to the arguments
+            callArgs.push_back(ptr);
+        }
+        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -437,6 +486,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
 
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
+        patterns.add<PythonCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);

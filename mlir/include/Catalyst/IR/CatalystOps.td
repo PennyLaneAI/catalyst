@@ -17,6 +17,7 @@
 #define CATALYST_OPS
 
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
 
@@ -77,7 +78,8 @@ def PrintOp : Catalyst_Op<"print"> {
     );
 }
 
-def CustomCallOp: Catalyst_Op<"custom_call"> {
+def CustomCallOp: Catalyst_Op<"custom_call",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let summary = "CustomCall operation";
   let description = [{
     Encapsulates an implementation-defined operation `call_target_name` that
@@ -98,6 +100,26 @@ def CustomCallOp: Catalyst_Op<"custom_call"> {
   let assemblyFormat = [{
     `fn` `(`$call_target_name`)` `(` $inputs `)`
       attr-dict `:` functional-type(operands, results)
+  }];
+}
+
+def PythonCallOp: Catalyst_Op<"pycallback",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = "CustomCall specialized for python callbacks.";
+
+  let description = [{
+    A custom call invokes code external to Catalyst. The `inputs` are passed to the
+    external code, and the external code is expected to produce a result of the
+    given type.
+  }];
+
+  let arguments = (ins
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
+        I64Attr: $identifier
+  );
+
+  let assemblyFormat = [{
+    `(` $inputs `)` attr-dict `:` functional-type(operands, results)
   }];
 }
 

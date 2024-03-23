@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include "Python.hpp"
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/Interfaces/InferTypeOpInterface.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-
-#include "Catalyst/IR/CatalystDialect.h"
-
-#define GET_OP_CLASSES
-#include "Catalyst/IR/CatalystOps.h.inc"
+std::mutex python_mutex;
+std::mutex &getPythonMutex() { return python_mutex; }

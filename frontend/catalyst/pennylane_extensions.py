@@ -19,9 +19,11 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
+import ctypes
+import inspect
 import numbers
 from collections.abc import Sequence, Sized
-from functools import update_wrapper
+from functools import update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -71,6 +73,7 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
+    python_callback_p,
     qmeasure_p,
     vjp_p,
     while_p,
@@ -93,6 +96,10 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.jnp_to_memref import (
+    get_ranked_memref_descriptor,
+    ranked_memref_to_numpy,
+)
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
@@ -320,6 +327,7 @@ def _check_grad_params(
     argnum: Optional[Union[int, List[int]]],
     len_flatten_args: int,
     in_tree: PyTreeDef,
+    with_value: bool = False,
 ) -> GradParams:
     """Check common gradient parameters and produce a class``GradParams`` object"""
     methods = {"fd", "auto"}
@@ -350,7 +358,9 @@ def _check_grad_params(
     argnum_selected = [argnum_unflatten[i] for i in argnum_list]
     argnum_expanded, _ = tree_flatten(argnum_selected)
     scalar_argnum = isinstance(argnum, int) or argnum is None
-    return GradParams(method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded)
+    return GradParams(
+        method, scalar_out, h, argnum_list, scalar_argnum, argnum_expanded, with_value
+    )
 
 
 def _unflatten_derivatives(results, in_tree, out_tree, grad_params, num_results):
@@ -400,6 +410,10 @@ class Grad:
         """
 
         if EvaluationContext.is_tracing():
+            assert (
+                not self.grad_params.with_value
+            ), "Tracing of value_and_grad is not implemented yet"
+
             fn = _ensure_differentiable(self.fn)
 
             args_data, in_tree = tree_flatten(args)
@@ -410,6 +424,7 @@ class Grad:
                 self.grad_params.argnum,
                 len(args_data),
                 in_tree,
+                self.grad_params.with_value,
             )
             jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
             args_argnum = tuple(args[i] for i in grad_params.argnum)
@@ -425,8 +440,14 @@ class Grad:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
             if self.grad_params.scalar_out:
-                results = jax.grad(self.fn, argnums=argnums)(*args)
+                if self.grad_params.with_value:
+                    results = jax.value_and_grad(self.fn, argnums=argnums)(*args)
+                else:
+                    results = jax.grad(self.fn, argnums=argnums)(*args)
             else:
+                assert (
+                    not self.grad_params.with_value
+                ), "value_and_grad cannot be used with a Jacobian"
                 results = jax.jacobian(self.fn, argnums=argnums)(*args)
 
         return results
@@ -560,6 +581,111 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """
     scalar_out = True
     return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+
+def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+    """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
+
+    This function allows the value and the gradient of a hybrid quantum-classical function to be
+    computed within the compiled program. Outside of a compiled function, this function will
+    simply dispatch to its JAX counterpart ``jax.value_and_grad``. The function ``f`` can return
+    any pytree-like shape.
+
+    .. warning::
+
+        Currently, higher-order differentiation is only supported by the finite-difference
+        method.
+
+    Args:
+        f (Callable): a function or a function object to differentiate
+        method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
+                      where:
+
+                      - ``"auto"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff. Catalyst supports ``"parameter-shift"`` and
+                        ``"adjoint"`` on internal QNodes. Notably, QNodes with
+                        ``diff_method="finite-diff"`` is not supported with ``"auto"``.
+
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        function.
+
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+
+    Returns:
+        Callable: A callable object that computes the value and gradient of the wrapped function
+        for the given arguments.
+
+    Raises:
+        ValueError: Invalid method or step size parameters.
+        DifferentiableCompilerError: Called on a function that doesn't return a single scalar.
+
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``value_and_grad`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
+
+    .. seealso:: :func:`~.jacobian`
+
+    **Example 1 (Classical preprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(jnp.pi * x, wires=0)
+                return qml.expval(qml.PauliY(0))
+
+            g = value_and_grad(circuit)
+            return g(x)
+
+    >>> workflow(2.0)
+    (array(0.2), array(-3.14159265))
+
+    **Example 2 (Classical preprocessing and postprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def value_and_grad_loss(theta):
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit(theta):
+                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(theta):
+                return jnp.pi / jnp.tanh(circuit(theta))
+
+            return catalyst.value_and_grad(loss, method="auto")(theta)
+
+    >>> value_and_grad_loss(1.0)
+    (array(-4.12502201), array(4.34374983))
+
+    **Example 3 (Purely classical functions)**
+
+    .. code-block:: python
+
+        def square(x: float):
+            return x ** 2
+
+        @qjit
+        def dsquare(x: float):
+            return catalyst.value_and_grad(square)(x)
+
+    >>> dsquare(2.3)
+    (array(5.29), array(4.6))
+    """
+    scalar_out = True
+    return Grad(f, GradParams(method, scalar_out, h, argnum, with_value=True))
 
 
 def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
@@ -1831,7 +1957,7 @@ def while_loop(cond_fn):
 def measure(
     wires, reset: Optional[bool] = False, postselect: Optional[int] = None
 ) -> DynamicJaxprTracer:
-    """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
+    """A :func:`qjit` compatible mid-circuit measurement on 1 qubit for PennyLane/Catalyst.
 
     .. important::
 
@@ -1839,7 +1965,7 @@ def measure(
         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
-        wires (Wires): The wire of the qubit the measurement process applies to
+        wires (int): The wire the projective measurement applies to.
         reset (Optional[bool]): Whether to reset the wire to the |0⟩ state after measurement.
         postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
@@ -1911,7 +2037,11 @@ def measure(
     ctx = EvaluationContext.get_main_tracing_context()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
-        raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+        raise TypeError(f"Only one element is supported for the 'wires' parameter, got {wires}.")
+    if isinstance(wires[0], jax.Array) and wires[0].shape not in ((), (1,)):
+        raise TypeError(
+            f"Measure is only supported on 1 qubit, got array of shape {wires[0].shape}."
+        )
 
     # Copy, so wires remain unmodified
     in_classical_tracers = wires.copy()
@@ -1920,7 +2050,6 @@ def measure(
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
     in_classical_tracers.append(postselect)
 
-    # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
@@ -2432,3 +2561,95 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
         )
 
     return batch_size
+
+
+class CallbackClosure:
+    """This is just a class containing data that is important for the callback."""
+
+    def __init__(self, *absargs, **abskwargs):
+        self.absargs = absargs
+        self.abskwargs = abskwargs
+
+    @property
+    def tree_flatten(self):
+        """Flatten args and kwargs."""
+        return tree_flatten((self.absargs, self.abskwargs))
+
+    @property
+    def low_level_sig(self):
+        """Get the memref descriptor types"""
+        flat_params, _ = self.tree_flatten
+        low_level_flat_params = []
+        for param in flat_params:
+            empty_memref_descriptor = get_ranked_memref_descriptor(param)
+            memref_type = type(empty_memref_descriptor)
+            ptr_ty = ctypes.POINTER(memref_type)
+            low_level_flat_params.append(ptr_ty)
+        return low_level_flat_params
+
+    def getArgsAsJAXArrays(self, flat_args):
+        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
+        it is best for the user if we continue with that idea and forward JAX arrays."""
+        jnpargs = []
+        for void_ptr, ty in zip(flat_args, self.low_level_sig):
+            memref_ty = ctypes.cast(void_ptr, ty)
+            nparray = ranked_memref_to_numpy(memref_ty)
+            jnparray = jnp.asarray(nparray)
+            jnpargs.append(jnparray)
+        return jnpargs
+
+
+def callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+    """
+    signature = inspect.signature(func)
+    retty = signature.return_annotation
+
+    # We just disable inconsistent return statements
+    # Since we are building this feature step by step.
+    @wraps(func)
+    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
+        if not EvaluationContext.is_tracing():
+            # If we are not in the tracing context, just evaluate the function.
+            return func(*args, **kwargs)
+
+        callback_implementation(func, retty, *args, **kwargs)
+
+    return bind_callback
+
+
+def callback_implementation(
+    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
+):
+    """
+    This function has been modified from its original form in the JAX project at
+    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2022 The JAX Authors.
+    """
+
+    flat_args, in_tree = tree_flatten((args, kwargs))
+    metadata = CallbackClosure(args, kwargs)
+
+    def _flat_callback(flat_args):
+        """Each flat_arg is a pointer.
+
+        It is a pointer to a memref object.
+        To find out which element type it has, we use the signature obtained previously.
+        """
+        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
+
+        args, kwargs = tree_unflatten(in_tree, jnpargs)
+        return tree_leaves(cb(*args, **kwargs))
+
+    # TODO(@erick-xanadu): Change back once we support return values.
+    # I am leaving this as a to-do because otherwise the coverage will complain.
+    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
+    results_aval = []
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+    out_flat = python_callback_p.bind(
+        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
+    )
+    return tree_unflatten(out_tree, out_flat)

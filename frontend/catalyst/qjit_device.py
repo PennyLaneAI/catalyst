@@ -13,16 +13,18 @@
 # limitations under the License.
 """This module contains the qjit device classes.
 """
+from functools import partial
 from typing import Optional, Set
 
 import pennylane as qml
+from pennylane.devices.preprocess import decompose
 from pennylane.measurements import MidMeasureMP
 
+from catalyst.preprocess import catalyst_acceptance, decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
     BackendInfo,
-    deduce_native_controlled_gates,
     get_pennylane_observables,
     get_pennylane_operations,
 )
@@ -33,62 +35,83 @@ from catalyst.utils.toml import (
 )
 
 RUNTIME_OPERATIONS = {
-    "Identity",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "Hadamard",
-    "S",
-    "T",
-    "PhaseShift",
-    "RX",
-    "RY",
-    "RZ",
-    "Rot",
     "CNOT",
-    "CY",
-    "CZ",
-    "SWAP",
-    "IsingXX",
-    "IsingYY",
-    "IsingXY",
     "ControlledPhaseShift",
+    "CRot",
     "CRX",
     "CRY",
     "CRZ",
-    "CRot",
     "CSWAP",
-    "Toffoli",
-    "MultiRZ",
-    "QubitUnitary",
+    "CY",
+    "CZ",
+    "Hadamard",
+    "Identity",
+    "IsingXX",
+    "IsingXY",
+    "IsingYY",
     "ISWAP",
+    "MultiRZ",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "PhaseShift",
     "PSWAP",
+    "QubitUnitary",
+    "Rot",
+    "RX",
+    "RY",
+    "RZ",
+    "S",
+    "SWAP",
+    "T",
+    "Toffoli",
     "GlobalPhase",
+    "C(GlobalPhase)",
+    "C(Hadamard)",
+    "C(IsingXX)",
+    "C(IsingXY)",
+    "C(IsingYY)",
+    "C(ISWAP)",
+    "C(MultiRZ)",
+    "ControlledQubitUnitary",
+    "C(PauliX)",
+    "C(PauliY)",
+    "C(PauliZ)",
+    "C(PhaseShift)",
+    "C(PSWAP)",
+    "C(Rot)",
+    "C(RX)",
+    "C(RY)",
+    "C(RZ)",
+    "C(S)",
+    "C(SWAP)",
+    "C(T)",
 }
 
 
-def get_qjit_pennylane_operations(config: TOMLDocument, shots_present, device_name) -> Set[str]:
-    """Get set of supported operations for the QJIT device in the PennyLane format. Take the target
-    device's config into account."""
+def get_qjit_pennylane_operations(
+    config: TOMLDocument, shots_present: bool, device_name: str
+) -> Set[str]:
+    """Calculate the set of supported quantum gates for the QJIT device from the gates
+    allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
     native_gates = get_pennylane_operations(config, shots_present, device_name)
-    qir_gates = set.union(
-        QJITDeviceNewAPI.operations_supported_by_QIR_runtime,
-        deduce_native_controlled_gates(QJITDeviceNewAPI.operations_supported_by_QIR_runtime),
-    )
-    supported_gates = list(set.intersection(native_gates, qir_gates))
+    # Gates that Catalyst runtime supports
+    qir_gates = RUNTIME_OPERATIONS
+    supported_gates = set.intersection(native_gates, qir_gates)
 
-    # These are added unconditionally.
-    supported_gates += ["Cond", "WhileLoop", "ForLoop"]
+    # Control-flow gates to be lowered down to the LLVM control-flow instructions
+    supported_gates.update({"Cond", "WhileLoop", "ForLoop"})
 
+    # Optionally enable runtime-powered mid-circuit measurments
     if check_mid_circuit_measurement_flag(config):  # pragma: no branch
-        supported_gates += ["MidCircuitMeasure"]
+        supported_gates.update({"MidCircuitMeasure"})
 
+    # Optionally enable runtime-powered quantum gate adjointing (inversions)
     if check_adjoint_flag(config, shots_present):
-        supported_gates += ["Adjoint"]
+        supported_gates.update({"Adjoint"})
 
-    supported_gates += ["ControlledQubitUnitary"]
-    return set(supported_gates)
+    return supported_gates
 
 
 class QJITDevice(qml.QubitDevice):
@@ -112,8 +135,6 @@ class QJITDevice(qml.QubitDevice):
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
-
-    operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
 
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
@@ -227,8 +248,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
-    operations_supported_by_QIR_runtime = RUNTIME_OPERATIONS
-
     @staticmethod
     def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:  # pragma: no cover
         # We currently override and only set a few gates to preserve existing behaviour.
@@ -276,6 +295,15 @@ class QJITDeviceNewAPI(qml.devices.Device):
     ):
         """Device preprocessing function."""
         program, config = self.original_device.preprocess(execution_config)
+
+        convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
+        program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
+
+        ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
+        program.add_transform(
+            decompose, stopping_condition=ops_acceptance, name=self.original_device.name
+        )
+
         # TODO: Add Catalyst program verification and validation
         return program, config
 

@@ -18,9 +18,10 @@
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmDevice.hpp"
 #include "OpenQasmRunner.hpp"
+#include "Python.hpp"
 #include "RuntimeCAPI.h"
 
-Catalyst::Runtime::PythonInterpreterGuard guard{};
+PythonInterpreterGuard guard{};
 
 #include <catch2/catch.hpp>
 
@@ -456,7 +457,7 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
         "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
-    constexpr size_t n{5};
+    constexpr size_t n{2};
     constexpr size_t size{1UL << n};
     auto wires = device->AllocateQubits(n);
 
@@ -471,8 +472,8 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
     device->MatrixOperation(matrix, {wires[0]}, false);
 
     std::string toqasm = "OPENQASM 3.0;\n"
-                         "qubit[5] qubits;\n"
-                         "bit[5] bits;\n"
+                         "qubit[2] qubits;\n"
+                         "bit[2] bits;\n"
                          "x qubits[0];\n"
                          "y qubits[1];\n"
                          "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) qubits[0]\n"

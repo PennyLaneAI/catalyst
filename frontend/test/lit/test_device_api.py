@@ -17,6 +17,7 @@
 """Test for the device API.
 """
 import pathlib
+import platform
 
 import pennylane as qml
 from pennylane.devices import Device
@@ -42,8 +43,12 @@ class DummyDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lightning_lib_path = (
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_lightning" + system_extension
+        )
 
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_lightning.so"
+        return "dummy.remote", lightning_lib_path
 
     def execute(self, circuits, execution_config):
         """Execute"""
@@ -59,7 +64,7 @@ class DummyDevice(Device):
 def test_circuit():
     """Test a circuit compilation to MLIR when using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.so", "dummy.remote", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
@@ -83,7 +88,7 @@ def test_preprocess():
     """Test a circuit (with preprocessing transforms) compilation to MLIR when
     using the new device API."""
 
-    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.so", "dummy.remote", "{'shots': 2048}"]
+    # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
 
     @qjit(target="mlir")
