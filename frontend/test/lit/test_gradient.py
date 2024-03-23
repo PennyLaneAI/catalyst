@@ -129,7 +129,7 @@ def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
     def circuit(params):
         qml.CRX(params[0], wires=[0, 1])
         qml.CRX(params[0], wires=[0, 2])
-        # CHECK-NEXT: [[const:%.+]] = mhlo.constant dense<[2.{{0+}}e-01, -5.3{{0+}}e-01]
+        # CHECK-NEXT: [[const:%.+]] = stablehlo.constant dense<[2.{{0+}}e-01, -5.3{{0+}}e-01]
         h_coeffs = np.array([0.2, -0.53])
         h_obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
         return qml.expval(qml.Hamiltonian(h_coeffs, h_obs))
