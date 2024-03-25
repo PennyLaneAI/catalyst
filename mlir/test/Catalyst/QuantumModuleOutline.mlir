@@ -37,3 +37,28 @@ module {
 
   }
 }
+
+// -----
+
+module {
+
+  func.func @callee() -> () {
+    func.return
+  }
+
+  // CHECK-LABEL: @callee
+  // CHECK-LABEL: @caller
+  // CHECK-LABEL: @caller
+  // CHECK-SAME: outlined
+  func.func @caller() -> () attributes { qnode } {
+    func.call @callee() : () -> ()
+    func.return
+  }
+
+  func.func @host() {
+    func.call @caller() : () -> ()
+    func.return
+
+  }
+}
+

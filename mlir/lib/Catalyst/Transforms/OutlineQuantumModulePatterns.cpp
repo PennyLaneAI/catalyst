@@ -55,33 +55,33 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
             return failure();
 
         auto deviceMod = rewriter.create<mlir::ModuleOp>(op.getLoc());
+        SymbolTable symbolTable(deviceMod);
+        SymbolTable parentSymbolTable(parent);
+
         IRMapping map;
+        Operation *cloneOp = op->clone(map);
         {
             PatternRewriter::InsertionGuard insertGuard(rewriter);
             rewriter.setInsertionPoint(deviceMod.getBody(), deviceMod.getBody()->end());
-            Operation *cloneOp = op->clone(map);
             rewriter.insert(cloneOp);
         }
 
-        /*
-            SmallVector<Operation *, 8> symbolDefWorklist = {cloneOp};
-            while (!symbolDefWorklist.empty()) {
-              if (std::optional<SymbolTable::UseRange> symbolUses =
-                      SymbolTable::getSymbolUses(symbolDefWorklist.pop_back_val())) {
+        SmallVector<Operation *, 8> symbolDefWorklist = {cloneOp};
+        while (!symbolDefWorklist.empty()) {
+            if (std::optional<SymbolTable::UseRange> symbolUses =
+                    SymbolTable::getSymbolUses(symbolDefWorklist.pop_back_val())) {
                 for (SymbolTable::SymbolUse symbolUse : *symbolUses) {
-                  StringRef symbolName =
-                      cast<FlatSymbolRefAttr>(symbolUse.getSymbolRef()).getValue();
-                  if (symbolTable.lookup(symbolName))
-                    continue;
+                    StringRef symbolName =
+                        cast<FlatSymbolRefAttr>(symbolUse.getSymbolRef()).getValue();
+                    if (symbolTable.lookup(symbolName))
+                        continue;
 
-                  Operation *symbolDefClone =
-                      parentSymbolTable.lookup(symbolName)->clone();
-                  symbolDefWorklist.push_back(symbolDefClone);
-                  symbolTable.insert(symbolDefClone);
+                    Operation *symbolDefClone = parentSymbolTable.lookup(symbolName)->clone();
+                    symbolDefWorklist.push_back(symbolDefClone);
+                    symbolTable.insert(symbolDefClone);
                 }
-              }
             }
-        */
+        }
 
         addOutlinedAttribute(op, rewriter);
         return success();
