@@ -15,6 +15,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -47,9 +48,40 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
                                         mlir::PatternRewriter &rewriter) const override
     {
 
-        bool isValid = hasQnodeAttribute(op) && !hasOutlinedAttribute(op);
+        ModuleOp parent = op->getParentOfType<ModuleOp>();
+        ModuleOp grandparent = parent->getParentOfType<ModuleOp>();
+        bool isValid = hasQnodeAttribute(op) && !hasOutlinedAttribute(op) && !grandparent;
         if (!isValid)
             return failure();
+
+        auto deviceMod = rewriter.create<mlir::ModuleOp>(op.getLoc());
+        IRMapping map;
+        {
+            PatternRewriter::InsertionGuard insertGuard(rewriter);
+            rewriter.setInsertionPoint(deviceMod.getBody(), deviceMod.getBody()->end());
+            Operation *cloneOp = op->clone(map);
+            rewriter.insert(cloneOp);
+        }
+
+        /*
+            SmallVector<Operation *, 8> symbolDefWorklist = {cloneOp};
+            while (!symbolDefWorklist.empty()) {
+              if (std::optional<SymbolTable::UseRange> symbolUses =
+                      SymbolTable::getSymbolUses(symbolDefWorklist.pop_back_val())) {
+                for (SymbolTable::SymbolUse symbolUse : *symbolUses) {
+                  StringRef symbolName =
+                      cast<FlatSymbolRefAttr>(symbolUse.getSymbolRef()).getValue();
+                  if (symbolTable.lookup(symbolName))
+                    continue;
+
+                  Operation *symbolDefClone =
+                      parentSymbolTable.lookup(symbolName)->clone();
+                  symbolDefWorklist.push_back(symbolDefClone);
+                  symbolTable.insert(symbolDefClone);
+                }
+              }
+            }
+        */
 
         addOutlinedAttribute(op, rewriter);
         return success();

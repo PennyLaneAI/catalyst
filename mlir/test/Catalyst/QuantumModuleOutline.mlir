@@ -25,6 +25,7 @@ func.func @test() {
 module {
 
   // CHECK-LABEL: @device
+  // CHECK-LABEL: @device
   // CHECK-SAME: outlined
   func.func @device() -> () attributes { qnode } {
     func.return

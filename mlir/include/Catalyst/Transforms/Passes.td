@@ -133,6 +133,10 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
 def OutlineQuantumModulePass : Pass<"outline-quantum-module"> {
     let summary = "Outline quantum modules";
     let constructor = "catalyst::OutlineQuantumModulePass()";
+
+    let dependentDialects = [
+        "mlir::func::FuncDialect",
+    ];
 }
 
 #endif // CATALYST_PASSES
