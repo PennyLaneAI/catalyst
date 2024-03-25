@@ -144,7 +144,7 @@ def get_pennylane_operations(
 
 
 def get_pennylane_observables(
-    config: TOMLDocument, shots_present: bool, device_name: str
+    config: TOMLDocument, shots_present: bool, _device_name: str
 ) -> Set[str]:
     """Get observables in PennyLane format. Apply ad-hoc patching"""
 
