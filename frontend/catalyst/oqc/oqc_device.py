@@ -15,7 +15,6 @@
 """This module contains the OQC device."""
 
 import os
-import pathlib
 
 from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
 from pennylane.transforms.core import TransformProgram
@@ -36,7 +35,7 @@ class OQCDevice(Device):
     """The OQC device allows to access the hardware devices from OQC using
     Catalyst."""
 
-    config = pathlib.Path(__file__).parent.joinpath("oqc.toml")
+    config = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/backend" + "/oqc.toml"
 
     @staticmethod
     def get_c_interface():
@@ -45,7 +44,7 @@ class OQCDevice(Device):
         """
 
         # TODO: Replace with the oqc shared library
-        return "oqc", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "oqc", get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc.so"
 
     def __init__(self, wires, backend, shots=1024, **kwargs):
         self._backend = backend
