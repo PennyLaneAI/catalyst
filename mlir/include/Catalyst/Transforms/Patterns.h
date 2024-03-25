@@ -28,5 +28,6 @@ void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
 void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
+void populateOutlineQuantumModulePatterns(mlir::RewritePatternSet &);
 
 } // namespace catalyst

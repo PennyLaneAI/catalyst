@@ -130,4 +130,9 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let constructor = "catalyst::GEPInboundsPass()";
 }
 
+def OutlineQuantumModulePass : Pass<"outline-quantum-module"> {
+    let summary = "Outline quantum modules";
+    let constructor = "catalyst::OutlineQuantumModulePass()";
+}
+
 #endif // CATALYST_PASSES
