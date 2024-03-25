@@ -384,6 +384,7 @@ class JAX_QJIT:
         # Optimization: Do not compute Jacobians for arguments which do not participate in
         #               differentiation.
         argnums = []
+        tangents, _ = tree_flatten(tangents)
         for idx, tangent in enumerate(tangents):
             if not isinstance(tangent, jax.custom_derivatives.SymbolicZero):
                 argnums.append(idx)
