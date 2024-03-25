@@ -20,6 +20,9 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
+
+
 
 include "Catalyst/IR/CatalystDialect.td"
 
@@ -122,5 +125,22 @@ def PythonCallOp: Catalyst_Op<"pycallback",
     `(` $inputs `)` attr-dict `:` functional-type(operands, results)
   }];
 }
+
+def DeviceModuleOp: Catalyst_Op<"module", [SymbolTable, Symbol, SingleBlockImplicitTerminator<"DeviceModuleEndOp">]> {
+  let regions = (region SizedRegion<1>:$bodyRegion);
+}
+
+
+def DeviceModuleEndOp : Catalyst_Op<"module_end", [
+  Terminator, HasParent<"DeviceModuleOp">
+]> {
+  let summary = "A pseudo op that marks the end of a catalyst.module.";
+  let description = [{
+    This op terminates the only block inside the only region of a `catalyst.module`.
+  }];
+
+  let assemblyFormat = "attr-dict";
+}
+
 
 #endif // GRADIENT_OPS
