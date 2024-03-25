@@ -113,13 +113,17 @@ extern "C" {
 
 using namespace Catalyst::Runtime;
 
-void pyregistry(int64_t identifier)
+void pyregistry(int64_t identifier, int64_t argc, ...)
+
 {
     // We need to guard calls to callback.
     // These are implemented in Python.
     std::lock_guard<std::mutex> lock(getPythonMutex());
 
-    // LIBREGISTRY is a compile time macro.
+    // LIBREGISTRY is a compile time macro. It is defined based on the output
+    // name of the callback library. And since it is stored in the same location
+    // as this library, it shares the ORIGIN variable. Do a `git grep LIBREGISTRY`
+    // to find its definition in the CMakeFiles.
     // It is the name of the library that contains the callbackCall implementation.
     // The reason why this is using dlopen is because we have historically wanted
     // to avoid a dependency of python in the runtime.
@@ -130,24 +134,24 @@ void pyregistry(int64_t identifier)
     //
     // This function cannot be tested from the runtime tests because there would be no valid python
     // function to callback...
-
-    std::string libpath = LIBREGISTRY;
-
-    void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
+    void *handle = dlopen(LIBREGISTRY, RTLD_LAZY);
     if (!handle) {
         char *err_msg = dlerror();
         RT_FAIL(err_msg);
     }
 
-    void (*callbackCall)(uintptr_t);
-    typedef void (*func_ptr_t)(uintptr_t);
+    void (*callbackCall)(int64_t, int64_t, va_list);
+    typedef void (*func_ptr_t)(int64_t, int64_t, va_list);
     callbackCall = (func_ptr_t)dlsym(handle, "callbackCall");
     if (!callbackCall) {
         char *err_msg = dlerror();
         RT_FAIL(err_msg);
     }
 
-    callbackCall(identifier);
+    va_list args;
+    va_start(args, argc);
+    callbackCall(identifier, argc, args);
+    va_end(args);
     dlclose(handle);
 }
 
