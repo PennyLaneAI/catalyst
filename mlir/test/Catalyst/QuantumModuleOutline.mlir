@@ -18,3 +18,21 @@
 func.func @test() {
   func.return
 }
+
+
+// -----
+
+module {
+
+  // CHECK-LABEL: @device
+  // CHECK-SAME: outlined
+  func.func @device() -> () attributes { qnode } {
+    func.return
+  }
+
+  func.func @host() {
+    func.call @device() : () -> ()
+    func.return
+
+  }
+}

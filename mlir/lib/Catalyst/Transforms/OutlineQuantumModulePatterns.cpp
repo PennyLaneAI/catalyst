@@ -21,6 +21,24 @@
 using namespace mlir;
 using namespace catalyst;
 
+bool hasQnodeAttribute(func::FuncOp funcOp)
+{
+    static constexpr llvm::StringRef qnodeAttr = "qnode";
+    return funcOp->hasAttr(qnodeAttr);
+}
+
+bool hasOutlinedAttribute(func::FuncOp funcOp)
+{
+    static constexpr llvm::StringRef qnodeAttr = "outlined";
+    return funcOp->hasAttr(qnodeAttr);
+}
+
+void addOutlinedAttribute(func::FuncOp funcOp, PatternRewriter &rewriter)
+{
+    static constexpr llvm::StringRef qnodeAttr = "outlined";
+    rewriter.updateRootInPlace(funcOp, [&] { funcOp->setAttr(qnodeAttr, rewriter.getUnitAttr()); });
+}
+
 namespace {
 struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::FuncOp> {
     using mlir::OpRewritePattern<func::FuncOp>::OpRewritePattern;
@@ -28,7 +46,13 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
     mlir::LogicalResult matchAndRewrite(func::FuncOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        return failure();
+
+        bool isValid = hasQnodeAttribute(op) && !hasOutlinedAttribute(op);
+        if (!isValid)
+            return failure();
+
+        addOutlinedAttribute(op, rewriter);
+        return success();
     }
 };
 
