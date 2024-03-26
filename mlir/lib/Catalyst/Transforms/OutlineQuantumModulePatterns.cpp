@@ -72,6 +72,7 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
         }
 
         SmallVector<Operation *, 8> symbolDefWorklist = {cloneOp};
+        rewriter.eraseOp(op);
         while (!symbolDefWorklist.empty()) {
             if (std::optional<SymbolTable::UseRange> symbolUses =
                     SymbolTable::getSymbolUses(symbolDefWorklist.pop_back_val())) {
@@ -81,9 +82,11 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
                     if (symbolTable.lookup(symbolName))
                         continue;
 
-                    Operation *symbolDefClone = parentSymbolTable.lookup(symbolName)->clone();
+                    auto originalOp = parentSymbolTable.lookup(symbolName);
+                    Operation *symbolDefClone = originalOp->clone();
                     symbolDefWorklist.push_back(symbolDefClone);
                     symbolTable.insert(symbolDefClone);
+                    rewriter.eraseOp(originalOp);
                 }
             }
         }
@@ -92,6 +95,7 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
             rewriter.create<DeviceExecuteOp>(op.getLoc(), callOp.getResultTypes(),
                                              deviceMod.getSymName().value(), SmallVector<Value>());
         rewriter.replaceOp(callOp, exec);
+
         return success();
     }
 };
