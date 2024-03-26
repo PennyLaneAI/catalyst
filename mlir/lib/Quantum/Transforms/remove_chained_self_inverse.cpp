@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "adjoint"
+#define DEBUG_TYPE "chained-self-inverse"
 
 #include <memory>
 #include <vector>
@@ -47,16 +47,16 @@ namespace quantum {
 #define GEN_PASS_DEF_QUANTUMCANONICALIZE
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct QuantumCanonicalizePass : impl::QuantumCanonicalizePassBase<QuantumCanonicalizePass> {
-    using QuantumCanonicalizePassBase::QuantumCanonicalizePassBase;
+struct RemoveChainedSelfInversePass : impl::RemoveChainedSelfInversePassBase<RemoveChainedSelfInversePass> {
+    using RemoveChainedSelfInversePassBase::RemoveChainedSelfInversePassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "quantum canonicalize pass"
+        LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
                           << "\n");
 
         RewritePatternSet patterns(&getContext());
-        populateHadamardCanonicalizationPatterns(patterns);
+        populateChainedHadamardPatterns(patterns);
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
@@ -65,9 +65,9 @@ struct QuantumCanonicalizePass : impl::QuantumCanonicalizePassBase<QuantumCanoni
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createQuantumCanonicalizePass()
+std::unique_ptr<Pass> createRemoveChainedSelfInversePass()
 {
-    return std::make_unique<quantum::QuantumCanonicalizePass>();
+    return std::make_unique<quantum::RemoveChainedSelfInversePass>();
 }
 
 } // namespace catalyst

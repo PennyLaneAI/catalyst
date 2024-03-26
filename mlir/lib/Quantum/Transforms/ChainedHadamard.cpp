@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "adjoint"
+#define DEBUG_TYPE "chained-hadamard"
 
 #include <algorithm>
 #include <iterator>
@@ -46,15 +46,15 @@ using namespace catalyst::quantum;
 
 namespace {
 
-struct CanonicalizeHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
+struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp> {
     using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
 
-    /// We check if the operation and it's parent is a hadamard operation. If so, replace op
+    /// We check if the operation and it's parent are hadamard operations. If so, replace op
     /// with it's "grandparent".
     mlir::LogicalResult matchAndRewrite(CustomOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        LLVM_DEBUG(dbgs() << "Canonicalizing the following hadamard operation:\n" << op << "\n");
+        LLVM_DEBUG(dbgs() << "Simplifying the following hadamard operation:\n" << op << "\n");
         if (op.getGateName().str() != "Hadamard")
             return failure();
 
@@ -79,9 +79,9 @@ struct CanonicalizeHadamardOpRewritePattern : public mlir::OpRewritePattern<Cust
 namespace catalyst {
 namespace quantum {
 
-void populateHadamardCanonicalizationPatterns(RewritePatternSet &patterns)
+void populateChainedHadamardPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<CanonicalizeHadamardOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<ChainedHadamardOpRewritePattern>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
