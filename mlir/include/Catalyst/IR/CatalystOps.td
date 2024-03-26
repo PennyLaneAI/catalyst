@@ -142,6 +142,14 @@ def DeviceModuleEndOp : Catalyst_Op<"module_end", [
   let assemblyFormat = "attr-dict";
 }
 
+def DevicePayloadOp : Catalyst_Op<"payload", []> {
+  let summary = "Data sent to remote device.";
+
+  let arguments = (ins
+      SignlessIntElementsAttr<8>: $data
+  );
+}
+
 def DeviceExecuteOp : Catalyst_Op<"exec", []> {
   let summary = "Lowering to execute a module in a device.";
 
