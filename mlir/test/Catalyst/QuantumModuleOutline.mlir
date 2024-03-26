@@ -24,9 +24,8 @@ func.func @test() {
 
 module {
 
+  // CHECK-LABEL: module @payload.device
   // CHECK-LABEL: @device
-  // CHECK-LABEL: @device
-  // CHECK-SAME: outlined
   func.func @device() -> () attributes { qnode } {
     func.return
   }
@@ -46,10 +45,9 @@ module {
     func.return
   }
 
+  // CHECK-LABEL: module @payload.caller
+  // CHECK-LABEL: @caller
   // CHECK-LABEL: @callee
-  // CHECK-LABEL: @caller
-  // CHECK-LABEL: @caller
-  // CHECK-SAME: outlined
   func.func @caller() -> () attributes { qnode } {
     func.call @callee() : () -> ()
     func.return
