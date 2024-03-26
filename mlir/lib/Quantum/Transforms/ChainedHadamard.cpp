@@ -59,7 +59,7 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
 
         ValueRange qbs = op.getInQubits();
         Operation *parent = qbs[0].getDefiningOp();
-        CustomOp *parentHadamard = dyn_cast<CustomOp*>(parent);
+        CustomOp *parentHadamard = dyn_cast<CustomOp *>(parent);
 
         if (parentHadamard == nullptr)
             return failure();
