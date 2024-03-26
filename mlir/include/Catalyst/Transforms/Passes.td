@@ -140,4 +140,9 @@ def OutlineQuantumModulePass : Pass<"outline-quantum-module"> {
     ];
 }
 
+def LowerQuantumModuleToPayloadPass : Pass<"lower-quantum-module"> {
+    let summary = "Lower quantum module";
+    let constructor = "catalyst::LowerQuantumModuleToPayloadPass()";
+}
+
 #endif // CATALYST_PASSES

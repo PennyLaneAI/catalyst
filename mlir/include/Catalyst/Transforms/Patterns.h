@@ -29,5 +29,6 @@ void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
 void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
 void populateOutlineQuantumModulePatterns(mlir::RewritePatternSet &);
+void populateLowerQuantumModuleToPayloadPatterns(mlir::RewritePatternSet &);
 
 } // namespace catalyst

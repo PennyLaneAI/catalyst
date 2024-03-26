@@ -18,6 +18,8 @@ file(GLOB SRC
     GEPInboundsPass.cpp
     OutlineQuantumModulePass.cpp
     OutlineQuantumModulePatterns.cpp
+    LowerQuantumModuleToPayloadPass.cpp
+    LowerQuantumModuleToPayloadPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
