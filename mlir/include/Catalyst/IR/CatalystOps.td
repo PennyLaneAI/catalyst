@@ -146,9 +146,15 @@ def DeviceExecuteOp : Catalyst_Op<"exec", []> {
   let summary = "Lowering to execute a module in a device.";
 
   let arguments = (ins
-        SymbolNameAttr:$module,
+        FlatSymbolRefAttr:$module,
         Variadic<AnyType>:$inputs
   );
+
+  let results = (outs Variadic<AnyType>);
+
+  let assemblyFormat = [{
+    `(` $inputs `)` attr-dict `:` functional-type(operands, results)
+  }];
 }
 
 

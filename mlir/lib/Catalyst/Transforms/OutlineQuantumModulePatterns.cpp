@@ -28,34 +28,38 @@ bool hasQnodeAttribute(func::FuncOp funcOp)
     return funcOp->hasAttr(qnodeAttr);
 }
 
-bool hasOutlinedAttribute(func::FuncOp funcOp)
+bool hasOutlinedAttribute(func::CallOp op)
 {
-    static constexpr llvm::StringRef qnodeAttr = "outlined";
-    return funcOp->hasAttr(qnodeAttr);
+    static constexpr llvm::StringRef payload = "payload";
+    return op->hasAttr(payload);
 }
 
-void addOutlinedAttribute(func::FuncOp funcOp, PatternRewriter &rewriter)
+void addOutlinedAttribute(func::CallOp op, ModuleOp module, PatternRewriter &rewriter)
 {
-    static constexpr llvm::StringRef qnodeAttr = "outlined";
-    rewriter.updateRootInPlace(funcOp, [&] { funcOp->setAttr(qnodeAttr, rewriter.getUnitAttr()); });
+    auto payload = rewriter.getStringAttr("payload");
+    auto symRefAttr = FlatSymbolRefAttr::get(rewriter.getStringAttr(module.getSymName().value()));
+    auto namedAttribute = NamedAttribute(payload, symRefAttr);
+    rewriter.updateRootInPlace(op, [&] { op->setAttrs({namedAttribute}); });
 }
 
 namespace {
-struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::FuncOp> {
-    using mlir::OpRewritePattern<func::FuncOp>::OpRewritePattern;
+struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::CallOp> {
+    using mlir::OpRewritePattern<func::CallOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(func::FuncOp op,
+    mlir::LogicalResult matchAndRewrite(func::CallOp callOp,
                                         mlir::PatternRewriter &rewriter) const override
     {
 
+        auto callee = callOp.getCalleeAttr();
+        auto op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callee);
         ModuleOp parent = op->getParentOfType<ModuleOp>();
         ModuleOp grandparent = parent->getParentOfType<ModuleOp>();
-        bool isValid = hasQnodeAttribute(op) && !hasOutlinedAttribute(op) && !grandparent;
+        bool isValid = hasQnodeAttribute(op) && !hasOutlinedAttribute(callOp) && !grandparent;
         if (!isValid)
             return failure();
 
         SymbolTable parentSymbolTable(parent);
-        auto newName = std::string("catalyst.module") + std::string(op.getSymName().data());
+        auto newName = std::string("payload.") + std::string(op.getSymName().data());
         auto deviceMod = rewriter.create<mlir::ModuleOp>(op.getLoc(), newName);
         SymbolTable symbolTable(deviceMod);
 
@@ -84,9 +88,10 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
             }
         }
 
-        auto exec = rewriter.create<DeviceExecuteOp>(op.getLoc(), deviceMod.getSymName().value(),
-                                                     SmallVector<Value>());
-        addOutlinedAttribute(op, rewriter);
+        auto exec =
+            rewriter.create<DeviceExecuteOp>(op.getLoc(), callOp.getResultTypes(),
+                                             deviceMod.getSymName().value(), SmallVector<Value>());
+        rewriter.replaceOp(callOp, exec);
         return success();
     }
 };
