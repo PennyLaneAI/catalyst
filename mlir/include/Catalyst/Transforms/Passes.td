@@ -136,6 +136,7 @@ def OutlineQuantumModulePass : Pass<"outline-quantum-module"> {
 
     let dependentDialects = [
         "mlir::func::FuncDialect",
+        "catalyst::CatalystDialect",
     ];
 }
 

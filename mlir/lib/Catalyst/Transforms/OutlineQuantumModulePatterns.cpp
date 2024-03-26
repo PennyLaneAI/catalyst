@@ -54,9 +54,10 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
         if (!isValid)
             return failure();
 
-        auto deviceMod = rewriter.create<mlir::ModuleOp>(op.getLoc());
-        SymbolTable symbolTable(deviceMod);
         SymbolTable parentSymbolTable(parent);
+        auto newName = std::string("catalyst.module") + std::string(op.getSymName().data());
+        auto deviceMod = rewriter.create<mlir::ModuleOp>(op.getLoc(), newName);
+        SymbolTable symbolTable(deviceMod);
 
         IRMapping map;
         Operation *cloneOp = op->clone(map);
@@ -83,6 +84,8 @@ struct OutlineQuantumModuleRewritePattern : public mlir::OpRewritePattern<func::
             }
         }
 
+        auto exec = rewriter.create<DeviceExecuteOp>(op.getLoc(), deviceMod.getSymName().value(),
+                                                     SmallVector<Value>());
         addOutlinedAttribute(op, rewriter);
         return success();
     }
