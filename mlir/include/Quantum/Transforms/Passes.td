@@ -71,4 +71,15 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let constructor = "catalyst::createAdjointLoweringPass()";
 }
 
+def createQuantumCanonicalizePass : Pass<"quantum-canonicalize"> {
+    let summary = "Perform canonicalizations of quantum custom operations.";
+
+    let dependentDialects = [
+        "LLVM::LLVMDialect",
+        "catalyst::CatalystDialect",
+    ];
+
+    let constructor = "catalyst::createQuantumCanonicalizePass()";
+}
+
 #endif // QUANTUM_PASSES
