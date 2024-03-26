@@ -142,5 +142,14 @@ def DeviceModuleEndOp : Catalyst_Op<"module_end", [
   let assemblyFormat = "attr-dict";
 }
 
+def DeviceExecute : Catalyst_Op<"exec", []> {
+  let summary = "Lowering to execute a module in a device.";
+
+  let arguments = (ins
+        SymbolNameAttr: $moduleName,
+        Variadic<AnyType>:$inputs
+  );
+}
+
 
 #endif // GRADIENT_OPS
