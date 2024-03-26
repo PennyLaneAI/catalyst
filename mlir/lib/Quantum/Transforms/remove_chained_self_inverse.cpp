@@ -47,7 +47,8 @@ namespace quantum {
 #define GEN_PASS_DEF_QUANTUMCANONICALIZE
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct RemoveChainedSelfInversePass : impl::RemoveChainedSelfInversePassBase<RemoveChainedSelfInversePass> {
+struct RemoveChainedSelfInversePass
+    : impl::RemoveChainedSelfInversePassBase<RemoveChainedSelfInversePass> {
     using RemoveChainedSelfInversePassBase::RemoveChainedSelfInversePassBase;
 
     void runOnOperation() final

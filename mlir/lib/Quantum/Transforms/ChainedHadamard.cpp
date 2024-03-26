@@ -51,8 +51,7 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
 
     /// We check if the operation and it's parent are hadamard operations. If so, replace op
     /// with it's "grandparent".
-    mlir::LogicalResult matchAndRewrite(CustomOp op,
-                                        mlir::PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Simplifying the following hadamard operation:\n" << op << "\n");
         if (op.getGateName().str() != "Hadamard")
@@ -61,13 +60,13 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
         ValueRange qbs = op.getInQubits();
         Operation *parent = qbs[0].getDefiningOp();
         auto *parentHadamard = dyn_cast<CustomOp>(parent);
-        
+
         if (parentHadamard == nullptr)
             return failure();
-        
+
         if (parentHadamard->getGateName().str() != "Hadamard")
             return failure();
-        
+
         Value simplifiedVal = parentHadamard->getInQubits()[0];
         rewriter.replaceOp(op, simplifiedVal);
         return success();
