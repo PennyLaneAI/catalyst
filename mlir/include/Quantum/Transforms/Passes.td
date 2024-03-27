@@ -74,11 +74,6 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
 def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 
-    let dependentDialects = [
-        "LLVM::LLVMDialect",
-        "catalyst::CatalystDialect",
-    ];
-
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
 }
 

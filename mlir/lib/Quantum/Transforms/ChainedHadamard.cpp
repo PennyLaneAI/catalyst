@@ -14,30 +14,12 @@
 
 #define DEBUG_TYPE "chained-hadamard"
 
-#include <algorithm>
-#include <iterator>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mlir/Dialect/Complex/IR/Complex.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/Verifier.h"
-#include "mlir/Transforms/DialectConversion.h"
-
 #include "Catalyst/IR/CatalystOps.h"
-#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "Quantum/Utils/QuantumSplitting.h"
 
 using llvm::dbgs;
 using namespace mlir;
@@ -77,7 +59,7 @@ struct ChainedHadamardOpRewritePattern : public mlir::OpRewritePattern<CustomOp>
 namespace catalyst {
 namespace quantum {
 
-void populateChainedHadamardPatterns(RewritePatternSet &patterns)
+void populateSelfInversePatterns(RewritePatternSet &patterns)
 {
     patterns.add<ChainedHadamardOpRewritePattern>(patterns.getContext(), 1);
 }
