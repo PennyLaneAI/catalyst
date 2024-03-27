@@ -219,6 +219,11 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python_version }}
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -230,7 +235,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML scipy
+        python -m pip install wheel numpy pybind11 PyYAML scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -288,8 +293,8 @@ jobs:
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
-              -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
+              -DPYTHON_EXECUTABLE=$(which python \
+              -Dpybind11_DIR=$(python -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DLIGHTNING_GIT_TAG="57be532" \
               -DKokkos_ENABLE_SERIAL=ON \
@@ -309,8 +314,8 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
-              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DPython3_EXECUTABLE=$(which python) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
@@ -356,7 +361,12 @@ jobs:
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
-    steps:    
+    steps:  
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python_version }}
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -366,27 +376,22 @@ jobs:
         name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
 
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
-
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist scipy
+        python -m pip install pytest pytest-xdist scipy
 
     - name: Install PennyLane Plugins
       run: |
-        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+        python -m pip install PennyLane-Lightning-Kokkos
+        python -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
+        python -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+        python -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
+        python -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
