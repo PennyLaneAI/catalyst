@@ -17,7 +17,7 @@
 // CHECK-LABEL: test_chained_self_inverse
 func.func @test_chained_self_inverse() -> !quantum.bit {
     // CHECK: quantum.alloc
-    // CHECK: quantum.dealloc
+    // CHECK: quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT: quantum.custom
