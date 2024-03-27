@@ -449,7 +449,8 @@ jobs:
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
-
+    
+    steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
