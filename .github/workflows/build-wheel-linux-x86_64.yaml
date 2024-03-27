@@ -293,10 +293,10 @@ jobs:
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
-              -DPYTHON_EXECUTABLE=$(which python \
+              -DPYTHON_EXECUTABLE=$(which python) \
               -Dpybind11_DIR=$(python -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="57be532" \
+              -DLIGHTNING_GIT_TAG="97830a3" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
@@ -315,7 +315,7 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python} -c "import numpy as np; print(np.get_include())") \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
