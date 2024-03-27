@@ -456,9 +456,9 @@ jobs:
     
     steps:
     - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.9'
+      name: Install Python
+      with:
+        python-version: '3.9'
 
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
