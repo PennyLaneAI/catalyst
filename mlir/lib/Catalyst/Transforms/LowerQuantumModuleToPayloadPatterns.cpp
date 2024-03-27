@@ -23,14 +23,19 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-struct LowerQuantumModuleToPayloadRewritePattern : public mlir::OpRewritePattern<func::CallOp> {
-    using mlir::OpRewritePattern<func::CallOp>::OpRewritePattern;
+struct LowerQuantumModuleToPayloadRewritePattern : public mlir::OpRewritePattern<ModuleOp> {
+    using mlir::OpRewritePattern<ModuleOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(func::CallOp callOp,
-                                        mlir::PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(ModuleOp op, mlir::PatternRewriter &rewriter) const override
     {
 
-        return failure();
+        ModuleOp parent = op->getParentOfType<ModuleOp>();
+        if (!parent)
+            return failure();
+
+        auto payloadOp = rewriter.create<DevicePayloadOp>(op.getLoc(), "Hello world!");
+        rewriter.replaceOp(op, payloadOp);
+        return success();
     }
 };
 

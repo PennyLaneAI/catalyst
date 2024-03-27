@@ -146,7 +146,7 @@ def DevicePayloadOp : Catalyst_Op<"payload", []> {
   let summary = "Data sent to remote device.";
 
   let arguments = (ins
-      SignlessIntElementsAttr<8>: $data
+      StrAttr: $data
   );
 }
 
