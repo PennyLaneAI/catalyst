@@ -142,12 +142,17 @@ def DeviceModuleEndOp : Catalyst_Op<"module_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def DevicePayloadOp : Catalyst_Op<"payload", []> {
+def DevicePayloadOp : Catalyst_Op<"payload", [Symbol]> {
   let summary = "Data sent to remote device.";
 
   let arguments = (ins
+      SymbolNameAttr: $sym_name,
       StrAttr: $data
   );
+
+  let assemblyFormat = [{
+    $sym_name attr-dict `:` functional-type(operands, results)
+  }];
 }
 
 def DeviceExecuteOp : Catalyst_Op<"exec", []> {

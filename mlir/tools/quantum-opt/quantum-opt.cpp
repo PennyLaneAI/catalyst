@@ -19,6 +19,8 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "stablehlo/dialect/Register.h"
 
@@ -49,6 +51,9 @@ int main(int argc, char **argv)
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<mlir::mhlo::MhloDialect>();
+
+    registerBuiltinDialectTranslation(registry);
+    mlir::registerLLVMDialectTranslation(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

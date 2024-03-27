@@ -14,12 +14,20 @@
 
 #include "llvm/Support/Debug.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/DLTI/DLTI.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Patterns.h"
+
+#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
+#include "mlir/Pass/PassManager.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -35,11 +43,29 @@ struct LowerQuantumModuleToPayloadPass
 
     void runOnOperation() final
     {
-        RewritePatternSet patterns(&getContext());
+        std::vector<ModuleOp> submodules;
+        getOperation()->walk([&](ModuleOp op) {
+            ModuleOp parent = op->getParentOfType<ModuleOp>();
+            if (!parent)
+                return;
 
-        populateLowerQuantumModuleToPayloadPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-            return signalPassFailure();
+            submodules.push_back(op);
+        });
+
+        for (auto op : submodules) {
+            auto pm = PassManager::on<ModuleOp>(&getContext());
+            pm.addPass(createArithToLLVMConversionPass());
+            pm.addPass(createConvertFuncToLLVMPass());
+
+            if (failed(runPipeline(pm, op))) {
+                return signalPassFailure();
+            }
+
+            RewritePatternSet patterns(&getContext());
+            populateLowerQuantumModuleToPayloadPatterns(patterns);
+            if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+                return signalPassFailure();
+            }
         }
     }
 };

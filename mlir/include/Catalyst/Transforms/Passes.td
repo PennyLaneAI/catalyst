@@ -143,6 +143,12 @@ def OutlineQuantumModulePass : Pass<"outline-quantum-module"> {
 def LowerQuantumModuleToPayloadPass : Pass<"lower-quantum-module"> {
     let summary = "Lower quantum module";
     let constructor = "catalyst::LowerQuantumModuleToPayloadPass()";
+
+    let dependentDialects = [
+        "mlir::LLVM::LLVMDialect",
+        "mlir::arith::ArithDialect",
+        "mlir::DLTIDialect"
+    ];
 }
 
 #endif // CATALYST_PASSES

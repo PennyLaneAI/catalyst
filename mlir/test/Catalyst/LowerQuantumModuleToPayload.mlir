@@ -22,18 +22,13 @@ func.func @test() {
 // -----
 
 module @foo {
-  func.func public @jit_foo() -> i1 attributes {llvm.emit_c_interface} {
-    builtin.module @payload.cir {
-      func.func private @cir() -> i1 attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
-        %1 = quantum.alloc( 1) : !quantum.reg
-        %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-        %mres, %out_qubit = quantum.measure %2 : i1, !quantum.bit
-        %3 = quantum.insert %1[ 0], %out_qubit : !quantum.reg, !quantum.bit
-        quantum.dealloc %3 : !quantum.reg
-        return %mres: i1
+    module @payload {
+      func.func private @cir() {
+        func.return 
       }
     }
-    %0 = catalyst.exec() {module = @payload.cir} : () -> i1
+  func.func public @jit_foo() -> i1 attributes {llvm.emit_c_interface} {
+    %0 = catalyst.exec() {module = @payload } : () -> i1
     return %0 : i1
   }
 }
