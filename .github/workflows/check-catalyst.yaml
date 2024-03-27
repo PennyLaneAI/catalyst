@@ -378,25 +378,20 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - uses: actions/setup-python@v4
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
-        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install -r requirements.txt
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt scipy
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
-        python -m pip install cuda-quantum==0.6.0
-        python -m pip install oqc-qcaas-client
+        python3 -m pip install cuda-quantum==0.6.0
+        python3 -m pip install oqc-qcaas-client
         make frontend
 
     - name: Get Cached LLVM Build
@@ -455,12 +450,6 @@ jobs:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
-    steps:
-    - uses: actions/setup-python@v4
-      name: Install Python
-      with:
-        python-version: '3.9'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -471,9 +460,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
-        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install -r requirements.txt
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt scipy
         make frontend
 
     - name: Get Cached LLVM Build
