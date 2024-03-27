@@ -30,7 +30,6 @@ module @foo {
         %mres, %out_qubit = quantum.measure %2 : i1, !quantum.bit
         %3 = quantum.insert %1[ 0], %out_qubit : !quantum.reg, !quantum.bit
         quantum.dealloc %3 : !quantum.reg
-        quantum.device_release
         return %mres: i1
       }
     }
