@@ -25,3 +25,11 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
     %3 = quantum.custom "Hadamard"() %2 : !quantum.bit
     return %3 : !quantum.bit
 }
+
+// CHECK-LABEL: test_chained_self_inverse_from_block_arg
+func.func @test_chained_self_inverse_from_block_arg(%arg: !quantum.bit) -> !quantum.bit {
+    // CHECK-NOT: quantum.custom
+    %0 = quantum.custom "Hadamard"() %arg : !quantum.bit
+    %1 = quantum.custom "Hadamard"() %0 : !quantum.bit
+    return %1 : !quantum.bit
+}
