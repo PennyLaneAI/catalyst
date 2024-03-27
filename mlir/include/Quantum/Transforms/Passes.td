@@ -71,4 +71,10 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let constructor = "catalyst::createAdjointLoweringPass()";
 }
 
+def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
+    let summary = "Perform removal of chained operations that are self inverses.";
+
+    let constructor = "catalyst::createRemoveChainedSelfInversePass()";
+}
+
 #endif // QUANTUM_PASSES
