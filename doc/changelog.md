@@ -666,7 +666,8 @@ Haochen Paul Wang.
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
-David Ittah.
+David Ittah,
+Shuli Shu.
 
 # Release 0.4.0
 

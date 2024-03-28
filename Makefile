@@ -205,6 +205,7 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
+	$(ASAN_COMMAND) $(PYTHON) -m pip install scipy
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/test/pytest $(PARALLELIZE) --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 	$(ASAN_COMMAND) $(PYTHON) -m pytest frontend/catalyst/oqc/test/ $(PARALLELIZE) --cov=catalyst --cov-append --tb=native --cov-report=$(COVERAGE_REPORT)
 ifeq ($(TEST_BRAKET), NONE)

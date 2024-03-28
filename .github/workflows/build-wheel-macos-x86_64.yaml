@@ -199,7 +199,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja delocate
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja delocate scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -260,7 +260,7 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG="v0.35.0" \
+              -DLIGHTNING_GIT_TAG="a0db3f0" \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=OFF \
@@ -352,7 +352,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist scipy
 
     - name: Install PennyLane Plugins
       run: |
