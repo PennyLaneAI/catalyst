@@ -267,6 +267,8 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
         device_gates = set.union(set(device.operations), set(device.observables))
+        if "MidMeasureMP" in device_gates:
+            device_gates.remove("MidMeasureMP")
         device_gates = filter_out_adjoint(device_gates)
         spec_gates = set.union(native, observables, matrix, decomposable)
         spec_gates = filter_out_adjoint(spec_gates)
