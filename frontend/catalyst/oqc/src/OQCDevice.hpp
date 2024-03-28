@@ -14,8 +14,6 @@
 
 #pragma once
 
-#define __device_oqc
-
 #include <algorithm>
 #include <bitset>
 #include <memory>
