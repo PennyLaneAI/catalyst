@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-quantum-module --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --outline-quantum-module --lower-quantum-module --split-input-file --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: test
 func.func @test() {
@@ -21,14 +21,14 @@ func.func @test() {
 
 // -----
 
-module @foo {
-    module @payload {
-      func.func private @cir() {
-        func.return 
-      }
-    }
-  func.func public @jit_foo() -> i1 attributes {llvm.emit_c_interface} {
-    %0 = catalyst.exec() {module = @payload } : () -> i1
-    return %0 : i1
+module {
+  func.func @cir(%arg0 : i64) -> i64 attributes { qnode } {
+    %0 = arith.constant 1 : i64
+    %1 = arith.addi %arg0, %0 : i64
+    func.return %1 : i64
+  }
+  func.func @jit_foo(%arg0 : i64) -> i64 attributes {llvm.emit_c_interface} {
+    %0 = func.call @cir(%arg0) : (i64) -> i64
+    return %0 : i64
   }
 }
