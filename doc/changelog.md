@@ -26,8 +26,31 @@
   123
   ```
 
-* The python layer of the OQC-Catalyst device is now available.
+* The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
+  [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+
+  ```py
+  from catalyst.oqc import OQCDevice
+
+  import os
+
+  os.environ["OQC_EMAIL"] = "your_email"
+  os.environ["OQC_PASSWORD"] = "your_password"
+  os.environ["OQC_URL"] = "oqc_url"
+
+  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+
+  @catalyst.qjit
+  @qml.qnode(device=device)
+  def circuit(a: float):
+      qml.Hadamard(0)
+      qml.CNOT(wires=[0, 1])
+      qml.RX(wires=0)
+      return qml.counts(wires=[0, 1])
+
+  print(circuit(0.2))
+  ```
 
 * Catalyst publishes Git revision string seen at the time of the packaging as
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
@@ -89,6 +112,9 @@
 
   After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
+* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded. 
+  [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -121,7 +147,8 @@ Ali Asadi,
 David Ittah,
 Romain Moyard,
 Sergei Mironov,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Muzammiluddin Syed.
 
 # Release 0.5.0
 
