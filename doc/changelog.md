@@ -7,7 +7,7 @@
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
 
-  Catalyst now supports callbacks with parameters return values.
+  Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
 
   ```py
