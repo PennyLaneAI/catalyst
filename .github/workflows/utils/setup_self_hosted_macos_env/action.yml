@@ -51,7 +51,7 @@ runs:
     - name: Add additional binaries to PATH
       shell: bash
       run: |
-        additional_paths=("/opt/homebrew/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
+        additional_paths=("$HOME/.pyenv/shims" "$HOME/.cargo/bin")
         for _path in ${additional_paths[@]};
         do
           [[ ":$PATH:" != *":$_path:"* ]] && echo "$_path" >> $GITHUB_PATH
