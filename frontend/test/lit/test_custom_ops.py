@@ -14,14 +14,13 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+from pathlib import Path
+
 import pennylane as qml
 from pennylane.operation import Operation
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
-
-# This is used just for internal testing
-from catalyst.pennylane_extensions import qfunc
 
 
 class RXX(Operation):
@@ -39,6 +38,10 @@ class RXX(Operation):
 
 lightning = qml.device("lightning.qubit", wires=3)
 
+operations = lightning.operations.copy()
+operations.add("RXX")
+operations.add("C(RXX)")
+
 
 class CustomDeviceWithoutSupport(qml.QubitDevice):
     name = "Device without support for RXX gate."
@@ -47,8 +50,11 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     version = "0.0.1"
     author = "CV quantum"
 
-    operations = lightning.operations.copy()
+    operations = operations
     observables = lightning.observables.copy()
+
+    # This `config` is used in Catalyst-Frontend
+    config = Path(__file__).parent / "without_rxx.toml"
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -66,16 +72,20 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     @staticmethod
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
-        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "dummy", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
-operations = lightning.operations.copy()
-operations.add("RXX")
+operations2 = lightning.operations.copy()
+operations2.add("RXX")
+operations2.add("C(RXX)")
 
 
 class CustomDeviceWithSupport(CustomDeviceWithoutSupport):
-    operations = operations
+    operations = operations2
     observables = lightning.observables.copy()
+
+    # This `config` is used in Catalyst-Frontend
+    config = Path(__file__).parent / "rxx.toml"
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
@@ -92,7 +102,7 @@ devRXX = CustomDeviceWithSupport(wires=2)
 
 def compile_circuit_with_device(device):
     @qjit(target="mlir")
-    @qfunc(device=device)
+    @qml.qnode(device)
     def f(x: float):
         RXX(x, wires=[0, 1])
         return measure(wires=0)
