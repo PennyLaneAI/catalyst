@@ -247,7 +247,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
             )
 
         # For observables, we do not have `non-native` section in the config, so we check that
-        # device data superseeds the specification.
+        # device data supercedes the specification.
         device_observables = set(device.observables)
         spec_observables = get_pennylane_observables(config, shots_present, device_name)
         if (spec_observables - device_observables) != set():
