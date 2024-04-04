@@ -26,11 +26,6 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-      - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.10'
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
@@ -38,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
-          python -m pip install scipy
+          python3 -m pip install scipy
 
       - name: Build Catalyst-Runtime
         run: |
@@ -408,7 +403,7 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        /opt/hostedtoolcache/Python/3.10.14/x64/bin/python -m pip install scipy --force-reinstall
+        # /opt/hostedtoolcache/Python/3.10.14/x64/bin/python -m pip install scipy --force-reinstall
         make frontend
 
     - name: Get Cached LLVM Build
@@ -467,12 +462,6 @@ jobs:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
     
-    steps:
-    - uses: actions/setup-python@v4
-      name: Install Python
-      with:
-        python-version: '3.10'
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -483,8 +472,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y libomp-dev libasan6 make
-        python -m pip install -r requirements.txt scipy
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
         make frontend
 
     - name: Get Cached LLVM Build
@@ -533,8 +523,8 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install -r requirements.txt
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
         make frontend
 
     - name: Get Cached LLVM Build
@@ -583,10 +573,6 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-      - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.10'
     #   - name: Collect Workflow Telemetry
     #     uses: catchpoint/workflow-telemetry-action@v2
       - name: Checkout the repo
@@ -602,11 +588,6 @@ jobs:
         run: |
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
-      
-      - name: Install additional dependencies (lightning device)
-        if: ${{ matrix.backend != 'openqasm' }}
-        run: |
-          pip install scipy
 
       - name: Download Catalyst-Runtime Artifact
         uses: actions/download-artifact@v3
@@ -669,11 +650,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/setup-python@v4
-        name: Install Python
-        with:
-          python-version: '3.10'
-
       - name: Checkout the repo
         uses: actions/checkout@v3
 
@@ -681,7 +657,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-          python -m pip install scipy
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
