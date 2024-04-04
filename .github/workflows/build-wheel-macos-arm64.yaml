@@ -309,6 +309,13 @@ jobs:
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
+  
+    # Build OQC-Runtime
+    - name: Build OQC-Runtime
+      run: |
+          OQC_BUILD_DIR="$(pwd)/oqc-build" \
+          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          make oqc
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -338,6 +345,7 @@ jobs:
         MHLO_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build \
         DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
         RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+        OQC_BUILD_DIR=$GITHUB_WORKSPACE/oqc-build \
         ENZYME_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build \
         make wheel
 
@@ -389,6 +397,11 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+    
+    - name: Install OQC client
+      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}} 
+      run: |
+        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
     - name: Install Catalyst
       run: |
@@ -400,3 +413,4 @@ jobs:
         python${{ matrix.python_version }} -m pytest -v $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/async_tests
         python${{ matrix.python_version }} -m pytest -v $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/test_oqc/oqc -n auto
