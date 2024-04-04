@@ -53,6 +53,8 @@ from catalyst.jax_extras import (
     tree_structure,
     tree_unflatten,
     wrap_init,
+    get_implicit_and_explicit_flat_args,
+    unzip2
 )
 from catalyst.jax_primitives import (
     AbstractQreg,
@@ -101,13 +103,27 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
+        closed_jaxpr, out_type, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
-            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+            # return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self.fn)
-        return tree_unflatten(out_tree, retval)
+            args_expanded = get_implicit_and_explicit_flat_args(None, *args)
+            res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
+            _, out_keep = unzip2(out_type)
+            res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
+            return tree_unflatten(out_tree, res_flat)
+
+        print("J@J@J@J@")
+        print(closed_jaxpr)
+        print("J@J@J@J@")
+
+        flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_jaxpr, args, kwargs)
+        args_flat = tree_flatten(args)[0]
+        res_flat = func_p.bind(flattened_fun, *args_flat, fn=self.fn)
+        return tree_unflatten(out_tree_promise(), res_flat)
+
+        # return tree_unflatten(out_tree, retval)
 
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)

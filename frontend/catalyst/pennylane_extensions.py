@@ -48,6 +48,7 @@ from catalyst.jax_extras import (  # infer_output_type3,
     DynamicJaxprTracer,
     Jaxpr,
     ShapedArray,
+    ExpansionStrategy,
     _input_type_to_tracers,
     collapse,
     cond_expansion_strategy,
@@ -403,17 +404,30 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
     """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
     method = grad_params.method
-    jaxpr = jax.make_jaxpr(f)(*args)
+    # jaxpr = jax.make_jaxpr(f)(*args)
+
+    mode, ctx = EvaluationContext.get_evaluation_mode()
+    assert mode == EvaluationMode.CLASSICAL_COMPILATION
+
+    _, in_sig, out_sig = trace_function(
+        ctx, f, *args, expansion_strategy=ExpansionStrategy(None, False, False, False)
+    )
+
+    jaxpr = out_sig.out_jaxpr()
+
+    print("GGGJJJJJJJJ")
+    print(jaxpr)
+    print("GGGJJJJJJJJ")
 
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
-    for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.argnum:
-            raise DifferentiableCompileError(
-                "Catalyst.grad/jacobian only supports differentiation on floating-point "
-                f"arguments, got '{arg.dtype}' at position {pos}."
-            )
+    # for pos, arg in enumerate(jaxpr.in_avals):
+    #     if arg.dtype.kind != "f" and pos in grad_params.argnum:
+    #         raise DifferentiableCompileError(
+    #             "Catalyst.grad/jacobian only supports differentiation on floating-point "
+    #             f"arguments, got '{arg.dtype}' at position {pos}."
+    #         )
 
     if grad_params.scalar_out:
         if not (len(jaxpr.out_avals) == 1 and jaxpr.out_avals[0].shape == ()):
