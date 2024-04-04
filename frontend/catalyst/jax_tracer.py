@@ -106,8 +106,6 @@ class Function:
         closed_jaxpr, out_type, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
-            # return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
-
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)
@@ -118,8 +116,6 @@ class Function:
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self.fn)
         return tree_unflatten(out_tree_promise(), res_flat)
-
-        # return tree_unflatten(out_tree, retval)
 
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
