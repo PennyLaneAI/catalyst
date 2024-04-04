@@ -114,10 +114,6 @@ class Function:
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 
-        print("J@J@J@J@")
-        print(closed_jaxpr)
-        print("J@J@J@J@")
-
         flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_jaxpr, args, kwargs)
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self.fn)
@@ -459,6 +455,9 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
     # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
     jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
+    print("MLIR BEGIN")
+    print(module)
+    print("MLIR END")
     return module, context, jaxpr, out_type2, out_tree
 
 

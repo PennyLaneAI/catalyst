@@ -415,9 +415,9 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     jaxpr = out_sig.out_jaxpr()
 
-    print("GGGJJJJJJJJ")
+    print("FUNC JAXPR")
     print(jaxpr)
-    print("GGGJJJJJJJJ")
+    print("FUNC JAXPR")
 
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
