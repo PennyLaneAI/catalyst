@@ -492,6 +492,7 @@ class TestProbs:
         with pytest.raises(AssertionError):
             qjit(circuit)(0.432)
 
+
 class TestOtherMeasurements:
     """Test other measurement processes."""
 
