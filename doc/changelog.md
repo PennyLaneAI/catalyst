@@ -76,7 +76,7 @@
 
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
-  It currently discard user preprocessing from the original device and is replace by Catalyst specific
+  It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
   preprocessing.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
