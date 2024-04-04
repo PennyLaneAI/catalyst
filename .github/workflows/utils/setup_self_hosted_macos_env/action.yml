@@ -43,15 +43,16 @@ runs:
         
         # The following two flags are exported to ensure the correct homebrew installed libomp libraries are used
         # during build time.
-        echo "LDFLAGS=-L/opt/homebrew/opt/libomp/lib $LDFLAGS" >> $GITHUB_ENV
-        echo "CPPFLAGS=-I/opt/homebrew/opt/libomp/include $CPPFLAGS" >> $GITHUB_ENV
+        echo "CFLAGS=-I$HOME/.local/include $CFLAGS" >> $GITHUB_ENV
+        echo "LDFLAGS=-L$HOME/.local/lib $LDFLAGS" >> $GITHUB_ENV
+        echo "CPPFLAGS=-I$HOME/.local/include $CPPFLAGS" >> $GITHUB_ENV
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
     - name: Add additional binaries to PATH
       shell: bash
       run: |
-        additional_paths=("$HOME/.pyenv/shims" "$HOME/.cargo/bin")
+        additional_paths=("$HOME/.local/bin" "$HOME/.pyenv/bin" "$HOME/.pyenv/shims" "$HOME/.cargo/bin")
         for _path in ${additional_paths[@]};
         do
           [[ ":$PATH:" != *":$_path:"* ]] && echo "$_path" >> $GITHUB_PATH
