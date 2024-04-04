@@ -295,7 +295,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
     ):
         """Device preprocessing function."""
-        # TODO: readd the user preprocessing program once transforms are compatible with TOML files
+        # TODO: readd the device preprocessing program once transforms are compatible with TOML files
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
 

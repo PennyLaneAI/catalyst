@@ -81,7 +81,7 @@ def test_qjit_device():
     assert transform_program
     assert len(transform_program) == 2
 
-    # TODO: readd when we do not discard user preprocessing
+    # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
     # assert t == "split_non_commuting"
 
