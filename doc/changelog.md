@@ -44,6 +44,10 @@
   `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`.
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
 
+* Catalyst now supports `qml.expval` and `qml.var` of `qml.Hermitian` observables
+  when finite shots are specified.
+  [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
+
 <h3>Improvements</h3>
 
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
