@@ -14,7 +14,7 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?="5bcae01"
+LIGHTNING_GIT_TAG_VALUE?="add_dldso" # TODO: Remove tmp tag 'add_dldso' before merge
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 BUILD_TARGETS := rt_capi
