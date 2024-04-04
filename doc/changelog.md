@@ -76,9 +76,12 @@
 
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
+  It currently discard user preprocessing from the original device and is replace by Catalyst specific
+  preprocessing.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
+  [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
