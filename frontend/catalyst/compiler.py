@@ -264,9 +264,14 @@ class LinkerDriver:
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
+        # Adds RUNTIME_LIB_DIR to the Python system path to allow the catalyst_callback_registry
+        # to be importable.
         sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
         import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
 
+        # We use MLIR's C runner utils library in the registry.
+        # In order to be able to dlopen that library we need to know the path
+        # So we set the path here.
         registry.set_mlir_lib_path(mlir_lib_path)
 
         lib_path_flags = [
