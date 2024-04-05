@@ -45,6 +45,7 @@ runs:
         # during build time.
         echo "CFLAGS=-I$HOME/.local/include $CFLAGS" >> $GITHUB_ENV
         echo "LDFLAGS=-L$HOME/.local/lib $LDFLAGS" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=-L$HOME/.local/lib $LDFLAGS" >> $GITHUB_ENV
         echo "CPPFLAGS=-I$HOME/.local/include $CPPFLAGS" >> $GITHUB_ENV
         echo "DYLD_LIBRARY_PATH=$HOME/.local/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
         echo "CMAKE_PREFIX_PATH=$HOME/.local/lib:$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
