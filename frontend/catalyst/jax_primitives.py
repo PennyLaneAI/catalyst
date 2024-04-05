@@ -776,24 +776,21 @@ def _gphase_lowering(
     ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
     ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
 
-    float_params = []
     assert 1 == len(params), "Only one param in GlobalPhase"
-    for p in params:
-        if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
-            baseType = ir.RankedTensorType(p.type).element_type
+    param = params[0]
+    if ir.RankedTensorType.isinstance(param.type) and ir.RankedTensorType(param.type).shape == []:
+        baseType = ir.RankedTensorType(param.type).element_type
 
-        if not ir.F64Type.isinstance(baseType):
-            baseType = ir.F64Type.get()
-            resultTensorType = ir.RankedTensorType.get((), baseType)
-            p = StableHLOConvertOp(resultTensorType, p).results
+    if not ir.F64Type.isinstance(baseType):
+        baseType = ir.F64Type.get()
+        resultTensorType = ir.RankedTensorType.get((), baseType)
+        param = StableHLOConvertOp(resultTensorType, param).results
 
-        p = TensorExtractOp(baseType, p, []).result
+    param = TensorExtractOp(baseType, param, []).result
 
-        assert ir.F64Type.isinstance(
-            p.type
-        ), "Only scalar double parameters are allowed for quantum gates!"
-
-        float_params.append(p)
+    assert ir.F64Type.isinstance(
+        param.type
+    ), "Only scalar double parameters are allowed for quantum gates!"
 
     ctrl_values_i1 = []
     for v in ctrl_values:
@@ -801,7 +798,7 @@ def _gphase_lowering(
         ctrl_values_i1.append(p)
 
     GlobalPhaseOp(
-        params=float_params[0],
+        params=param,
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
