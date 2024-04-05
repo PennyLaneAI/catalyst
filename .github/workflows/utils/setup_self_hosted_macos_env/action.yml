@@ -33,6 +33,8 @@ runs:
 
     # These environment variables ensure multi-threading workloads (ex: pytest-xdist)
     # work without any issues. Without them, the tests take hours to complete.
+    # TODO: Removed         echo "OpenMP_ROOT=$HOME/.local" >> $GITHUB_ENV
+    #        echo "CMAKE_ARGS=-DOpenMP_ROOT=$HOME/.local" >> $GITHUB_ENV
     - name: Setup MacOS Env Vars
       shell: bash
       run: |
@@ -50,8 +52,6 @@ runs:
         echo "DYLD_LIBRARY_PATH=$HOME/.local/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
         echo "CMAKE_INSTALL_RPATH=$HOME/.local/lib:$CMAKE_INSTALL_RPATH" >> $GITHUB_ENV
         echo "CMAKE_PREFIX_PATH=$HOME/.local:$HOME/.local/bin:$HOME/.local/include:$HOME/.local/lib:$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
-        echo "OpenMP_ROOT=$HOME/.local" >> $GITHUB_ENV
-        echo "CMAKE_ARGS=-DOpenMP_ROOT=$HOME/.local" >> $GITHUB_ENV
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
