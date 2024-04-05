@@ -739,22 +739,26 @@ def _qinsert_lowering(
 #
 @gphase_p.def_abstract_eval
 def _gphase_abstract_eval(
-    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+    *qubits_or_params, op=None, ctrl_len: int = 0
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
-    qubits = qubits_or_params[:qubits_len]
+    # but because gphase has no target qubits* and only one param
+    # it is actually
+    # param, ctrl_qubits*, ctrl_values*
+    param = qubits_or_params[0]
+    assert not isinstance(param, AbstractQbit)
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
-    all_qubits = qubits + ctrl_qubits
-    for idx in range(qubits_len + ctrl_len):
+    all_qubits = ctrl_qubits
+    for idx in range(ctrl_len):
         qubit = all_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
-    return (AbstractQbit(),) * (qubits_len + ctrl_len)
+    return (AbstractQbit(),) * (ctrl_len)
 
 
 @qinst_p.def_impl
 def _gphase_abstract_eval(
-    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+    *qubits_or_params, op=None, ctrl_len: int = 0
 ):
     """Not implemented"""
     raise NotImplementedError()
@@ -764,20 +768,15 @@ def _gphase_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *qubits_or_params,
     op=None,
-    qubits_len: int = 0,
-    params_len: int = 0,
     ctrl_len: int = 0,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len : qubits_len + params_len]
-    ctrl_qubits = qubits_or_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
-    ctrl_values = qubits_or_params[qubits_len + params_len + ctrl_len :]
+    param = qubits_or_params[0]
+    ctrl_qubits = qubits_or_params[1: 1 + ctrl_len]
+    ctrl_values = qubits_or_params[1 + ctrl_len :]
 
-    assert 1 == len(params), "Only one param in GlobalPhase"
-    param = params[0]
     if ir.RankedTensorType.isinstance(param.type) and ir.RankedTensorType(param.type).shape == []:
         baseType = ir.RankedTensorType(param.type).element_type
 
@@ -803,7 +802,7 @@ def _gphase_lowering(
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
     )
-    return qubits + ctrl_qubits
+    return ctrl_qubits
 
 
 #

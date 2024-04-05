@@ -435,12 +435,10 @@ def trace_quantum_tape(
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
             qubits2 = gphase_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
-                qubits_len=len(qubits),
-                params_len=len(op.parameters),
+                *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
             )
-            qrp.insert(op.wires, qubits2[: len(qubits)])
+            qrp.insert([], qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         else:
             qubits = qrp.extract(op.wires)
