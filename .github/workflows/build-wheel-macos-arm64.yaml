@@ -312,6 +312,19 @@ jobs:
         export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
+        
+        echo ''
+        echo '-------------------'
+        otool -L ./runtime-build/tests/runner_tests_lightning
+        echo '----------------------'
+        otool -l ./runtime-build/tests/runner_tests_lightning
+        
+        echo ''
+        echo '---------------------------'
+        otool -L ./runtime-build/tests/runner_tests_openqasm
+        echo '-----------------------------'
+        otool -l ./runtime-build/tests/runner_tests_openqasm
+        
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
   
