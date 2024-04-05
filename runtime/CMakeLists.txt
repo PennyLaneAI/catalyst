@@ -23,8 +23,6 @@ set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
 set(util_includes "${PROJECT_SOURCE_DIR}/utils")
 
-set(ENV_OpenMP_ROOT "$ENV{OpenMP_ROOT}")
-
 
 # Get LLVM hash to target from source tree.
 file(READ ../.dep-versions DEPENDENCY_VERSIONS)
@@ -95,7 +93,7 @@ endif()
 # On macOS libomp is typically installed via brew, which doesn't make the package discoverable by
 # default to avoid conflicting with GCC's OpenMP library.
 if(APPLE)
-    if(not ENV_OpenMP_ROOT)
+    if(NOT DEFINED ENV{OpenMP_ROOT})
         execute_process (
             COMMAND brew --prefix libomp
             OUTPUT_VARIABLE BREW_OMP
@@ -103,7 +101,7 @@ if(APPLE)
         )
         set(OpenMP_ROOT ${BREW_OMP})
     else()
-        set(OpenMP_ROOT ${ENV_OpenMP_ROOT})
+        set(OpenMP_ROOT "$ENV{OpenMP_ROOT}")
     endif()
 endif()
 
