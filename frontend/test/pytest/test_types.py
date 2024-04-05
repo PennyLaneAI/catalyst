@@ -54,4 +54,5 @@ def test_convert_numpy_dtype_to_mlir(inp, exp):
 def test_convert_numpy_dtype_to_mlir_error():
     """Test errors"""
     with pytest.raises(ValueError, match="Requested type conversion not available."):
-        convert_numpy_dtype_to_mlir(np.dtype(object))
+        with ctx:
+            convert_numpy_dtype_to_mlir(np.dtype(object))
