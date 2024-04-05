@@ -167,6 +167,7 @@ jobs:
               -DLLVM_INSTALL_UTILS=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_USE_STATIC_ZSTD=ON \
               -DLLVM_ENABLE_LLD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
