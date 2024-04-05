@@ -43,7 +43,7 @@ NUMPY_DTYPE_TO_MLIR = None
 
 def convert_numpy_dtype_to_mlir_safe(dtp):
     """Convert dtype to MLIR. Return None if no type conversion is possible"""
-    global NUMPY_DTYPE_TO_MLIR
+    global NUMPY_DTYPE_TO_MLIR  # pylint: disable=global-statement
     if not NUMPY_DTYPE_TO_MLIR:
         NUMPY_DTYPE_TO_MLIR = {
             np.dtype(np.complex128): ir.ComplexType.get(ir.F64Type.get()),
