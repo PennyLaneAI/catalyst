@@ -30,15 +30,10 @@ CSWAP = { properties = [ "invertible" ] }
 # Everything else should be decomposed.
 [operators.gates.decomp]
 
-# Gates which should be translated to QubitUnitary
 [operators.gates.matrix]
 
-# Observables supported by the device
+# Observables supported natively by the device
 [operators.observables]
-PauliX = {}
-PauliY = {}
-PauliZ = {}
-Hadamard = {}
 
 [measurement_processes]
 
