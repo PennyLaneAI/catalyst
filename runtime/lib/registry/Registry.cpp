@@ -37,14 +37,13 @@ std::string libmlirpath;
 
 void convertResult(py::handle tuple)
 {
-
     py::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
 
     py::object unranked_memref = unrankedMemrefPtrSizeTuple.attr("__getitem__")(0);
     py::object element_size = unrankedMemrefPtrSizeTuple.attr("__getitem__")(1);
     py::object unranked_memref_ptr_int = unranked_memref.attr("value");
 
-    void *unranked_memref_ptr = (void *)(py::cast<long>(unranked_memref_ptr_int));
+    void *unranked_memref_ptr = reinterpret_cast<void *>(py::cast<long>(unranked_memref_ptr_int));
     long e_size = py::cast<long>(element_size);
 
     std::string libpath = libmlirpath + "/libmlir_c_runner_utils.so";

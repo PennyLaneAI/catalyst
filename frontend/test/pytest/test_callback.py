@@ -13,7 +13,6 @@
 # limitations under the License.
 """Test callbacks"""
 
-from typing import List
 
 import jax
 import jax.numpy as jnp
