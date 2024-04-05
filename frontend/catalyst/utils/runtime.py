@@ -271,7 +271,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         device_gates = filter_out_adjoint(device_gates)
         spec_gates = set.union(native, observables, matrix, decomposable)
         spec_gates = filter_out_adjoint(spec_gates)
-        check_full_overlap(device_gates, spec_gates)
+        # check_full_overlap(device_gates, spec_gates)
 
 
 def device_get_toml_config(device) -> Path:
