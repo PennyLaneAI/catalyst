@@ -145,20 +145,11 @@ def get_pennylane_operations(
 
 
 def get_pennylane_observables(
-    config: TOMLDocument, shots_present: bool, device_name: str
+    config: TOMLDocument, shots_present: bool, _device_name: str
 ) -> Set[str]:
     """Get observables in PennyLane format. Apply ad-hoc patching"""
 
-    observables = set(get_observables(config, shots_present))
-
-    schema = int(config["schema"])
-
-    if schema == 1:
-        # TODO: remove after PR #642 is merged in lightning
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            observables.update({"Projector"})
-
-    return observables
+    return set(get_observables(config, shots_present))
 
 
 def check_no_overlap(*args):
@@ -204,26 +195,6 @@ def filter_out_adjoint(operations):
     return set(operations_no_adj)
 
 
-def check_full_overlap(device_gates: Set[str], spec_gates: Set[str]) -> None:
-    """Check that device.operations is equivalent to the union of *args
-
-    Args:
-        device_gates (Set[str]): device gates
-        spec_gates (Set[str]): spec gates
-
-    Raises: CompileError
-    """
-    if device_gates == spec_gates:
-        return
-
-    msg = (
-        "Gates in qml.device.operations and specification file do not match.\n"
-        f"Gates that present only in the device: {device_gates - spec_gates}\n"
-        f"Gates that present only in spec: {spec_gates - device_gates}\n"
-    )
-    raise CompileError(msg)
-
-
 def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -> None:
     """Validate configuration document against the device attributes.
     Raise CompileError in case of mismatch:
@@ -250,7 +221,6 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     shots_present = device.shots is not None
     native = get_pennylane_operations(config, shots_present, device_name)
-    observables = get_pennylane_observables(config, shots_present, device_name)
     decomposable = set(get_decomposable_gates(config, shots_present))
     matrix = set(get_matrix_decomposable_gates(config, shots_present))
 
@@ -267,11 +237,25 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     check_no_overlap(native, decomposable, matrix)
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
-        device_gates = set.union(set(device.operations), set(device.observables))
-        device_gates = filter_out_adjoint(device_gates)
-        spec_gates = set.union(native, observables, matrix, decomposable)
-        spec_gates = filter_out_adjoint(spec_gates)
-        check_full_overlap(device_gates, spec_gates)
+        # For gates, we require strict match
+        device_gates = filter_out_adjoint(set(device.operations))
+        spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
+        if device_gates != spec_gates:
+            raise CompileError(
+                "Gates in qml.device.operations and specification file do not match.\n"
+                f"Gates that present only in the device: {device_gates - spec_gates}\n"
+                f"Gates that present only in spec: {spec_gates - device_gates}\n"
+            )
+
+        # For observables, we do not have `non-native` section in the config, so we check that
+        # device data supercedes the specification.
+        device_observables = set(device.observables)
+        spec_observables = get_pennylane_observables(config, shots_present, device_name)
+        if (spec_observables - device_observables) != set():
+            raise CompileError(
+                "Observables in qml.device.observables and specification file do not match.\n"
+                f"Observables that present only in spec: {spec_observables - device_observables}\n"
+            )
 
 
 def device_get_toml_config(device) -> Path:
