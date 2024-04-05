@@ -312,7 +312,9 @@ jobs:
       run: |
         export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
-        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
+        cmake --build runtime-build \
+          -DCMAKE_BUILD_RPATH="$HOME/.local" \
+          --target runner_tests_lightning runner_tests_openqasm
         
         echo ''
         echo '-------------------'
