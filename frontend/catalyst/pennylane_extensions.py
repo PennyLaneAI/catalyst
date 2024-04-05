@@ -24,7 +24,7 @@ import inspect
 import numbers
 from collections.abc import Sequence, Sized
 from functools import update_wrapper, wraps
-from typing import Any, Callable, Iterable, List, Optional, Union
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Union
 
 import jax
 import jax.numpy as jnp
@@ -2639,10 +2639,13 @@ def callback_implementation(
         if ty == inspect.Signature.empty:
             return None
         if isinstance(ty, ShapedArray):
-            return ty
-        return shaped_abstractify(ty)
+            return ty.strip_weak_type()
+        return shaped_abstractify(ty).strip_weak_type()
 
     results_aval = tree_map(to_shaped_array, result_shape_dtypes)
+    if not isinstance(results_aval, Sequence):
+        results_aval = [results_aval]
+
     flat_results_aval, out_tree = tree_flatten(results_aval)
 
     def _flat_callback(flat_args):
@@ -2655,7 +2658,12 @@ def callback_implementation(
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retvals = tree_leaves(cb(*args, **kwargs))
         return_values = []
-        for retval in retvals:
+        for retval, exp_aval in zip(retvals, results_aval):
+            obs_aval = shaped_abstractify(retval)
+            if obs_aval != exp_aval:
+                raise TypeError(
+                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+                )
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)
             unranked_memref = get_unranked_memref_descriptor(retval)

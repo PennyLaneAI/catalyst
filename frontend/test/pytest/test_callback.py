@@ -13,6 +13,8 @@
 # limitations under the License.
 """Test callbacks"""
 
+from typing import List
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -163,3 +165,40 @@ def test_identity_types_shaped_array(arg):
         return identity(x)
 
     assert np.allclose(cir(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0],
+)
+def test_multiple_returns(arg):
+    """Test callback with multiple return values."""
+
+    @callback
+    def identity(arg) -> (int, int):
+        return arg, arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(arg), (arg, arg))
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [jnp.array([0.0, 1.0, 2.0])],
+)
+def test_incorrect_return(arg):
+    """Test callback with incorrect return types."""
+
+    @callback
+    def identity(arg) -> int:
+        return arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    with pytest.raises(TypeError, match="Callback identity expected type"):
+        cir(arg)
