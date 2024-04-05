@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test callbacks"""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -137,6 +138,24 @@ def test_identity_types(arg):
         as the return type. arg will be abstracted to find the type. This
         just avoids writing out the explicit type once you have a value
         that you know will be the same type as the return type."""
+        return arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [jnp.array(0), jnp.array(1)],
+)
+def test_identity_types_shaped_array(arg):
+    """Test callback with return values. Use ShapedArray to denote the type"""
+
+    @callback
+    def identity(arg) -> jax.core.ShapedArray([], int):
         return arg
 
     @qml.qjit
