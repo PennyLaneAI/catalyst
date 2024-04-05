@@ -49,7 +49,7 @@ runs:
         echo "CPPFLAGS=-I$HOME/.local/include $CPPFLAGS" >> $GITHUB_ENV
         echo "DYLD_LIBRARY_PATH=$HOME/.local/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
         echo "CMAKE_PREFIX_PATH=$HOME/.local:$HOME/.local/bin:$HOME/.local/include:$HOME/.local/lib:$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
-        echo "OpenMP_ROOT="$HOME/.local" >> $GITHUB_ENV
+        echo "OpenMP_ROOT=$HOME/.local" >> $GITHUB_ENV
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
