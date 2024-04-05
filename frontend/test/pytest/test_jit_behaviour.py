@@ -204,6 +204,7 @@ class TestJittedWithOneTypeRunWithAnother:
         assert id_from != id_to
         assert jnp.allclose(res_from, res_to)
 
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     @pytest.mark.parametrize(
         "to_type",
         [
