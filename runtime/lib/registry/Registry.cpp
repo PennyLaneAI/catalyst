@@ -35,6 +35,38 @@ std::unordered_map<int64_t, py::function> *references;
 
 std::string libmlirpath;
 
+struct UnrankedMemrefType {
+    int64_t rank;
+    void *descriptor;
+};
+
+class LibraryManager {
+    void *_handle;
+
+  public:
+    LibraryManager(std::string path)
+    {
+        this->_handle = dlopen(path.c_str(), RTLD_LAZY);
+        if (!this->_handle) {
+            throw py::value_error(dlerror());
+        }
+    }
+
+    ~LibraryManager() { dlclose(this->_handle); }
+
+    void operator()(long elementSize, UnrankedMemrefType *src, UnrankedMemrefType *dst)
+    {
+        void *f_ptr = dlsym(this->_handle, "memrefCopy");
+        if (!f_ptr) {
+            throw py::value_error(dlerror());
+        }
+        typedef void (*memrefCopy_t)(int64_t, void *, void *);
+        void (*memrefCopy)(int64_t, void *, void *);
+        memrefCopy = (memrefCopy_t)(f_ptr);
+        return memrefCopy(elementSize, src, dst);
+    }
+};
+
 void convertResult(py::handle tuple)
 {
     py::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
@@ -46,38 +78,17 @@ void convertResult(py::handle tuple)
     void *unranked_memref_ptr = reinterpret_cast<void *>(py::cast<long>(unranked_memref_ptr_int));
     long e_size = py::cast<long>(element_size);
 
-    std::string libpath = libmlirpath + "/libmlir_c_runner_utils.so";
-    void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
-    if (!handle) {
-        throw py::value_error(dlerror());
-    }
-
-    void *f_ptr = dlsym(handle, "memrefCopy");
-    if (!handle) {
-        throw py::value_error(dlerror());
-    }
-
-    void (*memrefCopy)(int64_t, void *, void *);
-    typedef void (*memrefCopy_t)(int64_t, void *, void *);
-    memrefCopy = (memrefCopy_t)(f_ptr);
-
     py::object dest = tuple.attr("__getitem__")(1);
 
     long destAsLong = py::cast<long>(dest);
     void *destAsPtr = (void *)(destAsLong);
 
-    // destAsPtr is a rankedMemref...
-    // we need to cast it into an unranked memref...
-    struct UnrankedMemrefType {
-        int64_t rank;
-        void *descriptor;
-    };
+    UnrankedMemrefType *src = (UnrankedMemrefType *)unranked_memref_ptr;
+    UnrankedMemrefType destMemref = {src->rank, destAsPtr};
 
-    UnrankedMemrefType *tempptr = (UnrankedMemrefType *)unranked_memref_ptr;
-
-    UnrankedMemrefType destAsUnranked = {tempptr->rank, destAsPtr};
-    memrefCopy(e_size, unranked_memref_ptr, &destAsUnranked);
-    dlclose(handle);
+    std::string libpath = libmlirpath + "/libmlir_c_runner_utils.so";
+    LibraryManager memrefCopy(libpath);
+    memrefCopy(e_size, src, &destMemref);
 }
 
 void convertResults(py::list results, py::list allocated)
