@@ -72,7 +72,7 @@
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
-  ((#641))[https://github.com/PennyLaneAI/catalyst/pull/641]
+  ((#642))[https://github.com/PennyLaneAI/catalyst/pull/642]
 
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
