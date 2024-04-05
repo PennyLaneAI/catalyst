@@ -52,7 +52,12 @@ class LibraryManager {
         }
     }
 
-    ~LibraryManager() { dlclose(this->_handle); }
+    ~LibraryManager()
+    {
+        if (this->_handle) {
+            dlclose(this->_handle);
+        }
+    }
 
     void operator()(long elementSize, UnrankedMemrefType *src, UnrankedMemrefType *dst)
     {
