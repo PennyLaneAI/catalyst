@@ -24,7 +24,7 @@ import inspect
 import numbers
 from collections.abc import Sequence, Sized
 from functools import update_wrapper, wraps
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Union
+from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -2611,7 +2611,7 @@ def callback(func):
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
     @wraps(func)
-    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
+    def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
@@ -2662,6 +2662,7 @@ def callback_implementation(
             obs_aval = shaped_abstractify(retval)
             if obs_aval != exp_aval:
                 raise TypeError(
+                    # pylint: disable-next=line-too-long
                     f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
                 )
             ranked_memref = get_ranked_memref_descriptor(retval)
