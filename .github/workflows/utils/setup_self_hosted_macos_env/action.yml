@@ -46,6 +46,7 @@ runs:
         echo "CFLAGS=-I$HOME/.local/include $CFLAGS" >> $GITHUB_ENV
         echo "LDFLAGS=-L$HOME/.local/lib $LDFLAGS" >> $GITHUB_ENV
         echo "CPPFLAGS=-I$HOME/.local/include $CPPFLAGS" >> $GITHUB_ENV
+        echo "DYLD_LIBRARY_PATH=$HOME/.local/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
 
 
     # These binaries are added to PATH as there were issues adding them by default on job start
