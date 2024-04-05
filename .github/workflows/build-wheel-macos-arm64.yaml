@@ -103,6 +103,11 @@ jobs:
 
       # This step is needed because actions/checkout cannot clone to outside GITHUB_WORKSPACE
       # https://github.com/actions/checkout/issues/197
+      # ----------
+      # We need the deps to build outside of the GITHUB_WORKSPACE as the paths where the file resides get embedded
+      # within the compiled file. And since the runner GITHUB_WORKSPACE value can change, this causes build errors where runnerA
+      # can build the cache but runnerB attempts to use the cache.
+      # Building outside of the GITHUB_WORKSPACE ensures all file paths are consistent across runners.
     - name: Copy Submodule to tmp cache directory
       run: |
         if [ ! -d "${{ steps.setup_env.outputs.dependency_build_dir }}/mlir" ]; then
