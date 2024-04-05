@@ -292,6 +292,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DCMAKE_INSTALL_RPATH="$HOME/.local/lib" \
+              -DCMAKE_BUILD_RPATH="$HOME/.local/lib" \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
@@ -312,9 +313,7 @@ jobs:
       run: |
         export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
-        cmake --build runtime-build \
-          -DCMAKE_BUILD_RPATH="$HOME/.local" \
-          --target runner_tests_lightning runner_tests_openqasm
+        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         
         echo ''
         echo '-------------------'
