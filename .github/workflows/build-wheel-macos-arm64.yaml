@@ -11,9 +11,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  MACOSX_DEPLOYMENT_TARGET: 12.0
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -41,6 +38,9 @@ jobs:
       group: 'Office 24th floor M2 Mac'
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 12.0
 
     steps:
     - name: Checkout Catalyst repo
@@ -220,6 +220,9 @@ jobs:
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 12.0
 
     steps:
     - name: Checkout Catalyst repo
