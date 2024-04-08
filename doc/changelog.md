@@ -69,6 +69,10 @@
 
 <h3>Improvements</h3>
 
+* `qml.sample` and `qml.counts` now produce integer arrays for the sample array and basis state
+  array when used without observables.
+  [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
+
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
   support, gate invertibility or differentiability.
@@ -117,7 +121,7 @@
 
   After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
-* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded. 
+* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
 <h3>Breaking changes</h3>
