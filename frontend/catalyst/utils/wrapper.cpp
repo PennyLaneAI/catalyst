@@ -15,13 +15,9 @@
 #include <iostream>
 #include <pybind11/pybind11.h>
 
-// Emit a compile time warning if we are using numpy
-// functions that are not compatible with numpy 1.22
-// Why 1.22?
-//
-// As of time of this writing 1.21.* will be deprecated
-// next month. See here: https://endoflife.date/numpy
-#define NPY_NO_DEPRECATED_API NPY_1_22_API_VERSION
+// TODO: Periodically check and increment version.
+// https://endoflife.date/numpy
+#define NPY_NO_DEPRECATED_API NPY_1_24_API_VERSION
 
 #include "numpy/arrayobject.h"
 
