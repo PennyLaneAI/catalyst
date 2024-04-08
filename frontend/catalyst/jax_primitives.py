@@ -354,7 +354,8 @@ def _grad_abstract(*args, jaxpr, fn, grad_params):
     # transformed_signature = calculate_grad_shape(signature, new_argnum)
     # return tuple(transformed_signature.get_results())
     t = [
-        (DShapedArray(shape=(InDBIdx(0), InDBIdx(0),), dtype=np.dtype(float)), True)
+        (ShapedArray(shape=(), dtype=np.dtype(int)), False),
+        (DShapedArray(shape=(InDBIdx(0), OutDBIdx(0),), dtype=np.dtype(float)), True)
     ]
     print("TTTTTTTT", t)
     return t

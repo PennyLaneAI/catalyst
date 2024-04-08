@@ -435,12 +435,12 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                 f"Catalyst.grad only supports scalar-output functions, got {jaxpr.out_avals}"
             )
 
-    for pos, res in enumerate(jaxpr.out_avals):
-        if res.dtype.kind != "f":
-            raise DifferentiableCompileError(
-                "Catalyst.grad/jacobian only supports differentiation on floating-point "
-                f"results, got '{res.dtype}' at position {pos}."
-            )
+    # for pos, res in enumerate(jaxpr.out_avals):
+    #     if res.dtype.kind != "f":
+    #         raise DifferentiableCompileError(
+    #             "Catalyst.grad/jacobian only supports differentiation on floating-point "
+    #             f"results, got '{res.dtype}' at position {pos}."
+    #         )
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
