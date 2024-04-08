@@ -22,6 +22,7 @@ from typing import Dict, Iterable, List
 import jax
 import numpy as np
 import pennylane as qml
+from jax import numpy as jnp
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
@@ -68,6 +69,10 @@ from catalyst.jax_extras import (
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
     while_loop_expansion_strategy,
+    DShapedArray,
+    ShapedArray,
+    OutDBIdx,
+    InDBIdx,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -206,7 +211,8 @@ while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
-grad_p = core.Primitive("grad")
+# grad_p = core.Primitive("grad")
+grad_p = DynshapePrimitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 grad_p.multiple_results = True
@@ -342,11 +348,17 @@ def _grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 @grad_p.def_abstract_eval
 def _grad_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
-    signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
-    offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
-    return tuple(transformed_signature.get_results())
+    # signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
+    # offset = len(jaxpr.consts)
+    # new_argnum = [num + offset for num in grad_params.argnum]
+    # transformed_signature = calculate_grad_shape(signature, new_argnum)
+    # return tuple(transformed_signature.get_results())
+    t = [
+        (ShapedArray(shape=(), dtype=np.dtype(float)), False),
+        (DShapedArray(shape=(OutDBIdx(0),), dtype=np.dtype(float)), True)
+    ]
+    print("TTTTTTTT", t)
+    return t
 
 
 def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -1374,13 +1386,15 @@ def _for_loop_abstract_eval(
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
 
-    return infer_output_type_jaxpr(
+    t = infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:body_nconsts],
         body_jaxpr.jaxpr.invars[body_nconsts:],
         body_jaxpr.jaxpr.outvars[nimplicit:],
         expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
         num_implicit_inputs=nimplicit,
     )
+    print("TTTTTTTT", t)
+    return t
 
 
 # pylint: disable=too-many-arguments

@@ -450,6 +450,9 @@ def trace_to_mlir(func, static_argnums, abstracted_axes, *args, **kwargs):
 
     # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
     jaxpr2, out_type2 = jaxpr_remove_implicit(jaxpr, out_type)
+    print("JAXPR BEGIN")
+    print(jaxpr2)
+    print("JAXPR END")
     module, context = jaxpr_to_mlir(func.__name__, jaxpr2)
     print("MLIR BEGIN")
     print(module)
