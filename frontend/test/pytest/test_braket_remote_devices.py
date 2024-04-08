@@ -214,11 +214,11 @@ class TestBraketSample:
             qml.RX(x, wires=0)
             return qml.sample()
 
-        expected = np.array([[0.0]] * 1000)
+        expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
         assert np.array_equal(observed, expected)
 
-        expected = np.array([[1.0]] * 1000)
+        expected = np.array([[1]] * 1000)
         observed = sample_1qbit(np.pi)
         assert np.array_equal(observed, expected)
 
@@ -243,10 +243,10 @@ class TestBraketSample:
             qml.RY(x, wires=1)
             return qml.sample()
 
-        expected = np.array([[0.0, 0.0]] * 1000)
+        expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
         assert np.array_equal(observed, expected)
-        expected = np.array([[1.0, 1.0]] * 1000)
+        expected = np.array([[1, 1]] * 1000)
         observed = sample_2qbits(np.pi)
         assert np.array_equal(observed, expected)
 
@@ -718,9 +718,11 @@ class TestBraketMeasurementsProcess:
 
         # qml.sample
         assert result[0].shape[0] == 100
+        assert result[0].dtype == np.int64
 
         # qml.counts
         assert sum(result[1][1]) == 100
+        assert result[1][0].dtype == np.int64
 
         # qml.probs
         assert result[2][0] > result[2][1]
