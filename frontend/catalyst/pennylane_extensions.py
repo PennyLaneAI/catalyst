@@ -577,7 +577,7 @@ class Grad:
             args_data, _ = tree_flatten(args)
 
             # It always returns list as required by catalyst control-flows
-            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = grad_p.bind(*(args_data[-1].shape[0], *args_data), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
         else:
             if argnums := self.grad_params.argnum is None:
                 argnums = 0
