@@ -132,7 +132,7 @@ class TestPyTreesReturnValues:
         jitted_fn = qjit(circuit3)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
-        assert isinstance(result[0], tuple)
+        assert isinstance(result[0], dict)
         assert len(result[1]) == 4
         assert jnp.allclose(result[2], expected_expval, atol=tol_stochastic, rtol=tol_stochastic)
 
@@ -256,7 +256,7 @@ class TestPyTreesReturnValues:
         jitted_fn = qjit(circuit2)
         result = jitted_fn(params)
         assert isinstance(result, dict)
-        assert isinstance(result["counts"], tuple)
+        assert isinstance(result["counts"], dict)
         assert len(result["state"]) == 4
         assert jnp.allclose(
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
