@@ -34,6 +34,7 @@ def convert_shaped_array_to_tensor(sarray):
     return ir.RankedTensorType.get(py_shape, mlir_dtype)
 
 
+# pylint: disable=too-many-return-statements
 def convert_numpy_dtype_to_mlir(dtp):
     """Convert dtype to MLIR. Raise ValueError if no conversion is possible"""
     if dtp == np.dtype(np.complex128):
