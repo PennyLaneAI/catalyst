@@ -5,27 +5,26 @@
 * Support for callbacks in Catalyst.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
+  [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
+  [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
 
-  Catalyst now supports callbacks with parameters but no return values.
-  This is the very first step in supporting callbacks.
+  Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
 
   ```py
   @callback
   def foo(val):
-    print("Hello world", val)
+    return val
 
   @qjit
-  def circuit(*args, **kwargs):
-    ...
-    foo(123)
-    ...
+  def circuit(param):
+    return foo(param)
 
   ```
 
   ```pycon
-  >>> circuit()
-  Hello world 123
+  >>> print(circuit(123))
+  123
   ```
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
@@ -73,6 +72,9 @@
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
   [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
+* An exception is now raised when OpenBLAS cannot be found by Catalyst.
+  [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
 
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
