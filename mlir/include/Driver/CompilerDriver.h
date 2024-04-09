@@ -89,15 +89,19 @@ struct CompilerOptions {
 
 struct CompilerOutput {
     typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
+    CompilerOutput(int counter = 0)
+        : pipelineCounter(counter)
+    {}
     std::string objectFilename;
     std::string outIR;
     std::string diagnosticMessages;
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
-    size_t pipelineCounter = 0;
+    size_t pipelineCounter;
 
     // Gets the next pipeline dump file name, prefixed with number.
-    std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir");
+    std::string nextDumpFilename(std::string filenameBase, std::string ext);
+    std::string pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx);
 };
 
 }; // namespace driver

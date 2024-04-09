@@ -15,6 +15,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -43,6 +44,24 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
         out.push_back(Pipeline({name, passes}));
     }
     return out;
+}
+
+size_t initDumpCounter(const char *workspace)
+{
+    using namespace std;
+    try {
+        size_t maxDump = 0;
+        auto dirIter = std::filesystem::directory_iterator("directory_path");
+        for (const filesystem::directory_entry& entry : dirIter) {
+            if (entry.is_regular_file()) {
+                maxDump = std::max(maxDump, size_t(stoul(entry.path().filename().string())));
+            }
+        }
+        return maxDump > 0 ? maxDump + 1 : 0;
+    }
+    catch(std::filesystem::filesystem_error &e) {
+        return 0;
+    }
 }
 
 PYBIND11_MODULE(compiler_driver, m)
@@ -78,7 +97,7 @@ PYBIND11_MODULE(compiler_driver, m)
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
            bool verbose, py::list pipelines,
            bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
-            std::unique_ptr<CompilerOutput> output(new CompilerOutput());
+            std::unique_ptr<CompilerOutput> output(new CompilerOutput(initDumpCounter(workspace)));
             assert(output);
 
             llvm::raw_string_ostream errStream{output->diagnosticMessages};

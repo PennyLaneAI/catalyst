@@ -286,10 +286,17 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 
 namespace catalyst::driver {
 
-std::string CompilerOutput::nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext)
+std::string CompilerOutput::nextDumpFilename(std::string filenameBase, std::string ext)
 {
-    return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
+    return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + filenameBase)
         .replace_extension(ext);
+}
+
+std::string CompilerOutput::pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx)
+{
+    return std::filesystem::path(
+        std::to_string(this->pipelineCounter) + "_" + std::to_string(pipelineIdx) + "_" + pipelineName)
+        .replace_extension(".mlir");
 }
 
 }
@@ -404,7 +411,7 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
         llvmModule->print(rawStringOstream, nullptr);
-        auto outFile = output.nextPipelineDumpFilename("PreEnzymeOpt", ".ll");
+        auto outFile = output.nextDumpFilename("PreEnzymeOpt", ".ll");
         dumpToFile(options, outFile, outputs["PreEnzymeOpt"]);
     }
 
@@ -448,7 +455,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
         llvmModule->print(rawStringOstream, nullptr);
-        auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
+        auto outFile = output.nextDumpFilename("Enzyme", ".ll");
         dumpToFile(options, outFile, outputs["Enzyme"]);
     }
 
@@ -459,28 +466,33 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output)
 
 {
+    using std::pair;
     auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
     // Maps a pass to zero or one pipelines ended by this pass
     // Maps a pass to its owning pipeline
-    std::unordered_map<const Pass *, Pipeline::Name> pipelineTailMarkers;
-    std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
+    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t> > pipelineTailMarkers;
+    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t> > passPipelineNames;
 
     // Fill all the pipe-to-pipeline mappings
-    for (const auto &pipeline : options.pipelinesCfg) {
-        size_t existingPasses = pm.size();
-        if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
-            return failure();
-        }
-        if (existingPasses != pm.size()) {
-            const Pass *pass = nullptr;
-            for (size_t pn = existingPasses; pn < pm.size(); pn++) {
-                pass = &(*(pm.begin() + pn));
-                passPipelineNames[pass] = pipeline.name;
+    {
+        size_t pipelineIdx = 0;
+        for (const auto &pipeline : options.pipelinesCfg) {
+            size_t existingPasses = pm.size();
+            if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
+                return failure();
             }
-            assert(pass != nullptr);
-            pipelineTailMarkers[pass] = pipeline.name;
+            if (existingPasses != pm.size()) {
+                const Pass *pass = nullptr;
+                for (size_t pn = existingPasses; pn < pm.size(); pn++) {
+                    pass = &(*(pm.begin() + pn));
+                    passPipelineNames[pass] = pair(pipeline.name, pipelineIdx);
+                }
+                assert(pass != nullptr);
+                pipelineTailMarkers[pass] = pair(pipeline.name, pipelineIdx);
+            }
+            pipelineIdx ++;
         }
     }
 
@@ -488,7 +500,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
-        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
+        dumpToFile(options, output.nextDumpFilename(options.moduleName.str(), ".mlir"),
                    tmp);
     }
 
@@ -505,15 +517,16 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
-            timer.dump(res->second, /*add_endl */ false);
+            timer.dump(res->second.first, /*add_endl */ false);
             catalyst::utils::LinesCount::Operation(op);
         }
 
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
-            auto pipelineName = res->second;
+            auto pipelineName = res->second.first;
+            auto pipelineIdx = res->second.second;
             llvm::raw_string_ostream s{outputs[pipelineName]};
             s << *op;
-            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
+            dumpToFile(options, output.pipelineDumpFilename(pipelineName, pipelineIdx),
                        outputs[pipelineName]);
         }
     };
@@ -522,13 +535,15 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPassFailedCallback = [&](Pass *pass, Operation *op) {
         auto res = passPipelineNames.find(pass);
         assert(res != passPipelineNames.end() && "Unexpected pass");
+        auto pipelineName = res->second.first;
+        auto pipelineIdx = res->second.second;
         options.diagnosticStream << "While processing '" << pass->getName() << "' pass "
-                                 << "of the '" << res->second << "' pipeline\n";
-        llvm::raw_string_ostream s{outputs[res->second]};
+                                 << "of the '" << pipelineName << "' pipeline\n";
+        llvm::raw_string_ostream s{outputs[pipelineName]};
         s << *op;
         if (options.keepIntermediate) {
-            dumpToFile(options, output.nextPipelineDumpFilename(res->second + "_FAILED"),
-                       outputs[res->second]);
+            dumpToFile(options, output.pipelineDumpFilename(pipelineName + "_FAILED", pipelineIdx),
+                       outputs[pipelineName]);
         }
     };
 
@@ -541,6 +556,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         return failure();
     }
 
+    output.pipelineCounter++;
     return success();
 }
 
@@ -562,9 +578,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
-    // TODO: FIXME:
-    // Let's try to enable multithreading. Do not forget to protect the printing.
-    ctx.disableMultithreading();
+    ctx.enableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
@@ -603,7 +617,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             catalyst::utils::LinesCount::Module(*llvmModule);
 
             if (options.keepIntermediate) {
-                dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
+                dumpToFile(options, output.nextDumpFilename("llvm_ir", ".ll"), *llvmModule);
             }
         }
     }
