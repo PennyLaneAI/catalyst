@@ -68,6 +68,9 @@
 
 <h3>Improvements</h3>
 
+* Use `sysconfig` instead of `distutils.sysconfig`.
+  [(#653)](https://github.com/PennyLaneAI/catalyst/pull/653)
+
 * An exception is now raised when OpenBLAS cannot be found by Catalyst.
   [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
 
