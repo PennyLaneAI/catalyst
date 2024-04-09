@@ -72,28 +72,15 @@ class LibraryManager {
     }
 };
 
-inline const uintptr_t ext_macos()
-{
-#ifdef __APPLE__
-    return reinterpret_cast<uintptr_t>(".dylib");
-#else
-    return reinterpret_cast<uintptr_t>(nullptr);
-#endif
-}
-
-inline const uintptr_t ext_unix()
-{
-#ifdef __linux__
-    return reinterpret_cast<uintptr_t>(".so");
-#else
-    return reinterpret_cast<uintptr_t>(nullptr);
-#endif
-}
-
 inline const char *ext()
 {
-    const uintptr_t ext_target = ext_macos() | ext_unix();
-    return reinterpret_cast<char *>(ext_target);
+#ifdef __APPLE__
+    return ".dylib";
+#elif __linux__
+    return ".so";
+#else
+#error "Only apple and linux are currently supported";
+#endif
 }
 
 std::string library_name(std::string name) { return name + ext(); }
