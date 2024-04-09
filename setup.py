@@ -18,7 +18,7 @@ import subprocess
 
 try:
     from distutils import sysconfig
-except:
+except ImportError:
     import sysconfig
 from os import path
 from typing import Optional
