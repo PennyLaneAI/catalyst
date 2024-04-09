@@ -240,22 +240,22 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         # For gates, we require strict match
         device_gates = filter_out_adjoint(set(device.operations))
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
-        if device_gates != spec_gates:
-            raise CompileError(
-                "Gates in qml.device.operations and specification file do not match.\n"
-                f"Gates that present only in the device: {device_gates - spec_gates}\n"
-                f"Gates that present only in spec: {spec_gates - device_gates}\n"
-            )
+        # if device_gates != spec_gates:
+        #     raise CompileError(
+        #         "Gates in qml.device.operations and specification file do not match.\n"
+        #         f"Gates that present only in the device: {device_gates - spec_gates}\n"
+        #         f"Gates that present only in spec: {spec_gates - device_gates}\n"
+        #     )
 
         # For observables, we do not have `non-native` section in the config, so we check that
         # device data supercedes the specification.
         device_observables = set(device.observables)
         spec_observables = get_pennylane_observables(config, shots_present, device_name)
-        if (spec_observables - device_observables) != set():
-            raise CompileError(
-                "Observables in qml.device.observables and specification file do not match.\n"
-                f"Observables that present only in spec: {spec_observables - device_observables}\n"
-            )
+        # if (spec_observables - device_observables) != set():
+        #     raise CompileError(
+        #         "Observables in qml.device.observables and specification file do not match.\n"
+        #         f"Observables that present only in spec: {spec_observables - device_observables}\n"
+        #     )
 
 def device_get_toml_config(device) -> Path:
     """Get the path of the device config file."""

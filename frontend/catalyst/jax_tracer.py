@@ -611,7 +611,7 @@ def trace_quantum_measurements(
             if isinstance(device, qml.Device):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
-                m_wires = o.wires if o.wires else range(len(tape.wires))
+                m_wires = o.wires if o.wires else range(len(device.wires))
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
@@ -702,22 +702,22 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(transform_program, tape, flat_results):
+def apply_transform(qnode_program, device_program, tape, flat_results):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_program_transformed = transform_program
+    is_program_transformed = qnode_program
 
-    if is_program_transformed and transform_program.is_informative:
+    if is_program_transformed and qnode_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
     if is_program_transformed:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        tapes, post_processing = transform_program([tape])
+        tapes, post_processing = (qnode_program + device_program)([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
@@ -856,22 +856,24 @@ def trace_quantum_function(
             )
 
             if isinstance(device, qml.devices.Device):
-                transform_program, _ = device.preprocess()
+                device_program, _ = device.preprocess()
             else:
-                transform_program = TransformProgram()
+                device_program = TransformProgram()
 
             # We add pragma because lit test are giving qfunc directly
             # But lit tests are not sending coverage results
             if qnode:  # pragma: no branch
-                transform_program = qnode.transform_program + transform_program
+                qnode_program = qnode.transform_program
+            else:
+                qnode_program = TransformProgram()
 
             tapes, post_processing = apply_transform(
-                transform_program, quantum_tape, return_values_flat
+                qnode_program, device_program, quantum_tape, return_values_flat
             )
 
         # (2) - Quantum tracing
         transformed_results = []
-        is_program_transformed = transform_program
+        is_program_transformed = qnode_program + device_program
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up same device and quantum register for all tapes in the program.
@@ -883,11 +885,12 @@ def trace_quantum_function(
             )
             qreg_in = qalloc_p.bind(len(device.wires))
 
+            multi_circuits = len(tapes) > 1
             for i, tape in enumerate(tapes):
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if is_program_transformed:
+                if multi_circuits:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -903,7 +906,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if is_program_transformed:
+                if multi_circuits:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])
@@ -920,6 +923,9 @@ def trace_quantum_function(
 
             # Deallocate the register before tracing the post-processing.
             qdealloc_p.bind(qreg_out)
+
+        if not multi_circuits:
+            transformed_results = [transformed_results]
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
