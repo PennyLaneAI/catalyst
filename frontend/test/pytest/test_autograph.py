@@ -1228,6 +1228,7 @@ class TestForLoops:
             qjit(autograph=True)(f)
 
     @pytest.mark.filterwarnings("error")
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     def test_ignore_warnings(self, monkeypatch):
         """Test the AutoGraph config flag properly silences warnings."""
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
