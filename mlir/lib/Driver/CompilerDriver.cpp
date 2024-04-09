@@ -283,6 +283,18 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 }
 } // namespace
 
+
+namespace catalyst::driver {
+
+std::string CompilerOutput::nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext)
+{
+    return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
+        .replace_extension(ext);
+}
+
+}
+
+
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
