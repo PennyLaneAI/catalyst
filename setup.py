@@ -15,11 +15,7 @@
 import glob
 import platform
 import subprocess
-
-try:
-    from distutils import sysconfig
-except ImportError:
-    import sysconfig
+import sysconfig
 from os import path
 from typing import Optional
 
