@@ -34,34 +34,26 @@ def convert_shaped_array_to_tensor(sarray):
     return ir.RankedTensorType.get(py_shape, mlir_dtype)
 
 
-# This variable needs to be lazily-initialized. The values
-# stored in this dictionary are MLIR types, which depend on the
-# existance of an MLIRContext object.
-# Upon import, there is no MLIRContext object.
-NUMPY_DTYPE_TO_MLIR = None
-
-
-def convert_numpy_dtype_to_mlir_safe(dtp):
-    """Convert dtype to MLIR. Return None if no type conversion is possible"""
-    global NUMPY_DTYPE_TO_MLIR  # pylint: disable=global-statement
-    if not NUMPY_DTYPE_TO_MLIR:
-        NUMPY_DTYPE_TO_MLIR = {
-            np.dtype(np.complex128): ir.ComplexType.get(ir.F64Type.get()),
-            np.dtype(np.complex64): ir.ComplexType.get(ir.F32Type.get()),
-            np.dtype(np.float64): ir.F64Type.get(),
-            np.dtype(np.float32): ir.F32Type.get(),
-            np.dtype(np.bool_): ir.IntegerType.get_signless(1),
-            np.dtype(np.int8): ir.IntegerType.get_signless(8),
-            np.dtype(np.int16): ir.IntegerType.get_signless(16),
-            np.dtype(np.int32): ir.IntegerType.get_signless(32),
-            np.dtype(np.int64): ir.IntegerType.get_signless(64),
-        }
-    return NUMPY_DTYPE_TO_MLIR.get(dtp)
-
-
 def convert_numpy_dtype_to_mlir(dtp):
     """Convert dtype to MLIR. Raise ValueError if no conversion is possible"""
-    retval = convert_numpy_dtype_to_mlir_safe(dtp)
-    if not retval:
-        raise ValueError("Requested type conversion not available.")
-    return retval
+    if dtp == np.dtype(np.complex128):
+        base = ir.F64Type.get()
+        return ir.ComplexType.get(base)
+    elif dtp == np.dtype(np.complex64):
+        base = ir.F32Type.get()
+        return ir.ComplexType.get(base)
+    elif dtp == np.dtype(np.float64):
+        return ir.F64Type.get()
+    elif dtp == np.dtype(np.float32):
+        return ir.F32Type.get()
+    elif dtp == np.dtype(np.bool_):
+        return ir.IntegerType.get_signless(1)
+    elif dtp == np.dtype(np.int8):
+        return ir.IntegerType.get_signless(8)
+    elif dtp == np.dtype(np.int16):
+        return ir.IntegerType.get_signless(16)
+    elif dtp == np.dtype(np.int32):
+        return ir.IntegerType.get_signless(32)
+    elif dtp == np.dtype(np.int64):
+        return ir.IntegerType.get_signless(64)
+    raise ValueError("Requested type conversion not available.")
