@@ -72,6 +72,32 @@ class LibraryManager {
     }
 };
 
+inline const uintptr_t ext_macos()
+{
+#ifdef __APPLE__
+    return reinterpret_cast<uintptr_t>(".dylib");
+#else
+    return reinterpret_cast<uintptr_t>(nullptr);
+#endif
+}
+
+inline const uintptr_t ext_unix()
+{
+#ifdef __linux__
+    return reinterpret_cast<uintptr_t>(".so");
+#else
+    return reinterpret_cast<uintptr_t>(nullptr);
+#endif
+}
+
+inline const char *ext()
+{
+    const uintptr_t ext_target = ext_macos() | ext_unix();
+    return reinterpret_cast<char *>(ext_target);
+}
+
+std::string library_name(std::string name) { return name + ext(); }
+
 void convertResult(py::handle tuple)
 {
     py::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
@@ -91,7 +117,7 @@ void convertResult(py::handle tuple)
     UnrankedMemrefType *src = (UnrankedMemrefType *)unranked_memref_ptr;
     UnrankedMemrefType destMemref = {src->rank, destAsPtr};
 
-    std::string libpath = libmlirpath + "/libmlir_c_runner_utils.so";
+    std::string libpath = libmlirpath + library_name("/libmlir_c_runner_utils");
     LibraryManager memrefCopy(libpath);
     memrefCopy(e_size, src, &destMemref);
 }
