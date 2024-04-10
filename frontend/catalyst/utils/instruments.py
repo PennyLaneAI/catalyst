@@ -24,6 +24,8 @@ import sys
 import time
 from contextlib import contextmanager
 
+# pylint: disable=f-string-without-interpolation
+
 
 ## API ##
 @contextmanager
@@ -158,7 +160,7 @@ class ResultReporter:
         print(f"[DIAGNOSTICS] Running {self.stage_name.ljust(23)}", end="\t", file=sys.stderr)
         formatted_wall_time = (str(wall_time // 1e3 / 1e3) + " ms").ljust(12)
         print(f"walltime: {formatted_wall_time}", end="\t", file=sys.stderr)
-        formatted_cpu_time = (str(wall_time // 1e3 / 1e3) + " ms").ljust(12)
+        formatted_cpu_time = (str(cpu_time // 1e3 / 1e3) + " ms").ljust(12)
         print(f"cputime: {formatted_cpu_time}", end="\t", file=sys.stderr)
         if program_size is not None:
             print(f"programsize: {program_size} lines", end="", file=sys.stderr)
@@ -184,7 +186,7 @@ class ResultReporter:
 
     @staticmethod
     def dump_header(session_name):
-        """Write the session header to file, contains the timestamp, session name, and system info."""
+        """Write the session header to file, including timestamp, session name, and system info."""
         filename = InstrumentSession.filename
         current_time = datetime.datetime.now()
 
@@ -200,6 +202,9 @@ class ResultReporter:
 
 ## SESSION ##
 class InstrumentSession:
+    """Provides access to global state during instrumentation and sets up / tears down
+    the environment used by the C++ instrumentation code. To be used as a context manager."""
+
     active = False
     filename = None
     finegrained = False
@@ -224,7 +229,7 @@ class InstrumentSession:
             os.environ["DIAGNOSTICS_RESULTS_PATH"] = self.path_flag
 
     @staticmethod
-    def open(session_name, filename, detailed):
+        """Open an instrumentation session. Sets the global state and env variables."""
         InstrumentSession.active = True
         InstrumentSession.filename = filename
         InstrumentSession.finegrained = detailed
@@ -236,7 +241,7 @@ class InstrumentSession:
             ResultReporter.dump_header(session_name)
 
     @staticmethod
-    def close():
+        """Close an instrumentation session. Resets the global state and env variables."""
         InstrumentSession.active = False
         InstrumentSession.filename = None
         InstrumentSession.finegrained = False
