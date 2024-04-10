@@ -237,7 +237,7 @@ class QJIT:
 
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         options = copy.deepcopy(self.compile_options)
-        options.pipelines = [("0_canonicalize", ["canonicalize"])]
+        options.pipelines = [("canonicalize", ["canonicalize"])]
         options.lower_to_llvm = False
         canonicalizer = Compiler(options)
 

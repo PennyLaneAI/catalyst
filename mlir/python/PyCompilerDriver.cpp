@@ -46,12 +46,13 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
     return out;
 }
 
+/// Count the number of files in a workspace. Return the next available counter.
 size_t initDumpCounter(const char *workspace)
 {
     using namespace std;
     try {
         size_t maxDump = 0;
-        auto dirIter = std::filesystem::directory_iterator("directory_path");
+        auto dirIter = std::filesystem::directory_iterator(workspace);
         for (const filesystem::directory_entry& entry : dirIter) {
             if (entry.is_regular_file()) {
                 maxDump = std::max(maxDump, size_t(stoul(entry.path().filename().string())));

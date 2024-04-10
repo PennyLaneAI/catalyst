@@ -250,11 +250,9 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        directory = os.path.join(os.getcwd(), workflow.__name__)
-        files = os.listdir(directory)
+        files = os.listdir(str(workflow.workspace))
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
-        workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
@@ -303,7 +301,7 @@ class TestCompilerState:
         assert "While processing 'TestPass' pass of the 'PipelineB' pipeline" in e.value.args[0]
         assert "PipelineA" not in e.value.args[0]
         assert "Trace" not in e.value.args[0]
-        assert isfile(os.path.join(str(compiled.workspace), "2_PipelineB_FAILED.mlir"))
+        assert isfile(os.path.join(str(compiled.workspace), "3_1_PipelineB_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
