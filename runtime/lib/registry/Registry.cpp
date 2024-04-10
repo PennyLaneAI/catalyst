@@ -19,6 +19,8 @@
 #include <pybind11/pybind11.h>
 #include <unordered_map>
 
+#include <chrono>
+
 #include <iostream>
 
 namespace py = pybind11;
@@ -109,6 +111,11 @@ extern "C" {
 [[gnu::visibility("default")]] void callbackCall(int64_t identifier, int64_t count, int64_t retc,
                                                  va_list args)
 {
+    typedef std::chrono::high_resolution_clock Clock;
+    using std::chrono::nanoseconds;
+    using std::chrono::duration_cast;
+    auto pre_start = Clock::now();
+
     auto it = references->find(identifier);
     if (it == references->end()) {
         throw std::invalid_argument("Callback called with invalid identifier");
@@ -121,8 +128,15 @@ extern "C" {
         flat_args.append(ptr);
     }
 
-    py::list flat_results = lambda(flat_args);
+    auto pre_end = Clock::now();
+    nanoseconds pre_time = duration_cast<nanoseconds>(pre_end-pre_start);
 
+    auto exec_start = Clock::now();
+    py::list flat_results = lambda(flat_args);
+    auto exec_end = Clock::now();
+    nanoseconds exec_time = duration_cast<nanoseconds>(exec_end-exec_start);
+
+    auto post_start = Clock::now();
     // We have a flat list of return values.
     // These returns **may** be array views to
     // the very same memrefs that we passed as inputs.
@@ -137,6 +151,9 @@ extern "C" {
         flat_returns_allocated_compiler.append(ptr);
     }
     convertResults(flat_results, flat_returns_allocated_compiler);
+    auto post_end = Clock::now();
+    nanoseconds post_time = duration_cast<nanoseconds>(post_end-post_start);
+    std::cout << "Callback time: " << pre_time << ", " << exec_time << ", " << post_time << '\n';
 }
 }
 
