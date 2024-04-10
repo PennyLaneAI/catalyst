@@ -69,6 +69,11 @@
 
 <h3>Improvements</h3>
 
+* The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
+  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
+  a Jupyter Notebook.
+  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
 * Manually cleanup the workspace, which prevents a warning from showing up during testing.
   [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
 
