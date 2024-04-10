@@ -53,6 +53,11 @@ class Directory:
             return
         shutil.rmtree(str(self))
 
+    def __del__(self):
+        """Avoid warning by doing manual cleanup during deletion."""
+        if isinstance(self._impl, tempfile.TemporaryDirectory):
+            self._impl.cleanup()
+
 
 class WorkspaceManager:
     """Singleton object that manages the output files for the IR.
