@@ -484,7 +484,7 @@ class Compiler:
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
-                multi_threaded_compilation=options.multi_threaded_compilation,
+                multi_threaded_compilation=self.options.multi_threaded_compilation,
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e
