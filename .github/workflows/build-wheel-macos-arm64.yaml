@@ -339,6 +339,7 @@ jobs:
 
     - name: Build wheel
       run: |
+        # TODO: Investigate why we need setuptools here and remove
         python${{ matrix.python_version }} -m pip install setuptools
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build \
