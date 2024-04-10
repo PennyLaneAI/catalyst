@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <filesystem>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -53,14 +53,14 @@ size_t initDumpCounter(const char *workspace)
     try {
         size_t maxDump = 0;
         auto dirIter = std::filesystem::directory_iterator(workspace);
-        for (const filesystem::directory_entry& entry : dirIter) {
+        for (const filesystem::directory_entry &entry : dirIter) {
             if (entry.is_regular_file()) {
                 maxDump = std::max(maxDump, size_t(stoul(entry.path().filename().string())));
             }
         }
         return maxDump > 0 ? maxDump + 1 : 0;
     }
-    catch(std::filesystem::filesystem_error &e) {
+    catch (std::filesystem::filesystem_error &e) {
         return 0;
     }
 }
@@ -96,8 +96,8 @@ PYBIND11_MODULE(compiler_driver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool verbose, py::list pipelines,
-           bool lower_to_llvm, bool multi_threaded_compilation) -> std::unique_ptr<CompilerOutput> {
+           bool verbose, py::list pipelines, bool lower_to_llvm,
+           bool multi_threaded_compilation) -> std::unique_ptr<CompilerOutput> {
             std::unique_ptr<CompilerOutput> output(new CompilerOutput(initDumpCounter(workspace)));
             assert(output);
 

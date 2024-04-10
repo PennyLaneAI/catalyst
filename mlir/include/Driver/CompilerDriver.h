@@ -90,9 +90,7 @@ struct CompilerOptions {
 
 struct CompilerOutput {
     typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
-    CompilerOutput(int counter = 0)
-        : pipelineCounter(counter)
-    {}
+    CompilerOutput(int counter = 0) : pipelineCounter(counter) {}
     std::string objectFilename;
     std::string outIR;
     std::string diagnosticMessages;

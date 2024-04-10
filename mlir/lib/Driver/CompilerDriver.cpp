@@ -283,7 +283,6 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 }
 } // namespace
 
-
 namespace catalyst::driver {
 
 std::string CompilerOutput::nextDumpFilename(std::string filenameBase, std::string ext)
@@ -294,13 +293,12 @@ std::string CompilerOutput::nextDumpFilename(std::string filenameBase, std::stri
 
 std::string CompilerOutput::pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx)
 {
-    return std::filesystem::path(
-        std::to_string(this->pipelineCounter) + "_" + std::to_string(pipelineIdx) + "_" + pipelineName)
+    return std::filesystem::path(std::to_string(this->pipelineCounter) + "_" +
+                                 std::to_string(pipelineIdx) + "_" + pipelineName)
         .replace_extension(".mlir");
 }
 
-}
-
+} // namespace catalyst::driver
 
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
@@ -472,15 +470,16 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     // Maps a pass to zero or one pipelines ended by this pass
     // Maps a pass to its owning pipeline
-    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t> > pipelineTailMarkers;
-    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t> > passPipelineNames;
+    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t>> pipelineTailMarkers;
+    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t>> passPipelineNames;
 
     // Fill all the pipe-to-pipeline mappings
     {
         size_t pipelineIdx = 0;
         for (const auto &pipeline : options.pipelinesCfg) {
             size_t existingPasses = pm.size();
-            if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
+            if (failed(
+                    parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
                 return failure();
             }
             if (existingPasses != pm.size()) {
@@ -492,7 +491,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                 assert(pass != nullptr);
                 pipelineTailMarkers[pass] = pair(pipeline.name, pipelineIdx);
             }
-            pipelineIdx ++;
+            pipelineIdx++;
         }
     }
 
@@ -500,8 +499,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
-        dumpToFile(options, output.nextDumpFilename(options.moduleName.str(), ".mlir"),
-                   tmp);
+        dumpToFile(options, output.nextDumpFilename(options.moduleName.str(), ".mlir"), tmp);
     }
 
     catalyst::utils::Timer timer{};
@@ -581,7 +579,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     ctx.enableMultithreading(options.enableMultiThreadedCompilation);
     CO_MSG(options, Verbosity::Debug,
-        "MLIR multi-threaded compilation: " << options.enableMultiThreadedCompilation);
+           "MLIR multi-threaded compilation: " << options.enableMultiThreadedCompilation);
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
