@@ -44,7 +44,7 @@ def instrumentation(session_name, filename=None, detailed=False):
     try:
         yield None
     finally:
-        del session
+        session.close()
 
 
 def instrument(fn=None, *, size_from=None, has_finegrained=False):
@@ -213,22 +213,14 @@ class InstrumentSession:
         self.enable_flag = os.environ.pop("ENABLE_DIAGNOSTICS", None)
         self.path_flag = os.environ.pop("DIAGNOSTICS_RESULTS_PATH", None)
 
-        self.open(session_name, filename, detailed)
+        self.open_session(session_name, filename, detailed)
 
-    def __del__(self):
-        self.close()
-
-        if self.enable_flag is None:
-            os.environ.pop("ENABLE_DIAGNOSTICS", None)  # safely delete
-        else:
-            os.environ["ENABLE_DIAGNOSTICS"] = self.enable_flag
-
-        if self.path_flag is None:
-            os.environ.pop("ENABLE_DIAGNOSTICS", None)  # safely delete
-        else:
-            os.environ["DIAGNOSTICS_RESULTS_PATH"] = self.path_flag
+    def close(self):
+        """Terminate the instrumentation session."""
+        self.close_session(self.enable_flag, self.path_flag)
 
     @staticmethod
+    def open_session(session_name, filename, detailed):
         """Open an instrumentation session. Sets the global state and env variables."""
         InstrumentSession.active = True
         InstrumentSession.filename = filename
@@ -241,7 +233,18 @@ class InstrumentSession:
             ResultReporter.dump_header(session_name)
 
     @staticmethod
+    def close_session(enable_flag, path_flag):
         """Close an instrumentation session. Resets the global state and env variables."""
         InstrumentSession.active = False
         InstrumentSession.filename = None
         InstrumentSession.finegrained = False
+
+        if enable_flag is None:
+            os.environ.pop("ENABLE_DIAGNOSTICS", None)  # safely delete
+        else:
+            os.environ["ENABLE_DIAGNOSTICS"] = enable_flag
+
+        if path_flag is None:
+            os.environ.pop("ENABLE_DIAGNOSTICS", None)  # safely delete
+        else:
+            os.environ["DIAGNOSTICS_RESULTS_PATH"] = path_flag
