@@ -429,6 +429,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
+    multi_threaded_compilation=False,
 ):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -721,36 +722,22 @@ def qjit(
 
     argnums = static_argnums
     axes = abstracted_axes
+    compile_options = CompileOptions(
+        verbose,
+        logfile,
+        target,
+        keep_intermediate,
+        pipelines,
+        autograph,
+        async_qnodes,
+        static_argnums=argnums,
+        abstracted_axes=axes,
+        multi_threaded_compilation=multi_threaded_compilation,
+    )
     if fn is not None:
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
+        return QJIT(fn, compile_options)
 
     def wrap_fn(fn):
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
+        return QJIT(fn, compile_options)
 
     return wrap_fn

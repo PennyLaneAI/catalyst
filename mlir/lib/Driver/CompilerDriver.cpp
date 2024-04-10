@@ -578,7 +578,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
-    ctx.enableMultithreading();
+
+    ctx.enableMultithreading(options.enableMultiThreadedCompilation);
+    CO_MSG(options, Verbosity::Debug,
+        "MLIR multi-threaded compilation: " << options.enableMultiThreadedCompilation);
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 

@@ -64,6 +64,8 @@ class CompileOptions:
         static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
+        multi_threaded_compilation (bool): Enable MLIR multi-threaded compilation. Disabled by
+            default.
     """
 
     verbose: Optional[bool] = False
@@ -76,6 +78,7 @@ class CompileOptions:
     lower_to_llvm: Optional[bool] = True
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+    multi_threaded_compilation: bool = False
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
@@ -481,6 +484,7 @@ class Compiler:
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
+                multi_threaded_compilation=options.multi_threaded_compilation,
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e

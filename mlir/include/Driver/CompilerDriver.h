@@ -78,6 +78,7 @@ struct CompilerOptions {
     std::vector<Pipeline> pipelinesCfg;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool lowerToLLVM;
+    bool enableMultiThreadedCompilation;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
