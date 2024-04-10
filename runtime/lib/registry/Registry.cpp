@@ -72,6 +72,19 @@ class LibraryManager {
     }
 };
 
+inline const char *ext()
+{
+#ifdef __APPLE__
+    return ".dylib";
+#elif __linux__
+    return ".so";
+#else
+#error "Only apple and linux are currently supported";
+#endif
+}
+
+std::string library_name(std::string name) { return name + ext(); }
+
 void convertResult(py::handle tuple)
 {
     py::object unrankedMemrefPtrSizeTuple = tuple.attr("__getitem__")(0);
@@ -91,7 +104,7 @@ void convertResult(py::handle tuple)
     UnrankedMemrefType *src = (UnrankedMemrefType *)unranked_memref_ptr;
     UnrankedMemrefType destMemref = {src->rank, destAsPtr};
 
-    std::string libpath = libmlirpath + "/libmlir_c_runner_utils.so";
+    std::string libpath = libmlirpath + library_name("/libmlir_c_runner_utils");
     LibraryManager memrefCopy(libpath);
     memrefCopy(e_size, src, &destMemref);
 }
