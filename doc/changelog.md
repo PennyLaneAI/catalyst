@@ -127,6 +127,14 @@
 
 <h3>Breaking changes</h3>
 
+<h3>Internal changes</h3>
+
+* The `catalyst.cuda.cudaqjit` decorator has been refactored to inherit from the main
+  `catalyst.QJIT` class. This enables the functionality provided by the `QJIT` class to be
+  supported by the CUDA quantum QJIT, while reducing code duplication. Longer term, this will help
+  enable autograph support for `catalyst.cuda.cudaqjit`.
+  [(#602)](https://github.com/PennyLaneAI/catalyst/pull/602)
+
 <h3>Bug fixes</h3>
 
 * Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
@@ -155,6 +163,7 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Josh Izaac,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez,
