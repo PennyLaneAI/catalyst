@@ -79,8 +79,8 @@ def printerr(*args, **kwargs) -> None:
     print(*args, **kwargs, file=sys.stderr)
 
 
-def parse_mlir_mt(mlir_mt:str) -> bool:
-    """ Parse --mlir-mt flag """
+def parse_mlir_mt(mlir_mt: str) -> bool:
+    """Parse --mlir-mt flag"""
     if mlir_mt.lower() in {"1", "yes", "true", "on"}:
         return True
     elif mlir_mt.lower() in {"0", "no", "false", "off"}:
