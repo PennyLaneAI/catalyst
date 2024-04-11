@@ -41,9 +41,7 @@ class TestControlledDecomposition:
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qml.probs()
 
-        with pytest.raises(
-            CompileError, match="not supported on device and does not provide a decomposition."
-        ):
+        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qjit(f, target="jaxpr")
 
 

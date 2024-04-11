@@ -73,7 +73,7 @@ def decompose(
 
     def decomposer(op):
 
-        if op.name in {"MultiControlledX", "BlockEncode"}:
+        if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -86,10 +86,9 @@ def decompose(
 
     if len(tape) == 0:
         return (tape,), lambda x: x[0]
-    prep_op = [tape[0]] if isinstance(tape[0], StatePrepBase) else []
 
     new_ops = []
-    for op in tape.operations[bool(prep_op) :]:
+    for op in tape.operations:
         if isinstance(op, MidMeasureMP):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
         if isinstance(
@@ -119,7 +118,7 @@ def decompose(
                     )
                 ]
             )
-    tape = qml.tape.QuantumScript(prep_op + new_ops, tape.measurements, shots=tape.shots)
+    tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
 

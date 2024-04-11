@@ -892,12 +892,12 @@ def trace_quantum_function(
             )
             qreg_in = qalloc_p.bind(len(device.wires))
 
-            multi_circuits = len(tapes) > 1
+            transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if multi_circuits:
+                if transformed:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -913,7 +913,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if multi_circuits:
+                if transformed:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])
