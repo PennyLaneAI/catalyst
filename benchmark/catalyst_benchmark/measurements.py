@@ -79,6 +79,16 @@ def printerr(*args, **kwargs) -> None:
     print(*args, **kwargs, file=sys.stderr)
 
 
+def parse_mlir_mt(mlir_mt:str) -> bool:
+    """ Parse --mlir-mt flag """
+    if mlir_mt.lower() in {"1", "yes", "true", "on"}:
+        return True
+    elif mlir_mt.lower() in {"0", "no", "false", "off"}:
+        return False
+    else:
+        raise NotImplementedError(f"Unsupported mlir-mt: {mlir_mt}")
+
+
 def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
     """Parse the implementation parameter, expect the "framework[+jax]/device" syntax."""
     tokens = implementation.split("/")
@@ -167,6 +177,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
+    mlir_mt = parse_mlir_mt(a.mlir_mt)
     weights = p.trial_params(0)
 
     def _main(weights: ShapedArray(weights.shape, dtype=jnp.float64)):
@@ -178,7 +189,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         weights = p.trial_params(i)
 
         b = time()
-        jit_main = qjit(_main)
+        jit_main = qjit(_main, multi_threaded_compilation=mlir_mt)
         e = time()
         times.append(e - b)
 
@@ -241,6 +252,7 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
+    mlir_mt = parse_mlir_mt(a.mlir_mt)
     weights = p.trial_params(0)
 
     def _main(weights: ShapedArray(weights.shape, dtype=jnp.float64)):
@@ -248,7 +260,7 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
         return workflow(p, weights)
 
     b = time()
-    jit_main = qjit(_main)
+    jit_main = qjit(_main, multi_threaded_compilation=mlir_mt)
     e = time()
     cmptime = e - b
 

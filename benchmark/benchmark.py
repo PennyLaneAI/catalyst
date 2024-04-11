@@ -62,6 +62,9 @@ runcmd.add_argument("-L","--nlayers", type=int, default=None, metavar="INT",
                     help="Number of layers, problem-specific (default - auto)")
 runcmd.add_argument("--vqe-diff-method", type=str, default="finite-diff",
                     help="VQE-specific: Differentiation method (default - backprop)")
+runcmd.add_argument("--mlir-mt", type=str, default="0",
+                    help="Catalyst-specific: Whether to use MLIR multi-threaded compilation "
+                    "(default - 0|no)")
 # fmt: on
 
 a = parse_args(ap, sys.argv[1:])
