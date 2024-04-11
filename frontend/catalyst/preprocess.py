@@ -96,15 +96,19 @@ def decompose(
             (
                 catalyst.pennylane_extensions.Adjoint,
                 catalyst.pennylane_extensions.MidCircuitMeasure,
+                catalyst.pennylane_extensions.ForLoop,
+                catalyst.pennylane_extensions.WhileLoop,
+                catalyst.pennylane_extensions.Cond,
             ),
         ):
             for r in op.regions:
-                tapes, _ = decompose(
-                    r.quantum_tape,
-                    stopping_condition=stopping_condition,
-                    max_expansion=max_expansion,
-                )
-                r.quantum_tape = tapes[0]
+                if r.quantum_tape:
+                    tapes, _ = decompose(
+                        r.quantum_tape,
+                        stopping_condition=stopping_condition,
+                        max_expansion=max_expansion,
+                    )
+                    r.quantum_tape = tapes[0]
             new_ops.append(op)
         else:
             new_ops.extend(

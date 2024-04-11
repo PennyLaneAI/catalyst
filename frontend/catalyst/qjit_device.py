@@ -291,9 +291,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
 
-        # convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
-        # program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
-
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(decompose, stopping_condition=ops_acceptance)
 
