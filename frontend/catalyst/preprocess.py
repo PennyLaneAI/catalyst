@@ -17,6 +17,7 @@ import catalyst.pennylane_extensions
 import jax
 import pennylane as qml
 from pennylane.operation import StatePrepBase
+from pennylane.measurements import MidMeasureMP
 from pennylane import transform
 from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, VarianceMP
 from pennylane.tape.tape import (
@@ -71,13 +72,33 @@ def decompose(
     """Decompose operations until the stopping condition is met."""
 
     def decomposer(op):
+
+        if op.name in {"MultiControlledX", "BlockEncode"}:
+            try:
+                mat = op.matrix()
+            except Exception as e:
+                raise CompileError(
+                    f"Operation {op} could not be decomposed, it might be unsupported."
+                ) from e
+            op = qml.QubitUnitary(mat, wires=op.wires)
+            return [op]
         return op.decomposition()
 
+    if len(tape) == 0:
+        return (tape,), lambda x: x[0]
     prep_op = [tape[0]] if isinstance(tape[0], StatePrepBase) else []
 
     new_ops = []
     for op in tape.operations[bool(prep_op) :]:
-        if isinstance(op, catalyst.pennylane_extensions.Adjoint):
+        if isinstance(op, MidMeasureMP):
+            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+        if isinstance(
+            op,
+            (
+                catalyst.pennylane_extensions.Adjoint,
+                catalyst.pennylane_extensions.MidCircuitMeasure,
+            ),
+        ):
             for r in op.regions:
                 tapes, _ = decompose(
                     r.quantum_tape,
@@ -87,7 +108,6 @@ def decompose(
                 r.quantum_tape = tapes[0]
             new_ops.append(op)
         else:
-
             new_ops.extend(
                 [
                     op

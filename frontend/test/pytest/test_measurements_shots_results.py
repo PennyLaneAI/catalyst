@@ -429,8 +429,8 @@ class TestVar:
             return qml.var(0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1))
 
         with pytest.raises(
-            ValueError,
-            match="Can only return the expectation of a single Hamiltonian observable",
+            TypeError,
+            match=r"VarianceMP\(Hamiltonian\/Sum\) cannot be computed with samples",
         ):
             circuit(0.432, 0.123, -0.543)
 
@@ -489,7 +489,6 @@ class TestOtherMeasurements:
                 qml.expval(qml.PauliZ(0)),
                 qml.var(qml.PauliZ(0)),
                 qml.probs(wires=[0, 1]),
-                qml.state(),
             )
 
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10000))
@@ -530,9 +529,6 @@ class TestOtherMeasurements:
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )
-
-        # qml.state
-        assert np.allclose(result[5], expected(x, qml.state()))
 
 
 if __name__ == "__main__":

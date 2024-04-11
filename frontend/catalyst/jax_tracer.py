@@ -838,7 +838,6 @@ def trace_quantum_function(
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
-        print("initial0", quantum_tape.circuit)
         with EvaluationContext.frame_tracing_context(ctx) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
@@ -846,7 +845,6 @@ def trace_quantum_function(
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
                 return_values_flat = wffa.call_wrapped(*in_classical_tracers)
-            print("initial1", quantum_tape.circuit)
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
             # Therefore we need to compute the tree with measurements as leaves and it comes
@@ -875,7 +873,7 @@ def trace_quantum_function(
                 qnode_program = qnode.transform_program
             else:
                 qnode_program = TransformProgram()
-            print("device", device_program)
+
             tapes, post_processing = apply_transform(
                 qnode_program, device_program, quantum_tape, return_values_flat
             )
@@ -896,7 +894,6 @@ def trace_quantum_function(
 
             multi_circuits = len(tapes) > 1
             for i, tape in enumerate(tapes):
-                print("op", tape.operations)
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
@@ -933,9 +930,6 @@ def trace_quantum_function(
 
             # Deallocate the register before tracing the post-processing.
             qdealloc_p.bind(qreg_out)
-
-        if not multi_circuits:
-            transformed_results = [transformed_results]
 
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
