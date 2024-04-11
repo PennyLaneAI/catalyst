@@ -78,7 +78,7 @@ class CompileOptions:
     lower_to_llvm: Optional[bool] = True
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    multi_threaded_compilation: bool = False
+    multi_threaded_compilation: bool = True
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
