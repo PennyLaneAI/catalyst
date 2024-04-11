@@ -7,6 +7,7 @@
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
+  [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -67,6 +68,14 @@
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
 
 <h3>Improvements</h3>
+
+* The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
+  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
+  a Jupyter Notebook.
+  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
+* Manually cleanup the workspace, which prevents a warning from showing up during testing.
+  [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
 
 * An exception is now raised when OpenBLAS cannot be found by Catalyst.
   [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)

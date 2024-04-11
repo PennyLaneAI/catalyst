@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <filesystem>
+#include <csignal>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -96,8 +97,13 @@ PYBIND11_MODULE(compiler_driver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool verbose, py::list pipelines, bool lower_to_llvm,
+           bool verbose, py::list pipelines,
+           bool lower_to_llvm,
            bool multi_threaded_compilation) -> std::unique_ptr<CompilerOutput> {
+            // Install signal handler to catch user interrupts (e.g. CTRL-C).
+            signal(SIGINT,
+                   [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
+
             std::unique_ptr<CompilerOutput> output(new CompilerOutput(initDumpCounter(workspace)));
             assert(output);
 
