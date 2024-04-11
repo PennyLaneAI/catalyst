@@ -13,8 +13,10 @@
 # limitations under the License.
 """This module contains the preprocessing functions.
 """
+import catalyst.pennylane_extensions
 import jax
 import pennylane as qml
+from pennylane.operation import StatePrepBase
 from pennylane import transform
 from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, VarianceMP
 from pennylane.tape.tape import (
@@ -24,6 +26,82 @@ from pennylane.tape.tape import (
 
 import catalyst
 from catalyst.utils.exceptions import CompileError
+
+
+def _operator_decomposition_gen(
+    op: qml.operation.Operator,
+    acceptance_function,
+    decomposer,
+    max_expansion=None,
+    current_depth=0,
+    name: str = "device",
+):
+    """A generator that yields the next operation that is accepted."""
+    max_depth_reached = False
+    if max_expansion is not None and max_expansion <= current_depth:
+        max_depth_reached = True
+    if acceptance_function(op) or max_depth_reached:
+        yield op
+    else:
+        try:
+            decomp = decomposer(op)
+            current_depth += 1
+        except qml.operation.DecompositionUndefinedError as e:
+            raise CompileError(
+                f"Operator {op} not supported on {name} and does not provide a decomposition."
+            ) from e
+
+        for sub_op in decomp:
+            yield from _operator_decomposition_gen(
+                sub_op,
+                acceptance_function,
+                decomposer=decomposer,
+                max_expansion=max_expansion,
+                current_depth=current_depth,
+                name=name,
+            )
+
+
+@transform
+def decompose(
+    tape: qml.tape.QuantumTape,
+    stopping_condition,
+    max_expansion=None,
+):
+    """Decompose operations until the stopping condition is met."""
+
+    def decomposer(op):
+        return op.decomposition()
+
+    prep_op = [tape[0]] if isinstance(tape[0], StatePrepBase) else []
+
+    new_ops = []
+    for op in tape.operations[bool(prep_op) :]:
+        if isinstance(op, catalyst.pennylane_extensions.Adjoint):
+            for r in op.regions:
+                tapes, _ = decompose(
+                    r.quantum_tape,
+                    stopping_condition=stopping_condition,
+                    max_expansion=max_expansion,
+                )
+                r.quantum_tape = tapes[0]
+            new_ops.append(op)
+        else:
+
+            new_ops.extend(
+                [
+                    op
+                    for op in _operator_decomposition_gen(
+                        op,
+                        stopping_condition,
+                        decomposer=decomposer,
+                        max_expansion=max_expansion,
+                    )
+                ]
+            )
+    tape = qml.tape.QuantumScript(prep_op + new_ops, tape.measurements, shots=tape.shots)
+
+    return (tape,), lambda x: x[0]
 
 
 @transform

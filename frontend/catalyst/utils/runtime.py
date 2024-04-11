@@ -257,6 +257,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         #         f"Observables that present only in spec: {spec_observables - device_observables}\n"
         #     )
 
+
 def device_get_toml_config(device) -> Path:
     """Get the path of the device config file."""
     if hasattr(device, "config"):

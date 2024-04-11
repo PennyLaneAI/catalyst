@@ -83,6 +83,7 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
+from pennylane.devices.preprocess import decompose
 
 
 class Function:
@@ -317,6 +318,13 @@ class HybridOp(Operation):
     ) -> QRegPromise:
         """Perform the second, quantum part of the Hybrid operation tracing."""
         raise NotImplementedError("HybridOp should implement trace")  # pragma: no cover
+
+    # def decomposition(self):
+    #     for r in self.regions:
+    #         tapes, _ = decompose(r.quantum_tape)
+    #         print("here<", tapes[0].circuit)
+    #         r.quantum_tape = tapes[0]
+    #     return super().decomposition()
 
 
 def has_nested_tapes(op: Operation) -> bool:
@@ -717,13 +725,14 @@ def apply_transform(qnode_program, device_program, tape, flat_results):
 
     if is_program_transformed:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        tapes, post_processing = (qnode_program + device_program)([tape])
+        total_program = qnode_program + device_program
+        tapes, post_processing = total_program([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
     else:
         # Apply the identity transform in order to keep generalization
-        tapes, post_processing = identity_qnode_transform(tape)
+        tapes, post_processing = device_program([tape])
     return tapes, post_processing
 
 
@@ -829,7 +838,7 @@ def trace_quantum_function(
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
-
+        print("initial0", quantum_tape.circuit)
         with EvaluationContext.frame_tracing_context(ctx) as trace:
             wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
@@ -837,7 +846,7 @@ def trace_quantum_function(
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
                 return_values_flat = wffa.call_wrapped(*in_classical_tracers)
-
+            print("initial1", quantum_tape.circuit)
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
             # Therefore we need to compute the tree with measurements as leaves and it comes
@@ -866,14 +875,14 @@ def trace_quantum_function(
                 qnode_program = qnode.transform_program
             else:
                 qnode_program = TransformProgram()
-
+            print("device", device_program)
             tapes, post_processing = apply_transform(
                 qnode_program, device_program, quantum_tape, return_values_flat
             )
 
         # (2) - Quantum tracing
         transformed_results = []
-        is_program_transformed = qnode_program + device_program
+        # is_program_transformed = qnode_program + device_program
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up same device and quantum register for all tapes in the program.
@@ -887,6 +896,7 @@ def trace_quantum_function(
 
             multi_circuits = len(tapes) > 1
             for i, tape in enumerate(tapes):
+                print("op", tape.operations)
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
