@@ -36,6 +36,7 @@ from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_leaves,
+    tree_map,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
@@ -98,6 +99,7 @@ from catalyst.tracing.contexts import (
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
+    get_unranked_memref_descriptor,
     ranked_memref_to_numpy,
 )
 from catalyst.utils.runtime import (
@@ -2610,18 +2612,18 @@ def callback(func):
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
     @wraps(func)
-    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
+    def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        callback_implementation(func, retty, *args, **kwargs)
+        return callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
 
 
 def callback_implementation(
-    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -2634,6 +2636,19 @@ def callback_implementation(
     flat_args, in_tree = tree_flatten((args, kwargs))
     metadata = CallbackClosure(args, kwargs)
 
+    def to_shaped_array(ty):
+        if ty == inspect.Signature.empty:
+            return None
+        if isinstance(ty, ShapedArray):
+            return ty.strip_weak_type()
+        return shaped_abstractify(ty).strip_weak_type()
+
+    results_aval = tree_map(to_shaped_array, result_shape_dtypes)
+    if not isinstance(results_aval, Sequence):
+        results_aval = [results_aval]
+
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+
     def _flat_callback(flat_args):
         """Each flat_arg is a pointer.
 
@@ -2641,15 +2656,27 @@ def callback_implementation(
         To find out which element type it has, we use the signature obtained previously.
         """
         jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-
         args, kwargs = tree_unflatten(in_tree, jnpargs)
-        return tree_leaves(cb(*args, **kwargs))
+        retvals = tree_leaves(cb(*args, **kwargs))
+        return_values = []
+        for retval, exp_aval in zip(retvals, results_aval):
+            obs_aval = shaped_abstractify(retval)
+            if obs_aval != exp_aval:
+                raise TypeError(
+                    # pylint: disable-next=line-too-long
+                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+                )
+            ranked_memref = get_ranked_memref_descriptor(retval)
+            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
+            unranked_memref = get_unranked_memref_descriptor(retval)
+            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
+            # We need to keep a value of retval around
+            # Otherwise, Python's garbage collection will collect the memory
+            # before we run the memory copy in the runtime.
+            # We need to copy the unranked_memref_ptr and we need to know the element size.
+            return_values.append((unranked_memref_ptr, element_size, retval))
+        return return_values
 
-    # TODO(@erick-xanadu): Change back once we support return values.
-    # I am leaving this as a to-do because otherwise the coverage will complain.
-    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
-    results_aval = []
-    flat_results_aval, out_tree = tree_flatten(results_aval)
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )

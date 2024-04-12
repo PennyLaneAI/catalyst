@@ -74,6 +74,7 @@ from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 from catalyst.compiler import get_lib_path
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -250,7 +251,9 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
-    return PythonCallOp(args, identifier).results
+
+    mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
+    return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
 #

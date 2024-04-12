@@ -5,27 +5,27 @@
 * Support for callbacks in Catalyst.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
+  [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
+  [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
+  [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
 
-  Catalyst now supports callbacks with parameters but no return values.
-  This is the very first step in supporting callbacks.
+  Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
 
   ```py
   @callback
   def foo(val):
-    print("Hello world", val)
+    return val
 
   @qjit
-  def circuit(*args, **kwargs):
-    ...
-    foo(123)
-    ...
+  def circuit(param):
+    return foo(param)
 
   ```
 
   ```pycon
-  >>> circuit()
-  Hello world 123
+  >>> print(circuit(123))
+  123
   ```
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
@@ -68,6 +68,17 @@
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
 
 <h3>Improvements</h3>
+
+* The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
+  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
+  a Jupyter Notebook.
+  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
+* Manually cleanup the workspace, which prevents a warning from showing up during testing.
+  [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
+
+* An exception is now raised when OpenBLAS cannot be found by Catalyst.
+  [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
 
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
@@ -117,7 +128,7 @@
 
   After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
-* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded. 
+* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
 <h3>Breaking changes</h3>

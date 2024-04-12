@@ -313,7 +313,7 @@ jobs:
     - name: Build OQC-Runtime
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
           make oqc
 
     # Build Quantum and Gradient Dialects
