@@ -518,9 +518,6 @@ def trace_observables(
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
-    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
-        # Use the pauli sentence representation of the observable, if applicable
-        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
@@ -532,6 +529,9 @@ def trace_observables(
         coeffs = jax.numpy.array(terms[0])
         nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
         obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
+    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
+        # Use the pauli sentence representation of the observable, if applicable
+        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"

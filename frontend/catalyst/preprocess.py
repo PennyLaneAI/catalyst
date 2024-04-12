@@ -179,7 +179,7 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
             catalyst.pennylane_extensions.Cond,
         ),
     ):
-        return op.visited
+        return op.name in operations and op.visited
 
     return op.name in operations
 
