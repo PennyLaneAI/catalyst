@@ -37,7 +37,7 @@ class RXX(Operation):
         return [qml.PauliRot(self.theta, pauli_word="XX", wires=self.wires)]
 
 
-lightning = qml.device("lightning.qubit", wires=3)
+lightning = qml.device("lightning.kokkos", wires=3)
 
 
 class CustomDeviceWithoutSupport(qml.QubitDevice):

@@ -27,7 +27,7 @@ from catalyst.pennylane_extensions import qfunc
 def get_custom_device_without(num_wires, discards):
     """Generate a custom device without gates in discards."""
 
-    lightning = qml.device("lightning.qubit", wires=3)
+    lightning = qml.device("lightning.kokkos", wires=3)
     copy = lightning.operations.copy()
     observables_copy = lightning.observables.copy()
     for discard in discards:

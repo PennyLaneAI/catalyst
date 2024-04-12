@@ -24,13 +24,14 @@ from catalyst import qjit
 from catalyst.pennylane_extensions import qfunc
 from catalyst.qjit_device import QJITDevice
 from catalyst.utils.runtime import device_get_toml_config
+from catalyst.compiler import get_lib_path
 
 
 def get_custom_qjit_device(num_wires, discarded_operations=None, added_operations=None):
     """Generate a custom device with the modified set of supported gates."""
 
-    lightning = qml.device("lightning.qubit", wires=3)
-    config = device_get_toml_config(lightning)
+    lightning = qml.device("lightning.kokkos", wires=3)
+
     operations_copy = lightning.operations.copy()
     observables_copy = lightning.observables.copy()
     for op in discarded_operations or []:
@@ -38,7 +39,7 @@ def get_custom_qjit_device(num_wires, discarded_operations=None, added_operation
     for op in added_operations or []:
         operations_copy.add(op)
 
-    class CustomQJITDevice(QJITDevice):
+    class CustomDevice(qml.QubitDevice):
         """Custom Device"""
 
         name = "Device without some operations"
@@ -51,13 +52,23 @@ def get_custom_qjit_device(num_wires, discarded_operations=None, added_operation
         observables = observables_copy
 
         # pylint: disable=too-many-arguments
-        def __init__(self, shots=None, wires=None, backend=None):
-            super().__init__(config, wires=wires, shots=shots, backend=backend)
+        def __init__(
+            self, shots=None, wires=None, backend_name=None, backend_lib=None, backend_kwargs=None
+        ):
+            self.backend_name = backend_name if backend_name else "default"
+            self.backend_lib = backend_lib if backend_lib else "default"
+            self.backend_kwargs = backend_kwargs if backend_kwargs else ""
+            super().__init__(wires=wires, shots=shots)
 
-        def apply(self, operations, **kwargs):  # pylint: disable=missing-function-docstring
+        def apply(self, operations, **kwargs):
             pass
 
-    return CustomQJITDevice(wires=num_wires)
+        @staticmethod
+        def get_c_interface():
+            """Location to shared object with C/C++ implementation"""
+            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
+    return CustomDevice(wires=num_wires)
 
 
 def test_named_controlled():

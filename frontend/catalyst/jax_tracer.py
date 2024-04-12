@@ -500,6 +500,7 @@ def trace_observables(
         out_classical_tracers: a list of classical tracers corresponding to the measured values.
         nqubits: number of actually measured qubits.
     """
+    print(obs)
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = None
     if obs is None:
