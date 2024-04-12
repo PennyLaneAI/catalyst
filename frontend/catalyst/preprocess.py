@@ -13,19 +13,24 @@
 # limitations under the License.
 """This module contains the preprocessing functions.
 """
-import catalyst.pennylane_extensions
 import jax
 import pennylane as qml
-from pennylane.operation import StatePrepBase
-from pennylane.measurements import MidMeasureMP
 from pennylane import transform
-from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, VarianceMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MidMeasureMP,
+    ProbabilityMP,
+    VarianceMP,
+)
+from pennylane.operation import StatePrepBase
 from pennylane.tape.tape import (
     _validate_computational_basis_sampling,
     rotations_and_diagonal_measurements,
 )
 
 import catalyst
+import catalyst.pennylane_extensions
 from catalyst.utils.exceptions import CompileError
 
 
@@ -72,7 +77,6 @@ def decompose(
     """Decompose operations until the stopping condition is met."""
 
     def decomposer(op):
-
         if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
             try:
                 mat = op.matrix()
@@ -82,16 +86,7 @@ def decompose(
                 ) from e
             op = qml.QubitUnitary(mat, wires=op.wires)
             return [op]
-        return op.decomposition()
-
-    if len(tape) == 0:
-        return (tape,), lambda x: x[0]
-
-    new_ops = []
-    for op in tape.operations:
-        if isinstance(op, MidMeasureMP):
-            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-        if isinstance(
+        elif isinstance(
             op,
             (
                 catalyst.pennylane_extensions.Adjoint,
@@ -109,19 +104,28 @@ def decompose(
                         max_expansion=max_expansion,
                     )
                     r.quantum_tape = tapes[0]
-            new_ops.append(op)
-        else:
-            new_ops.extend(
-                [
-                    op
-                    for op in _operator_decomposition_gen(
-                        op,
-                        stopping_condition,
-                        decomposer=decomposer,
-                        max_expansion=max_expansion,
-                    )
-                ]
-            )
+            op.visited = True
+            return [op]
+        return op.decomposition()
+
+    if len(tape) == 0:
+        return (tape,), lambda x: x[0]
+
+    new_ops = []
+    for op in tape.operations:
+        if isinstance(op, MidMeasureMP):
+            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+        new_ops.extend(
+            [
+                op
+                for op in _operator_decomposition_gen(
+                    op,
+                    stopping_condition,
+                    decomposer=decomposer,
+                    max_expansion=max_expansion,
+                )
+            ]
+        )
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
@@ -165,6 +169,18 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
+    if isinstance(
+        op,
+        (
+            catalyst.pennylane_extensions.Adjoint,
+            catalyst.pennylane_extensions.MidCircuitMeasure,
+            catalyst.pennylane_extensions.ForLoop,
+            catalyst.pennylane_extensions.WhileLoop,
+            catalyst.pennylane_extensions.Cond,
+        ),
+    ):
+        return op.visited
+
     return op.name in operations
 
 

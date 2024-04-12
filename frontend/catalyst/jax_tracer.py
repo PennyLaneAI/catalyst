@@ -22,6 +22,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane.devices.preprocess import decompose
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
@@ -83,7 +84,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
-from pennylane.devices.preprocess import decompose
 
 
 class Function:
@@ -273,6 +273,8 @@ class HybridOp(Operation):
         binder (Callable):
             JAX primitive binder function to call when the quantum tracing is complete.
     """
+
+    visited = False
 
     def _no_binder(self, *_):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
@@ -515,7 +517,7 @@ def trace_observables(
         obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
-        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.parameters), *nested_obs)
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
     elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
         # Use the pauli sentence representation of the observable, if applicable
         obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
