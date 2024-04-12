@@ -167,6 +167,7 @@ David Ittah,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez,
+Lee James O'Riordan
 Muzammiluddin Syed.
 
 # Release 0.5.0
