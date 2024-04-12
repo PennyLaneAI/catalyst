@@ -23,7 +23,6 @@ from pennylane.measurements import (
     ProbabilityMP,
     VarianceMP,
 )
-from pennylane.operation import StatePrepBase
 from pennylane.tape.tape import (
     _validate_computational_basis_sampling,
     rotations_and_diagonal_measurements,
@@ -40,7 +39,6 @@ def _operator_decomposition_gen(
     decomposer,
     max_expansion=None,
     current_depth=0,
-    name: str = "device",
 ):
     """A generator that yields the next operation that is accepted."""
     max_depth_reached = False
@@ -54,7 +52,7 @@ def _operator_decomposition_gen(
             current_depth += 1
         except qml.operation.DecompositionUndefinedError as e:
             raise CompileError(
-                f"Operator {op} not supported on {name} and does not provide a decomposition."
+                f"Operator {op} not supported on device and does not provide a decomposition."
             ) from e
 
         for sub_op in decomp:
@@ -64,7 +62,6 @@ def _operator_decomposition_gen(
                 decomposer=decomposer,
                 max_expansion=max_expansion,
                 current_depth=current_depth,
-                name=name,
             )
 
 
@@ -116,15 +113,13 @@ def decompose(
         if isinstance(op, MidMeasureMP):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
         new_ops.extend(
-            [
-                op
-                for op in _operator_decomposition_gen(
-                    op,
-                    stopping_condition,
-                    decomposer=decomposer,
-                    max_expansion=max_expansion,
-                )
-            ]
+            op
+            for op in _operator_decomposition_gen(
+                op,
+                stopping_condition,
+                decomposer=decomposer,
+                max_expansion=max_expansion,
+            )
         )
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 

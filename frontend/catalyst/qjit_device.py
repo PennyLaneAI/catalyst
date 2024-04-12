@@ -17,7 +17,6 @@ from functools import partial
 from typing import Optional, Set
 
 import pennylane as qml
-from pennylane.devices.preprocess import decompose
 from pennylane.measurements import MidMeasureMP
 from pennylane.transforms.core import TransformProgram
 
