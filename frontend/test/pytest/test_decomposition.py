@@ -22,6 +22,62 @@ from catalyst.compiler import get_lib_path
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
 
+lightning = qml.device("lightning.kokkos", wires=3)
+copy = lightning.operations.copy()
+copy.discard("MultiControlledX")
+copy.discard("Rot")
+copy.discard("S")
+
+
+class CustomDevice(qml.QubitDevice):
+    """Dummy Device"""
+
+    name = "Dummy Device"
+    short_name = "dummy.device"
+    pennylane_requires = "0.32.0"
+    version = "0.0.1"
+    author = "Dummy"
+
+    operations = copy
+    observables = lightning.observables.copy()
+
+    def __init__(self, shots=None, wires=None):
+        self.backend_name = "default"
+        self.backend_lib = "default"
+        self.backend_kwargs = {}
+        super().__init__(wires=wires, shots=shots)
+
+    def apply(self, operations, **kwargs):
+        """Unused"""
+        raise RuntimeError("Only C/C++ interface is defined")
+
+    @staticmethod
+    def get_c_interface():
+        """Location to shared object with C/C++ implementation"""
+        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
+
+dev = CustomDevice(wires=2)
+
+
+@pytest.mark.skip(reason="skip this test with the plugin system on CI")
+@pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
+def test_decomposition(param, expected):
+    @qjit()
+    @qfunc(device=dev)
+    def mid_circuit(x: float):
+        qml.Hadamard(wires=0)
+        qml.Rot(0, 0, x, wires=0)
+        qml.Hadamard(wires=0)
+        m = measure(wires=0)
+        b = m ^ 0x1
+        qml.Hadamard(wires=1)
+        qml.Rot(0, 0, b * jnp.pi, wires=1)
+        qml.Hadamard(wires=1)
+        return measure(wires=1)
+
+    assert mid_circuit(param) == expected
+
 
 class TestControlledDecomposition:
     """Test behaviour around the decomposition of the `Controlled` class."""
