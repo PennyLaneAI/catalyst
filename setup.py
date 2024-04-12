@@ -15,7 +15,6 @@
 import glob
 import platform
 import subprocess
-import sysconfig
 from os import path
 from typing import Optional
 
@@ -26,6 +25,7 @@ from setuptools import (  # pylint: disable=wrong-import-order
     find_namespace_packages,
     setup,
 )
+from setuptools._distutils import sysconfig
 from setuptools.command.build_ext import build_ext
 
 system_platform = platform.system()
