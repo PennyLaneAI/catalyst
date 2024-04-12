@@ -135,6 +135,9 @@
 
 <h3>Bug fixes</h3>
 
+* Enable support for QNode argument `diff_method=None` with QJIT.
+  [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
+
 * Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
   contain one element.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
