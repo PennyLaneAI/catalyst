@@ -83,6 +83,7 @@ configure:
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
 		-DPython_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)
@@ -107,6 +108,7 @@ lq_configure:
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
 		-DPython_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		$(CMAKE_ARGS)

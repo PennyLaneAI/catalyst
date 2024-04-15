@@ -288,7 +288,7 @@ jobs:
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
-              -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DLIGHTNING_GIT_TAG="v0.35.0" \
@@ -300,7 +300,7 @@ jobs:
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
-    
+
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
@@ -391,7 +391,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
 
     - name: Install OQC client
-      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}} 
+      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
