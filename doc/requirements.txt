@@ -27,5 +27,4 @@ matplotlib==3.8.0
 lxml_html_clean
 
 # Pre-install development lightning wheels
---extra-index-url https://test.pypi.org/simple/
-pennylane-lightning==0.35.0-dev21
+# --extra-index-url https://test.pypi.org/simple/
