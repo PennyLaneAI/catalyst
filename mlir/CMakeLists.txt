@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.20)
 project(catalyst LANGUAGES CXX C)
 
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
