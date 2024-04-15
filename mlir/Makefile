@@ -143,10 +143,24 @@ test:
 	@echo "test the Catalyst MLIR dialects test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
-.PHONY: clean
-clean:
-	@echo "clean build files"
-	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR) $(ENZYME_BUILD_DIR)
+.PHONY: clean clean-dialects clean-enzyme clean-mhlo
+clean: clean-dialects clean-llvm clean-mhlo clean-enzyme
+
+clean-dialects:
+	@echo "clean catalyst dialect build files"
+	rm -rf $(DIALECTS_BUILD_DIR)
+
+clean-llvm:
+	@echo "clean llvm/mlir build files"
+	rm -rf $(LLVM_BUILD_DIR)
+
+clean-mhlo:
+	@echo "clean HLO dialect build files"
+	rm -rf $(MHLO_BUILD_DIR)
+
+clean-enzyme:
+	@echo "clean enzyme build files"
+	rm -rf $(ENZYME_BUILD_DIR)
 
 .PHONY: format
 format:
