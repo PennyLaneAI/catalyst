@@ -2,6 +2,7 @@ PYTHON := $(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
@@ -15,7 +16,6 @@ ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
 LIGHTNING_GIT_TAG_VALUE?=v0.35.0
-NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 BUILD_TARGETS := rt_capi
 TEST_TARGETS := ""
