@@ -13,24 +13,28 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-find_package(pybind11 CONFIG)
+function(fetch_pybind11)
+    set(PYBIND11_FINDPYTHON ON) # Avoid warning raised by pybind11 on newer cmake versions.
+    find_package(pybind11 CONFIG)
+    if (pybind11_FOUND)
+        message(STATUS, "FOUND pybind11")
+    else()
+        message(STATUS "Could not find existing pybind11-dev package. Building from source.")
+        set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
 
-if(pybind11_FOUND)
-    message(STATUS "Found pybind11")
-else()
-    message(STATUS "Cound not find existing pybind11-dev package. Building from source.")
-    set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
+        # https://cmake.org/cmake/help/latest/module/FindPython.html
+        find_package(Python COMPONENTS Interpreter Development)
 
-    # https://cmake.org/cmake/help/latest/module/FindPython.html
-    find_package(Python COMPONENTS Interpreter Development)
+        FetchContent_Declare(pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.10.1
+        )
 
-    FetchContent_Declare(pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG        v2.10.1
-    )
+        FetchContent_MakeAvailable(pybind11)
+    endif()
+endfunction()
 
-    FetchContent_MakeAvailable(pybind11)
-endif()
+fetch_pybind11()
 
 message(STATUS "Building the OQC device.")
 
