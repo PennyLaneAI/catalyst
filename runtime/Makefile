@@ -7,7 +7,6 @@ NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
-CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
