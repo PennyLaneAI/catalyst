@@ -41,7 +41,7 @@ struct FunctionAttributes {
 /// Verbosity level
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
 // low-level messages, we might want to hide these.
-enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
+enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, Timing = 3, All = 4 };
 
 /// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \
