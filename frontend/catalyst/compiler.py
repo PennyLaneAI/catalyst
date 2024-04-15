@@ -403,10 +403,7 @@ class LinkerDriver:
         infile_path = pathlib.Path(infile)
         if not infile_path.exists():
             raise FileNotFoundError(f"Cannot find {infile}.")
-        if platform.system() == "Linux":
-            return str(infile_path.with_suffix(".so"))
-        else:  # pragma: nocover
-            return str(infile_path.with_suffix(".dylib"))
+        return str(infile_path.with_suffix(".so"))
 
     @staticmethod
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
