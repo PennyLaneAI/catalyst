@@ -132,11 +132,11 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build libzstd-devel
+        yum update -y && yum install -y libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
 
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
@@ -226,11 +226,11 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build openmpi-devel libzstd-devel
+        yum update -y && yum install -y openmpi-devel libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
