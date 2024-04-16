@@ -354,12 +354,12 @@ jobs:
         path: wheel/
         retention-days: 14
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
+    - name: Setup SSH session
+      uses: lhotari/action-upterm@v1
       if: ${{ failure() }}
       with:
-        limit-access-to-actor: true
-        timeout-minutes: 10
+        limit-access-to-users: dime10
+        wait-timeout-minutes: 5
 
   test-wheels:
     needs: [constants, catalyst-linux-wheels-x86-64]
