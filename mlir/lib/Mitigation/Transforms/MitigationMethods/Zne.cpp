@@ -41,13 +41,13 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
     Location loc = op.getLoc();
 
     // Scalar factors
-    auto scalarFactors = op.getScalarFactors();
-    RankedTensorType scalarFactorType = scalarFactors.getType().cast<RankedTensorType>();
-    const auto sizeInt = scalarFactorType.getDimSize(0);
+    auto scaleFactors = op.getScaleFactors();
+    RankedTensorType scaleFactorType = scaleFactors.getType().cast<RankedTensorType>();
+    const auto sizeInt = scaleFactorType.getDimSize(0);
 
     // Create the folded circuit function
     FlatSymbolRefAttr foldedCircuitRefAttr =
-        getOrInsertFoldedCircuit(loc, rewriter, op, scalarFactorType.getElementType());
+        getOrInsertFoldedCircuit(loc, rewriter, op, scaleFactorType.getElementType());
     func::FuncOp foldedCircuit =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, foldedCircuitRefAttr);
 
@@ -68,7 +68,7 @@ void ZneLowering::rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const
                     std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
                     SmallVector<Value> index = {i};
                     Value scalarFactor =
-                        builder.create<tensor::ExtractOp>(loc, scalarFactors, index);
+                        builder.create<tensor::ExtractOp>(loc, scaleFactors, index);
                     Value scalarFactorCasted =
                         builder.create<index::CastSOp>(loc, builder.getIndexType(), scalarFactor);
                     newArgs.push_back(scalarFactorCasted);

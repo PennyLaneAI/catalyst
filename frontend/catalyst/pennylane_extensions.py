@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
+import ctypes
 import inspect
 import numbers
 from collections.abc import Sequence, Sized
@@ -35,6 +36,7 @@ from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_leaves,
+    tree_map,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
@@ -95,6 +97,11 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.jnp_to_memref import (
+    get_ranked_memref_descriptor,
+    get_unranked_memref_descriptor,
+    ranked_memref_to_numpy,
+)
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
@@ -1952,7 +1959,7 @@ def while_loop(cond_fn):
 def measure(
     wires, reset: Optional[bool] = False, postselect: Optional[int] = None
 ) -> DynamicJaxprTracer:
-    """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
+    """A :func:`qjit` compatible mid-circuit measurement on 1 qubit for PennyLane/Catalyst.
 
     .. important::
 
@@ -1960,7 +1967,7 @@ def measure(
         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
-        wires (Wires): The wire of the qubit the measurement process applies to
+        wires (int): The wire the projective measurement applies to.
         reset (Optional[bool]): Whether to reset the wire to the |0⟩ state after measurement.
         postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
@@ -2032,7 +2039,11 @@ def measure(
     ctx = EvaluationContext.get_main_tracing_context()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
-        raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+        raise TypeError(f"Only one element is supported for the 'wires' parameter, got {wires}.")
+    if isinstance(wires[0], jax.Array) and wires[0].shape not in ((), (1,)):
+        raise TypeError(
+            f"Measure is only supported on 1 qubit, got array of shape {wires[0].shape}."
+        )
 
     # Copy, so wires remain unmodified
     in_classical_tracers = wires.copy()
@@ -2041,7 +2052,6 @@ def measure(
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
     in_classical_tracers.append(postselect)
 
-    # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
@@ -2555,6 +2565,42 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
     return batch_size
 
 
+class CallbackClosure:
+    """This is just a class containing data that is important for the callback."""
+
+    def __init__(self, *absargs, **abskwargs):
+        self.absargs = absargs
+        self.abskwargs = abskwargs
+
+    @property
+    def tree_flatten(self):
+        """Flatten args and kwargs."""
+        return tree_flatten((self.absargs, self.abskwargs))
+
+    @property
+    def low_level_sig(self):
+        """Get the memref descriptor types"""
+        flat_params, _ = self.tree_flatten
+        low_level_flat_params = []
+        for param in flat_params:
+            empty_memref_descriptor = get_ranked_memref_descriptor(param)
+            memref_type = type(empty_memref_descriptor)
+            ptr_ty = ctypes.POINTER(memref_type)
+            low_level_flat_params.append(ptr_ty)
+        return low_level_flat_params
+
+    def getArgsAsJAXArrays(self, flat_args):
+        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
+        it is best for the user if we continue with that idea and forward JAX arrays."""
+        jnpargs = []
+        for void_ptr, ty in zip(flat_args, self.low_level_sig):
+            memref_ty = ctypes.cast(void_ptr, ty)
+            nparray = ranked_memref_to_numpy(memref_ty)
+            jnparray = jnp.asarray(nparray)
+            jnpargs.append(jnparray)
+        return jnpargs
+
+
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
@@ -2565,18 +2611,18 @@ def callback(func):
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
     @wraps(func)
-    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
+    def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        callback_implementation(func, retty, *args, **kwargs)
+        return callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
 
 
 def callback_implementation(
-    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -2587,19 +2633,49 @@ def callback_implementation(
     """
 
     flat_args, in_tree = tree_flatten((args, kwargs))
+    metadata = CallbackClosure(args, kwargs)
 
-    def _flat_callback(*flat_args):
-        """This function packages flat arguments back into the shapes expected by the function."""
-        _args, _kwargs = tree_unflatten(in_tree, flat_args)
-        assert not _args, "Args are not yet expected here."
-        assert not _kwargs, "Kwargs are not yet supported here."
-        return tree_leaves(cb())
+    def to_shaped_array(ty):
+        if ty == inspect.Signature.empty:
+            return None
+        if isinstance(ty, ShapedArray):
+            return ty.strip_weak_type()
+        return shaped_abstractify(ty).strip_weak_type()
 
-    # TODO(@erick-xanadu): Change back once we support arguments.
-    # I am leaving this as a to-do because otherwise the coverage will complain.
-    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
-    results_aval = []
+    results_aval = tree_map(to_shaped_array, result_shape_dtypes)
+    if not isinstance(results_aval, Sequence):
+        results_aval = [results_aval]
+
     flat_results_aval, out_tree = tree_flatten(results_aval)
+
+    def _flat_callback(flat_args):
+        """Each flat_arg is a pointer.
+
+        It is a pointer to a memref object.
+        To find out which element type it has, we use the signature obtained previously.
+        """
+        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
+        args, kwargs = tree_unflatten(in_tree, jnpargs)
+        retvals = tree_leaves(cb(*args, **kwargs))
+        return_values = []
+        for retval, exp_aval in zip(retvals, results_aval):
+            obs_aval = shaped_abstractify(retval)
+            if obs_aval != exp_aval:
+                raise TypeError(
+                    # pylint: disable-next=line-too-long
+                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+                )
+            ranked_memref = get_ranked_memref_descriptor(retval)
+            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
+            unranked_memref = get_unranked_memref_descriptor(retval)
+            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
+            # We need to keep a value of retval around
+            # Otherwise, Python's garbage collection will collect the memory
+            # before we run the memory copy in the runtime.
+            # We need to copy the unranked_memref_ptr and we need to know the element size.
+            return_values.append((unranked_memref_ptr, element_size, retval))
+        return return_values
+
     out_flat = python_callback_p.bind(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )

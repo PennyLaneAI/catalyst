@@ -23,7 +23,6 @@ import pytest
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import (
-    check_full_overlap,
     check_no_overlap,
     get_device_config,
     validate_config_with_device,
@@ -310,14 +309,6 @@ def test_check_overlap_msg():
     msg = "Device 'test' has overlapping gates."
     with pytest.raises(CompileError, match=msg):
         check_no_overlap(["A"], ["A"], ["A"], device_name="test")
-
-
-def test_check_full_overlap():
-    """Test that if there is no full overlap of operations, then an error is raised."""
-
-    msg = f"Gates in qml.device.operations and specification file do not match"
-    with pytest.raises(CompileError, match=msg):
-        check_full_overlap({"A", "B", "C", "C(X)"}, {"A", "B", "Adjoint(Y)"})
 
 
 def test_config_invalid_attr():

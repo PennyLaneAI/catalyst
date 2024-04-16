@@ -20,6 +20,7 @@ from typing import Optional, Set
 import pennylane as qml
 from pennylane.devices.preprocess import decompose
 from pennylane.measurements import MidMeasureMP
+from pennylane.transforms.core import TransformProgram
 
 from catalyst.preprocess import catalyst_acceptance, decompose_ops_to_unitary
 from catalyst.utils.exceptions import CompileError
@@ -301,7 +302,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
         execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
     ):
         """Device preprocessing function."""
-        program, config = self.original_device.preprocess(execution_config)
+        # TODO: readd the device preprocessing program once transforms are compatible with
+        # TOML files
+        _, config = self.original_device.preprocess(execution_config)
+        program = TransformProgram()
 
         convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
         program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)

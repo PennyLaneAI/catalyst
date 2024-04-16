@@ -74,7 +74,7 @@ requirements = [
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit;python_version<'3.11'",
-    "scipy",
+    "scipy<=1.12.0",
     "diastatic-malt>=2.15.1",
 ]
 
@@ -213,6 +213,7 @@ setup(
     packages=find_namespace_packages(
         where="frontend",
         include=["catalyst", "catalyst.*", "mlir_quantum"],
+        exclude=["catalyst.oqc.*"],
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
