@@ -135,9 +135,6 @@ HLO_LOWERING_PASS = (
             "mhlo-legalize-to-std"
             ")"
         ),
-        # "func.func(hlo-legalize-shapeops-to-standard)",
-        # "func.func(hlo-legalize-to-linalg)",
-        # "func.func(mhlo-legalize-to-std)",
         "convert-to-signless",
         "canonicalize",
         "scatter-lowering",
@@ -181,9 +178,6 @@ BUFFERIZATION_PASS = (
             "buffer-deallocation"
             ")"
         ),
-        # "func.func(buffer-hoisting)",
-        # "func.func(buffer-loop-hoisting)",
-        # "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         "canonicalize",
