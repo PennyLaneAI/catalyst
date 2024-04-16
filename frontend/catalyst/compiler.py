@@ -127,7 +127,14 @@ HLO_LOWERING_PASS = (
         "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow,hlo-legalize-shapeops-to-standard,hlo-legalize-to-linalg,mhlo-legalize-to-std)",
+        (
+            "func.func("
+            "mhlo-legalize-control-flow,"
+            "hlo-legalize-shapeops-to-standard,"
+            "hlo-legalize-to-linalg,"
+            "mhlo-legalize-to-std"
+            ")"
+        ),
         # "func.func(hlo-legalize-shapeops-to-standard)",
         # "func.func(hlo-legalize-to-linalg)",
         # "func.func(mhlo-legalize-to-std)",
@@ -166,7 +173,14 @@ BUFFERIZATION_PASS = (
         # "func.func(tensor-bufferize)",
         "quantum-bufferize",
         "func-bufferize",
-        "func.func(finalizing-bufferize, buffer-hoisting, buffer-loop-hoisting, buffer-deallocation)",
+        (
+            "func.func("
+            "finalizing-bufferize,"
+            "buffer-hoisting,"
+            "buffer-loop-hoisting,"
+            "buffer-deallocation"
+            ")"
+        ),
         # "func.func(buffer-hoisting)",
         # "func.func(buffer-loop-hoisting)",
         # "func.func(buffer-deallocation)",
