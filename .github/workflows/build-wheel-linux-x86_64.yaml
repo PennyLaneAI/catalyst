@@ -356,6 +356,13 @@ jobs:
         path: wheel/
         retention-days: 14
 
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ failure() }}
+      with:
+        limit-access-to-actor: true
+        timeout-minutes: 10
+
   test-wheels:
     needs: [constants, catalyst-linux-wheels-x86-64]
     strategy:
