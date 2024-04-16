@@ -46,7 +46,7 @@ namespace catalyst::utils {
  * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
  * along with `ENABLE_DIAGNOSTICS=ON`.
  */
-class Timer {
+template <class Stream> class Timer {
   private:
     // Toggle the support w.r.t. the value of `ENABLE_DIAGNOSTICS`
     bool debug_timer;
@@ -108,8 +108,7 @@ class Timer {
         }
     }
 
-    void print(const std::string &name, llvm::raw_ostream &stream = llvm::errs(),
-               bool add_endl = true) noexcept
+    void print(const std::string &name, Stream &stream, bool add_endl = true) noexcept
     {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
@@ -156,8 +155,7 @@ class Timer {
         ofile.close();
     }
 
-    void dump(const std::string &name, llvm::raw_ostream &stream = llvm::errs(),
-              bool add_endl = true)
+    void dump(const std::string &name, Stream &stream, bool add_endl = true)
     {
         if (!debug_timer) {
             return;
@@ -173,8 +171,8 @@ class Timer {
     }
 
     template <typename Function, typename... Args>
-    static auto timer(Function func, const std::string &fileName, llvm::raw_ostream &stream,
-                      bool add_endl, Args &&...args)
+    static auto timer(Function func, const std::string &fileName, Stream &stream, bool add_endl,
+                      Args &&...args)
     {
         if (!enable_debug_timer()) {
             return func(std::forward<Args>(args)...);

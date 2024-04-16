@@ -471,6 +471,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
 {
     using std::pair;
+    using Timer = catalyst::utils::Timer<llvm::raw_ostream>;
     auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
@@ -515,7 +516,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         dumpToFile(options, output.nextDumpFilename(options.moduleName.str(), ".mlir"), tmp);
     }
 
-    catalyst::utils::Timer timer{};
+    Timer timer{};
 
     auto beforePassCallback = [&](Pass *pass, Operation *op) {
         if (!timer.is_active()) {
@@ -573,8 +574,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
-    using timer = catalyst::utils::Timer;
-
+    using Timer = catalyst::utils::Timer<llvm::raw_ostream>;
     DialectRegistry registry;
     static bool initialized = false;
     if (!initialized) {
@@ -609,12 +609,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
     OwningOpRef<ModuleOp> op =
-        timer::timer(parseMLIRSource, "parseMLIRSource", options.diagnosticStream,
+        Timer::timer(parseMLIRSource, "parseMLIRSource", options.diagnosticStream,
                      /* add_endl */ false, &ctx, *sourceMgr);
     catalyst::utils::LinesCount::ModuleOp(*op, options.diagnosticStream);
 
     if (op) {
-        if (failed(timer::timer(runLowering, "runMLIRPasses", options.diagnosticStream,
+        if (failed(Timer::timer(runLowering, "runMLIRPasses", options.diagnosticStream,
                                 /* add_endl */ true, options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -624,7 +624,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
-            llvmModule = timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
+            llvmModule = Timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
                                       options.diagnosticStream, /* add_endl */ false, *op,
                                       llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
@@ -643,7 +643,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent,
                "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
-        llvmModule = timer::timer(parseLLVMSource, "parseLLVMSource", options.diagnosticStream,
+        llvmModule = Timer::timer(parseLLVMSource, "parseLLVMSource", options.diagnosticStream,
                                   /* add_endl */ false, llvmContext, options.source,
                                   options.moduleName, err);
         if (!llvmModule) {
@@ -657,14 +657,14 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-        if (failed(timer::timer(runLLVMPasses, "runLLVMPasses", options.diagnosticStream,
+        if (failed(Timer::timer(runLLVMPasses, "runLLVMPasses", options.diagnosticStream,
                                 /* add_endl */ false, options, llvmModule, output))) {
             return failure();
         }
 
         catalyst::utils::LinesCount::Module(*llvmModule.get(), options.diagnosticStream);
 
-        if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", options.diagnosticStream,
+        if (failed(Timer::timer(runEnzymePasses, "runEnzymePasses", options.diagnosticStream,
                                 /* add_endl */ false, options, llvmModule, output))) {
             return failure();
         }
@@ -687,7 +687,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             // element type. This is because the LLVM pointer type is
             // opaque and requires looking into its uses to infer its type.
             SmallVector<RankedTensorType> returnTypes;
-            if (failed(timer::timer(inferMLIRReturnTypes, "inferMLIRReturn",
+            if (failed(Timer::timer(inferMLIRReturnTypes, "inferMLIRReturn",
                                     options.diagnosticStream,
                                     /* add_endl */ true, &ctx, function.value()->getReturnType(),
                                     Float64Type::get(&ctx), returnTypes))) {
@@ -710,7 +710,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         auto outfile = options.getObjectFile();
-        if (failed(timer::timer(compileObjectFile, "compileObjFile", options.diagnosticStream,
+        if (failed(Timer::timer(compileObjectFile, "compileObjFile", options.diagnosticStream,
                                 /* add_endl */ true, options, std::move(llvmModule), outfile))) {
             return failure();
         }
