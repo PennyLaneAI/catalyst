@@ -22,7 +22,7 @@ import pathlib
 import platform
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Set
+from typing import Any, Dict
 
 import pennylane as qml
 
