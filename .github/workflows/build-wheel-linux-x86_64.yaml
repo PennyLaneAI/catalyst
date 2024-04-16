@@ -136,7 +136,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
 
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
@@ -230,7 +230,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -333,8 +333,6 @@ jobs:
 
     - name: Build wheel
       run: |
-        # TODO: Investigate why we need setuptools here and remove
-        python${{ matrix.python_version }} -m pip install setuptools
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
         MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
