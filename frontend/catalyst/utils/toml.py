@@ -234,6 +234,83 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
     )
 
 
+def patch_schema1_collections(
+    config, device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
+):
+    """For old schema1 config files we deduce some information which was not explicitly encoded."""
+
+    # TODO: remove after PR #642 is merged in lightning
+    # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
+    # is what actual device reports.
+    if device_name == "lightning.kokkos":  # pragma: nocover
+        native_gate_props["GlobalPhase"] = OperationProperties(
+            invertible=False, controllable=True, differentiable=True
+        )
+
+    # TODO: remove after PR #642 is merged in lightning
+    if device_name == "lightning.kokkos":  # pragma: nocover
+        observable_props["Projector"] = OperationProperties(
+            invertible=False, controllable=False, differentiable=False
+        )
+
+    # The deduction logic is the following:
+    # * Most of the gates have their `C(Gate)` controlled counterparts.
+    # * Some gates have to be decomposed if controlled version is used. Typically these are
+    #   gates which are already controlled but have well-known names.
+    # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
+    gates_to_be_decomposed_if_controlled = [
+        "Identity",
+        "CNOT",
+        "CY",
+        "CZ",
+        "CSWAP",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "ControlledPhaseShift",
+        "QubitUnitary",
+        "ControlledQubitUnitary",
+        "Toffoli",
+    ]
+
+    supports_controlled = check_quantum_control_flag(config)
+    if supports_controlled:
+        # Add ControlledQubitUnitary as a controlled version of QubitUnitary
+        if "QubitUnitary" in native_gate_props:
+            native_gate_props["ControlledQubitUnitary"] = OperationProperties(
+                invertible=False, controllable=False, differentiable=True
+            )
+        # By default, enable the `C(gate)` version for most `gates`.
+        for op, props in native_gate_props.items():
+            props.controllable = op not in gates_to_be_decomposed_if_controlled
+
+    supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
+    if supports_adjoint:
+        # Makr all gates as invertibles
+        for props in native_gate_props.values():
+            props.invertible = True
+
+    # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
+    # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
+    # listed in either matrix or decomposable sections. This is a contradiction, because
+    # condition (1) means that `ControlledQubitUnitary` is also in the native set. We solve it
+    # here by applying a fixup.
+    # TODO: remove after PR #642 is merged in lightning
+    if "ControlledQubitUnitary" in native_gate_props:  # pragma: nocover
+        if "ControlledQubitUnitary" in matrix_decomp_props:
+            matrix_decomp_props.pop("ControlledQubitUnitary")
+        if "ControlledQubitUnitary" in decomp_props:
+            decomp_props.pop("ControlledQubitUnitary")
+
+    # Fix a bug in device toml schema 1
+    if "ControlledPhaseShift" in native_gate_props:  # pragma: nocover
+        if "ControlledPhaseShift" in matrix_decomp_props:
+            matrix_decomp_props.pop("ControlledPhaseShift")
+        if "ControlledPhaseShift" in decomp_props:
+            decomp_props.pop("ControlledPhaseShift")
+
+
 def get_device_config(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceConfig:
@@ -259,76 +336,14 @@ def get_device_config(
         observable_props[g] = get_operation_properties(props)
 
     if schema == 1:
-        # TODO: remove after PR #642 is merged in lightning
-        # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
-        # is what actual device reports.
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            native_gate_props["GlobalPhase"] = OperationProperties(
-                invertible=False, controllable=True, differentiable=True
-            )
-
-        # TODO: remove after PR #642 is merged in lightning
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            observable_props["Projector"] = OperationProperties(
-                invertible=False, controllable=False, differentiable=False
-            )
-
-        # The deduction logic is the following:
-        # * Most of the gates have their `C(Gate)` controlled counterparts.
-        # * Some gates have to be decomposed if controlled version is used. Typically these are
-        #   gates which are already controlled but have well-known names.
-        # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
-        gates_to_be_decomposed_if_controlled = [
-            "Identity",
-            "CNOT",
-            "CY",
-            "CZ",
-            "CSWAP",
-            "CRX",
-            "CRY",
-            "CRZ",
-            "CRot",
-            "ControlledPhaseShift",
-            "QubitUnitary",
-            "ControlledQubitUnitary",
-            "Toffoli",
-        ]
-
-        supports_controlled = check_quantum_control_flag(config)
-        if supports_controlled:
-            # Add ControlledQubitUnitary as a controlled version of QubitUnitary
-            if "QubitUnitary" in native_gate_props:
-                native_gate_props["ControlledQubitUnitary"] = OperationProperties(
-                    invertible=False, controllable=False, differentiable=True
-                )
-            # By default, enable the `C(gate)` version for most `gates`.
-            for op, props in native_gate_props.items():
-                props.controllable = op not in gates_to_be_decomposed_if_controlled
-
-        supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
-        if supports_adjoint:
-            # Makr all gates as invertibles
-            for props in native_gate_props.values():
-                props.invertible = True
-
-        # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
-        # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
-        # listed in either matrix or decomposable sections. This is a contradiction, because
-        # condition (1) means that `ControlledQubitUnitary` is also in the native set. We solve it
-        # here by applying a fixup.
-        # TODO: remove after PR #642 is merged in lightning
-        if "ControlledQubitUnitary" in native_gate_props:  # pragma: nocover
-            if "ControlledQubitUnitary" in matrix_decomp_props:
-                matrix_decomp_props.pop("ControlledQubitUnitary")
-            if "ControlledQubitUnitary" in decomp_props:
-                decomp_props.pop("ControlledQubitUnitary")
-
-        # Fix a bug in device toml schema 1
-        if "ControlledPhaseShift" in native_gate_props:  # pragma: nocover
-            if "ControlledPhaseShift" in matrix_decomp_props:
-                matrix_decomp_props.pop("ControlledPhaseShift")
-            if "ControlledPhaseShift" in decomp_props:
-                decomp_props.pop("ControlledPhaseShift")
+        patch_schema1_collections(
+            config,
+            device_name,
+            native_gate_props,
+            matrix_decomp_props,
+            decomp_props,
+            observable_props,
+        )
 
     return DeviceConfig(
         native_gates=native_gate_props,
