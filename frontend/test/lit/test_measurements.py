@@ -173,7 +173,7 @@ def expval2(x: float, y: float):
     # CHECK: [[p3:%.+]] = quantum.namedobs [[q2]][ Hadamard]
     # CHECK: [[t0:%.+]] = quantum.tensor [[p1]], [[p2]], [[p3]]
     # CHECK: quantum.expval [[t0]] : f64
-    return qml.expval(qml.prod(*[qml.PauliX(0), qml.PauliZ(1), qml.Hadamard(2)]))
+    return qml.expval(qml.PauliX(0) @ qml.PauliZ(1) @ qml.Hadamard(2))
 
 
 print(expval2.mlir)
@@ -352,7 +352,7 @@ def expval9(x: float, y: float):
     # CHECK: [[p3:%.+]] = quantum.namedobs [[q2]][ Hadamard]
     # CHECK: [[obs:%.+]] = quantum.tensor [[p1]], [[p2]], [[p3]]
     # CHECK: quantum.expval [[obs]] : f64
-    return qml.expval(qml.prod(*[qml.PauliX(0), qml.PauliZ(1), qml.Hadamard(2)]))
+    return qml.expval(qml.PauliX(0) @ qml.PauliZ(1) @ qml.Hadamard(2))
 
 
 print(expval9.mlir)

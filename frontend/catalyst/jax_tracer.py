@@ -320,13 +320,6 @@ class HybridOp(Operation):
         """Perform the second, quantum part of the Hybrid operation tracing."""
         raise NotImplementedError("HybridOp should implement trace")  # pragma: no cover
 
-    # def decomposition(self):
-    #     for r in self.regions:
-    #         tapes, _ = decompose(r.quantum_tape)
-    #         print("here<", tapes[0].circuit)
-    #         r.quantum_tape = tapes[0]
-    #     return super().decomposition()
-
 
 def has_nested_tapes(op: Operation) -> bool:
     """Detects if the PennyLane operation holds nested quantum tapes or not."""
