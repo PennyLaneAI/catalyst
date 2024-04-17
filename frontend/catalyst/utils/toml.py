@@ -55,7 +55,7 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
     return config
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class OperationProperties:
     """Capabilities of a single operation"""
 
