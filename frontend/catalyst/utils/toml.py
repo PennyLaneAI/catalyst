@@ -236,7 +236,7 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
 
 def patch_schema1_collections(
     config, device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
-):
+):  # pylint: disable=too-many-arguments, too-many-branches
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
 
     # TODO: remove after PR #642 is merged in lightning
@@ -315,7 +315,6 @@ def get_device_config(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceConfig:
     """Load TOML document into the DeviceConfig structure"""
-    # pylint: disable=too-many-branches
 
     schema = int(config["schema"])
 
