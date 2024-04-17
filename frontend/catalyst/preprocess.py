@@ -30,6 +30,7 @@ from pennylane.tape.tape import (
 
 import catalyst
 import catalyst.pennylane_extensions
+from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
 
@@ -68,6 +69,7 @@ def _operator_decomposition_gen(
 @transform
 def decompose(
     tape: qml.tape.QuantumTape,
+    ctx,
     stopping_condition,
     max_expansion=None,
 ):
@@ -93,14 +95,16 @@ def decompose(
                 catalyst.pennylane_extensions.Cond,
             ),
         ):
-            for r in op.regions:
-                if r.quantum_tape:
-                    tapes, _ = decompose(
-                        r.quantum_tape,
-                        stopping_condition=stopping_condition,
-                        max_expansion=max_expansion,
-                    )
-                    r.quantum_tape = tapes[0]
+            for region in op.regions:
+                if region.quantum_tape:
+                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                        tapes, _ = decompose(
+                            region.quantum_tape,
+                            ctx=ctx,
+                            stopping_condition=stopping_condition,
+                            max_expansion=max_expansion,
+                        )
+                        region.quantum_tape = tapes[0]
             op.visited = True
             return [op]
         return op.decomposition()

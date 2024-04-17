@@ -25,6 +25,7 @@ from pennylane.transforms.core import TransformProgram
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.qjit_device import QJITDeviceNewAPI
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 
 
@@ -77,7 +78,8 @@ def test_qjit_device():
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
-    transform_program, _ = device_qjit.preprocess()
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
     assert len(transform_program) == 1
 

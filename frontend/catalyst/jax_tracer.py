@@ -857,7 +857,7 @@ def trace_quantum_function(
             )
 
             if isinstance(device, qml.devices.Device):
-                device_program, _ = device.preprocess()
+                device_program, _ = device.preprocess(ctx)
             else:
                 device_program = TransformProgram()
 

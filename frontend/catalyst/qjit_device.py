@@ -282,6 +282,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
     def preprocess(
         self,
+        ctx,
         execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
     ):
         """Device preprocessing function."""
@@ -291,7 +292,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         program = TransformProgram()
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(decompose, stopping_condition=ops_acceptance)
+        program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
 
         # TODO: Add Catalyst program verification and validation
         return program, config
