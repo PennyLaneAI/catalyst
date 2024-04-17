@@ -174,7 +174,7 @@ class QJITDevice(qml.QubitDevice):
 
     @property
     def operations(self) -> Set[str]:
-        """Print the device operations using PennyLane's syntax"""
+        """Get the device operations using PennyLane's syntax"""
         return pennylane_operation_set(self.caps.native_gates)
 
     @property
