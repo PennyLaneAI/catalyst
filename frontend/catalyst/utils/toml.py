@@ -125,11 +125,11 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
     raise CompileError("quantum_control flag is not supported in TOMLs schema >= 2")
 
 
-def get_gates(
+def parse_toml_section(
     config: TOMLDocument, path: List[str], program_features: ProgramFeatures
 ) -> Dict[str, dict]:
-    """Read the toml config section specified by `path`. Filters-out gates which don't match
-    condition. For now the only condition we support is `shots_present`."""
+    """Parses the section of toml config file specified by `path`. Filters-out gates which don't
+    match condition. For now the only condition we support is `shots_present`."""
     gates = {}
     analytic = "analytic"
     finiteshots = "finiteshots"
@@ -175,7 +175,7 @@ def get_gates(
 
 def get_observables(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Override the set of supported observables."""
-    return get_gates(config, ["operators", "observables"], program_features)
+    return parse_toml_section(config, ["operators", "observables"], program_features)
 
 
 def get_native_gates(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
@@ -183,9 +183,9 @@ def get_native_gates(config: TOMLDocument, program_features: ProgramFeatures) ->
 
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "native"], program_features)
+        return parse_toml_section(config, ["operators", "gates", 0, "native"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "native"], program_features)
+        return parse_toml_section(config, ["operators", "gates", "native"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
@@ -200,9 +200,9 @@ def get_decomposable_gates(
     """
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "decomp"], program_features)
+        return parse_toml_section(config, ["operators", "gates", 0, "decomp"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "decomp"], program_features)
+        return parse_toml_section(config, ["operators", "gates", "decomp"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
@@ -217,9 +217,9 @@ def get_matrix_decomposable_gates(
     """
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "matrix"], program_features)
+        return parse_toml_section(config, ["operators", "gates", 0, "matrix"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "matrix"], program_features)
+        return parse_toml_section(config, ["operators", "gates", "matrix"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
