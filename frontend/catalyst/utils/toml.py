@@ -94,7 +94,7 @@ def intersect_operations(
 
 
 def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[str]:
-    """Prints a config section into a set of strings using PennyLane syntax"""
+    """Returns a config section into a set of strings using PennyLane syntax"""
     ops = set()
     # Back-mapping from class names to string names
     for g, props in config_ops.items():
