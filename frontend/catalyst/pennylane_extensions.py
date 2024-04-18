@@ -2629,6 +2629,8 @@ def pure_callback(callback_fn, result_type=None):
 
     `pure_callback`s are expected to have a return type which matches
     the return type of the function being called.
+
+    At the moment, `pure_callback`s should not be used inside gradients.
     """
 
     signature = inspect.signature(callback_fn)
@@ -2666,6 +2668,8 @@ def io_callback(callback_fn):
 
     `io_callback`s are expected to not return anything.
     May be useful for custom printing and logging into files.
+
+    At the moment, `pure_callback`s should not be used inside gradients.
     """
 
     @callback
