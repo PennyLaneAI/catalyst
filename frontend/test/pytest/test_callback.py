@@ -216,6 +216,20 @@ def test_pure_callback():
     assert np.allclose(cir(0.0), 0.0)
 
 
+def test_pure_callback_decorator():
+    """Test identity pure callback."""
+
+    @pure_callback
+    def identity(a) -> float:
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(0.0), 0.0)
+
+
 def test_pure_callback_no_return_value():
     """Test identity pure callback no return."""
 
@@ -226,7 +240,7 @@ def test_pure_callback_no_return_value():
     def cir(x):
         return pure_callback(identity)(x)
 
-    with pytest.raises(TypeError, match="missing 1 required positional argument"):
+    with pytest.raises(TypeError, match="pure_callback requires a result_type"):
         cir(0.0)
 
 
@@ -239,6 +253,26 @@ def test_io_callback(capsys):
     @qml.qjit
     def cir(x):
         io_callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"
+
+
+def test_io_callback_decorator(capsys):
+    """Test io callback"""
+
+    @io_callback
+    def my_own_print(a):
+        print(a)
+
+    @qml.qjit
+    def cir(x):
+        my_own_print(x)
         return None
 
     captured = capsys.readouterr()

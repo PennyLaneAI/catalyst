@@ -2601,8 +2601,24 @@ class CallbackClosure:
         return jnpargs
 
 
-def pure_callback(callback_fn, result_type):
+def to_shaped_array(ty):
+    if ty == inspect.Signature.empty:
+        return None
+    if isinstance(ty, ShapedArray):
+        return ty.strip_weak_type()
+    return shaped_abstractify(ty).strip_weak_type()
+
+
+def pure_callback(callback_fn, result_type=None):
     """Pure callback"""
+
+    signature = inspect.signature(callback_fn)
+    if result_type is None:
+        result_type = signature.return_annotation
+
+    result_type = tree_map(to_shaped_array, result_type)
+    if result_type is None:
+        raise TypeError("pure_callback requires a result_type")
 
     @callback
     def closure(*args, **kwargs) -> result_type:
@@ -2656,13 +2672,6 @@ def callback_implementation(
 
     flat_args, in_tree = tree_flatten((args, kwargs))
     metadata = CallbackClosure(args, kwargs)
-
-    def to_shaped_array(ty):
-        if ty == inspect.Signature.empty:
-            return None
-        if isinstance(ty, ShapedArray):
-            return ty.strip_weak_type()
-        return shaped_abstractify(ty).strip_weak_type()
 
     results_aval = tree_map(to_shaped_array, result_shape_dtypes)
     if not isinstance(results_aval, Sequence):
