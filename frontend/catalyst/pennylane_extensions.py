@@ -2601,18 +2601,24 @@ class CallbackClosure:
         return jnpargs
 
 
-def check_result_type_correctness(result_type):
-    """Check the correctness of result type for callbacks."""
-    if result_type is None:
-        raise TypeError("pure_callback requires a non-None result_type")
-
-
 def pure_callback(callback_fn, result_type):
     """Pure callback"""
 
     @callback
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
+
+    return closure
+
+
+def io_callback(callback_fn):
+    """IO callback"""
+
+    @callback
+    def closure(*args, **kwargs) -> None:
+        retval = callback_fn(*args, **kwargs)
+        if retval is not None:
+            raise ValueError("io_callback is expected to return None")
 
     return closure
 

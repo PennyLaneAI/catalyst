@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.pennylane_extensions import callback, pure_callback
+from catalyst.pennylane_extensions import callback, io_callback, pure_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -214,3 +214,55 @@ def test_pure_callback():
         return pure_callback(identity, float)(x)
 
     assert np.allclose(cir(0.0), 0.0)
+
+
+def test_pure_callback_no_return_value():
+    """Test identity pure callback no return."""
+
+    def identity(a):
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return pure_callback(identity)(x)
+
+    with pytest.raises(TypeError, match="missing 1 required positional argument"):
+        cir(0.0)
+
+
+def test_io_callback(capsys):
+    """Test io callback"""
+
+    def my_own_print(a):
+        print(a)
+
+    @qml.qjit
+    def cir(x):
+        io_callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"
+
+
+def test_io_callback_returns_something(capsys):
+    """Test io callback returns something"""
+
+    def my_own_print(a):
+        print(a)
+        return 1
+
+    @qml.qjit
+    def cir(x):
+        io_callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    with pytest.raises(ValueError, match="io_callback is expected to return None"):
+        cir(0)
