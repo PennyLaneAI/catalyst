@@ -13,8 +13,8 @@
 # limitations under the License.
 """Tests for type conversion"""
 
-from collections.abc import Sequence
 import inspect
+from collections.abc import Sequence
 
 import numpy as np
 from jax._src.api_util import shaped_abstractify
