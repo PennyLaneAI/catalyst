@@ -24,3 +24,7 @@ pennylane-lightning[kokkos]
 amazon-braket-pennylane-plugin>=1.23.0
 lark
 optax
+
+# Pre-install development lightning wheels
+--extra-index-url https://test.pypi.org/simple/
+pennylane-lightning==0.35.0-dev30
