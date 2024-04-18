@@ -2602,6 +2602,7 @@ class CallbackClosure:
 
 
 def to_shaped_array(ty):
+    """Maps types from the type signature or otherwise to shaped_arrays without weak type."""
     if ty == inspect.Signature.empty:
         return None
     if isinstance(ty, ShapedArray):
