@@ -6,5 +6,5 @@ enzyme=1beb98b51442d50652eaa3ffb9574f4720d611f1
 
 # Always remove custom PL/LQ versions before release.
 
-lightning=0.36.0.dev30
+lightning=0.36.0-dev32
 pennylane=master
