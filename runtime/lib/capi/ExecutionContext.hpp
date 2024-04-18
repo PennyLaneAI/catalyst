@@ -25,7 +25,7 @@
 #include <unordered_set>
 
 #include "Exception.hpp"
-#include "Python.hpp"
+#include "CatalystPython.hpp"
 #include "QuantumDevice.hpp"
 #include "Types.h"
 

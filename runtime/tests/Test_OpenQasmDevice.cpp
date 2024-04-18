@@ -18,7 +18,7 @@
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmDevice.hpp"
 #include "OpenQasmRunner.hpp"
-#include "Python.hpp"
+#include "CatalystPython.hpp"
 #include "RuntimeCAPI.h"
 
 PythonInterpreterGuard guard{};

@@ -21,7 +21,6 @@
 #define __build_with_pybind11
 #endif
 
-struct PythonInterpreterGuard;
 std::mutex &getPythonMutex();
 
 /**
