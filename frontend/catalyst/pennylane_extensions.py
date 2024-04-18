@@ -2610,7 +2610,26 @@ def to_shaped_array(ty):
 
 
 def pure_callback(callback_fn, result_type=None):
-    """Pure callback"""
+    """Pure callback
+
+    Using `pure_callback` allows a user to run python.
+    `pure_callback`s can be used via a decorator:
+
+    ```python
+    @pure_callback
+    def identity(x) -> int:
+        return x
+    ```
+
+    or through a more functional syntax:
+
+    ```python
+    pure_callback(identity, int)(x)
+    ```
+
+    `pure_callback`s are expected to have a return type which matches
+    the return type of the function being called.
+    """
 
     signature = inspect.signature(callback_fn)
     if result_type is None:
@@ -2628,7 +2647,26 @@ def pure_callback(callback_fn, result_type=None):
 
 
 def io_callback(callback_fn):
-    """IO callback"""
+    """IO callback
+
+    Using `io_callback` allows a user to run python.
+    `io_callback`s can be used via a decorator:
+
+    ```python
+    @io_callback
+    def my_custom_print(x):
+        print(x)
+    ```
+
+    or through a more functional syntax:
+
+    ```python
+    io_callback(my_custom_print)(x)
+    ```
+
+    `io_callback`s are expected to not return anything.
+    May be useful for custom printing and logging into files.
+    """
 
     @callback
     def closure(*args, **kwargs) -> None:
