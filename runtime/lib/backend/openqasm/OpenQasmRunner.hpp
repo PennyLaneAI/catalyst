@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "Exception.hpp"
-#include "Python.hpp"
+#include "CatalystPython.hpp"
 
 #include <pybind11/embed.h>
 

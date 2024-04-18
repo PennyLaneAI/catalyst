@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Python.hpp"
+#include "CatalystPython.hpp"
 
 std::mutex python_mutex;
 std::mutex &getPythonMutex() { return python_mutex; }
