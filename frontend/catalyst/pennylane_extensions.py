@@ -177,7 +177,6 @@ class QFunc:
         flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_quantum, args, {})
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
-        # TODO: [0] temp fix
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 

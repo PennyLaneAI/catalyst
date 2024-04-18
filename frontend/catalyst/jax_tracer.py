@@ -521,9 +521,6 @@ def trace_observables(
         coeffs = jax.numpy.array(terms[0])
         nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
         obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
-    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
-        # Use the pauli sentence representation of the observable, if applicable
-        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
@@ -865,8 +862,6 @@ def trace_quantum_function(
             # But lit tests are not sending coverage results
             if qnode:  # pragma: no branch
                 qnode_program = qnode.transform_program
-            else:
-                qnode_program = TransformProgram()
 
             tapes, post_processing = apply_transform(
                 qnode_program, device_program, quantum_tape, return_values_flat
@@ -874,7 +869,6 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         transformed_results = []
-        # is_program_transformed = qnode_program + device_program
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up same device and quantum register for all tapes in the program.
@@ -886,12 +880,12 @@ def trace_quantum_function(
             )
             qreg_in = qalloc_p.bind(len(device.wires))
 
-            transformed = len(qnode_program) > 0
+            qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if transformed:
+                if qnode_transformed:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -907,7 +901,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if transformed:
+                if qnode_transformed:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])

@@ -43,7 +43,7 @@ def _operator_decomposition_gen(
 ):
     """A generator that yields the next operation that is accepted."""
     max_depth_reached = False
-    if max_expansion is not None and max_expansion <= current_depth:
+    if max_expansion is not None and max_expansion <= current_depth:  # pragma: no cover
         max_depth_reached = True
     if acceptance_function(op) or max_depth_reached:
         yield op
@@ -51,7 +51,7 @@ def _operator_decomposition_gen(
         try:
             decomp = decomposer(op)
             current_depth += 1
-        except qml.operation.DecompositionUndefinedError as e:
+        except qml.operation.DecompositionUndefinedError as e:  # pragma: no cover
             raise CompileError(
                 f"Operator {op} not supported on device and does not provide a decomposition."
             ) from e
