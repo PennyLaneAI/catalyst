@@ -30,10 +30,10 @@ from catalyst.utils.runtime import device_get_toml_config
 def get_custom_qjit_device(num_wires, discarded_operations=None, added_operations=None):
     """Generate a custom device with the modified set of supported gates."""
 
-    lightning = qml.device("lightning.kokkos", wires=3)
+    lightning = qml.device("lightning.qubit", wires=3)
 
-    operations_copy = lightning.operations.copy()
-    observables_copy = lightning.observables.copy()
+    operations_copy = list(lightning.operations).copy()
+    observables_copy = list(lightning.observables).copy()
     for op in discarded_operations or []:
         operations_copy.discard(op)
     for op in added_operations or []:
