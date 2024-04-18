@@ -858,10 +858,7 @@ def trace_quantum_function(
             else:
                 device_program = TransformProgram()
 
-            # We add pragma because lit test are giving qfunc directly
-            # But lit tests are not sending coverage results
-            if qnode:  # pragma: no branch
-                qnode_program = qnode.transform_program
+            qnode_program = qnode.transform_program if qnode else TransformProgram()
 
             tapes, post_processing = apply_transform(
                 qnode_program, device_program, quantum_tape, return_values_flat
