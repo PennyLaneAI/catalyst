@@ -14,7 +14,7 @@
 
 #include "OQCDevice.cpp"
 #include "OQCRunner.hpp"
-#include "Python.hpp"
+#include "CatalystPython.hpp"
 #include "RuntimeCAPI.h"
 
 PythonInterpreterGuard guard{};
