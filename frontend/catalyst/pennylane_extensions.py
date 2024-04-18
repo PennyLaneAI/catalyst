@@ -109,6 +109,7 @@ from catalyst.utils.runtime import (
     validate_config_with_device,
 )
 from catalyst.utils.toml import TOMLDocument
+from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
@@ -2601,15 +2602,6 @@ class CallbackClosure:
         return jnpargs
 
 
-def to_shaped_array(ty):
-    """Maps types from the type signature or otherwise to shaped_arrays without weak type."""
-    if ty == inspect.Signature.empty:
-        return None
-    if isinstance(ty, ShapedArray):
-        return ty.strip_weak_type()
-    return shaped_abstractify(ty).strip_weak_type()
-
-
 def pure_callback(callback_fn, result_type=None):
     """Pure callback
 
@@ -2638,7 +2630,7 @@ def pure_callback(callback_fn, result_type=None):
     if result_type is None:
         result_type = signature.return_annotation
 
-    result_type = tree_map(to_shaped_array, result_type)
+    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
     if result_type is None:
         raise TypeError("pure_callback requires a result_type")
 
@@ -2716,7 +2708,7 @@ def callback_implementation(
     flat_args, in_tree = tree_flatten((args, kwargs))
     metadata = CallbackClosure(args, kwargs)
 
-    results_aval = tree_map(to_shaped_array, result_shape_dtypes)
+    results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     if not isinstance(results_aval, Sequence):
         results_aval = [results_aval]
 
