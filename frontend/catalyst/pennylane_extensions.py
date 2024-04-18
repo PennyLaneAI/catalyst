@@ -2601,6 +2601,22 @@ class CallbackClosure:
         return jnpargs
 
 
+def check_result_type_correctness(result_type):
+    """Check the correctness of result type for callbacks."""
+    if result_type is None:
+        raise TypeError("pure_callback requires a non-None result_type")
+
+
+def pure_callback(callback_fn, result_type):
+    """Pure callback"""
+
+    @callback
+    def closure(*args, **kwargs) -> result_type:
+        return callback_fn(*args, **kwargs)
+
+    return closure
+
+
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.

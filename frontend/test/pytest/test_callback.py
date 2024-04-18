@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.pennylane_extensions import callback
+from catalyst.pennylane_extensions import callback, pure_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -201,3 +201,16 @@ def test_incorrect_return(arg):
 
     with pytest.raises(TypeError, match="Callback identity expected type"):
         cir(arg)
+
+
+def test_pure_callback():
+    """Test identity pure callback."""
+
+    def identity(a):
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return pure_callback(identity, float)(x)
+
+    assert np.allclose(cir(0.0), 0.0)
