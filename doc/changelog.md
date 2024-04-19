@@ -69,6 +69,9 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now checks that devices (new API), have the wires set.
+  [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
+
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
