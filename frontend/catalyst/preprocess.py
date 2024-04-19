@@ -77,14 +77,7 @@ def decompose(
 
     def decomposer(op):
         if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
-            try:
-                mat = op.matrix()
-            except Exception as e:
-                raise CompileError(
-                    f"Operation {op} could not be decomposed, it might be unsupported."
-                ) from e
-            op = qml.QubitUnitary(mat, wires=op.wires)
-            return [op]
+            return _decompose_to_matrix(op)
         elif isinstance(
             op,
             (
@@ -95,18 +88,7 @@ def decompose(
                 catalyst.pennylane_extensions.Cond,
             ),
         ):
-            for region in op.regions:
-                if region.quantum_tape:
-                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        tapes, _ = decompose(
-                            region.quantum_tape,
-                            ctx=ctx,
-                            stopping_condition=stopping_condition,
-                            max_expansion=max_expansion,
-                        )
-                        region.quantum_tape = tapes[0]
-            op.visited = True
-            return [op]
+            return _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion)
         return op.decomposition()
 
     if len(tape) == 0:
@@ -128,6 +110,32 @@ def decompose(
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
+
+
+def _decompose_to_matrix(op):
+    try:
+        mat = op.matrix()
+    except Exception as e:
+        raise CompileError(
+            f"Operation {op} could not be decomposed, it might be unsupported."
+        ) from e
+    op = qml.QubitUnitary(mat, wires=op.wires)
+    return [op]
+
+
+def _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion):
+    for region in op.regions:
+        if region.quantum_tape:
+            with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                tapes, _ = decompose(
+                    region.quantum_tape,
+                    ctx=ctx,
+                    stopping_condition=stopping_condition,
+                    max_expansion=max_expansion,
+                )
+                region.quantum_tape = tapes[0]
+    op.visited = True
+    return [op]
 
 
 @transform
