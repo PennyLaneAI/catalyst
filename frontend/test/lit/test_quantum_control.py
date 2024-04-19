@@ -32,8 +32,8 @@ def get_custom_qjit_device(num_wires, discarded_operations=None, added_operation
 
     lightning = qml.device("lightning.qubit", wires=3)
 
-    operations_copy = list(lightning.operations).copy()
-    observables_copy = list(lightning.observables).copy()
+    operations_copy = set(lightning.operations).copy()
+    observables_copy = set(lightning.observables).copy()
     for op in discarded_operations or []:
         operations_copy.discard(op)
     for op in added_operations or []:

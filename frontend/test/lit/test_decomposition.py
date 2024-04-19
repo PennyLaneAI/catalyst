@@ -28,8 +28,8 @@ def get_custom_device_without(num_wires, discards):
     """Generate a custom device without gates in discards."""
 
     lightning = qml.device("lightning.qubit", wires=3)
-    copy = list(lightning.operations).copy()
-    observables_copy = list(lightning.observables).copy()
+    copy = set(lightning.operations).copy()
+    observables_copy = set(lightning.observables).copy()
     for discard in discards:
         copy.discard(discard)
 

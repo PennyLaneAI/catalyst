@@ -69,7 +69,7 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
         return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
-operations = lightning.operations.copy()
+operations = set(lightning.operations).copy()
 operations.add("RXX")
 
 
