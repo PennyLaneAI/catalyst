@@ -22,8 +22,8 @@ from catalyst.compiler import get_lib_path
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
 
-lightning = qml.device("lightning.kokkos", wires=3)
-copy = lightning.operations.copy()
+lightning = qml.device("lightning.qubit", wires=3)
+copy = set(lightning.operations).copy()
 copy.discard("MultiControlledX")
 copy.discard("Rot")
 copy.discard("S")
@@ -54,7 +54,7 @@ class CustomDevice(qml.QubitDevice):
     @staticmethod
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
-        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "CustomDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
 dev = CustomDevice(wires=2)

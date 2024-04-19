@@ -860,12 +860,12 @@ def _qinst_lowering(
         if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
             baseType = ir.RankedTensorType(p.type).element_type
 
-            if not ir.F64Type.isinstance(baseType):
-                baseType = ir.F64Type.get()
-                resultTensorType = ir.RankedTensorType.get((), baseType)
-                p = StableHLOConvertOp(resultTensorType, p).results
+        if not ir.F64Type.isinstance(baseType):
+            baseType = ir.F64Type.get()
+            resultTensorType = ir.RankedTensorType.get((), baseType)
+            p = StableHLOConvertOp(resultTensorType, p).results
 
-            p = TensorExtractOp(baseType, p, []).result
+        p = TensorExtractOp(baseType, p, []).result
 
         assert ir.F64Type.isinstance(
             p.type

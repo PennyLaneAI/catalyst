@@ -27,9 +27,9 @@ from catalyst.pennylane_extensions import qfunc
 def get_custom_device_without(num_wires, discards):
     """Generate a custom device without gates in discards."""
 
-    lightning = qml.device("lightning.kokkos", wires=3)
-    copy = lightning.operations.copy()
-    observables_copy = lightning.observables.copy()
+    lightning = qml.device("lightning.qubit", wires=3)
+    copy = set(lightning.operations).copy()
+    observables_copy = set(lightning.observables).copy()
     for discard in discards:
         copy.discard(discard)
 
@@ -60,7 +60,10 @@ def get_custom_device_without(num_wires, discards):
         @staticmethod
         def get_c_interface():
             """Location to shared object with C/C++ implementation"""
-            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+            return (
+                "CustomDevice",
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so",
+            )
 
     return CustomDevice(wires=num_wires)
 

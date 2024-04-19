@@ -37,7 +37,7 @@ class RXX(Operation):
         return [qml.PauliRot(self.theta, pauli_word="XX", wires=self.wires)]
 
 
-lightning = qml.device("lightning.kokkos", wires=3)
+lightning = qml.device("lightning.qubit", wires=3)
 
 
 class CustomDeviceWithoutSupport(qml.QubitDevice):
@@ -47,8 +47,8 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     version = "0.0.1"
     author = "CV quantum"
 
-    operations = lightning.operations.copy()
-    observables = lightning.observables.copy()
+    operations = list(lightning.operations).copy()
+    observables = list(lightning.observables).copy()
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -66,10 +66,10 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     @staticmethod
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
-        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
-operations = lightning.operations.copy()
+operations = set(lightning.operations).copy()
 operations.add("RXX")
 
 
