@@ -35,7 +35,6 @@ from catalyst.jax_extras import (
     DynamicJaxprTracer,
     DynshapedClosedJaxpr,
     PyTreeDef,
-    PyTreeRegistry,
     ShapedArray,
     _abstractify,
     _input_type_to_tracers,
@@ -47,7 +46,6 @@ from catalyst.jax_extras import (
     sort_eqns,
     transient_jax_config,
     tree_flatten,
-    tree_structure,
     tree_unflatten,
     wrap_init,
 )
@@ -578,6 +576,58 @@ def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Calla
     return [tape], lambda res: res[0]
 
 
+@jax.tree_util.register_pytree_node_class
+class CountsDictionary:
+    """A self-exiting class to return the properly formatted counts dictionary.
+
+    The main goal is to map from the Catalyst counts representation to the PennyLane one:
+      (eigvals_array, counts_array)  ->  {eigval: count}
+
+    with the added behaviour that as long we are in a tracing context, the Catalyst representation
+    is preserved during flatten/unflatten operations, and as soon as concrete results are available
+    a regular Python dictionary is produced during unflattening.
+
+    Additionally, formatting is applied to the eigenvalues to convert them to an integer bitstring
+    reprensentation of the basis states when computational basis counts are requested, whereas
+    for obserable counts they are left as floats.
+    """
+
+    def __init__(self, eigvals, counts, compbasis):
+        self._eigvals = eigvals
+        self._counts = counts
+        self._compbasis = compbasis
+
+    # Added this function to make the existing decomposition transform pass (that turns expval ...
+    # into qml.counts + post-processsing).
+    def __getitem__(self, idx):
+        """Support post-processing on the dictionary counts by exposing access to the eigenvalue
+        and count arrays just like before."""
+        if idx not in (0, 1):
+            raise KeyError(
+                "An abstract counts dictionary can only be indexed with 0 or 1, providing "
+                "the key array (eigenvalues / basis states) and the value array (counts)."
+            )
+
+        return self._eigvals if idx == 0 else self._counts
+
+    def tree_flatten(self):
+        return (self._eigvals, self._counts), self._compbasis
+
+    @staticmethod
+    def tree_unflatten(aux_data, children):
+        compbasis = aux_data
+        eigvals, counts = children
+
+        # We keep the Catalyst format as long as we are tracing/transforming the program.
+        if isinstance(eigvals, jax.core.Tracer) or isinstance(counts, jax.core.Tracer):
+            return CountsDictionary(eigvals, counts, compbasis)
+
+        if compbasis:
+            num_bits = int(jnp.log2(len(eigvals)))
+            eigvals = map(lambda x: format(int(x), "b").zfill(num_bits), eigvals)
+        return dict(zip(eigvals, counts))
+
+
 def trace_quantum_measurements(
     device: QubitDevice,
     qrp: QRegPromise,
@@ -631,12 +681,19 @@ def trace_quantum_measurements(
             elif o.return_type.value == "counts":
                 shape = (2**nqubits,) if using_compbasis else (2,)
                 out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
-                counts_tree = tree_structure(("keys", "counts"))
+
+                leaf_node = jax.tree_util.tree_structure("")
+                counts_tree = jax.tree_util.PyTreeDef.make_from_node_data_and_children(
+                    jax._src.tree_util.default_registry,
+                    (CountsDictionary, using_compbasis),
+                    [leaf_node, leaf_node],
+                )
+
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children):
                     meas_return_trees_children[i] = counts_tree
-                    out_tree = out_tree.make_from_node_data_and_children(
-                        PyTreeRegistry(),
+                    out_tree = jax.tree_util.PyTreeDef.make_from_node_data_and_children(
+                        jax._src.tree_util.default_registry,
                         out_tree.node_data(),
                         meas_return_trees_children,
                     )

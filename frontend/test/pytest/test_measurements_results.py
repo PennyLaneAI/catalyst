@@ -70,13 +70,13 @@ class TestCounts:
             qml.RX(x, wires=0)
             return qml.counts()
 
-        expected = [np.array([0, 1]), np.array([1000, 0])]
+        expected = {"0": 1000, "1": 0}
         observed = counts_1qbit(0.0)
-        assert np.array_equal(observed, expected)
+        assert observed == expected
 
-        expected = [np.array([0, 1]), np.array([0, 1000])]
+        expected = {"0": 0, "1": 1000}
         observed = counts_1qbit(np.pi)
-        assert np.array_equal(observed, expected)
+        assert observed == expected
 
     def test_count_on_2qbits(self, backend):
         """Test counts on 2 qubits."""
@@ -88,13 +88,13 @@ class TestCounts:
             qml.RY(x, wires=1)
             return qml.counts()
 
-        expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
+        expected = {"00": 1000, "01": 0, "10": 0, "11": 0}
         observed = counts_2qbit(0.0)
-        assert np.array_equal(observed, expected)
+        assert observed == expected
 
-        expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 0, 1000])]
+        expected = {"00": 0, "01": 0, "10": 0, "11": 1000}
         observed = counts_2qbit(np.pi)
-        assert np.array_equal(observed, expected)
+        assert observed == expected
 
     def test_count_on_2qbits_endianness(self, backend):
         """Test counts on 2 qubits with check for endianness."""
@@ -106,13 +106,13 @@ class TestCounts:
             qml.RX(y, wires=1)
             return qml.counts()
 
-        expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 1000, 0])]
+        expected = {"00": 0, "01": 0, "10": 1000, "11": 0}
         observed = counts_2qbit(np.pi, 0)
-        assert np.array_equal(observed, expected)
+        assert observed == expected
 
-        expected = [np.array([0, 1, 2, 3]), np.array([0, 1000, 0, 0])]
+        expected = {"00": 0, "01": 1000, "10": 0, "11": 0}
         observed = counts_2qbit(0, np.pi)
-        assert np.array_equal(observed, expected)
+        assert observed == expected
 
 
 class TestExpval:

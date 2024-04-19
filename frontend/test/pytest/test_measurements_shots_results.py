@@ -504,11 +504,10 @@ class TestOtherMeasurements:
         assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=10000).shape
 
         # qml.counts
-        for r, e in zip(
-            result[1][0], expected(x, qml.counts(all_outcomes=True), shots=10000).keys()
-        ):
-            assert format(int(r), "02b") == e
-        assert sum(result[1][1]) == 10000
+        counts_expected = expected(x, qml.counts(all_outcomes=True), shots=10000)
+        assert result[1].keys() == counts_expected.keys()
+        assert all(abs(x - y) < 100 for x, y in zip(result[1].values(), counts_expected.values()))
+        assert sum(result[1].values()) == 10000
 
         # qml.expval
         assert np.allclose(
