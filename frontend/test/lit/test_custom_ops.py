@@ -66,7 +66,7 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     @staticmethod
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
-        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
 operations = lightning.operations.copy()

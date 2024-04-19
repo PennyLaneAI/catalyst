@@ -66,7 +66,7 @@ def get_custom_qjit_device(num_wires, discarded_operations=None, added_operation
         @staticmethod
         def get_c_interface():
             """Location to shared object with C/C++ implementation"""
-            return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+            return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     return CustomDevice(wires=num_wires)
 

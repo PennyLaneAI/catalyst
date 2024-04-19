@@ -54,7 +54,7 @@ class CustomDevice(qml.QubitDevice):
     @staticmethod
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
-        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "CustomDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
 dev = CustomDevice(wires=2)
