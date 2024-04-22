@@ -2634,7 +2634,7 @@ def pure_callback(callback_fn, result_type=None):
 
 
     ```python
-    def add_1(x) -> int:
+    def add_1(x):
         return x + 1
 
     @qjit
