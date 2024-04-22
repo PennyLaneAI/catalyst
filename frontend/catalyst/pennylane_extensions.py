@@ -2656,7 +2656,8 @@ def pure_callback(callback_fn, result_type=None):
 
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
     if result_type is None:
-        msg = "A function using pure_callback requires return types to be passed in as a parameter or type annotation."
+        msg = "A function using pure_callback requires return types "
+        msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
     @callback
@@ -2669,8 +2670,8 @@ def pure_callback(callback_fn, result_type=None):
 def io_callback(callback_fn):
     """IO callback
 
-    Using `io_callback` allows a user to run a python function with side effects inside an `@qjit` context.
-    To mark a function as an `io_callback`, one can use a decorator:
+    Using `io_callback` allows a user to run a python function with side effects inside an `@qjit`
+    context. To mark a function as an `io_callback`, one can use a decorator:
 
     ```python
     @io_callback

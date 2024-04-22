@@ -127,6 +127,8 @@ def test_kwargs(capsys):
 
 
 def test_simple_increment():
+    """Test increment function"""
+
     @callback
     def inc(arg) -> int:
         return arg + 1
@@ -252,10 +254,9 @@ def test_pure_callback_no_return_value():
     def cir(x):
         return pure_callback(identity)(x)
 
-    with pytest.raises(
-        TypeError,
-        match="A function using pure_callback requires return types to be passed in as a parameter or type annotation.",
-    ):
+    msg = "A function using pure_callback requires return types to be "
+    msg += "passed in as a parameter or type annotation."
+    with pytest.raises(TypeError, match=msg):
         cir(0.0)
 
 
