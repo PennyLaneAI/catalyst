@@ -58,7 +58,7 @@ Hadamard = {}
 Hermitian = {}
 # Tensor,
 Projector = {}
-Sprod = {}
+SProd = {}
 Hamiltonian = { condition = [ "analytic" ] }
 Sum = {}
 Prod = {}

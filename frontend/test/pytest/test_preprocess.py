@@ -139,7 +139,7 @@ class TestPreprocess:
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qml.probs()
 
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
+        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qml.qjit(f, target="jaxpr")
 
     @pytest.mark.skipif(
@@ -220,7 +220,7 @@ class TestTransform:
             )
 
         res = circuit(0.2)
-        results = res[0]
+        results = res
 
         assert isinstance(results, tuple)
         assert len(results) == 4

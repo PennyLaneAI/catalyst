@@ -23,7 +23,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.pennylane_extensions import qfunc
 
 lightning = qml.device("lightning.qubit", wires=3)
-copy = lightning.operations.copy()
+copy = set(lightning.operations).copy()
 copy.discard("MultiControlledX")
 copy.discard("Rot")
 copy.discard("S")
@@ -54,7 +54,7 @@ class CustomDevice(qml.QubitDevice):
     @staticmethod
     def get_c_interface():
         """Location to shared object with C/C++ implementation"""
-        return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "CustomDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
 
 dev = CustomDevice(wires=2)
@@ -97,7 +97,7 @@ class TestControlledDecomposition:
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qml.probs()
 
-        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
+        with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qjit(f, target="jaxpr")
 
 
