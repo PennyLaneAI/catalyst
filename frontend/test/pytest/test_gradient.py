@@ -156,6 +156,9 @@ def test_non_differentiable_qnode():
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliZ(wires=0))
 
+    # Ensure None allows forward-pass to succeed
+    assert np.allclose(qjit(f)(1.0), np.cos(1.0))
+
     @qjit
     def grad_f(x):
         return grad(f, method="auto")(x)
