@@ -73,7 +73,13 @@ def decompose(
     stopping_condition,
     max_expansion=None,
 ):
-    """Decompose operations until the stopping condition is met."""
+    """Decompose operations until the stopping condition is met.
+
+    PennyLane operations are decomposed in the same manner as in PennyLane. For
+    HybridOp (not QCtrl) we recurse and call the decompose function on each region tape. After
+    finishing the decomposition on a HybridOp we mark it as visited such that it meets
+    the acceptance criteria and is not decomposed further,
+    """
 
     def decomposer(op):
         if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
