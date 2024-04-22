@@ -67,7 +67,6 @@ class DummyDeviceNoWires(Device):
     )
 
     def __init__(self, shots=1024):
-        print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(shots=shots)
 
     @staticmethod
