@@ -73,6 +73,10 @@
   array when used without observables.
   [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
 
+* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
