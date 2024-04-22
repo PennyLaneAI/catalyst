@@ -78,5 +78,6 @@ def test_convert_pytype_to_shaped_array(inp, exp):
     """Test conversion to shaped arrays"""
     assert convert_pytype_to_shaped_array(inp) == exp
 
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

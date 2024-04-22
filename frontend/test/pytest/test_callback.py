@@ -126,6 +126,18 @@ def test_kwargs(capsys):
         assert string in captured.out
 
 
+def test_simple_increment():
+    @callback
+    def inc(arg) -> int:
+        return arg + 1
+
+    @qml.qjit
+    def cir(arg):
+        return inc(arg)
+
+    assert np.allclose(cir(0), 1)
+
+
 @pytest.mark.parametrize(
     "arg",
     [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
@@ -240,7 +252,10 @@ def test_pure_callback_no_return_value():
     def cir(x):
         return pure_callback(identity)(x)
 
-    with pytest.raises(TypeError, match="pure_callback requires a result_type"):
+    with pytest.raises(
+        TypeError,
+        match="A function using pure_callback requires return types to be passed in as a parameter or type annotation.",
+    ):
         cir(0.0)
 
 
@@ -301,6 +316,6 @@ def test_io_callback_returns_something(capsys):
     with pytest.raises(ValueError, match="io_callback is expected to return None"):
         cir(0)
 
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
-

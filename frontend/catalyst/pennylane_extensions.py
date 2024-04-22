@@ -2605,23 +2605,47 @@ class CallbackClosure:
 def pure_callback(callback_fn, result_type=None):
     """Pure callback
 
+    A pure function is a function that:
+
+      1. Given the same arguments *args, the results will be the same each time the function is
+         called.
+      2. The function has no side effect.
+
+    A pure callback is a pure python function that can be executed by the python virtual machine.
+    This is in direct contrast to functions which get JIT compiled by Catalyst.
+
     Using `pure_callback` allows a user to run python.
     `pure_callback`s can be used via a decorator:
 
     ```python
     @pure_callback
-    def identity(x) -> int:
-        return x
+    def add_1(x) -> int:
+        return x + 1
+
+    @qjit
+    def context(x):
+        return add_1(x)
+
+    # Can also be used outside a JIT compiled context
+    two = add_1(1)
     ```
 
-    or through a more functional syntax:
+    It can also be used through a more functional syntax:
+
 
     ```python
-    pure_callback(identity, int)(x)
+    def add_1(x) -> int:
+        return x + 1
+
+    @qjit
+    def context(x):
+        return pure_callback(add_1, int)(x)
     ```
 
     `pure_callback`s are expected to have a return type which matches
-    the return type of the function being called.
+    the return type of the function being called. This can be specified
+    as type hints in the decorator syntax or as the second parameter in the functional
+    syntax.
 
     At the moment, `pure_callback`s should not be used inside gradients.
     """
@@ -2632,7 +2656,8 @@ def pure_callback(callback_fn, result_type=None):
 
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
     if result_type is None:
-        raise TypeError("pure_callback requires a result_type")
+        msg = "A function using pure_callback requires return types to be passed in as a parameter or type annotation."
+        raise TypeError(msg)
 
     @callback
     def closure(*args, **kwargs) -> result_type:
@@ -2644,19 +2669,32 @@ def pure_callback(callback_fn, result_type=None):
 def io_callback(callback_fn):
     """IO callback
 
-    Using `io_callback` allows a user to run python.
-    `io_callback`s can be used via a decorator:
+    Using `io_callback` allows a user to run a python function with side effects inside an `@qjit` context.
+    To mark a function as an `io_callback`, one can use a decorator:
 
     ```python
     @io_callback
     def my_custom_print(x):
         print(x)
+
+    @qjit
+    def foo(x):
+       my_custom_print(x)
+
+    # Can also be used outside of a JIT compiled context.
+    my_custom_print(x)
     ```
 
     or through a more functional syntax:
 
     ```python
-    io_callback(my_custom_print)(x)
+    @io_callback
+    def my_custom_print(x):
+        print(x)
+
+    @qjit
+    def foo(x):
+        io_callback(my_custom_print)(x)
     ```
 
     `io_callback`s are expected to not return anything.
