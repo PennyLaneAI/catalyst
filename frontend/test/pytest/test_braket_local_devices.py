@@ -671,7 +671,7 @@ class TestBraketMeasurementsProcess:
 
         # qml.counts
         assert sum(result[1][1]) == 100
-        assert result[1][0].dtyp == np.int64
+        assert result[1][0].dtype == np.int64
 
         # qml.probs
         assert result[2][0] > result[2][1]
