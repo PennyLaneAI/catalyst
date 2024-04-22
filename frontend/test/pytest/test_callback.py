@@ -318,5 +318,32 @@ def test_io_callback_returns_something(capsys):
         cir(0)
 
 
+def test_io_callback_modify_global(capsys):
+    """Test mutation"""
+
+    x = 0
+
+    @io_callback
+    def set_x_to(y):
+        nonlocal x
+        x = y
+
+    @io_callback
+    def print_x():
+        nonlocal x
+        print(x)
+
+    @qml.qjit
+    def cir():
+        print_x()
+        set_x_to(1)
+        print_x()
+
+    cir()
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0\n1"
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
