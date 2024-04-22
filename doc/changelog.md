@@ -77,7 +77,7 @@
 * Manually cleanup the workspace, which prevents a warning from showing up during testing.
   [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
 
-* Ignore unraisable warning in autograph test.
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
   [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 
 * An exception is now raised when OpenBLAS cannot be found by Catalyst.
