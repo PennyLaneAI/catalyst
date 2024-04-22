@@ -125,7 +125,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -199,7 +199,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -277,7 +277,7 @@ jobs:
     - name: Build OQC-Runtime
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
           make oqc
 
     - name: Test Catalyst-Runtime

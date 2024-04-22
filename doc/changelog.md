@@ -5,27 +5,27 @@
 * Support for callbacks in Catalyst.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
+  [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
+  [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
+  [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
 
-  Catalyst now supports callbacks with parameters but no return values.
-  This is the very first step in supporting callbacks.
+  Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
 
   ```py
   @callback
   def foo(val):
-    print("Hello world", val)
+    return val
 
   @qjit
-  def circuit(*args, **kwargs):
-    ...
-    foo(123)
-    ...
+  def circuit(param):
+    return foo(param)
 
   ```
 
   ```pycon
-  >>> circuit()
-  Hello world 123
+  >>> print(circuit(123))
+  123
   ```
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
@@ -73,6 +73,20 @@
   array when used without observables.
   [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
 
+* The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
+  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
+  a Jupyter Notebook.
+  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
+* Manually cleanup the workspace, which prevents a warning from showing up during testing.
+  [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
+
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
+
+* An exception is now raised when OpenBLAS cannot be found by Catalyst.
+  [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
+
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
   support, gate invertibility or differentiability.
@@ -81,11 +95,12 @@
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
-  preprocessing.
+  preprocessing. This preprocessing is a decomposition based on the TOML file.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
   [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
+  [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
@@ -128,6 +143,9 @@
 
 <h3>Bug fixes</h3>
 
+* Enable support for QNode argument `diff_method=None` with QJIT.
+  [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
+
 * Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
   contain one element.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
@@ -157,6 +175,7 @@ David Ittah,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez,
+Lee James O'Riordan,
 Muzammiluddin Syed.
 
 # Release 0.5.0
