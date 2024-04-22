@@ -1227,8 +1227,7 @@ class TestForLoops:
         with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
             qjit(autograph=True)(f)
 
-    @pytest.mark.filterwarnings("error")
-    @pytest.mark.filterwarnings("ignore::UserWarning")
+    @pytest.mark.filterwarnings("error::UserWarning")
     def test_ignore_warnings(self, monkeypatch):
         """Test the AutoGraph config flag properly silences warnings."""
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
