@@ -2670,6 +2670,9 @@ def pure_callback(callback_fn, result_type=None):
 def io_callback(callback_fn):
     """IO callback
 
+    An IO callback is a python function that can write to stdout or to a file.
+    It is expected to return no values.
+
     Using `io_callback` allows a user to run a python function with side effects inside an `@qjit`
     context. To mark a function as an `io_callback`, one can use a decorator:
 
