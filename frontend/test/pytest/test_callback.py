@@ -300,3 +300,7 @@ def test_io_callback_returns_something(capsys):
 
     with pytest.raises(ValueError, match="io_callback is expected to return None"):
         cir(0)
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
+
