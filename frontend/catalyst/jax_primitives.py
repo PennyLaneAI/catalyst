@@ -298,7 +298,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         # if supported and parameter-shift otherwise. Emulating the same behaviour
         # would require generating code to query the device.
         # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = fn.diff_method if fn.diff_method != "best" else "parameter-shift"
+        diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op.name.value
