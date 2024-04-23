@@ -134,6 +134,7 @@ def pure_callback(callback_fn, result_type=None):
 
     return closure
 
+
 def callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
@@ -152,6 +153,7 @@ def callback(func):
         return callback_implementation(func, retty, *args, **kwargs)
 
     return bind_callback
+
 
 def callback_implementation(
     cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
