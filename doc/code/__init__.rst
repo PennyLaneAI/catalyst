@@ -27,11 +27,3 @@ Module: catalyst.cuda
     :no-heading:
     :no-inheritance-diagram:
     :fullname:
-
-Module: catalyst.callback
----------------------
-
-.. automodapi:: catalyst.callback
-    :no-heading:
-    :no-inheritance-diagram:
-    :fullname:
