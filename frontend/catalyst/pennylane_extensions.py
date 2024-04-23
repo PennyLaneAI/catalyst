@@ -2692,6 +2692,7 @@ def io_callback(callback_fn):
     or through a more functional syntax:
 
     ```python
+    @io_callback
     def my_custom_print(x):
         print(x)
 
@@ -2703,7 +2704,7 @@ def io_callback(callback_fn):
     `io_callback`s are expected to not return anything.
     May be useful for custom printing and logging into files.
 
-    At the moment, `io_callback`s should not be used inside gradients.
+    At the moment, `pure_callback`s should not be used inside gradients.
     """
 
     @callback
