@@ -77,10 +77,10 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 class DeviceConfig:
     """Quantum device capabilities"""
 
-    native_gates: Dict[str, OperationProperties]
-    decomp: Dict[str, OperationProperties]
-    matrix: Dict[str, OperationProperties]
-    observables: Dict[str, OperationProperties]
+    native_ops: Dict[str, OperationProperties]
+    to_decomp_ops: Dict[str, OperationProperties]
+    to_matrix_ops: Dict[str, OperationProperties]
+    native_obs: Dict[str, OperationProperties]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
@@ -178,7 +178,7 @@ def get_observables(config: TOMLDocument, program_features: ProgramFeatures) -> 
     return parse_toml_section(config, ["operators", "observables"], program_features)
 
 
-def get_native_gates(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
+def get_native_ops(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Get the gates from the `native` section of the config."""
 
     schema = int(config["schema"])
@@ -319,7 +319,7 @@ def get_device_config(
     schema = int(config["schema"])
 
     native_gate_props = {}
-    for g, props in get_native_gates(config, program_features).items():
+    for g, props in get_native_ops(config, program_features).items():
         native_gate_props[g] = get_operation_properties(props)
 
     matrix_decomp_props = {}
@@ -345,10 +345,10 @@ def get_device_config(
         )
 
     return DeviceConfig(
-        native_gates=native_gate_props,
-        decomp=decomp_props,
-        matrix=matrix_decomp_props,
-        observables=observable_props,
+        native_ops=native_gate_props,
+        to_decomp_ops=decomp_props,
+        to_matrix_ops=matrix_decomp_props,
+        native_obs=observable_props,
         mid_circuit_measurement_flag=check_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=check_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=check_compilation_flag(config, "dynamic_qubit_management"),

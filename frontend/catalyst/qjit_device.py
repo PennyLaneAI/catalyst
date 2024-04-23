@@ -86,10 +86,10 @@ def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
     qir_gates = RUNTIME_OPERATIONS
 
     # Intersection of the above
-    qjit_config.native_gates = intersect_operations(target_config.native_gates, qir_gates)
+    qjit_config.native_ops = intersect_operations(target_config.native_ops, qir_gates)
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
-    qjit_config.native_gates.update(
+    qjit_config.native_ops.update(
         {
             "Cond": OperationProperties(invertible=True, controllable=True, differentiable=True),
             "WhileLoop": OperationProperties(
@@ -101,7 +101,7 @@ def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
 
     # Optionally enable runtime-powered mid-circuit measurments
     if target_config.mid_circuit_measurement_flag:  # pragma: no branch
-        qjit_config.native_gates.update(
+        qjit_config.native_ops.update(
             {
                 "MidCircuitMeasure": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
@@ -110,8 +110,8 @@ def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
         )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if all(ng.invertible for ng in target_config.native_gates.values()):
-        qjit_config.native_gates.update(
+    if all(ng.invertible for ng in target_config.native_ops.values()):
+        qjit_config.native_ops.update(
             {
                 "Adjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
@@ -175,7 +175,7 @@ class QJITDevice(qml.QubitDevice):
     @property
     def operations(self) -> Set[str]:
         """Get the device operations using PennyLane's syntax"""
-        return pennylane_operation_set(self.caps.native_gates)
+        return pennylane_operation_set(self.caps.native_ops)
 
     @property
     def observables(self) -> Set[str]:
@@ -290,7 +290,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return pennylane_operation_set(self.caps.native_gates)
+        return pennylane_operation_set(self.caps.native_ops)
 
     @property
     def observables(self) -> Set[str]:

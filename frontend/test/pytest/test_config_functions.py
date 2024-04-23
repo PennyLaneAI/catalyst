@@ -34,7 +34,7 @@ from catalyst.utils.toml import (
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
-    get_native_gates,
+    get_native_ops,
     pennylane_operation_set,
     read_toml_file,
 )
@@ -115,7 +115,7 @@ def test_get_observables_schema1():
             """
         ),
     )
-    assert {"PauliX"} == pennylane_operation_set(device_config.observables)
+    assert {"PauliX"} == pennylane_operation_set(device_config.native_obs)
 
 
 def test_get_observables_schema2():
@@ -130,10 +130,10 @@ def test_get_observables_schema2():
             """
         ),
     )
-    assert {"PauliX"} == pennylane_operation_set(device_config.observables)
+    assert {"PauliX"} == pennylane_operation_set(device_config.native_obs)
 
 
-def test_get_native_gates_schema1_no_qcontrol():
+def test_get_native_ops_schema1_no_qcontrol():
     """Test native gates are properly obtained from the toml."""
     device_config = get_test_device_config(
         ProgramFeatures(False),
@@ -147,10 +147,10 @@ def test_get_native_gates_schema1_no_qcontrol():
             """
         ),
     )
-    assert {"PauliX"} == pennylane_operation_set(device_config.native_gates)
+    assert {"PauliX"} == pennylane_operation_set(device_config.native_ops)
 
 
-def test_get_native_gates_schema1_qcontrol():
+def test_get_native_ops_schema1_qcontrol():
     """Test native gates are properly obtained from the toml."""
     device_config = get_test_device_config(
         ProgramFeatures(False),
@@ -164,11 +164,11 @@ def test_get_native_gates_schema1_qcontrol():
             """
         ),
     )
-    assert {"PauliZ", "C(PauliZ)"} == pennylane_operation_set(device_config.native_gates)
+    assert {"PauliZ", "C(PauliZ)"} == pennylane_operation_set(device_config.native_ops)
 
 
 @pytest.mark.parametrize("qadjoint", [True, False])
-def test_get_native_gates_schema1_qadjoint(qadjoint):
+def test_get_native_ops_schema1_qadjoint(qadjoint):
     """Test native gates are properly obtained from the toml."""
     device_config = get_test_device_config(
         ProgramFeatures(False),
@@ -182,10 +182,10 @@ def test_get_native_gates_schema1_qadjoint(qadjoint):
             """
         ),
     )
-    assert device_config.native_gates["PauliZ"].invertible is qadjoint
+    assert device_config.native_ops["PauliZ"].invertible is qadjoint
 
 
-def test_get_native_gates_schema2():
+def test_get_native_ops_schema2():
     """Test native gates are properly obtained from the toml."""
     device_config = get_test_device_config(
         ProgramFeatures(False),
@@ -199,10 +199,10 @@ def test_get_native_gates_schema2():
         ),
     )
 
-    assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(device_config.native_gates)
+    assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(device_config.native_ops)
 
 
-def test_get_native_gates_schema2_optional_shots():
+def test_get_native_ops_schema2_optional_shots():
     """Test native gates are properly obtained from the toml."""
     device_config = get_test_device_config(
         ProgramFeatures(True),
@@ -215,11 +215,11 @@ def test_get_native_gates_schema2_optional_shots():
             """
         ),
     )
-    assert "PauliX" in device_config.native_gates
-    assert "PauliY" not in device_config.native_gates
+    assert "PauliX" in device_config.native_ops
+    assert "PauliY" not in device_config.native_ops
 
 
-def test_get_native_gates_schema2_optional_noshots():
+def test_get_native_ops_schema2_optional_noshots():
     """Test native gates are properly obtained from the toml."""
     device_config = get_test_device_config(
         ProgramFeatures(False),
@@ -232,8 +232,8 @@ def test_get_native_gates_schema2_optional_noshots():
             """
         ),
     )
-    assert "PauliX" not in device_config.native_gates
-    assert "PauliY" in device_config.native_gates
+    assert "PauliX" not in device_config.native_ops
+    assert "PauliY" in device_config.native_ops
 
 
 def test_get_decomp_gates_schema1():
@@ -249,9 +249,9 @@ def test_get_decomp_gates_schema1():
         ),
     )
 
-    assert "PauliX" in device_config.decomp
-    assert "PauliY" in device_config.decomp
-    assert "PauliZ" not in device_config.decomp
+    assert "PauliX" in device_config.to_decomp_ops
+    assert "PauliY" in device_config.to_decomp_ops
+    assert "PauliZ" not in device_config.to_decomp_ops
 
 
 def test_get_decomp_gates_schema2():
@@ -267,8 +267,8 @@ def test_get_decomp_gates_schema2():
         ),
     )
 
-    assert "PauliX" in device_config.decomp
-    assert "PauliY" in device_config.decomp
+    assert "PauliX" in device_config.to_decomp_ops
+    assert "PauliY" in device_config.to_decomp_ops
 
 
 def test_get_matrix_decomposable_gates_schema1():
@@ -284,8 +284,8 @@ def test_get_matrix_decomposable_gates_schema1():
         ),
     )
 
-    assert "PauliX" in device_config.matrix
-    assert "PauliY" in device_config.matrix
+    assert "PauliX" in device_config.to_matrix_ops
+    assert "PauliY" in device_config.to_matrix_ops
 
 
 def test_get_matrix_decomposable_gates_schema2():
@@ -301,7 +301,7 @@ def test_get_matrix_decomposable_gates_schema2():
         ),
     )
 
-    assert "PauliZ" in device_config.matrix
+    assert "PauliZ" in device_config.to_matrix_ops
 
 
 def test_check_overlap_msg():
@@ -398,7 +398,7 @@ def test_config_unsupported_schema():
         get_decomposable_gates(config, program_features)
 
     with pytest.raises(CompileError):
-        get_native_gates(config, program_features)
+        get_native_ops(config, program_features)
 
     with pytest.raises(CompileError):
         check_quantum_control_flag(config)

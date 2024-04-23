@@ -135,9 +135,9 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
     program_features = ProgramFeatures(device.shots is not None)
     device_config = get_device_config(config, program_features, device_name)
 
-    native = pennylane_operation_set(device_config.native_gates)
-    decomposable = pennylane_operation_set(device_config.decomp)
-    matrix = pennylane_operation_set(device_config.matrix)
+    native = pennylane_operation_set(device_config.native_ops)
+    decomposable = pennylane_operation_set(device_config.to_decomp_ops)
+    matrix = pennylane_operation_set(device_config.to_matrix_ops)
 
     check_no_overlap(native, decomposable, matrix, device_name=device_name)
 
@@ -155,7 +155,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         # For observables, we do not have `non-native` section in the config, so we check that
         # device data supercedes the specification.
         device_observables = set(device.observables)
-        spec_observables = pennylane_operation_set(device_config.observables)
+        spec_observables = pennylane_operation_set(device_config.native_obs)
         if (spec_observables - device_observables) != set():
             raise CompileError(
                 "Observables in qml.device.observables and specification file do not match.\n"
