@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout Catalyst repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -67,7 +67,7 @@ jobs:
 
 
       - name: Upload Catalyst-Runtime Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: runtime-build-${{ matrix.compiler }}
           path: |
@@ -76,7 +76,7 @@ jobs:
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: oqc-build-${{ matrix.compiler }}
           path: |
@@ -94,22 +94,22 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Both the LLVM source and build folder are required for further dialect builds.
     # Caching is significantly faster than git cloning since LLVM is such a large repository.
 
     - name: Cache LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
+        enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: ${{ needs.constants.outputs.llvm_version }}
@@ -117,7 +117,7 @@ jobs:
 
     - name: Cache LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
@@ -153,19 +153,19 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
-        enableCrossOsArchive: True
+        enableCrossOsArchive: true
 
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
@@ -173,7 +173,7 @@ jobs:
 
     - name: Cache MHLO Build
       id: cache-mhlo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
@@ -181,21 +181,21 @@ jobs:
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -223,19 +223,19 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Cache Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
-        enableCrossOsArchive: True
+        enableCrossOsArchive: true
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ needs.constants.outputs.enzyme_version }}
@@ -243,7 +243,7 @@ jobs:
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
@@ -251,21 +251,21 @@ jobs:
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -293,7 +293,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
@@ -304,58 +304,58 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
 
     - name: Get Cached MHLO Build
       id: cache-mhlo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+        enableCrossOsArchive: true
+        fail-on-cache-miss: true
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Cache CCache
       id: cache-ccache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: .ccache
         # TODO: revisit once actions/cache has an update feature
@@ -376,7 +376,7 @@ jobs:
         make dialects
 
     - name: Upload Quantum Build Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: |
@@ -395,7 +395,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
@@ -412,20 +412,20 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
@@ -468,7 +468,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install lightning.kokkos used in Python tests
       run: |
@@ -484,20 +484,20 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
@@ -522,7 +522,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
@@ -534,20 +534,20 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-${{ matrix.compiler }}
-        fail-on-cache-miss: True
+        fail-on-cache-miss: true
 
     - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: quantum-build
 
     - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: runtime-build-${{ matrix.compiler }}
         path: runtime-build/lib
@@ -582,7 +582,7 @@ jobs:
     #     uses: catchpoint/workflow-telemetry-action@v2
 
       - name: Checkout the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -596,7 +596,7 @@ jobs:
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Download Catalyst-Runtime Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: runtime-build-${{ matrix.compiler }}
           path: runtime-build/lib
@@ -657,7 +657,7 @@ jobs:
 
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
