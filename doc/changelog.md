@@ -76,6 +76,10 @@
 
 <h3>Improvements</h3>
 
+* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
@@ -83,6 +87,9 @@
 
 * Manually cleanup the workspace, which prevents a warning from showing up during testing.
   [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
+
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 
 * An exception is now raised when OpenBLAS cannot be found by Catalyst.
   [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
@@ -143,6 +150,9 @@
 
 <h3>Bug fixes</h3>
 
+* Enable support for QNode argument `diff_method=None` with QJIT.
+  [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
+
 * Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
   contain one element.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
@@ -172,6 +182,7 @@ David Ittah,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez,
+Lee James O'Riordan,
 Muzammiluddin Syed.
 
 # Release 0.5.0
