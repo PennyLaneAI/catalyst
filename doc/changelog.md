@@ -29,9 +29,9 @@
   123
   ```
 
-  This includes support for the specialized `pure_callback` and `io_callback` where
+  This includes support for the specialized `pure_callback` and `debug.callback` where
   `pure_callback` is expected to return a value and be side effect free,
-  while `io_callback` is expected to produce a side effect and have no return values.
+  while `debug.callback` is expected to produce a side effect and have no return values.
 
   At the moment, callbacks should not be used inside methods which are differentiated.
 

@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.pennylane_extensions import callback, io_callback, pure_callback
+from catalyst.callback import callback, io_callback, pure_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
