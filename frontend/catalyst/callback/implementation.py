@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Callback module"""
+
 import inspect
 import ctypes
 from collections.abc import Sequence
 from typing import Any, Callable
-from functools import update_wrapper, wraps
+from functools import wraps
 
-import jax
 import jax.numpy as jnp
-import numpy as np
 from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 from catalyst.tracing.contexts import EvaluationContext

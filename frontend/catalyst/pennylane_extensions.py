@@ -19,11 +19,9 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
-import ctypes
-import inspect
 import numbers
 from collections.abc import Sequence, Sized
-from functools import update_wrapper, wraps
+from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -36,7 +34,6 @@ from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_leaves,
-    tree_map,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
@@ -74,7 +71,6 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
-    python_callback_p,
     qmeasure_p,
     vjp_p,
     while_p,
@@ -97,11 +93,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.utils.jnp_to_memref import (
-    get_ranked_memref_descriptor,
-    get_unranked_memref_descriptor,
-    ranked_memref_to_numpy,
-)
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
@@ -109,7 +100,6 @@ from catalyst.utils.runtime import (
     validate_config_with_device,
 )
 from catalyst.utils.toml import TOMLDocument
-from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
 def _check_no_measurements(tape: QuantumTape) -> None:
