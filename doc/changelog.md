@@ -139,6 +139,9 @@
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
+* Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`. As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above (e.g. Ubuntu 20.04 and above).
+  [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -176,7 +179,8 @@ Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez,
 Lee James O'Riordan,
-Muzammiluddin Syed.
+Muzammiluddin Syed,
+Raul Torres.
 
 # Release 0.5.0
 
