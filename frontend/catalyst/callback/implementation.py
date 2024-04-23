@@ -67,53 +67,6 @@ class CallbackClosure:
             jnpargs.append(jnparray)
         return jnpargs
 
-def io_callback(callback_fn):
-    """IO callback
-
-    An IO callback is a python function that can write to stdout or to a file.
-    It is expected to return no values.
-
-    Using `io_callback` allows a user to run a python function with side effects inside an `@qjit`
-    context. To mark a function as an `io_callback`, one can use a decorator:
-
-    ```python
-    @io_callback
-    def my_custom_print(x):
-        print(x)
-
-    @qjit
-    def foo(x):
-       my_custom_print(x)
-
-    # Can also be used outside of a JIT compiled context.
-    my_custom_print(x)
-    ```
-
-    or through a more functional syntax:
-
-    ```python
-    @io_callback
-    def my_custom_print(x):
-        print(x)
-
-    @qjit
-    def foo(x):
-        io_callback(my_custom_print)(x)
-    ```
-
-    `io_callback`s are expected to not return anything.
-    May be useful for custom printing and logging into files.
-
-    At the moment, `pure_callback`s should not be used inside gradients.
-    """
-
-    @callback
-    def closure(*args, **kwargs) -> None:
-        retval = callback_fn(*args, **kwargs)
-        if retval is not None:
-            raise ValueError("io_callback is expected to return None")
-
-    return closure
 
 def pure_callback(callback_fn, result_type=None):
     """Pure callback
