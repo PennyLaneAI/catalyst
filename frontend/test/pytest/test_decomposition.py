@@ -12,71 +12,94 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import tempfile
+
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
 from catalyst import CompileError, ctrl, measure, qjit
-from catalyst.compiler import get_lib_path
-
-# This is used just for internal testing
-from catalyst.pennylane_extensions import qfunc
-
-lightning = qml.device("lightning.qubit", wires=3)
-copy = set(lightning.operations).copy()
-copy.discard("MultiControlledX")
-copy.discard("Rot")
-copy.discard("S")
 
 
 class CustomDevice(qml.QubitDevice):
-    """Dummy Device"""
+    """Custom Gate Set Device"""
 
-    name = "Dummy Device"
-    short_name = "dummy.device"
-    pennylane_requires = "0.32.0"
-    version = "0.0.1"
-    author = "Dummy"
+    name = "Custom Device"
+    short_name = "lightning.qubit"
+    pennylane_requires = "0.35.0"
+    version = "0.0.2"
+    author = "Tester"
 
-    operations = copy
-    observables = lightning.observables.copy()
+    lightning_device = qml.device("lightning.qubit", wires=0)
+    operations = lightning_device.operations.copy() - {
+        "MultiControlledX",
+        "Rot",
+        "S",
+        "C(Rot)",
+        "C(S)",
+    }
+    observables = lightning_device.observables.copy()
+
+    config = None
+    backend_name = "default"
+    backend_lib = "default"
+    backend_kwargs = {}
 
     def __init__(self, shots=None, wires=None):
-        self.backend_name = "default"
-        self.backend_lib = "default"
-        self.backend_kwargs = {}
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
         """Unused"""
         raise RuntimeError("Only C/C++ interface is defined")
 
-    @staticmethod
-    def get_c_interface():
-        """Location to shared object with C/C++ implementation"""
-        return "CustomDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+    def __enter__(self, *args, **kwargs):
+        lightning_toml = self.lightning_device.config
+        with open(lightning_toml, mode="r", encoding="UTF-8") as f:
+            toml_contents = f.readlines()
+
+        # TODO: update once schema 2 is merged
+        updated_toml_contents = []
+        for line in toml_contents:
+            if '"MultiControlledX",' in line:
+                continue
+            elif '"Rot",' in line:
+                continue
+            elif '"S",' in line:
+                continue
+            else:
+                updated_toml_contents.append(line)
+
+        self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+        self.toml_file.writelines(updated_toml_contents)
+        self.toml_file.close()  # close for now without deleting
+
+        self.config = self.toml_file.name
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        os.unlink(self.toml_file.name)
+        self.config = None
 
 
-dev = CustomDevice(wires=2)
-
-
-@pytest.mark.skip(reason="skip this test with the plugin system on CI")
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
-    @qjit()
-    @qfunc(device=dev)
-    def mid_circuit(x: float):
-        qml.Hadamard(wires=0)
-        qml.Rot(0, 0, x, wires=0)
-        qml.Hadamard(wires=0)
-        m = measure(wires=0)
-        b = m ^ 0x1
-        qml.Hadamard(wires=1)
-        qml.Rot(0, 0, b * jnp.pi, wires=1)
-        qml.Hadamard(wires=1)
-        return measure(wires=1)
+    with CustomDevice(wires=2) as dev:
 
-    assert mid_circuit(param) == expected
+        @qjit
+        @qml.qnode(dev)
+        def mid_circuit(x: float):
+            qml.Hadamard(wires=0)
+            qml.Rot(0, 0, x, wires=0)
+            qml.Hadamard(wires=0)
+            m = measure(wires=0)
+            b = m ^ 0x1
+            qml.Hadamard(wires=1)
+            qml.Rot(0, 0, b * jnp.pi, wires=1)
+            qml.Hadamard(wires=1)
+            return measure(wires=1)
+
+        assert mid_circuit(param) == expected
 
 
 class TestControlledDecomposition:
