@@ -17,10 +17,16 @@ jobs:
     with:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
 
+  determine_runner:
+    name: Determine runner type to use
+    uses: ./.github/workflows/utils/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-latest
+
   runtime:
     name: Catalyst-Runtime Build
-    needs: [constants]
-    runs-on: ubuntu-latest
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -80,8 +86,8 @@ jobs:
 
   llvm:
     name: LLVM Build
-    needs: [constants]
-    runs-on: ubuntu-latest
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -139,8 +145,8 @@ jobs:
 
   mhlo:
     name: MHLO Dialect Build
-    needs: [constants, llvm]
-    runs-on: ubuntu-latest
+    needs: [constants, llvm, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -209,8 +215,8 @@ jobs:
 
   enzyme:
     name: Enzyme Build
-    needs: [constants, llvm]
-    runs-on: ubuntu-latest
+    needs: [constants, llvm, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -279,8 +285,8 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, llvm, mhlo, enzyme]
-    runs-on: ubuntu-latest
+    needs: [constants, llvm, mhlo, enzyme, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -381,8 +387,8 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [constants, llvm, runtime, quantum]
-    runs-on: ubuntu-latest
+    needs: [constants, llvm, runtime, quantum, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -454,8 +460,8 @@ jobs:
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
-    needs: [constants, llvm, runtime, quantum]
-    runs-on: ubuntu-latest
+    needs: [constants, llvm, runtime, quantum, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -508,8 +514,8 @@ jobs:
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
-    needs: [constants, llvm, runtime, quantum]
-    runs-on: ubuntu-latest
+    needs: [constants, llvm, runtime, quantum, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
@@ -563,8 +569,8 @@ jobs:
 
   runtime-device-tests:
     name: Runtime Tests (Linux)
-    needs: [constants, runtime]
-    runs-on: ubuntu-latest
+    needs: [constants, runtime, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       fail-fast: false
       matrix:
@@ -646,8 +652,8 @@ jobs:
 
   runtime-code-cov:
     name: Runtime Code Coverage (Linux)
-    needs: [constants]
-    runs-on: ubuntu-latest
+    needs: [constants, determine_runner]
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
     steps:
       - name: Checkout the repo
