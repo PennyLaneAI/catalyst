@@ -12,21 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..implementation import callback
+from ..implementation import callback as base_callback
 
 """debug.callback module"""
 
-def io_callback(callback_fn):
-    """IO callback
 
-    An IO callback is a python function that can write to stdout or to a file.
+def callback(callback_fn):
+    """Debug callback
+
+    An debug callback is a python function that can write to stdout or to a file.
     It is expected to return no values.
 
-    Using `io_callback` allows a user to run a python function with side effects inside an `@qjit`
-    context. To mark a function as an `io_callback`, one can use a decorator:
+    Using `debug.callback` allows a user to run a python function with side effects inside an
+    `@qjit` context. To mark a function as a `debug.callback`, one can use a decorator:
 
     ```python
-    @io_callback
+    @debug.callback
     def my_custom_print(x):
         print(x)
 
@@ -41,25 +42,24 @@ def io_callback(callback_fn):
     or through a more functional syntax:
 
     ```python
-    @io_callback
     def my_custom_print(x):
         print(x)
 
     @qjit
     def foo(x):
-        io_callback(my_custom_print)(x)
+        debug.callback(my_custom_print)(x)
     ```
 
-    `io_callback`s are expected to not return anything.
+    `debug.callback`s are expected to not return anything.
     May be useful for custom printing and logging into files.
 
-    At the moment, `pure_callback`s should not be used inside gradients.
+    At the moment, `debug.callback`s should not be used inside gradients.
     """
 
-    @callback
+    @base_callback
     def closure(*args, **kwargs) -> None:
         retval = callback_fn(*args, **kwargs)
         if retval is not None:
-            raise ValueError("io_callback is expected to return None")
+            raise ValueError("debug.callback is expected to return None")
 
     return closure

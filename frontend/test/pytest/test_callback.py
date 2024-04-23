@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.callback import callback, io_callback, pure_callback
+from catalyst.callback import callback, debug, pure_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -260,15 +260,15 @@ def test_pure_callback_no_return_value():
         cir(0.0)
 
 
-def test_io_callback(capsys):
-    """Test io callback"""
+def test_debug_callback(capsys):
+    """Test debug callback"""
 
     def my_own_print(a):
         print(a)
 
     @qml.qjit
     def cir(x):
-        io_callback(my_own_print)(x)
+        debug.callback(my_own_print)(x)
         return None
 
     captured = capsys.readouterr()
@@ -279,10 +279,10 @@ def test_io_callback(capsys):
     assert captured.out.strip() == "0"
 
 
-def test_io_callback_decorator(capsys):
-    """Test io callback"""
+def test_debug_callback_decorator(capsys):
+    """Test debug callback"""
 
-    @io_callback
+    @debug.callback
     def my_own_print(a):
         print(a)
 
@@ -299,7 +299,7 @@ def test_io_callback_decorator(capsys):
     assert captured.out.strip() == "0"
 
 
-def test_io_callback_returns_something(capsys):
+def test_debug_callback_returns_something(capsys):
     """Test io callback returns something"""
 
     def my_own_print(a):
@@ -308,13 +308,13 @@ def test_io_callback_returns_something(capsys):
 
     @qml.qjit
     def cir(x):
-        io_callback(my_own_print)(x)
+        debug.callback(my_own_print)(x)
         return None
 
     captured = capsys.readouterr()
     assert captured.out.strip() == ""
 
-    with pytest.raises(ValueError, match="io_callback is expected to return None"):
+    with pytest.raises(ValueError, match="debug.callback is expected to return None"):
         cir(0)
 
 
@@ -323,12 +323,12 @@ def test_io_callback_modify_global(capsys):
 
     x = 0
 
-    @io_callback
+    @debug.callback
     def set_x_to(y):
         nonlocal x
         x = y
 
-    @io_callback
+    @debug.callback
     def print_x():
         nonlocal x
         print(x)

@@ -14,23 +14,25 @@
 
 """Callback module"""
 
-import inspect
 import ctypes
+import inspect
 from collections.abc import Sequence
-from typing import Any, Callable
 from functools import wraps
+from typing import Any, Callable
 
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
+
+from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
-from catalyst.utils.types import convert_pytype_to_shaped_array
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
     get_unranked_memref_descriptor,
     ranked_memref_to_numpy,
 )
-from catalyst.jax_primitives import python_callback_p
+from catalyst.utils.types import convert_pytype_to_shaped_array
+
 
 class CallbackClosure:
     """This is just a class containing data that is important for the callback."""
