@@ -179,7 +179,7 @@ class QJITDevice(qml.QubitDevice):
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.caps.observables)
+        return pennylane_operation_set(self.caps.native_obs)
 
     def apply(self, operations, **kwargs):
         """
@@ -285,7 +285,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.caps.observables)
+        return pennylane_operation_set(self.caps.native_obs)
 
     def preprocess(
         self,
