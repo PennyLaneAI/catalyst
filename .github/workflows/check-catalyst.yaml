@@ -19,7 +19,7 @@ jobs:
 
   determine_runner:
     name: Determine runner type to use
-    uses: ./.github/workflows/utils/determine-workflow-runner.yml
+    uses: ./.github/workflows/determine-workflow-runner.yml
     with:
       default_runner: ubuntu-latest
 
