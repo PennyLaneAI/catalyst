@@ -8,6 +8,7 @@
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
+  [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -27,6 +28,12 @@
   >>> print(circuit(123))
   123
   ```
+
+  This includes support for the specialized `pure_callback` and `debug.callback` where
+  `pure_callback` is expected to return a value and be side effect free,
+  while `debug.callback` is expected to produce a side effect and have no return values.
+
+  At the moment, callbacks should not be used inside methods which are differentiated.
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
