@@ -16,16 +16,15 @@ jobs:
   determine_workflow_runner:
     runs-on: ubuntu-latest
 
-    if: >-
-      ${{
-        github.event_name == 'pull_request'
-        && contains(github.event.pull_request.labels.*.name, 'urgent')
-      }}
-
     outputs:
       runner_group: ${{ steps.runner_group.outputs.runner_group }}
 
     steps:
       - name: Output Runner Group name
+        if: >-
+          ${{
+            github.event_name == 'pull_request'
+            && contains(github.event.pull_request.labels.*.name, 'urgent')
+          }}
         id: runner_group
         run: echo 'runner_group=pl-4-core-large-runner' >> $GITHUB_OUTPUT
