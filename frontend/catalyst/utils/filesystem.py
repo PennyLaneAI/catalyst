@@ -80,11 +80,15 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
                 return
             elif major == 3 and minor < 12:
                 # pylint: disable-next=protected-access
-                tempfile.TemporaryDirectory._cleanup(name, warn_message, ignore_errors=ignore_errors)
+                tempfile.TemporaryDirectory._cleanup(
+                    name, warn_message, ignore_errors=ignore_errors
+                )
                 return
 
             # pylint: disable-next=protected-access
-            tempfile.TemporaryDirectory._cleanup(name, warn_message, ignore_errors=ignore_errors, delete=delete)
+            tempfile.TemporaryDirectory._cleanup(
+                name, warn_message, ignore_errors=ignore_errors, delete=delete
+            )
 
 
 class WorkspaceManager:
