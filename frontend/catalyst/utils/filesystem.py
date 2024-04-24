@@ -58,6 +58,19 @@ class Directory:
         if isinstance(self._impl, tempfile.TemporaryDirectory):
             self._impl.cleanup()
 
+class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
+   """Derived class from tempfile.TemporaryDirectory
+
+   This overrides the _cleanup method which would normally emit a warning
+   after removing the directory. This warning is unconditional and it is emitted
+   because it is not called explicitly.
+   """
+
+   @classmethod
+   def _cleanup(cls, name, warn_message, ignore_errors=False):
+       tempfile.TemporaryDirectory._rmtree(name, ignore_errors=ignore_errors)
+
+
 
 class WorkspaceManager:
     """Singleton object that manages the output files for the IR.
@@ -98,7 +111,7 @@ class WorkspaceManager:
             # TODO: Once Python 3.12 becomes the least supported version of python, consider
             # setting the fields: delete and delete_on_close.
             # This can likely avoid having all the code below.
-            return tempfile.TemporaryDirectory(dir=path.resolve(), prefix=name.name)
+            return TemporaryDirectorySilent(dir=path.resolve(), prefix=name.name)
 
         count = 1
         curr_preferred_abspath = path / name
