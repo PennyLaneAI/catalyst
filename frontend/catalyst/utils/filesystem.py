@@ -85,7 +85,10 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
                 )
                 return
 
-            # pylint: disable-next=protected-access
+            # Even though this will never be reached due to different python versions
+            # pylint still complains about unexpected-keyword-arg.
+            # pylint is probably run with python 3.10 which does not have delete.
+            # pylint: disable-next=protected-access,unexpected-keyword-arg
             tempfile.TemporaryDirectory._cleanup(
                 name, warn_message, ignore_errors=ignore_errors, delete=delete
             )
