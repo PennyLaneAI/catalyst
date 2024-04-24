@@ -53,17 +53,18 @@ class Directory:
             return
         shutil.rmtree(str(self))
 
+
 class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
-   """Derived class from tempfile.TemporaryDirectory
+    """Derived class from tempfile.TemporaryDirectory
 
-   This overrides the _cleanup method which would normally emit a warning
-   after removing the directory. This warning is unconditional and it is emitted
-   because it is not called explicitly.
-   """
+    This overrides the _cleanup method which would normally emit a warning
+    after removing the directory. This warning is unconditional and it is emitted
+    because it is not called explicitly.
+    """
 
-   @classmethod
-   def _cleanup(cls, name, warn_message, ignore_errors=False):
-       tempfile.TemporaryDirectory._rmtree(name, ignore_errors=ignore_errors)
+    @classmethod
+    def _cleanup(cls, name, warn_message, ignore_errors=False):
+        tempfile.TemporaryDirectory._rmtree(name, ignore_errors=ignore_errors)
 
 
 class WorkspaceManager:
