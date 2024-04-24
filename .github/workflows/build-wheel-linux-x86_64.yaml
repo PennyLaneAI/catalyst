@@ -16,17 +16,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  determine_runner:
+    name: Determine runner type to use
+    uses: ./.github/workflows/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-latest
+
   check_if_wheel_build_required:
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
-    needs: [check_if_wheel_build_required]
+    needs: [check_if_wheel_build_required, determine_runner]
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    with:
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
   build-dependencies:
-    needs: [constants, check_if_wheel_build_required]
+    needs: [constants, check_if_wheel_build_required, determine_runner]
 
     strategy:
       fail-fast: false
@@ -37,7 +45,7 @@ jobs:
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     container: ${{ matrix.container_img }}
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
@@ -205,11 +213,11 @@ jobs:
         cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
-    needs: [constants, build-dependencies]
+    needs: [constants, build-dependencies, determine_runner]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [${{ needs.determine_runner.outputs.runner_group }}]
         arch: [x86_64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
@@ -355,11 +363,11 @@ jobs:
         retention-days: 14
 
   test-wheels:
-    needs: [constants, catalyst-linux-wheels-x86-64]
+    needs: [constants, catalyst-linux-wheels-x86-64, determine_runner]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-20.04]
+        os: [${{ needs.determine_runner.outputs.runner_group }}]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
