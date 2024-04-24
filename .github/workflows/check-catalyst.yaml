@@ -42,20 +42,6 @@ jobs:
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
-      # TODO: Remove these two steps prior to merging
-      - name: Upper case Test with actions/cache
-        uses: actions/cache@v3
-        with:
-          path: fake-path
-          key: fake-key
-          fail-on-cache-miss: True
-      - name: Lower case test with actions/cache
-        uses: actions/cache@v4
-        with:
-          path: fake-path2
-          key: fake-key2
-          fail-on-cache-miss: true
-
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
