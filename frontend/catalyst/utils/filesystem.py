@@ -18,6 +18,7 @@ Functions to interface with the filesystem.
 import pathlib
 import shutil
 import tempfile
+import warnings
 
 
 class Directory:
@@ -64,8 +65,10 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
 
     @classmethod
     def _cleanup(cls, name, warn_message, ignore_errors=False):
-        tempfile.TemporaryDirectory._rmtree(name, ignore_errors=ignore_errors)
-
+        """Ignore ResourceWarning during cleanup"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=ResourceWarning)
+            tempfile.TemporaryDirectory._cleanup(name, warn_message, ignore_errors=ignore_errors)
 
 class WorkspaceManager:
     """Singleton object that manages the output files for the IR.
