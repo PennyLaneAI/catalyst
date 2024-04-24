@@ -13,11 +13,17 @@
 # limitations under the License.
 """Tests for type conversions"""
 
+import inspect
+
 import numpy as np
 import pytest
 from jax._src.lib.mlir import ir
+from jax.core import ShapedArray
 
-from catalyst.utils.types import convert_numpy_dtype_to_mlir
+from catalyst.utils.types import (
+    convert_numpy_dtype_to_mlir,
+    convert_pytype_to_shaped_array,
+)
 
 ctx = ir.Context()
 f64 = ir.F64Type.get(ctx)
@@ -56,3 +62,22 @@ def test_convert_numpy_dtype_to_mlir_error():
     with pytest.raises(ValueError, match="Requested type conversion not available."):
         with ctx:
             convert_numpy_dtype_to_mlir(np.dtype(object))
+
+
+@pytest.mark.parametrize(
+    "inp,exp",
+    [
+        (inspect.Signature.empty, None),
+        (int, ShapedArray([], int)),
+        (float, ShapedArray([], float)),
+        (bool, ShapedArray([], bool)),
+        (ShapedArray([2], bool), ShapedArray([2], bool)),
+    ],
+)
+def test_convert_pytype_to_shaped_array(inp, exp):
+    """Test conversion to shaped arrays"""
+    assert convert_pytype_to_shaped_array(inp) == exp
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

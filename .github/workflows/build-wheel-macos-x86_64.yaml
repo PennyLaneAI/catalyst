@@ -158,6 +158,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
@@ -272,7 +273,7 @@ jobs:
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
-    
+
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
@@ -366,9 +367,9 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
-    
+
     - name: Install OQC client
-      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}} 
+      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

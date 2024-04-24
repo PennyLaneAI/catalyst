@@ -8,6 +8,7 @@
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
+  [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -27,6 +28,12 @@
   >>> print(circuit(123))
   123
   ```
+
+  This includes support for the specialized `pure_callback` and `debug.callback` where
+  `pure_callback` is expected to return a value and be side effect free,
+  while `debug.callback` is expected to produce a side effect and have no return values.
+
+  At the moment, callbacks should not be used inside methods which are differentiated.
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
@@ -69,6 +76,10 @@
 
 <h3>Improvements</h3>
 
+* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
@@ -91,12 +102,14 @@
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
-  preprocessing. This preprocessing is a decomposition based on the TOML file.
+  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that 
+  devices have the wires set.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
   [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
   [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
+  [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
