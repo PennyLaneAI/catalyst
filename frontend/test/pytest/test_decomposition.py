@@ -48,6 +48,7 @@ class CustomDevice(qml.QubitDevice):
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
+        self.toml_file = None
 
     def apply(self, operations, **kwargs):
         """Unused"""
@@ -63,12 +64,12 @@ class CustomDevice(qml.QubitDevice):
         for line in toml_contents:
             if '"MultiControlledX",' in line:
                 continue
-            elif '"Rot",' in line:
+            if '"Rot",' in line:
                 continue
-            elif '"S",' in line:
+            if '"S",' in line:
                 continue
-            else:
-                updated_toml_contents.append(line)
+
+            updated_toml_contents.append(line)
 
         self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
         self.toml_file.writelines(updated_toml_contents)

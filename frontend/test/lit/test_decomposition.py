@@ -47,6 +47,7 @@ def get_custom_device_without(num_wires, discards):
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
+            self.toml_file = None
 
         def apply(self, operations, **kwargs):
             """Unused"""
@@ -62,8 +63,7 @@ def get_custom_device_without(num_wires, discards):
             for line in toml_contents:
                 if any(f'"{gate}",' in line for gate in discards):
                     continue
-                else:
-                    updated_toml_contents.append(line)
+                updated_toml_contents.append(line)
 
             self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
             self.toml_file.writelines(updated_toml_contents)
