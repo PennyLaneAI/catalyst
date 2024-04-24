@@ -217,9 +217,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [${{ needs.determine_runner.outputs.runner_group }}]
+        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
@@ -325,7 +325,7 @@ jobs:
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DQUAfromJsonNTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
@@ -367,8 +367,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [${{ needs.determine_runner.outputs.runner_group }}]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
