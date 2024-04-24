@@ -8,6 +8,7 @@
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
+  [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -27,6 +28,12 @@
   >>> print(circuit(123))
   123
   ```
+
+  This includes support for the specialized `pure_callback` and `debug.callback` where
+  `pure_callback` is expected to return a value and be side effect free,
+  while `debug.callback` is expected to produce a side effect and have no return values.
+
+  At the moment, callbacks should not be used inside methods which are differentiated.
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
@@ -69,6 +76,10 @@
 
 <h3>Improvements</h3>
 
+* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
@@ -76,6 +87,9 @@
 
 * Manually cleanup the workspace, which prevents a warning from showing up during testing.
   [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
+
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 
 * An exception is now raised when OpenBLAS cannot be found by Catalyst.
   [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
@@ -134,9 +148,15 @@
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
+* Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`. As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above (e.g. Ubuntu 20.04 and above).
+  [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+
+* Enable support for QNode argument `diff_method=None` with QJIT.
+  [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
 
 * Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
   contain one element.
@@ -167,7 +187,9 @@ David Ittah,
 Romain Moyard,
 Sergei Mironov,
 Erick Ochoa Lopez,
-Muzammiluddin Syed.
+Lee James O'Riordan,
+Muzammiluddin Syed,
+Raul Torres.
 
 # Release 0.5.0
 
