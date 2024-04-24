@@ -11,6 +11,10 @@ on:
         required: false
         default: false
         type: boolean
+      runs_on:
+        required: false
+        default: ubuntu-22.04
+        type: string
     outputs:
       llvm_version:
         description: "LLVM version"
@@ -44,7 +48,7 @@ on:
 
 jobs:
   set-constants:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ inputs.runs_on }}
 
     steps:
       - name: Checkout Catalyst repo

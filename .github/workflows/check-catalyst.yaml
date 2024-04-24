@@ -11,17 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  constants:
-    name: "Set build matrix"
-    uses: ./.github/workflows/constants.yaml
-    with:
-      multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
-
   determine_runner:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
       default_runner: ubuntu-latest
+
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    needs: [determine_runner]
+    with:
+      multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
   runtime:
     name: Catalyst-Runtime Build
@@ -39,6 +41,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+
+      # TODO: Remove these two steps prior to merging
+      - name: Upper case Test with actions/cache
+        uses: actions/cache@v4
+        with:
+          path: fake-path
+          key: fake-key
+          fail-on-cache-miss: True
+      - name: Lower case test with actions/cache
+        uses: actions/cache@v4
+        with:
+          path: fake-path2
+          key: fake-key2
+          fail-on-cache-miss: true
 
       - name: Build Catalyst-Runtime
         run: |
