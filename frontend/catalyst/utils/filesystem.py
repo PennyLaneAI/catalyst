@@ -70,6 +70,7 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
             warnings.simplefilter("ignore", category=ResourceWarning)
             tempfile.TemporaryDirectory._cleanup(name, warn_message, ignore_errors=ignore_errors)
 
+
 class WorkspaceManager:
     """Singleton object that manages the output files for the IR.
 
