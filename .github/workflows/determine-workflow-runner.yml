@@ -34,6 +34,7 @@ jobs:
           ${{
             github.event_name == 'pull_request'
             && contains(github.event.pull_request.labels.*.name, 'urgent')
+            && startsWith(inputs.default_runner, 'ubuntu')
           }}
         id: runner_group
         run: echo "runner_group=$LARGE_RUNNER_GROUP_NAME" >> $GITHUB_OUTPUT
