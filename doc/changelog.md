@@ -145,6 +145,9 @@
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
+* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
+  [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
