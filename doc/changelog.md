@@ -102,12 +102,14 @@
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
-  preprocessing. This preprocessing is a decomposition based on the TOML file.
+  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that 
+  devices have the wires set.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
   [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
   [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
+  [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
