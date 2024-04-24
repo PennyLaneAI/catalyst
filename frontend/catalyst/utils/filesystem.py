@@ -68,6 +68,7 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
         """Ignore ResourceWarning during cleanup"""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=ResourceWarning)
+            # pylint: disable-next=protected-access
             tempfile.TemporaryDirectory._cleanup(name, warn_message, ignore_errors=ignore_errors)
 
 
