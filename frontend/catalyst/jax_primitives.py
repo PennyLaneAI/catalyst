@@ -740,16 +740,13 @@ def _qinsert_lowering(
 @gphase_p.def_abstract_eval
 def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, params*, ctrl_qubits*, ctrl_values*
-    # but because gphase has no target qubits* and only one param
-    # it is actually
     # param, ctrl_qubits*, ctrl_values*
+    # since gphase has no target qubits.
     param = qubits_or_params[0]
     assert not isinstance(param, AbstractQbit)
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
-    all_qubits = ctrl_qubits
     for idx in range(ctrl_len):
-        qubit = all_qubits[idx]
+        qubit = ctrl_qubits[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * (ctrl_len)
 
