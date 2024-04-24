@@ -738,9 +738,7 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(
-    *qubits_or_params, op=None, ctrl_len: int = 0
-):
+def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
     # but because gphase has no target qubits* and only one param
@@ -757,9 +755,7 @@ def _gphase_abstract_eval(
 
 
 @qinst_p.def_impl
-def _gphase_abstract_eval(
-    *qubits_or_params, op=None, ctrl_len: int = 0
-):
+def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
     """Not implemented"""
     raise NotImplementedError()
 
@@ -774,7 +770,7 @@ def _gphase_lowering(
     ctx.allow_unregistered_dialects = True
 
     param = qubits_or_params[0]
-    ctrl_qubits = qubits_or_params[1: 1 + ctrl_len]
+    ctrl_qubits = qubits_or_params[1 : 1 + ctrl_len]
     ctrl_values = qubits_or_params[1 + ctrl_len :]
 
     if ir.RankedTensorType.isinstance(param.type) and ir.RankedTensorType(param.type).shape == []:
