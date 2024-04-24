@@ -85,9 +85,6 @@
   a Jupyter Notebook.
   [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
 
-* Manually cleanup the workspace, which prevents a warning from showing up during testing.
-  [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
-
 * Fix a stochastic autograph test failure due to broadly turning warnings into errors.
   [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 

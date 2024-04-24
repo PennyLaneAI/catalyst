@@ -53,11 +53,6 @@ class Directory:
             return
         shutil.rmtree(str(self))
 
-    def __del__(self):
-        """Avoid warning by doing manual cleanup during deletion."""
-        if isinstance(self._impl, tempfile.TemporaryDirectory):
-            self._impl.cleanup()
-
 class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
    """Derived class from tempfile.TemporaryDirectory
 
@@ -69,7 +64,6 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
    @classmethod
    def _cleanup(cls, name, warn_message, ignore_errors=False):
        tempfile.TemporaryDirectory._rmtree(name, ignore_errors=ignore_errors)
-
 
 
 class WorkspaceManager:
