@@ -138,11 +138,6 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device):  # pragma: nocover
-        self.func = fn
-        self.device = device
-        update_wrapper(self, fn)
-
     @staticmethod
     def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
@@ -178,27 +173,6 @@ class QFunc:
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
-
-
-def qfunc(device):
-    """A Device specific quantum function.
-
-    Args:
-        device (a derived class from QubitDevice): A device specification which determines
-            the valid gate set for the quantum function.
-        fn (Callable): the quantum function
-
-    Returns:
-        Grad: A QFunc object that denotes the the declaration of a quantum function.
-
-    """
-
-    assert device is not None
-
-    def dec_no_params(fn):
-        return QFunc(fn, device)
-
-    return dec_no_params
 
 
 Differentiable = Union[Function, QNode]
