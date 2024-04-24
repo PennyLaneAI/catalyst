@@ -265,6 +265,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
+
+        if original_device.wires is None:
+            raise AttributeError("Catalyst does not support devices without set wires.")
+
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         self.target_config = target_config
