@@ -51,8 +51,9 @@ jobs:
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     - name: Set Ownership in Container
       run: |
@@ -86,25 +87,28 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
         enableCrossOsArchive: True
 
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
         path: mlir/mlir-hlo
 
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ needs.constants.outputs.enzyme_version }}
