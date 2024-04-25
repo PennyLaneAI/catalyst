@@ -45,12 +45,12 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mlir/llvm-project
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
@@ -58,7 +58,7 @@ jobs:
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
         key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
@@ -66,7 +66,7 @@ jobs:
 
     - name: Cache Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
@@ -74,7 +74,7 @@ jobs:
 
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: ${{ needs.constants.outputs.llvm_version }}
@@ -82,7 +82,7 @@ jobs:
 
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
@@ -90,7 +90,7 @@ jobs:
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ needs.constants.outputs.enzyme_version }}
@@ -99,27 +99,27 @@ jobs:
     # Cache external project builds
     - name: Cache LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python_version }}
 
@@ -191,10 +191,10 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python_version }}
 
@@ -204,7 +204,7 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/llvm-project
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
@@ -213,7 +213,7 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
@@ -221,7 +221,7 @@ jobs:
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
         key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
@@ -230,7 +230,7 @@ jobs:
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
@@ -238,7 +238,7 @@ jobs:
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
@@ -246,7 +246,7 @@ jobs:
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
@@ -326,7 +326,7 @@ jobs:
         delocate-wheel --require-archs=x86_64 -w ./wheel -v dist/*.whl --ignore-missing-dependencies -vv
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: wheel/
@@ -347,16 +347,16 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Download Wheel Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: catalyst-macos_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
 
     - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python_version }}
 
