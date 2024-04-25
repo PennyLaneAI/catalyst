@@ -228,8 +228,9 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     - name: Install dependencies (CentOS)
       run: |
