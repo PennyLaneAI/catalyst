@@ -200,7 +200,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate scipy
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -363,7 +363,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist scipy
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
 
     - name: Install PennyLane Plugins
       run: |
