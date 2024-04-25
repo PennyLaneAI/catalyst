@@ -21,6 +21,7 @@ import jax
 from jax.interpreters import mlir
 
 import catalyst
+from catalyst.api_extensions.callbacks import debug_callback as callback
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler
 from catalyst.jax_primitives import print_p
@@ -184,3 +185,12 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
     return CompiledFunction(shared_object, qfunc_name, result_types, compiler.options)
+
+
+__all__ = (
+    "callback",
+    "print",
+    "print_compilation_stage",
+    "get_cmain",
+    "compile_from_mlir",
+)
