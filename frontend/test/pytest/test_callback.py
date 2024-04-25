@@ -13,10 +13,14 @@
 # limitations under the License.
 """Test callbacks"""
 
+
+import jax
+import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.pennylane_extensions import callback
+from catalyst.callback import callback, debug, pure_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -120,3 +124,226 @@ def test_kwargs(capsys):
     captured = capsys.readouterr()
     for string in ["a 0", "b 1", "c 2", "d 3", "e 4"]:
         assert string in captured.out
+
+
+def test_simple_increment():
+    """Test increment function"""
+
+    @callback
+    def inc(arg) -> int:
+        return arg + 1
+
+    @qml.qjit
+    def cir(arg):
+        return inc(arg)
+
+    assert np.allclose(cir(0), 1)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
+)
+def test_identity_types(arg):
+    """Test callback with return values"""
+
+    @callback
+    def identity(arg) -> arg:
+        """Weird trick, if it is the identity function, we can just pass arg
+        as the return type. arg will be abstracted to find the type. This
+        just avoids writing out the explicit type once you have a value
+        that you know will be the same type as the return type."""
+        return arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [jnp.array(0), jnp.array(1)],
+)
+def test_identity_types_shaped_array(arg):
+    """Test callback with return values. Use ShapedArray to denote the type"""
+
+    @callback
+    def identity(arg) -> jax.core.ShapedArray([], int):
+        return arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0],
+)
+def test_multiple_returns(arg):
+    """Test callback with multiple return values."""
+
+    @callback
+    def identity(arg) -> (int, int):
+        return arg, arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(arg), (arg, arg))
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [jnp.array([0.0, 1.0, 2.0])],
+)
+def test_incorrect_return(arg):
+    """Test callback with incorrect return types."""
+
+    @callback
+    def identity(arg) -> int:
+        return arg
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    with pytest.raises(TypeError, match="Callback identity expected type"):
+        cir(arg)
+
+
+def test_pure_callback():
+    """Test identity pure callback."""
+
+    def identity(a):
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return pure_callback(identity, float)(x)
+
+    assert np.allclose(cir(0.0), 0.0)
+
+
+def test_pure_callback_decorator():
+    """Test identity pure callback."""
+
+    @pure_callback
+    def identity(a) -> float:
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(0.0), 0.0)
+
+
+def test_pure_callback_no_return_value():
+    """Test identity pure callback no return."""
+
+    def identity(a):
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return pure_callback(identity)(x)
+
+    msg = "A function using pure_callback requires return types to be "
+    msg += "passed in as a parameter or type annotation."
+    with pytest.raises(TypeError, match=msg):
+        cir(0.0)
+
+
+def test_debug_callback(capsys):
+    """Test debug callback"""
+
+    def my_own_print(a):
+        print(a)
+
+    @qml.qjit
+    def cir(x):
+        debug.callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"
+
+
+def test_debug_callback_decorator(capsys):
+    """Test debug callback"""
+
+    @debug.callback
+    def my_own_print(a):
+        print(a)
+
+    @qml.qjit
+    def cir(x):
+        my_own_print(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"
+
+
+def test_debug_callback_returns_something(capsys):
+    """Test io callback returns something"""
+
+    def my_own_print(a):
+        print(a)
+        return 1
+
+    @qml.qjit
+    def cir(x):
+        debug.callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    with pytest.raises(ValueError, match="debug.callback is expected to return None"):
+        cir(0)
+
+
+def test_io_callback_modify_global(capsys):
+    """Test mutation"""
+
+    x = 0
+
+    @debug.callback
+    def set_x_to(y):
+        nonlocal x
+        x = y
+
+    @debug.callback
+    def print_x():
+        nonlocal x
+        print(x)
+
+    @qml.qjit
+    def cir():
+        print_x()
+        set_x_to(1)
+        print_x()
+
+    cir()
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0\n1"
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

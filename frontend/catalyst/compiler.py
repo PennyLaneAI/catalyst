@@ -264,6 +264,16 @@ class LinkerDriver:
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
+        # Adds RUNTIME_LIB_DIR to the Python system path to allow the catalyst_callback_registry
+        # to be importable.
+        sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
+
+        # We use MLIR's C runner utils library in the registry.
+        # In order to be able to dlopen that library we need to know the path
+        # So we set the path here.
+        registry.set_mlir_lib_path(mlir_lib_path)
+
         lib_path_flags = [
             f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",
@@ -300,7 +310,13 @@ class LinkerDriver:
 
         file_prefix = "libopenblas"
         search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-        openblas_so_file = glob.glob(search_pattern)[0]
+        search_result = glob.glob(search_pattern)
+        if not search_result:
+            raise CompileError(
+                f'Unable to find OpenBLAS library at "{search_pattern}". '
+                "Please ensure that SciPy is installed and available via pip."
+            )
+        openblas_so_file = search_result[0]
         openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
 
         lib_path_flags += [

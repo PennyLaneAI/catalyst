@@ -86,7 +86,8 @@ test_circuit()
 
 def test_preprocess():
     """Test a circuit (with preprocessing transforms) compilation to MLIR when
-    using the new device API."""
+    using the new device API.
+    TODO: we need to readd the two check-not once we accept the device preprocessing."""
 
     # CHECK:    quantum.device["[[PATH:.*]]librtd_lightning.{{so|dylib}}", "dummy.remote", "{'shots': 2048}"]
     dev = DummyDevice(wires=2, shots=2048)
@@ -99,8 +100,8 @@ def test_preprocess():
         # CHECK:   quantum.custom "Hadamard"
         # CHECK:   quantum.custom "CNOT"
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
-        # CHECK:   quantum.custom "Hadamard"
-        # CHECK:   quantum.custom "CNOT"
+        # CHECK-NOT:   quantum.custom "Hadamard"
+        # CHECK-NOT:   quantum.custom "CNOT"
         # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliY]
         # CHECK:    return [[RETURN:.*]]: tensor<f64>, tensor<f64>
         return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliY(wires=0))

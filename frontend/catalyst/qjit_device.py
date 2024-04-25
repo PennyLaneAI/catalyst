@@ -17,10 +17,10 @@ from functools import partial
 from typing import Optional, Set
 
 import pennylane as qml
-from pennylane.devices.preprocess import decompose
 from pennylane.measurements import MidMeasureMP
+from pennylane.transforms.core import TransformProgram
 
-from catalyst.preprocess import catalyst_acceptance, decompose_ops_to_unitary
+from catalyst.preprocess import catalyst_acceptance, decompose
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
@@ -248,15 +248,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
-    @staticmethod
-    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:  # pragma: no cover
-        # We currently override and only set a few gates to preserve existing behaviour.
-        # We could choose to read from config and use the "matrix" gates.
-        # However, that affects differentiability.
-        # None of the "matrix" gates with more than 2 qubits parameters are differentiable.
-        # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
-        return {"MultiControlledX", "BlockEncode"}
-
     def __init__(
         self,
         original_device,
@@ -267,6 +258,10 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
+
+        if original_device.wires is None:
+            raise AttributeError("Catalyst does not support devices without set wires.")
+
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         self.target_config = target_config
@@ -291,18 +286,17 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
     def preprocess(
         self,
+        ctx,
         execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
     ):
         """Device preprocessing function."""
-        program, config = self.original_device.preprocess(execution_config)
-
-        convert_to_matrix_ops = {"MultiControlledX", "BlockEncode"}
-        program.add_transform(decompose_ops_to_unitary, convert_to_matrix_ops)
+        # TODO: readd the device preprocessing program once transforms are compatible with
+        # TOML files
+        _, config = self.original_device.preprocess(execution_config)
+        program = TransformProgram()
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(
-            decompose, stopping_condition=ops_acceptance, name=self.original_device.name
-        )
+        program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
 
         # TODO: Add Catalyst program verification and validation
         return program, config

@@ -14,7 +14,8 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?="add_dldso" # TODO: Remove tmp tag 'add_dldso' before merge
+ENABLE_LAPACK?=ON
+LIGHTNING_GIT_TAG_VALUE?=master
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 BUILD_TARGETS := rt_capi
@@ -85,6 +86,7 @@ configure:
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 lq_configure:
@@ -109,6 +111,7 @@ lq_configure:
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/librt_capi.so: configure

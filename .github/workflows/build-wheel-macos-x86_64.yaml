@@ -125,7 +125,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -158,6 +158,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
@@ -199,7 +200,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja delocate scipy
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -261,8 +262,9 @@ jobs:
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DLIGHTNING_GIT_TAG="add_dldso" \
+              -DLIGHTNING_GIT_TAG= master \
               -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=OFF \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
@@ -273,12 +275,12 @@ jobs:
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
-    
+
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
           make oqc
 
     - name: Test Catalyst-Runtime
@@ -367,9 +369,9 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
-    
+
     - name: Install OQC client
-      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}} 
+      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

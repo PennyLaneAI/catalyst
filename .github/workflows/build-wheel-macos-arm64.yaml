@@ -153,7 +153,7 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Install Dependencies (Python)
-      run: python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja scipy
+      run: python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja scipy
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -186,6 +186,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
@@ -227,7 +228,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML cmake ninja delocate scipy
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -289,7 +290,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="add_dldso" \
+              -DLIGHTNING_GIT_TAG= master \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
@@ -309,12 +310,12 @@ jobs:
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
-  
+
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
           make oqc
 
     # Build Quantum and Gradient Dialects
@@ -397,9 +398,9 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
-    
+
     - name: Install OQC client
-      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}} 
+      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

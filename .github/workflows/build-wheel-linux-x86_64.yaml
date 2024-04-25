@@ -136,7 +136,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML scipy
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML scipy
 
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
@@ -184,6 +184,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=protected \
@@ -230,7 +231,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML scipy
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -285,14 +286,13 @@ jobs:
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
-        # TODO: Remove tmp tag 'add_dldso' before merge
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="add_dldso" \
+              -DLIGHTNING_GIT_TAG= master \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
@@ -301,14 +301,14 @@ jobs:
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
-    
+
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          RUNTIME_BUILD_DIR="$(pwd)/runtime-build" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
           make oqc
 
     # Build Quantum and Gradient Dialects
@@ -392,7 +392,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
 
     - name: Install OQC client
-      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}} 
+      if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

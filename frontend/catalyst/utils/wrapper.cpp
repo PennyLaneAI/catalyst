@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <csignal>
 #include <iostream>
 #include <pybind11/pybind11.h>
 
-// Emit a compile time warning if we are using numpy
-// functions that are not compatible with numpy 1.22
-// Why 1.22?
-//
-// As of time of this writing 1.21.* will be deprecated
-// next month. See here: https://endoflife.date/numpy
-#define NPY_NO_DEPRECATED_API NPY_1_22_API_VERSION
+// TODO: Periodically check and increment version.
+// https://endoflife.date/numpy
+#define NPY_NO_DEPRECATED_API NPY_1_24_API_VERSION
 
 #include "numpy/arrayobject.h"
 
@@ -198,6 +195,9 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
 py::list wrap(py::object func, py::tuple py_args, py::object result_desc, py::object transfer,
               py::dict numpy_arrays)
 {
+    // Install signal handler to catch user interrupts (e.g. CTRL-C).
+    signal(SIGINT, [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
+
     py::list returns;
 
     size_t length = py_args.attr("__len__")().cast<size_t>();

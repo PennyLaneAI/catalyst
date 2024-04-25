@@ -19,11 +19,8 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import copy
-import ctypes
-import inspect
 import numbers
 from collections.abc import Sequence, Sized
-from functools import update_wrapper, wraps
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -47,7 +44,7 @@ from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 import catalyst
-from catalyst.jax_extras import (  # infer_output_type3,
+from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
     Jaxpr,
@@ -73,7 +70,6 @@ from catalyst.jax_primitives import (
     grad_p,
     jvp_p,
     probs_p,
-    python_callback_p,
     qmeasure_p,
     vjp_p,
     while_p,
@@ -96,10 +92,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.utils.jnp_to_memref import (
-    get_ranked_memref_descriptor,
-    ranked_memref_to_numpy,
-)
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
@@ -136,35 +128,30 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device):  # pragma: nocover
-        self.func = fn
-        self.device = device
-        update_wrapper(self, fn)
+    def __new__(cls):
+        raise NotImplementedError()
 
     @staticmethod
     def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, config)
 
+    # pylint: disable=no-member
     def __call__(self, *args, **kwargs):
-        qnode = None
-        if isinstance(self, qml.QNode):
-            qnode = self
-            config = device_get_toml_config(self.device)
-            validate_config_with_device(self.device, config)
-            backend_info = QFunc.extract_backend_info(self.device, config)
+        assert isinstance(self, qml.QNode)
 
-            if isinstance(self.device, qml.devices.Device):
-                device = QJITDeviceNewAPI(self.device, config, backend_info)
-            else:
-                device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
-        else:  # pragma: nocover
-            # Allow QFunc to still be used by itself for internal testing.
-            device = self.device
+        config = device_get_toml_config(self.device)
+        validate_config_with_device(self.device, config)
+        backend_info = QFunc.extract_backend_info(self.device, config)
+
+        if isinstance(self.device, qml.devices.Device):
+            device = QJITDeviceNewAPI(self.device, config, backend_info)
+        else:
+            device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, device, args, kwargs, qnode
+                self.func, device, args, kwargs, qnode=self
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -175,28 +162,7 @@ class QFunc:
         flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_quantum, args, {})
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
-        return tree_unflatten(out_tree_promise(), res_flat)
-
-
-def qfunc(device):
-    """A Device specific quantum function.
-
-    Args:
-        device (a derived class from QubitDevice): A device specification which determines
-            the valid gate set for the quantum function.
-        fn (Callable): the quantum function
-
-    Returns:
-        Grad: A QFunc object that denotes the the declaration of a quantum function.
-
-    """
-
-    assert device is not None
-
-    def dec_no_params(fn):
-        return QFunc(fn, device)
-
-    return dec_no_params
+        return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
 Differentiable = Union[Function, QNode]
@@ -2561,95 +2527,3 @@ def _get_batch_size(args_flat, axes_flat, axis_size):
         )
 
     return batch_size
-
-
-class CallbackClosure:
-    """This is just a class containing data that is important for the callback."""
-
-    def __init__(self, *absargs, **abskwargs):
-        self.absargs = absargs
-        self.abskwargs = abskwargs
-
-    @property
-    def tree_flatten(self):
-        """Flatten args and kwargs."""
-        return tree_flatten((self.absargs, self.abskwargs))
-
-    @property
-    def low_level_sig(self):
-        """Get the memref descriptor types"""
-        flat_params, _ = self.tree_flatten
-        low_level_flat_params = []
-        for param in flat_params:
-            empty_memref_descriptor = get_ranked_memref_descriptor(param)
-            memref_type = type(empty_memref_descriptor)
-            ptr_ty = ctypes.POINTER(memref_type)
-            low_level_flat_params.append(ptr_ty)
-        return low_level_flat_params
-
-    def getArgsAsJAXArrays(self, flat_args):
-        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
-        it is best for the user if we continue with that idea and forward JAX arrays."""
-        jnpargs = []
-        for void_ptr, ty in zip(flat_args, self.low_level_sig):
-            memref_ty = ctypes.cast(void_ptr, ty)
-            nparray = ranked_memref_to_numpy(memref_ty)
-            jnparray = jnp.asarray(nparray)
-            jnpargs.append(jnparray)
-        return jnpargs
-
-
-def callback(func):
-    """Decorator that will correctly pass the signature as arguments to the callback
-    implementation.
-    """
-    signature = inspect.signature(func)
-    retty = signature.return_annotation
-
-    # We just disable inconsistent return statements
-    # Since we are building this feature step by step.
-    @wraps(func)
-    def bind_callback(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
-        if not EvaluationContext.is_tracing():
-            # If we are not in the tracing context, just evaluate the function.
-            return func(*args, **kwargs)
-
-        callback_implementation(func, retty, *args, **kwargs)
-
-    return bind_callback
-
-
-def callback_implementation(
-    cb: Callable[..., Any], _result_shape_dtypes: Any, *args: Any, **kwargs: Any
-):
-    """
-    This function has been modified from its original form in the JAX project at
-    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
-    version released under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2022 The JAX Authors.
-    """
-
-    flat_args, in_tree = tree_flatten((args, kwargs))
-    metadata = CallbackClosure(args, kwargs)
-
-    def _flat_callback(flat_args):
-        """Each flat_arg is a pointer.
-
-        It is a pointer to a memref object.
-        To find out which element type it has, we use the signature obtained previously.
-        """
-        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-
-        args, kwargs = tree_unflatten(in_tree, jnpargs)
-        return tree_leaves(cb(*args, **kwargs))
-
-    # TODO(@erick-xanadu): Change back once we support return values.
-    # I am leaving this as a to-do because otherwise the coverage will complain.
-    # results_aval = tree_map(lambda x: jax.core.ShapedArray(x.shape, x.dtype), result_shape_dtypes)
-    results_aval = []
-    flat_results_aval, out_tree = tree_flatten(results_aval)
-    out_flat = python_callback_p.bind(
-        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
-    )
-    return tree_unflatten(out_tree, out_flat)
