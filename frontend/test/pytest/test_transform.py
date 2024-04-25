@@ -73,10 +73,12 @@ def test_batch_input(backend):
     inputs = pnp.random.uniform(0, pnp.pi, (batch_size, 2), requires_grad=False)
     weights = pnp.random.uniform(-pnp.pi, pnp.pi, (2,))
 
-    expected_output = jax.jit(qnode_control)(inputs, weights)
-    observed_output = qjit(qnode_backend)(inputs, weights)
-
-    assert_allclose(expected_output, observed_output)
+    expected = jax.jit(qnode_control)(inputs, weights)
+    observed = qjit(qnode_backend)(inputs, weights)
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert np.allclose(expected, observed)
+    assert expected_shape == observed_shape
 
 
 def test_batch_params(backend):
@@ -113,6 +115,10 @@ def test_batch_params(backend):
     observed = compiled(data, x, weights)
     assert np.allclose(expected, observed)
 
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
+
 
 def test_split_non_commuting(backend):
     """Test split non commuting"""
@@ -146,6 +152,10 @@ def test_split_non_commuting(backend):
     expected = jax.jit(qnode_control)()
     observed = qjit(qnode_backend)()
     assert np.allclose(expected, observed)
+
+    _, expected_shape = jax.tree_util.tree_flatten(expected)
+    _, observed_shape = jax.tree_util.tree_flatten(observed)
+    assert expected_shape == observed_shape
 
 
 class RX_broadcasted(qml.RX):
@@ -222,6 +232,9 @@ class TestBroadcastExpand:
         observed = qjit(qnode_backend)(*params, obs)
 
         assert np.allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        assert expected_shape == observed_shape
 
     @pytest.mark.parametrize("params", parameters)
     @pytest.mark.parametrize("obs", observables)
@@ -264,6 +277,10 @@ class TestBroadcastExpand:
         observed = qjit(qnode_backend)(*params, obs)
 
         assert np.allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        # TODO: expected is tuple, observed is list
+        assert expected_shape.num_leaves == observed_shape.num_leaves
 
 
 class TestCutCircuitMCTransform:
@@ -302,6 +319,9 @@ class TestCutCircuitMCTransform:
         observed = cut_circuit_qjit(x)
 
         assert_allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        assert expected_shape == observed_shape
 
 
 class TestHamiltonianExpand:
@@ -340,6 +360,9 @@ class TestHamiltonianExpand:
         observed = qjit(qnode_backend)()
 
         assert np.allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        assert expected_shape == observed_shape
 
 
 class TestSumExpand:
@@ -366,6 +389,9 @@ class TestSumExpand:
         expected = jax.jit(qnode_control)()
         observed = qjit(qnode_backend)()
         assert np.allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        assert expected_shape == observed_shape
 
 
 class TestQFuncTransforms:
@@ -393,6 +419,9 @@ class TestQFuncTransforms:
         compiled_function = qjit(qnode_backend)
         observed = compiled_function(theta_1, theta_2)
         assert np.allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        assert expected_shape == observed_shape
 
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
@@ -442,6 +471,9 @@ class TestQFuncTransforms:
         compiled = qjit(qnode_backend)
         observed = compiled()
         assert np.allclose(expected, observed)
+        _, expected_shape = jax.tree_util.tree_flatten(expected)
+        _, observed_shape = jax.tree_util.tree_flatten(observed)
+        assert expected_shape == observed_shape
 
 
 class TestTransformValidity:
