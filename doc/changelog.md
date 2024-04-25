@@ -175,6 +175,11 @@
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
+<h3>Internal changes</h3>
+
+* The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
+  [(#679)](https://github.com/PennyLaneAI/catalyst/pull/679)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
