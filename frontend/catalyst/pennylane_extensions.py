@@ -21,7 +21,6 @@ while using :func:`~.qjit`.
 import copy
 import numbers
 from collections.abc import Sequence, Sized
-from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -45,7 +44,7 @@ from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 import catalyst
-from catalyst.jax_extras import (  # infer_output_type3,
+from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
     Jaxpr,
@@ -129,35 +128,30 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
-    def __init__(self, fn, device):  # pragma: nocover
-        self.func = fn
-        self.device = device
-        update_wrapper(self, fn)
+    def __new__(cls):
+        raise NotImplementedError()
 
     @staticmethod
     def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, config)
 
+    # pylint: disable=no-member
     def __call__(self, *args, **kwargs):
-        qnode = None
-        if isinstance(self, qml.QNode):
-            qnode = self
-            config = device_get_toml_config(self.device)
-            validate_config_with_device(self.device, config)
-            backend_info = QFunc.extract_backend_info(self.device, config)
+        assert isinstance(self, qml.QNode)
 
-            if isinstance(self.device, qml.devices.Device):
-                device = QJITDeviceNewAPI(self.device, config, backend_info)
-            else:
-                device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
-        else:  # pragma: nocover
-            # Allow QFunc to still be used by itself for internal testing.
-            device = self.device
+        config = device_get_toml_config(self.device)
+        validate_config_with_device(self.device, config)
+        backend_info = QFunc.extract_backend_info(self.device, config)
+
+        if isinstance(self.device, qml.devices.Device):
+            device = QJITDeviceNewAPI(self.device, config, backend_info)
+        else:
+            device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, device, args, kwargs, qnode
+                self.func, device, args, kwargs, qnode=self
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -169,27 +163,6 @@ class QFunc:
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
-
-
-def qfunc(device):
-    """A Device specific quantum function.
-
-    Args:
-        device (a derived class from QubitDevice): A device specification which determines
-            the valid gate set for the quantum function.
-        fn (Callable): the quantum function
-
-    Returns:
-        Grad: A QFunc object that denotes the the declaration of a quantum function.
-
-    """
-
-    assert device is not None
-
-    def dec_no_params(fn):
-        return QFunc(fn, device)
-
-    return dec_no_params
 
 
 Differentiable = Union[Function, QNode]
