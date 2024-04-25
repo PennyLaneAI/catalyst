@@ -149,7 +149,7 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-  
+
     - name: Cache MHLO Source
       id: cache-mhlo-source
       uses: actions/cache@v3
@@ -461,7 +461,6 @@ jobs:
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
-    
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
