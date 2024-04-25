@@ -17,7 +17,14 @@ This module is a collection of public API extensions for pragramming with Cataly
 """
 
 from catalyst.api_extensions.callbacks import pure_callback
-from catalyst.api_extensions.control_flow import cond, for_loop, while_loop
+from catalyst.api_extensions.control_flow import (
+    Cond,
+    ForLoop,
+    WhileLoop,
+    cond,
+    for_loop,
+    while_loop,
+)
 from catalyst.api_extensions.differentiation import (
     grad,
     jacobian,
@@ -27,7 +34,14 @@ from catalyst.api_extensions.differentiation import (
 )
 from catalyst.api_extensions.error_mitigation import mitigate_with_zne
 from catalyst.api_extensions.function_maps import vmap
-from catalyst.api_extensions.quantum_operators import adjoint, ctrl, measure
+from catalyst.api_extensions.quantum_operators import (
+    Adjoint,
+    MidCircuitMeasure,
+    QCtrl,
+    adjoint,
+    ctrl,
+    measure,
+)
 
 __all__ = (
     "pure_callback",
