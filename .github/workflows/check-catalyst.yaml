@@ -461,6 +461,8 @@ jobs:
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
+    
+    steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -574,6 +576,7 @@ jobs:
     steps:
     #   - name: Collect Workflow Telemetry
     #     uses: catchpoint/workflow-telemetry-action@v2
+
       - name: Checkout the repo
         uses: actions/checkout@v3
 
