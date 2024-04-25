@@ -245,6 +245,7 @@ jobs:
     - name: Install Dependencies (Python)
       run: |
         python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
+        python3.9 -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
