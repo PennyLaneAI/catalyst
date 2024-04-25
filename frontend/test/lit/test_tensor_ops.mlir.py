@@ -18,7 +18,7 @@ import pennylane as qml
 from jax import numpy as jnp
 
 from catalyst import measure, qjit
-from catalyst.api_extensions.debug import print_compilation_stage
+from catalyst.debug import print_compilation_stage
 
 # Test methodology:
 # Each mathematical function found in numpy

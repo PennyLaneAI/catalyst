@@ -15,7 +15,7 @@ Module: catalyst
 Module: catalyst.debug
 ----------------------
 
-.. automodapi:: catalyst.api_extensions.debug
+.. automodapi:: catalyst.debug
     :no-heading:
     :no-inheritance-diagram:
     :fullname:
