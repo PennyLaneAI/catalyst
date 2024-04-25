@@ -28,7 +28,6 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-import catalyst
 from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
 from catalyst.tracing.contexts import EvaluationContext
