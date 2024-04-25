@@ -111,7 +111,7 @@ more complex quantum circuits; see below for the list of currently supported ope
 
    1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
    2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-   3. The list of device-supported gates employed by Catalyst is currently different than that of the ``lightning.qubit`` device, as defined by the :class:`~.pennylane_extensions.QJITDevice`.
+   3. The list of device-supported gates employed by Catalyst is currently different than that of the ``lightning.qubit`` device, as defined by the :class:`~.qjit_device.QJITDevice`.
 
 .. raw:: html
 

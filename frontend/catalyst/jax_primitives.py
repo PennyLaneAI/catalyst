@@ -278,7 +278,7 @@ def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memre
 #
 # func
 #
-mlir_fn_cache: Dict["catalyst.pennylane_extensions.Function", str] = {}
+mlir_fn_cache: Dict["catalyst.jax_tracer.Function", str] = {}
 
 
 @func_p.def_impl

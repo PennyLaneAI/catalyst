@@ -86,10 +86,10 @@ entry_points = {
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
-        "catalyst.ops = catalyst:pennylane_extensions",
+        "catalyst.ops = catalyst.api_extensions",
         "catalyst.qjit = catalyst:qjit",
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
-        "cuda_quantum.ops = catalyst:pennylane_extensions",
+        "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.cuda:cudaqjit",
     ],
 }

@@ -21,8 +21,15 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import cond, for_loop, grad, jacobian, qjit, value_and_grad
-from catalyst.pennylane_extensions import DifferentiableCompileError
+from catalyst import (
+    DifferentiableCompileError,
+    cond,
+    for_loop,
+    grad,
+    jacobian,
+    qjit,
+    value_and_grad,
+)
 
 # pylint: disable=too-many-lines
 
