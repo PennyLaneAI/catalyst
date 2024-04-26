@@ -189,8 +189,6 @@ def callback_implementation(
     metadata = CallbackClosure(args, kwargs)
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
-    if not isinstance(results_aval, Sequence):
-        results_aval = [results_aval]
 
     flat_results_aval, out_tree = tree_flatten(results_aval)
 
@@ -204,7 +202,8 @@ def callback_implementation(
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retvals = tree_leaves(cb(*args, **kwargs))
         return_values = []
-        for retval, exp_aval in zip(retvals, results_aval):
+        results_aval_sequence = results_aval if isinstance(results_aval, Sequence) else [results_aval]
+        for retval, exp_aval in zip(retvals, results_aval_sequence):
             obs_aval = shaped_abstractify(retval)
             if obs_aval != exp_aval:
                 raise TypeError(
