@@ -76,9 +76,10 @@ def print_memref(x):
         x (jax.Array, Any): A single jax array whose numeric values are printed at runtime.
             Additional information about how the array is stored in memory is printed.
             Tensors, in the Catalyst runtime are represented as memref descriptor structs.
-            For more information about memref descirptors visit: https://mlir.llvm.org/docs/Dialects/MemRef/
-            This includes the base memory address of the data buffer, as well as the rank of the array,
-            the size of each dimension, and the strides between elements.
+            For more information about memref descirptors visit:
+            https://mlir.llvm.org/docs/Dialects/MemRef/
+            This includes the base memory address of the data buffer, as well as the rank of
+            the array, the size of each dimension, and the strides between elements.
 
     **Example**
 
