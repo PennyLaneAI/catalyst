@@ -2,7 +2,10 @@
 
 <h3>New features</h3>
 
-* Support for callbacks in Catalyst.
+* Catalyst now supports external host callbacks with parameters and return values
+  within qjit-compiled code. This provides the ability to insert native Python code
+  into any qjit-compiled function, allowing for both enhanced debugging ability as well
+  as the capability to include subroutines that do not yet support qjit-compilation.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
@@ -12,29 +15,54 @@
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
 
-  Catalyst now supports callbacks with parameters and return values.
-  The following is now possible:
+  The following two callback functions are available:
 
-  ```py
-  @debug.callback
-  def foo(val):
-    print(f"myval: {val}")
+  - `catalyst.pure_callback` supports callbacks of **pure** functions. That is, functions
+    with no side-effects that accept parameters and return values. However, the return
+    type and shape of the function must be known in advance, and is provided as a type signature.
 
-  @pure_callback
-  def bar(val) -> int:
-    return val + 1
+    ```python
+    @catalyst.pure_callback
+    def callback_fn(x) -> float:
+        # here we call non-JAX compatible code, such
+        # as standard NumPy
+        return np.sin(x)
 
-  @qjit
-  def circuit(param):
-    x = bar(param)
-    foo(x)
+    @qml.qjit
+    def fn(x):
+        return jnp.cos(callback_fn(x ** 2))
+    ```
+    ```pycon
+    >>> fn(0.654)
+    array(0.9151995)
+    ```
 
-  ```
+  - `catalyst.debug.callback` supports callbacks of functions with **no** return values. This makes it
+    an easy entry point for debugging, for example via printing or logging at runtime.
 
-  ```pycon
-  >>> print(circuit(123))
-  myval: 124
-  ```
+    ```python
+    @catalyst.debug.callback
+    def callback_fn(y):
+        print("Value of y =", y)
+
+    @qml.qjit
+    def fn(x):
+        y = jnp.sin(x)
+        callback_fn(y)
+        return y ** 2
+    ```
+    ```pycon
+    >>> fn(0.54)
+    Value of y = 0.5141359916531132
+    array(0.26433582)
+    >>> fn(1.52)
+    Value of y = 0.998710143975583
+    array(0.99742195)
+    ```
+  
+  Note that callbacks do not currently support differentiation, and cannot be used inside
+  functions that `catalyst.grad` is applied to.
+
 
   This includes support for the specialized `pure_callback` and `debug.callback` where
   `pure_callback` is expected to return a value and be side effect free,
