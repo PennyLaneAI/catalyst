@@ -96,7 +96,8 @@ def print_memref(x):
     Enables printing of numeric values at runtime and the value's metadata.
 
     Tensors in the Catalyst runtime are represented as memref descriptor structs.
-    For more information about memref descriptors see the `MLIR documentation <https://mlir.llvm.org/docs/Dialects/MemRef/>`__.
+    For more information about memref descriptors see the
+    `MLIR documentation <https://mlir.llvm.org/docs/Dialects/MemRef/>`__.
     This function will print the base memory address of the data buffer, as well as the rank of
     the array, the size of each dimension, and the strides between elements.
 
