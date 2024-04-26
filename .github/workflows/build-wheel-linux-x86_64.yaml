@@ -218,7 +218,8 @@ jobs:
         cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
-    needs: [constants, build-dependencies, determine_runner]
+    # TODO: Revert this back to `needs: [constants, build-dependencies, determine_runner]`
+    needs: [constants, determine_runner]
     strategy:
       fail-fast: false
       matrix:
