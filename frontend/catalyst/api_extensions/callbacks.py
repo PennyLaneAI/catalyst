@@ -202,7 +202,9 @@ def callback_implementation(
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retvals = tree_leaves(cb(*args, **kwargs))
         return_values = []
-        results_aval_sequence = results_aval if isinstance(results_aval, Sequence) else [results_aval]
+        results_aval_sequence = (
+            results_aval if isinstance(results_aval, Sequence) else [results_aval]
+        )
         for retval, exp_aval in zip(retvals, results_aval_sequence):
             obs_aval = shaped_abstractify(retval)
             if obs_aval != exp_aval:
