@@ -218,8 +218,7 @@ jobs:
         cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
-    # TODO: Revert this back to `needs: [constants, build-dependencies, determine_runner]`
-    needs: [constants, determine_runner]
+    needs: [constants, build-dependencies, determine_runner]
     strategy:
       fail-fast: false
       matrix:
@@ -375,7 +374,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
