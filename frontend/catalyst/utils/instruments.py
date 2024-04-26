@@ -25,6 +25,8 @@ import time
 from contextlib import contextmanager
 
 # pylint: disable=f-string-without-interpolation
+# Tested in LIT test suite.
+# pragma: no cover
 
 
 ## API ##
