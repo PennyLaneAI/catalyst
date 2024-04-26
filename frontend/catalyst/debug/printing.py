@@ -28,20 +28,23 @@ from catalyst.tracing.contexts import EvaluationContext
 def print(fmt, *args, **kwargs):
     """A :func:`~.qjit` compatible print function for printing values at runtime.
 
-    This print function allows printing of values at runtime, unlike usage of standard Python ``print`` which will print values at program capture/compile time.
-    
-    ``debug.print`` is a minimal wrapper around :func:`~.debug.callback` which calls Python's ``builtins.print`` function, and thus will use the same formatting styles as Python's built-in print function.
-    
+    This print function allows printing of values at runtime, unlike usage of standard Python
+    ``print`` which will print values at program capture/compile time.
+
+    ``debug.print`` is a minimal wrapper around :func:`~.debug.callback` which calls Python's
+    ``builtins.print`` function, and thus will use the same formatting styles as Python's built-in
+    print function.
+
     Args:
         fmt (str): The string to be printed. Note that this may also be a
-            format string used to format input arguments (for example 
-            ``cost={x}``), similar to those permitted by ``str.format``. See 
+            format string used to format input arguments (for example
+            ``cost={x}``), similar to those permitted by ``str.format``. See
             the Python docs on
-            `string formatting <https://docs.python.org/3/library/stdtypes.html#str.format>`__
-            and `format string syntax <https://docs.python.org/3/library/string.html#formatstrings>`__.
+            `string formatting <https://docs.python.org/3/library/stdtypes.html#str.format>`__ and
+            `format string syntax <https://docs.python.org/3/library/string.html#formatstrings>`__.
         **args: Arguments to be passed to the format string.
         **kwargs: Keyword arguments to be passed to the format string.
-        
+
     .. seealso:: :func:`~.print_memref`
 
     **Example**
@@ -54,9 +57,9 @@ def print(fmt, *args, **kwargs):
 
     >>> f(1, 2, 3)
     c=3 b=2 a=1
-    
+
     .. note::
-    
+
         Using Python f-strings as the `fmt` string will not work as expected since they will be treated as Python objects.
         This means that array values embedded in them will have their compile-time representation
         printed, instead of actual data.
@@ -88,18 +91,18 @@ def _print_callback(*args, **kwargs):
 def print_memref(x):
     """A :func:`qjit` compatible print function for printing numeric values at runtime with memref information.
 
-    Enables printing of numeric values at runtime.
+    Enables printing of numeric values at runtime and the value's metadata.
+
+    Tensors, in the Catalyst runtime are represented as memref descriptor structs.
+    For more information about memref descirptors visit:
+    https://mlir.llvm.org/docs/Dialects/MemRef/
+    This function will print the base memory address of the data buffer, as well as the rank of
+    the array, the size of each dimension, and the strides between elements.
 
     Args:
         x (jax.Array, Any): A single jax array whose numeric values are printed at runtime.
-            Additional information about how the array is stored in memory is printed.
-            Tensors, in the Catalyst runtime are represented as memref descriptor structs.
-            For more information about memref descirptors visit:
-            https://mlir.llvm.org/docs/Dialects/MemRef/
-            This includes the base memory address of the data buffer, as well as the rank of
-            the array, the size of each dimension, and the strides between elements.
-            
-.. seealso:: :func:`~.debug.print`
+
+    .. seealso:: :func:`~.debug.print`
 
     **Example**
 
