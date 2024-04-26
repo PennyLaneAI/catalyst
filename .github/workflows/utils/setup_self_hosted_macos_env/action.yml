@@ -8,6 +8,10 @@ inputs:
   python_version:
     description: Version of Python being used by the Job
     required: true
+  llvm_cache:
+    description: Python version which was used to build LLVM cache
+    required: true
+
 
 outputs:
   python_version:
