@@ -222,7 +222,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         arch: [x86_64]
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
@@ -374,7 +374,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
