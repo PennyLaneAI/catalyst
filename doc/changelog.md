@@ -40,7 +40,7 @@
   while `debug.callback` is expected to produce a side effect and have no return values.
 
   Syntactic sugar on top of `debug.callback` includes `debug.print` which allows the user
-  to use formatstrings to format the string before printing. See https://docs.python.org/3/library/string.html#formatstrings
+  to use string formatting (akin to `str.format()`) before printing. See https://docs.python.org/3/library/string.html#formatstrings
 
   ```py
   @qjit
