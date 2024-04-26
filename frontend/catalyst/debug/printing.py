@@ -48,18 +48,13 @@ def _print_callback(*args, **kwargs):
 
 
 # pylint: disable=redefined-builtin
-def print_memref(x, memref=False):
+def print_memref(x):
     """A :func:`qjit` compatible print function for printing values at runtime.
 
-    Enables printing of numeric values at runtime. Can also print objects or strings as constants.
+    Enables printing of numeric values at runtime.
 
     Args:
-        x (jax.Array, Any): A single jax array whose numeric values are printed at runtime, or any
-            object whose string representation will be treated as a constant and printed at runtime.
-        memref (Optional[bool]): When set to ``True``, additional information about how the array is
-            stored in memory is printed, via the so-called "memref" descriptor. This includes the
-            base memory address of the data buffer, as well as the rank of the array, the size of
-            each dimension, and the strides between elements.
+        x (jax.Array, Any): A single jax array whose numeric values are printed at runtime
 
     **Example**
 
@@ -67,13 +62,11 @@ def print_memref(x, memref=False):
 
         @qjit
         def func(x: float):
-            debug.print(x, memref=True)
-            debug.print("exit")
+            debug.print_memref(x)
 
     >>> func(jnp.array(0.43))
     Unranked Memref base@ = 0x5629ff2b6680 rank = 0 offset = 0 sizes = [] strides = [] data =
     [0.43]
-    exit
 
     Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
 
@@ -84,10 +77,9 @@ def print_memref(x, memref=False):
         printed, instead of actual data.
     """
     if EvaluationContext.is_tracing():
-        if isinstance(x, jax.core.Tracer):
-            print_p.bind(x, memref=memref)
-        else:
-            print_p.bind(string=str(x))
+        if not isinstance(x, jax.core.Tracer):
+            raise TypeError("Arguments to print_memref must be of type jax.core.Tracer")
+        print_p.bind(x, memref=True)
     else:
         # Dispatch to Python print outside a qjit context.
         builtins.print(x)

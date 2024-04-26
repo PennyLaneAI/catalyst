@@ -66,7 +66,7 @@ class TestDebugPrint:
 
         @qjit
         def test(x):
-            debug.print(x, memref=True)
+            debug.print_memref(x)
 
         out, err = capfd.readouterr()
         assert err == ""
