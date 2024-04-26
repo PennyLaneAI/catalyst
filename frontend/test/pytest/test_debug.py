@@ -28,25 +28,22 @@ class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
     @pytest.mark.parametrize(
-        ("arg", "expected"),
+        ("arg"),
         [
-            (True, "1\n"),  # TODO: True/False would be nice
-            (3, "3\n"),
-            (3.5, "3.5\n"),
-            (3 + 4j, "(3,4)\n"),
-            (np.array(3), "3\n"),
-            (jnp.array(3), "3\n"),
-            (jnp.array(3.000001), "3\n"),  # TODO: show more precision
-            (jnp.array(3.1 + 4j), "(3.1,4)\n"),
-            (jnp.array([3]), "[3]\n"),
-            (jnp.array([3, 4, 5]), "[3,  4,  5]\n"),
-            (
-                jnp.array([[3, 4], [5, 6], [7, 8]]),
-                "[[3,   4], \n [5,   6], \n [7,   8]]\n",
-            ),
+            True,
+            3,
+            3.5,
+            3 + 4j,
+            np.array(3),
+            jnp.array(3),
+            jnp.array(3.000001),
+            jnp.array(3.1 + 4j),
+            jnp.array([3]),
+            jnp.array([3, 4, 5]),
+            jnp.array([[3, 4], [5, 6], [7, 8]]),
         ],
     )
-    def test_function_arguments(self, capfd, arg, expected):
+    def test_function_arguments(self, capfd, arg):
         """Test printing of arbitrary JAX tracer values."""
 
         @qjit
@@ -61,7 +58,8 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert expected == out
+        expected = str(arg)
+        assert expected == out.strip()
 
     def test_optional_descriptor(self, capfd):
         """Test the optional memref descriptor functionality."""
