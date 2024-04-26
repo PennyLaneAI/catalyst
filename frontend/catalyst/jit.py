@@ -32,6 +32,7 @@ import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
@@ -46,7 +47,6 @@ from catalyst.utils.c_template import mlir_type_to_numpy_type
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.instruments import instrument
 from catalyst.utils.patching import Patcher
 
 # Required for JAX tracer objects as PennyLane wires.

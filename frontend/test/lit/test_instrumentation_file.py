@@ -19,7 +19,8 @@ import pathlib
 import numpy as np
 import pennylane as qml
 
-from catalyst import instrumentation, qjit
+from catalyst import qjit
+from catalyst.debug import instrumentation
 
 filename = "__tmp_test_timing_results.txt"
 

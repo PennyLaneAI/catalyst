@@ -93,7 +93,6 @@ from catalyst.utils.exceptions import (
     CompileError,
     DifferentiableCompileError,
 )
-from catalyst.utils.instruments import instrumentation
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
@@ -185,7 +184,6 @@ __all__ = (
     "CompileError",
     "DifferentiableCompileError",
     "CompileOptions",
-    "instrumentation",
     "debug",
     *_api_extension_list,
 )
