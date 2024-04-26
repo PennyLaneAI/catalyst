@@ -15,6 +15,8 @@
 """This module enables runtime printing of program values."""
 
 import builtins
+import sys
+from functools import partial
 
 import jax
 

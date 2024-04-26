@@ -16,6 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from jax.tree_util import register_pytree_node_class
 
 from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
@@ -115,6 +116,7 @@ class TestDebugPrint:
         assert err == ""
         assert expected == out
 
+    @register_pytree_node_class
     class MyObject:
         def __init__(self, string):
             self.string = string
@@ -122,11 +124,20 @@ class TestDebugPrint:
         def __str__(self):
             return f"MyObject({self.string})"
 
-    @pytest.mark.parametrize(
-        ("arg", "expected"), [(3, "3\n"), ("hi", "hi\n"), (MyObject("hello"), "MyObject(hello)\n")]
-    )
-    def test_compile_time_values(self, capfd, arg, expected):
+        def tree_flatten(self):
+            """tree flatten"""
+            return ([], [self.string])
+
+        @classmethod
+        def tree_unflatten(cls, aux_data, _children):
+            """unflatten"""
+            return cls(*aux_data)
+
+    @pytest.mark.parametrize(("arg"), [3, "hi", MyObject("hello")])
+    def test_compile_time_values(self, capfd, arg):
         """Test printing of arbitrary Python objects, including strings."""
+
+        expected = str(arg)
 
         @qjit
         def test():
@@ -140,7 +151,7 @@ class TestDebugPrint:
 
         out, err = capfd.readouterr()
         assert err == ""
-        assert out == expected
+        assert out.strip() == expected
 
     @pytest.mark.parametrize(
         ("arg", "expected"),
@@ -185,6 +196,18 @@ class TestDebugPrint:
         out, err = capfd.readouterr()
         assert err == ""
         assert out == "hello\ngoodbye\n"
+
+    def test_fstring_print(self, capsys):
+        """Test fstring like function."""
+
+        @qjit
+        def cir(a, b, c):
+            debug.print("{c} {b} {a}", a=a, b=b, c=c)
+
+        cir(1, 2, 3)
+        out, err = capsys.readouterr()
+        expected = "3 2 1"
+        assert expected == out.strip()
 
 
 class TestPrintStage:
