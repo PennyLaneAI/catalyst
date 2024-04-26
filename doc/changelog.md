@@ -61,7 +61,6 @@
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
 
   ```py
-  from catalyst.oqc import OQCDevice
 
   import os
 
@@ -69,7 +68,7 @@
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+  device = qml.device("oqc.remote", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(device=device)

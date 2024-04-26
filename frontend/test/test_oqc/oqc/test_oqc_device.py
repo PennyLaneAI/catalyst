@@ -24,6 +24,15 @@ import pytest
 class TestOQCDevice:
     """Test the OQC device python layer for Catalyst."""
 
+    def test_entrypoint(self, set_dummy_oqc_env):
+        """Test the initialization."""
+
+        device = qml.device("oqc.remote", backend="lucy", shots=1000, wires=8)
+
+        assert device.backend == "lucy"
+        assert device.shots == qml.measurements.Shots(1000)
+        assert device.wires == qml.wires.Wires(range(0, 8))
+
     def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""
         from catalyst.oqc import OQCDevice
