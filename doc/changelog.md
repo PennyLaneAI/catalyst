@@ -32,7 +32,7 @@
 
   ```pycon
   >>> print(circuit(123))
-myval: 124
+  myval: 124
   ```
 
   This includes support for the specialized `pure_callback` and `debug.callback` where

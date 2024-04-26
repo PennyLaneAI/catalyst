@@ -73,7 +73,12 @@ def print_memref(x):
     Enables printing of numeric values at runtime.
 
     Args:
-        x (jax.Array, Any): A single jax array whose numeric values are printed at runtime
+        x (jax.Array, Any): A single jax array whose numeric values are printed at runtime.
+            Additional information about how the array is stored in memory is printed.
+            Tensors, in the Catalyst runtime are represented as memref descriptor structs.
+            For more information about memref descirptors visit: https://mlir.llvm.org/docs/Dialects/MemRef/
+            This includes the base memory address of the data buffer, as well as the rank of the array,
+            the size of each dimension, and the strides between elements.
 
     **Example**
 
@@ -88,12 +93,6 @@ def print_memref(x):
     [0.43]
 
     Outside a :func:`qjit` compiled function the operation falls back to the Python print statement.
-
-    .. note::
-
-        Python f-strings will not work as expected since they will be treated as Python objects.
-        This means that array values embeded in them will have their compile-time representation
-        printed, instead of actual data.
     """
     if EvaluationContext.is_tracing():
         if not isinstance(x, jax.core.Tracer):
