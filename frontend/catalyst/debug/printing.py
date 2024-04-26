@@ -60,7 +60,7 @@ def print(fmt, *args, **kwargs):
 
     .. note::
 
-        Using Python f-strings as the `fmt` string will not work as expected since they will be
+        Using Python f-strings as the ``fmt`` string will not work as expected since they will be
         treated as Python objects.
         This means that array values embedded in them will have their compile-time representation
         printed, instead of actual data.
@@ -96,8 +96,7 @@ def print_memref(x):
     Enables printing of numeric values at runtime and the value's metadata.
 
     Tensors in the Catalyst runtime are represented as memref descriptor structs.
-    For more information about memref descriptors visit:
-    https://mlir.llvm.org/docs/Dialects/MemRef/
+    For more information about memref descriptors see the `MLIR documentation <https://mlir.llvm.org/docs/Dialects/MemRef/>`__.
     This function will print the base memory address of the data buffer, as well as the rank of
     the array, the size of each dimension, and the strides between elements.
 
