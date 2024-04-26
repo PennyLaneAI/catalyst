@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [3.9]
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on:
@@ -51,7 +51,6 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
-        llvm_cache: 3.9
 
     # Cache external project sources
     - name: Cache LLVM Source
@@ -226,7 +225,6 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
-        llvm_cache: ${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
       run: |
@@ -246,7 +244,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
