@@ -16,17 +16,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  determine_runner:
+    name: Determine runner type to use
+    uses: ./.github/workflows/determine-workflow-runner.yml
+    with:
+      default_runner: ubuntu-latest
+
   check_if_wheel_build_required:
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
-    needs: [check_if_wheel_build_required]
+    needs: [check_if_wheel_build_required, determine_runner]
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
+    with:
+      runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
   build-dependencies:
-    needs: [constants, check_if_wheel_build_required]
+    needs: [constants, check_if_wheel_build_required, determine_runner]
 
     strategy:
       fail-fast: false
@@ -37,12 +45,13 @@ jobs:
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     container: ${{ matrix.container_img }}
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
     steps:
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -78,6 +87,7 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
         enableCrossOsArchive: True
 
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
@@ -86,6 +96,7 @@ jobs:
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
@@ -94,6 +105,7 @@ jobs:
         ref: ${{ needs.constants.outputs.mhlo_version }}
         path: mlir/mlir-hlo
 
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
@@ -206,13 +218,13 @@ jobs:
         cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
-    needs: [constants, build-dependencies]
+    needs: [constants, build-dependencies, determine_runner]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
@@ -220,6 +232,7 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
+    # TODO: Cannot use actions/checkout@v4 as node20 is not supported in manylinux2014 container
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -356,12 +369,12 @@ jobs:
         retention-days: 14
 
   test-wheels:
-    needs: [constants, catalyst-linux-wheels-x86-64]
+    needs: [constants, catalyst-linux-wheels-x86-64, determine_runner]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-20.04]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
@@ -374,13 +387,18 @@ jobs:
         python-version: ${{ matrix.python_version }}
 
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
         name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
         path: dist
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
 
     - name: Install Python dependencies
       run: |

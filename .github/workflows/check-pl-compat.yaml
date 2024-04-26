@@ -31,7 +31,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - if: ${{ inputs.catalyst == 'stable' }}
@@ -48,43 +48,43 @@ jobs:
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-gcc
         fail-on-cache-miss: True
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: mlir/mlir-hlo
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-gcc
         fail-on-cache-miss: True
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
     - name: Clone Enzyme Submodule
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ needs.constants.outputs.enzyme_version }}
