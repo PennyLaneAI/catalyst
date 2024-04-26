@@ -12,8 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""callback.debug module"""
+"""Catalyst's debug module contains functions useful for user program debugging."""
 
-from .implementation import callback
+from catalyst.api_extensions.callbacks import debug_callback as callback
+from catalyst.debug.compiler_functions import (
+    compile_from_mlir,
+    get_cmain,
+    print_compilation_stage,
+)
+from catalyst.debug.printing import print  # pylint: disable=redefined-builtin
 
-__all__ = ["callback"]
+__all__ = (
+    "callback",
+    "print",
+    "print_compilation_stage",
+    "get_cmain",
+    "compile_from_mlir",
+)

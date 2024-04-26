@@ -20,7 +20,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.callback import callback, debug, pure_callback
+from catalyst import debug, pure_callback
+from catalyst.api_extensions.callbacks import base_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -28,7 +29,7 @@ def test_callback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
     stays the same."""
 
-    @callback
+    @base_callback
     def identity(x):
         return x
 
@@ -38,7 +39,7 @@ def test_callback_no_tracing(arg):
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
-    @callback
+    @base_callback
     def my_callback() -> None:
         print("Hello erick")
 
@@ -58,7 +59,7 @@ def test_callback_no_returns_no_params(capsys):
 def test_callback_twice(capsys):
     """Test callback no parameters no returns"""
 
-    @callback
+    @base_callback
     def my_callback():
         print("Hello erick")
 
@@ -90,7 +91,7 @@ def test_callback_twice(capsys):
 def test_callback_send_param(capsys):
     """Test callback with parameters no returns"""
 
-    @callback
+    @base_callback
     def my_callback(n) -> None:
         print(n)
 
@@ -107,7 +108,7 @@ def test_callback_send_param(capsys):
 def test_kwargs(capsys):
     """Test kwargs returns"""
 
-    @callback
+    @base_callback
     def my_callback(**kwargs) -> None:
         for k, v in kwargs.items():
             print(k, v)
@@ -129,7 +130,7 @@ def test_kwargs(capsys):
 def test_simple_increment():
     """Test increment function"""
 
-    @callback
+    @base_callback
     def inc(arg) -> int:
         return arg + 1
 
@@ -147,7 +148,7 @@ def test_simple_increment():
 def test_identity_types(arg):
     """Test callback with return values"""
 
-    @callback
+    @base_callback
     def identity(arg) -> arg:
         """Weird trick, if it is the identity function, we can just pass arg
         as the return type. arg will be abstracted to find the type. This
@@ -169,7 +170,7 @@ def test_identity_types(arg):
 def test_identity_types_shaped_array(arg):
     """Test callback with return values. Use ShapedArray to denote the type"""
 
-    @callback
+    @base_callback
     def identity(arg) -> jax.core.ShapedArray([], int):
         return arg
 
@@ -187,7 +188,7 @@ def test_identity_types_shaped_array(arg):
 def test_multiple_returns(arg):
     """Test callback with multiple return values."""
 
-    @callback
+    @base_callback
     def identity(arg) -> (int, int):
         return arg, arg
 
@@ -205,7 +206,7 @@ def test_multiple_returns(arg):
 def test_incorrect_return(arg):
     """Test callback with incorrect return types."""
 
-    @callback
+    @base_callback
     def identity(arg) -> int:
         return arg
 

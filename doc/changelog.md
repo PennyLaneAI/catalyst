@@ -14,7 +14,7 @@
   The following is now possible:
 
   ```py
-  @callback
+  @pure_callback
   def foo(val):
     return val
 
@@ -102,7 +102,7 @@
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
-  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that 
+  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that
   devices have the wires set.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)

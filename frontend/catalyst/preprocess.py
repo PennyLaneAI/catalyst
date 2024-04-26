@@ -28,8 +28,8 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-import catalyst
-import catalyst.pennylane_extensions
+from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
+from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
@@ -87,11 +87,11 @@ def decompose(
         elif isinstance(
             op,
             (
-                catalyst.pennylane_extensions.Adjoint,
-                catalyst.pennylane_extensions.MidCircuitMeasure,
-                catalyst.pennylane_extensions.ForLoop,
-                catalyst.pennylane_extensions.WhileLoop,
-                catalyst.pennylane_extensions.Cond,
+                Adjoint,
+                MidCircuitMeasure,
+                ForLoop,
+                WhileLoop,
+                Cond,
             ),
         ):
             return _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion)
@@ -159,7 +159,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, catalyst.pennylane_extensions.QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -185,11 +185,11 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     if isinstance(
         op,
         (
-            catalyst.pennylane_extensions.Adjoint,
-            catalyst.pennylane_extensions.MidCircuitMeasure,
-            catalyst.pennylane_extensions.ForLoop,
-            catalyst.pennylane_extensions.WhileLoop,
-            catalyst.pennylane_extensions.Cond,
+            Adjoint,
+            MidCircuitMeasure,
+            ForLoop,
+            WhileLoop,
+            Cond,
         ),
     ):
         return op.name in operations and op.visited
