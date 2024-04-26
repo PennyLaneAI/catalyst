@@ -15,7 +15,6 @@
 """This module enables runtime printing of program values."""
 
 import builtins
-import sys
 from functools import partial
 
 import jax
@@ -25,7 +24,6 @@ from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
 
 
-# pylint: disable=redefined-builtin
 def print(fmt, *args, **kwargs):
     """A print function.
 
