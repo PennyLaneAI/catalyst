@@ -226,7 +226,7 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env
       with:
         python_version: ${{ matrix.python_version }}
-        llvm_cache: 3.9
+        llvm_cache: ${{ matrix.python_version }}
 
     - name: Install Dependencies (Python)
       run: |
