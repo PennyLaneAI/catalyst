@@ -41,7 +41,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: [3.9]
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -260,7 +260,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
