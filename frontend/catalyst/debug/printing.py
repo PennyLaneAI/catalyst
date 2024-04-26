@@ -90,7 +90,8 @@ def _print_callback(*args, **kwargs):
 
 # pylint: disable=redefined-builtin
 def print_memref(x):
-    """A :func:`qjit` compatible print function for printing numeric values at runtime with memref information.
+    """A :func:`qjit` compatible print function for printing numeric values at runtime with memref
+    information.
 
     Enables printing of numeric values at runtime and the value's metadata.
 
