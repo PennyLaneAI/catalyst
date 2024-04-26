@@ -9,29 +9,49 @@
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
 
   ```py
-  @pure_callback
+  @debug.callback
   def foo(val):
     return val
 
+  @pure_callback
+  def bar(val) -> int:
+    return val + 1
+
   @qjit
   def circuit(param):
-    return foo(param)
+    x = bar(param)
+    foo(x)
 
   ```
 
   ```pycon
   >>> print(circuit(123))
-  123
+  124
   ```
 
   This includes support for the specialized `pure_callback` and `debug.callback` where
   `pure_callback` is expected to return a value and be side effect free,
   while `debug.callback` is expected to produce a side effect and have no return values.
+
+  Syntactic sugar on top of `debug.callback` includes `debug.print` which allows the user
+  to use f-stringlike to format the string before printing.
+
+  ```py
+  @qjit
+  def cir(a, b, c):
+      debug.print("{c} {b} {a}", a=a, b=b, c=c)
+  ```
+
+  ```pycon
+  >>> cir(1, 2, 3)
+  3 2 1
+  ```
 
   At the moment, callbacks should not be used inside methods which are differentiated.
 
@@ -148,7 +168,11 @@
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
+
 <h3>Breaking changes</h3>
+
+* `catalyst.debug.print` has changed, resulting in the `memref` keyword argument being removed. Please use `catalyst.debug.print_memref` instead.
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
 <h3>Bug fixes</h3>
 

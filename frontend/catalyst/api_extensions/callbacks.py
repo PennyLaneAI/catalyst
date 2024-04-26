@@ -47,6 +47,7 @@ def pure_callback(callback_fn, result_type=None):
       1. Given the same arguments *args, the results will be the same each time the function is
          called.
       2. The function has no side effect.
+      3. Examples of side effects include modifying a non-local variable, printing, etc.
 
     A pure callback is a pure python function that can be executed by the python virtual machine.
     This is in direct contrast to functions which get JIT compiled by Catalyst.
@@ -105,7 +106,7 @@ def pure_callback(callback_fn, result_type=None):
 
 
 def debug_callback(callback_fn):
-    """Debug callback
+    """debug.callback : useful for printing and logging
 
     An debug callback is a python function that can write to stdout or to a file.
     It is expected to return no values.
