@@ -26,22 +26,40 @@ from catalyst.tracing.contexts import EvaluationContext
 
 # pylint: disable=redefined-builtin
 def print(fmt, *args, **kwargs):
-    """A print function.
+    """A :func:`~.qjit` compatible print function for printing values at runtime.
 
-    This print function works with python callbacks, so all arguments will be printed in the same
-    way as the :func:`builtins.print` function prints them.
+    This print function allows printing of values at runtime, unlike usage of standard Python ``print`` which will print values at program capture/compile time.
+    
+    ``debug.print`` is a minimal wrapper around :func:`~.debug.callback` which calls Python's ``builtins.print`` function, and thus will use the same formatting styles as Python's built-in print function.
+    
+    Args:
+        fmt (str): The string to be printed. Note that this may also be a
+            format string used to format input arguments (for example 
+            ``cost={x}``), similar to those permitted by ``str.format``. See 
+            the Python docs on
+            `string formatting <https://docs.python.org/3/library/stdtypes.html#str.format>`__
+            and `format string syntax <https://docs.python.org/3/library/string.html#formatstrings>`__.
+        **args: Arguments to be passed to the format string.
+        **kwargs: Keyword arguments to be passed to the format string.
+        
+    .. seealso:: :func:`~.print_memref`
 
-    One difference is that if the first argument is a string, it may be used similarly to an
-    fstring. Like so:
+    **Example**
 
     .. code-block:: python
 
         @qjit
-        def cir(a, b, c):
+        def f(a, b, c):
             debug.print("c={c} b={b} a={a}", a=a, b=b, c=c)
 
-        cir(1, 2, 3)
-    >>> c=3 b=2 a=1
+    >>> f(1, 2, 3)
+    c=3 b=2 a=1
+    
+    .. note::
+    
+        Using Python f-strings as the `fmt` string will not work as expected since they will be treated as Python objects.
+        This means that array values embedded in them will have their compile-time representation
+        printed, instead of actual data.
     """
 
     if isinstance(fmt, str):
@@ -68,7 +86,7 @@ def _print_callback(*args, **kwargs):
 
 # pylint: disable=redefined-builtin
 def print_memref(x):
-    """A :func:`qjit` compatible print function for printing values at runtime.
+    """A :func:`qjit` compatible print function for printing numeric values at runtime with memref information.
 
     Enables printing of numeric values at runtime.
 
@@ -80,6 +98,8 @@ def print_memref(x):
             https://mlir.llvm.org/docs/Dialects/MemRef/
             This includes the base memory address of the data buffer, as well as the rank of
             the array, the size of each dimension, and the strides between elements.
+            
+.. seealso:: :func:`~.debug.print`
 
     **Example**
 
