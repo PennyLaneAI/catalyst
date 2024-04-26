@@ -106,9 +106,12 @@ def pure_callback(callback_fn, result_type=None):
 
 
 def debug_callback(callback_fn):
-    """debug.callback : useful for printing and logging
 
-    An debug callback is a python function that can write to stdout or to a file.
+This function allowys users to execute Python function (with no return values) at runtime within their qjitted workflows
+    """A function that is useful for printing and logging and allows users to execute a Python 
+    function (with no return values) at runtime within their qjitted workflows.
+
+    A debug callback is a python function that can write to stdout or to a file.
     It is expected to return no values.
 
     Using `debug.callback` allows a user to run a python function with side effects inside an
