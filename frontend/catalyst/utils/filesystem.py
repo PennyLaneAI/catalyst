@@ -16,10 +16,8 @@ Functions to interface with the filesystem.
 """
 
 import pathlib
-import platform
 import shutil
 import tempfile
-import warnings
 
 
 class Directory:
@@ -65,33 +63,12 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
     """
 
     @classmethod
-    def _cleanup(cls, name, warn_message, ignore_errors=False, delete=True):
-        """Ignore ResourceWarning during cleanup"""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=ResourceWarning)
-            # Different python versions have different keyword arguments.
-            # Changed in version 3.10: Added ignore_errors=False kwarg.
-            # Changed in version 3.12: Added delete=True kwarg.
-            major, minor, _ = platform.python_version_tuple()
-            major, minor = int(major), int(minor)
-            if major == 3 and minor < 10:
-                # pylint: disable-next=protected-access
-                tempfile.TemporaryDirectory._cleanup(name, warn_message)
-                return
-            elif major == 3 and minor < 12:
-                # pylint: disable-next=protected-access
-                tempfile.TemporaryDirectory._cleanup(
-                    name, warn_message, ignore_errors=ignore_errors
-                )
-                return
+    def _cleanup(cls, name, warn_message, **kwargs):  # pylint: disable=arguments-differ
+        """Ignore ResourceWarning during cleanup."""
+        del warn_message
 
-            # Even though this will never be reached due to different python versions
-            # pylint still complains about unexpected-keyword-arg.
-            # pylint is probably run with python 3.10 which does not have delete.
-            # pylint: disable-next=protected-access,unexpected-keyword-arg
-            tempfile.TemporaryDirectory._cleanup(
-                name, warn_message, ignore_errors=ignore_errors, delete=delete
-            )
+        # pylint: disable-next=protected-access
+        tempfile.TemporaryDirectory._rmtree(name, **kwargs)
 
 
 class WorkspaceManager:
