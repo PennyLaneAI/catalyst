@@ -353,6 +353,8 @@ def test_io_callback_modify_global(capsys):
     [0.1, jnp.array(0.1)],
 )
 def test_no_return_list(arg):
+    """Test that the callback returns a scalar and not a list."""
+
     @pure_callback
     def callback_fn(x) -> float:
         return np.sin(x)
@@ -364,6 +366,22 @@ def test_no_return_list(arg):
         return jnp.cos(res)
 
     f(arg)
+
+
+def test_tuple_out():
+    """Test with multiple tuples."""
+
+    @pure_callback
+    def callback_fn(x) -> (bool, bool):
+        return x > 1.0, x > 2.0
+
+    @qml.qjit
+    def f(x):
+        res = callback_fn(x**2)
+        assert isinstance(res, tuple) and len(res) == 2
+        return jnp.cos(res[0])
+
+    f(0.1)
 
 
 if __name__ == "__main__":
