@@ -12,7 +12,6 @@
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
-  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
 
   The following two callback functions are available:
@@ -63,13 +62,11 @@
   Note that callbacks do not currently support differentiation, and cannot be used inside
   functions that `catalyst.grad` is applied to.
 
+* More flexible runtime printing through support for format strings.
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
-  This includes support for the specialized `pure_callback` and `debug.callback` where
-  `pure_callback` is expected to return a value and be side effect free,
-  while `debug.callback` is expected to produce a side effect and have no return values.
-
-  Syntactic sugar on top of `debug.callback` includes `debug.print` which allows the user
-  to use string formatting (akin to `str.format()`) before printing. See https://docs.python.org/3/library/string.html#formatstrings
+  The `catalyst.debug.print` function has been updated to support Python-like format
+  strings:
 
   ```py
   @qjit
@@ -82,25 +79,27 @@
   3 2 1
   ```
 
-  At the moment, callbacks should not be used inside methods which are differentiated.
+  Note that previous functionality of the print function to print out memory reference information
+  of variables has been moved to `catalyst.debug.print_memref`.
 
-* The OQC-Catalyst device is now available and supports single counts measurement.
+* Catalyst now supports QNodes that execute on [Oxford Quantum Circuits (OQC)](https://www.oqc.tech/)
+  superconducting hardware, via [OQC Cloud](https://docs.oqc.app).
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
 
+  To use OQC Cloud with Catalyst, simply ensure your credentials are set as environment variables, and load the `oqc.remote` device to be used within your qjit-compiled
+  workflows.
+
   ```py
-  from catalyst.oqc import OQCDevice
-
   import os
-
   os.environ["OQC_EMAIL"] = "your_email"
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+  dev = qml.device("oqc.remote", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
-  @qml.qnode(device=device)
+  @qml.qnode(dev)
   def circuit(a: float):
       qml.Hadamard(0)
       qml.CNOT(wires=[0, 1])
