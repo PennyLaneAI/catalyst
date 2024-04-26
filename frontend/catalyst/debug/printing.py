@@ -18,12 +18,37 @@ import builtins
 
 import jax
 
+from catalyst.api_extensions.callbacks import debug_callback
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
 
 
 # pylint: disable=redefined-builtin
-def print(x, memref=False):
+def print(fmt, *args, **kwargs):
+    if isinstance(fmt, str):
+        debug_callback(partial(_format_print_callback, fmt))(*args, **kwargs)
+        return
+
+    debug_callback(_print_callback)(fmt, *args, **kwargs)
+
+
+def _format_print_callback(fmt: str, *args, **kwargs):
+    """
+    This function has been modified from its original form in the JAX project at
+    https://github.com/google/jax/blob/5eeebf2c1829bf3c66c947b6e12464a779434e29/jax/_src/debugging.py#L269
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+    Copyright 2022 The Jax Authors.
+    """
+    sys.stdout.write(fmt.format(*args, **kwargs))
+    sys.stdout.write("\n")
+
+
+def _print_callback(*args, **kwargs):
+    builtins.print(*args, **kwargs)
+
+
+# pylint: disable=redefined-builtin
+def print_memref(x, memref=False):
     """A :func:`qjit` compatible print function for printing values at runtime.
 
     Enables printing of numeric values at runtime. Can also print objects or strings as constants.
