@@ -10,6 +10,7 @@
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
+  [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
