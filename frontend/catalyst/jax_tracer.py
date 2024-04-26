@@ -768,21 +768,20 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         out_tree(PyTreeDef): PyTree shape of the qnode result
     """
 
-    with EvaluationContext.frame_tracing_context(ctx, trace):
-        # What is the input to the post_processing function?
-        # The input to the post_processing function is going to be a list of values One for each
-        # tape. The tracers are all flat in pp_args.
+    # What is the input to the post_processing function?
+    # The input to the post_processing function is going to be a list of values One for each
+    # tape. The tracers are all flat in pp_args.
 
-        # We need to deduce the type/shape/tree of the post_processing.
-        wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
+    # We need to deduce the type/shape/tree of the post_processing.
+    wffa, _, _, out_tree_promise = deduce_avals(post_processing, (pp_args,), {})
 
-        # wffa will take as an input a flatten tracers.
-        # After wffa is called, then the shape becomes available in out_tree_promise.
-        in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
-        out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
-        jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
-        closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-        return closed_jaxpr, out_type, out_tree_promise()
+    # wffa will take as an input a flatten tracers.
+    # After wffa is called, then the shape becomes available in out_tree_promise.
+    in_tracers = [trace.full_raise(t) for t in tree_flatten(pp_args)[0]]
+    out_tracers = [trace.full_raise(t) for t in wffa.call_wrapped(*in_tracers)]
+    jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_tracers)
+    closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+    return closed_jaxpr, out_type, out_tree_promise()
 
 
 def trace_quantum_function(
@@ -846,7 +845,7 @@ def trace_quantum_function(
                 qnode_program, device_program, quantum_tape, return_values_flat
             )
 
-        
+        with EvaluationContext.frame_tracing_context(ctx) as trace2:
             # (2) - Quantum tracing
             transformed_results = []
             qnode_transformed = len(qnode_program) > 0
@@ -883,7 +882,7 @@ def trace_quantum_function(
                 # func bind
                 def _eval_circuit(*args):
                     # Jaxpr
-                    jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(meas_tracers)
+                    jaxpr, out_type, consts = ctx.frames[trace2].to_jaxpr2(meas_tracers)
                     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
                     args_expanded = get_implicit_and_explicit_flat_args(None, *args)
                     res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -897,10 +896,9 @@ def trace_quantum_function(
                 res_flat = func_p.bind(flattened_fun, *args_flat, fn=_eval_circuit)
                 meas_results = tree_unflatten(meas_trees, res_flat)
                 transformed_results.append(meas_results)
-        closed_jaxpr, out_type, out_tree = trace_post_processing(
-            ctx, trace, post_processing, transformed_results
-        )
+            closed_jaxpr, out_type, out_tree = trace_post_processing(
+                ctx, trace, post_processing, transformed_results
+            )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
-        print(closed_jaxpr)
     return closed_jaxpr, out_type, out_tree

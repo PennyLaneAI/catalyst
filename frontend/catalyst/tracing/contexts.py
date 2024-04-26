@@ -118,6 +118,7 @@ class EvaluationContext:
         """Start a new JAX tracing frame, e.g. to trace a region of some
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
+        print("ENTER", ctx)
         main = ctx.mains[trace] if trace is not None else None
         with new_dynamic_main2(DynamicJaxprTrace, main=main) as nmain:
             nmain.jaxpr_stack = ()
@@ -131,6 +132,7 @@ class EvaluationContext:
                     yield ctx.trace
                 finally:
                     ctx.trace = parent_trace
+        print("EXIT", ctx)
 
     @classmethod
     def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:
