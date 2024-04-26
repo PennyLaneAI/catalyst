@@ -27,7 +27,14 @@ from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
+from jax.core import eval_jaxpr
+from jax.tree_util import tree_flatten, tree_unflatten
 
+from catalyst.jax_extras import (
+    deduce_avals,
+    get_implicit_and_explicit_flat_args,
+    unzip2,
+)
 import catalyst
 from catalyst.jax_extras import (
     ClosedJaxpr,
@@ -778,31 +785,6 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         return closed_jaxpr, out_type, out_tree_promise()
 
 
-def reset_qubit(qreg_in, w):
-    """Perform a qubit reset on a single wire. Suitable for use during late-stage tracing,
-    as JAX primitives are used directly. These operations will not appear on tape."""
-
-    def flip(qreg):
-        """Flip a qubit."""
-        qbit = qextract_p.bind(qreg, w)
-        qbit2 = qinst_p.bind(qbit, op="PauliX", qubits_len=1)[0]
-        return qinsert_p.bind(qreg, w, qbit2)
-
-    def dont_flip(qreg):
-        """Identity function."""
-        return qreg
-
-    qbit = qextract_p.bind(qreg_in, w)
-    m, qbit2 = qmeasure_p.bind(qbit)
-    qreg_mid = qinsert_p.bind(qreg_in, w, qbit2)
-
-    jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
-    jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
-
-    return qreg_out
-
-
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:
@@ -864,21 +846,17 @@ def trace_quantum_function(
                 qnode_program, device_program, quantum_tape, return_values_flat
             )
 
-        # (2) - Quantum tracing
-        transformed_results = []
-
-        with EvaluationContext.frame_tracing_context(ctx, trace):
-            # Set up same device and quantum register for all tapes in the program.
-            # We just need to ensure the qubits are reset in between each.
-            qdevice_p.bind(
-                rtd_lib=device.backend_lib,
-                rtd_name=device.backend_name,
-                rtd_kwargs=str(device.backend_kwargs),
-            )
-            qreg_in = qalloc_p.bind(len(device.wires))
-
+        
+            # (2) - Quantum tracing
+            transformed_results = []
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
+                qdevice_p.bind(
+                    rtd_lib=device.backend_lib,
+                    rtd_name=device.backend_name,
+                    rtd_kwargs=str(device.backend_kwargs),
+                )
+                qreg_in = qalloc_p.bind(len(device.wires))
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
@@ -891,34 +869,38 @@ def trace_quantum_function(
                     trees = return_values_tree
 
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
+                meas, meas_trees = trace_quantum_measurements(
+                    device, qrp_out, output, trees, tape
+                )
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
-                # TODO: Allow the user to return whatever types they specify.
-                if qnode_transformed:
-                    assert isinstance(meas_results, list)
-                    if len(meas_results) == 1:
-                        transformed_results.append(meas_results[0])
-                    else:
-                        transformed_results.append(tuple(meas_results))
-                else:
-                    transformed_results.append(meas_results)
+                # Deallocate the register before tracing the post-processing.
+                qdealloc_p.bind(qreg_out)
 
-                # Reset the qubits and update the register value for the next tape.
-                if len(tapes) > 1 and i < len(tapes) - 1:
-                    for w in device.wires:
-                        qreg_out = reset_qubit(qreg_out, w)
-                    qreg_in = qreg_out
-
-            # Deallocate the register before tracing the post-processing.
-            qdealloc_p.bind(qreg_out)
-
+                # func bind
+                def _eval_circuit(*args):
+                    # Jaxpr
+                    jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(meas_tracers)
+                    closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+                    args_expanded = get_implicit_and_explicit_flat_args(None, *args)
+                    res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
+                    _, out_keep = unzip2(out_type)
+                    res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
+                    return tree_unflatten(meas_trees, res_flat)
+                
+                flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_circuit, args, {})
+                args_flat = tree_flatten(args)[0]
+                setattr(_eval_circuit, '__name__', f'{f.__name__}_{i}')
+                res_flat = func_p.bind(flattened_fun, *args_flat, fn=_eval_circuit)
+                meas_results = tree_unflatten(meas_trees, res_flat)
+                transformed_results.append(meas_results)
         closed_jaxpr, out_type, out_tree = trace_post_processing(
             ctx, trace, post_processing, transformed_results
         )
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
+        print(closed_jaxpr)
     return closed_jaxpr, out_type, out_tree
