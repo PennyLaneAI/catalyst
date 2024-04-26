@@ -11,10 +11,14 @@ This file is a wrapper around MLIR's np_to_memref to allow for abstract types an
 to be converted to and from memrefs.
 """
 
+import jax
 import numpy as np
 from mlir_quantum.runtime import as_ctype
 from mlir_quantum.runtime import (
     get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor,
+)
+from mlir_quantum.runtime import (
+    get_unranked_memref_descriptor as mlir_get_unranked_memref_descriptor,
 )
 from mlir_quantum.runtime import ranked_memref_to_numpy as mlir_ranked_memref_to_numpy
 from mlir_quantum.runtime.np_to_memref import (
@@ -52,12 +56,29 @@ def get_ranked_memref_descriptor(array):
         # This is necessary for keyword arguments
         array = np.array(array)
 
+    if isinstance(array, jax.Array):
+        array = np.asarray(array)
+
     if isinstance(array, ShapedArray):
         # If input is ShapedArray
         return get_ranked_memref_descriptor_from_shaped_array(array)
 
     # Use default implementation from MLIR's library.
     return mlir_get_ranked_memref_descriptor(array)
+
+
+def get_unranked_memref_descriptor(array):
+    """Wrapper around MLIR's get_unranked_memref_descriptor."""
+
+    if isinstance(array, (int, float, bool, complex)):
+        # Convenience
+        array = np.array(array)
+
+    if isinstance(array, jax.Array):
+        array = np.asarray(array)
+
+    # Use default implementation from MLIR's library.
+    return mlir_get_unranked_memref_descriptor(array)
 
 
 def ranked_memref_to_numpy(ranked_memref):

@@ -16,14 +16,132 @@
 import jax
 import pennylane as qml
 from pennylane import transform
-from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, VarianceMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MidMeasureMP,
+    ProbabilityMP,
+    VarianceMP,
+)
 from pennylane.tape.tape import (
     _validate_computational_basis_sampling,
     rotations_and_diagonal_measurements,
 )
 
-import catalyst
+from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
+from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
+from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
+
+
+def _operator_decomposition_gen(
+    op: qml.operation.Operator,
+    acceptance_function,
+    decomposer,
+    max_expansion=None,
+    current_depth=0,
+):
+    """A generator that yields the next operation that is accepted."""
+    max_depth_reached = False
+    if max_expansion is not None and max_expansion <= current_depth:  # pragma: no cover
+        max_depth_reached = True
+    if acceptance_function(op) or max_depth_reached:
+        yield op
+    else:
+        try:
+            decomp = decomposer(op)
+            current_depth += 1
+        except qml.operation.DecompositionUndefinedError as e:  # pragma: no cover
+            raise CompileError(
+                f"Operator {op} not supported on device and does not provide a decomposition."
+            ) from e
+
+        for sub_op in decomp:
+            yield from _operator_decomposition_gen(
+                sub_op,
+                acceptance_function,
+                decomposer=decomposer,
+                max_expansion=max_expansion,
+                current_depth=current_depth,
+            )
+
+
+@transform
+def decompose(
+    tape: qml.tape.QuantumTape,
+    ctx,
+    stopping_condition,
+    max_expansion=None,
+):
+    """Decompose operations until the stopping condition is met.
+
+    PennyLane operations are decomposed in the same manner as in PennyLane. For
+    HybridOp (not QCtrl) we recurse and call the decompose function on each region tape. After
+    finishing the decomposition on a HybridOp we mark it as visited such that it meets
+    the acceptance criteria and is not decomposed further,
+    """
+
+    def decomposer(op):
+        if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
+            return _decompose_to_matrix(op)
+        elif isinstance(
+            op,
+            (
+                Adjoint,
+                MidCircuitMeasure,
+                ForLoop,
+                WhileLoop,
+                Cond,
+            ),
+        ):
+            return _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion)
+        return op.decomposition()
+
+    if len(tape) == 0:
+        return (tape,), lambda x: x[0]
+
+    new_ops = []
+    for op in tape.operations:
+        if isinstance(op, MidMeasureMP):
+            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+        new_ops.extend(
+            op
+            for op in _operator_decomposition_gen(
+                op,
+                stopping_condition,
+                decomposer=decomposer,
+                max_expansion=max_expansion,
+            )
+        )
+    tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
+
+    return (tape,), lambda x: x[0]
+
+
+def _decompose_to_matrix(op):
+    try:
+        mat = op.matrix()
+    except Exception as e:
+        raise CompileError(
+            f"Operation {op} could not be decomposed, it might be unsupported."
+        ) from e
+    op = qml.QubitUnitary(mat, wires=op.wires)
+    return [op]
+
+
+def _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion):
+    for region in op.regions:
+        if region.quantum_tape:
+            with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                tapes, _ = decompose(
+                    region.quantum_tape,
+                    ctx=ctx,
+                    stopping_condition=stopping_condition,
+                    max_expansion=max_expansion,
+                )
+                region.quantum_tape = tapes[0]
+    op.visited = True
+    return [op]
 
 
 @transform
@@ -41,7 +159,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, catalyst.pennylane_extensions.QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -64,6 +182,18 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
+    if isinstance(
+        op,
+        (
+            Adjoint,
+            MidCircuitMeasure,
+            ForLoop,
+            WhileLoop,
+            Cond,
+        ),
+    ):
+        return op.name in operations and op.visited
+
     return op.name in operations
 
 

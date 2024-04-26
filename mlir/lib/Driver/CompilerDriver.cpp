@@ -80,8 +80,7 @@ class LinesCount {
         if (!name.empty()) {
             std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
         }
-        std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines";
-        std::cerr << std::endl;
+        std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines\n";
     }
 
     inline static void store(const std::string &opStrBuf, const std::string &name,

@@ -33,6 +33,7 @@ from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
+from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
     filter_static_args,
@@ -217,7 +218,7 @@ class QJIT:
         full_sig = merge_static_args(dynamic_sig, args, static_argnums)
 
         with Patcher(
-            (qml.QNode, "__call__", catalyst.pennylane_extensions.QFunc.__call__),
+            (qml.QNode, "__call__", QFunc.__call__),
         ):
             # TODO: improve PyTree handling
             jaxpr, treedef = trace_to_jaxpr(
@@ -543,7 +544,7 @@ def qjit(
 
         3. The list of device-supported gates employed by Catalyst is currently different than that
             of the ``lightning.qubit`` device, as defined by the
-            :class:`~.pennylane_extensions.QJITDevice`.
+            :class:`~.qjit_device.QJITDevice`.
 
     .. details::
         :title: AutoGraph and Python control flow

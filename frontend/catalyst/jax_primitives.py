@@ -74,8 +74,9 @@ from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 from catalyst.compiler import get_lib_path
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,too-many-lines
+# pylint: disable=unused-argument,abstract-method,too-many-lines
 
 #########
 # Types #
@@ -250,7 +251,9 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
-    return PythonCallOp(args, identifier).results
+
+    mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
+    return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
 #
@@ -268,14 +271,13 @@ def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
-    const_val = ir.StringAttr.get(string + "\0") if string else None
-    return PrintOp(val=val, const_val=const_val, print_descriptor=memref).results
+    return PrintOp(val=val, const_val=None, print_descriptor=memref).results
 
 
 #
 # func
 #
-mlir_fn_cache: Dict["catalyst.pennylane_extensions.Function", str] = {}
+mlir_fn_cache: Dict["catalyst.jax_tracer.Function", str] = {}
 
 
 @func_p.def_impl
@@ -295,7 +297,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         # if supported and parameter-shift otherwise. Emulating the same behaviour
         # would require generating code to query the device.
         # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = fn.diff_method if fn.diff_method != "best" else "parameter-shift"
+        diff_method = "parameter-shift" if fn.diff_method == "best" else str(fn.diff_method)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op.name.value

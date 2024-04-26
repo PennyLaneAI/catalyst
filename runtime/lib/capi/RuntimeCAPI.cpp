@@ -108,8 +108,7 @@ extern "C" {
 using namespace Catalyst::Runtime;
 using timer = catalyst::utils::Timer;
 
-void pyregistry(int64_t identifier, int64_t argc, ...)
-
+void pyregistry(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
     // We need to guard calls to callback.
     // These are implemented in Python.
@@ -135,8 +134,8 @@ void pyregistry(int64_t identifier, int64_t argc, ...)
         RT_FAIL(err_msg);
     }
 
-    void (*callbackCall)(int64_t, int64_t, va_list);
-    typedef void (*func_ptr_t)(int64_t, int64_t, va_list);
+    void (*callbackCall)(int64_t, int64_t, int64_t, va_list);
+    typedef void (*func_ptr_t)(int64_t, int64_t, int64_t, va_list);
     callbackCall = (func_ptr_t)dlsym(handle, "callbackCall");
     if (!callbackCall) {
         char *err_msg = dlerror();
@@ -144,8 +143,8 @@ void pyregistry(int64_t identifier, int64_t argc, ...)
     }
 
     va_list args;
-    va_start(args, argc);
-    callbackCall(identifier, argc, args);
+    va_start(args, retc);
+    callbackCall(identifier, argc, retc, args);
     va_end(args);
     dlclose(handle);
 }
@@ -157,6 +156,7 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    // void *ptr = malloc(size);
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
