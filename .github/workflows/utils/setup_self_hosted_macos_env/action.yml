@@ -113,7 +113,7 @@ runs:
       id: build_dir
       shell: bash
       env:
-        BUILD_DIR: /tmp/llvm_cache_${{ inputs.python_version }}
+        BUILD_DIR: /tmp/llvm_cache_3.9
       run: |
         rm -rf "$BUILD_DIR"*
         mkdir "$BUILD_DIR"
