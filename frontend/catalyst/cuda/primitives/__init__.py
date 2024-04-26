@@ -22,7 +22,7 @@ from jax import numpy as jnp
 
 # We disable protected access in particular to avoid warnings with cudaq._pycuda.
 # And we disable unused-argument to avoid unused arguments in abstract_eval, particularly kwargs.
-# pylint: disable=protected-access,unused-argument,line-too-long
+# pylint: disable=protected-access,unused-argument,abstract-method,line-too-long
 
 
 class AbsCudaQState(jax.core.AbstractValue):

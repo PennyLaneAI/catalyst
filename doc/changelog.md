@@ -17,7 +17,7 @@
   ```py
   @debug.callback
   def foo(val):
-    return val
+    print(f"myval: {val}")
 
   @pure_callback
   def bar(val) -> int:
@@ -32,7 +32,7 @@
 
   ```pycon
   >>> print(circuit(123))
-  124
+myval: 124
   ```
 
   This includes support for the specialized `pure_callback` and `debug.callback` where
@@ -40,7 +40,7 @@
   while `debug.callback` is expected to produce a side effect and have no return values.
 
   Syntactic sugar on top of `debug.callback` includes `debug.print` which allows the user
-  to use f-stringlike to format the string before printing.
+  to use formatstrings to format the string before printing. See https://docs.python.org/3/library/string.html#formatstrings
 
   ```py
   @qjit
