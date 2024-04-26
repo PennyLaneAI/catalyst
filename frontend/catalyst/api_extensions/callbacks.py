@@ -106,8 +106,6 @@ def pure_callback(callback_fn, result_type=None):
 
 
 def debug_callback(callback_fn):
-
-This function allowys users to execute Python function (with no return values) at runtime within their qjitted workflows
     """A function that is useful for printing and logging and allows users to execute a Python 
     function (with no return values) at runtime within their qjitted workflows.
 
