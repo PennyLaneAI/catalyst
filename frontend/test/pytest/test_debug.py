@@ -87,6 +87,17 @@ class TestDebugPrint:
         assert err == ""
         assert regex.match(out)
 
+    def test_bad_argument(self):
+        """Test bad argument."""
+
+        @qjit
+        def test(x):
+            debug.print_memref("foo")
+
+        msg = "Arguments to print_memref must be of type jax.core.Tracer"
+        with pytest.raises(TypeError, match=msg):
+            test(3.14)
+
     @pytest.mark.parametrize(
         ("arg", "expected"),
         [
