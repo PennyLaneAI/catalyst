@@ -86,8 +86,8 @@ def pure_callback(callback_fn, result_type=None):
         def fn(x):
             return jnp.cos(callback_fn(x ** 2))
 
-        >>> fn(0.654)
-        array(0.9151995)
+    >>> fn(0.654)
+    array(0.9151995)
 
     It can also be used functionally:
 
@@ -146,8 +146,8 @@ def pure_callback(callback_fn, result_type=None):
         array([1.97507074+0.j, 0.01493759+0.j])
     """
 
-    signature = inspect.signature(callback_fn)
     if result_type is None:
+        signature = inspect.signature(callback_fn)
         result_type = signature.return_annotation
 
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
@@ -164,42 +164,65 @@ def pure_callback(callback_fn, result_type=None):
 
 
 def debug_callback(callback_fn):
-    """debug.callback : useful for printing and logging
+    """Execute a Python
+    function with no return value and potential side effects from within a qjit-compiled function.
 
-    An debug callback is a python function that can write to stdout or to a file.
-    It is expected to return no values.
+    This makes it an easy entry point for debugging, for example via printing or logging at
+    runtime.
 
-    Using `debug.callback` allows a user to run a python function with side effects inside an
-    `@qjit` context. To mark a function as a `debug.callback`, one can use a decorator:
+    The callback function will be quantum just-in-time compiled alongside the rest of the
+    workflow, however it will be executed at runtime by the Python virtual machine.
+    This is in contrast to functions which get directly qjit-compiled by Catalyst, which will
+    be executed at runtime by machine-native code.
 
-    ```python
-    @debug.callback
-    def my_custom_print(x):
-        print(x)
+    .. note::
 
-    @qjit
-    def foo(x):
-       my_custom_print(x)
+        Callbacks do not currently support differentiation, and cannot be used inside
+        functions that :func:`.catalyst.grad` is applied to.
 
-    # Can also be used outside of a JIT compiled context.
-    my_custom_print(x)
-    ```
+    Args:
+        callback_fn (callable): The function to be used as a callback.
+            Any Python-based function is supported, as long as it does not
+            return anything (or returns None).
 
-    or through a more functional syntax:
+    .. seealso:: :func:`.debug.print`, :func:`.pure_callback`.
 
-    ```python
-    def my_custom_print(x):
-        print(x)
+    **Example**
 
-    @qjit
-    def foo(x):
-        debug.callback(my_custom_print)(x)
-    ```
+    ``debug.callback`` can be used as a decorator:
 
-    `debug.callback`s are expected to not return anything.
-    May be useful for custom printing and logging into files.
+    .. code-block:: python
 
-    At the moment, `debug.callback`s should not be used inside gradients.
+        @catalyst.debug.callback
+        def callback_fn(y):
+            print("Value of y =", y)
+
+        @qml.qjit
+        def fn(x):
+            y = jnp.sin(x)
+            callback_fn(y)
+            return y ** 2
+
+    >>> fn(0.54)
+    Value of y = 0.5141359916531132
+    array(0.26433582)
+    >>> fn(1.52)
+    Value of y = 0.998710143975583
+    array(0.99742195)
+
+    It can also be used functionally:
+
+    .. code-block:: python
+
+        @qml.qjit
+        def fn(x):
+            y = jnp.sin(x)
+            catalyst.debug.callback(lambda z: print("Value of y = ", z))(y)
+            return y ** 2
+
+    >>> fn(0.543)
+    Value of y =  0.5167068002272901
+    array(0.26698592)
     """
 
     @base_callback
