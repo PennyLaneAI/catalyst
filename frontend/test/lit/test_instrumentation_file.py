@@ -14,7 +14,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pathlib
+import os
 
 import numpy as np
 import pennylane as qml
@@ -136,4 +136,4 @@ with instrumentation(circuit.__name__, filename=filename, detailed=True):
 with open(filename, mode="r", encoding="UTF-8") as f:
     print(f.read())
 
-pathlib.Path.unlink(filename)
+os.remove(filename)
