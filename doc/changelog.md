@@ -177,6 +177,9 @@
 
 <h3>Bug fixes</h3>
 
+* Fix `measurement_from_counts` following an update of a private function in PennyLane.
+  [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
+
 * Enable support for QNode argument `diff_method=None` with QJIT.
   [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
 

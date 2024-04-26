@@ -214,7 +214,7 @@ def measurements_from_counts(tape):
         Samples are not supported.
     """
     if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape.measurements)
+        _validate_computational_basis_sampling(tape)
     diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
     for i, m in enumerate(diagonal_measurements):
         if m.obs is not None:
