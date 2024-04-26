@@ -271,8 +271,7 @@ def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
-    const_val = ir.StringAttr.get(string + "\0") if string else None
-    return PrintOp(val=val, const_val=const_val, print_descriptor=memref).results
+    return PrintOp(val=val, const_val=None, print_descriptor=memref).results
 
 
 #
