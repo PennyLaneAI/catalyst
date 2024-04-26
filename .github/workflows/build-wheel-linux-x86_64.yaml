@@ -150,9 +150,6 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
 
-    - name: Create Action failure
-      run: exit 1
-
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
     # other tools can find it, in particular collect2 invoked by gcc.)
