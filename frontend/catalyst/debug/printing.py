@@ -24,6 +24,7 @@ from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
 
 
+# pylint: disable=redefined-builtin
 def print(fmt, *args, **kwargs):
     """A print function.
 

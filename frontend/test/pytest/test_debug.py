@@ -91,7 +91,7 @@ class TestDebugPrint:
         """Test bad argument."""
 
         @qjit
-        def test(x):
+        def test(_x):
             debug.print_memref("foo")
 
         msg = "Arguments to print_memref must be of type jax.core.Tracer"
@@ -233,7 +233,7 @@ class TestPrintStage:
 
         print_compilation_stage(func, "HLOLoweringPass")
 
-        out, err = capsys.readouterr()
+        out, _ = capsys.readouterr()
         assert "@jit_func() -> tensor<i64>" in out
         assert "stablehlo.constant" not in out
 
