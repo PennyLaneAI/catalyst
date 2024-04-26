@@ -27,6 +27,24 @@ from catalyst.tracing.contexts import EvaluationContext
 
 # pylint: disable=redefined-builtin
 def print(fmt, *args, **kwargs):
+    """A print function.
+
+    This print function works with python callbacks, so all arguments will be printed in the same
+    way as the :func:`builtins.print` function prints them.
+
+    One difference is that if the first argument is a string, it may be used similarly to an
+    fstring. Like so:
+
+    .. code-block:: python
+
+        @qjit
+        def cir(a, b, c):
+            debug.print("c={c} b={b} a={a}", a=a, b=b, c=c)
+
+        cir(1, 2, 3)
+    >>> c=3 b=2 a=1
+    """
+
     if isinstance(fmt, str):
         debug_callback(partial(_format_print_callback, fmt))(*args, **kwargs)
         return
@@ -41,11 +59,11 @@ def _format_print_callback(fmt: str, *args, **kwargs):
     version released under the Apache License, Version 2.0, with the following copyright notice:
     Copyright 2022 The Jax Authors.
     """
-    sys.stdout.write(fmt.format(*args, **kwargs))
-    sys.stdout.write("\n")
+    builtins.print(fmt.format(*args, **kwargs))
 
 
 def _print_callback(*args, **kwargs):
+    """Print without formatting"""
     builtins.print(*args, **kwargs)
 
 
