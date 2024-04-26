@@ -76,7 +76,7 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,too-many-lines
+# pylint: disable=unused-argument,abstract-method,too-many-lines
 
 #########
 # Types #
@@ -271,14 +271,13 @@ def _print_def_impl(*args, string=None, memref=False):  # pragma: no cover
 
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None, memref=False):
     val = args[0] if args else None
-    const_val = ir.StringAttr.get(string + "\0") if string else None
-    return PrintOp(val=val, const_val=const_val, print_descriptor=memref).results
+    return PrintOp(val=val, const_val=None, print_descriptor=memref).results
 
 
 #
 # func
 #
-mlir_fn_cache: Dict["catalyst.pennylane_extensions.Function", str] = {}
+mlir_fn_cache: Dict["catalyst.jax_tracer.Function", str] = {}
 
 
 @func_p.def_impl

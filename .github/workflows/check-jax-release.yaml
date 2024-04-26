@@ -20,7 +20,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install deps
       run: |
@@ -42,21 +42,21 @@ jobs:
         echo "ENZYME_REVISION=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
 
     - name: Clone LLVM repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: ${{ env.LLVM_REVISION }}
         path: mlir/llvm-project
 
     - name: Clone MHLO repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ env.MHLO_REVISION }}
         path: mlir/mlir-hlo
 
     - name: Clone Enzyme repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ env.ENZYME_REVISION }}
