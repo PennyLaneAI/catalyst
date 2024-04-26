@@ -60,7 +60,8 @@ def print(fmt, *args, **kwargs):
 
     .. note::
 
-        Using Python f-strings as the `fmt` string will not work as expected since they will be treated as Python objects.
+        Using Python f-strings as the `fmt` string will not work as expected since they will be
+        treated as Python objects.
         This means that array values embedded in them will have their compile-time representation
         printed, instead of actual data.
     """
