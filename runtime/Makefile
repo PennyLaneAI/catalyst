@@ -16,6 +16,7 @@ ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
 ENABLE_LAPACK?=ON
 LIGHTNING_GIT_TAG_VALUE?=def8a26
+PYBIND11_DIR=$(shell python3 -c "import pybind11; print(pybind11.get_cmake_dir())")
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 BUILD_TARGETS := rt_capi
@@ -86,7 +87,7 @@ configure:
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-Dpybind11_DIR=$(python3 -c "import pybind11; print(pybind11.get_cmake_dir())") \
+		-Dpybind11_DIR=$(PYBIND11_DIR) \
 		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
