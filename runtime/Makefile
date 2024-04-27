@@ -86,6 +86,7 @@ configure:
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-Dpybind11_DIR=$(python3 -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
