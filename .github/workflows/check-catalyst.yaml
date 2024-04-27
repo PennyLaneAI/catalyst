@@ -411,7 +411,6 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        /opt/hostedtoolcache/Python/3.10.14/x64/bin/python -m pip install scipy --force-reinstall
         make frontend
 
     - name: Get Cached LLVM Build
