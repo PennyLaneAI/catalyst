@@ -27,7 +27,7 @@ class TestOQCDevice:
     def test_entrypoint(self, set_dummy_oqc_env):
         """Test the initialization."""
 
-        device = qml.device("oqc.remote", backend="lucy", shots=1000, wires=8)
+        device = qml.device("oqc.cloud", backend="lucy", shots=1000, wires=8)
 
         assert device.backend == "lucy"
         assert device.shots == qml.measurements.Shots(1000)

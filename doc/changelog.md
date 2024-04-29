@@ -68,7 +68,7 @@
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = qml.device("oqc.remote", backend="lucy", shots=2012, wires=2)
+  device = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(device=device)
