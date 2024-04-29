@@ -59,6 +59,29 @@ class DummyDevice(Device):
         return transform_program, execution_config
 
 
+class DummyDeviceNoWires(Device):
+    """A dummy device from the device API without wires."""
+
+    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
+        "runtime/tests/third_party/dummy_device.toml"
+    )
+
+    def __init__(self, shots=1024):
+        super().__init__(shots=shots)
+
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+
+        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
+    def execute(self, circuits, execution_config):
+        """Execution."""
+        return circuits, execution_config
+
+
 @pytest.mark.skipif(
     not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
     reason="lib_dummydevice.so was not found.",
@@ -70,10 +93,9 @@ def test_qjit_device():
     # Create qjit device
     config = device_get_toml_config(device)
     backend_info = extract_backend_info(device, config)
-    device_qjit = QJITDeviceNewAPI(device, config, backend_info)
+    device_qjit = QJITDeviceNewAPI(device, backend_info)
 
     # Check attributes of the new device
-    assert isinstance(device_qjit.target_config, dict)
     assert device_qjit.shots == qml.measurements.Shots(2032)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
@@ -98,6 +120,24 @@ def test_qjit_device():
     assert len(device_qjit.operations) > 0
     assert isinstance(device_qjit.observables, set)
     assert len(device_qjit.observables) > 0
+
+
+@pytest.mark.skipif(
+    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
+    reason="lib_dummydevice.so was not found.",
+)
+def test_qjit_device_no_wires():
+    """Test the qjit device from a device using the new api without wires set."""
+    device = DummyDeviceNoWires(shots=2032)
+
+    # Create qjit device
+    config = device_get_toml_config(device)
+    backend_info = extract_backend_info(device, config)
+
+    with pytest.raises(
+        AttributeError, match="Catalyst does not support devices without set wires."
+    ):
+        QJITDeviceNewAPI(device, backend_info)
 
 
 @pytest.mark.skipif(

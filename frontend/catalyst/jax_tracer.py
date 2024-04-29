@@ -432,16 +432,12 @@ def trace_quantum_tape(
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         elif isinstance(op, qml.GlobalPhase):
-            qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
             qubits2 = gphase_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
-                qubits_len=len(qubits),
-                params_len=len(op.parameters),
+                *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
             )
-            qrp.insert(op.wires, qubits2[: len(qubits)])
-            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+            qrp.insert(controlled_wires, qubits2)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -687,7 +683,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
-        return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
+        return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     if not is_valid_output:
@@ -826,7 +822,6 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-    # pylint: disable=too-many-branches
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)

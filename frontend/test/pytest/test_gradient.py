@@ -21,8 +21,15 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import cond, for_loop, grad, jacobian, qjit, value_and_grad
-from catalyst.pennylane_extensions import DifferentiableCompileError
+from catalyst import (
+    DifferentiableCompileError,
+    cond,
+    for_loop,
+    grad,
+    jacobian,
+    qjit,
+    value_and_grad,
+)
 
 # pylint: disable=too-many-lines
 
@@ -155,6 +162,9 @@ def test_non_differentiable_qnode():
     def f(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliZ(wires=0))
+
+    # Ensure None allows forward-pass to succeed
+    assert np.allclose(qjit(f)(1.0), np.cos(1.0))
 
     @qjit
     def grad_f(x):

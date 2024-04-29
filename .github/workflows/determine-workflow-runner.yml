@@ -1,0 +1,40 @@
+name: Determine Workflow Runner group
+
+on:
+  workflow_call:
+    inputs:
+      default_runner:
+        description: The runner type that is used by the calling workflow by default
+        required: true
+        type: string
+    outputs:
+      runner_group:
+        description: The runner all subsequent jobs within the calling workflow should run on
+        value: ${{ jobs.determine_workflow_runner.outputs.runner_group || inputs.default_runner }}
+
+env:
+  LARGE_RUNNER_GROUP_NAME: pl-4-core-large-runner
+
+jobs:
+  determine_workflow_runner:
+    runs-on: >-
+      ${{
+        (
+          github.event_name == 'pull_request'
+          && contains(github.event.pull_request.labels.*.name, 'urgent')
+        ) && 'pl-4-core-large-runner' || 'ubuntu-latest'
+      }}
+
+    outputs:
+      runner_group: ${{ steps.runner_group.outputs.runner_group }}
+
+    steps:
+      - name: Output Runner Group name
+        if: >-
+          ${{
+            github.event_name == 'pull_request'
+            && contains(github.event.pull_request.labels.*.name, 'urgent')
+            && startsWith(inputs.default_runner, 'ubuntu')
+          }}
+        id: runner_group
+        run: echo "runner_group=$LARGE_RUNNER_GROUP_NAME" >> $GITHUB_OUTPUT
