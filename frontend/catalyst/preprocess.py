@@ -230,6 +230,7 @@ def measurements_from_counts(tape):
 
     new_measurements = [qml.counts(wires=list(measured_wires))]
     new_tape = type(tape)(news_operations, new_measurements, shots=tape.shots)
+    print(new_tape.circuit)
 
     def postprocessing_counts_to_expval(results):
         """A processing function to get expecation values from counts."""
