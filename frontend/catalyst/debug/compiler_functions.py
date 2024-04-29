@@ -18,14 +18,13 @@ This module contains debug functions to interact with the compiler and compiled 
 
 import os
 
-from jax.interpreters import mlir
-
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.filesystem import WorkspaceManager
+from jax.interpreters import mlir
 
 
 def print_compilation_stage(fn, stage):

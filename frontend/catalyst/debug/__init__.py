@@ -25,7 +25,6 @@ from catalyst.debug.printing import (  # pylint: disable=redefined-builtin
     print_memref,
 )
 
-
 __all__ = (
     "callback",
     "print",

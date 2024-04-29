@@ -18,10 +18,10 @@ import builtins
 from functools import partial
 
 import jax
-
-from catalyst.api_extensions.callbacks import debug_callback
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
+
+from .callback import callback
 
 
 # pylint: disable=redefined-builtin
@@ -68,10 +68,10 @@ def print(fmt, *args, **kwargs):
     """
 
     if isinstance(fmt, str):
-        debug_callback(partial(_format_print_callback, fmt))(*args, **kwargs)
+        callback(partial(_format_print_callback, fmt))(*args, **kwargs)
         return
 
-    debug_callback(_print_callback)(fmt, *args, **kwargs)
+    callback(_print_callback)(fmt, *args, **kwargs)
 
 
 def _format_print_callback(fmt: str, *args, **kwargs):
