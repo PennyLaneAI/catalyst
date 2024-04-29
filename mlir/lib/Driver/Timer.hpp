@@ -65,10 +65,7 @@ template <class Stream> class Timer {
     static inline bool enable_debug_timer() noexcept
     {
         char *value = getenv("ENABLE_DIAGNOSTICS");
-        if (value && std::string(value) == "ON") {
-            return true;
-        }
-        return false;
+        return value && std::string(value) == "ON";
     }
 
   public:

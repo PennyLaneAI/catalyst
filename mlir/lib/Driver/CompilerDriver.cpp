@@ -132,10 +132,7 @@ class LinesCount {
     [[nodiscard]] inline static bool is_diagnostics_enabled()
     {
         char *value = getenv("ENABLE_DIAGNOSTICS");
-        if (!value || std::string(value) != "ON") {
-            return false;
-        }
-        return true;
+        return value && std::string(value) == "ON";
     }
 
     static void Operation(Operation *op, llvm::raw_ostream &stream = llvm::errs(),

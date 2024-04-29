@@ -13,9 +13,11 @@
 # limitations under the License.
 """Tests for type conversion"""
 
+import inspect
 from collections.abc import Sequence
 
 import numpy as np
+from jax._src.api_util import shaped_abstractify
 from jax._src.lib.mlir import ir
 
 from catalyst.jax_extras import ShapedArray
@@ -32,6 +34,15 @@ def convert_shaped_array_to_tensor(sarray):
     py_shape = sarray.shape
     mlir_dtype = convert_numpy_dtype_to_mlir(numpy_dtype)
     return ir.RankedTensorType.get(py_shape, mlir_dtype)
+
+
+def convert_pytype_to_shaped_array(ty):
+    """Maps types from the type signature or otherwise to shaped_arrays without weak type."""
+    if ty == inspect.Signature.empty:
+        return None
+    if isinstance(ty, ShapedArray):
+        return ty.strip_weak_type()
+    return shaped_abstractify(ty).strip_weak_type()
 
 
 # pylint: disable=too-many-return-statements
