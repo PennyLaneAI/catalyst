@@ -22,11 +22,14 @@ from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
+    CompileError,
     DifferentiableCompileError,
     cond,
     for_loop,
     grad,
     jacobian,
+    measure,
+    pure_callback,
     qjit,
     value_and_grad,
 )
@@ -1170,6 +1173,38 @@ def test_adj_qubitunitary(inp, backend):
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
+
+
+class TestGradientErrors:
+
+    def test_measure_error(self):
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            _bool = measure(0)
+            qml.RX(_bool + 1, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def foo(x: float):
+                return grad(f)(x)
+
+    def test_callback_error(self):
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            y = pure_callback(jnp.sin, float)(x)
+            qml.RX(y, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def foo(x: float):
+                return grad(f)(x)
 
 
 if __name__ == "__main__":
