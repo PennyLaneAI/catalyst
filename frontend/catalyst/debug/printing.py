@@ -18,6 +18,7 @@ import builtins
 from functools import partial
 
 import jax
+
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
 
