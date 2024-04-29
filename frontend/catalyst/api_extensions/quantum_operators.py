@@ -54,7 +54,7 @@ from catalyst.tracing.contexts import EvaluationContext
 def measure(
     wires, reset: Optional[bool] = False, postselect: Optional[int] = None
 ) -> DynamicJaxprTracer:
-    """A :func:`qjit` compatible mid-circuit measurement on 1 qubit for PennyLane/Catalyst.
+    r"""A :func:`qjit` compatible mid-circuit measurement on 1 qubit for PennyLane/Catalyst.
 
     .. important::
 
@@ -63,7 +63,7 @@ def measure(
 
     Args:
         wires (int): The wire the projective measurement applies to.
-        reset (Optional[bool]): Whether to reset the wire to the |0⟩ state after measurement.
+        reset (Optional[bool]): Whether to reset the wire to the :math:`|0\rangle` state after measurement.
         postselect (Optional[int]): Which basis state to postselect after a mid-circuit measurement.
 
     Returns:

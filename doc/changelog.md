@@ -109,11 +109,6 @@
   print(circuit(0.2))
   ```
 
-* Catalyst publishes Git revision string seen at the time of the packaging as
-  `catalyst.__revision__` . For editable installations, the revision is read at the time of
-  module import.
-  [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
-
 * Catalyst compiler and runtime have now the capability to provide detailed profiling information.
   This includes insights such as the program size at various stages within the compilation pipeline
   and the respective time durations spent in each of these stages.
@@ -231,6 +226,11 @@
 
 * The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
   [(#679)](https://github.com/PennyLaneAI/catalyst/pull/679)
+
+* Catalyst publishes Git revision string seen at the time of the packaging as
+  `catalyst.__revision__` . For editable installations, the revision is read at the time of
+  module import.
+  [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
 
 <h3>Contributors</h3>
 
