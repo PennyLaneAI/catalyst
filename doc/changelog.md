@@ -87,6 +87,7 @@
   superconducting hardware, via [OQC Cloud](https://docs.oqc.app).
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+  [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
   To use OQC Cloud with Catalyst, simply ensure your credentials are set as environment variables, and load the `oqc.remote` device to be used within your qjit-compiled
   workflows.
@@ -97,7 +98,7 @@
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  dev = qml.device("oqc.remote", backend="lucy", shots=2012, wires=2)
+  dev = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(dev)
