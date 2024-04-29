@@ -239,13 +239,13 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 // CHECK-LABEL: @qubit_unitary
 func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p2 : memref<4x4xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
     // Only check the last members of the deconstructed memref struct being inserted.
-    // CHECK: [[m1:%.+]] = llvm.insertvalue %arg7
-    // CHECK: [[m2:%.+]] = llvm.insertvalue %arg14
+    // CHECK-DAG: [[m1:%.+]] = llvm.insertvalue %arg7
+    // CHECK-DAG: [[m2:%.+]] = llvm.insertvalue %arg14
 
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
-    // CHECK: [[a:%.+]] = llvm.mlir.zero : !llvm.ptr
-    // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK-DAG: [[a:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK-DAG: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-DAG: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: llvm.store [[m1]], [[buf1]]
     // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[buf1]], [[a]], [[c1_1]], %arg0)
@@ -306,11 +306,11 @@ func.func @namedobs(%q : !quantum.bit) {
 // CHECK-LABEL: @hermitian
 func.func @hermitian(%q : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>, %p2 : memref<4x4xcomplex<f64>>) {
     // Only check the last members of the deconstructed memref struct being inserted.
-    // CHECK: [[m1:%.+]] = llvm.insertvalue %arg7
-    // CHECK: [[m2:%.+]] = llvm.insertvalue %arg14
+    // CHECK-DAG: [[m1:%.+]] = llvm.insertvalue %arg7
+    // CHECK-DAG: [[m2:%.+]] = llvm.insertvalue %arg14
 
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-DAG: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_1]] x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK: llvm.store [[m1]], [[buf1]]
     // CHECK: llvm.call @__catalyst__qis__HermitianObs([[buf1]], [[c1]], %arg0)
@@ -349,11 +349,11 @@ func.func @tensor(%obs : !quantum.obs) {
 // CHECK-LABEL: @hamiltonian
 func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
     // Only check the last members of the deconstructed memref struct being inserted.
-    // CHECK: [[v1:%.+]] = llvm.insertvalue %arg5
-    // CHECK: [[v2:%.+]] = llvm.insertvalue %arg10
+    // CHECK-DAG: [[v1:%.+]] = llvm.insertvalue %arg5
+    // CHECK-DAG: [[v2:%.+]] = llvm.insertvalue %arg10
 
-    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
-    // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-DAG: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK-DAG: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: llvm.store [[v1]], [[buf1]]
     // CHECK: llvm.call @__catalyst__qis__HamiltonianObs([[buf1]], [[c1]], %arg0)
