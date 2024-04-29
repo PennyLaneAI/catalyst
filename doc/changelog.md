@@ -59,6 +59,7 @@
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+  [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
   ```py
 
