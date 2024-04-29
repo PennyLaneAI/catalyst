@@ -58,19 +58,19 @@ void annotate(func::FuncOp op, PatternRewriter &rewriter, const char *attr)
     op->setAttr(attr, rewriter.getUnitAttr());
 }
 
-struct AnnotateFunctionTransform : public OpRewritePattern<func::FuncOp> {
+struct AnnotateFunctionPattern : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
     LogicalResult match(func::FuncOp op) const override;
     void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AnnotateFunctionTransform::match(func::FuncOp op) const
+LogicalResult AnnotateFunctionPattern::match(func::FuncOp op) const
 {
     return successfulMatchLeaf(op) ? success() : failure();
 }
 
-void AnnotateFunctionTransform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
+void AnnotateFunctionPattern::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     annotate(op, rewriter, hasMeasureAttrName);
 }
@@ -116,8 +116,8 @@ bool successfulMatchNode(func::FuncOp op, const char *attr, CallGraph &cg)
     return !isAnnotated(op, attr) && anyCalleeIsAnnotated(op, attr, cg);
 }
 
-struct PropagateAnnotationTransform : public OpRewritePattern<func::FuncOp> {
-    PropagateAnnotationTransform(MLIRContext *ctx, CallGraph &cg)
+struct PropagateAnnotationPattern : public OpRewritePattern<func::FuncOp> {
+    PropagateAnnotationPattern(MLIRContext *ctx, CallGraph &cg)
         : OpRewritePattern<func::FuncOp>(ctx), callgraph(cg)
     {
     }
@@ -129,12 +129,12 @@ struct PropagateAnnotationTransform : public OpRewritePattern<func::FuncOp> {
     CallGraph &callgraph;
 };
 
-LogicalResult PropagateAnnotationTransform::match(func::FuncOp op) const
+LogicalResult PropagateAnnotationPattern::match(func::FuncOp op) const
 {
     return successfulMatchNode(op, hasMeasureAttrName, callgraph) ? success() : failure();
 }
 
-void PropagateAnnotationTransform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
+void PropagateAnnotationPattern::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     annotate(op, rewriter, hasMeasureAttrName);
 }
@@ -154,8 +154,8 @@ struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPas
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         CallGraph &cg = getAnalysis<CallGraph>();
-        patterns.add<AnnotateFunctionTransform>(context);
-        patterns.add<PropagateAnnotationTransform>(context, cg);
+        patterns.add<AnnotateFunctionPattern>(context);
+        patterns.add<PropagateAnnotationPattern>(context, cg);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
