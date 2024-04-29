@@ -109,13 +109,30 @@
   print(circuit(0.2))
   ```
 
-* Catalyst compiler and runtime have now the capability to provide detailed profiling information.
-  This includes insights such as the program size at various stages within the compilation pipeline
-  and the respective time durations spent in each of these stages.
-  You can print the results by enabling the `ENABLE_DIAGNOSTICS=ON` environment variable,
-  or you can save them to a file by specifying an additional environment variable,
-  `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`.
+
+* Catalyst now ships with an instrumentation feature allowing to explore what steps are run during
+  compilation and execution, and for how long.
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
+  [(#597)](https://github.com/PennyLaneAI/catalyst/pull/597)
+
+  Instrumentation can be enabled from the frontend with the `catalyst.debug.instrumentation`
+  context manager:
+
+  ```py
+  @qjit
+  def expensive_function(a, b):
+      return a + b
+
+  with debug.instrumentation("session_name", filename="profiling_results.txt", detailed=True):
+    expensive_function(1, 2)
+  ```
+
+  The results will be appended to the provided file if the `filename` attribute is set, and printed
+  to the console otherwise. The flag `detailed` determines whether individual steps in the compiler
+  and runtime are instrumented, or whether only high-level steps like "program capture" and
+  "compilation" are reported.
+
+  Measurements currently include wall time, CPU time, and (intermediate) program size.
 
 <h3>Improvements</h3>
 
@@ -127,9 +144,6 @@
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
   [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
-
-* Manually cleanup the workspace, which prevents a warning from showing up during testing.
-  [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
 
 * Fix a stochastic autograph test failure due to broadly turning warnings into errors.
   [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
@@ -191,6 +205,8 @@
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
+* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
+  [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
 
 <h3>Breaking changes</h3>
 
@@ -198,6 +214,9 @@
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
 <h3>Bug fixes</h3>
+
+* Fix `measurement_from_counts` following an update of a private function in PennyLane.
+  [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
 
 * Enable support for QNode argument `diff_method=None` with QJIT.
   [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)

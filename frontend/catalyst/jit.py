@@ -32,6 +32,7 @@ import catalyst
 from catalyst.autograph import run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
@@ -185,6 +186,7 @@ class QJIT:
 
     # Processing Stages #
 
+    @instrument
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         processed_fn = self.original_function
@@ -194,6 +196,7 @@ class QJIT:
 
         return processed_fn
 
+    @instrument(size_from=0)
     def capture(self, args):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
@@ -224,6 +227,7 @@ class QJIT:
 
         return jaxpr, treedef, dynamic_sig
 
+    @instrument(size_from=0, has_finegrained=True)
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
 
@@ -247,6 +251,7 @@ class QJIT:
 
         return mlir_module, mlir_string
 
+    @instrument(size_from=1, has_finegrained=True)
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
 
@@ -274,6 +279,7 @@ class QJIT:
 
         return compiled_fn, llvm_ir
 
+    @instrument(has_finegrained=True)
     def run(self, args, kwargs):
         """Invoke a previously compiled function with the supplied arguments.
 
@@ -430,7 +436,7 @@ def qjit(
     pipelines=None,
     static_argnums=None,
     abstracted_axes=None,
-):  # pylint: disable=too-many-arguments
+):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -719,39 +725,10 @@ def qjit(
         the ``sum_abstracted`` function would only compile once and its definition would be
         reused for subsequent function calls.
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
 
-    argnums = static_argnums
-    axes = abstracted_axes
-    if fn is not None:
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
+    if fn is None:
+        return functools.partial(qjit, **kwargs)
 
-    def wrap_fn(fn):
-        return QJIT(
-            fn,
-            CompileOptions(
-                verbose,
-                logfile,
-                target,
-                keep_intermediate,
-                pipelines,
-                autograph,
-                async_qnodes,
-                static_argnums=argnums,
-                abstracted_axes=axes,
-            ),
-        )
-
-    return wrap_fn
+    return QJIT(fn, CompileOptions(**kwargs))
