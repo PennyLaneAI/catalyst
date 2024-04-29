@@ -117,7 +117,6 @@ bool successfulMatchNode(func::FuncOp op, const char *attr, CallGraph &cg)
 }
 
 struct PropagateAnnotationTransform : public OpRewritePattern<func::FuncOp> {
-
     PropagateAnnotationTransform(MLIRContext *ctx, CallGraph &cg)
         : OpRewritePattern<func::FuncOp>(ctx), callgraph(cg)
     {

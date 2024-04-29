@@ -1176,8 +1176,11 @@ def test_adj_qubitunitary(inp, backend):
 
 
 class TestGradientErrors:
+    """Test errors when an operation which does not have a valid gradient is reachable
+    from the grad op"""
 
     def test_measure_error(self):
+        """Test with measure"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x):
@@ -1189,10 +1192,11 @@ class TestGradientErrors:
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
             @qml.qjit
-            def foo(x: float):
+            def cir(x: float):
                 return grad(f)(x)
 
     def test_callback_error(self):
+        """Test with callback"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x):
@@ -1203,7 +1207,7 @@ class TestGradientErrors:
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
 
             @qml.qjit
-            def foo(x: float):
+            def cir(x: float):
                 return grad(f)(x)
 
 
