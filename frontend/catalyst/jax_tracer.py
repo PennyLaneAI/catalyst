@@ -578,6 +578,7 @@ def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Calla
     return [tape], lambda res: res[0]
 
 
+# pylint: disable=too-many-statements,too-many-branches
 def trace_quantum_measurements(
     device: QubitDevice,
     qrp: QRegPromise,
@@ -598,7 +599,6 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    # pylint: disable=too-many-branches
     if isinstance(device, qml.Device):
         shots = device.shots
     else:
@@ -832,7 +832,6 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-    # pylint: disable=too-many-branches
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
