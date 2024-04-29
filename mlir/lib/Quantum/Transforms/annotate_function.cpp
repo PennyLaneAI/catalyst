@@ -79,8 +79,10 @@ std::optional<func::FuncOp> getFuncOp(const CallGraphNode *node, CallGraph &cg)
 {
     std::optional<func::FuncOp> funcOp = std::nullopt;
     if (node == cg.getExternalCallerNode())
+        // if we don't know who called us, return nullopt
         return funcOp;
     if (node == cg.getUnknownCalleeNode())
+        // if we don't know the callee, return nullopt
         return funcOp;
     auto *callableRegion = node->getCallableRegion();
     funcOp = cast<func::FuncOp>(callableRegion->getParentOp());
@@ -97,10 +99,26 @@ bool anyCalleeIsAnnotated(func::FuncOp op, const char *attr, CallGraph &cg)
 {
     Region &region = op.getRegion();
     CallGraphNode *node = cg.lookupNode(&region);
-    // TODO: ICE if we do not find the node.
+    // TODO: Internal Compiler Error (ICE) if we do not find the node.
+    // Me, (@erick-xanadu) will leave this TODO as a TODO.
+    // I strongly believe that using `signalPassFailure` is not the correct way
+    // to report an ICE. I have asked on the forum but no answer yet.
+    // I believe something that would be appropriate in quantum-opt
+    // is to use abort() and a message just before.
+    // But this wouldn't be appropriate for the compiler driver.
     for (auto i = node->begin(), e = node->end(); i != e; ++i) {
         std::optional<func::FuncOp> maybeCallee = getCallee(*i, cg);
-        // An indirect call
+        // An indirect call.
+        // This will not happen in the current version of Catalyst as all calls are direct.
+        // Which calls would be indirect?
+        // Those which are defined via a pointer address. E.g.,
+        // auto func = &foo;
+        // or virtual functions.
+        // If we don't know which function we are calling, it is safest to assume that the function
+        // may be annotated.
+        // We can get better precision by using one of the many callgraph analyses.
+        // See Sundaresan, Vijay, et al. "Practical virtual method call resolution for Java." ACM
+        // SIGPLAN Notices 35.10 (2000): 264-280.
         if (!maybeCallee)
             return true;
 
