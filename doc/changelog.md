@@ -13,6 +13,7 @@
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
+  [(#689)](https://github.com/PennyLaneAI/catalyst/pull/689)
 
   The following two callback functions are available:
 

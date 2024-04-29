@@ -98,53 +98,26 @@ def pure_callback(callback_fn, result_type=None):
     >>> add_one(2)
     array(3)
 
-    .. details::
-        :title: NumPy universal functions and Python built-ins
+    For callback functions that return arrays, a ``jax.ShapeDtypeStruct``
+    object can be created to specify the expected return shape and data type:
 
-        NumPy universal functions (ufuncs, such as ``np.sin``) and Python built-in
-        functions (such as ``print``) represent many building block elementary functions
-        in Python and NumPy.
+    .. code-block:: python
 
-        These functions are written in a lower level language such as C/C++/Fortran, and
-        Catalyst will not be able to automatically inspect their signature:
+        @qml.qjit
+        def fn(x):
+            x = jnp.cos(x)
 
-        >>> @qjit
-        >>> def npsin(x):
-        ...     return catalyst.pure_callback(np.sin, float)(x)
-        >>> npsin(0.54)
-        ValueError: callable <ufunc 'sin'> is not supported by signature
+            result_shape = jax.ShapeDtypeStruct(x.shape, jnp.complex128)
 
-        A workaround is to wrap such functions in a custom function definition or lambda function:
+            @catalyst.pure_callback
+            def callback_fn(y) -> result_shape:
+                return jax.jit(jnp.fft.fft)(y)
 
-        >>> @qjit
-        >>> def npsin(x):
-        ...     return catalyst.pure_callback(lambda y: np.sin(y), float)(x)
-        >>> npsin(0.54)
-        array(0.51413599)
+            x = callback_fn(x)
+            return x
 
-    .. details::
-        :title: Functions that return arrays
-
-        For callback functions that return arrays, a ``jax.ShapeDtypeStruct``
-        object can be created to specify the expected return shape and data type:
-
-        .. code-block:: python
-
-            @qml.qjit
-            def fn(x):
-                x = jnp.cos(x)
-
-                result_shape = jax.ShapeDtypeStruct(x.shape, jnp.complex128)
-
-                @catalyst.pure_callback
-                def callback_fn(y) -> result_shape:
-                    return jax.jit(jnp.fft.fft)(y)
-
-                x = callback_fn(x)
-                return x
-
-        >>> fn(jnp.array([0.1, 0.2]))
-        array([1.97507074+0.j, 0.01493759+0.j])
+    >>> fn(jnp.array([0.1, 0.2]))
+    array([1.97507074+0.j, 0.01493759+0.j])
     """
 
     if result_type is None:
