@@ -5,3 +5,6 @@ llvm=cd9a641613eddf25d4b25eaa96b2c393d401d42c
 enzyme=1beb98b51442d50652eaa3ffb9574f4720d611f1
 
 # Always remove custom PL/LQ versions before release.
+
+lightning=0.36.0-dev40
+pennylane=d7342b69f5b7829532e7d3cd8f750afa7f54d25d
