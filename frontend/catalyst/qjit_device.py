@@ -167,7 +167,9 @@ class QJITDevice(qml.QubitDevice):
         device_name = backend.device_name if backend else "default"
 
         program_features = ProgramFeatures(shots is not None)
-        target_device_capabilities = get_device_capabilities(target_config, program_features, device_name)
+        target_device_capabilities = get_device_capabilities(
+            target_config, program_features, device_name
+        )
         self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
 
     @property
@@ -276,7 +278,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         target_config = device_get_toml_config(original_device)
         program_features = ProgramFeatures(original_device.shots is not None)
-        target_device_capabilities = get_device_capabilities(target_config, program_features, device_name)
+        target_device_capabilities = get_device_capabilities(
+            target_config, program_features, device_name
+        )
         self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
 
     @property

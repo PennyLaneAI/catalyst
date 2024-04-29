@@ -21,6 +21,7 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
+from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import (
     check_no_overlap,
@@ -38,7 +39,6 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
     read_toml_file,
 )
-from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
 
 
 class DummyDevice(qml.QubitDevice):
@@ -71,7 +71,9 @@ def get_test_config(config_text: str) -> TOMLDocument:
         return config
 
 
-def get_test_device_capabilities(program_features: ProgramFeatures, config_text: str) -> DeviceCapabilities:
+def get_test_device_capabilities(
+    program_features: ProgramFeatures, config_text: str
+) -> DeviceCapabilities:
     """Parse test config into the DeviceCapabilities structure"""
     config = get_test_config(config_text)
     device_capabilities = get_device_capabilities(config, program_features, "dummy")
@@ -200,7 +202,9 @@ def test_get_native_ops_schema2():
         ),
     )
 
-    assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(device_capabilities.native_ops)
+    assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(
+        device_capabilities.native_ops
+    )
 
 
 def test_get_native_ops_schema2_optional_shots():
@@ -377,6 +381,7 @@ def test_config_invalid_condition_duplicate(shots):
                 """
             ),
         )
+
 
 def test_config_qjit_device_operations():
     """Check the gate condition handling logic"""
