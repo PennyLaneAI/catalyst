@@ -38,6 +38,7 @@ endif()
 set(ALL_MHLO_PASSES
   ChloPasses
   MhloPasses
+  StablehloPasses
   MhloToArithmeticConversion
   MhloToMemrefConversion
   MhloToStandard
@@ -45,6 +46,7 @@ set(ALL_MHLO_PASSES
   MhloToLinalg
   MhloShapeOpsToStandard
   MhloToStablehlo
+  MhloQuantToIntConversion
   StablehloToMhlo
 )
 
