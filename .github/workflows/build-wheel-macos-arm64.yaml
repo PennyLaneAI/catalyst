@@ -44,7 +44,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Runner Environment
       id: setup_env
@@ -55,7 +55,7 @@ jobs:
     # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
@@ -63,7 +63,7 @@ jobs:
 
     - name: Cache MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo
         key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
@@ -71,7 +71,7 @@ jobs:
 
     - name: Cache Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
@@ -79,7 +79,7 @@ jobs:
 
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: ${{ needs.constants.outputs.llvm_version }}
@@ -87,7 +87,7 @@ jobs:
 
     - name: Clone MHLO Submodule
       if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
@@ -95,7 +95,7 @@ jobs:
 
     - name: Clone Enzyme Submodule
       if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
         ref: ${{ needs.constants.outputs.enzyme_version }}
@@ -133,21 +133,21 @@ jobs:
     # Cache external project builds
     - name: Cache LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
@@ -186,6 +186,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build/lib/cmake/mlir \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DLLVM_ENABLE_LLD=OFF \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
@@ -217,7 +218,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Runner Environment
       id: setup_env
@@ -231,7 +232,7 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/llvm-project
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
@@ -240,7 +241,7 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
@@ -248,7 +249,7 @@ jobs:
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/mlir-hlo
         key: Linux-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
@@ -257,7 +258,7 @@ jobs:
 
     - name: Get Cached MHLO Build
       id: cache-mhlo-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
@@ -265,7 +266,7 @@ jobs:
 
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mlir/Enzyme
         key: Linux-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
@@ -273,7 +274,7 @@ jobs:
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme-build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
         key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
@@ -288,7 +289,8 @@ jobs:
               -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG="v0.35.0" \
+              -DLIGHTNING_GIT_TAG=5feb4a10c9cd15fa590c513fc7c6a10a0b334269 \
+              -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DKokkos_ENABLE_COMPLEX_ALIGN=OFF \
@@ -354,7 +356,7 @@ jobs:
         delocate-wheel --require-archs=arm64 -w ./wheel -v dist/*.whl --ignore-missing-dependencies -vv
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: wheel/
@@ -374,7 +376,7 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Runner Environment
       id: setup_env
@@ -383,7 +385,7 @@ jobs:
         python_version: ${{ matrix.python_version }}
 
     - name: Download Wheel Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: catalyst-macos_arm64-wheel-py-${{ matrix.python_version }}.zip
         path: dist

@@ -15,7 +15,8 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?=v0.35.0
+LIGHTNING_GIT_TAG_VALUE?=5feb4a10c9cd15fa590c513fc7c6a10a0b334269
+ENABLE_LAPACK?=OFF
 
 BUILD_TARGETS := rt_capi
 TEST_TARGETS := ""
@@ -86,6 +87,7 @@ configure:
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 lq_configure:
@@ -111,6 +113,7 @@ lq_configure:
 		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/librt_capi.so: configure

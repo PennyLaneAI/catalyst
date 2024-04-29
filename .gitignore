@@ -1,6 +1,5 @@
 # Build directories
 build
-debug
 __pycache__
 pennylane_catalyst.egg-info
 *.so
