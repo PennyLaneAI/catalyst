@@ -10,6 +10,6 @@ jobs:
     name: CPL latest/rc/latest
     uses: ./.github/workflows/check-pl-compat.yaml
     with:
-      catalyst: latest
+      catalyst: release-candidate
       pennylane: release-candidate
-      lightning: latest
+      lightning: release-candidate

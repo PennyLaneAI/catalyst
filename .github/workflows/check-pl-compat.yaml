@@ -37,6 +37,9 @@ jobs:
     - if: ${{ inputs.catalyst == 'stable' }}
       run: |
         git checkout $(git tag | sort -V | tail -1)
+    - if: ${{ inputs.catalyst == 'release-candidate' }}
+      run: |
+        git checkout v0.6.0-rc
 
     - name: Install deps
       run: |
@@ -90,7 +93,7 @@ jobs:
         ref: ${{ needs.constants.outputs.enzyme_version }}
         path: mlir/Enzyme
 
-    - name: Install Catalyst (latest/stable)
+    - name: Install Catalyst (latest/stable/release-candidate)
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
@@ -126,6 +129,18 @@ jobs:
         ENABLE_OPENQASM=ON \
         make runtime
 
+    - name: Build Catalyst Runtime (release-candidate)
+      if: ${{ inputs.lightning == 'release-candidate' }}
+      run: |
+        COMPILER_LAUNCHER="" \
+        C_COMPILER=$(which gcc }}) \
+        CXX_COMPILER=$(which g++ }}) \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
+        LIGHTNING_GIT_TAG_VALUE=v0.36.0_rc \
+        ENABLE_LIGHTNING_KOKKOS=ON \
+        ENABLE_OPENQASM=ON \
+        make runtime
+
     - name: Install PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'latest' }}
       run: |
@@ -137,6 +152,12 @@ jobs:
       run: |
         pip install --upgrade pennylane-lightning
         pip install --upgrade pennyLane-lightning-kokkos
+
+    - name: Install PennyLane-Lightning (release-candidate)
+      if: ${{ inputs.lightning == 'release-candidate' }}
+      run: |
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
+        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
 
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
@@ -152,7 +173,6 @@ jobs:
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
         pip install git+https://github.com/PennyLaneAI/pennylane.git@v0.36.0-rc0
-
 
     - name: Add Frontend Dependencies to PATH
       run: |
