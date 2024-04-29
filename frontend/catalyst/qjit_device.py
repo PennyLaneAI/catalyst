@@ -169,17 +169,17 @@ class QJITDevice(qml.QubitDevice):
 
         program_features = ProgramFeatures(shots is not None)
         target_device_config = get_device_config(target_config, program_features, device_name)
-        self.caps = get_qjit_device_config(target_device_config)
+        self.capabilities = get_qjit_device_config(target_device_config)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations using PennyLane's syntax"""
-        return pennylane_operation_set(self.caps.native_ops)
+        return pennylane_operation_set(self.capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.caps.native_obs)
+        return pennylane_operation_set(self.capabilities.native_obs)
 
     def apply(self, operations, **kwargs):
         """
@@ -279,17 +279,17 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         program_features = ProgramFeatures(original_device.shots is not None)
         target_device_config = get_device_config(target_config, program_features, device_name)
-        self.caps = get_qjit_device_config(target_device_config)
+        self.capabilities = get_qjit_device_config(target_device_config)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return pennylane_operation_set(self.caps.native_ops)
+        return pennylane_operation_set(self.capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.caps.native_obs)
+        return pennylane_operation_set(self.capabilities.native_obs)
 
     def preprocess(
         self,
