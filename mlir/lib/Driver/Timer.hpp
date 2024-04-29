@@ -117,10 +117,10 @@ template <class Stream> class Timer {
             << std::fixed << " ms";
         oss << "\t" << std::fixed << "cputime: " << std::setprecision(3) << cpu_elapsed
             << std::fixed << " ms";
-        stream << oss.str();
         if (add_endl) {
-            stream << "\n";
+            oss << std::endl;
         }
+        stream << oss.str();
     }
 
     void store(const std::string &name, const std::filesystem::path &file_path)

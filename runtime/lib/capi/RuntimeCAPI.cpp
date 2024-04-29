@@ -263,8 +263,8 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
 {
-    timer::timer(__catalyst__rt__device_init__impl, "device_init", std::cerr, /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs);
+    timer::timer(__catalyst__rt__device_init__impl, "device_init", std::cerr, /* add_endl */ true,
+                 rtd_lib, rtd_name, rtd_kwargs);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -277,7 +277,8 @@ static int __catalyst__rt__device_release__impl()
 
 void __catalyst__rt__device_release()
 {
-    timer::timer(__catalyst__rt__device_release__impl, "device_release", std::cerr, /* add_endl */ true);
+    timer::timer(__catalyst__rt__device_release__impl, "device_release", std::cerr,
+                 /* add_endl */ true);
 }
 
 void __catalyst__rt__print_state() { getQuantumDevicePtr()->PrintState(); }
@@ -371,8 +372,8 @@ static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
 
 void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
 {
-    timer::timer(__catalyst__rt__qubit_release_array__impl, "qubit_release_array",
-                 std::cerr, /* add_endl */ true, qubit_array);
+    timer::timer(__catalyst__rt__qubit_release_array__impl, "qubit_release_array", std::cerr,
+                 /* add_endl */ true, qubit_array);
 }
 
 int64_t __catalyst__rt__num_qubits()

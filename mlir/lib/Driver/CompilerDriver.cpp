@@ -72,10 +72,9 @@ namespace catalyst::utils {
  * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
  * along with `ENABLE_DIAGNOSTICS=ON`.
  */
-class LinesCount {
+template <class Stream> class LinesCount {
   private:
-    inline static void print(const std::string &opStrBuf, llvm::raw_ostream &stream,
-                             const std::string &name)
+    inline static void print(const std::string &opStrBuf, Stream &stream, const std::string &name)
     {
         std::ostringstream oss;
         const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
@@ -116,7 +115,7 @@ class LinesCount {
         ofile.close();
     }
 
-    inline static void dump(const std::string &opStrBuf, llvm::raw_ostream &stream = llvm::errs(),
+    inline static void dump(const std::string &opStrBuf, Stream &stream,
                             const std::string &name = {})
     {
         char *file = getenv("DIAGNOSTICS_RESULTS_PATH");
@@ -135,8 +134,7 @@ class LinesCount {
         return value && std::string(value) == "ON";
     }
 
-    static void Operation(Operation *op, llvm::raw_ostream &stream = llvm::errs(),
-                          const std::string &name = {})
+    static void Operation(Operation *op, Stream &stream, const std::string &name = {})
     {
         if (!is_diagnostics_enabled()) {
             return;
@@ -149,8 +147,7 @@ class LinesCount {
         dump(opStrBuf, stream, name);
     }
 
-    static void ModuleOp(const ModuleOp &op, llvm::raw_ostream &stream = llvm::errs(),
-                         const std::string &name = {})
+    static void ModuleOp(const ModuleOp &op, Stream &stream, const std::string &name = {})
     {
         if (!is_diagnostics_enabled()) {
             return;
@@ -163,8 +160,7 @@ class LinesCount {
         dump(modStrBef, stream, name);
     }
 
-    static void Module(const llvm::Module &llvmModule, llvm::raw_ostream &stream = llvm::errs(),
-                       const std::string &name = {})
+    static void Module(const llvm::Module &llvmModule, Stream &stream, const std::string &name = {})
     {
         if (!is_diagnostics_enabled()) {
             return;
@@ -468,7 +464,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
 {
     using std::pair;
-    using Timer = catalyst::utils::Timer<llvm::raw_ostream>;
+    using Timer = catalyst::utils::Timer<std::ostream>;
+    using LineCounter = catalyst::utils::LinesCount<std::ostream>;
     auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
@@ -526,8 +523,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
-            timer.dump(res->second.first, options.diagnosticStream, /*add_endl */ false);
-            catalyst::utils::LinesCount::Operation(op, options.diagnosticStream);
+            timer.dump(res->second.first, std::cerr, /*add_endl */ false);
+            LineCounter::Operation(op, std::cerr);
         }
 
         if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
@@ -571,7 +568,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
-    using Timer = catalyst::utils::Timer<llvm::raw_ostream>;
+    using Timer = catalyst::utils::Timer<std::ostream>;
+    using LineCounter = catalyst::utils::LinesCount<std::ostream>;
     DialectRegistry registry;
     static bool initialized = false;
     if (!initialized) {
@@ -605,13 +603,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
     SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
 
-    OwningOpRef<ModuleOp> op =
-        Timer::timer(parseMLIRSource, "parseMLIRSource", options.diagnosticStream,
-                     /* add_endl */ false, &ctx, *sourceMgr);
-    catalyst::utils::LinesCount::ModuleOp(*op, options.diagnosticStream);
+    OwningOpRef<ModuleOp> op = Timer::timer(parseMLIRSource, "parseMLIRSource", std::cerr,
+                                            /* add_endl */ false, &ctx, *sourceMgr);
+    LineCounter::ModuleOp(*op, std::cerr);
 
     if (op) {
-        if (failed(Timer::timer(runLowering, "runMLIRPasses", options.diagnosticStream,
+        if (failed(Timer::timer(runLowering, "runMLIRPasses", std::cerr,
                                 /* add_endl */ true, options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -621,15 +618,14 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
-            llvmModule = Timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR",
-                                      options.diagnosticStream, /* add_endl */ false, *op,
-                                      llvmContext, "LLVMDialectModule");
+            llvmModule = Timer::timer(translateModuleToLLVMIR, "translateModuleToLLVMIR", std::cerr,
+                                      /* add_endl */ false, *op, llvmContext, "LLVMDialectModule");
             if (!llvmModule) {
                 CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
             }
 
-            catalyst::utils::LinesCount::Module(*llvmModule, options.diagnosticStream);
+            LineCounter::Module(*llvmModule, std::cerr);
 
             if (options.keepIntermediate) {
                 dumpToFile(options, output.nextDumpFilename("llvm_ir", ".ll"), *llvmModule);
@@ -640,7 +636,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         CO_MSG(options, Verbosity::Urgent,
                "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
-        llvmModule = Timer::timer(parseLLVMSource, "parseLLVMSource", options.diagnosticStream,
+        llvmModule = Timer::timer(parseLLVMSource, "parseLLVMSource", std::cerr,
                                   /* add_endl */ false, llvmContext, options.source,
                                   options.moduleName, err);
         if (!llvmModule) {
@@ -650,23 +646,23 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
 
-        catalyst::utils::LinesCount::Module(*llvmModule, options.diagnosticStream);
+        LineCounter::Module(*llvmModule, std::cerr);
     }
 
     if (llvmModule) {
-        if (failed(Timer::timer(runLLVMPasses, "runLLVMPasses", options.diagnosticStream,
+        if (failed(Timer::timer(runLLVMPasses, "runLLVMPasses", std::cerr,
                                 /* add_endl */ false, options, llvmModule, output))) {
             return failure();
         }
 
-        catalyst::utils::LinesCount::Module(*llvmModule.get(), options.diagnosticStream);
+        LineCounter::Module(*llvmModule.get(), std::cerr);
 
-        if (failed(Timer::timer(runEnzymePasses, "runEnzymePasses", options.diagnosticStream,
+        if (failed(Timer::timer(runEnzymePasses, "runEnzymePasses", std::cerr,
                                 /* add_endl */ false, options, llvmModule, output))) {
             return failure();
         }
 
-        catalyst::utils::LinesCount::Module(*llvmModule.get(), options.diagnosticStream);
+        LineCounter::Module(*llvmModule.get(), std::cerr);
 
         output.outIR.clear();
         outIRStream << *llvmModule;
@@ -684,8 +680,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             // element type. This is because the LLVM pointer type is
             // opaque and requires looking into its uses to infer its type.
             SmallVector<RankedTensorType> returnTypes;
-            if (failed(Timer::timer(inferMLIRReturnTypes, "inferMLIRReturn",
-                                    options.diagnosticStream,
+            if (failed(Timer::timer(inferMLIRReturnTypes, "inferMLIRReturn", std::cerr,
                                     /* add_endl */ true, &ctx, function.value()->getReturnType(),
                                     Float64Type::get(&ctx), returnTypes))) {
                 // Inferred return types are only required when compiling from textual IR. This
@@ -707,7 +702,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         auto outfile = options.getObjectFile();
-        if (failed(Timer::timer(compileObjectFile, "compileObjFile", options.diagnosticStream,
+        if (failed(Timer::timer(compileObjectFile, "compileObjFile", std::cerr,
                                 /* add_endl */ true, options, std::move(llvmModule), outfile))) {
             return failure();
         }
