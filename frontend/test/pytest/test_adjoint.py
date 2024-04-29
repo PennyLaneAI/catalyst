@@ -27,6 +27,10 @@ from catalyst import adjoint as C_adjoint
 from catalyst import cond, for_loop, qjit, while_loop
 
 
+def test_pl_version_tmp():
+    assert qml.__version__ == "0.37.0-dev", f"got {qml.__version__}"
+
+
 def verify_catalyst_adjoint_against_pennylane(quantum_func, device, *args):
     """
     A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's
