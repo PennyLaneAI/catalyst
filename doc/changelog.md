@@ -59,9 +59,9 @@
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+  [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
   ```py
-  from catalyst.oqc import OQCDevice
 
   import os
 
@@ -69,7 +69,7 @@
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+  device = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(device=device)
