@@ -32,8 +32,8 @@ from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
 from catalyst import for_loop, measure, qjit, while_loop
+from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion
-from catalyst.pennylane_extensions import QCtrl
 
 
 def verify_catalyst_ctrl_against_pennylane(

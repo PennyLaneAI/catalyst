@@ -19,6 +19,7 @@ CY = { properties = [ "invertible", "differentiable" ] }
 CZ = { properties = [ "invertible", "differentiable" ] }
 PhaseShift = { properties = [ "controllable", "invertible", "differentiable" ] }
 ControlledPhaseShift = { properties = [ "invertible", "differentiable" ] }
+CPhase = { properties = [ "invertible", "differentiable" ] }
 RX = { properties = [ "controllable", "invertible", "differentiable" ] }
 RY = { properties = [ "controllable", "invertible", "differentiable" ] }
 RZ = { properties = [ "controllable", "invertible", "differentiable" ] }
@@ -53,11 +54,9 @@ ISWAP = {}
 PSWAP = {}
 SISWAP = {}
 SQISW = {}
-CPhase = {}
 BasisState = {}
 QubitStateVector = {}
 StatePrep = {}
-ControlledQubitUnitary = {}
 DiagonalQubitUnitary = {}
 QubitCarry = {}
 QubitSum = {}

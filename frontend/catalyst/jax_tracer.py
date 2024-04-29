@@ -683,7 +683,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
-        return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
+        return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     if not is_valid_output:

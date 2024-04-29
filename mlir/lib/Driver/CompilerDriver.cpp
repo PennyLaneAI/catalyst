@@ -80,8 +80,7 @@ class LinesCount {
         if (!name.empty()) {
             std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
         }
-        std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines";
-        std::cerr << std::endl;
+        std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines\n";
     }
 
     inline static void store(const std::string &opStrBuf, const std::string &name,
@@ -129,10 +128,7 @@ class LinesCount {
     [[nodiscard]] inline static bool is_diagnostics_enabled()
     {
         char *value = getenv("ENABLE_DIAGNOSTICS");
-        if (!value || std::string(value) != "ON") {
-            return false;
-        }
-        return true;
+        return value && std::string(value) == "ON";
     }
 
     static void Operation(Operation *op, const std::string &name = {})

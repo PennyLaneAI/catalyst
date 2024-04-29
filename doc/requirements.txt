@@ -29,4 +29,4 @@ lxml_html_clean
 
 # Pre-install development lightning wheels
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning==0.36.0-dev30
+pennylane-lightning==0.36.0-dev40
