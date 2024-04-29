@@ -248,6 +248,10 @@
 
 <h3>Breaking changes</h3>
 
+* `qml.sample` and `qml.counts` now produce integer arrays for the sample array and basis state
+  array when used without observables.
+  [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
+
 * `catalyst.debug.print` no longer supports the `memref` keyword argument.
   Please use `catalyst.debug.print_memref` instead.
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
