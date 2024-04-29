@@ -140,7 +140,7 @@ class TestExpval:
 
         with pytest.raises(
             RuntimeError,
-            match="Hermitian observables do not support shot measurement",
+            match="Hermitian observables with shot measurement are not supported",
         ):
             circuit(np.pi / 4, np.pi / 4)
 
@@ -348,7 +348,7 @@ class TestVar:
 
         with pytest.raises(
             RuntimeError,
-            match="Hermitian observables do not support shot measurement",
+            match="Hermitian observables with shot measurement are not supported",
         ):
             circuit(np.pi / 4, np.pi / 4)
 

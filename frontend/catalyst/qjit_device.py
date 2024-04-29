@@ -198,7 +198,7 @@ class QJITDevice(qml.QubitDevice):
             will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
         3. The list of device-supported gates employed by Catalyst is currently different than
             that of the ``lightning.qubit`` device, as defined by the
-            :class:`~.pennylane_extensions.QJITDevice`.
+            :class:`~.qjit_device.QJITDevice`.
 
         Args:
             circuit: circuit to expand

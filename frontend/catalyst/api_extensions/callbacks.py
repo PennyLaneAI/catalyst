@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Callback module"""
+"""
+This module contains public API functions that enable host callbacks from
+a compiled program. Host callbacks are able to run non-jittable code at runtime
+but require a Python interpreter instance.
+"""
 
 import ctypes
 import inspect
@@ -34,42 +38,7 @@ from catalyst.utils.jnp_to_memref import (
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
-class CallbackClosure:
-    """This is just a class containing data that is important for the callback."""
-
-    def __init__(self, *absargs, **abskwargs):
-        self.absargs = absargs
-        self.abskwargs = abskwargs
-
-    @property
-    def tree_flatten(self):
-        """Flatten args and kwargs."""
-        return tree_flatten((self.absargs, self.abskwargs))
-
-    @property
-    def low_level_sig(self):
-        """Get the memref descriptor types"""
-        flat_params, _ = self.tree_flatten
-        low_level_flat_params = []
-        for param in flat_params:
-            empty_memref_descriptor = get_ranked_memref_descriptor(param)
-            memref_type = type(empty_memref_descriptor)
-            ptr_ty = ctypes.POINTER(memref_type)
-            low_level_flat_params.append(ptr_ty)
-        return low_level_flat_params
-
-    def getArgsAsJAXArrays(self, flat_args):
-        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
-        it is best for the user if we continue with that idea and forward JAX arrays."""
-        jnpargs = []
-        for void_ptr, ty in zip(flat_args, self.low_level_sig):
-            memref_ty = ctypes.cast(void_ptr, ty)
-            nparray = ranked_memref_to_numpy(memref_ty)
-            jnparray = jnp.asarray(nparray)
-            jnpargs.append(jnparray)
-        return jnpargs
-
-
+## API ##
 def pure_callback(callback_fn, result_type=None):
     """Pure callback
 
@@ -78,6 +47,7 @@ def pure_callback(callback_fn, result_type=None):
       1. Given the same arguments *args, the results will be the same each time the function is
          called.
       2. The function has no side effect.
+      3. Examples of side effects include modifying a non-local variable, printing, etc.
 
     A pure callback is a pure python function that can be executed by the python virtual machine.
     This is in direct contrast to functions which get JIT compiled by Catalyst.
@@ -128,14 +98,64 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    @callback
+    @base_callback
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
 
     return closure
 
 
-def callback(func):
+def debug_callback(callback_fn):
+    """A function that is useful for printing and logging and allows users to execute a Python
+    function (with no return values) at runtime within their qjitted workflows.
+
+    A debug callback is a python function that can write to stdout or to a file.
+    It is expected to return no values.
+
+    Using `debug.callback` allows a user to run a python function with side effects inside an
+    `@qjit` context. To mark a function as a `debug.callback`, one can use a decorator:
+
+    ```python
+    @debug.callback
+    def my_custom_print(x):
+        print(x)
+
+    @qjit
+    def foo(x):
+       my_custom_print(x)
+
+    # Can also be used outside of a JIT compiled context.
+    my_custom_print(x)
+    ```
+
+    or through a more functional syntax:
+
+    ```python
+    def my_custom_print(x):
+        print(x)
+
+    @qjit
+    def foo(x):
+        debug.callback(my_custom_print)(x)
+    ```
+
+    `debug.callback`s are expected to not return anything.
+    May be useful for custom printing and logging into files.
+
+    At the moment, `debug.callback`s should not be used inside gradients.
+    """
+
+    @base_callback
+    def closure(*args, **kwargs) -> None:
+        retval = callback_fn(*args, **kwargs)
+        if retval is not None:
+            raise ValueError("debug.callback is expected to return None")
+
+    return closure
+
+
+## IMPL ##
+def base_callback(func):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -170,8 +190,6 @@ def callback_implementation(
     metadata = CallbackClosure(args, kwargs)
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
-    if not isinstance(results_aval, Sequence):
-        results_aval = [results_aval]
 
     flat_results_aval, out_tree = tree_flatten(results_aval)
 
@@ -185,7 +203,10 @@ def callback_implementation(
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retvals = tree_leaves(cb(*args, **kwargs))
         return_values = []
-        for retval, exp_aval in zip(retvals, results_aval):
+        results_aval_sequence = (
+            results_aval if isinstance(results_aval, Sequence) else [results_aval]
+        )
+        for retval, exp_aval in zip(retvals, results_aval_sequence):
             obs_aval = shaped_abstractify(retval)
             if obs_aval != exp_aval:
                 raise TypeError(
@@ -207,3 +228,39 @@ def callback_implementation(
         *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
     )
     return tree_unflatten(out_tree, out_flat)
+
+
+class CallbackClosure:
+    """This is just a class containing data that is important for the callback."""
+
+    def __init__(self, *absargs, **abskwargs):
+        self.absargs = absargs
+        self.abskwargs = abskwargs
+
+    @property
+    def tree_flatten(self):
+        """Flatten args and kwargs."""
+        return tree_flatten((self.absargs, self.abskwargs))
+
+    @property
+    def low_level_sig(self):
+        """Get the memref descriptor types"""
+        flat_params, _ = self.tree_flatten
+        low_level_flat_params = []
+        for param in flat_params:
+            empty_memref_descriptor = get_ranked_memref_descriptor(param)
+            memref_type = type(empty_memref_descriptor)
+            ptr_ty = ctypes.POINTER(memref_type)
+            low_level_flat_params.append(ptr_ty)
+        return low_level_flat_params
+
+    def getArgsAsJAXArrays(self, flat_args):
+        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
+        it is best for the user if we continue with that idea and forward JAX arrays."""
+        jnpargs = []
+        for void_ptr, ty in zip(flat_args, self.low_level_sig):
+            memref_ty = ctypes.cast(void_ptr, ty)
+            nparray = ranked_memref_to_numpy(memref_ty)
+            jnparray = jnp.asarray(nparray)
+            jnpargs.append(jnparray)
+        return jnpargs
