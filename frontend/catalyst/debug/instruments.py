@@ -32,14 +32,50 @@ from contextlib import contextmanager
 ## API ##
 @contextmanager
 def instrumentation(session_name, filename=None, detailed=False):
-    """Start an instrumentation session. A session cannot be tied to the creation of a QJIT object
+    """Instrumentation session to output information on wall time, CPU time,
+    and intermediate program size of a program during compilation and execution.
+
+    A session cannot be tied to the creation of a QJIT object
     nor its lifetime, because it involves both compile time and runtime measurements. It cannot
     be a context-free process either since we need to write results to an existing results file.
 
     Args:
         session_name (str): identifier to distinguish multiple results, primarily for humans
-        filename (str): desired path to write results to in YAML format
-        detailed (bool): whether to instrument finegrained steps in the compiler and runtime
+        filename (str): Desired path to write results to in YAML format. If ``None``, the
+            results will instead be printed to the console.
+        detailed (bool): whether to instrument finegrained steps in the compiler and runtime.
+            If ``False``, only high-level steps such as program capture and
+            compilation are reported.
+
+    **Example**
+
+    >>> @qjit
+    ... def expensive_function(a, b):
+    ...     return a + b
+    >>> with debug.instrumentation("session_name", detailed=False):
+    >>>     expensive_function(1, 2)
+    2024-04-29 18:19:29.349886:
+    name: session_name
+    system:
+    os: Linux-6.1.58+-x86_64-with-glibc2.35
+    arch: x86_64
+    python: 3.10.12
+    results:
+    - capture:
+        walltime: 6.296216
+        cputime: 2.715764
+        programsize: 0
+    - generate_ir:
+        walltime: 8.84289
+        cputime: 8.836589
+        programsize: 14
+    - compile:
+        walltime: 199.249725
+        cputime: 38.820425
+        programsize: 121
+    - run:
+        walltime: 1.053613
+        cputime: 1.019584
     """
     session = InstrumentSession(session_name, filename, detailed)
 
@@ -49,17 +85,62 @@ def instrumentation(session_name, filename=None, detailed=False):
         session.close()
 
 
-def instrument(fn=None, *, size_from=None, has_finegrained=False):
-    """Decorator that marks functions as targets for instrumentation. Instrumentation is only
-    performed when enabled by a session.
+def instrument(fn=None, *, size_from=None, detailed=False):
+    """Decorator that marks specific functions as targets for instrumentation.
+    nstrumentation is only performed when enabled by a session.
 
     Args:
         fn (Callable): function to instrument
         size_from (int | None): optional index indicating from which result to measure program size
-                                by number of newlines in the string representation of the result
+            by number of newlines in the string representation of the result
+        detailed (bool): whether to instrument finegrained steps in the compiler and runtime.
+            If ``False``, only high-level steps such as program capture and
+            compilation are reported.
+
+    **Example**
+
+    .. code-block:: python
+
+        @instrument
+        def expensive_function(a, b):
+            return a + b
+
+        @qml.qjit
+        def fn(x):
+            y = jnp.sin(x) ** 3
+            z = expensive_function(x, y)
+            return jnp.cos(z)
+
+    >>> with catalyst.debug.instrumentation("session_name"):
+    ...     fn(0.43)
+    2024-04-29 19:05:00.719805:
+      name: session_name
+      system:
+        os: Linux-6.1.58+-x86_64-with-glibc2.35
+        arch: x86_64
+        python: 3.10.12
+      results:
+        - capture:
+            walltime: 7.359074
+            cputime: 7.324612
+            programsize: 5
+        - expensive_function:
+            walltime: 0.771452
+            cputime: 0.765094
+        - generate_ir:
+            walltime: 11.269458
+            cputime: 11.305722
+            programsize: 18
+        - compile:
+            walltime: 164.486692
+            cputime: 52.139593
+            programsize: 128
+        - run:
+            walltime: 0.864398
+            cputime: 0.859378
     """
     if fn is None:
-        return functools.partial(instrument, size_from=size_from, has_finegrained=has_finegrained)
+        return functools.partial(instrument, size_from=size_from, detailed=detailed)
 
     stage_name = getattr(fn, "__name__", "UNKNOWN")
 
@@ -68,7 +149,7 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
         if not InstrumentSession.active:
             return fn(*args, **kwargs)
 
-        with ResultReporter(stage_name, has_finegrained) as reporter:
+        with ResultReporter(stage_name, detailed) as reporter:
             fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)

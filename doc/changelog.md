@@ -111,7 +111,6 @@
   print(circuit(0.2))
   ```
 
-
 * Catalyst now ships with an instrumentation feature allowing to explore what steps are run during
   compilation and execution, and for how long.
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
@@ -120,13 +119,34 @@
   Instrumentation can be enabled from the frontend with the `catalyst.debug.instrumentation`
   context manager:
 
-  ```py
-  @qjit
-  def expensive_function(a, b):
-      return a + b
-
-  with debug.instrumentation("session_name", filename="profiling_results.txt", detailed=True):
-    expensive_function(1, 2)
+  ```pycon
+  >>> @qjit
+  ... def expensive_function(a, b):
+  ...     return a + b
+  >>> with debug.instrumentation("session_name", detailed=False):
+  >>>     expensive_function(1, 2)
+  2024-04-29 18:19:29.349886:
+  name: session_name
+  system:
+    os: Linux-6.1.58+-x86_64-with-glibc2.35
+    arch: x86_64
+    python: 3.10.12
+  results:
+    - capture:
+        walltime: 6.296216
+        cputime: 2.715764
+        programsize: 0
+    - generate_ir:
+        walltime: 8.84289
+        cputime: 8.836589
+        programsize: 14
+    - compile:
+        walltime: 199.249725
+        cputime: 38.820425
+        programsize: 121
+    - run:
+        walltime: 1.053613
+        cputime: 1.019584
   ```
 
   The results will be appended to the provided file if the `filename` attribute is set, and printed
@@ -138,31 +158,57 @@
 
 <h3>Improvements</h3>
 
-* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
-  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
-  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+* AutoGraph now supports return statements inside conditionals in qjit-compiled
+  functions.
+  [(#583)](https://github.com/PennyLaneAI/catalyst/pull/583)
 
-* The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
-  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
-  a Jupyter Notebook.
-  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+  For example, the following pattern is now supported, as long as
+  all return values have the same type:
 
-* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
-  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
+  ```pycon
+  >>> @qml.qjit(autograph=True)
+  ... def fn(x):
+  ...     if x > 0:
+  ...         return jnp.sin(x)
+  ...     return jnp.cos(x)
+  >>> fn(0.1)
+  array(0.09983342)
+  >>> fn(-0.1)
+  array(0.99500417)
+  ```
 
-* An exception is now raised when OpenBLAS cannot be found by Catalyst.
-  [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
+  This support extends to quantum circuits:
 
-* An updated quantum device specification format is now supported by Catalyst. The toml schema 2
-  configs allow device autors to specify individual gate properties such as native quantum control
-  support, gate invertibility or differentiability.
-  [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
+  ```py
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit(autograph=True)
+  @qml.qnode(dev)
+  def f(x: float):
+    qml.RX(x, wires=0)
+
+    m = catalyst.measure(0)
+
+    if not m:
+        return m, qml.expval(qml.PauliZ(0))
+
+    qml.RX(x ** 2, wires=0)
+
+    return m, qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> f(1.4)
+  (array(False), array(1.))
+  >>> f(1.4)
+  (array(True), array(0.37945176))
+  ```
+
+  Note that returning results with different types or shapes within the same function, such as
+  different observables or differently shaped arrays, is not possible.
 
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
-  It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
-  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that
-  devices have the wires set.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
@@ -170,49 +216,40 @@
   [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
   [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
 
-* Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
-  functions.
-  [(#583)](https://github.com/PennyLaneAI/catalyst/pull/583)
+  When using the new device API, Catalyst will discard the preprocessing from the original device,
+  replacing it with Catalyst-specific preprocessing based on the TOML file provided by the device.
+  Catalyst also requires that provided devices specify their wires upfront.
 
-  The following is now possible:
-
-  ```py
-  @qjit(autograph=True)
-  @qml.qnode(qml.device("lightning.qubit", wires=1))
-  def f(x: float):
-    qml.RY(x, wires=0)
-
-    m = measure(0)
-    if not m:
-        return qml.expval(qml.PauliZ(0))
-
-    ...
-
-    return qml.expval(qml.PauliZ(0))
-  ```
-
-  Note that returning different *kinds* of results, like different observables or differently
-  shaped arrays, is not possible.
-
-* The Python interpreter is now a shared resource across the runtime.
-  [(#615)](https://github.com/PennyLaneAI/catalyst/pull/615)
-
-  This change allows any part of the runtime to start executing Python code through pybind.
-
-* Fix runtime tests to be compatible with amazon-braket-sdk==1.73.3
-  [(#620)](https://github.com/PennyLaneAI/catalyst/pull/620)
-
-  After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
-
-* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
+* A new compiler optimization that removes redundant chains of self inverse operations has been
+  added. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we
+  only match redundant Hadamard operations, but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
-* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
-  [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
+* The compilation & execution of `@qjit` compiled functions can now be aborted using an interrupt
+  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
+  a Jupyter Notebook.
+  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
+* The Catalyst Amazon Braket support has been updated to work with the latest version of the
+  Amazon Braket PennyLane plugin (v1.25.0) and Amazon Braket Python SDK (v1.73.3)
+  [(#620)](https://github.com/PennyLaneAI/catalyst/pull/620)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+
+  Note that with this update, all declared qubits in a submitted program will always be measured, even if specific qubits were never used.
+
+* An updated quantum device specification format is now supported by Catalyst. The device TOML schema v2
+  allow device authors to specify properties such as native quantum control
+  support, gate invertibility, or differentiability, at a per-operation level.
+  [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
+
+* An exception is now raised when OpenBLAS cannot be found by Catalyst.
+  [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
 
 <h3>Breaking changes</h3>
 
-* `catalyst.debug.print` has changed, resulting in the `memref` keyword argument being removed. Please use `catalyst.debug.print_memref` instead.
+* `catalyst.debug.print` no longer supports the `memref` keyword argument.
+  Please use `catalyst.debug.print_memref` instead.
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
 <h3>Bug fixes</h3>
@@ -243,6 +280,12 @@
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
+
+* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
+  [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
+
 <h3>Internal changes</h3>
 
 * The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
@@ -252,6 +295,11 @@
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
   module import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
+
+* The Python interpreter is now a shared resource across the runtime.
+  [(#615)](https://github.com/PennyLaneAI/catalyst/pull/615)
+
+  This change allows any part of the runtime to start executing Python code through pybind.
 
 <h3>Contributors</h3>
 
