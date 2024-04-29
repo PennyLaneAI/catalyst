@@ -58,11 +58,12 @@ def pure_callback(callback_fn, result_type=None):
             Any Python-based function is supported, as long as it:
 
             * is a pure function
-              (meaning it is deterministic --- for the same function arguments, the same result is always
-              returned --- and has no side effects, such as modifying a non-local
+              (meaning it is deterministic --- for the same function arguments, the same result
+              is always returned --- and has no side effects, such as modifying a non-local
               variable),
 
-            * has a signature that can be inspected (that is, it is not a NumPy ufunc or Python builtin),
+            * has a signature that can be inspected (that is, it is not a NumPy ufunc or Python
+              builtin),
 
             * the return type and shape is deterministic and known ahead of time.
         result_type (type): The type returned by the function.
