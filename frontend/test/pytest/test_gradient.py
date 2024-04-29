@@ -1216,8 +1216,7 @@ class TestGradientErrors:
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x):
-            y = pure_callback(jnp.sin, float)(x)
-            qml.RX(y, wires=0)
+            qml.RX(x, wires=0)
             return qml.expval(qml.PauliX(0))
 
         def g(x):
