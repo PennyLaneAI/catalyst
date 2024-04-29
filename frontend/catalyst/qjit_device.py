@@ -24,13 +24,13 @@ from pennylane.transforms.core import TransformProgram
 from catalyst.preprocess import catalyst_acceptance, decompose
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import BackendInfo
+from catalyst.utils.runtime import BackendInfo, device_get_toml_config
 from catalyst.utils.toml import (
-    DeviceConfig,
+    DeviceCapabilities,
     OperationProperties,
     ProgramFeatures,
     TOMLDocument,
-    get_device_config,
+    get_device_capabilities,
     intersect_operations,
     pennylane_operation_set,
 )
@@ -75,17 +75,17 @@ RUNTIME_OPERATIONS = {
 # fmt:on
 
 
-def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
+def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
-    qjit_config = deepcopy(target_config)
+    qjit_config = deepcopy(target_capabilities)
 
     # Gates that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
 
     # Intersection of the above
-    qjit_config.native_ops = intersect_operations(target_config.native_ops, qir_gates)
+    qjit_config.native_ops = intersect_operations(target_capabilities.native_ops, qir_gates)
 
     # Control-flow gates to be lowered down to the LLVM control-flow instructions
     qjit_config.native_ops.update(
@@ -99,7 +99,7 @@ def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
     )
 
     # Optionally enable runtime-powered mid-circuit measurments
-    if target_config.mid_circuit_measurement_flag:  # pragma: no branch
+    if target_capabilities.mid_circuit_measurement_flag:  # pragma: no branch
         qjit_config.native_ops.update(
             {
                 "MidCircuitMeasure": OperationProperties(
@@ -109,7 +109,7 @@ def get_qjit_device_config(target_config: DeviceConfig) -> Set[str]:
         )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if all(ng.invertible for ng in target_config.native_ops.values()):
+    if all(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_config.native_ops.update(
             {
                 "Adjoint": OperationProperties(
@@ -144,7 +144,7 @@ class QJITDevice(qml.QubitDevice):
     author = ""
 
     @staticmethod
-    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
+    def _get_operations_to_convert_to_matrix(_capabilities: DeviceCapabilities) -> Set[str]:
         # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
@@ -161,15 +161,14 @@ class QJITDevice(qml.QubitDevice):
     ):
         super().__init__(wires=wires, shots=shots)
 
-        self.target_config = target_config
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
         program_features = ProgramFeatures(shots is not None)
-        target_device_config = get_device_config(target_config, program_features, device_name)
-        self.capabilities = get_qjit_device_config(target_device_config)
+        target_device_capabilities = get_device_capabilities(target_config, program_features, device_name)
+        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
@@ -209,7 +208,7 @@ class QJITDevice(qml.QubitDevice):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
-            self.target_config
+            self.capabilities
         )
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
@@ -258,7 +257,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def __init__(
         self,
         original_device,
-        target_config: TOMLDocument,
         backend: Optional[BackendInfo] = None,
     ):
         self.original_device = original_device
@@ -271,15 +269,15 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
-        self.target_config = target_config
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
+        target_config = device_get_toml_config(original_device)
         program_features = ProgramFeatures(original_device.shots is not None)
-        target_device_config = get_device_config(target_config, program_features, device_name)
-        self.capabilities = get_qjit_device_config(target_device_config)
+        target_device_capabilities = get_device_capabilities(target_config, program_features, device_name)
+        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:

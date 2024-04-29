@@ -74,7 +74,7 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 
 
 @dataclass
-class DeviceConfig:
+class DeviceCapabilities:
     """Quantum device capabilities"""
 
     native_ops: Dict[str, OperationProperties]
@@ -311,10 +311,10 @@ def patch_schema1_collections(
             decomp_props.pop("ControlledPhaseShift")
 
 
-def get_device_config(
+def get_device_capabilities(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
-) -> DeviceConfig:
-    """Load TOML document into the DeviceConfig structure"""
+) -> DeviceCapabilities:
+    """Load TOML document into the DeviceCapabilities structure"""
 
     schema = int(config["schema"])
 
@@ -344,7 +344,7 @@ def get_device_config(
             observable_props,
         )
 
-    return DeviceConfig(
+    return DeviceCapabilities(
         native_ops=native_gate_props,
         to_decomp_ops=decomp_props,
         to_matrix_ops=matrix_decomp_props,
