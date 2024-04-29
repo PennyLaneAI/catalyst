@@ -81,6 +81,7 @@ def AnnotateFunctionPass : Pass<"annotate-function"> {
     let summary = "Annotate functions that contain a measurement operation.";
 
     let dependentDialects = [
+        "catalyst::CatalystDialect",
         "func::FuncDialect"
     ];
 

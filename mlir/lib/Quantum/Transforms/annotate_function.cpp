@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/IR/CatalystOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -26,22 +27,30 @@ using namespace catalyst::quantum;
 
 namespace {
 
-static constexpr const char *hasMeasureAttrName = "catalyst.hasMeasureOp";
+static constexpr const char *hasMeasureAttrName = "catalyst.invalidGradientOperation";
 
 bool isAnnotated(func::FuncOp op, const char *attr)
 {
     return (bool)(op->getAttrOfType<UnitAttr>(attr));
 }
 
-bool hasMeasureOp(func::FuncOp op)
+bool invalidGradientOperation(func::FuncOp op)
 {
-    auto res = op.walk([](MeasureOp op) { return WalkResult::interrupt(); });
+    auto res = op.walk([](Operation *o) {
+        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::PythonCallOp>(o) ||
+            dyn_cast<catalyst::CustomCallOp>(o)) {
+            return WalkResult::interrupt();
+        }
+        else {
+            return WalkResult::advance();
+        }
+    });
     return res.wasInterrupted();
 }
 
 bool successfulMatchLeaf(func::FuncOp op)
 {
-    return !isAnnotated(op, hasMeasureAttrName) && hasMeasureOp(op);
+    return !isAnnotated(op, hasMeasureAttrName) && invalidGradientOperation(op);
 }
 
 void annotate(func::FuncOp op, PatternRewriter &rewriter, const char *attr)

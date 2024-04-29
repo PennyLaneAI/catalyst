@@ -55,9 +55,13 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
-    if (callee->getAttrOfType<UnitAttr>("catalyst.hasMeasureOp")) {
-        return op_state->emitOpError(
-            "quantum measurements are not allowed in the gradient regions");
+    if (callee->getAttrOfType<UnitAttr>("catalyst.invalidGradientOperation")) {
+        return op_state->emitOpError("An operation without a valid gradient was found in code "
+                                     "reachable from the gradient operation.\n"
+                                     "Example of operations not allowed:\n"
+                                     " * mid circuit measurements\n"
+                                     " * callbacks\n"
+                                     " * ZNE mitigation.");
     }
 
     for (unsigned i = 0; i < fnArgs.size(); ++i)

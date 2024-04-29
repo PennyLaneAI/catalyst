@@ -168,7 +168,7 @@ func.func @measure(%arg0: f64) -> f64 {
 }
 
 %f0 = arith.constant 0.0 : f64
-// expected-error@+1 {{quantum measurements are not allowed in the gradient regions}}
+// expected-error@+1 {{An operation without a valid gradient was found}}
 gradient.grad "fd" @measure(%f0) : (f64) -> (f64)
 
 // -----
@@ -190,5 +190,5 @@ func.func @foo(%arg0 : f64) -> f64 {
 }
 
 %f0 = arith.constant 0.0 : f64
-// expected-error@+1 {{quantum measurements are not allowed in the gradient regions}}
+// expected-error@+1 {{An operation without a valid gradient was found}}
 gradient.grad "fd" @foo(%f0) : (f64) -> (f64)
