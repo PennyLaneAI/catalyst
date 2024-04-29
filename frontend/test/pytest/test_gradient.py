@@ -29,6 +29,7 @@ from catalyst import (
     grad,
     jacobian,
     measure,
+    mitigate_with_zne,
     pure_callback,
     qjit,
     value_and_grad,
@@ -1209,6 +1210,24 @@ class TestGradientErrors:
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
+
+    def test_with_zne(self):
+        """Test with ZNE"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            y = pure_callback(jnp.sin, float)(x)
+            qml.RX(y, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        def g(x):
+            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(x)
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(g)(x)
 
 
 if __name__ == "__main__":
