@@ -384,5 +384,16 @@ def test_tuple_out():
     f(0.1)
 
 
+def test_numpy_ufuncs():
+    """Test with numpy ufuncs."""
+
+    @qml.qjit
+    def f(x):
+        y = pure_callback(np.sin, float)(x)
+        return y
+
+    assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
