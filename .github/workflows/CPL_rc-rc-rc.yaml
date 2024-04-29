@@ -1,4 +1,4 @@
-name: Check CPL latest/rc/latest
+name: Check CPL rc/rc/rc
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-config:
-    name: CPL latest/rc/latest
+    name: CPL rc/rc/rc
     uses: ./.github/workflows/check-pl-compat.yaml
     with:
       catalyst: release-candidate
