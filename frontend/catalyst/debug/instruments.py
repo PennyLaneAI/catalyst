@@ -40,12 +40,12 @@ def instrumentation(session_name, filename=None, detailed=False):
     be a context-free process either since we need to write results to an existing results file.
 
     Args:
-        session_name (str): identifier to distinguish multiple results, primarily for humans
+        session_name (str): identifier to distinguish multiple sessions or runs within the same result file
         filename (str): Desired path to write results to in YAML format. If ``None``, the
             results will instead be printed to the console.
-        detailed (bool): whether to instrument finegrained steps in the compiler and runtime.
-            If ``False``, only high-level steps such as program capture and
-            compilation are reported.
+        detailed (bool): Whether to instrument fine-grained steps in the compiler and runtime.
+            If ``False``, only high-level steps such as "program capture" and
+            "compilation" are reported.
 
     **Example**
 
@@ -87,12 +87,12 @@ def instrumentation(session_name, filename=None, detailed=False):
 
 def instrument(fn=None, *, size_from=None, has_finegrained=False):
     """Decorator that marks specific functions as targets for instrumentation.
-    nstrumentation is only performed when enabled by a session.
+    Instrumentation is only performed when enabled by a session.
 
     Args:
         fn (Callable): function to instrument
         size_from (int | None): optional index indicating from which result to measure program size
-            by number of newlines in the string representation of the result
+            (by number of newlines in the string representation of the result)
         has_finegrained (bool): whether to instrument finegrained steps in the compiler and runtime.
             If ``False``, only high-level steps such as program capture and
             compilation are reported.
