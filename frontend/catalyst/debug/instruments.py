@@ -85,7 +85,7 @@ def instrumentation(session_name, filename=None, detailed=False):
         session.close()
 
 
-def instrument(fn=None, *, size_from=None, detailed=False):
+def instrument(fn=None, *, size_from=None, has_finegrained=False):
     """Decorator that marks specific functions as targets for instrumentation.
     nstrumentation is only performed when enabled by a session.
 
@@ -93,7 +93,7 @@ def instrument(fn=None, *, size_from=None, detailed=False):
         fn (Callable): function to instrument
         size_from (int | None): optional index indicating from which result to measure program size
             by number of newlines in the string representation of the result
-        detailed (bool): whether to instrument finegrained steps in the compiler and runtime.
+        has_finegrained (bool): whether to instrument finegrained steps in the compiler and runtime.
             If ``False``, only high-level steps such as program capture and
             compilation are reported.
 
@@ -140,7 +140,7 @@ def instrument(fn=None, *, size_from=None, detailed=False):
             cputime: 0.859378
     """
     if fn is None:
-        return functools.partial(instrument, size_from=size_from, detailed=detailed)
+        return functools.partial(instrument, size_from=size_from, has_finegrained=has_finegrained)
 
     stage_name = getattr(fn, "__name__", "UNKNOWN")
 
@@ -149,7 +149,7 @@ def instrument(fn=None, *, size_from=None, detailed=False):
         if not InstrumentSession.active:
             return fn(*args, **kwargs)
 
-        with ResultReporter(stage_name, detailed) as reporter:
+        with ResultReporter(stage_name, has_finegrained) as reporter:
             fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)
