@@ -21,13 +21,12 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "Quantum/Transforms/annotate_function.hpp"
 
 using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace {
-
-static constexpr const char *hasMeasureAttrName = "catalyst.invalidGradientOperation";
 
 bool isAnnotated(func::FuncOp op, const char *attr)
 {
@@ -50,7 +49,7 @@ bool invalidGradientOperation(func::FuncOp op)
 
 bool successfulMatchLeaf(func::FuncOp op)
 {
-    return !isAnnotated(op, hasMeasureAttrName) && invalidGradientOperation(op);
+    return !isAnnotated(op, hasInvalidGradientOp) && invalidGradientOperation(op);
 }
 
 void annotate(func::FuncOp op, PatternRewriter &rewriter, const char *attr)
@@ -72,7 +71,7 @@ LogicalResult AnnotateFunctionPattern::match(func::FuncOp op) const
 
 void AnnotateFunctionPattern::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
-    annotate(op, rewriter, hasMeasureAttrName);
+    annotate(op, rewriter, hasInvalidGradientOp);
 }
 
 std::optional<func::FuncOp> getFuncOp(const CallGraphNode *node, CallGraph &cg)
@@ -142,12 +141,12 @@ struct PropagateAnnotationPattern : public OpRewritePattern<func::FuncOp> {
 
 LogicalResult PropagateAnnotationPattern::match(func::FuncOp op) const
 {
-    return successfulMatchNode(op, hasMeasureAttrName, callgraph) ? success() : failure();
+    return successfulMatchNode(op, hasInvalidGradientOp, callgraph) ? success() : failure();
 }
 
 void PropagateAnnotationPattern::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
-    annotate(op, rewriter, hasMeasureAttrName);
+    annotate(op, rewriter, hasInvalidGradientOp);
 }
 
 } // namespace
