@@ -16,6 +16,8 @@
 # pylint: disable=unused-argument
 import pathlib
 
+import os
+import tempfile
 import numpy as np
 import pennylane as qml
 import pytest
@@ -57,6 +59,58 @@ class DummyDevice(Device):
         transform_program = TransformProgram()
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
+
+
+class DummyDeviceCounts(Device):
+    """A dummy device from the device API without wires."""
+
+    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
+        "runtime/tests/third_party/dummy_device.toml"
+    )
+
+    def __init__(self, wires, shots=1024):
+        super().__init__(wires=wires, shots=shots)
+
+    @staticmethod
+    def get_c_interface():
+        """Returns a tuple consisting of the device name, and
+        the location to the shared object with the C/C++ device implementation.
+        """
+
+        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+
+    def execute(self, circuits, execution_config):
+        """Execution."""
+        return circuits, execution_config
+
+    def __enter__(self, *args, **kwargs):
+        dummy_toml = self.config
+        with open(dummy_toml, mode="r", encoding="UTF-8") as f:
+            toml_contents = f.readlines()
+
+        updated_toml_contents = []
+        for line in toml_contents:
+            if "Expval" in line:
+                continue
+            if "Var" in line:
+                continue
+            if "Probs" in line:
+                continue
+            if "Sample" in line:
+                continue
+
+            updated_toml_contents.append(line)
+
+        self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+        self.toml_file.writelines(updated_toml_contents)
+        self.toml_file.close()  # close for now without deleting
+
+        self.config = self.toml_file.name
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        os.unlink(self.toml_file.name)
+        self.config = None
 
 
 class TestPreprocess:
@@ -170,6 +224,31 @@ class TestPreprocess:
         assert "expval" not in mlir
         assert "var" not in mlir
         assert "counts" in mlir
+
+    @pytest.mark.skipif(
+        not pathlib.Path(
+            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        ).is_file(),
+        reason="lib_dummydevice.so was not found.",
+    )
+    def test_measurement_from_counts_integration_multiple_measurements_device(self):
+        """Test the measurment from counts transform as part of the Catalyst pipeline."""
+        with DummyDeviceCounts(wires=4, shots=1000) as dev:
+
+            @qml.qjit
+            @qml.qnode(dev)
+            def circuit(theta: float):
+                qml.X(0)
+                qml.X(1)
+                qml.X(2)
+                qml.X(3)
+                return qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1))
+
+            mlir = qml.qjit(circuit, target="mlir").mlir
+
+            assert "expval" not in mlir
+            assert "var" not in mlir
+            assert "counts" in mlir
 
     @pytest.mark.skipif(
         not pathlib.Path(
