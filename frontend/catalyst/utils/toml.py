@@ -131,7 +131,15 @@ def get_observables(config: TOMLDocument, shots_present: bool) -> Dict[str, dict
 
 def get_measurement_processes(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
     """Get the measurements processes from the `native` section of the config."""
-    return get_gates(config, ["measurement_processes"], shots_present)
+
+    schema = int(config["schema"])
+    if schema == 1:
+        shots_string = "finiteshots" if shots_present else "exactshots"
+        return get_gates(config, ["measurement_processes", shots_string], shots_present)
+    if schema == 2:
+        return get_gates(config, ["measurement_processes"], shots_present)
+
+    raise CompileError(f"Unsupported config schema {schema}")
 
 
 def get_native_gates(config: TOMLDocument, shots_present: bool) -> Dict[str, dict]:
