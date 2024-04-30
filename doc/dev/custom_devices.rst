@@ -335,7 +335,7 @@ headers and fields are generally required, unless stated otherwise.
         Var = {}
         Probs = {}
         Sample = {}
-        Count = { condition = [ "finiteshots" ] }
+        Counts = { condition = [ "finiteshots" ] }
 
         [compilation]
 
