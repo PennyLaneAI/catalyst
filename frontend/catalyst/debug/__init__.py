@@ -20,12 +20,18 @@ from catalyst.debug.compiler_functions import (
     get_cmain,
     print_compilation_stage,
 )
-from catalyst.debug.printing import print  # pylint: disable=redefined-builtin
+from catalyst.debug.instruments import instrumentation
+from catalyst.debug.printing import (  # pylint: disable=redefined-builtin
+    print,
+    print_memref,
+)
 
 __all__ = (
     "callback",
     "print",
+    "print_memref",
     "print_compilation_stage",
     "get_cmain",
     "compile_from_mlir",
+    "instrumentation",
 )

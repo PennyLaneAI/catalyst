@@ -47,6 +47,7 @@ def pure_callback(callback_fn, result_type=None):
       1. Given the same arguments *args, the results will be the same each time the function is
          called.
       2. The function has no side effect.
+      3. Examples of side effects include modifying a non-local variable, printing, etc.
 
     A pure callback is a pure python function that can be executed by the python virtual machine.
     This is in direct contrast to functions which get JIT compiled by Catalyst.
@@ -105,9 +106,10 @@ def pure_callback(callback_fn, result_type=None):
 
 
 def debug_callback(callback_fn):
-    """Debug callback
+    """A function that is useful for printing and logging and allows users to execute a Python
+    function (with no return values) at runtime within their qjitted workflows.
 
-    An debug callback is a python function that can write to stdout or to a file.
+    A debug callback is a python function that can write to stdout or to a file.
     It is expected to return no values.
 
     Using `debug.callback` allows a user to run a python function with side effects inside an
@@ -188,8 +190,6 @@ def callback_implementation(
     metadata = CallbackClosure(args, kwargs)
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
-    if not isinstance(results_aval, Sequence):
-        results_aval = [results_aval]
 
     flat_results_aval, out_tree = tree_flatten(results_aval)
 
@@ -203,7 +203,10 @@ def callback_implementation(
         args, kwargs = tree_unflatten(in_tree, jnpargs)
         retvals = tree_leaves(cb(*args, **kwargs))
         return_values = []
-        for retval, exp_aval in zip(retvals, results_aval):
+        results_aval_sequence = (
+            results_aval if isinstance(results_aval, Sequence) else [results_aval]
+        )
+        for retval, exp_aval in zip(retvals, results_aval_sequence):
             obs_aval = shaped_abstractify(retval)
             if obs_aval != exp_aval:
                 raise TypeError(
