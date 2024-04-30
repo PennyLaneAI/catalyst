@@ -392,11 +392,7 @@ def cudaq_sample_impl(kernel, *args, shots_count=1000):
     a_dict = cudaq.sample(kernel, *args, shots_count=shots_count)
     aggregate = []
     for bitstring, count in a_dict.items():
-        # It is technically a bit array
-        # So we should use int(bit)
-        # But in Catalyst, these are floats.
-        # So we use floats.
-        bitarray = [float(bit) for bit in bitstring]
+        bitarray = [int(bit) for bit in bitstring]
         for _ in range(count):
             aggregate.append(bitarray)
 
@@ -437,8 +433,7 @@ def cudaq_counts_impl(kernel, *args, shape=None, shots_count=1000):
     a_dict_decimal = {str(int(k[::-1], 2)): v for k, v in a_dict.items()}
     res.update(a_dict_decimal)
 
-    # The integers are actually floats in Catalyst
-    bitstrings, counts_items = zip(*[(float(k), v) for k, v in res.items()])
+    bitstrings, counts_items = zip(*[(int(k), v) for k, v in res.items()])
 
     return jnp.array(bitstrings), jnp.array(counts_items)
 
