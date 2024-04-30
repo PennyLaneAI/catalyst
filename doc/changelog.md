@@ -11,6 +11,7 @@
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
+  [(#204)](https://github.com/PennyLaneAI/catalyst/pull/204)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -55,6 +56,9 @@
   ```
 
   At the moment, callbacks should not be used inside methods which are differentiated.
+  A CompileError exception will be raised if at compile time it is found that code
+  reachable from the gradient operation contains either a mid-circuit measurement,
+  a callback, or a custom call (which happens through the mitigation operation).
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)

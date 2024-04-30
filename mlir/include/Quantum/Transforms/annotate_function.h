@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,21 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #pragma once
-
-#include <memory>
-
-#include "mlir/Pass/Pass.h"
 
 namespace catalyst {
 
-std::unique_ptr<mlir::Pass> createQuantumBufferizationPass();
-std::unique_ptr<mlir::Pass> createQuantumConversionPass();
-std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
-std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
-std::unique_ptr<mlir::Pass> createAdjointLoweringPass();
-std::unique_ptr<mlir::Pass> createRemoveChainedSelfInversePass();
-std::unique_ptr<mlir::Pass> createAnnotateFunctionPass();
+namespace quantum {
+
+static constexpr const char *hasInvalidGradientOp = "catalyst.invalidGradientOperation";
+
+}
 
 } // namespace catalyst
