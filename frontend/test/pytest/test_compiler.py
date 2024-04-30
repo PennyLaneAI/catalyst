@@ -121,7 +121,7 @@ class TestCompilerErrors:
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test the return value if a user requests an intermediate file that doesn't exist."""
         compiler = Compiler()
-        with pytest.raises(CompileError, match="Requesting the output of an empty pipeline"):
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("inexistent-file")
 
     def test_runtime_error(self, backend):
@@ -218,15 +218,15 @@ class TestCompilerState:
             return qml.state()
 
         compiler = workflow.compiler
-        with pytest.raises(CompileError, match="Requesting the output of an empty pipeline"):
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline1")
         assert compiler.get_output_of("HLOLoweringPass")
         assert compiler.get_output_of("QuantumCompilationPass")
-        with pytest.raises(CompileError, match="Requesting the output of an empty pipeline"):
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline2")
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
-        with pytest.raises(CompileError, match="Requesting the output of an empty pipeline"):
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("None-existing-pipeline")
         workflow.workspace.cleanup()
 
@@ -239,7 +239,7 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        with pytest.raises(CompileError, match="Requesting the output of an empty pipeline"):
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             workflow.compiler.get_output_of("None-existing-pipeline")
         workflow.workspace.cleanup()
 
