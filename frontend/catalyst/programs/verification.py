@@ -39,6 +39,7 @@ def verify_program(config: DeviceCapabilities, program: ProgramRepresentation):
     """
     verify_inverses(config, program)
     verify_control(config, program)
+    verify_differentiability(config, program)
 
 
 def verify_inverses(config: DeviceCapabilities, program: ProgramRepresentation) -> None:
@@ -50,6 +51,14 @@ def verify_inverses(config: DeviceCapabilities, program: ProgramRepresentation) 
 
 
 def verify_control(config: DeviceCapabilities, program: ProgramRepresentation) -> None:
+    """Verify quantum program against the device capabilities.
+
+    Raises: CompileError
+    """
+    pass
+
+
+def verify_differentiability(config: DeviceCapabilities, program: ProgramRepresentation) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
