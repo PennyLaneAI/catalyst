@@ -21,7 +21,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
-#include "Quantum/Transforms/annotate_function.hpp"
+#include "Quantum/Transforms/annotate_function.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;

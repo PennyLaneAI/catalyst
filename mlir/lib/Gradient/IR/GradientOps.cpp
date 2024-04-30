@@ -21,6 +21,7 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/annotate_function.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -55,7 +56,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
-    if (callee->getAttrOfType<UnitAttr>("catalyst.invalidGradientOperation")) {
+    if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
         return op_state->emitOpError("An operation without a valid gradient was found in code "
                                      "reachable from the gradient operation.\n"
                                      "Example of operations not allowed:\n"
