@@ -98,6 +98,7 @@ bool anyCalleeIsAnnotated(func::FuncOp op, const char *attr, CallGraph &cg)
 {
     Region &region = op.getRegion();
     CallGraphNode *node = cg.lookupNode(&region);
+    assert(node && "An incorrect region was used to look up a node in the callgraph.");
     for (auto i = node->begin(), e = node->end(); i != e; ++i) {
         std::optional<func::FuncOp> maybeCallee = getCallee(*i, cg);
         // An indirect call.
