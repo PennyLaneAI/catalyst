@@ -11,10 +11,14 @@ set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Avoid warning raised by pybind11 on newer cmake versions. PYBIND11_FINDPYTHON=ON caused issues.
+if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.27")
+ cmake_policy(SET CMP0148 OLD)
+endif()
+
 include(FetchContent)
 
 function(fetch_pybind11)
-    set(PYBIND11_FINDPYTHON ON) # Avoid warning raised by pybind11 on newer cmake versions.
     find_package(pybind11 CONFIG)
     if (pybind11_FOUND)
         message(STATUS, "FOUND pybind11")
