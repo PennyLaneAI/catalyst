@@ -20,9 +20,7 @@ import pytest
 
 from catalyst import grad, qjit
 
-pytest.importorskip("braket")
-
-from braket.devices import Devices  # pylint: disable=wrong-import-position
+braket = pytest.importorskip("braket")
 
 try:
     qml.device(
@@ -53,7 +51,7 @@ class TestBraketS3Bucket:
             ),
             qml.device(
                 "braket.aws.qubit",
-                device_arn=Devices.Amazon.SV1,
+                device_arn=braket.devices.Devices.Amazon.SV1,
                 s3_destination_folder=("my-bucket", "my-prefix"),
                 wires=2,
             ),
@@ -88,7 +86,7 @@ class TestBraketGates:
             ),
             qml.device(
                 "braket.aws.qubit",
-                device_arn=Devices.Amazon.SV1,
+                device_arn=braket.devices.Devices.Amazon.SV1,
                 wires=3,
             ),
         ],
@@ -139,7 +137,7 @@ class TestBraketGates:
             ),
             qml.device(
                 "braket.aws.qubit",
-                device_arn=Devices.Amazon.SV1,
+                device_arn=braket.devices.Devices.Amazon.SV1,
                 wires=3,
             ),
         ],
