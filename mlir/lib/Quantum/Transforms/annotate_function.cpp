@@ -99,13 +99,6 @@ bool anyCalleeIsAnnotated(func::FuncOp op, const char *attr, CallGraph &cg)
 {
     Region &region = op.getRegion();
     CallGraphNode *node = cg.lookupNode(&region);
-    // TODO: Internal Compiler Error (ICE) if we do not find the node.
-    // Me, (@erick-xanadu) will leave this TODO as a TODO.
-    // I strongly believe that using `signalPassFailure` is not the correct way
-    // to report an ICE. I have asked on the forum but no answer yet.
-    // I believe something that would be appropriate in quantum-opt
-    // is to use abort() and a message just before.
-    // But this wouldn't be appropriate for the compiler driver.
     for (auto i = node->begin(), e = node->end(); i != e; ++i) {
         std::optional<func::FuncOp> maybeCallee = getCallee(*i, cg);
         // An indirect call.
