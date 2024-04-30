@@ -55,7 +55,7 @@ def read_toml_file(toml_file: str) -> TOMLDocument:
     return config
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class OperationProperties:
     """Capabilities of a single operation"""
 
@@ -74,13 +74,13 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 
 
 @dataclass
-class DeviceConfig:
+class DeviceCapabilities:
     """Quantum device capabilities"""
 
-    native_gates: Dict[str, OperationProperties]
-    decomp: Dict[str, OperationProperties]
-    matrix: Dict[str, OperationProperties]
-    observables: Dict[str, OperationProperties]
+    native_ops: Dict[str, OperationProperties]
+    to_decomp_ops: Dict[str, OperationProperties]
+    to_matrix_ops: Dict[str, OperationProperties]
+    native_obs: Dict[str, OperationProperties]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
@@ -94,7 +94,7 @@ def intersect_operations(
 
 
 def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[str]:
-    """Prints a config section into a set of strings using PennyLane syntax"""
+    """Returns a config section into a set of strings using PennyLane syntax"""
     ops = set()
     # Back-mapping from class names to string names
     for g, props in config_ops.items():
@@ -125,11 +125,11 @@ def check_quantum_control_flag(config: TOMLDocument) -> bool:
     raise CompileError("quantum_control flag is not supported in TOMLs schema >= 2")
 
 
-def get_gates(
+def parse_toml_section(
     config: TOMLDocument, path: List[str], program_features: ProgramFeatures
 ) -> Dict[str, dict]:
-    """Read the toml config section specified by `path`. Filters-out gates which don't match
-    condition. For now the only condition we support is `shots_present`."""
+    """Parses the section of toml config file specified by `path`. Filters-out gates which don't
+    match condition. For now the only condition we support is `shots_present`."""
     gates = {}
     analytic = "analytic"
     finiteshots = "finiteshots"
@@ -175,17 +175,17 @@ def get_gates(
 
 def get_observables(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Override the set of supported observables."""
-    return get_gates(config, ["operators", "observables"], program_features)
+    return parse_toml_section(config, ["operators", "observables"], program_features)
 
 
-def get_native_gates(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
+def get_native_ops(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Get the gates from the `native` section of the config."""
 
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "native"], program_features)
+        return parse_toml_section(config, ["operators", "gates", 0, "native"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "native"], program_features)
+        return parse_toml_section(config, ["operators", "gates", "native"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
@@ -200,9 +200,9 @@ def get_decomposable_gates(
     """
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "decomp"], program_features)
+        return parse_toml_section(config, ["operators", "gates", 0, "decomp"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "decomp"], program_features)
+        return parse_toml_section(config, ["operators", "gates", "decomp"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
@@ -217,9 +217,9 @@ def get_matrix_decomposable_gates(
     """
     schema = int(config["schema"])
     if schema == 1:
-        return get_gates(config, ["operators", "gates", 0, "matrix"], program_features)
+        return parse_toml_section(config, ["operators", "gates", 0, "matrix"], program_features)
     elif schema == 2:
-        return get_gates(config, ["operators", "gates", "matrix"], program_features)
+        return parse_toml_section(config, ["operators", "gates", "matrix"], program_features)
 
     raise CompileError(f"Unsupported config schema {schema}")
 
@@ -234,16 +234,92 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
     )
 
 
-def get_device_config(
+def patch_schema1_collections(
+    config, device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
+):  # pylint: disable=too-many-arguments, too-many-branches
+    """For old schema1 config files we deduce some information which was not explicitly encoded."""
+
+    # TODO: remove after PR #642 is merged in lightning
+    # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
+    # is what actual device reports.
+    if device_name == "lightning.kokkos":  # pragma: nocover
+        native_gate_props["GlobalPhase"] = OperationProperties(
+            invertible=False, controllable=True, differentiable=True
+        )
+
+    # TODO: remove after PR #642 is merged in lightning
+    if device_name == "lightning.kokkos":  # pragma: nocover
+        observable_props["Projector"] = OperationProperties(
+            invertible=False, controllable=False, differentiable=False
+        )
+
+    # The deduction logic is the following:
+    # * Most of the gates have their `C(Gate)` controlled counterparts.
+    # * Some gates have to be decomposed if controlled version is used. Typically these are
+    #   gates which are already controlled but have well-known names.
+    # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
+    gates_to_be_decomposed_if_controlled = [
+        "Identity",
+        "CNOT",
+        "CY",
+        "CZ",
+        "CSWAP",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "ControlledPhaseShift",
+        "QubitUnitary",
+        "ControlledQubitUnitary",
+        "Toffoli",
+    ]
+
+    supports_controlled = check_quantum_control_flag(config)
+    if supports_controlled:
+        # Add ControlledQubitUnitary as a controlled version of QubitUnitary
+        if "QubitUnitary" in native_gate_props:
+            native_gate_props["ControlledQubitUnitary"] = OperationProperties(
+                invertible=False, controllable=False, differentiable=True
+            )
+        # By default, enable the `C(gate)` version for most `gates`.
+        for op, props in native_gate_props.items():
+            props.controllable = op not in gates_to_be_decomposed_if_controlled
+
+    supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
+    if supports_adjoint:
+        # Makr all gates as invertibles
+        for props in native_gate_props.values():
+            props.invertible = True
+
+    # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
+    # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
+    # listed in either matrix or decomposable sections. This is a contradiction, because
+    # condition (1) means that `ControlledQubitUnitary` is also in the native set. We solve it
+    # here by applying a fixup.
+    # TODO: remove after PR #642 is merged in lightning
+    if "ControlledQubitUnitary" in native_gate_props:  # pragma: nocover
+        if "ControlledQubitUnitary" in matrix_decomp_props:
+            matrix_decomp_props.pop("ControlledQubitUnitary")
+        if "ControlledQubitUnitary" in decomp_props:
+            decomp_props.pop("ControlledQubitUnitary")
+
+    # Fix a bug in device toml schema 1
+    if "ControlledPhaseShift" in native_gate_props:  # pragma: nocover
+        if "ControlledPhaseShift" in matrix_decomp_props:
+            matrix_decomp_props.pop("ControlledPhaseShift")
+        if "ControlledPhaseShift" in decomp_props:
+            decomp_props.pop("ControlledPhaseShift")
+
+
+def get_device_capabilities(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
-) -> DeviceConfig:
-    """Load TOML document into the DeviceConfig structure"""
-    # pylint: disable=too-many-branches
+) -> DeviceCapabilities:
+    """Load TOML document into the DeviceCapabilities structure"""
 
     schema = int(config["schema"])
 
     native_gate_props = {}
-    for g, props in get_native_gates(config, program_features).items():
+    for g, props in get_native_ops(config, program_features).items():
         native_gate_props[g] = get_operation_properties(props)
 
     matrix_decomp_props = {}
@@ -259,82 +335,20 @@ def get_device_config(
         observable_props[g] = get_operation_properties(props)
 
     if schema == 1:
-        # TODO: remove after PR #642 is merged in lightning
-        # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
-        # is what actual device reports.
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            native_gate_props["GlobalPhase"] = OperationProperties(
-                invertible=False, controllable=True, differentiable=True
-            )
+        patch_schema1_collections(
+            config,
+            device_name,
+            native_gate_props,
+            matrix_decomp_props,
+            decomp_props,
+            observable_props,
+        )
 
-        # TODO: remove after PR #642 is merged in lightning
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            observable_props["Projector"] = OperationProperties(
-                invertible=False, controllable=False, differentiable=False
-            )
-
-        # The deduction logic is the following:
-        # * Most of the gates have their `C(Gate)` controlled counterparts.
-        # * Some gates have to be decomposed if controlled version is used. Typically these are
-        #   gates which are already controlled but have well-known names.
-        # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
-        gates_to_be_decomposed_if_controlled = [
-            "Identity",
-            "CNOT",
-            "CY",
-            "CZ",
-            "CSWAP",
-            "CRX",
-            "CRY",
-            "CRZ",
-            "CRot",
-            "ControlledPhaseShift",
-            "QubitUnitary",
-            "ControlledQubitUnitary",
-            "Toffoli",
-        ]
-
-        supports_controlled = check_quantum_control_flag(config)
-        if supports_controlled:
-            # Add ControlledQubitUnitary as a controlled version of QubitUnitary
-            if "QubitUnitary" in native_gate_props:
-                native_gate_props["ControlledQubitUnitary"] = OperationProperties(
-                    invertible=False, controllable=False, differentiable=True
-                )
-            # By default, enable the `C(gate)` version for most `gates`.
-            for op, props in native_gate_props.items():
-                props.controllable = op not in gates_to_be_decomposed_if_controlled
-
-        supports_adjoint = check_compilation_flag(config, "quantum_adjoint")
-        if supports_adjoint:
-            # Makr all gates as invertibles
-            for props in native_gate_props.values():
-                props.invertible = True
-
-        # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
-        # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
-        # listed in either matrix or decomposable sections. This is a contradiction, because
-        # condition (1) means that `ControlledQubitUnitary` is also in the native set. We solve it
-        # here by applying a fixup.
-        # TODO: remove after PR #642 is merged in lightning
-        if "ControlledQubitUnitary" in native_gate_props:  # pragma: nocover
-            if "ControlledQubitUnitary" in matrix_decomp_props:
-                matrix_decomp_props.pop("ControlledQubitUnitary")
-            if "ControlledQubitUnitary" in decomp_props:
-                decomp_props.pop("ControlledQubitUnitary")
-
-        # Fix a bug in device toml schema 1
-        if "ControlledPhaseShift" in native_gate_props:  # pragma: nocover
-            if "ControlledPhaseShift" in matrix_decomp_props:
-                matrix_decomp_props.pop("ControlledPhaseShift")
-            if "ControlledPhaseShift" in decomp_props:
-                decomp_props.pop("ControlledPhaseShift")
-
-    return DeviceConfig(
-        native_gates=native_gate_props,
-        decomp=decomp_props,
-        matrix=matrix_decomp_props,
-        observables=observable_props,
+    return DeviceCapabilities(
+        native_ops=native_gate_props,
+        to_decomp_ops=decomp_props,
+        to_matrix_ops=matrix_decomp_props,
+        native_obs=observable_props,
         mid_circuit_measurement_flag=check_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=check_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=check_compilation_flag(config, "dynamic_qubit_management"),

@@ -114,11 +114,29 @@ def PythonCallOp: Catalyst_Op<"pycallback",
   }];
 
   let arguments = (ins
-        I64Attr: $identifier
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
+        I64Attr: $identifier,
+        OptionalAttr<I64Attr>: $number_original_arg
   );
 
+  let results = (outs Variadic<AnyType>);
+
+  let builders = [
+        OpBuilder<(ins "mlir::TypeRange":$resultTypes, "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier), [{
+            auto id = $_builder.getI64IntegerAttr(identifier);
+            auto argc = $_builder.getI64IntegerAttr(inputs.size());
+            return build($_builder, $_state, resultTypes, inputs, id, argc);
+        }]>,
+
+        OpBuilder<(ins "mlir::TypeRange":$resultTypes, "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier, "int64_t": $size), [{
+            auto id = $_builder.getI64IntegerAttr(identifier);
+            auto argc = $_builder.getI64IntegerAttr(size);
+            return build($_builder, $_state, resultTypes, inputs, id, argc);
+        }]>
+    ];
+
   let assemblyFormat = [{
-    attr-dict
+    `(` $inputs `)` attr-dict `:` functional-type(operands, results)
   }];
 }
 

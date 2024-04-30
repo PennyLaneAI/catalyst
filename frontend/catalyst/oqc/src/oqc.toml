@@ -12,7 +12,6 @@ PauliZ = { }
 S = { }
 T = { }
 CNOT = { }
-Identity = { }
 Toffoli = { }
 CY = { }
 CZ = { }
@@ -34,6 +33,7 @@ U3 = { }
 # Optional, since gates not listed in this list will typically be decomposed by
 # default, but can be useful to express a deviation from this device's regular
 # strategy in PennyLane.
+
 [operators.gates.decomp]
 
 # Gates which should be translated to QubitUnitary
@@ -58,6 +58,7 @@ Count = { condition = [ "finiteshots" ] }
 qjit_compatible = true
 # If the device requires run time generation of the quantum circuit.
 runtime_code_generation = true
+
 # If the device supports mid circuit measurements natively
 mid_circuit_measurement = false
 

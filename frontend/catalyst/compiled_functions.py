@@ -23,7 +23,6 @@ from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
     as_ctype,
-    get_ranked_memref_descriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
 )
@@ -38,6 +37,7 @@ from catalyst.tracing.type_signatures import (
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
+from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
 
 
 class SharedObjectManager:

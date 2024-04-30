@@ -1,54 +1,165 @@
-# Release 0.6.0-dev
+# Release 0.7.0-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Internal changes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.6.0
 
 <h3>New features</h3>
 
 * Support for callbacks in Catalyst.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
+  [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
+  [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
+  [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
+  [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
+  [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
+  [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
 
-  Catalyst now supports callbacks without parameters nor return values.
-  This is the very first step in supporting callbacks.
-  The following is now possible.
+  Catalyst now supports callbacks with parameters and return values.
+  The following is now possible:
 
   ```py
-  @callback
-  def foo():
-    print("Hello world")
+  @debug.callback
+  def foo(val):
+    print(f"myval: {val}")
+
+  @pure_callback
+  def bar(val) -> int:
+    return val + 1
 
   @qjit
-  def circuit(*args, **kwargs):
-    ...
-    foo()
-    ...
+  def circuit(param):
+    x = bar(param)
+    foo(x)
+
   ```
 
-* The python layer of the OQC-Catalyst device is now available.
+  ```pycon
+  >>> print(circuit(123))
+  myval: 124
+  ```
+
+  This includes support for the specialized `pure_callback` and `debug.callback` where
+  `pure_callback` is expected to return a value and be side effect free,
+  while `debug.callback` is expected to produce a side effect and have no return values.
+
+  Syntactic sugar on top of `debug.callback` includes `debug.print` which allows the user
+  to use string formatting (akin to `str.format()`) before printing. See https://docs.python.org/3/library/string.html#formatstrings
+
+  ```py
+  @qjit
+  def cir(a, b, c):
+      debug.print("{c} {b} {a}", a=a, b=b, c=c)
+  ```
+
+  ```pycon
+  >>> cir(1, 2, 3)
+  3 2 1
+  ```
+
+  At the moment, callbacks should not be used inside methods which are differentiated.
+
+* The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
+  [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+
+  ```py
+  from catalyst.oqc import OQCDevice
+
+  import os
+
+  os.environ["OQC_EMAIL"] = "your_email"
+  os.environ["OQC_PASSWORD"] = "your_password"
+  os.environ["OQC_URL"] = "oqc_url"
+
+  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+
+  @catalyst.qjit
+  @qml.qnode(device=device)
+  def circuit(a: float):
+      qml.Hadamard(0)
+      qml.CNOT(wires=[0, 1])
+      qml.RX(wires=0)
+      return qml.counts(wires=[0, 1])
+
+  print(circuit(0.2))
+  ```
 
 * Catalyst publishes Git revision string seen at the time of the packaging as
   `catalyst.__revision__` . For editable installations, the revision is read at the time of
   module import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
 
-* Catalyst compiler and runtime have now the capability to provide detailed profiling information.
-  This includes insights such as the program size at various stages within the compilation pipeline
-  and the respective time durations spent in each of these stages.
-  You can print the results by enabling the `ENABLE_DIAGNOSTICS=ON` environment variable,
-  or you can save them to a file by specifying an additional environment variable,
-  `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`.
+* Catalyst now ships with an instrumentation feature allowing to explore what steps are run during
+  compilation and execution, and for how long.
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
+  [(#597)](https://github.com/PennyLaneAI/catalyst/pull/597)
+
+  Instrumentation can be enabled from the frontend with the `catalyst.debug.instrumentation`
+  context manager:
+
+  ```py
+  @qjit
+  def expensive_function(a, b):
+      return a + b
+
+  with debug.instrumentation("session_name", filename="profiling_results.txt", detailed=True):
+    expensive_function(1, 2)
+  ```
+
+  The results will be appended to the provided file if the `filename` attribute is set, and printed
+  to the console otherwise. The flag `detailed` determines whether individual steps in the compiler
+  and runtime are instrumented, or whether only high-level steps like "program capture" and
+  "compilation" are reported.
+
+  Measurements currently include wall time, cpu time, and (intermediate) program size.
 
 <h3>Improvements</h3>
+
+* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
+
+* The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
+  signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
+  a Jupyter Notebook.
+  [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
+
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
+
+* An exception is now raised when OpenBLAS cannot be found by Catalyst.
+  [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
 
 * An updated quantum device specification format is now supported by Catalyst. The toml schema 2
   configs allow device autors to specify individual gate properties such as native quantum control
   support, gate invertibility or differentiability.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
-* Catalyst now supports devices built from the 
+* Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
+  It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
+  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that
+  devices have the wires set.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
+  [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
+  [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
+  [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
@@ -84,9 +195,34 @@
 
   After an update in the amazon-braket-sdk all declared qubits are measured as opposed to drop if there were no uses.
 
+* Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
+  [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
+
+* Remove unnecessary logic for handling wires from GlobalPhase.
+  [(#640)](https://github.com/PennyLaneAI/catalyst/pull/640)
+
+* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
+  [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
+
 <h3>Breaking changes</h3>
 
+* `catalyst.debug.print` has changed, resulting in the `memref` keyword argument being removed. Please use `catalyst.debug.print_memref` instead.
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
+
 <h3>Bug fixes</h3>
+
+* Fix `measurement_from_counts` following an update of a private function in PennyLane.
+  [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
+
+* Enable support for QNode argument `diff_method=None` with QJIT.
+  [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
+
+* Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
+  contain one element.
+  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
+
+* Allow all Catalyst gates to receive `wire` values of less than 64 bitwidth.
+  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
 * Fix the endianness of counts in Catalyst and matches PennyLane.
   [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
@@ -101,6 +237,11 @@
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
+<h3>Internal changes</h3>
+
+* The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
+  [(#679)](https://github.com/PennyLaneAI/catalyst/pull/679)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -109,7 +250,9 @@ Ali Asadi,
 David Ittah,
 Romain Moyard,
 Sergei Mironov,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Lee James O'Riordan,
+Muzammiluddin Syed.
 
 # Release 0.5.0
 
@@ -125,12 +268,12 @@ Erick Ochoa Lopez.
   written to minimize usage of Python for loops (which can be slow and inefficient), and instead
   push as much of the computation through to the array manipulation library, by taking advantage of
   extra batch dimensions.
-  
+
   For example, consider the following QNode:
-  
+
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qml.qnode(dev)
   def circuit(x, y):
       qml.RX(jnp.pi * x[0] + y, wires=0)
@@ -138,15 +281,15 @@ Erick Ochoa Lopez.
       qml.RX(x[1] * x[2], wires=0)
       return qml.expval(qml.PauliZ(0))
   ```
-  
+
   ```pycon
   >>> circuit(jnp.array([0.1, 0.2, 0.3]), jnp.pi)
   Array(-0.93005586, dtype=float64)
   ```
-  
+
   We can use `catalyst.vmap` to introduce additional batch dimensions to our input arguments,
   without needing to use a Python for loop:
-  
+
   ```pycon
   >>> x = jnp.array([[0.1, 0.2, 0.3],
   ...                [0.4, 0.5, 0.6],
@@ -155,7 +298,7 @@ Erick Ochoa Lopez.
   >>> qjit(vmap(cost))(x, y)
   array([-0.93005586, -0.97165424, -0.6987465 ])
   ```
-  
+
   `catalyst.vmap()` has been implemented to match the same behaviour of `jax.vmap`, so should be a drop-in
   replacement in most cases. Under-the-hood, it is automatically inserting Catalyst-compatible for loops,
   which will be compiled and executed outside of Python for increased performance.
@@ -179,7 +322,7 @@ Erick Ochoa Lopez.
   * `softwareq.qpp`: a modern C++ statevector simulator
   * `nvidia.custatevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
   * `nvidia.cutensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
-  
+
   For example:
 
   ```python
@@ -432,7 +575,7 @@ Erick Ochoa Lopez.
 
 * Remove redundant copies of TOML files for `lightning.kokkos` and `lightning.qubit`.
   [(#472)](https://github.com/PennyLaneAI/catalyst/pull/472)
-  
+
   `lightning.kokkos` and `lightning.qubit` now ship with their own TOML file. As such, we use the TOML file provided by them.
 
 * Capturing quantum circuits with many gates prior to compilation is now quadratically faster (up to
@@ -493,7 +636,7 @@ Erick Ochoa Lopez.
   To avoid this, two changes were necessary:
 
   * The Catalyst runtime now has a different API from QIR instructions.
-  
+
     The runtime has been modified such that QIR instructions are lowered to functions where
     the `__quantum__` part of the function name is replaced with `__catalyst__`. This prevents
     the possibility of symbol conflicts with other libraries that implement QIR as a library.
@@ -526,7 +669,7 @@ Erick Ochoa Lopez.
   ```py
   def f(x):
     return jax.numpy.sum(x[::2])
-  
+
   x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
   ```
   ```pycon

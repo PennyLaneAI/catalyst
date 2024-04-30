@@ -71,12 +71,6 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers)
     getModifiersAdjoint(mod), getModifiersControlledWires(mod), getModifiersControlledValues(mod)
 
 /**
- * @brief Thread local timer to measure the execution time of the runtime
- * instructions.
- */
-thread_local static catalyst::utils::Timer capi_timer{};
-
-/**
  * @brief Initialize the device instance and update the value of RTD_PTR
  * to the new initialized device pointer.
  */
@@ -112,14 +106,18 @@ void deactivateDevice()
 extern "C" {
 
 using namespace Catalyst::Runtime;
+using timer = catalyst::utils::Timer;
 
-void pyregistry(int64_t identifier)
+void pyregistry(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
     // We need to guard calls to callback.
     // These are implemented in Python.
     std::lock_guard<std::mutex> lock(getPythonMutex());
 
-    // LIBREGISTRY is a compile time macro.
+    // LIBREGISTRY is a compile time macro. It is defined based on the output
+    // name of the callback library. And since it is stored in the same location
+    // as this library, it shares the ORIGIN variable. Do a `git grep LIBREGISTRY`
+    // to find its definition in the CMakeFiles.
     // It is the name of the library that contains the callbackCall implementation.
     // The reason why this is using dlopen is because we have historically wanted
     // to avoid a dependency of python in the runtime.
@@ -130,24 +128,24 @@ void pyregistry(int64_t identifier)
     //
     // This function cannot be tested from the runtime tests because there would be no valid python
     // function to callback...
-
-    std::string libpath = LIBREGISTRY;
-
-    void *handle = dlopen(libpath.c_str(), RTLD_LAZY);
+    void *handle = dlopen(LIBREGISTRY, RTLD_LAZY);
     if (!handle) {
         char *err_msg = dlerror();
         RT_FAIL(err_msg);
     }
 
-    void (*callbackCall)(uintptr_t);
-    typedef void (*func_ptr_t)(uintptr_t);
+    void (*callbackCall)(int64_t, int64_t, int64_t, va_list);
+    typedef void (*func_ptr_t)(int64_t, int64_t, int64_t, va_list);
     callbackCall = (func_ptr_t)dlsym(handle, "callbackCall");
     if (!callbackCall) {
         char *err_msg = dlerror();
         RT_FAIL(err_msg);
     }
 
-    callbackCall(identifier);
+    va_list args;
+    va_start(args, retc);
+    callbackCall(identifier, argc, retc, args);
+    va_end(args);
     dlclose(handle);
 }
 
@@ -158,6 +156,7 @@ void __catalyst__host__rt__unrecoverable_error()
 
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
+    // void *ptr = malloc(size);
     void *ptr = malloc(size);
     CTX->getMemoryManager()->insert(ptr);
     return ptr;
@@ -243,9 +242,8 @@ void __catalyst__rt__finalize()
     CTX.reset(nullptr);
 }
 
-void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
+static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
 {
-    capi_timer.start();
     // Device library cannot be a nullptr
     RT_FAIL_IF(!rtd_lib, "Invalid device library");
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
@@ -260,16 +258,26 @@ void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_
     if (CTX->getDeviceRecorderStatus()) {
         getQuantumDevicePtr()->StartTapeRecording();
     }
-    capi_timer.dump("device_init");
+    return 0;
+}
+
+void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
+{
+    timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
+                 rtd_name, rtd_kwargs);
+}
+
+static int __catalyst__rt__device_release__impl()
+{
+    RT_FAIL_IF(!CTX, "Cannot release an ACTIVE device out of scope of the global driver");
+    // TODO: This will be used for the async support
+    deactivateDevice();
+    return 0;
 }
 
 void __catalyst__rt__device_release()
 {
-    capi_timer.start();
-    RT_FAIL_IF(!CTX, "Cannot release an ACTIVE device out of scope of the global driver");
-    // TODO: This will be used for the async support
-    deactivateDevice();
-    capi_timer.dump("device_release");
+    timer::timer(__catalyst__rt__device_release__impl, "device_release", /* add_endl */ true);
 }
 
 void __catalyst__rt__print_state() { getQuantumDevicePtr()->PrintState(); }
@@ -289,19 +297,22 @@ void __catalyst__rt__toggle_recorder(bool status)
     }
 }
 
-QUBIT *__catalyst__rt__qubit_allocate()
+static QUBIT *__catalyst__rt__qubit_allocate__impl()
 {
-    capi_timer.start();
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
 
-    capi_timer.dump("qubit_allocate");
     return reinterpret_cast<QUBIT *>(getQuantumDevicePtr()->AllocateQubit());
 }
 
-QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
+QUBIT *__catalyst__rt__qubit_allocate()
 {
-    capi_timer.start();
+    return timer::timer(__catalyst__rt__qubit_allocate__impl, "qubit_allocate",
+                        /* add_endl */ true);
+}
+
+static QirArray *__catalyst__rt__qubit_allocate_array__impl(int64_t num_qubits)
+{
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);
     RT_ASSERT(num_qubits >= 0);
@@ -315,7 +326,6 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
     // I don't like this copying.
     std::vector<QubitIdType> *qubit_vector_ptr =
         new std::vector<QubitIdType>(qubit_vector.begin(), qubit_vector.end());
-    capi_timer.dump("qubit_allocate_array");
 
     // Because this function is interfacing with C
     // I think we should return a trivial-type
@@ -331,21 +341,37 @@ QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
     return (QirArray *)qubit_vector_ptr;
 }
 
-void __catalyst__rt__qubit_release(QUBIT *qubit)
+QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
 {
-    capi_timer.start();
-    return getQuantumDevicePtr()->ReleaseQubit(reinterpret_cast<QubitIdType>(qubit));
-    capi_timer.dump("qubit_release");
+    return timer::timer(__catalyst__rt__qubit_allocate_array__impl, "qubit_allocate_array",
+                        /* add_endl */ true, num_qubits);
 }
 
-void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
+static int __catalyst__rt__qubit_release__impl(QUBIT *qubit)
 {
-    capi_timer.start();
+    getQuantumDevicePtr()->ReleaseQubit(reinterpret_cast<QubitIdType>(qubit));
+    return 0;
+}
+
+void __catalyst__rt__qubit_release(QUBIT *qubit)
+{
+    timer::timer(__catalyst__rt__qubit_release__impl, "qubit_release",
+                 /* add_endl */ true, qubit);
+}
+
+static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
+{
     getQuantumDevicePtr()->ReleaseAllQubits();
     std::vector<QubitIdType> *qubit_array_ptr =
         reinterpret_cast<std::vector<QubitIdType> *>(qubit_array);
     delete qubit_array_ptr;
-    capi_timer.dump("qubit_release_array");
+    return 0;
+}
+
+void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
+{
+    timer::timer(__catalyst__rt__qubit_release_array__impl, "qubit_release_array",
+                 /* add_endl */ true, qubit_array);
 }
 
 int64_t __catalyst__rt__num_qubits()

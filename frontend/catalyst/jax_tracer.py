@@ -274,6 +274,9 @@ class HybridOp(Operation):
             JAX primitive binder function to call when the quantum tracing is complete.
     """
 
+    # Added as a criteria for the decomposition of HybridOp: see the qjit device preprocessing
+    visited = False
+
     def _no_binder(self, *_):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
 
@@ -430,16 +433,12 @@ def trace_quantum_tape(
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         elif isinstance(op, qml.GlobalPhase):
-            qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
             qubits2 = gphase_p.bind(
-                *[*qubits, *op.parameters, *controlled_qubits, *controlled_values],
-                qubits_len=len(qubits),
-                params_len=len(op.parameters),
+                *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
             )
-            qrp.insert(op.wires, qubits2[: len(qubits)])
-            qrp.insert(controlled_wires, qubits2[len(qubits) :])
+            qrp.insert(controlled_wires, qubits2)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -508,10 +507,7 @@ def trace_observables(
         obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
-        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.parameters), *nested_obs)
-    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
-        # Use the pauli sentence representation of the observable, if applicable
-        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
@@ -612,7 +608,7 @@ def trace_quantum_measurements(
             if isinstance(device, qml.Device):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
-                m_wires = o.wires if o.wires else range(len(tape.wires))
+                m_wires = o.wires if o.wires else range(len(device.wires))
 
             obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
@@ -688,7 +684,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
-        return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
+        return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     if not is_valid_output:
@@ -703,28 +699,29 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(transform_program, tape, flat_results):
+def apply_transform(qnode_program, device_program, tape, flat_results):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
     params = tape.get_parameters(trainable_only=False)
     tape.trainable_params = qml.math.get_trainable_indices(params)
 
-    is_program_transformed = transform_program
+    is_program_transformed = qnode_program
 
-    if is_program_transformed and transform_program.is_informative:
+    if is_program_transformed and qnode_program.is_informative:
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
     if is_program_transformed:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        tapes, post_processing = transform_program([tape])
+        total_program = qnode_program + device_program
+        tapes, post_processing = total_program([tape])
         if not is_valid_for_batch and len(tapes) > 1:
             msg = "Multiple tapes are generated, but each run might produce different results."
             raise CompileError(msg)
     else:
         # Apply the identity transform in order to keep generalization
-        tapes, post_processing = identity_qnode_transform(tape)
+        tapes, post_processing = device_program([tape])
     return tapes, post_processing
 
 
@@ -826,7 +823,6 @@ def trace_quantum_function(
         out_type: JAXPR output type (list of abstract values with explicitness flags).
         out_tree: PyTree shapen of the result
     """
-
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape(shots=device.shots)
@@ -837,7 +833,6 @@ def trace_quantum_function(
                 # Quantum tape transformations happen at the end of tracing
                 in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
                 return_values_flat = wffa.call_wrapped(*in_classical_tracers)
-
             # Ans contains the leaves of the pytree (empty for measurement without
             # data https://github.com/PennyLaneAI/pennylane/pull/4607)
             # Therefore we need to compute the tree with measurements as leaves and it comes
@@ -856,26 +851,22 @@ def trace_quantum_function(
             )
 
             if isinstance(device, qml.devices.Device):
-                transform_program, _ = device.preprocess()
+                device_program, _ = device.preprocess(ctx)
             else:
-                transform_program = TransformProgram()
+                device_program = TransformProgram()
 
-            # We add pragma because lit test are giving qfunc directly
-            # But lit tests are not sending coverage results
-            if qnode:  # pragma: no branch
-                transform_program = qnode.transform_program + transform_program
+            qnode_program = qnode.transform_program if qnode else TransformProgram()
 
             tapes, post_processing = apply_transform(
-                transform_program, quantum_tape, return_values_flat
+                qnode_program, device_program, quantum_tape, return_values_flat
             )
 
             # Verify the program against the device capabilities
             for tape in tapes:
-                verify_program(device.caps, ProgramRepresentation(trace, tape))
+                verify_program(device.capabilities, ProgramRepresentation(trace, tape))
 
         # (2) - Quantum tracing
         transformed_results = []
-        is_program_transformed = transform_program
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             # Set up same device and quantum register for all tapes in the program.
@@ -887,11 +878,12 @@ def trace_quantum_function(
             )
             qreg_in = qalloc_p.bind(len(device.wires))
 
+            qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if is_program_transformed:
+                if qnode_transformed:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -907,7 +899,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if is_program_transformed:
+                if qnode_transformed:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])
