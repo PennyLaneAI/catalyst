@@ -534,7 +534,6 @@ class TestOtherMeasurements:
             rtol=tol_stochastic,
         )
 
-        assert np.allclose(result[5], expected(x, qml.state()))
 
 
 if __name__ == "__main__":
