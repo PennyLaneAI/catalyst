@@ -534,14 +534,7 @@ class TestOtherMeasurements:
             rtol=tol_stochastic,
         )
 
-        # qml.state
-        with pytest.warns(
-            UserWarning,
-            match="Requested state or density matrix with finite shots; the returned "
-            "state information is analytic and is unaffected by sampling. To silence "
-            "this warning, set shots=None on the device.",
-        ):
-            assert np.allclose(result[5], expected(x, qml.state()))
+        assert np.allclose(result[5], expected(x, qml.state()))
 
 
 if __name__ == "__main__":
