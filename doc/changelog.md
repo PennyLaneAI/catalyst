@@ -125,28 +125,10 @@
   ...     return a + b
   >>> with debug.instrumentation("session_name", detailed=False):
   >>>     expensive_function(1, 2)
-  2024-04-29 18:19:29.349886:
-  name: session_name
-  system:
-    os: Linux-6.1.58+-x86_64-with-glibc2.35
-    arch: x86_64
-    python: 3.10.12
-  results:
-    - capture:
-        walltime: 6.296216
-        cputime: 2.715764
-        programsize: 0
-    - generate_ir:
-        walltime: 8.84289
-        cputime: 8.836589
-        programsize: 14
-    - compile:
-        walltime: 199.249725
-        cputime: 38.820425
-        programsize: 121
-    - run:
-        walltime: 1.053613
-        cputime: 1.019584
+  [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
+  [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
+  [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+  [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms  
   ```
 
   The results will be appended to the provided file if the `filename` attribute is set, and printed
