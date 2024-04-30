@@ -148,7 +148,8 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
 
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
@@ -244,7 +245,8 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
