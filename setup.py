@@ -69,8 +69,8 @@ else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
 
 requirements = [
-    pennylane_dep,
-    lightning_dep,
+    "pennylane>=0.35",
+    "pennylane-lightning>=0.35",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "tomlkit; python_version < '3.11'",
