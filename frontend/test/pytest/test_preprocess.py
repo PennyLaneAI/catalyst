@@ -32,9 +32,7 @@ from catalyst.preprocess import decompose_ops_to_unitary, measurements_from_coun
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -46,7 +44,7 @@ class DummyDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy.so"
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -62,12 +60,6 @@ class DummyDevice(Device):
 class TestPreprocess:
     """Test the preprocessing transforms implemented in Catalyst."""
 
-    @pytest.mark.skipif(
-        not pathlib.Path(
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
-        ).is_file(),
-        reason="lib_dummydevice.so was not found.",
-    )
     def test_decompose_integration(self):
         """Test the decompose transform as part of the Catalyst pipeline."""
         dev = DummyDevice(wires=4)
@@ -95,12 +87,6 @@ class TestPreprocess:
         assert isinstance(decomposed_ops[0], qml.QubitUnitary)
         assert isinstance(decomposed_ops[1], qml.RX)
 
-    @pytest.mark.skipif(
-        not pathlib.Path(
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
-        ).is_file(),
-        reason="lib_dummydevice.so was not found.",
-    )
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = DummyDevice(wires=4)
@@ -115,12 +101,6 @@ class TestPreprocess:
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
-    @pytest.mark.skipif(
-        not pathlib.Path(
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
-        ).is_file(),
-        reason="lib_dummydevice.so was not found.",
-    )
     def test_no_matrix(self):
         """Test that controlling an operation without a matrix method raises an error."""
         dev = DummyDevice(wires=4)
@@ -142,12 +122,6 @@ class TestPreprocess:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported."):
             qml.qjit(f, target="jaxpr")
 
-    @pytest.mark.skipif(
-        not pathlib.Path(
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
-        ).is_file(),
-        reason="lib_dummydevice.so was not found.",
-    )
     def test_measurement_from_counts_integration_multiple_measurements(self):
         """Test the measurment from counts transform as part of the Catalyst pipeline."""
         dev = DummyDevice(wires=4, shots=1000)
@@ -171,12 +145,6 @@ class TestPreprocess:
         assert "var" not in mlir
         assert "counts" in mlir
 
-    @pytest.mark.skipif(
-        not pathlib.Path(
-            get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
-        ).is_file(),
-        reason="lib_dummydevice.so was not found.",
-    )
     def test_measurement_from_counts_integration_single_measurement(self):
         """Test the measurment from counts transform with a single measurements as part of
         the Catalyst pipeline."""

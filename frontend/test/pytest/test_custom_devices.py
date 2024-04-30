@@ -128,10 +128,6 @@ OBSERVABLES = [
 RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(RUNTIME_LIB_PATH + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
@@ -161,7 +157,7 @@ def test_custom_device_load():
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+            return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy.so"
 
     device = DummyDevice(wires=1)
     config = device_get_toml_config(device)
@@ -173,7 +169,7 @@ def test_custom_device_load():
     @qml.qnode(device)
     def f():
         """This function would normally return False.
-        However, DummyDevice as defined in libdummy_device.so
+        However, DummyDevice as defined in librtd_dummy.so
         has been implemented to always return True."""
         return measure(0)
 
