@@ -616,7 +616,7 @@ class TestArraysInHamiltonian:
     def test_array_repr_from_context1(self, coeffs, backend):
         """Test array representation from context in Hamiltonian."""
 
-        @qjit
+        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f():
             qml.Hadamard(wires=0)
