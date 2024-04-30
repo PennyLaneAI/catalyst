@@ -307,8 +307,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
 
-        counts = {"Counts"}
-        if self.measurement_processes == counts:
+        if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
 
         # TODO: Add Catalyst program verification and validation
