@@ -20,6 +20,24 @@
 
 using namespace mlir;
 
+namespace {
+struct AnnotateDebugCallbackPattern : public OpRewritePattern<LLVM::CallOp> {
+    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
+
+    LogicalResult match(LLVM::CallOp op) const override;
+    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult AnnotateDebugCallbackPattern::match(LLVM::CallOp) const {
+    return failure();
+}
+
+
+void AnnotateDebugCallbackPattern::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
+{
+}
+}
+
 namespace catalyst {
 
 #define GEN_PASS_DEF_ANNOTATEDEBUGCALLBACKASENZYMECONSTPASS
@@ -31,6 +49,13 @@ struct AnnotateDebugCallbackAsEnzymeConstPass : impl::AnnotateDebugCallbackAsEnz
 
     void runOnOperation() final
     {
+
+        MLIRContext *context = &getContext();
+        RewritePatternSet patterns(context);
+        patterns.add<AnnotateDebugCallbackPattern>(context);
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+            signalPassFailure();
+        }
     }
 };
 
