@@ -128,7 +128,7 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 
 .PHONY: dummy_device
 dummy_device:
-	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
+	cmake --build $(RT_BUILD_DIR) --target rtd_dummy -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
