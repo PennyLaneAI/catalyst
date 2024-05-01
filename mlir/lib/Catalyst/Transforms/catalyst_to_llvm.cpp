@@ -456,6 +456,10 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
 
         auto resultsSizeAttr = op.getOperands().size() - argcint;
+        bool isDebugCallback = resultsSizeAttr == 0;
+        if (isDebugCallback) {
+            customCallFnOp->setAttr("catalyst.debugCallback", rewriter.getUnitAttr());
+        }
         auto resultsSizeVal =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
 
