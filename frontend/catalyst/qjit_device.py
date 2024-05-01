@@ -25,9 +25,9 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
     BackendInfo,
+    get_pennylane_measurement_processes,
     get_pennylane_observables,
     get_pennylane_operations,
-    get_pennylane_measurement_processes,
 )
 from catalyst.utils.toml import (
     TOMLDocument,

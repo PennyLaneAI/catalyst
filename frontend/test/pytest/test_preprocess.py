@@ -13,12 +13,12 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
+import os
 import pathlib
 
-import os
-import tempfile
 # pylint: disable=unused-argument
 import platform
+import tempfile
 
 import numpy as np
 import pennylane as qml

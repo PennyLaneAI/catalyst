@@ -27,10 +27,10 @@ from catalyst.utils.runtime import (
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_measurement_processes,
     get_native_gates,
     get_pennylane_observables,
     get_pennylane_operations,
-    get_measurement_processes,
     validate_config_with_device,
 )
 from catalyst.utils.toml import check_adjoint_flag, read_toml_file
