@@ -74,6 +74,7 @@ message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
+list(APPEND devices_list rtd_dummy)
 
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
     list(APPEND devices_list pennylane_lightning rtd_lightning)
