@@ -65,9 +65,7 @@ class DummyDevice(Device):
 class DummyDeviceCounts(Device):
     """A dummy device from the device API without wires."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)
@@ -78,7 +76,9 @@ class DummyDeviceCounts(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
