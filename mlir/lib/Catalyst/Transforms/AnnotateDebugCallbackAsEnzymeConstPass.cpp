@@ -21,6 +21,7 @@
 using namespace mlir;
 
 namespace {
+static constexpr llvm::StringRef debugCallback = "catalyst.debugCallback";
 struct AnnotateDebugCallbackPattern : public OpRewritePattern<LLVM::CallOp> {
     using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
 
@@ -28,14 +29,17 @@ struct AnnotateDebugCallbackPattern : public OpRewritePattern<LLVM::CallOp> {
     void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AnnotateDebugCallbackPattern::match(LLVM::CallOp) const {
-    return failure();
+LogicalResult AnnotateDebugCallbackPattern::match(LLVM::CallOp callOp) const {
+    bool isDebugCallback = callOp->hasAttr(debugCallback);
+    return isDebugCallback ? success() : failure();
 }
 
 
 void AnnotateDebugCallbackPattern::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
+    rewriter.updateRootInPlace(callOp, [&] { callOp->removeAttr(debugCallback); });
 }
+
 }
 
 namespace catalyst {

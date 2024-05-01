@@ -26,9 +26,14 @@ func.func @foo() {
 
 // -----
 
+// This test checks the invariant that after the transformation
+// the attribute has been removed.
+
 // CHECK-LABEL: @test1
 module @test1 {
-  llvm.func @pyregistry(i64, i64, i64, ...) 
+  // CHECK: llvm.call @pyregistry
+  // CHECK-NOT: catalyst.debugCallback
+  llvm.func @pyregistry(i64, i64, i64, ...)  attributes { catalyst.debugCallback }
   llvm.func @wrapper() {
     %0 = llvm.mlir.constant(139935726668624 : i64) : i64
     %1 = llvm.mlir.constant(0 : i64) : i64
