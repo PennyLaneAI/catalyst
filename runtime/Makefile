@@ -18,7 +18,7 @@ ENABLE_LAPACK?=OFF
 LIGHTNING_GIT_TAG_VALUE?=5feb4a10c9cd15fa590c513fc7c6a10a0b334269
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
-BUILD_TARGETS := rt_capi
+BUILD_TARGETS := rt_capi rtd_dummy
 TEST_TARGETS := ""
 
 ifeq ($(ENABLE_LIGHTNING), ON)
@@ -128,7 +128,7 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 
 .PHONY: dummy_device
 dummy_device:
-	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
+	cmake --build $(RT_BUILD_DIR) --target rtd_dummy -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
