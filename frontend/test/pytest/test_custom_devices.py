@@ -13,7 +13,7 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
-import pathlib
+import platform
 
 import pennylane as qml
 import pytest
@@ -156,8 +156,11 @@ def test_custom_device_load():
             """Returns a tuple consisting of the device name, and
             the location to the shared object with the C/C++ device implementation.
             """
-
-            return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy.so"
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+            )
+            return "DummyDevice", lib_path
 
     device = DummyDevice(wires=1)
     config = device_get_toml_config(device)

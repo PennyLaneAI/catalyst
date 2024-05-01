@@ -13,8 +13,10 @@
 # limitations under the License.
 """Test for the device preprocessing.
 """
-# pylint: disable=unused-argument
 import pathlib
+
+# pylint: disable=unused-argument
+import platform
 
 import numpy as np
 import pennylane as qml
@@ -43,8 +45,9 @@ class DummyDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
-
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""

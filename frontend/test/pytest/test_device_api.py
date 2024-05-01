@@ -14,6 +14,7 @@
 """Test for the device API.
 """
 import pathlib
+import platform
 
 import pennylane as qml
 import pytest
@@ -43,8 +44,9 @@ class DummyDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
-
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
