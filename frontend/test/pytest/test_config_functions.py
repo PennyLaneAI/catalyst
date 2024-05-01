@@ -27,6 +27,7 @@ from catalyst.utils.runtime import (
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_measurement_processes,
     get_native_gates,
     get_pennylane_observables,
     get_pennylane_operations,
@@ -453,6 +454,8 @@ def test_config_unsupported_schema():
             get_matrix_decomposable_gates(config, False)
         with pytest.raises(CompileError):
             get_pennylane_operations(config, False, "device_name")
+        with pytest.raises(CompileError):
+            get_measurement_processes(config, False)
         with pytest.raises(CompileError):
             check_adjoint_flag(config, False)
 
