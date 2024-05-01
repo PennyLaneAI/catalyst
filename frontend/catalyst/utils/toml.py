@@ -81,7 +81,7 @@ class DeviceCapabilities:
     to_decomp_ops: Dict[str, OperationProperties]
     to_matrix_ops: Dict[str, OperationProperties]
     native_obs: Dict[str, OperationProperties]
-    measurement_processes: Dict[str, OperationProperties]
+    measurement_processes: Set[str]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
@@ -350,9 +350,9 @@ def get_device_capabilities(
     for g, props in get_observables(config, program_features).items():
         observable_props[g] = get_operation_properties(props)
 
-    measurements_props = {}
+    measurements_props = set()
     for g, props in get_measurement_processes(config, program_features).items():
-        measurements_props[g] = get_operation_properties(props)
+        measurements_props.add(g)
 
     if schema == 1:
         patch_schema1_collections(
