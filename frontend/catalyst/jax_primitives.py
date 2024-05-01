@@ -291,6 +291,9 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
     func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
 
+    # TODO: Update the condition here: when multiple circuits are generated
+    # we need to pass the information that they need to be annotated as qnode.
+    # The original qnode that generate multiple circuit should not be marked.
     if isinstance(fn, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
         # "best", the default option in PennyLane, chooses backprop on the device

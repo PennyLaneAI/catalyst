@@ -847,11 +847,16 @@ def trace_quantum_function(
                 qnode_program, device_program, quantum_tape, return_values_flat
             )
 
-        with EvaluationContext.frame_tracing_context(ctx) as trace2:
             # (2) - Quantum tracing
             transformed_results = []
             qnode_transformed = len(qnode_program) > 0
             for i, tape in enumerate(tapes):
+                # TODO: Here I would like to start a new trace for each tape but that already as the
+                # Jaxpr from the classical part in (ctx and trace). Ideally I would like to copy and
+                # extend, but we can only extend existing trace.
+                # I encounter leaked values everytime I tried to create a new trace without expanding.
+                # e.g. with EvaluationContext.frame_tracing_context(ctx) as trace2:
+                # Maybe we should have with EvaluationContext.frame_tracing_context(ctx, trace) as trace2:
                 qdevice_p.bind(
                     rtd_lib=device.backend_lib,
                     rtd_name=device.backend_name,
@@ -870,9 +875,7 @@ def trace_quantum_function(
                     trees = return_values_tree
 
                 qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                meas, meas_trees = trace_quantum_measurements(
-                    device, qrp_out, output, trees, tape
-                )
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
@@ -883,18 +886,21 @@ def trace_quantum_function(
 
                 # func bind
                 def _eval_circuit(*args):
-                    # Jaxpr
-                    jaxpr, out_type, consts = ctx.frames[trace2].to_jaxpr2(meas_tracers)
+                    # TODO: Here I would like to first get the Jaxpr from inner trace (ctx and trace2)
+                    jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(meas_tracers)
                     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
                     args_expanded = get_implicit_and_explicit_flat_args(None, *args)
-                    res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
+                    res_expanded = eval_jaxpr(
+                        closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded
+                    )
                     _, out_keep = unzip2(out_type)
                     res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
                     return tree_unflatten(meas_trees, res_flat)
-                
+
                 flattened_fun, _, _, out_tree_promise = deduce_avals(_eval_circuit, args, {})
                 args_flat = tree_flatten(args)[0]
-                setattr(_eval_circuit, '__name__', f'{f.__name__}_{i}')
+                # Name patching (qnode_name_i)
+                setattr(_eval_circuit, "__name__", f"{f.__name__}_{i}")
                 res_flat = func_p.bind(flattened_fun, *args_flat, fn=_eval_circuit)
                 meas_results = tree_unflatten(meas_trees, res_flat)
                 transformed_results.append(meas_results)

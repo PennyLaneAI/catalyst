@@ -157,6 +157,24 @@ def test_split_non_commuting(backend):
     _, observed_shape = jax.tree_util.tree_flatten(observed)
     assert expected_shape == observed_shape
 
+    def test_split_non_commuting_generate_multiple_qnodes(backend):
+        """Test that the capture generates multiple QNodes."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qml.transforms.split_non_commuting
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return qml.expval(qml.Z(0)), qml.expval(qml.X(0))
+
+        print(circuit(0.5))
+        print(circuit.jaxpr)
+        print(circuit.mlir)
+
 
 class RX_broadcasted(qml.RX):
     """A version of qml.RX that detects batching."""
