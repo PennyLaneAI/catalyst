@@ -74,7 +74,7 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 
 
 @dataclass
-class DeviceCapabilities:
+class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     """Quantum device capabilities"""
 
     native_ops: Dict[str, OperationProperties]
