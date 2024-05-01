@@ -293,6 +293,11 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """Get the device observables"""
         return pennylane_operation_set(self.capabilities.native_obs)
 
+    @property
+    def measurement_processes(self) -> Set[str]:
+        """Get the device measurement processes"""
+        return self.capabilities.measurement_processes
+
     def preprocess(
         self,
         ctx,
