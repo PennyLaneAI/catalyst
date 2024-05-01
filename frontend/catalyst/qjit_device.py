@@ -21,7 +21,7 @@ import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 from pennylane.transforms.core import TransformProgram
 
-from catalyst.preprocess import catalyst_acceptance, decompose
+from catalyst.preprocess import catalyst_acceptance, decompose, measurements_from_counts
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import BackendInfo, device_get_toml_config
@@ -311,6 +311,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
+
+        if self.measurement_processes == {"Counts"}:
+            program.add_transform(measurements_from_counts)
 
         # TODO: Add Catalyst program verification and validation
         return program, config

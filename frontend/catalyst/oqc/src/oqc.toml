@@ -47,9 +47,7 @@ PauliZ = {}
 Hadamard = {}
 
 [measurement_processes]
-Expval = { condition = [ "finiteshots" ] }
-Var = { condition = [ "finiteshots" ] }
-Probs = { condition = [ "finiteshots" ] }
+
 Counts = { condition = [ "finiteshots" ] }
 
 
