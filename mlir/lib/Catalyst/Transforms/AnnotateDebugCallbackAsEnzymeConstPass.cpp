@@ -17,6 +17,7 @@
 
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Gradient/Transforms/EnzymeConstants.h"
 
 using namespace mlir;
 
@@ -37,6 +38,12 @@ LogicalResult AnnotateDebugCallbackPattern::match(LLVM::CallOp callOp) const {
 
 void AnnotateDebugCallbackPattern::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
 {
+    auto llvmPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+    Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(callOp->getLoc(), llvmPtrType, catalyst::gradient::enzyme_const_key);
+    // We need to place the an enzyme_autodiff call here.
+    // And the parameter needs to be:
+    // * callOp's FlatSymbolRefAttr
+    // * zip(enzyme_const, args)
     rewriter.updateRootInPlace(callOp, [&] { callOp->removeAttr(debugCallback); });
 }
 
