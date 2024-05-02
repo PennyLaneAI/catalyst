@@ -38,7 +38,12 @@ from catalyst import (
     qjit,
     vjp,
 )
-from catalyst.autograph import TRANSFORMER, AutoGraphError, autograph_source
+from catalyst.autograph import (
+    TRANSFORMER,
+    AutoGraphError,
+    autograph_source,
+    disable_autograph,
+)
 
 check_cache = TRANSFORMER.has_cache
 
@@ -1716,6 +1721,31 @@ class TestMixed:
 
         assert f(0.4) == 1
         assert f(0.1) == 3
+
+
+@pytest.mark.tf
+class TestDisableAutograph:
+    """Test ways of disabling autograph conversion"""
+
+    def test_disable_autograph(self):
+        """Test disabling autograph with decorator."""
+
+        @disable_autograph
+        def f():
+            x = 6
+            if x > 5:
+                y = x**2
+            else:
+                y = x**3
+            return y
+
+        @qjit(autograph=True)
+        def g(x: float, n: int):
+            for _ in range(n):
+                x = x + f()
+            return x
+
+        assert g(0.4, 6) == 216.4
 
 
 if __name__ == "__main__":
