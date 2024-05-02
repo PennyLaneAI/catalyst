@@ -72,7 +72,6 @@ class Failing:
         return self.ref
 
 
-@pytest.mark.tf
 class TestSourceCodeInfo:
     """Unit tests for exception utilities that retrieves traceback information for the original
     source code."""
@@ -154,7 +153,6 @@ class TestSourceCodeInfo:
                 assert e.args == ("Test failure",)
 
 
-@pytest.mark.tf
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
@@ -399,7 +397,6 @@ class TestIntegration:
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
 
-@pytest.mark.tf
 class TestCodePrinting:
     """Test that the transformed source code can be printed in different settings."""
 
@@ -529,7 +526,6 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
 
-@pytest.mark.tf
 class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""
@@ -695,7 +691,6 @@ class TestConditionals:
             qjit(autograph=True)(f)
 
 
-@pytest.mark.tf
 class TestForLoops:
     """Test that the autograph transformations produce correct results on for loops."""
 
@@ -1249,7 +1244,6 @@ class TestForLoops:
         assert f() == 9
 
 
-@pytest.mark.tf
 class TestWhileLoops:
     """Test that the autograph transformations produce correct results on while loops."""
 
@@ -1432,7 +1426,6 @@ class TestWhileLoops:
             qjit(autograph=True)(f)
 
 
-@pytest.mark.tf
 @pytest.mark.parametrize(
     "execution_context", (lambda fn: fn, qml.qnode(qml.device("lightning.qubit", wires=1)))
 )
@@ -1542,7 +1535,6 @@ class TestFallback:
         assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
 
 
-@pytest.mark.tf
 class TestLogicalOps:
     """Test logical operations: and, or, not"""
 
@@ -1617,7 +1609,6 @@ class TestLogicalOps:
             assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
 
 
-@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
@@ -1723,7 +1714,6 @@ class TestMixed:
         assert f(0.1) == 3
 
 
-@pytest.mark.tf
 class TestDisableAutograph:
     """Test ways of disabling autograph conversion"""
 
