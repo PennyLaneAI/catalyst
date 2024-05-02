@@ -196,6 +196,27 @@ the following command.
 
     circuit.get_output_of("BufferizationPass")
 
+Profiling and instrumentation
+=============================
+
+The :func:`catalyst.debug.instrumentation` context manager allows exploration of
+the steps that are run during compilation and execution, and for how long.
+
+Instrumentation can be enabled from the frontend with the :func:`~.debug.instrumentation` context
+manager:
+
+>>> @qjit
+... def expensive_function(a, b):
+...     return a + b
+>>> with debug.instrumentation("session_name", detailed=False):
+>>>     expensive_function(1, 2)
+[DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
+[DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
+[DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+[DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
+
+Measurements currently include wall time, CPU time, and (intermediate) program size;
+please refer to the docstring for more details.
 
 Compilation Steps
 =================
