@@ -70,6 +70,7 @@ class QFunc:
             device = QJITDeviceNewAPI(self.device, backend_info)
         else:
             device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
+        self.qjit_device = device
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(

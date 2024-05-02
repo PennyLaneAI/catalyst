@@ -720,6 +720,9 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
+    if method == "adjoint" and isinstance(fn, QNode):
+        _verify_op_differentiability_on_device(jaxpr, fn.qjit_device)
+
     return jaxpr, out_tree
 
 
@@ -788,3 +791,42 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         raise DifferentiableCompileError(
             "The adjoint method can only be used for QNodes which return qml.expval."
         )
+
+
+def _is_differentiable_on_device(op_name, device) -> bool:
+    """Checks if the operation `op_name` is differentiable on the `device`"""
+    if op_name not in device.capabilities.native_ops:
+        return False
+    return device.capabilities.native_ops[op_name].differentiable
+
+
+def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: QJITDeviceUnion) -> None:
+    """Verify quantum program against the device capabilities.
+
+    Raises: CompileError
+    """
+
+    def _get_inner_jaxprs(e:JaxprEqn) -> List[Jaxpr]:
+        if any(e.primitive == p for p in [while_p, for_p]):
+            inner_jaxpr = e.params['jaxpr']
+            return [inner_jaxpr]
+        elif e.primitive == cond_p:
+            assert False # FIXME: get cond branches
+            return []
+        elif e.primitive == func_p:
+            inner_jaxpr = e.params['call_jaxpr']
+            return [inner_jaxpr]
+        return []
+
+    def _go(jaxpr:Jaxpr, device) -> None:
+        for e in jaxpr.eqns:
+            if e.primitive == qinst_p:
+                op = e.params['op']
+                if not _is_differentiable_on_device(op, device):
+                    raise CompileError('non-differentiable')
+            elif inner_jaxprs := _get_inner_jaxprs(e):
+                for inner_jaxpr in inner_jaxprs:
+                    _go(inner_jaxpr, device)
+
+    _go(jaxpr, device)
+
