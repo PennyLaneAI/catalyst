@@ -2,10 +2,10 @@
 
 <h3>New features</h3>
 
-* Catalyst now supports external host callbacks with parameters and return values
+* Catalyst now supports externally hosted callbacks with parameters and return values
   within qjit-compiled code. This provides the ability to insert native Python code
-  into any qjit-compiled function, allowing for both enhanced debugging ability as well
-  as the capability to include subroutines that do not yet support qjit-compilation.
+  into any qjit-compiled function, allowing for the capability to include subroutines 
+  that do not yet support qjit-compilation and enhancing the debugging experience.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
@@ -18,7 +18,7 @@
   The following two callback functions are available:
 
   - `catalyst.pure_callback` supports callbacks of **pure** functions. That is, functions
-    with no side-effects that accept parameters and return values. However, the return
+    with no [side-effects](https://runestone.academy/ns/books/published/fopp/Functions/SideEffects.html) that accept parameters and return values. However, the return
     type and shape of the function must be known in advance, and is provided as a type signature.
 
     ```python
@@ -69,7 +69,7 @@
   The `catalyst.debug.print` function has been updated to support Python-like format
   strings:
 
-  ```py
+  ```python
   @qjit
   def cir(a, b, c):
       debug.print("{c} {b} {a}", a=a, b=b, c=c)
@@ -92,7 +92,7 @@
   To use OQC Cloud with Catalyst, simply ensure your credentials are set as environment variables,
   and load the `oqc.cloud` device to be used within your qjit-compiled workflows.
 
-  ```py
+  ```python
   import os
   os.environ["OQC_EMAIL"] = "your_email"
   os.environ["OQC_PASSWORD"] = "your_password"
@@ -161,7 +161,7 @@
 
   This support extends to quantum circuits:
 
-  ```py
+  ```python
   dev = qml.device("lightning.qubit", wires=1)
 
   @qjit(autograph=True)
@@ -215,7 +215,7 @@
   only match redundant Hadamard operations, but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
-* The `catalyst.measure` can now receive 1D arrays for the `wires` parameter as long as they only
+* The `catalyst.measure` function can now receive 1D arrays for the `wires` parameter as long as they only
   contain one element.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
@@ -238,8 +238,8 @@
 
   Note that with this update, all declared qubits in a submitted program will always be measured, even if specific qubits were never used.
 
-* An updated quantum device specification format is now supported by Catalyst. The device TOML schema v2
-  allow device authors to specify properties such as native quantum control
+* An updated quantum device specification format, TOML schema v2, is now supported by Catalyst. This
+  allows device authors to specify properties such as native quantum control
   support, gate invertibility, or differentiability, at a per-operation level.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
@@ -271,16 +271,16 @@
 * The QNode argument `diff_method=None` is now supported for QNodes within a qjit-compiled function.
   [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
 
-* Allow all Catalyst gates to receive `wire` values of less than 64 bitwidth.
+* Catalyst now allows for gates to receive `wire` values of less than 64 bitwidth.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
 * A bug has been fixed where the C++ compiler driver was incorrectly being triggered twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
-* Adds lowering pass for `shape` operations. This allows programs with `jnp.reshape` to succeed.
+* Programs with `jnp.reshape` no longer fail.
   [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
 
-* Fixes adjoint lowering bug that did not take into account control wires.
+* Fixed a bug with `adjoint` that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
 * A bug in the test suite causing stochastic autograph test failures has been fixed.
@@ -294,8 +294,8 @@
 * The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
   [(#679)](https://github.com/PennyLaneAI/catalyst/pull/679)
 
-* Catalyst publishes Git revision string seen at the time of the packaging as
-  `catalyst.__revision__` . For editable installations, the revision is read at the time of
+* Catalyst publishes the Git revision string seen at the time of the packaging as
+  `catalyst.__revision__`. For editable installations, the revision is read at the time of
   module import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
 
