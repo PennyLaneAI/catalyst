@@ -226,6 +226,9 @@
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
+* Raises an exception if the user has an incompatible CUDA Quantum version installed.
+  [(#707)](https://github.com/PennyLaneAI/catalyst/pull/707)
+
 <h3>Internal changes</h3>
 
 * The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
