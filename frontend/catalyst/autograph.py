@@ -20,10 +20,11 @@ Python control flow and other imperative expressions rather than the functional 
 by Catalyst."""
 
 import inspect
+from contextlib import ContextDecorator
 
 import pennylane as qml
-from malt.core import converter
-from malt.impl.api import PyToPy, do_not_convert
+from malt.core import ag_ctx, converter
+from malt.impl.api import PyToPy
 
 import catalyst
 from catalyst import ag_primitives
@@ -197,20 +198,14 @@ def autograph_source(fn):
     )
 
 
-def disable_autograph(fn):
-    """Decorator that disables AutoGraph for the given function.
+class disable_autograph(ag_ctx.ControlStatusCtx, ContextDecorator):
+    """Context decorator that disables AutoGraph for the given function/context.
 
-    Args:
-        fn (Callable): the original function object that must not be converted
-
-    Returns:
-        fn: the function not being converted
-
-    **Example**
+    **Example 1: as a function decorator**
 
     .. code-block:: python
 
-        @disable_autograph
+        @disable_autograph()
         def f():
             x = 6
             if x > 5:
@@ -227,9 +222,32 @@ def disable_autograph(fn):
 
     >>> print(g(0.4, 6))
     216.4
+
+    **Example 2: as a context manager**
+
+    .. code-block:: python
+
+        def f():
+            x = 6
+            if x > 5:
+                y = x ** 2
+            else:
+                y = x ** 3
+            return y
+
+        @qjit(autograph=True)
+        def g():
+            x = 0.4
+            with disable_autograph():
+                x += f()
+            return x
+
+    >>> print(g())
+    36.4
     """
 
-    return do_not_convert(fn)
+    def __init__(self):
+        super().__init__(status=ag_ctx.Status.DISABLED)
 
 
 TOPLEVEL_OPTIONS = converter.ConversionOptions(

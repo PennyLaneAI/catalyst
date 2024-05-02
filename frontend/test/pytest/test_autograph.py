@@ -1717,10 +1717,10 @@ class TestMixed:
 class TestDisableAutograph:
     """Test ways of disabling autograph conversion"""
 
-    def test_disable_autograph(self):
+    def test_disable_autograph_decorator(self):
         """Test disabling autograph with decorator."""
 
-        @disable_autograph
+        @disable_autograph()
         def f():
             x = 6
             if x > 5:
@@ -1736,6 +1736,26 @@ class TestDisableAutograph:
             return x
 
         assert g(0.4, 6) == 216.4
+
+    def test_disable_autograph_context_manager(self):
+        """Test disabling autograph with context manager."""
+
+        def f():
+            x = 6
+            if x > 5:
+                y = x**2
+            else:
+                y = x**3
+            return y
+
+        @qjit(autograph=True)
+        def g():
+            x = 0.4
+            with disable_autograph():
+                x += f()
+            return x
+
+        assert g() == 36.4
 
 
 if __name__ == "__main__":

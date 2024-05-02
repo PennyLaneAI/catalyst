@@ -2,6 +2,53 @@
 
 <h3>New features</h3>
 
+* Support for disabling Autograph for a specific function.
+[(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
+
+  The following is now possible:
+
+  ```py
+  @disable_autograph()
+  def f():
+    x = 6
+    if x > 5:
+      y = x ** 2
+    else:
+      y = x ** 3
+    return y
+
+  @qjit(autograph=True)
+  def g(x: float, n: int):
+    for _ in range(n):
+      x = x + f()
+    return x
+
+  ```
+
+* Support for disabling Autograph only for the function calls inside a specific context,
+withouth affecting the bare code inside such context.
+[(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
+
+  The following is now possible:
+
+  ```py
+  def f():
+    x = 6
+    if x > 5:
+      y = x ** 2
+    else:
+      y = x ** 3
+    return y
+
+  @qjit(autograph=True)
+  def g():
+    x = 0.4
+    with disable_autograph():
+      x += f()
+    return x
+
+  ```
+
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
@@ -13,6 +60,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Raul Torres
 
 # Release 0.6.0
 
