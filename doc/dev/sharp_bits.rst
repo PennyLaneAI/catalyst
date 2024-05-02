@@ -579,7 +579,7 @@ Catalyst provides two callback functions:
   function must be known in advance, and is provided as a type signature.
 
 - :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
-   an easy entry point for debugging, for example via printing or logging at runtime.
+  an easy entry point for debugging, for example via printing or logging at runtime.
 
 Note that callbacks do not currently support differentiation, and cannot be used inside
 functions that :func:`~.grad` is applied to.
