@@ -23,7 +23,7 @@ import inspect
 
 import pennylane as qml
 from malt.core import converter
-from malt.impl.api import PyToPy
+from malt.impl.api import PyToPy, do_not_convert
 
 import catalyst
 from catalyst import ag_primitives
@@ -195,6 +195,41 @@ def autograph_source(fn):
         "The given function was not converted by AutoGraph. If you expect the"
         "given function to be converted, please submit a bug report."
     )
+
+
+def disable_autograph(fn):
+    """Decorator that disables AutoGraph for the given function.
+
+    Args:
+        fn (Callable): the original function object that must not be converted
+
+    Returns:
+        fn: the function not being converted
+
+    **Example**
+
+    .. code-block:: python
+
+        @disable_autograph
+        def f():
+            x = 6
+            if x > 5:
+                y = x ** 2
+            else:
+                y = x ** 3
+            return y
+
+        @qjit(autograph=True)
+        def g(x: float, n: int):
+            for _ in range(n):
+                x = x + f()
+            return x
+
+    >>> print(g(0.4, 6))
+    216.4
+    """
+
+    return do_not_convert(fn)
 
 
 TOPLEVEL_OPTIONS = converter.ConversionOptions(
