@@ -95,7 +95,7 @@ Var = {}
 Probs = {}
 State = { condition = [ "analytic" ] }
 Sample = { condition = [ "finiteshots" ] }
-Count = { condition = [ "finiteshots" ] }
+Counts = { condition = [ "finiteshots" ] }
 
 [compilation]
 

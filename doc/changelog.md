@@ -89,8 +89,8 @@
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
   [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
-  To use OQC Cloud with Catalyst, simply ensure your credentials are set as environment variables, and load the `oqc.remote` device to be used within your qjit-compiled
-  workflows.
+  To use OQC Cloud with Catalyst, simply ensure your credentials are set as environment variables,
+  and load the `oqc.cloud` device to be used within your qjit-compiled workflows.
 
   ```py
   import os
@@ -189,6 +189,14 @@
   Note that returning results with different types or shapes within the same function, such as
   different observables or differently shaped arrays, is not possible.
 
+* Errors are now raised at compile time if the gradient of an unsupported function
+  is requested.
+  [(#204)](https://github.com/PennyLaneAI/catalyst/pull/204)
+
+  At the moment, `CompileError` exceptions will be raised if at compile time it is found that code
+  reachable from the gradient operation contains either a mid-circuit measurement, a callback, or a
+  custom call (which happens through the mitigation operation).
+
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
@@ -206,6 +214,16 @@
   added. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we
   only match redundant Hadamard operations, but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
+
+* The `catalyst.measure` can now receive 1D arrays for the `wires` parameter as long as they only
+  contain one element.
+  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
+
+  For example, the following is now supported:
+
+  ```python
+  catalyst.measure(wires=jnp.array([0]))
+  ```
 
 * The compilation & execution of `@qjit` compiled functions can now be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
@@ -225,7 +243,10 @@
   support, gate invertibility, or differentiability, at a per-operation level.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
-* An exception is now raised when OpenBLAS cannot be found by Catalyst.
+  For more details on the new TOML schema, please refer to the
+  [custom devices documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/custom_devices.html).
+
+* An exception is now raised when OpenBLAS cannot be found by Catalyst during compilation.
   [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
 
 <h3>Breaking changes</h3>
@@ -234,42 +255,38 @@
   array when used without observables.
   [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
 
+* The endianness of counts in Catalyst now matches the convention of PennyLane.
+  [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
+
 * `catalyst.debug.print` no longer supports the `memref` keyword argument.
   Please use `catalyst.debug.print_memref` instead.
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
 
 <h3>Bug fixes</h3>
 
-* Fix `measurement_from_counts` following an update of a private function in PennyLane.
+* The transform `measurement_from_counts` used for processing circuits for devices
+  has been updated following an update of a private function in PennyLane.
   [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
 
-* Enable support for QNode argument `diff_method=None` with QJIT.
+* The QNode argument `diff_method=None` is now supported for QNodes within a qjit-compiled function.
   [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
-
-* Allow `catalyst.measure` to receive 1D arrays for the `wires` parameter as long as they only
-  contain one element.
-  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
 * Allow all Catalyst gates to receive `wire` values of less than 64 bitwidth.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
-* Fix the endianness of counts in Catalyst and matches PennyLane.
-  [(#601)](https://github.com/PennyLaneAI/catalyst/pull/601)
-
-* Fix the issue of triggering the C++ compiler driver twice.
+* A bug has been fixed where the C++ compiler driver was incorrectly being triggered twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
 
 * Adds lowering pass for `shape` operations. This allows programs with `jnp.reshape` to succeed.
-  Some templates may use `jnp.reshape`.
   [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
 
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
-* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+* A bug in the test suite causing stochastic autograph test failures has been fixed.
   [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 
-* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
+* Running tests should no longer raise `ResourceWarning` from `tempfile.TemporaryDirectory`.
   [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
 
 <h3>Internal changes</h3>

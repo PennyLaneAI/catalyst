@@ -119,10 +119,10 @@ class TestCompilerErrors:
             )
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
-        """Test return value if user request intermediate file that doesn't exist."""
+        """Test the return value if a user requests an intermediate file that doesn't exist."""
         compiler = Compiler()
-        result = compiler.get_output_of("inexistent-file")
-        assert result is None
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
+            compiler.get_output_of("inexistent-file")
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
@@ -218,15 +218,16 @@ class TestCompilerState:
             return qml.state()
 
         compiler = workflow.compiler
-        assert compiler.get_output_of("EmptyPipeline1") is None
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
+            compiler.get_output_of("EmptyPipeline1")
         assert compiler.get_output_of("HLOLoweringPass")
         assert compiler.get_output_of("QuantumCompilationPass")
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
+            compiler.get_output_of("EmptyPipeline2")
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
-        assert compiler.get_output_of("EmptyPipeline2") is None
-        assert compiler.get_output_of("PreEnzymeOpt")
-        assert compiler.get_output_of("Enzyme")
-        assert compiler.get_output_of("None-existing-pipeline") is None
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
+            compiler.get_output_of("None-existing-pipeline")
         workflow.workspace.cleanup()
 
     def test_print_nonexistent_stages(self, backend):
@@ -238,7 +239,8 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        assert workflow.compiler.get_output_of("None-existing-pipeline") is None
+        with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
+            workflow.compiler.get_output_of("None-existing-pipeline")
         workflow.workspace.cleanup()
 
     def test_workspace(self):

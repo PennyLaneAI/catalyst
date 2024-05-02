@@ -34,6 +34,7 @@ from catalyst.utils.toml import (
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_measurement_processes,
     get_native_gates,
     get_observables,
     read_toml_file,
@@ -150,6 +151,14 @@ def get_pennylane_observables(
     """Get observables in PennyLane format. Apply ad-hoc patching"""
 
     return set(get_observables(config, shots_present))
+
+
+def get_pennylane_measurement_processes(
+    config: TOMLDocument, shots_present: bool, _device_name: str
+) -> Set[str]:
+    """Get measurement processes in PennyLane format"""
+
+    return set(get_measurement_processes(config, shots_present))
 
 
 def check_no_overlap(*args):

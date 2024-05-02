@@ -19,14 +19,19 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from jax.tree_util import tree_flatten
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
+    CompileError,
     DifferentiableCompileError,
     cond,
     for_loop,
     grad,
     jacobian,
+    measure,
+    mitigate_with_zne,
+    pure_callback,
     qjit,
     value_and_grad,
 )
@@ -1101,8 +1106,8 @@ def test_pytrees_return_classical():
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
     catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
 
-    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
-    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+    flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
 
     assert tree_jax == tree_catalyst
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
@@ -1120,8 +1125,8 @@ def test_pytrees_args_classical():
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
     catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
 
-    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
-    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+    flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
 
     assert tree_jax == tree_catalyst
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
@@ -1139,8 +1144,8 @@ def test_pytrees_args_return_classical():
     jax_expected_results = jax.jit(jax.jacobian(f, argnums=[0, 1]))(x, y)
     catalyst_results = qjit(jacobian(f, argnum=[0, 1]))(x, y)
 
-    flatten_res_jax, tree_jax = jax.tree_flatten(jax_expected_results)
-    flatten_res_catalyst, tree_catalyst = jax.tree_flatten(catalyst_results)
+    flatten_res_jax, tree_jax = tree_flatten(jax_expected_results)
+    flatten_res_catalyst, tree_catalyst = tree_flatten(catalyst_results)
 
     assert tree_jax == tree_catalyst
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
@@ -1170,6 +1175,59 @@ def test_adj_qubitunitary(inp, backend):
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
+
+
+class TestGradientErrors:
+    """Test errors when an operation which does not have a valid gradient is reachable
+    from the grad op"""
+
+    def test_measure_error(self):
+        """Test with measure"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            _bool = measure(0)
+            qml.RX(_bool + 1, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_callback_error(self):
+        """Test with callback"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            y = pure_callback(jnp.sin, float)(x)
+            qml.RX(y, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_with_zne(self):
+        """Test with ZNE"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        def g(x):
+            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(x)
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(g)(x)
 
 
 if __name__ == "__main__":

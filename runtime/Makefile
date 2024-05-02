@@ -2,6 +2,7 @@ PYTHON := $(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
@@ -14,11 +15,10 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-ENABLE_LAPACK?=OFF
 LIGHTNING_GIT_TAG_VALUE?=5feb4a10c9cd15fa590c513fc7c6a10a0b334269
-NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+ENABLE_LAPACK?=OFF
 
-BUILD_TARGETS := rt_capi
+BUILD_TARGETS := rt_capi rtd_dummy
 TEST_TARGETS := ""
 
 ifeq ($(ENABLE_LIGHTNING), ON)
@@ -83,7 +83,8 @@ configure:
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
-		-DPython_EXECUTABLE=$(PYTHON) \
+		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
@@ -108,7 +109,8 @@ lq_configure:
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
-		-DPython_EXECUTABLE=$(PYTHON) \
+		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
@@ -128,7 +130,7 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 
 .PHONY: dummy_device
 dummy_device:
-	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
+	cmake --build $(RT_BUILD_DIR) --target rtd_dummy -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning

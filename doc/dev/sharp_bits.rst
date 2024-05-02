@@ -206,10 +206,10 @@ If we wish to print the value of variables at *runtime*, we can instead use the
 >>> from catalyst import debug
 >>> @qjit
 ... def g(x):
-...     debug.print(x)
+...     debug.print("Value of x = {x}", x=x)
 ...     return x ** 2
 >>> g(2.)
-[2.]
+Value of x = 2.0
 array(4.)
 
 Avoiding recompilation
@@ -511,6 +511,7 @@ that doesn't work with Catalyst includes:
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
 - ``jax.debug``
+- ``jax.scipy.linalg.expm``
 - ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
   indices.
 
@@ -544,6 +545,44 @@ This includes:
 
 For more details, please see the `JAX documentation
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
+
+Callbacks
+---------
+
+When coming across functionality that is not yet supported by Catalyst, such as functions like
+``jax.scipy.linalg.expm``, Python callbacks can be used to call arbitrary Python code within
+a qjit-compiled function, as long as the return shape and type is known:
+
+.. code-block:: python
+
+    @qjit
+    def fn(x):
+
+        A = jnp.sin(x) * jnp.array([0.23, 0.2], [0.43, -0.54.])
+
+        @catalyst.pure_callback
+        @jax.jit # since the callback function is pure JAX, we can jit it
+        def callback_fn(A) -> jax.ShapeDtypeStruct(A.shape, A.dtype):
+            # here we call non-Catalyst compatible code
+            return jax.scipy.linalg.expm(A)
+
+        return jnp.cos(callback_fn(A))
+
+>>> fn(0.654)
+array([[0.39385058, 0.99369752],
+       [0.97097762, 0.74283208]])
+
+Catalyst provides two callback functions:
+
+- :func:`~.pure_callback` supports callbacks of **pure** functions. That is, functions with no
+  side-effects that accept parameters and return values. However, the return type and shape of the
+  function must be known in advance, and is provided as a type signature.
+
+- :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
+   an easy entry point for debugging, for example via printing or logging at runtime.
+
+Note that callbacks do not currently support differentiation, and cannot be used inside
+functions that :func:`~.grad` is applied to.
 
 JAX integration
 ---------------

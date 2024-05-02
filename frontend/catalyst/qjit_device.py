@@ -20,11 +20,12 @@ import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 from pennylane.transforms.core import TransformProgram
 
-from catalyst.preprocess import catalyst_acceptance, decompose
+from catalyst.preprocess import catalyst_acceptance, decompose, measurements_from_counts
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime import (
     BackendInfo,
+    get_pennylane_measurement_processes,
     get_pennylane_observables,
     get_pennylane_operations,
 )
@@ -273,6 +274,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
         shots_present = original_device.shots is not None
         self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
         self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        self._measurement_processes = get_pennylane_measurement_processes(
+            target_config, shots_present, device_name
+        )
 
     @property
     def operations(self) -> Set[str]:
@@ -283,6 +287,11 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def observables(self) -> Set[str]:
         """Get the device observables"""
         return self._observables
+
+    @property
+    def measurement_processes(self) -> Set[str]:
+        """Get the device measurement processes"""
+        return self._measurement_processes
 
     def preprocess(
         self,
@@ -297,6 +306,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
+
+        if self.measurement_processes == {"Counts"}:
+            program.add_transform(measurements_from_counts)
 
         # TODO: Add Catalyst program verification and validation
         return program, config
