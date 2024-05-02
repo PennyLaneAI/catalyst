@@ -60,6 +60,8 @@ class TestCudaQ:
                 qml.RX(jnp.pi / 4, wires=[0])
                 return measure(0)
 
+            circuit()
+
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
