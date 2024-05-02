@@ -22,7 +22,7 @@ import jax
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
 
-from catalyst.debug.callback import as debug_callback
+from catalyst.debug.callback import callback as debug_callback
 
 
 # pylint: disable=redefined-builtin
