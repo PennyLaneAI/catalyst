@@ -22,6 +22,7 @@ static constexpr const char *enzyme_custom_gradient_key = "__enzyme_register_gra
 static constexpr const char *enzyme_like_free_key = "__enzyme_function_like_free";
 static constexpr const char *enzyme_const_key = "enzyme_const";
 static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
+static constexpr const char *enzyme_inactivefn_key = "__enzyme_inactivefn";
 
 }
 }
