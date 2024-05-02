@@ -451,9 +451,12 @@ def for_loop(lower_bound, upper_bound, step):
     >>> circuit(7, 1.6)
     [array(0.97926626), array(0.55395718)]
     """
+
     def _body_query(body_fn):
         return ForLoopCallable(lower_bound, upper_bound, step, body_fn)
+
     return _body_query
+
 
 ## IMPL ##
 class CondCallable:
@@ -560,10 +563,11 @@ class CondCallable:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
 
+
 class ForLoopCallable:
     """
     Wrapping for_loop decorator into a class so that the actual ForLoop operation object, which
-    is created locally in _call_with_quantum_ctx(ctx), can be retrived without changing its 
+    is created locally in _call_with_quantum_ctx(ctx), can be retrived without changing its
     return type. THe retrived ForLoop is in LoopBodyFunction.operation.
 
     **Example**
@@ -604,6 +608,7 @@ class ForLoopCallable:
     (array([0.5, 0. , 0.5, 0. ]),)
 
     """
+
     def __init__(self, lower_bound, upper_bound, step, body_fn):
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
@@ -628,8 +633,7 @@ class ForLoopCallable:
                 arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [
-                        inner_trace.full_raise(t)
-                        for t in wffa.call_wrapped(*arg_classical_tracers)
+                        inner_trace.full_raise(t) for t in wffa.call_wrapped(*arg_classical_tracers)
                     ]
 
             res_avals = list(map(shaped_abstractify, res_classical_tracers))
