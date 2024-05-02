@@ -46,7 +46,7 @@ def pure_callback(callback_fn, result_type=None):
     The callback function will be quantum just-in-time compiled alongside the rest of the
     workflow, however it will be executed at runtime by the Python virtual machine.
     This is in contrast to functions which get directly qjit-compiled by Catalyst, which will
-    be executed at runtime by machine-native code.
+    be executed at runtime as machine-native code.
 
     .. note::
 

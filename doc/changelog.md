@@ -147,17 +147,22 @@
   For example, the following pattern is now supported, as long as
   all return values have the same type:
 
+
+  ```python
+  @qml.qjit(autograph=True)
+  def fn(x):
+      if x > 0:
+          return jnp.sin(x)
+      return jnp.cos(x)
+  ```
+
   ```pycon
-  >>> @qml.qjit(autograph=True)
-  ... def fn(x):
-  ...     if x > 0:
-  ...         return jnp.sin(x)
-  ...     return jnp.cos(x)
   >>> fn(0.1)
   array(0.09983342)
   >>> fn(-0.1)
   array(0.99500417)
   ```
+
 
   This support extends to quantum circuits:
 
@@ -195,7 +200,7 @@
 
   At the moment, `CompileError` exceptions will be raised if at compile time it is found that code
   reachable from the gradient operation contains either a mid-circuit measurement, a callback, or a
-  custom call (which happens through the mitigation operation).
+  JAX-style custom call (which happens through the mitigation operation as well as certain JAX operations).
 
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
@@ -240,7 +245,7 @@
 
 * An updated quantum device specification format, TOML schema v2, is now supported by Catalyst. This
   allows device authors to specify properties such as native quantum control
-  support, gate invertibility, or differentiability, at a per-operation level.
+  support, gate invertibility, and differentiability on a per-operation level.
   [(#554)](https://github.com/PennyLaneAI/catalyst/pull/554)
 
   For more details on the new TOML schema, please refer to the
@@ -286,7 +291,7 @@
 * A bug in the test suite causing stochastic autograph test failures has been fixed.
   [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 
-* Running tests should no longer raise `ResourceWarning` from `tempfile.TemporaryDirectory`.
+* Running Catalyst tests should no longer raise `ResourceWarning` from the use of `tempfile.TemporaryDirectory`.
   [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
 
 <h3>Internal changes</h3>

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Catalyst's debug module contains functions useful for user program debugging."""
+
 from catalyst.debug.callback import callback
 from catalyst.debug.compiler_functions import (
     compile_from_mlir,

@@ -35,9 +35,6 @@ def instrumentation(session_name, filename=None, detailed=False):
     """Instrumentation session to output information on wall time, CPU time,
     and intermediate program size of a program during compilation and execution.
 
-    A session cannot be tied to the creation of a QJIT object
-    nor its lifetime, because it involves both compile time and runtime measurements. It cannot
-    be a context-free process either since we need to write results to an existing results file.
 
     Args:
         session_name (str): identifier to distinguish multiple sessions or runs within the same result file
@@ -59,6 +56,9 @@ def instrumentation(session_name, filename=None, detailed=False):
     [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
     [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
     """
+    # A session cannot be tied to the creation of a QJIT object
+    # nor its lifetime, because it involves both compile time and runtime measurements. It cannot
+    # be a context-free process either since we need to write results to an existing results file.
     session = InstrumentSession(session_name, filename, detailed)
 
     try:

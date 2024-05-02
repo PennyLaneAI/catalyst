@@ -199,11 +199,12 @@ the following command.
 Profiling and instrumentation
 =============================
 
-The :func:`catalyst.debug.instrumentation` context manager allows exploration of
-the steps that are run during compilation and execution, and for how long.
+Catalyst features built-in instrumentation capabilities for the compiler, which can
+be used to explore which steps are run by the compiler (and certain runtime functions),
+and for how long.
 
-Instrumentation can be enabled from the frontend with the :func:`~.debug.instrumentation` context
-manager:
+The instrumentation can be enabled from the frontend with the :func:`~.debug.instrumentation`
+context manager:
 
 >>> @qjit
 ... def expensive_function(a, b):
