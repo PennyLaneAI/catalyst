@@ -16,10 +16,18 @@ This module contains a CudaQDevice and the qjit
 entry point.
 """
 
+from importlib.metadata import version
 from pathlib import Path
 
 import cudaq
 import pennylane as qml
+
+installed_version = version("cuda_quantum")
+compatible_version = "0.6.0"
+if installed_version != compatible_version:
+    msg = f"Attempting to compile with incompatible version cuda_quantum=={installed_version}."
+    msg += f"Please install compatible version cuda_quantum=={compatible_version}."
+    raise ValueError(msg)
 
 from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
