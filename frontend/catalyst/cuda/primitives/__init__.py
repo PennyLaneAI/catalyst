@@ -22,13 +22,6 @@ import cudaq
 import jax
 from jax import numpy as jnp
 
-installed_version = version("cuda_quantum")
-compatible_version = "0.6.0"
-if installed_version != compatible_version:
-    msg = f"Attempting to compile with incompatible version cuda_quantum=={installed_version}."
-    msg += f"Please install compatible version cuda_quantum=={compatible_version}."
-    raise ValueError(msg)
-
 # We disable protected access in particular to avoid warnings with cudaq._pycuda.
 # And we disable unused-argument to avoid unused arguments in abstract_eval, particularly kwargs.
 # pylint: disable=protected-access,unused-argument,abstract-method,line-too-long
