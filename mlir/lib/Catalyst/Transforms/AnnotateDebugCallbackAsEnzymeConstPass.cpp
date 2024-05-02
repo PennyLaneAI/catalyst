@@ -21,34 +21,6 @@
 
 using namespace mlir;
 
-namespace {
-static constexpr llvm::StringRef debugCallback = "catalyst.debugCallback";
-struct AnnotateDebugCallbackPattern : public OpRewritePattern<LLVM::CallOp> {
-    using OpRewritePattern<LLVM::CallOp>::OpRewritePattern;
-
-    LogicalResult match(LLVM::CallOp op) const override;
-    void rewrite(LLVM::CallOp op, PatternRewriter &rewriter) const override;
-};
-
-LogicalResult AnnotateDebugCallbackPattern::match(LLVM::CallOp callOp) const {
-    bool isDebugCallback = callOp->hasAttr(debugCallback);
-    return isDebugCallback ? success() : failure();
-}
-
-
-void AnnotateDebugCallbackPattern::rewrite(LLVM::CallOp callOp, PatternRewriter &rewriter) const
-{
-    auto llvmPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(callOp->getLoc(), llvmPtrType, catalyst::gradient::enzyme_const_key);
-    // We need to place the an enzyme_autodiff call here.
-    // And the parameter needs to be:
-    // * callOp's FlatSymbolRefAttr
-    // * zip(enzyme_const, args)
-    rewriter.updateRootInPlace(callOp, [&] { callOp->removeAttr(debugCallback); });
-}
-
-}
-
 namespace catalyst {
 
 #define GEN_PASS_DEF_ANNOTATEDEBUGCALLBACKASENZYMECONSTPASS
@@ -61,12 +33,35 @@ struct AnnotateDebugCallbackAsEnzymeConstPass : impl::AnnotateDebugCallbackAsEnz
     void runOnOperation() final
     {
 
+        auto mod = getOperation();
+        StringRef pyregistryFnName = "pyregistry";
+        auto fnDecl = mod.lookupSymbol<LLVM::LLVMFuncOp>(pyregistryFnName);
+        if (!fnDecl) return;
+
         MLIRContext *context = &getContext();
-        RewritePatternSet patterns(context);
-        patterns.add<AnnotateDebugCallbackPattern>(context);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-            signalPassFailure();
-        }
+        auto builder = OpBuilder(context);
+        builder.setInsertionPointToStart(mod.getBody());
+        auto ptrTy = LLVM::LLVMPointerType::get(context);
+        auto arrTy = LLVM::LLVMArrayType::get(ptrTy, 1);
+        auto loc = mod.getLoc();
+        auto isConstant = false;
+        auto linkage = LLVM::Linkage::External;
+        auto key = catalyst::gradient::enzyme_inactivefn_key;
+        auto glb = builder.create<LLVM::GlobalOp>(loc, arrTy, isConstant, linkage, key, nullptr);
+
+        // Create a block and push it to the global
+        auto *contextGlb = glb.getContext();
+        Block *block = new Block();
+        glb.getInitializerRegion().push_back(block);
+        builder.setInsertionPointToStart(block);
+
+        auto undef = builder.create<LLVM::UndefOp>(glb.getLoc(), arrTy);
+        auto fnSym = SymbolRefAttr::get(context, pyregistryFnName);
+        auto fnPtr = builder.create<LLVM::AddressOfOp>(glb.getLoc(), ptrTy, fnSym);
+        auto filledInArray = builder.create<LLVM::InsertValueOp>(glb.getLoc(), undef, fnPtr, 0);
+        builder.create<LLVM::ReturnOp>(glb.getLoc(), filledInArray);
+
+
     }
 };
 

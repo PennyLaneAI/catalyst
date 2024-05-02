@@ -139,7 +139,6 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
@@ -210,6 +209,7 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "add-exception-handling",
+        "annotate-debug-callback-as-enzyme-const",
     ],
 )
 

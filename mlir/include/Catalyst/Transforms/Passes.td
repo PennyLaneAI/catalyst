@@ -130,7 +130,7 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let constructor = "catalyst::GEPInboundsPass()";
 }
 
-def AnnotateDebugCallbackAsEnzymeConstPass : Pass<"annotate-debug-callback-as-enzyme-const"> {
+def AnnotateDebugCallbackAsEnzymeConstPass : Pass<"annotate-debug-callback-as-enzyme-const", "ModuleOp"> {
     let summary = "Annotates debug callbacks as enzyme_const";
 
     let description = [{
