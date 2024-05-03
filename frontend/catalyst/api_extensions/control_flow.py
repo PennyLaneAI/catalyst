@@ -660,9 +660,9 @@ class ForLoopCallable:
 
 class WhileLoopCallable:
     """
-    Wrapping while_loop decorator into a class so that the actual "WhileLoop" operation object, which
-    is created locally in _call_with_quantum_ctx(ctx), can be retrived without changing its
-    return type. The retrived WhileLoop is in LoopBodyFunction.operation.
+    Wrapping while_loop decorator into a class so that the actual "WhileLoop" operation object,
+    which is created locally in _call_with_quantum_ctx(ctx), can be retrived without changing
+    its return type. The retrived WhileLoop is in LoopBodyFunction.operation.
 
     **Example**
 
