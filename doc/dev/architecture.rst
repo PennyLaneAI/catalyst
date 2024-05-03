@@ -6,7 +6,7 @@ Architecture
    <br />
 
 The Catalyst stack leverages state-of-the-art technologies to accelerate hybrid quantum-classical
-workflows without losing the ability to quickly prototype in Python. To do so, Catalyst buils upon
+workflows without losing the ability to quickly prototype in Python. To do so, Catalyst builds upon
 the `MLIR <https://mlir.llvm.org/docs/>`_ and `LLVM <https://llvm.org/>`_ compiler frameworks,
 the `QIR <https://github.com/qir-alliance>`_ project, and the
 `JAX <https://jax.readthedocs.io/en/latest/>`_ framework for composable transforms in machine
