@@ -84,6 +84,11 @@ def cudaqjit(fn=None, **kwargs):
     statistics (such as probabilities and variance) are not yet supported.
     """
     _check_version_compatibility()
+    # The following is needed here because the version compatibility check is above.
+    # If it is not here, then the import below would happen before the
+    # version compatibility test and there are some fields deleted from
+    # version 0.6.0. This means that during module import, an error would occur.
+    # pylint: disable-next=import-outside-toplevel
     from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
 
     if fn is not None:
