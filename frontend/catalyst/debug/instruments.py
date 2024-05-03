@@ -32,15 +32,64 @@ from contextlib import contextmanager
 ## API ##
 @contextmanager
 def instrumentation(session_name, filename=None, detailed=False):
-    """Start an instrumentation session. A session cannot be tied to the creation of a QJIT object
-    nor its lifetime, because it involves both compile time and runtime measurements. It cannot
-    be a context-free process either since we need to write results to an existing results file.
+    """Instrumentation session to output information on wall time, CPU time,
+    and intermediate program size of a program during compilation and execution.
+
 
     Args:
-        session_name (str): identifier to distinguish multiple results, primarily for humans
-        filename (str): desired path to write results to in YAML format
-        detailed (bool): whether to instrument finegrained steps in the compiler and runtime
+        session_name (str): identifier to distinguish multiple sessions or runs within the same result file
+        filename (str): Desired path to write results to in YAML format. If ``None``, the
+            results will instead be printed to the console.
+        detailed (bool): Whether to instrument fine-grained steps in the compiler and runtime.
+            If ``False``, only high-level steps such as "program capture" and
+            "compilation" are reported.
+
+    **Example**
+
+    Printing an instrumentation session to the console:
+
+    >>> @qjit
+    ... def expensive_function(a, b):
+    ...     return a + b
+    >>> with debug.instrumentation("session_name", detailed=False):
+    ...     expensive_function(1, 2)
+    [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
+    [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
+    [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+    [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
+
+    We can also write an instrumentation session to a YAML file:
+
+    >>> with debug.instrumentation("session_name", filename="session.yml", detailed=False):
+    ...     expensive_function(1, 2)
+    >>> with open('session.yml', 'r') as f:
+    ...     print(f.read())
+    2024-04-29 18:19:29.349886:
+    name: session_name
+    system:
+      os: Linux-6.1.58+-x86_64-with-glibc2.35
+      arch: x86_64
+      python: 3.10.12
+    results:
+      - capture:
+          walltime: 6.296216
+          cputime: 2.715764
+          programsize: 0
+      - generate_ir:
+          walltime: 8.84289
+          cputime: 8.836589
+          programsize: 14
+      - compile:
+          walltime: 199.249725
+          cputime: 38.820425
+          programsize: 121
+      - run:
+          walltime: 1.053613
+          cputime: 1.019584
     """
+    # A session cannot be tied to the creation of a QJIT object
+    # nor its lifetime, because it involves both compile time and runtime measurements. It cannot
+    # be a context-free process either since we need to write results to an existing results file.
     session = InstrumentSession(session_name, filename, detailed)
 
     try:
@@ -50,13 +99,38 @@ def instrumentation(session_name, filename=None, detailed=False):
 
 
 def instrument(fn=None, *, size_from=None, has_finegrained=False):
-    """Decorator that marks functions as targets for instrumentation. Instrumentation is only
-    performed when enabled by a session.
+    """Decorator that marks specific functions as targets for instrumentation.
+    Instrumentation is only performed when enabled by a session.
 
     Args:
         fn (Callable): function to instrument
         size_from (int | None): optional index indicating from which result to measure program size
-                                by number of newlines in the string representation of the result
+            (by number of newlines in the string representation of the result)
+        has_finegrained (bool): whether to instrument finegrained steps in the compiler and runtime.
+            If ``False``, only high-level steps such as program capture and
+            compilation are reported.
+
+    **Example**
+
+    .. code-block:: python
+
+        @instrument
+        def expensive_function(a, b):
+            return a + b
+
+        @qjit
+        def fn(x):
+            y = jnp.sin(x) ** 3
+            z = expensive_function(x, y)
+            return jnp.cos(z)
+
+    >>> with catalyst.debug.instrumentation("session_name"):
+    ...     fn(0.43)
+    [DIAGNOSTICS] Running expensive_function        walltime: 1.908 ms      cputime: 1.904 ms
+    [DIAGNOSTICS] Running capture                   walltime: 6.691 ms      cputime: 6.686 ms       programsize: 5 lines
+    [DIAGNOSTICS] Running generate_ir               walltime: 5.938 ms      cputime: 5.934 ms       programsize: 18 lines
+    [DIAGNOSTICS] Running compile                   walltime: 41.826 ms     cputime: 13.287 ms      programsize: 128 lines
+    [DIAGNOSTICS] Running run                       walltime: 0.801 ms      cputime: 0.795 ms
     """
     if fn is None:
         return functools.partial(instrument, size_from=size_from, has_finegrained=has_finegrained)

@@ -31,7 +31,7 @@ Dev Containers
 
 
 Try out Catalyst in self-contained, ready-to-go environments called
-`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`_:
+`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`__:
 
 .. image:: https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square
   :alt: Try Catalyst in Dev Container
@@ -40,7 +40,7 @@ Try out Catalyst in self-contained, ready-to-go environments called
 
 | You will need an existing installation of `Docker <https://www.docker.com/>`_,
   `VS Code <https://code.visualstudio.com/>`_, and the VS Code
-  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`_
+  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`__
   extension.
 
 If desired, the Docker images can also be used in a standalone fashion:
@@ -151,7 +151,7 @@ Runtime
 
 By default, the runtime builds and installs all supported backend devices, enabling the execution of
 quantum circuits on local simulators and remote services, such as Amazon Braket.
-The `PennyLane-Lightning<https://github.com/PennyLaneAI/pennylane-lightning>`_ suite devices require
+The `PennyLane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`__ suite devices require
 C++20 standard library features. Older C++ compilers may not support this, so it is recommended to use a
 modern compiler with these features.
 
