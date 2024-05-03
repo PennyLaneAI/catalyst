@@ -19,7 +19,7 @@ pre-built binaries are being distributed via the Python Package Index (PyPI) for
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
     app.
 
-Pre-built packages for Windows are not yet available, and comptability with other platforms is
+Pre-built packages for Windows are not yet available, and compatibility with other platforms is
 untested and cannot be guaranteed. If you are using one of these platforms, please
 try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
 
@@ -48,10 +48,10 @@ If desired, the Docker images can also be used in a standalone fashion:
 | `Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`_
 | `Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`_
 
-The user image provides an officially supported enviroment and automatically installs the latest
-release of Catalyst. The developer image only provides the right enviroment to build Catalyst from
+The user image provides an officially supported environment and automatically installs the latest
+release of Catalyst. The developer image only provides the right environment to build Catalyst from
 source, and requires launching the post-install script at ``.devcontainer/dev/post-install.sh``
-from whithin the root of the running container.
+from within the root of the running container.
 
 .. note::
 

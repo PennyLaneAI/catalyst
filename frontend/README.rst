@@ -18,7 +18,7 @@ To facilitate the above process, the frontend introduces several extensions to t
 in order to natively trace and represent quantum instructions. Additionally, extensions to the
 PennyLane package enable compilation of arbitrary control flow inside of quantum functions, as well
 as support of real-time mid-circuit measurements and measurement result feedback. Any ``jax.jit``
-compatible programs are default supported by the Catalyst frontend.
+compatible programs are supported by default by the Catalyst frontend.
 
 For more information on how to use the frontend, please refer to the
 `quickstart guide <https://docs.pennylane.ai/projects/catalyst/en/latest/dev/quick_start.html>`_.

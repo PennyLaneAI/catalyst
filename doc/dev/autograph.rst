@@ -104,7 +104,7 @@ Currently, AutoGraph supports converting the following Python statements:
 - ``if`` statements (including ``elif`` and ``else``)
 - ``for`` loops
 - ``while`` loops
-- ``and``, ``or`, and ``not`` in certain cases
+- ``and``, ``or``, and ``not`` in certain cases
 
 ``break`` and ``continue`` statements are currently not supported.
 
@@ -277,7 +277,7 @@ array(4.)
 New variable assignments
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-If a new, previously non-existant variable is assigned in one branch, it must
+If a new, previously non-existent variable is assigned in one branch, it must
 be assigned in **all** branches. This means that you **must** include an
 ``else`` statement if you are assigning a new variable:
 
@@ -541,7 +541,7 @@ For loops that update variables can also be converted with AutoGraph:
 array(13)
 
 However, like with conditionals, a similar restriction applies: variables
-which are updated across iterations of the loop must have a JAX compileable
+which are updated across iterations of the loop must have a JAX compilable
 type (Booleans, Python numeric types, and JAX arrays).
 
 You can also utilize temporary variables within a for loop:
@@ -605,7 +605,7 @@ As with for loops, while loops that update variables can also be converted with 
 array(6.4)
 
 However, like with conditionals, a similar restriction applies: variables
-which are updated across iterations of the loop must have a JAX compileable
+which are updated across iterations of the loop must have a JAX compilable
 type (Booleans, Python numeric types, and JAX arrays).
 
 You can also utilize temporary variables within a while loop:
