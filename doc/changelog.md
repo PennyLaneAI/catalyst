@@ -2,13 +2,16 @@
 
 <h3>New features</h3>
 
-* Support for disabling Autograph for a specific function.
-[(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
+* Support for disabling Autograph for a specific function or
+  only for the function calls inside a specific context,
+  without affecting the bare code inside such context.
+  [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
+  [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
 
-  The following is now possible:
+  Using `disable_autograph` as a decorator is now possible:
 
   ```py
-  @disable_autograph()
+  @disable_autograph
   def f():
     x = 6
     if x > 5:
@@ -25,11 +28,7 @@
 
   ```
 
-* Support for disabling Autograph only for the function calls inside a specific context,
-withouth affecting the bare code inside such context.
-[(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
-
-  The following is now possible:
+  Applying `disable_autograph` to a context is now possible:
 
   ```py
   def f():
@@ -43,7 +42,7 @@ withouth affecting the bare code inside such context.
   @qjit(autograph=True)
   def g():
     x = 0.4
-    with disable_autograph():
+    with disable_autograph:
       x += f()
     return x
 

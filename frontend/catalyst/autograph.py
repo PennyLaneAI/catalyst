@@ -198,14 +198,26 @@ def autograph_source(fn):
     )
 
 
-class disable_autograph(ag_ctx.ControlStatusCtx, ContextDecorator):
+class DisableAutograph(ag_ctx.ControlStatusCtx, ContextDecorator):
     """Context decorator that disables AutoGraph for the given function/context.
+
+    .. note::
+
+        A singleton instance is used for discarding parentheses usage:
+
+        @disable_autograph
+        instead of
+        @DisableAutograph()
+
+        with disable_autograph:
+        instead of
+        with DisableAutograph()
 
     **Example 1: as a function decorator**
 
     .. code-block:: python
 
-        @disable_autograph()
+        @disable_autograph
         def f():
             x = 6
             if x > 5:
@@ -238,7 +250,7 @@ class disable_autograph(ag_ctx.ControlStatusCtx, ContextDecorator):
         @qjit(autograph=True)
         def g():
             x = 0.4
-            with disable_autograph():
+            with disable_autograph:
                 x += f()
             return x
 
@@ -249,6 +261,9 @@ class disable_autograph(ag_ctx.ControlStatusCtx, ContextDecorator):
     def __init__(self):
         super().__init__(status=ag_ctx.Status.DISABLED)
 
+
+# Singleton instance of DisableAutograph
+disable_autograph = DisableAutograph()
 
 TOPLEVEL_OPTIONS = converter.ConversionOptions(
     recursive=True,

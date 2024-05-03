@@ -562,7 +562,7 @@ print_code(chain_logical_call)
 # -----
 
 
-@disable_autograph()
+@disable_autograph
 def f():
     """Simple function with if statements"""
     x = 6
@@ -633,7 +633,7 @@ def disable_autograph_context_manager_jax():
     """Checks that Autograph is disabled for a given context."""
     # CHECK: { lambda ; . let  in (36.4,) }
     x = 0.4
-    with disable_autograph():
+    with disable_autograph:
         x += h()
     return x
 

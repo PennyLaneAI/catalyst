@@ -1720,7 +1720,7 @@ class TestDisableAutograph:
     def test_disable_autograph_decorator(self):
         """Test disabling autograph with decorator."""
 
-        @disable_autograph()
+        @disable_autograph
         def f():
             x = 6
             if x > 5:
@@ -1751,7 +1751,7 @@ class TestDisableAutograph:
         @qjit(autograph=True)
         def g():
             x = 0.4
-            with disable_autograph():
+            with disable_autograph:
                 x += f()
             return x
 
