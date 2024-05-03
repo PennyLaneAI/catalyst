@@ -22,13 +22,13 @@
     type and shape of the function must be known in advance, and is provided as a type signature.
 
     ```python
-    @catalyst.pure_callback
+    @pure_callback
     def callback_fn(x) -> float:
         # here we call non-JAX compatible code, such
         # as standard NumPy
         return np.sin(x)
 
-    @qml.qjit
+    @qjit
     def fn(x):
         return jnp.cos(callback_fn(x ** 2))
     ```
@@ -45,7 +45,7 @@
     def callback_fn(y):
         print("Value of y =", y)
 
-    @qml.qjit
+    @qjit
     def fn(x):
         y = jnp.sin(x)
         callback_fn(y)
@@ -100,7 +100,7 @@
 
   dev = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
-  @catalyst.qjit
+  @qjit
   @qml.qnode(dev)
   def circuit(a: float):
       qml.Hadamard(0)
@@ -149,7 +149,7 @@
 
 
   ```python
-  @qml.qjit(autograph=True)
+  @qjit(autograph=True)
   def fn(x):
       if x > 0:
           return jnp.sin(x)
@@ -162,7 +162,6 @@
   >>> fn(-0.1)
   array(0.99500417)
   ```
-
 
   This support extends to quantum circuits:
 
@@ -210,6 +209,7 @@
   [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
   [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
   [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
+  [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
 
   When using the new device API, Catalyst will discard the preprocessing from the original device,
   replacing it with Catalyst-specific preprocessing based on the TOML file provided by the device.
@@ -220,8 +220,8 @@
   only match redundant Hadamard operations, but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
-* The `catalyst.measure` function can now receive 1D arrays for the `wires` parameter as long as they only
-  contain one element.
+* The `catalyst.measure` operation is now more lenient in the accepted type for the `wires` parameter.
+  In addition to a scalar, a 1D array is also accepted as long as it only contains one element.
   [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
   For example, the following is now supported:
@@ -269,15 +269,8 @@
 
 <h3>Bug fixes</h3>
 
-* The transform `measurement_from_counts` used for processing circuits for devices
-  has been updated following an update of a private function in PennyLane.
-  [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
-
 * The QNode argument `diff_method=None` is now supported for QNodes within a qjit-compiled function.
   [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
-
-* Catalyst now allows for gates to receive `wire` values of less than 64 bitwidth.
-  [(#623)](https://github.com/PennyLaneAI/catalyst/pull/623)
 
 * A bug has been fixed where the C++ compiler driver was incorrectly being triggered twice.
   [(#594)](https://github.com/PennyLaneAI/catalyst/pull/594)
@@ -285,7 +278,8 @@
 * Programs with `jnp.reshape` no longer fail.
   [(#592)](https://github.com/PennyLaneAI/catalyst/pull/592)
 
-* Fixed a bug with `adjoint` that did not take into account control wires.
+* A bug in the quantum adjoint routine in the compiler has been fixed, which didn't take into
+  account control wires on operations in all instances.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
 
 * A bug in the test suite causing stochastic autograph test failures has been fixed.
@@ -299,9 +293,10 @@
 * The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
   [(#679)](https://github.com/PennyLaneAI/catalyst/pull/679)
 
-* Catalyst publishes the Git revision string seen at the time of the packaging as
-  `catalyst.__revision__`. For editable installations, the revision is read at the time of
-  module import.
+* Catalyst now publishes a revision string under `catalyst.__revision__`, in addition
+  to the existing `catalyst.__version__` string.
+  The revision contains the Git commit hash of the repository at the time of packaging,
+  or for editable installations the active commit hash at the time of package import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
 
 * The Python interpreter is now a shared resource across the runtime.

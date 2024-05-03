@@ -103,7 +103,7 @@ def pure_callback(callback_fn, result_type=None):
 
     .. code-block:: python
 
-        @qml.qjit
+        @qjit
         def fn(x):
             x = jnp.cos(x)
 

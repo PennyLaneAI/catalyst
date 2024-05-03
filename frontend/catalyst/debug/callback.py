@@ -50,7 +50,7 @@ def callback(callback_fn):
         def callback_fn(y):
             print("Value of y =", y)
 
-        @qml.qjit
+        @qjit
         def fn(x):
             y = jnp.sin(x)
             callback_fn(y)
@@ -67,7 +67,7 @@ def callback(callback_fn):
 
     .. code-block:: python
 
-        @qml.qjit
+        @qjit
         def fn(x):
             y = jnp.sin(x)
             catalyst.debug.callback(lambda z: print("Value of y = ", z))(y)

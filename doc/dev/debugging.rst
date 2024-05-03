@@ -210,7 +210,7 @@ context manager:
 ... def expensive_function(a, b):
 ...     return a + b
 >>> with debug.instrumentation("session_name", detailed=False):
->>>     expensive_function(1, 2)
+...     expensive_function(1, 2)
 [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
 [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
 [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
