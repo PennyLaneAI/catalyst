@@ -27,9 +27,9 @@ def _check_version_compatibility():
     installed_version = version("cuda_quantum")
     compatible_version = "0.6.0"
     if installed_version != compatible_version:
-        msg = f"Compiling with incompatible version cuda_quantum=={installed_version}."
+        msg = f"Compiling with incompatible version cuda_quantum=={installed_version}. "
         msg += f"Please install compatible version cuda_quantum=={compatible_version}."
-        raise ValueError(msg)
+        raise ModuleNotFoundError(msg)
 
 
 def cudaqjit(fn=None, **kwargs):
