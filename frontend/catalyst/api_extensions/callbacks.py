@@ -88,8 +88,8 @@ def pure_callback(callback_fn, result_type=None):
     At the moment, `pure_callback`s should not be used inside gradients.
     """
 
-    signature = inspect.signature(callback_fn)
     if result_type is None:
+        signature = inspect.signature(callback_fn)
         result_type = signature.return_annotation
 
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)

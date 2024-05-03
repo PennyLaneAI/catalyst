@@ -1,4 +1,20 @@
-# Release 0.6.0-dev
+# Release 0.7.0-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Internal changes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.6.0
 
 <h3>New features</h3>
 
@@ -11,6 +27,7 @@
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
+  [(#204)](https://github.com/PennyLaneAI/catalyst/pull/204)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -55,13 +72,16 @@
   ```
 
   At the moment, callbacks should not be used inside methods which are differentiated.
+  A CompileError exception will be raised if at compile time it is found that code
+  reachable from the gradient operation contains either a mid-circuit measurement,
+  a callback, or a custom call (which happens through the mitigation operation).
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+  [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
   ```py
-  from catalyst.oqc import OQCDevice
 
   import os
 
@@ -69,7 +89,7 @@
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+  device = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(device=device)
@@ -112,6 +132,10 @@
   Measurements currently include wall time, cpu time, and (intermediate) program size.
 
 <h3>Improvements</h3>
+
+* `qml.sample` and `qml.counts` now produce integer arrays for the sample array and basis state
+  array when used without observables.
+  [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
 
 * Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
   [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
@@ -181,6 +205,9 @@
 
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
+
+* Remove unnecessary logic for handling wires from GlobalPhase.
+  [(#640)](https://github.com/PennyLaneAI/catalyst/pull/640)
 
 * Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
   [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
