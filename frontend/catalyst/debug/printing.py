@@ -46,18 +46,24 @@ def print(fmt, *args, **kwargs):
         **args: Arguments to be passed to the format string.
         **kwargs: Keyword arguments to be passed to the format string.
 
-    .. seealso:: :func:`~.print_memref`
+    .. seealso:: :func:`~.print_memref`, :func:`~.debug.callback`.
 
     **Example**
 
-    .. code-block:: python
-
-        @qjit
-        def f(a, b, c):
-            debug.print("c={c} b={b} a={a}", a=a, b=b, c=c)
-
+    >>> @qjit
+    ... def f(a, b, c):
+    ...     debug.print("c={c} b={b} a={a}", a=a, b=b, c=c)
     >>> f(1, 2, 3)
     c=3 b=2 a=1
+
+    In addition to passing keyword arguments to the format string, we can also pass arguments
+    positionally:
+
+    >>> @qjit
+    ... def f(x, y):
+    ...     debug.print("Value of x = {0:.2f}", x)
+    >>> f(0.543, 0.23)
+    Value of x = 0.54
 
     .. note::
 
