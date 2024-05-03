@@ -63,9 +63,9 @@ class CustomDevice(qml.QubitDevice):
         for line in toml_contents:
             if '"MultiControlledX",' in line or line.startswith("MultiControlledX "):
                 continue
-            if '"Rot",' in line or line.startswith('Rot '):
+            if '"Rot",' in line or line.startswith("Rot "):
                 continue
-            if '"S",' in line or line.startswith('S '):
+            if '"S",' in line or line.startswith("S "):
                 continue
 
             updated_toml_contents.append(line)
