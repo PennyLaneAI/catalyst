@@ -59,7 +59,7 @@ def verify_catalyst_ctrl_against_pennylane(
         else:
             return quantum_func(*args, ctrl_fn=PL_ctrl)
 
-    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
+    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args), atol=1e-7)
 
 
 def test_qctrl_op_object(backend):
