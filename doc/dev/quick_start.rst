@@ -41,7 +41,7 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 .. warning::
 
     The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-    ``braket.local.qubit``, and ``braket.aws.qubit`` but future plans include the addition of more.
+    ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud`` but future plans include the addition of more.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
 way you are used to, as long as you ensure that all operations are added to the main tape.
