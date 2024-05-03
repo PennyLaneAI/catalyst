@@ -102,6 +102,7 @@ class DummyDeviceCounts(Device):
 
             updated_toml_contents.append(line)
 
+        # pylint-next: disable=attribute-defined-outside-init
         self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
         self.toml_file.writelines(updated_toml_contents)
         self.toml_file.close()  # close for now without deleting
