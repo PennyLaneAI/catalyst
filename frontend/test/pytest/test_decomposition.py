@@ -59,14 +59,13 @@ class CustomDevice(qml.QubitDevice):
         with open(lightning_toml, mode="r", encoding="UTF-8") as f:
             toml_contents = f.readlines()
 
-        # TODO: update once schema 2 is merged
         updated_toml_contents = []
         for line in toml_contents:
-            if '"MultiControlledX",' in line:
+            if '"MultiControlledX",' in line or line.startswith("MultiControlledX "):
                 continue
-            if '"Rot",' in line:
+            if '"Rot",' in line or line.startswith('Rot '):
                 continue
-            if '"S",' in line:
+            if '"S",' in line or line.startswith('S '):
                 continue
 
             updated_toml_contents.append(line)
