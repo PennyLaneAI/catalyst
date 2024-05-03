@@ -287,6 +287,9 @@
 * Running Catalyst tests should no longer raise `ResourceWarning` from the use of `tempfile.TemporaryDirectory`.
   [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
 
+* Raises an exception if the user has an incompatible CUDA Quantum version installed.
+  [(#707)](https://github.com/PennyLaneAI/catalyst/pull/707)
+
 <h3>Internal changes</h3>
 
 * The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
