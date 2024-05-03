@@ -15,7 +15,7 @@
 """
 from copy import deepcopy
 from functools import partial
-from typing import Optional, Set
+from typing import Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
@@ -315,3 +315,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         Raises: RuntimeError
         """
         raise RuntimeError("QJIT devices cannot execute tapes.")
+
+
+AnyQJITDevice = Union[QJITDevice, QJITDeviceNewAPI]
+

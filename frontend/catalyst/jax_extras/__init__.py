@@ -25,6 +25,7 @@ from catalyst.jax_extras.tracing import (
     DynamicJaxprTracer,
     DynshapedClosedJaxpr,
     Jaxpr,
+    JaxprEqn,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,

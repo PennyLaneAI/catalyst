@@ -26,7 +26,7 @@ from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
 import catalyst
-from catalyst.jax_extras import Jaxpr
+from catalyst.jax_extras import Jaxpr, JaxprEqn
 from catalyst.jax_primitives import (
     GradParams,
     expval_p,
@@ -35,10 +35,15 @@ from catalyst.jax_primitives import (
     jvp_p,
     probs_p,
     vjp_p,
+    qinst_p,
+    while_p,
+    for_p,
+    cond_p,
 )
 from catalyst.jax_tracer import Function
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.qjit_device import AnyQJITDevice
 
 Differentiable = Union[Function, QNode]
 DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
@@ -720,8 +725,8 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
-    if method == "adjoint" and isinstance(fn, QNode):
-        _verify_op_differentiability_on_device(jaxpr, fn.qjit_device)
+    if isinstance(f, QNode) and f.diff_method == "adjoint":
+        _verify_op_differentiability_on_device(jaxpr, f.qjit_device)
 
     return jaxpr, out_tree
 
@@ -800,19 +805,18 @@ def _is_differentiable_on_device(op_name, device) -> bool:
     return device.capabilities.native_ops[op_name].differentiable
 
 
-def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: QJITDeviceUnion) -> None:
+def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: AnyQJITDevice) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
     """
 
     def _get_inner_jaxprs(e:JaxprEqn) -> List[Jaxpr]:
-        if any(e.primitive == p for p in [while_p, for_p]):
+        if e.primitive in [while_p, for_p]:
             inner_jaxpr = e.params['jaxpr']
             return [inner_jaxpr]
-        elif e.primitive == cond_p:
-            assert False # FIXME: get cond branches
-            return []
+        elif e.primitive is cond_p:
+            return e.params['branch_jaxprs']
         elif e.primitive == func_p:
             inner_jaxpr = e.params['call_jaxpr']
             return [inner_jaxpr]
@@ -821,9 +825,9 @@ def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: QJITDeviceUnion
     def _go(jaxpr:Jaxpr, device) -> None:
         for e in jaxpr.eqns:
             if e.primitive == qinst_p:
-                op = e.params['op']
-                if not _is_differentiable_on_device(op, device):
-                    raise CompileError('non-differentiable')
+                op_name = e.params['op']
+                if not _is_differentiable_on_device(op_name, device):
+                    raise DifferentiableCompileError(f'{op_name} is non-differentiable')
             elif inner_jaxprs := _get_inner_jaxprs(e):
                 for inner_jaxpr in inner_jaxprs:
                     _go(inner_jaxpr, device)
