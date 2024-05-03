@@ -1,4 +1,20 @@
-# Release 0.6.0-dev
+# Release 0.7.0-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Internal changes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.6.0
 
 <h3>New features</h3>
 
@@ -189,6 +205,9 @@
 
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
+
+* Remove unnecessary logic for handling wires from GlobalPhase.
+  [(#640)](https://github.com/PennyLaneAI/catalyst/pull/640)
 
 * Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
   [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)

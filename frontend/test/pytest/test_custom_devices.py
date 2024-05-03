@@ -82,6 +82,8 @@ OPERATIONS = [
     "Adjoint(ISWAP)",
     "Adjoint(SISWAP)",
     "MultiControlledX",
+    "SISWAP",
+    "ControlledPhaseShift",
     "C(PauliY)",
     "C(RY)",
     "C(PauliX)",

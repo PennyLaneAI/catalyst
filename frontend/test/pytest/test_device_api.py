@@ -89,10 +89,9 @@ def test_qjit_device():
     # Create qjit device
     config = device_get_toml_config(device)
     backend_info = extract_backend_info(device, config)
-    device_qjit = QJITDeviceNewAPI(device, config, backend_info)
+    device_qjit = QJITDeviceNewAPI(device, backend_info)
 
     # Check attributes of the new device
-    assert isinstance(device_qjit.target_config, dict)
     assert device_qjit.shots == qml.measurements.Shots(2032)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
@@ -130,7 +129,7 @@ def test_qjit_device_no_wires():
     with pytest.raises(
         AttributeError, match="Catalyst does not support devices without set wires."
     ):
-        QJITDeviceNewAPI(device, config, backend_info)
+        QJITDeviceNewAPI(device, backend_info)
 
 
 def test_simple_circuit():

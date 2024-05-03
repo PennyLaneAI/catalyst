@@ -22,21 +22,17 @@ import pathlib
 import platform
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any, Dict
 
 import pennylane as qml
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
+    ProgramFeatures,
     TOMLDocument,
-    check_quantum_control_flag,
-    get_decomposable_gates,
-    get_matrix_decomposable_gates,
-    get_measurement_processes,
-    get_native_gates,
-    get_observables,
+    get_device_capabilities,
+    pennylane_operation_set,
     read_toml_file,
 )
 
@@ -69,103 +65,12 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
-def deduce_schema1_native_controlled_gates(native_gates: Set[str]) -> Set[str]:
-    """Calculate the set of controlled gates given the set of natively supported gates. This
-    function is used with the toml config schema 1 which did not support per-gate control
-    specifications. Later schemas provide the required information directly.
-    """
-    # The deduction logic is the following:
-    # * Most of the gates have their `C(Gate)` controlled counterparts.
-    # * Some gates have to be decomposed if controlled version is used. Typically these are gates
-    #   which are already controlled but have well-known names.
-    # * Few gates, like `QubitUnitary`, have separate classes for their controlled versions.
-    gates_to_be_decomposed_if_controlled = [
-        "Identity",
-        "CNOT",
-        "CY",
-        "CZ",
-        "CSWAP",
-        "CRX",
-        "CRY",
-        "CRZ",
-        "CRot",
-        "ControlledPhaseShift",
-        "QubitUnitary",
-        "Toffoli",
-    ]
-    native_controlled_gates = set(
-        [f"C({gate})" for gate in native_gates if gate not in gates_to_be_decomposed_if_controlled]
-        + [f"Controlled{gate}" for gate in native_gates if gate in ["QubitUnitary"]]
-    )
-    return native_controlled_gates
-
-
-def get_pennylane_operations(
-    config: TOMLDocument, shots_present: bool, device_name: str
-) -> Set[str]:
-    """Get gates that are natively supported by the device and therefore do not need to be
-    decomposed.
-
-    Args:
-        config (Dict[Str, Any]): Configuration dictionary
-        shots_present (bool): True is exact shots is specified in the current top-level program
-        device_name (str): Name of quantum device. Used for ad-hoc patching.
-
-    Returns:
-        Set[str]: List of gate names in the PennyLane format.
-    """
-    gates_PL = set()
-    schema = int(config["schema"])
-
-    if schema == 1:
-        native_gates_attrs = get_native_gates(config, shots_present)
-        assert all(len(v) == 0 for v in native_gates_attrs.values())
-        native_gates = set(native_gates_attrs)
-        supports_controlled = check_quantum_control_flag(config)
-        native_controlled_gates = (
-            deduce_schema1_native_controlled_gates(native_gates) if supports_controlled else set()
-        )
-
-        # TODO: remove after PR #642 is merged in lightning
-        if device_name == "lightning.kokkos":  # pragma: nocover
-            native_gates.update({"C(GlobalPhase)"})
-
-        gates_PL = set.union(native_gates, native_controlled_gates)
-
-    elif schema == 2:
-        native_gates = get_native_gates(config, shots_present)
-        for gate, attrs in native_gates.items():
-            gates_PL.add(f"{gate}")
-            if "controllable" in attrs.get("properties", {}):
-                gates_PL.add(f"C({gate})")
-
-    else:
-        raise CompileError("Device configuration schema {schema} is not supported")
-
-    return gates_PL
-
-
-def get_pennylane_observables(
-    config: TOMLDocument, shots_present: bool, _device_name: str
-) -> Set[str]:
-    """Get observables in PennyLane format. Apply ad-hoc patching"""
-
-    return set(get_observables(config, shots_present))
-
-
-def get_pennylane_measurement_processes(
-    config: TOMLDocument, shots_present: bool, _device_name: str
-) -> Set[str]:
-    """Get measurement processes in PennyLane format"""
-
-    return set(get_measurement_processes(config, shots_present))
-
-
-def check_no_overlap(*args):
+def check_no_overlap(*args, device_name):
     """Check items in *args are mutually exclusive.
 
     Args:
         *args (List[Str]): List of strings.
+        device_name (str): Device name for error reporting.
 
     Raises:
         CompileError
@@ -181,7 +86,7 @@ def check_no_overlap(*args):
         overlaps.update(s - union)
         union = union - s
 
-    msg = f"Device has overlapping gates: {overlaps}"
+    msg = f"Device '{device_name}' has overlapping gates: {overlaps}"
     raise CompileError(msg)
 
 
@@ -227,23 +132,14 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         )
 
     device_name = device.short_name if isinstance(device, qml.Device) else device.name
+    program_features = ProgramFeatures(device.shots is not None)
+    device_capabilities = get_device_capabilities(config, program_features, device_name)
 
-    shots_present = device.shots is not None
-    native = get_pennylane_operations(config, shots_present, device_name)
-    decomposable = set(get_decomposable_gates(config, shots_present))
-    matrix = set(get_matrix_decomposable_gates(config, shots_present))
+    native = pennylane_operation_set(device_capabilities.native_ops)
+    decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)
+    matrix = pennylane_operation_set(device_capabilities.to_matrix_ops)
 
-    # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
-    # supported, (2) native quantum control flag is enabled and (3) `ControlledQubitUnitary` is
-    # listed in either matrix or decomposable sections. This is a contradiction, because condition
-    # (1) means that `ControlledQubitUnitary` is also in the native set. We solve it here by
-    # applying a fixup.
-    # TODO: remove after PR #642 is merged in lightning
-    if "ControlledQubitUnitary" in native:
-        matrix = matrix - {"ControlledQubitUnitary"}
-        decomposable = decomposable - {"ControlledQubitUnitary"}
-
-    check_no_overlap(native, decomposable, matrix)
+    check_no_overlap(native, decomposable, matrix, device_name=device_name)
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
         # For gates, we require strict match
@@ -259,7 +155,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
         # For observables, we do not have `non-native` section in the config, so we check that
         # device data supercedes the specification.
         device_observables = set(device.observables)
-        spec_observables = get_pennylane_observables(config, shots_present, device_name)
+        spec_observables = pennylane_operation_set(device_capabilities.native_obs)
         if (spec_observables - device_observables) != set():
             raise CompileError(
                 "Observables in qml.device.observables and specification file do not match.\n"
@@ -267,8 +163,8 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
             )
 
 
-def device_get_toml_config(device) -> Path:
-    """Get the path of the device config file."""
+def device_get_toml_config(device) -> TOMLDocument:
+    """Get the contents of the device config file."""
     if hasattr(device, "config"):
         # The expected case: device specifies its own config.
         toml_file = device.config

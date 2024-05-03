@@ -67,7 +67,7 @@ class QFunc:
         backend_info = QFunc.extract_backend_info(self.device, config)
 
         if isinstance(self.device, qml.devices.Device):
-            device = QJITDeviceNewAPI(self.device, config, backend_info)
+            device = QJITDeviceNewAPI(self.device, backend_info)
         else:
             device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
 
