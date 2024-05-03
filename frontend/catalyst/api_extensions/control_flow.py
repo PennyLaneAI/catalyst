@@ -232,150 +232,6 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def while_loop(cond_fn):
-    """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
-
-    This decorator provides a functional version of the traditional while
-    loop, similar to ``jax.lax.while_loop``. That is, any variables that are
-    modified across iterations need to be provided as inputs and outputs to
-    the loop body function:
-
-    - Input arguments contain the value of a variable at the start of an
-      iteration
-
-    - Output arguments contain the value at the end of the iteration. The
-      outputs are then fed back as inputs to the next iteration.
-
-    The final iteration values are also returned from the
-    transformed function.
-
-    This form of control flow can also be called from the Python interpreter without needing to use
-    :func:`~.qjit`.
-
-    The semantics of ``while_loop`` are given by the following Python pseudo-code:
-
-    .. code-block:: python
-
-        def while_loop(cond_fun, body_fun, *args):
-            while cond_fun(*args):
-                args = body_fn(*args)
-            return args
-
-    Args:
-        cond_fn (Callable): the condition function in the while loop
-
-    Returns:
-        Callable: A wrapper around the while-loop function.
-
-    Raises:
-        TypeError: Invalid return type of the condition expression.
-
-    **Example**
-
-    .. code-block:: python
-
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x: float):
-
-            @while_loop(lambda x: x < 2.0)
-            def loop_rx(x):
-                # perform some work and update (some of) the arguments
-                qml.RX(x, wires=0)
-                return x ** 2
-
-            # apply the while loop
-            final_x = loop_rx(x)
-
-            return qml.expval(qml.PauliZ(0)), final_x
-
-    >>> circuit(1.6)
-    [array(-0.02919952), array(2.56)]
-    """
-
-    def _body_query(body_fn):
-        def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: JaxTracingContext):
-                outer_trace = ctx.trace
-                in_classical_tracers, _ = tree_flatten(init_state)
-
-                with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, _, cond_tree = deduce_avals(cond_fn, init_state, {})
-                    arg_classical_tracers = _input_type_to_tracers(
-                        cond_trace.new_arg, cond_in_avals
-                    )
-                    res_classical_tracers = [
-                        cond_trace.full_raise(t)
-                        for t in cond_wffa.call_wrapped(*arg_classical_tracers)
-                    ]
-                    cond_region = HybridOpRegion(
-                        cond_trace, None, arg_classical_tracers, res_classical_tracers
-                    )
-
-                _check_single_bool_value(cond_tree(), res_classical_tracers)
-
-                with EvaluationContext.frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, _, body_tree = deduce_avals(body_fn, init_state, {})
-                    arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
-                    quantum_tape = QuantumTape()
-                    with QueuingManager.stop_recording(), quantum_tape:
-                        res_classical_tracers = [
-                            body_trace.full_raise(t)
-                            for t in wffa.call_wrapped(*arg_classical_tracers)
-                        ]
-                    body_region = HybridOpRegion(
-                        body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
-                    )
-
-                res_avals = list(map(shaped_abstractify, res_classical_tracers))
-                out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-
-                WhileLoop(in_classical_tracers, out_classical_tracers, [cond_region, body_region])
-                return tree_unflatten(body_tree(), out_classical_tracers)
-
-            def _call_with_classical_ctx():
-                init_vals, in_tree = tree_flatten(init_state)
-                init_avals = tuple(_abstractify(val) for val in init_vals)
-                cond_jaxpr, cond_consts, cond_tree = _initial_style_jaxpr(
-                    cond_fn, in_tree, init_avals, "while_cond"
-                )
-                body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-                    body_fn, in_tree, init_avals, "while_loop"
-                )
-                _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
-                out_classical_tracers = while_p.bind(
-                    *(cond_consts + body_consts + init_vals),
-                    cond_jaxpr=cond_jaxpr,
-                    body_jaxpr=body_jaxpr,
-                    cond_nconsts=len(cond_consts),
-                    body_nconsts=len(body_consts),
-                )
-                return tree_unflatten(body_tree, out_classical_tracers)
-
-            def _call_during_interpretation():
-                args = init_state
-                fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
-                while cond_fn(*args):
-                    fn_res = body_fn(*args)
-                    args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
-                return fn_res
-
-            mode, ctx = EvaluationContext.get_evaluation_mode()
-            if mode == EvaluationMode.QUANTUM_COMPILATION:
-                return _call_with_quantum_ctx(ctx)
-            elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-                return _call_with_classical_ctx()
-            else:
-                assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
-                return _call_during_interpretation()
-
-        return _call_handler
-
-    return _body_query
-
-
 def for_loop(lower_bound, upper_bound, step):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
@@ -458,6 +314,75 @@ def for_loop(lower_bound, upper_bound, step):
     return _body_query
 
 
+def while_loop(cond_fn):
+    """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
+
+    This decorator provides a functional version of the traditional while
+    loop, similar to ``jax.lax.while_loop``. That is, any variables that are
+    modified across iterations need to be provided as inputs and outputs to
+    the loop body function:
+
+    - Input arguments contain the value of a variable at the start of an
+      iteration
+
+    - Output arguments contain the value at the end of the iteration. The
+      outputs are then fed back as inputs to the next iteration.
+
+    The final iteration values are also returned from the
+    transformed function.
+
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
+    The semantics of ``while_loop`` are given by the following Python pseudo-code:
+
+    .. code-block:: python
+
+        def while_loop(cond_fun, body_fun, *args):
+            while cond_fun(*args):
+                args = body_fn(*args)
+            return args
+
+    Args:
+        cond_fn (Callable): the condition function in the while loop
+
+    Returns:
+        Callable: A wrapper around the while-loop function.
+
+    Raises:
+        TypeError: Invalid return type of the condition expression.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: float):
+
+            @while_loop(lambda x: x < 2.0)
+            def loop_rx(x):
+                # perform some work and update (some of) the arguments
+                qml.RX(x, wires=0)
+                return x ** 2
+
+            # apply the while loop
+            final_x = loop_rx(x)
+
+            return qml.expval(qml.PauliZ(0)), final_x
+
+    >>> circuit(1.6)
+    [array(-0.02919952), array(2.56)]
+    """
+
+    def _body_query(body_fn):
+        return WhileLoopCallable(cond_fn, body_fn)
+
+    return _body_query
+
+
 ## IMPL ##
 class CondCallable:
     """User-facing wrapper provoding "else_if" and "otherwise" public methods.
@@ -466,12 +391,56 @@ class CondCallable:
     released under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
+
+    Also provides access to the underlying "Cond" operation object.
+
+    **Example**
+
+
+    .. code-block:: python
+
+        @qml.transform
+        def my_quantum_transform(tape):
+            ops = tape.operations.copy()
+
+            @cond(isinstance(ops[-1], qml.Hadamard))
+            def f():
+                qml.Hadamard(1)
+                return 1
+            @f.otherwise
+            def f():
+                qml.T(0)
+                return 0
+
+            res = f()
+            ops.append(f.operation)
+
+            def post_processing_fn(results):
+                return results
+
+            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+            print(res)
+            print(modified_tape.operations)
+            return [modified_tape], post_processing_fn
+
+        @qml.qjit
+        @my_quantum_transform
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def main():
+            qml.Hadamard(0)
+            return qml.probs()
+
+    >>> main()
+    Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
+    [Hadamard(wires=[0]), Cond(tapes=[[Hadamard(wires=[1])], [T(wires=[0])]])]
+    (array([0.25, 0.25, 0.25, 0.25]),)
     """
 
     def __init__(self, pred, true_fn):
         self.preds = [pred]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda: None
+        self.operation = None
 
     def else_if(self, pred):
         """
@@ -531,7 +500,7 @@ class CondCallable:
         _assert_cond_result_structure(out_treedefs)
         _assert_cond_result_types(out_signatures)
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in out_signatures[0]]
-        Cond(in_classical_tracers, out_classical_tracers, regions)
+        self.operation = Cond(in_classical_tracers, out_classical_tracers, regions)
         return tree_unflatten(out_tree(), out_classical_tracers)
 
     def _call_with_classical_ctx(self):
@@ -566,9 +535,9 @@ class CondCallable:
 
 class ForLoopCallable:
     """
-    Wrapping for_loop decorator into a class so that the actual ForLoop operation object, which
+    Wrapping for_loop decorator into a class so that the actual "ForLoop" operation object, which
     is created locally in _call_with_quantum_ctx(ctx), can be retrived without changing its
-    return type. THe retrived ForLoop is in LoopBodyFunction.operation.
+    return type. The retrived ForLoop is in LoopBodyFunction.operation.
 
     **Example**
 
@@ -579,10 +548,9 @@ class ForLoopCallable:
         def my_quantum_transform(tape):
             ops = tape.operations.copy()
 
-            @for_loop(0, 10, 1)
+            @for_loop(0, 4, 1)
             def f(i, sum):
-                qml.PauliY(0)
-                qml.T(0)
+                qml.Hadamard(0)
                 return sum+1
 
             res = f(0)
@@ -604,9 +572,8 @@ class ForLoopCallable:
 
     >>> main()
     Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
-    [Hadamard(wires=[0]), ForLoop(tapes=[[Y(0), T(wires=[0])]])]
+    [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
     (array([0.5, 0. , 0.5, 0. ]),)
-
     """
 
     def __init__(self, lower_bound, upper_bound, step, body_fn):
@@ -675,6 +642,133 @@ class ForLoopCallable:
             fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
             for i in range(self.lower_bound, self.upper_bound, self.step):
                 fn_res = self.body_fn(i, *args)
+                args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+            return fn_res
+
+        mode, ctx = EvaluationContext.get_evaluation_mode()
+        if mode == EvaluationMode.QUANTUM_COMPILATION:
+            return _call_with_quantum_ctx(ctx)
+        elif mode == EvaluationMode.CLASSICAL_COMPILATION:
+            return _call_with_classical_ctx()
+        else:
+            assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
+            return _call_during_interpretation()
+
+    def __call__(self, *init_state):
+        return self._call_handler(*init_state)
+
+
+class WhileLoopCallable:
+    """
+    Wrapping while_loop decorator into a class so that the actual "WhileLoop" operation object, which
+    is created locally in _call_with_quantum_ctx(ctx), can be retrived without changing its
+    return type. The retrived WhileLoop is in LoopBodyFunction.operation.
+
+    **Example**
+
+    .. code-block:: python
+
+        @qml.transform
+        def my_quantum_transform(tape):
+            ops = tape.operations.copy()
+            print("input tape", ops)
+
+            @while_loop(lambda i: i<4)
+            def f(i):
+                qml.PauliX(0)
+                return i+1
+
+            res = f(0)
+            ops.append(f.operation)
+
+            def post_processing_fn(results):
+                return results
+
+            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+            print(res)
+            print(modified_tape.operations)
+            return [modified_tape], post_processing_fn
+
+
+        @qml.qjit
+        @my_quantum_transform
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def main():
+            qml.PauliX(0)
+            return qml.probs()
+
+    >>> main()
+    Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
+    [X(0), WhileLoop(tapes=[[X(0)]])]
+    (array([0., 0., 1., 0.]),)
+    """
+
+    def __init__(self, cond_fn, body_fn):
+        self.cond_fn = cond_fn
+        self.body_fn = body_fn
+        self.operation = None
+
+    def _call_handler(self, *init_state):
+        def _call_with_quantum_ctx(ctx: JaxTracingContext):
+            outer_trace = ctx.trace
+            in_classical_tracers, _ = tree_flatten(init_state)
+
+            with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
+                cond_wffa, cond_in_avals, _, cond_tree = deduce_avals(self.cond_fn, init_state, {})
+                arg_classical_tracers = _input_type_to_tracers(cond_trace.new_arg, cond_in_avals)
+                res_classical_tracers = [
+                    cond_trace.full_raise(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
+                ]
+                cond_region = HybridOpRegion(
+                    cond_trace, None, arg_classical_tracers, res_classical_tracers
+                )
+
+            _check_single_bool_value(cond_tree(), res_classical_tracers)
+
+            with EvaluationContext.frame_tracing_context(ctx) as body_trace:
+                wffa, in_avals, _, body_tree = deduce_avals(self.body_fn, init_state, {})
+                arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
+                quantum_tape = QuantumTape()
+                with QueuingManager.stop_recording(), quantum_tape:
+                    res_classical_tracers = [
+                        body_trace.full_raise(t) for t in wffa.call_wrapped(*arg_classical_tracers)
+                    ]
+                body_region = HybridOpRegion(
+                    body_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
+                )
+
+            res_avals = list(map(shaped_abstractify, res_classical_tracers))
+            out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+
+            self.operation = WhileLoop(
+                in_classical_tracers, out_classical_tracers, [cond_region, body_region]
+            )
+            return tree_unflatten(body_tree(), out_classical_tracers)
+
+        def _call_with_classical_ctx():
+            init_vals, in_tree = tree_flatten(init_state)
+            init_avals = tuple(_abstractify(val) for val in init_vals)
+            cond_jaxpr, cond_consts, cond_tree = _initial_style_jaxpr(
+                self.cond_fn, in_tree, init_avals, "while_cond"
+            )
+            body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+                self.body_fn, in_tree, init_avals, "while_loop"
+            )
+            _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
+            out_classical_tracers = while_p.bind(
+                *(cond_consts + body_consts + init_vals),
+                cond_jaxpr=cond_jaxpr,
+                body_jaxpr=body_jaxpr,
+                cond_nconsts=len(cond_consts),
+                body_nconsts=len(body_consts),
+            )
+            return tree_unflatten(body_tree, out_classical_tracers)
+
+        def _call_during_interpretation():
+            args = init_state
+            fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+            while self.cond_fn(*args):
+                fn_res = self.body_fn(*args)
                 args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
             return fn_res
 
