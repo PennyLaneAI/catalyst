@@ -89,7 +89,7 @@ and those that happen at **runtime** (step 3).
 
     As a general rule of thumb, things that happen at compile-time
     are slow (or lead to slowdowns), while things that happen at
-    runtime are fast (or lead to speadups).
+    runtime are fast (or lead to speedups).
 
     However, if the same computation is repeated every time the
     compiled function is run (where the results are the same no
@@ -223,20 +223,20 @@ For example, consider the following:
 
 >>> @qjit
 ... def f(x, y):
-...     print("Tracing occuring")
+...     print("Tracing occurring")
 ...     return x ** 2 + y
 >>> f(0.4, 1)
-Tracing occuring
+Tracing occurring
 array(1.16)
 >>> f(0.2, 3)
 array(3.04)
 
 However, if we change the argument types in a way where Catalyst can't perform
-auto-type promotion before passing the argument to the comppiled function
+auto-type promotion before passing the argument to the compiled function
 (e.g., passing a float instead of an integer), recompilation will occur:
 
 >>> f(0.15, 0.65)
-Tracing occuring
+Tracing occurring
 array(0.6725)
 
 However, changing a float to an integer will not cause recompilation:
@@ -247,12 +247,12 @@ array(8.65)
 Similarly, changing the shape of an array will also trigger recompilation:
 
 >>> f(jnp.array([0.2]), jnp.array([0.6]))
-Tracing occuring
+Tracing occurring
 array([0.64])
 >>> f(jnp.array([0.8]), jnp.array([1.6]))
 array([2.24])
 >>> f(jnp.array([0.8, 0.1]), jnp.array([1.6, -2.0]))
-Tracing occuring
+Tracing occurring
 array([ 2.24, -1.99])
 
 This is something to be aware of, especially when porting existing PennyLane
@@ -416,7 +416,7 @@ Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
 
 Let's switch over to `Lightning <https://docs.pennylane.ai/projects/lightning>`__,
-our high-performance statevector simulator,
+our high-performance state-vector simulator,
 alongside the adjoint differentiation method. To do so, we change the first
 two lines of the above code-block to set the device as ``"lightning.qubit"``,
 and specify ``diff_method="adjoint"`` in the QNode decorator. With this
@@ -471,7 +471,7 @@ now takes 16.4s ± 1.51s.
 
 However, while the quantum function is now compiled, and the compiled function
 is called to compute cost and gradient values, the optimization loop is still
-occuring in Python.
+occurring in Python.
 
 Instead, we can write the optimization loop itself as a function and decorate
 it with ``@qjit``; this will compile the optimization loop, and allow the full
@@ -734,7 +734,7 @@ when working with classical control in Catalyst.
   array(6.)
 
 - There may be some cases where automatic type promotion cannot be applied; for example,
-  ommitting a return value in one branch (e.g., which by default in Python is equivalent
+  omitting a return value in one branch (e.g., which by default in Python is equivalent
   to returning ``None``) but not in others. This will result in an error ---
   if other branches do return values, the else branch must be specified.
 
@@ -984,7 +984,7 @@ are registered as Pytrees with compatible data types.
 >>> f(obj)
 TypeError: Unsupported argument type: <class '__main__.MyObject'>
 
-By registring it as a Pytree (that is, specifying to JAX the dynamic and
+By registering it as a Pytree (that is, specifying to JAX the dynamic and
 static compile-time information, we make this object compatible with
 Catalyst:
 
