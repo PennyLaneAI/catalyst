@@ -27,6 +27,7 @@ from catalyst.utils.runtime import (
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
+    get_measurement_processes,
     get_native_gates,
     get_pennylane_observables,
     get_pennylane_operations,
@@ -35,7 +36,7 @@ from catalyst.utils.runtime import (
 from catalyst.utils.toml import check_adjoint_flag, read_toml_file
 
 
-class DummyDevice(qml.QubitDevice):
+class DeviceToBeTested(qml.QubitDevice):
     """Test device"""
 
     name = "Dummy Device"
@@ -72,13 +73,12 @@ def test_validate_config_with_device(schema):
             )
 
         config = read_toml_file(toml_file)
-
-        device = DummyDevice()
+        name = DeviceToBeTested.name
         with pytest.raises(
             CompileError,
-            match=f"Attempting to compile program for incompatible device '{device.name}'",
+            match=f"Attempting to compile program for incompatible device '{name}'",
         ):
-            validate_config_with_device(device, config)
+            validate_config_with_device(DeviceToBeTested(), config)
 
 
 def test_get_observables_schema1():
@@ -454,6 +454,8 @@ def test_config_unsupported_schema():
             get_matrix_decomposable_gates(config, False)
         with pytest.raises(CompileError):
             get_pennylane_operations(config, False, "device_name")
+        with pytest.raises(CompileError):
+            get_measurement_processes(config, False)
         with pytest.raises(CompileError):
             check_adjoint_flag(config, False)
 

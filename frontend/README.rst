@@ -23,46 +23,4 @@ compatible programs are supported by default by the Catalyst frontend.
 For more information on how to use the frontend, please refer to the
 `quickstart guide <https://docs.pennylane.ai/projects/catalyst/en/latest/dev/quick_start.html>`_.
 
-Contents
-========
-
-The ``catalyst`` Python package is a mixed Python package which relies on some C extensions from the
-``jaxlib`` package and the MLIR Python bindings. It is structured as follows, with two sub-packages:
-
-- `python_bindings <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/python_bindings>`_:
-    A copy of the auto-generated Python bindings for operations of various MLIR dialects.
-    Slated for removal.
-
-- `utils <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/utils>`_:
-    Contains various utility code for the project.
-
-and the following modules:
-
-- `jit.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jit.py>`_:
-    This module contains classes and decorators for just-in-time and ahead-of-time compilation of
-    hybrid quantum-classical functions using Catalyst.
-
-- `compiler.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/compiler.py>`_:
-    This module contains functions for lowering, compiling, and linking MLIR/LLVM representations.
-
-- `jax_primitives.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jax_primitives.py>`_:
-    This module contains JAX-compatible quantum primitives to support the lowering of quantum
-    operations, measurements, and observables to JAXPR.
-
-- `jax_tape.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jax_tape.py>`_:
-    This module contains a wrapper around the PennyLane :class:`~pennylane.QuantumTape` class that
-    supports capturing classical computations and control flow of quantum operations that occur
-    within the circuit.
-
-- `jax_tracer.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jax_tracer.py>`_:
-    This module contains functions for tracing and lowering JAX code to MLIR.
-
-- `param_evaluator.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/param_evaluator.py>`_:
-    This module is responsible for stitching JAXPR pieces together by transferring traced values
-    produced in piece of JAXPR to another.
-
-- `pennylane_extensions.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/pennylane_extensions.py>`_:
-    This module contains various functions for enabling Catalyst functionality (such as mid-circuit
-    measurements, advanced control flow, and gradients) from PennyLane while using :func:`~.qjit`.
-
 .. frontend-end-inclusion-marker-do-not-remove

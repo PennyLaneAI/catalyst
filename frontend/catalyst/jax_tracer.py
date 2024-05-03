@@ -578,6 +578,7 @@ def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Calla
     return [tape], lambda res: res[0]
 
 
+# pylint: disable=too-many-statements,too-many-branches
 def trace_quantum_measurements(
     device: QubitDevice,
     qrp: QRegPromise,
@@ -598,7 +599,6 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    # pylint: disable=too-many-branches
     if isinstance(device, qml.Device):
         shots = device.shots
     else:
@@ -619,7 +619,10 @@ def trace_quantum_measurements(
 
             if o.return_type.value == "sample":
                 shape = (shots, nqubits) if using_compbasis else (shots,)
-                out_classical_tracers.append(sample_p.bind(obs_tracers, shots=shots, shape=shape))
+                result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                if using_compbasis:
+                    result = jnp.astype(result, jnp.int64)
+                out_classical_tracers.append(result)
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
@@ -630,7 +633,10 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
                 shape = (2**nqubits,) if using_compbasis else (2,)
-                out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
+                results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
+                if using_compbasis:
+                    results = (jnp.asarray(results[0], jnp.int64), results[1])
+                out_classical_tracers.extend(results)
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children):
@@ -687,7 +693,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
     def is_midcircuit_measurement(op):
         """Only to avoid 100 character per line limit."""
-        return isinstance(op, catalyst.pennylane_extensions.MidCircuitMeasure)
+        return isinstance(op, catalyst.api_extensions.MidCircuitMeasure)
 
     is_valid_output = is_out_measurement_sequence or is_out_single_measurement
     if not is_valid_output:
@@ -702,7 +708,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(qnode_program, device_program, tape, flat_results):
+def apply_transform(qnode_program, device_program, device_modify_measurements, tape, flat_results):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -715,7 +721,7 @@ def apply_transform(qnode_program, device_program, tape, flat_results):
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    if is_program_transformed:
+    if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         total_program = qnode_program + device_program
         tapes, post_processing = total_program([tape])
@@ -860,8 +866,16 @@ def trace_quantum_function(
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
+            device_modify_measurements = "measurements_from_counts" in [
+                t.transform.__name__ for t in device_program
+            ]
+
             tapes, post_processing = apply_transform(
-                qnode_program, device_program, quantum_tape, return_values_flat
+                qnode_program,
+                device_program,
+                device_modify_measurements,
+                quantum_tape,
+                return_values_flat,
             )
 
         # (2) - Quantum tracing
@@ -882,7 +896,7 @@ def trace_quantum_function(
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if qnode_transformed:
+                if qnode_transformed or device_modify_measurements:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -898,7 +912,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if qnode_transformed:
+                if qnode_transformed or device_modify_measurements:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])

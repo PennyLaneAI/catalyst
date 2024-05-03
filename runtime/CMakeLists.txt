@@ -6,6 +6,11 @@ include(FetchContent)
 set(CMAKE_CXX_STANDARD  20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Avoid warning raised by pybind11 on newer cmake versions. PYBIND11_FINDPYTHON=ON caused issues.
+if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.27")
+ cmake_policy(SET CMP0148 OLD)
+endif()
+
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
@@ -52,9 +57,6 @@ function(fetch_pybind11)
         message(STATUS "Could not find existing pybind11-dev package. Building from source.")
         set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
 
-        # https://cmake.org/cmake/help/latest/module/FindPython.html
-        find_package(Python COMPONENTS Interpreter Development)
-
         FetchContent_Declare(pybind11
         GIT_REPOSITORY https://github.com/pybind/pybind11.git
         GIT_TAG        v2.10.1
@@ -74,6 +76,7 @@ message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
+list(APPEND devices_list rtd_dummy)
 
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
     list(APPEND devices_list pennylane_lightning rtd_lightning)

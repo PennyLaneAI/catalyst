@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Callback module"""
+"""
+This module contains public API functions that enable host callbacks from
+a compiled program. Host callbacks are able to run non-jittable code at runtime
+but require a Python interpreter instance.
+"""
 
 import ctypes
 import inspect
@@ -32,6 +36,181 @@ from catalyst.utils.jnp_to_memref import (
     ranked_memref_to_numpy,
 )
 from catalyst.utils.types import convert_pytype_to_shaped_array
+
+
+## API ##
+def pure_callback(callback_fn, result_type=None):
+    """Execute and return the results of a functionally pure Python
+    function from within a qjit-compiled function.
+
+    The callback function will be quantum just-in-time compiled alongside the rest of the
+    workflow, however it will be executed at runtime by the Python virtual machine.
+    This is in contrast to functions which get directly qjit-compiled by Catalyst, which will
+    be executed at runtime as machine-native code.
+
+    .. note::
+
+        Callbacks do not currently support differentiation, and cannot be used inside
+        functions that :func:`.catalyst.grad` is applied to.
+
+    Args:
+        callback_fn (callable): The pure function to be used as a callback.
+            Any Python-based function is supported, as long as it:
+
+            * is a pure function
+              (meaning it is deterministic --- for the same function arguments, the same result
+              is always returned --- and has no side effects, such as modifying a non-local
+              variable),
+
+            * has a signature that can be inspected (that is, it is not a NumPy ufunc or Python
+              builtin),
+
+            * the return type and shape is deterministic and known ahead of time.
+        result_type (type): The type returned by the function.
+
+    .. seealso:: :func:`.debug.print`, :func:`.debug.callback`.
+
+    **Example**
+
+    ``pure_callback`` can be used as a decorator. In this case, we must specify the result type
+    via a type hint:
+
+    .. code-block:: python
+
+        @catalyst.pure_callback
+        def callback_fn(x) -> float:
+            # here we call non-JAX compatible code, such
+            # as standard NumPy
+            return np.sin(x)
+
+        @qjit
+        def fn(x):
+            return jnp.cos(callback_fn(x ** 2))
+
+    >>> fn(0.654)
+    array(0.9151995)
+
+    It can also be used functionally:
+
+    >>> @qjit
+    >>> def add_one(x):
+    ...     return catalyst.pure_callback(lambda x: x + 1, int)(x)
+    >>> add_one(2)
+    array(3)
+
+    For callback functions that return arrays, a ``jax.ShapeDtypeStruct``
+    object can be created to specify the expected return shape and data type:
+
+    .. code-block:: python
+
+        @qjit
+        def fn(x):
+            x = jnp.cos(x)
+
+            result_shape = jax.ShapeDtypeStruct(x.shape, jnp.complex128)
+
+            @catalyst.pure_callback
+            def callback_fn(y) -> result_shape:
+                return jax.jit(jnp.fft.fft)(y)
+
+            x = callback_fn(x)
+            return x
+
+    >>> fn(jnp.array([0.1, 0.2]))
+    array([1.97507074+0.j, 0.01493759+0.j])
+    """
+
+    if result_type is None:
+        signature = inspect.signature(callback_fn)
+        result_type = signature.return_annotation
+
+    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+    if result_type is None:
+        msg = "A function using pure_callback requires return types "
+        msg += "to be passed in as a parameter or type annotation."
+        raise TypeError(msg)
+
+    @base_callback
+    def closure(*args, **kwargs) -> result_type:
+        return callback_fn(*args, **kwargs)
+
+    return closure
+
+
+## IMPL ##
+def base_callback(func):
+    """Decorator that will correctly pass the signature as arguments to the callback
+    implementation.
+    """
+    signature = inspect.signature(func)
+    retty = signature.return_annotation
+
+    # We just disable inconsistent return statements
+    # Since we are building this feature step by step.
+    @wraps(func)
+    def bind_callback(*args, **kwargs):
+        if not EvaluationContext.is_tracing():
+            # If we are not in the tracing context, just evaluate the function.
+            return func(*args, **kwargs)
+
+        return callback_implementation(func, retty, *args, **kwargs)
+
+    return bind_callback
+
+
+def callback_implementation(
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
+):
+    """
+    This function has been modified from its original form in the JAX project at
+    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2022 The JAX Authors.
+    """
+
+    flat_args, in_tree = tree_flatten((args, kwargs))
+    metadata = CallbackClosure(args, kwargs)
+
+    results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
+
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+
+    def _flat_callback(flat_args):
+        """Each flat_arg is a pointer.
+
+        It is a pointer to a memref object.
+        To find out which element type it has, we use the signature obtained previously.
+        """
+        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
+        args, kwargs = tree_unflatten(in_tree, jnpargs)
+        retvals = tree_leaves(cb(*args, **kwargs))
+        return_values = []
+        results_aval_sequence = (
+            results_aval if isinstance(results_aval, Sequence) else [results_aval]
+        )
+        for retval, exp_aval in zip(retvals, results_aval_sequence):
+            obs_aval = shaped_abstractify(retval)
+            if obs_aval != exp_aval:
+                raise TypeError(
+                    # pylint: disable-next=line-too-long
+                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+                )
+            ranked_memref = get_ranked_memref_descriptor(retval)
+            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
+            unranked_memref = get_unranked_memref_descriptor(retval)
+            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
+            # We need to keep a value of retval around
+            # Otherwise, Python's garbage collection will collect the memory
+            # before we run the memory copy in the runtime.
+            # We need to copy the unranked_memref_ptr and we need to know the element size.
+            return_values.append((unranked_memref_ptr, element_size, retval))
+        return return_values
+
+    out_flat = python_callback_p.bind(
+        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
+    )
+    return tree_unflatten(out_tree, out_flat)
 
 
 class CallbackClosure:
@@ -68,142 +247,3 @@ class CallbackClosure:
             jnparray = jnp.asarray(nparray)
             jnpargs.append(jnparray)
         return jnpargs
-
-
-def pure_callback(callback_fn, result_type=None):
-    """Pure callback
-
-    A pure function is a function that:
-
-      1. Given the same arguments *args, the results will be the same each time the function is
-         called.
-      2. The function has no side effect.
-
-    A pure callback is a pure python function that can be executed by the python virtual machine.
-    This is in direct contrast to functions which get JIT compiled by Catalyst.
-
-    Using `pure_callback` allows a user to run python.
-    `pure_callback`s can be used via a decorator:
-
-    ```python
-    @pure_callback
-    def add_1(x) -> int:
-        return x + 1
-
-    @qjit
-    def context(x):
-        return add_1(x)
-
-    # Can also be used outside a JIT compiled context
-    two = add_1(1)
-    ```
-
-    It can also be used through a more functional syntax:
-
-
-    ```python
-    def add_1(x):
-        return x + 1
-
-    @qjit
-    def context(x):
-        return pure_callback(add_1, int)(x)
-    ```
-
-    `pure_callback`s are expected to have a return type which matches
-    the return type of the function being called. This can be specified
-    as type hints in the decorator syntax or as the second parameter in the functional
-    syntax.
-
-    At the moment, `pure_callback`s should not be used inside gradients.
-    """
-
-    signature = inspect.signature(callback_fn)
-    if result_type is None:
-        result_type = signature.return_annotation
-
-    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
-    if result_type is None:
-        msg = "A function using pure_callback requires return types "
-        msg += "to be passed in as a parameter or type annotation."
-        raise TypeError(msg)
-
-    @callback
-    def closure(*args, **kwargs) -> result_type:
-        return callback_fn(*args, **kwargs)
-
-    return closure
-
-
-def callback(func):
-    """Decorator that will correctly pass the signature as arguments to the callback
-    implementation.
-    """
-    signature = inspect.signature(func)
-    retty = signature.return_annotation
-
-    # We just disable inconsistent return statements
-    # Since we are building this feature step by step.
-    @wraps(func)
-    def bind_callback(*args, **kwargs):
-        if not EvaluationContext.is_tracing():
-            # If we are not in the tracing context, just evaluate the function.
-            return func(*args, **kwargs)
-
-        return callback_implementation(func, retty, *args, **kwargs)
-
-    return bind_callback
-
-
-def callback_implementation(
-    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
-):
-    """
-    This function has been modified from its original form in the JAX project at
-    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
-    version released under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2022 The JAX Authors.
-    """
-
-    flat_args, in_tree = tree_flatten((args, kwargs))
-    metadata = CallbackClosure(args, kwargs)
-
-    results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
-    if not isinstance(results_aval, Sequence):
-        results_aval = [results_aval]
-
-    flat_results_aval, out_tree = tree_flatten(results_aval)
-
-    def _flat_callback(flat_args):
-        """Each flat_arg is a pointer.
-
-        It is a pointer to a memref object.
-        To find out which element type it has, we use the signature obtained previously.
-        """
-        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-        args, kwargs = tree_unflatten(in_tree, jnpargs)
-        retvals = tree_leaves(cb(*args, **kwargs))
-        return_values = []
-        for retval, exp_aval in zip(retvals, results_aval):
-            obs_aval = shaped_abstractify(retval)
-            if obs_aval != exp_aval:
-                raise TypeError(
-                    # pylint: disable-next=line-too-long
-                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
-                )
-            ranked_memref = get_ranked_memref_descriptor(retval)
-            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
-            unranked_memref = get_unranked_memref_descriptor(retval)
-            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
-            # We need to keep a value of retval around
-            # Otherwise, Python's garbage collection will collect the memory
-            # before we run the memory copy in the runtime.
-            # We need to copy the unranked_memref_ptr and we need to know the element size.
-            return_values.append((unranked_memref_ptr, element_size, retval))
-        return return_values
-
-    out_flat = python_callback_p.bind(
-        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
-    )
-    return tree_unflatten(out_tree, out_flat)

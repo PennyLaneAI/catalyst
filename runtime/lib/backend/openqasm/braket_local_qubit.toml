@@ -71,7 +71,7 @@ Var = {}
 Probs = {}
 State = { condition = [ "analytic" ] }
 Sample = { condition = [ "finiteshots" ] }
-Count = { condition = [ "finiteshots" ] }
+Counts = { condition = [ "finiteshots" ] }
 
 [compilation]
 # If the device is compatible with qjit

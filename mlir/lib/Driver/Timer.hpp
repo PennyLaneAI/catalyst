@@ -64,10 +64,7 @@ class Timer {
     static inline bool enable_debug_timer() noexcept
     {
         char *value = getenv("ENABLE_DIAGNOSTICS");
-        if (value && std::string(value) == "ON") {
-            return true;
-        }
-        return false;
+        return value && std::string(value) == "ON";
     }
 
   public:
@@ -119,7 +116,7 @@ class Timer {
         std::cerr << "\t" << std::fixed << "cputime: " << std::setprecision(3) << cpu_elapsed
                   << std::fixed << " ms";
         if (add_endl) {
-            std::cerr << std::endl;
+            std::cerr << "\n";
         }
     }
 

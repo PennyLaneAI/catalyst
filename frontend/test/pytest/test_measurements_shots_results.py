@@ -140,7 +140,7 @@ class TestExpval:
 
         with pytest.raises(
             RuntimeError,
-            match="Hermitian observables do not support shot measurement",
+            match="Hermitian observables with shot measurement are not supported",
         ):
             circuit(np.pi / 4, np.pi / 4)
 
@@ -348,7 +348,7 @@ class TestVar:
 
         with pytest.raises(
             RuntimeError,
-            match="Hermitian observables do not support shot measurement",
+            match="Hermitian observables with shot measurement are not supported",
         ):
             circuit(np.pi / 4, np.pi / 4)
 
@@ -503,6 +503,7 @@ class TestOtherMeasurements:
 
         # qml.sample
         assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=10000).shape
+        assert result[0].dtype == np.int64
 
         # qml.counts
         for r, e in zip(
@@ -510,6 +511,7 @@ class TestOtherMeasurements:
         ):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
+        assert result[1][0].dtype == np.int64
 
         # qml.expval
         assert np.allclose(
