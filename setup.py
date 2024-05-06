@@ -56,10 +56,17 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = "0.35.1"
-lq_min_release = "0.35.1"
-pennylane_dep = f"pennylane>{pl_min_release}"
-lightning_dep = f"pennylane-lightning>{lq_min_release}"
+pl_min_release = 0.36
+lq_min_release = pl_min_release
+
+if pl_version is not None:
+    pennylane_dep = f"pennylane @ git+https://github.com/pennylaneai/pennylane@{pl_version}"
+else:
+    pennylane_dep = f"pennylane>={pl_min_release}"
+if lq_version is not None:
+    lightning_dep = f"pennylane-lightning=={lq_version}"  # use TestPyPI wheels to avoid rebuild
+else:
+    lightning_dep = f"pennylane-lightning>={lq_min_release}"
 
 requirements = [
     pennylane_dep,
