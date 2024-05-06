@@ -46,6 +46,7 @@ __all__ = [
     "and_",
     "or_",
     "not_",
+    "set_item",
 ]
 
 
@@ -565,6 +566,31 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             return new_qnode()
 
         return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
+
+
+def set_item(target, i, x):
+    """An implementation of the AutoGraph 'set_item' function. The interface is defined by
+    AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives.
+    The idea is to accept the much simpler single index assigment syntax for Jax arrays,
+    to subsequently transform it under the hood into the set of 'at' and 'set' calls that
+    Autograph supports. E.g.:
+        target[i] = x -> target = target.at[i].set(x)
+
+    .. note::
+        For this feature to work, 'converter.Feature.LISTS' had to be added to the
+        TOP_LEVEL_OPTIONS and NESTED_LEVEL_OPTIONS conversion options of our own Catalyst
+        Autograph transformer. If you create a new transformer and want to support this feature,
+        make sure you enable such option there as well.
+    """
+
+    # Apply the 'at...set' transformation only to Jax arrays.
+    # Otherwise, fallback to Python's default syntax.
+    if isinstance(target, DynamicJaxprTracer):
+        target = target.at[i].set(x)
+    else:
+        target[i] = x
+
+    return target
 
 
 class CRange:
