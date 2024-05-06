@@ -26,10 +26,13 @@ from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
 from catalyst import (
+    AutoGraphError,
     adjoint,
+    autograph_source,
     cond,
     ctrl,
     debug,
+    disable_autograph,
     for_loop,
     grad,
     jacobian,
@@ -38,12 +41,7 @@ from catalyst import (
     qjit,
     vjp,
 )
-from catalyst.autograph import (
-    TRANSFORMER,
-    AutoGraphError,
-    autograph_source,
-    disable_autograph,
-)
+from catalyst.autograph.transformer import TRANSFORMER
 
 check_cache = TRANSFORMER.has_cache
 
@@ -78,7 +76,7 @@ class TestSourceCodeInfo:
 
     def test_non_converted_function(self):
         """Test the robustness of traceback conversion on a non-converted function."""
-        from catalyst.ag_primitives import get_source_code_info
+        from catalyst.autograph.ag_primitives import get_source_code_info
 
         try:
             result = ""
@@ -696,7 +694,7 @@ class TestForLoops:
 
     def test_python_range_fallback(self):
         """Test that the custom CRange wrapper correctly falls back to Python."""
-        from catalyst.ag_primitives import CRange
+        from catalyst.autograph.ag_primitives import CRange
 
         # pylint: disable=protected-access
 

@@ -888,7 +888,7 @@ the decomposition as follows:
 
 .. code-block:: python
 
-    from catalyst.autograph import autograph
+    from catalyst import run_autograph
 
     class RXX(qml.operation.Operation):
         num_params = 1
@@ -897,7 +897,7 @@ the decomposition as follows:
         def compute_decomposition(self, *params, wires=None):
             theta = params[0]
 
-            @autograph
+            @run_autograph
             def f(params):
                 if params[0] == 0.3:
                     qml.PauliRot(theta, 'XX', wires=wires)
