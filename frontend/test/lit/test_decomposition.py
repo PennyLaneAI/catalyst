@@ -15,7 +15,6 @@
 # RUN: %PYTHON %s | FileCheck %s
 # pylint: disable=line-too-long
 
-import os
 import tempfile
 from copy import deepcopy
 
@@ -24,11 +23,7 @@ import pennylane as qml
 
 from catalyst import cond, for_loop, measure, qjit, while_loop
 from catalyst.utils.runtime import pennylane_operation_set
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    ProgramFeatures,
-    get_device_capabilities,
-)
+from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 
 def get_custom_device_without(num_wires, discards):
@@ -72,6 +67,7 @@ def get_custom_device_without(num_wires, discards):
 
         @property
         def operations(self):
+            """Return operations using PennyLane's C(.) syntax"""
             return (
                 pennylane_operation_set(self.qjit_capabilities.native_ops)
                 | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
@@ -80,6 +76,7 @@ def get_custom_device_without(num_wires, discards):
 
         @property
         def observables(self):
+            """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
     return CustomDevice(wires=num_wires)

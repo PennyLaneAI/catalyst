@@ -29,12 +29,8 @@ import pennylane as qml
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     DeviceCapabilities,
-    ProgramFeatures,
-    TOMLDocument,
-    get_device_capabilities,
     get_lib_path,
     pennylane_operation_set,
-    read_toml_file,
 )
 
 # TODO: This should be removed after implementing `get_c_interface`

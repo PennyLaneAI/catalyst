@@ -30,7 +30,6 @@ from catalyst.utils.toml import (
     TOMLDocument,
     check_quantum_control_flag,
     get_decomposable_gates,
-    get_device_capabilities,
     get_matrix_decomposable_gates,
     get_native_ops,
     load_device_capabilities,

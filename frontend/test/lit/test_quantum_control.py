@@ -16,7 +16,6 @@
 """ Test the lowering cases involving quantum control """
 
 import os
-import tempfile
 from copy import deepcopy
 
 import jax.numpy as jnp
@@ -25,7 +24,6 @@ import pennylane as qml
 from catalyst import qjit
 from catalyst.utils.runtime import pennylane_operation_set
 from catalyst.utils.toml import (
-    DeviceCapabilities,
     OperationProperties,
     ProgramFeatures,
     get_device_capabilities,
@@ -64,6 +62,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
 
         @property
         def operations(self):
+            """Get PennyLane operations."""
             return (
                 pennylane_operation_set(self.qjit_capabilities.native_ops)
                 | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
@@ -72,6 +71,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
 
         @property
         def observables(self):
+            """Get PennyLane observables."""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         def apply(self, operations, **kwargs):

@@ -28,9 +28,6 @@ from catalyst.utils.runtime import BackendInfo
 from catalyst.utils.toml import (
     DeviceCapabilities,
     OperationProperties,
-    ProgramFeatures,
-    TOMLDocument,
-    get_device_capabilities,
     intersect_operations,
     pennylane_operation_set,
 )

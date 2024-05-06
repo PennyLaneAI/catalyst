@@ -63,7 +63,7 @@ class QFunc:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, capabilities)
 
-    # pylint: disable=no-member
+    # pylint: disable=no-member, attribute-defined-outside-init
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 

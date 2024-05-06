@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import tempfile
 from copy import deepcopy
 
 import pennylane as qml
@@ -22,11 +20,7 @@ from jax import numpy as jnp
 
 from catalyst import CompileError, ctrl, measure, qjit
 from catalyst.utils.runtime import pennylane_operation_set
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    ProgramFeatures,
-    get_device_capabilities,
-)
+from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 
 class CustomDevice(qml.QubitDevice):
@@ -60,6 +54,7 @@ class CustomDevice(qml.QubitDevice):
 
     @property
     def operations(self):
+        """Get PennyLane operations."""
         return (
             pennylane_operation_set(self.qjit_capabilities.native_ops)
             | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
@@ -68,6 +63,7 @@ class CustomDevice(qml.QubitDevice):
 
     @property
     def observables(self):
+        """Get PennyLane observables."""
         return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
 

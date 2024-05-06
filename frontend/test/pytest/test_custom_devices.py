@@ -22,7 +22,7 @@ from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import extract_backend_info
-from catalyst.utils.toml import get_device_capabilities, get_device_toml_config
+from catalyst.utils.toml import get_device_capabilities
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
