@@ -58,11 +58,11 @@ def get_custom_device_without(num_wires, discards):
             )
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in discards:
-                if gate in dummy_capabilities.native_ops:
+                if gate in custom_capabilities.native_ops:
                     custom_capabilities.native_ops.pop(gate)
-                if gate in dummy_capabilities.to_decomp_ops:
+                if gate in custom_capabilities.to_decomp_ops:
                     custom_capabilities.to_decomp_ops.pop(gate)
-                if gate in dummy_capabilities.to_matrix_ops:
+                if gate in custom_capabilities.to_matrix_ops:
                     custom_capabilities.to_matrix_ops.pop(gate)
             self.qjit_capabilities = custom_capabilities
 
