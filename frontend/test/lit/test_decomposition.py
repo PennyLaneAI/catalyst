@@ -15,7 +15,6 @@
 # RUN: %PYTHON %s | FileCheck %s
 # pylint: disable=line-too-long
 
-import tempfile
 from copy import deepcopy
 
 import jax

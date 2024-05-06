@@ -15,7 +15,6 @@
 # RUN: %PYTHON %s | FileCheck %s
 """ Test the lowering cases involving quantum control """
 
-import os
 from copy import deepcopy
 
 import jax.numpy as jnp
