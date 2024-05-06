@@ -81,7 +81,7 @@ requirements = [
 
 entry_points = {
     "pennylane.plugins": [
-        "oqc.cloud = catalyst.oqc:OQCDevice",
+        "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
         "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
@@ -217,7 +217,7 @@ setup(
     packages=find_namespace_packages(
         where="frontend",
         include=["catalyst", "catalyst.*", "mlir_quantum"],
-        exclude=["catalyst.oqc.*"],
+        exclude=["catalyst.third_party.oqc.*"],
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
