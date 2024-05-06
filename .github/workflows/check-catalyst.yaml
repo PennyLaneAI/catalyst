@@ -412,7 +412,7 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
+        python3 -m pip install pennylane-lightning==0.36.0
         python3 -m pip install --upgrade --verbose git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
         python3 -m pip install --verbose jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
 
