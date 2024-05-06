@@ -406,7 +406,6 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja delocate
         python${{ matrix.python_version }} -m pip install pennylane-lightning==0.36.0
         python${{ matrix.python_version }} -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
         python${{ matrix.python_version }} -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
