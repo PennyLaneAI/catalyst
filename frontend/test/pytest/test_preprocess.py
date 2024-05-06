@@ -26,7 +26,10 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.compiler import get_lib_path
-from catalyst.preprocess import decompose_ops_to_unitary, measurements_from_counts
+from catalyst.device.decomposition import (
+    decompose_ops_to_unitary,
+    measurements_from_counts,
+)
 
 
 class DummyDevice(Device):

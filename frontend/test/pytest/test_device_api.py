@@ -24,7 +24,7 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.qjit_device import QJITDeviceNewAPI
+from catalyst.device import QJITDeviceNewAPI
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 
