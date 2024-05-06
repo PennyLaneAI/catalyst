@@ -482,8 +482,8 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
         sudo apt-get -y -q install ninja-build make cmake clang libomp-dev libasan6
         python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
-        python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
-        PL_BACKEND="lightning_kokkos" python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
+        python3 -m pip install pennylane-lightning==0.36.0
+        python3 -m pip install 'pennylane-lightning[kokkos]==0.36.0'
 
     - name: Install Deps
       run: |
@@ -542,9 +542,9 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
-                                      python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
-                                      python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
-        PL_BACKEND="lightning_kokkos" python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@v0.36.0_rc
+        python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
+        python3 -m pip install pennylane-lightning==0.36.0
+        python3 -m pip install 'pennylane-lightning[kokkos]==0.36.0'
         python3 -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
 
     - name: Get Cached LLVM Build
