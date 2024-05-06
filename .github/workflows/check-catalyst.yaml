@@ -403,18 +403,14 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        make frontend
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        python3 -m pip install pennylane-lightning==0.36.0
-        python3 -m pip install --upgrade --verbose git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
-        python3 -m pip install --verbose jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
+        make frontend
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -478,17 +474,10 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        sudo apt-get -y -q install ninja-build make cmake clang libomp-dev libasan6
-        python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
-        python3 -m pip install pennylane-lightning==0.36.0
-        python3 -m pip install 'pennylane-lightning[kokkos]==0.36.0'
+        pip install PennyLane-Lightning-Kokkos
 
     - name: Install Deps
       run: |
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
         make frontend
         python3 -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
 
@@ -538,14 +527,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        sudo apt-get -y -q install ninja-build make cmake clang libomp-dev libasan6
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
-        python3 -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
-        python3 -m pip install pennylane-lightning==0.36.0
-        python3 -m pip install 'pennylane-lightning[kokkos]==0.36.0'
-        python3 -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
