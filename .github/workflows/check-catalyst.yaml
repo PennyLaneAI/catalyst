@@ -478,8 +478,11 @@ jobs:
 
     - name: Install Deps
       run: |
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python3 -m pip install -r requirements.txt
         make frontend
-        python3 -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
