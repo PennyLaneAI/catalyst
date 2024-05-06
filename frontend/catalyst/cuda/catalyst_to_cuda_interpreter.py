@@ -820,7 +820,7 @@ class QJIT_CUDAQ:
             an MLIR module
         """
 
-        def cudaq_backend_info(device, _config) -> BackendInfo:
+        def cudaq_backend_info(device, _capabilities) -> BackendInfo:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """

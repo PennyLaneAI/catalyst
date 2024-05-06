@@ -21,7 +21,8 @@ import pytest
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
+from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.toml import get_device_capabilities, get_device_toml_config
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [
@@ -166,8 +167,8 @@ def test_custom_device_load():
             return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     device = DummyDevice(wires=1)
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
+    capabilities = get_device_capabilities(device)
+    backend_info = extract_backend_info(device, capabilities)
     assert backend_info.kwargs["option1"] == 42
     assert "option2" not in backend_info.kwargs
 

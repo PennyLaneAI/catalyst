@@ -24,7 +24,7 @@ from pennylane.transforms.core import TransformProgram
 from catalyst.preprocess import catalyst_acceptance, decompose
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import BackendInfo, device_get_toml_config
+from catalyst.utils.runtime import BackendInfo
 from catalyst.utils.toml import (
     DeviceCapabilities,
     OperationProperties,
@@ -154,7 +154,7 @@ class QJITDevice(qml.QubitDevice):
 
     def __init__(
         self,
-        target_config: TOMLDocument,
+        original_device_capabilities: DeviceCapabilities,
         shots=None,
         wires=None,
         backend: Optional[BackendInfo] = None,
@@ -164,23 +164,18 @@ class QJITDevice(qml.QubitDevice):
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
-        device_name = backend.device_name if backend else "default"
 
-        program_features = ProgramFeatures(shots is not None)
-        target_device_capabilities = get_device_capabilities(
-            target_config, program_features, device_name
-        )
-        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
+        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations using PennyLane's syntax"""
-        return pennylane_operation_set(self.capabilities.native_ops)
+        return pennylane_operation_set(self.qjit_capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.capabilities.native_obs)
+        return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
     def apply(self, operations, **kwargs):
         """
@@ -259,6 +254,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def __init__(
         self,
         original_device,
+        original_device_capabilities: DeviceCapabilities,
         backend: Optional[BackendInfo] = None,
     ):
         self.original_device = original_device
@@ -274,24 +270,18 @@ class QJITDeviceNewAPI(qml.devices.Device):
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
-        device_name = backend.device_name if backend else "default"
 
-        target_config = device_get_toml_config(original_device)
-        program_features = ProgramFeatures(original_device.shots is not None)
-        target_device_capabilities = get_device_capabilities(
-            target_config, program_features, device_name
-        )
-        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
+        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return pennylane_operation_set(self.capabilities.native_ops)
+        return pennylane_operation_set(self.qjit_capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.capabilities.native_obs)
+        return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
     @property
     def measurement_processes(self) -> Set[str]:

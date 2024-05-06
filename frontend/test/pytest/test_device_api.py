@@ -26,7 +26,12 @@ from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.qjit_device import QJITDeviceNewAPI
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
+from catalyst.utils.runtime import extract_backend_info
+from catalyst.utils.toml import (
+    ProgramFeatures,
+    get_device_capabilities,
+    get_device_toml_config,
+)
 
 
 class DummyDevice(Device):
@@ -91,9 +96,9 @@ def test_qjit_device():
     device = DummyDevice(wires=10, shots=2032)
 
     # Create qjit device
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
-    device_qjit = QJITDeviceNewAPI(device, backend_info)
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+    device_qjit = QJITDeviceNewAPI(device, capabilities, backend_info)
 
     # Check attributes of the new device
     assert device_qjit.shots == qml.measurements.Shots(2032)
@@ -131,8 +136,8 @@ def test_qjit_device_no_wires():
     device = DummyDeviceNoWires(shots=2032)
 
     # Create qjit device
-    config = device_get_toml_config(device)
-    backend_info = extract_backend_info(device, config)
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
 
     with pytest.raises(
         AttributeError, match="Catalyst does not support devices without set wires."
