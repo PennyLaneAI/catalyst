@@ -122,6 +122,11 @@ def validate_device_capabilities(
     if hasattr(device, "operations") and hasattr(device, "observables"):
         # For gates, we require strict match
         device_gates = filter_out_adjoint(set(device.operations))
+        if device_name == "lightning.kokkos":
+            # Lightning-kokkos device supports GlobalPhase via PythonAPI but does not via C++ API.
+            # device.operations represents PythonAPI so we relax the validation for this case.
+            # https://github.com/PennyLaneAI/pennylane-lightning/pull/642#issuecomment-2075771670
+            device_gates = device_gates - {"C(GlobalPhase)"}
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
         if device_gates != spec_gates:
             raise CompileError(
