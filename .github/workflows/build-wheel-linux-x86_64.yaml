@@ -413,10 +413,6 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        sudo apt-get -y -q install ninja-build make cmake clang libomp-dev libasan6
-        python${{ matrix.python_version }} -m pip install -r $GITHUB_WORKSPACE/requirements.txt
         python${{ matrix.python_version }} -m pip install pennylane-lightning==0.36.0
         python${{ matrix.python_version }} -m pip install 'pennylane-lightning[kokkos]==0.36.0'
         python${{ matrix.python_version }} -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
