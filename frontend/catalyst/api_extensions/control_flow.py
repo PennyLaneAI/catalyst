@@ -444,10 +444,14 @@ class CondCallable:
 
     @property
     def operation(self):
-        if self._operation == None:
+        """
+        @property for CondCallable.operation
+        """
+        if self._operation is None:
             raise ValueError(
                 """
-                The cond() was not called (or has not been called) in a quantum context and thus has no associated quantum operation.
+                The cond() was not called (or has not been called) in a quantum context,
+                and thus has no associated quantum operation.
                 """
             )
         return self._operation
@@ -599,10 +603,14 @@ class ForLoopCallable:
 
     @property
     def operation(self):
-        if self._operation == None:
+        """
+        @property for ForLoopCallable.operation
+        """
+        if self._operation is None:
             raise ValueError(
                 """
-                The for_loop() was not called (or has not been called) in a quantum context and thus has no associated quantum operation.
+                The for_loop() was not called (or has not been called) in a quantum context,
+                and thus has no associated quantum operation.
                 """
             )
         return self._operation
@@ -735,10 +743,14 @@ class WhileLoopCallable:
 
     @property
     def operation(self):
-        if self._operation == None:
+        """
+        @property for WhileLoopCallable.operation
+        """
+        if self._operation is None:
             raise ValueError(
                 """
-                The while_loop() was not called (or has not been called) in a quantum context and thus has no associated quantum operation.
+                The while_loop() was not called (or has not been called) in a quantum context,
+                and thus has no associated quantum operation.
                 """
             )
         return self._operation
