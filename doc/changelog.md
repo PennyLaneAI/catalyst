@@ -383,7 +383,7 @@ Muzammiluddin Syed.
 
   The following devices are available when compiling with CUDA Quantum:
 
-  * `softwareq.qpp`: a modern C++ statevector simulator
+  * `softwareq.qpp`: a modern C++ state-vector simulator
   * `nvidia.custatevec`: The NVIDIA CuStateVec GPU simulator (with support for multi-gpu)
   * `nvidia.cutensornet`: The NVIDIA CuTensorNet GPU simulator (with support for matrix product state)
 
