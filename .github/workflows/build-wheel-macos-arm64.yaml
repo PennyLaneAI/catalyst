@@ -289,7 +289,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG=5feb4a10c9cd15fa590c513fc7c6a10a0b334269 \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
@@ -406,7 +406,11 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
+        python${{ matrix.python_version }} -m pip install pennylane-lightning==0.36.0
+        python${{ matrix.python_version }} -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
+        python${{ matrix.python_version }} -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
+        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --no-deps
+
 
     - name: Run Python Pytest Tests
       run: |
