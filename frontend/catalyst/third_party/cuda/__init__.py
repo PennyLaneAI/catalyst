@@ -21,7 +21,7 @@ from pathlib import Path
 import cudaq
 import pennylane as qml
 
-from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
+from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import interpret
 
 
 def cudaqjit(fn=None, **kwargs):
@@ -151,7 +151,7 @@ class SoftwareQQPP(BaseCudaInstructionSet):
 
         dev = qml.device("softwareq.qpp", wires=2)
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(dev)
         def circuit(x):
           qml.RX(x[0], wires=0)
@@ -191,7 +191,7 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 
         dev = qml.device("nvidia.custatevec", wires=2)
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(dev)
         def circuit(x):
           qml.RX(x[0], wires=0)
@@ -235,7 +235,7 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
 
         dev = qml.device("nvidia.cutensornet", wires=2)
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(dev)
         def circuit(x):
           qml.RX(x[0], wires=0)

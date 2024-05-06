@@ -23,7 +23,7 @@ Module: catalyst.debug
 Module: catalyst.cuda
 ---------------------
 
-.. automodapi:: catalyst.cuda
+.. automodapi:: catalyst.third_party.cuda
     :no-heading:
     :no-inheritance-diagram:
     :fullname:
