@@ -86,7 +86,7 @@ all: runtime mlir oqc frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
-	$(PYTHON) -m pip install -e . --no-deps
+	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple
 	rm -r frontend/PennyLane_Catalyst.egg-info
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime
