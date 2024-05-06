@@ -127,6 +127,9 @@ def validate_device_capabilities(
             # device.operations represents PythonAPI so we relax the validation for this case.
             # https://github.com/PennyLaneAI/pennylane-lightning/pull/642#issuecomment-2075771670
             device_gates = device_gates - {"C(GlobalPhase)"}
+        # CPhase is a Python alias to the ControlledPhaseShift. Nevertheless, it does exist in the
+        # PL operations. We exclude it because we never going to process class with this name.
+        device_gates = device_gates - {"CPhase"}
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
         if device_gates != spec_gates:
             raise CompileError(

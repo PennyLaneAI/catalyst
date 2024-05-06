@@ -291,7 +291,7 @@ def patch_schema1_collections(
     # is what actual device reports.
     if device_name == "lightning.kokkos":  # pragma: nocover
         native_gate_props["GlobalPhase"] = OperationProperties(
-            invertible=False, controllable=True, differentiable=True
+            invertible=False, controllable=False, differentiable=True
         )
 
     # TODO: remove after PR #642 is merged in lightning
@@ -299,6 +299,11 @@ def patch_schema1_collections(
         observable_props["Projector"] = OperationProperties(
             invertible=False, controllable=False, differentiable=False
         )
+
+    # TODO: remove after PR #642 is merged in lightning
+    # CPhase is an alias, which might exist in a toml schema 1 configs. We remove it here.
+    if 'CPhase' in matrix_decomp_props:
+        matrix_decomp_props.pop("CPhase")
 
     # The deduction logic is the following:
     # * Most of the gates have their `C(Gate)` controlled counterparts.
