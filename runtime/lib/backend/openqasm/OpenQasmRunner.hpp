@@ -122,7 +122,7 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
             from importlib.metadata import version
-            from packaging.version import Version
+            from semantic_version import Version
 
             obs_version = version("amazon-braket-pennylane-plugin")
             min_version = "1.27.1"
@@ -186,7 +186,7 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
             from importlib.metadata import version
-            from packaging.version import Version
+            from semantic_version import Version
 
             obs_version = version("amazon-braket-pennylane-plugin")
             min_version = "1.27.1"
@@ -261,7 +261,7 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
             from importlib.metadata import version
-            from packaging.version import Version
+            from semantic_version import Version
 
             obs_version = version("amazon-braket-pennylane-plugin")
             min_version = "1.27.1"
@@ -331,7 +331,7 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
             from importlib.metadata import version
-            from packaging.version import Version
+            from semantic_version import Version
 
             obs_version = version("amazon-braket-pennylane-plugin")
             min_version = "1.27.1"
@@ -395,7 +395,7 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
             from importlib.metadata import version
-            from packaging.version import Version
+            from semantic_version import Version
 
             obs_version = version("amazon-braket-pennylane-plugin")
             min_version = "1.27.1"
