@@ -417,12 +417,7 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install pennylane-lightning==0.36.0
-        python${{ matrix.python_version }} -m pip install 'pennylane-lightning[kokkos]==0.36.0'
-        python${{ matrix.python_version }} -m pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.36.0-rc0
-        python${{ matrix.python_version }} -m pip install jax==0.4.23 jaxlib==0.4.23 tomlkit 'scipy<1.13' 'numpy<2' 'diastatic-malt>=2.15.1'
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --no-deps
-
+        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Run Python Pytest Tests
       run: |
