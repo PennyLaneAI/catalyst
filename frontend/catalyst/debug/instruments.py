@@ -24,7 +24,7 @@ import sys
 import time
 from contextlib import contextmanager
 
-# pylint: disable=f-string-without-interpolation
+# pylint: disable=f-string-without-interpolation,line-too-long
 # Tested in LIT test suite.
 # pragma: no cover
 

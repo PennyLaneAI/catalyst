@@ -16,7 +16,6 @@
 
 """Test for the device API.
 """
-import pathlib
 import platform
 
 import pennylane as qml
