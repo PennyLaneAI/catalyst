@@ -19,10 +19,9 @@ from functools import partial
 
 import jax
 
+from catalyst.debug.callback import callback as debug_callback
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
-
-from catalyst.debug.callback import callback as debug_callback
 
 
 # pylint: disable=redefined-builtin
