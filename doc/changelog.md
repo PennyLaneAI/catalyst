@@ -8,15 +8,11 @@
 
 <h3>Bug fixes</h3>
 
-* Fixes incompatibility with new version of amazon braket local simulator.
-
 <h3>Internal changes</h3>
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
-
-Erick Ochoa Lopez
 
 # Release 0.6.0
 
