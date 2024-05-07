@@ -8,11 +8,16 @@
 
 <h3>Bug fixes</h3>
 
+* Bumps minimum required for the amazon-braket-pennylane-plugin to 1.27.1.
+  [(#724)](https://github.com/PennyLaneAI/catalyst/pull/724)
+
 <h3>Internal changes</h3>
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Erick Ochoa Lopez
 
 # Release 0.6.0
 
