@@ -70,7 +70,7 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
         minor_version = sys.version_info[1]
         if kwargs.get("delete") and minor_version >= 12:
             # Changed in version 3.12: Removed the "delete" kwargs
-            del kwargs["delete"]
+            del kwargs["delete"]  # pragma: nocover
         # pylint: disable-next=protected-access
         tempfile.TemporaryDirectory._rmtree(name, **kwargs)
 
