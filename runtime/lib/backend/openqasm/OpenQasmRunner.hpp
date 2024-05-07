@@ -121,6 +121,14 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
+            from importlib.metadata import version
+            from packaging.version.Version import Version
+
+            obs_version = version("amazon-braket-pennylane-plugin")
+            min_version = "1.27.1"
+            if not Version(min_version) <= Version(obs_version):
+                msg = f"amazon-braket-pennylane-plugin expected to be at least version {min_version}"
+                raise ModuleImportError(msg)
 
             try:
                 if braket_device in ["default", "braket_sv", "braket_dm"]:
@@ -177,6 +185,14 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
+            from importlib.metadata import version
+            from packaging.version.Version import Version
+
+            obs_version = version("amazon-braket-pennylane-plugin")
+            min_version = "1.27.1"
+            if not Version(min_version) <= Version(obs_version):
+                msg = f"amazon-braket-pennylane-plugin expected to be at least version {min_version}"
+                raise ModuleImportError(msg)
 
             try:
                 if braket_device in ["default", "braket_sv", "braket_dm"]:
@@ -244,6 +260,14 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
+            from importlib.metadata import version
+            from packaging.version.Version import Version
+
+            obs_version = version("amazon-braket-pennylane-plugin")
+            min_version = "1.27.1"
+            if not Version(min_version) <= Version(obs_version):
+                msg = f"amazon-braket-pennylane-plugin expected to be at least version {min_version}"
+                raise ModuleImportError(msg)
 
             try:
                 if braket_device in ["default", "braket_sv", "braket_dm"]:
@@ -306,6 +330,14 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
+            from importlib.metadata import version
+            from packaging.version.Version import Version
+
+            obs_version = version("amazon-braket-pennylane-plugin")
+            min_version = "1.27.1"
+            if not Version(min_version) <= Version(obs_version):
+                msg = f"amazon-braket-pennylane-plugin expected to be at least version {min_version}"
+                raise ModuleImportError(msg)
 
             try:
                 if braket_device in ["default", "braket_sv", "braket_dm"]:
@@ -362,6 +394,14 @@ struct BraketRunner : public OpenQasmRunner {
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
+            from importlib.metadata import version
+            from packaging.version.Version import Version
+
+            obs_version = version("amazon-braket-pennylane-plugin")
+            min_version = "1.27.1"
+            if not Version(min_version) <= Version(obs_version):
+                msg = f"amazon-braket-pennylane-plugin expected to be at least version {min_version}"
+                raise ModuleImportError(msg)
 
             try:
                 if braket_device in ["default", "braket_sv", "braket_dm"]:

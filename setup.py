@@ -77,6 +77,7 @@ requirements = [
     "scipy<1.13",
     "numpy<2",
     "diastatic-malt>=2.15.1",
+    "packaging",
 ]
 
 entry_points = {
