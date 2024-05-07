@@ -66,12 +66,14 @@ def _operator_decomposition_gen(
                 current_depth=current_depth,
             )
 
+
 def catalyst_decomposer(op):
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
     if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
         return _decompose_to_matrix(op)
     return op.decomposition()
+
 
 @transform
 def decompose(
@@ -119,13 +121,13 @@ def _decompose_to_matrix(op):
         ) from e
     op = qml.QubitUnitary(mat, wires=op.wires)
     return [op]
-    
+
 
 def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
-            new_tape = None  
+            new_tape = None
         else:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 tapes, _ = decompose(
@@ -134,8 +136,12 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
                     stopping_condition=stopping_condition,
                     max_expansion=max_expansion,
                 )
-                new_tape = tapes[0]              
-        new_regions.append(HybridOpRegion(region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers))
+                new_tape = tapes[0]
+        new_regions.append(
+            HybridOpRegion(
+                region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers
+            )
+        )
 
     new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
     new_op.visited = True
