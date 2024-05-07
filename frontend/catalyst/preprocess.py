@@ -30,6 +30,7 @@ from pennylane.tape.tape import (
 
 import catalyst
 import catalyst.pennylane_extensions
+from catalyst.jax_tracer import has_nested_tapes, HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
@@ -65,12 +66,19 @@ def _operator_decomposition_gen(
                 current_depth=current_depth,
             )
 
+def catalyst_decomposer(op):
+    if isinstance(op, MidMeasureMP):
+        raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+    if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
+        return _decompose_to_matrix(op)
+    return op.decomposition()
 
 @transform
 def decompose(
     tape: qml.tape.QuantumTape,
     ctx,
     stopping_condition,
+    decomposer=catalyst_decomposer,
     max_expansion=None,
 ):
     """Decompose operations until the stopping condition is met.
@@ -81,29 +89,13 @@ def decompose(
     the acceptance criteria and is not decomposed further,
     """
 
-    def decomposer(op):
-        if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
-            return _decompose_to_matrix(op)
-        elif isinstance(
-            op,
-            (
-                catalyst.pennylane_extensions.Adjoint,
-                catalyst.pennylane_extensions.MidCircuitMeasure,
-                catalyst.pennylane_extensions.ForLoop,
-                catalyst.pennylane_extensions.WhileLoop,
-                catalyst.pennylane_extensions.Cond,
-            ),
-        ):
-            return _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion)
-        return op.decomposition()
-
     if len(tape) == 0:
         return (tape,), lambda x: x[0]
 
     new_ops = []
     for op in tape.operations:
-        if isinstance(op, MidMeasureMP):
-            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+        if has_nested_tapes(op):
+            op = _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion)
         new_ops.extend(
             op
             for op in _operator_decomposition_gen(
@@ -127,11 +119,14 @@ def _decompose_to_matrix(op):
         ) from e
     op = qml.QubitUnitary(mat, wires=op.wires)
     return [op]
+    
 
-
-def _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion):
+def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
+    new_regions = []
     for region in op.regions:
-        if region.quantum_tape:
+        if region.quantum_tape is None:
+            new_tape = None  
+        else:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 tapes, _ = decompose(
                     region.quantum_tape,
@@ -139,9 +134,12 @@ def _decompose_hybrid_op(op, ctx, stopping_condition, max_expansion):
                     stopping_condition=stopping_condition,
                     max_expansion=max_expansion,
                 )
-                region.quantum_tape = tapes[0]
-    op.visited = True
-    return [op]
+                new_tape = tapes[0]              
+        new_regions.append(HybridOpRegion(region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers))
+
+    new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    new_op.visited = True
+    return new_op
 
 
 @transform
