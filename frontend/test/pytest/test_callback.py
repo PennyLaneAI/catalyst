@@ -14,13 +14,16 @@
 """Test callbacks"""
 
 
+from collections.abc import Sequence
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.pennylane_extensions import callback
+from catalyst import debug, pure_callback
+from catalyst.api_extensions.callbacks import base_callback
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -28,7 +31,7 @@ def test_callback_no_tracing(arg):
     """Test that when there's no tracing the behaviour of identity
     stays the same."""
 
-    @callback
+    @base_callback
     def identity(x):
         return x
 
@@ -38,7 +41,7 @@ def test_callback_no_tracing(arg):
 def test_callback_no_returns_no_params(capsys):
     """Test callback no parameters no returns"""
 
-    @callback
+    @base_callback
     def my_callback() -> None:
         print("Hello erick")
 
@@ -58,7 +61,7 @@ def test_callback_no_returns_no_params(capsys):
 def test_callback_twice(capsys):
     """Test callback no parameters no returns"""
 
-    @callback
+    @base_callback
     def my_callback():
         print("Hello erick")
 
@@ -90,7 +93,7 @@ def test_callback_twice(capsys):
 def test_callback_send_param(capsys):
     """Test callback with parameters no returns"""
 
-    @callback
+    @base_callback
     def my_callback(n) -> None:
         print(n)
 
@@ -107,7 +110,7 @@ def test_callback_send_param(capsys):
 def test_kwargs(capsys):
     """Test kwargs returns"""
 
-    @callback
+    @base_callback
     def my_callback(**kwargs) -> None:
         for k, v in kwargs.items():
             print(k, v)
@@ -126,6 +129,20 @@ def test_kwargs(capsys):
         assert string in captured.out
 
 
+def test_simple_increment():
+    """Test increment function"""
+
+    @base_callback
+    def inc(arg) -> int:
+        return arg + 1
+
+    @qml.qjit
+    def cir(arg):
+        return inc(arg)
+
+    assert np.allclose(cir(0), 1)
+
+
 @pytest.mark.parametrize(
     "arg",
     [0, 3.14, complex(0.0, 1.0), jnp.array(0), jnp.array([1, 2, 3]), jnp.array([[1, 2], [2, 3]])],
@@ -133,7 +150,7 @@ def test_kwargs(capsys):
 def test_identity_types(arg):
     """Test callback with return values"""
 
-    @callback
+    @base_callback
     def identity(arg) -> arg:
         """Weird trick, if it is the identity function, we can just pass arg
         as the return type. arg will be abstracted to find the type. This
@@ -155,7 +172,7 @@ def test_identity_types(arg):
 def test_identity_types_shaped_array(arg):
     """Test callback with return values. Use ShapedArray to denote the type"""
 
-    @callback
+    @base_callback
     def identity(arg) -> jax.core.ShapedArray([], int):
         return arg
 
@@ -173,7 +190,7 @@ def test_identity_types_shaped_array(arg):
 def test_multiple_returns(arg):
     """Test callback with multiple return values."""
 
-    @callback
+    @base_callback
     def identity(arg) -> (int, int):
         return arg, arg
 
@@ -191,7 +208,7 @@ def test_multiple_returns(arg):
 def test_incorrect_return(arg):
     """Test callback with incorrect return types."""
 
-    @callback
+    @base_callback
     def identity(arg) -> int:
         return arg
 
@@ -201,3 +218,182 @@ def test_incorrect_return(arg):
 
     with pytest.raises(TypeError, match="Callback identity expected type"):
         cir(arg)
+
+
+def test_pure_callback():
+    """Test identity pure callback."""
+
+    def identity(a):
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return pure_callback(identity, float)(x)
+
+    assert np.allclose(cir(0.0), 0.0)
+
+
+def test_pure_callback_decorator():
+    """Test identity pure callback."""
+
+    @pure_callback
+    def identity(a) -> float:
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return identity(x)
+
+    assert np.allclose(cir(0.0), 0.0)
+
+
+def test_pure_callback_no_return_value():
+    """Test identity pure callback no return."""
+
+    def identity(a):
+        return a
+
+    @qml.qjit
+    def cir(x):
+        return pure_callback(identity)(x)
+
+    msg = "A function using pure_callback requires return types to be "
+    msg += "passed in as a parameter or type annotation."
+    with pytest.raises(TypeError, match=msg):
+        cir(0.0)
+
+
+def test_debug_callback(capsys):
+    """Test debug callback"""
+
+    def my_own_print(a):
+        print(a)
+
+    @qml.qjit
+    def cir(x):
+        debug.callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"
+
+
+def test_debug_callback_decorator(capsys):
+    """Test debug callback"""
+
+    @debug.callback
+    def my_own_print(a):
+        print(a)
+
+    @qml.qjit
+    def cir(x):
+        my_own_print(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    cir(0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0"
+
+
+def test_debug_callback_returns_something(capsys):
+    """Test io callback returns something"""
+
+    def my_own_print(a):
+        print(a)
+        return 1
+
+    @qml.qjit
+    def cir(x):
+        debug.callback(my_own_print)(x)
+        return None
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    with pytest.raises(ValueError, match="debug.callback is expected to return None"):
+        cir(0)
+
+
+def test_io_callback_modify_global(capsys):
+    """Test mutation"""
+
+    x = 0
+
+    @debug.callback
+    def set_x_to(y):
+        nonlocal x
+        x = y
+
+    @debug.callback
+    def print_x():
+        nonlocal x
+        print(x)
+
+    @qml.qjit
+    def cir():
+        print_x()
+        set_x_to(1)
+        print_x()
+
+    cir()
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "0\n1"
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1)],
+)
+def test_no_return_list(arg):
+    """Test that the callback returns a scalar and not a list."""
+
+    @pure_callback
+    def callback_fn(x) -> float:
+        return np.sin(x)
+
+    @qml.qjit
+    def f(x):
+        res = callback_fn(x**2)
+        assert not isinstance(res, Sequence)
+        return jnp.cos(res)
+
+    f(arg)
+
+
+def test_tuple_out():
+    """Test with multiple tuples."""
+
+    @pure_callback
+    def callback_fn(x) -> (bool, bool):
+        return x > 1.0, x > 2.0
+
+    @qml.qjit
+    def f(x):
+        res = callback_fn(x**2)
+        assert isinstance(res, tuple) and len(res) == 2
+        return jnp.cos(res[0])
+
+    f(0.1)
+
+
+def test_numpy_ufuncs():
+    """Test with numpy ufuncs."""
+
+    @qml.qjit
+    def f(x):
+        y = pure_callback(np.sin, float)(x)
+        return y
+
+    assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

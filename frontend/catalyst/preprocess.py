@@ -31,6 +31,8 @@ from pennylane.tape.tape import (
 import catalyst
 import catalyst.pennylane_extensions
 from catalyst.jax_tracer import has_nested_tapes, HybridOpRegion
+from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
+from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
@@ -166,7 +168,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, catalyst.pennylane_extensions.QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -192,11 +194,11 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     if isinstance(
         op,
         (
-            catalyst.pennylane_extensions.Adjoint,
-            catalyst.pennylane_extensions.MidCircuitMeasure,
-            catalyst.pennylane_extensions.ForLoop,
-            catalyst.pennylane_extensions.WhileLoop,
-            catalyst.pennylane_extensions.Cond,
+            Adjoint,
+            MidCircuitMeasure,
+            ForLoop,
+            WhileLoop,
+            Cond,
         ),
     ):
         return op.name in operations and op.visited
@@ -221,7 +223,7 @@ def measurements_from_counts(tape):
         Samples are not supported.
     """
     if tape.samples_computational_basis and len(tape.measurements) > 1:
-        _validate_computational_basis_sampling(tape.measurements)
+        _validate_computational_basis_sampling(tape)
     diagonalizing_gates, diagonal_measurements = rotations_and_diagonal_measurements(tape)
     for i, m in enumerate(diagonal_measurements):
         if m.obs is not None:

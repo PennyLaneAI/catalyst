@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for functions to check config validity."""
+"""Unit tests for device toml config parsing and validation."""
 
 from os.path import join
 from tempfile import TemporaryDirectory
@@ -21,18 +21,24 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
+from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime import (
     check_no_overlap,
+    get_device_capabilities,
+    validate_config_with_device,
+)
+from catalyst.utils.toml import (
+    DeviceCapabilities,
+    ProgramFeatures,
+    TOMLDocument,
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
-    get_native_gates,
-    get_pennylane_observables,
-    get_pennylane_operations,
-    validate_config_with_device,
+    get_native_ops,
+    pennylane_operation_set,
+    read_toml_file,
 )
-from catalyst.utils.toml import check_adjoint_flag, read_toml_file
 
 
 class DummyDevice(qml.QubitDevice):
@@ -53,6 +59,25 @@ class DummyDevice(qml.QubitDevice):
 
 
 ALL_SCHEMAS = [1, 2]
+
+
+def get_test_config(config_text: str) -> TOMLDocument:
+    """Parse test config into the TOMLDocument structure"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(config_text)
+        config = read_toml_file(toml_file)
+        return config
+
+
+def get_test_device_capabilities(
+    program_features: ProgramFeatures, config_text: str
+) -> DeviceCapabilities:
+    """Parse test config into the DeviceCapabilities structure"""
+    config = get_test_config(config_text)
+    device_capabilities = get_device_capabilities(config, program_features, "dummy")
+    return device_capabilities
 
 
 @pytest.mark.parametrize("schema", ALL_SCHEMAS)
@@ -83,379 +108,323 @@ def test_validate_config_with_device(schema):
 
 def test_get_observables_schema1():
     """Test observables are properly obtained from the toml schema 1."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"TestNativeGate"}
-
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 1
-                        [operators]
-                        observables = [ "TestNativeGate" ]
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+                schema = 1
+                [operators]
+                observables = [ "PauliX" ]
+            """
+        ),
+    )
+    assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_obs)
 
 
 def test_get_observables_schema2():
     """Test observables are properly obtained from the toml schema 2."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"TestNativeGate1"}
-
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.observables]
-                        TestNativeGate1 = { }
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_observables(config, False, "device_name")
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+                schema = 2
+                [operators.observables]
+                PauliX = { }
+            """
+        ),
+    )
+    assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_obs)
 
 
-def test_get_native_gates_schema1_no_qcontrol():
+def test_get_native_ops_schema1_no_qcontrol():
     """Test native gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"TestNativeGate"}
-
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 1
-                        [[operators.gates]]
-                        native = [ "TestNativeGate" ]
-                        [compilation]
-                        quantum_control = false
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+                schema = 1
+                [[operators.gates]]
+                native = [ "PauliX" ]
+                [compilation]
+                quantum_control = false
+            """
+        ),
+    )
+    assert {"PauliX"} == pennylane_operation_set(device_capabilities.native_ops)
 
 
-def test_get_native_gates_schema1_qcontrol():
+def test_get_native_ops_schema1_qcontrol():
     """Test native gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"C(TestNativeGate)", "TestNativeGate"}
-
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 1
-                        [[operators.gates]]
-                        native = [ "TestNativeGate" ]
-                        [compilation]
-                        quantum_control = true
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+                schema = 1
+                [[operators.gates]]
+                native = [ "PauliZ" ]
+                [compilation]
+                quantum_control = true
+            """
+        ),
+    )
+    assert {"PauliZ", "C(PauliZ)"} == pennylane_operation_set(device_capabilities.native_ops)
 
 
-def test_get_adjoint_schema2():
+@pytest.mark.parametrize("qadjoint", [True, False])
+def test_get_native_ops_schema1_qadjoint(qadjoint):
     """Test native gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestNativeGate1 = { properties = [ 'invertible' ] }
-                        TestNativeGate2 = { properties = [ 'invertible' ] }
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert check_adjoint_flag(config, False)
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            rf"""
+                schema = 1
+                [[operators.gates]]
+                native = [ "PauliZ" ]
+                [compilation]
+                quantum_adjoint = {str(qadjoint).lower()}
+            """
+        ),
+    )
+    assert device_capabilities.native_ops["PauliZ"].invertible is qadjoint
 
 
-def test_get_native_gates_schema2():
+def test_get_native_ops_schema2():
     """Test native gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"C(TestNativeGate1)", "TestNativeGate1", "TestNativeGate2"}
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+                schema = 2
+                [operators.gates.native]
+                PauliX = { properties = [ 'controllable' ] }
+                PauliY = { }
+            """
+        ),
+    )
 
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestNativeGate1 = { properties = [ 'controllable' ] }
-                        TestNativeGate2 = { }
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, False, "device_name")
+    assert {"PauliX", "C(PauliX)", "PauliY"} == pennylane_operation_set(
+        device_capabilities.native_ops
+    )
 
 
-def test_get_native_gates_schema2_optional_shots():
+def test_get_native_ops_schema2_optional_shots():
     """Test native gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"TestNativeGate1"}
-
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestNativeGate1 = { condition = ['finiteshots'] }
-                        TestNativeGate2 = { condition = ['analytic'] }
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, True, "device_name")
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(True),
+        dedent(
+            r"""
+                schema = 2
+                [operators.gates.native]
+                PauliX = { condition = ['finiteshots'] }
+                PauliY = { condition = ['analytic'] }
+            """
+        ),
+    )
+    assert "PauliX" in device_capabilities.native_ops
+    assert "PauliY" not in device_capabilities.native_ops
 
 
-def test_get_native_gates_schema2_optional_noshots():
+def test_get_native_ops_schema2_optional_noshots():
     """Test native gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_deduced_gates = {"TestNativeGate2"}
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestNativeGate1 = { condition = ['finiteshots'] }
-                        TestNativeGate2 = { condition = ['analytic'] }
-                    """
-                )
-            )
-        config = read_toml_file(toml_file)
-    assert test_deduced_gates == get_pennylane_operations(config, False, "device")
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+                schema = 2
+                [operators.gates.native]
+                PauliX = { condition = ['finiteshots'] }
+                PauliY = { condition = ['analytic'] }
+            """
+        ),
+    )
+    assert "PauliX" not in device_capabilities.native_ops
+    assert "PauliY" in device_capabilities.native_ops
 
 
 def test_get_decomp_gates_schema1():
     """Test native decomposition gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_gates = {"TestDecompGate": {}}
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    f"""
-                        schema = 1
-                        [[operators.gates]]
-                        decomp = {str(list(test_gates.keys()))}
-                    """
-                )
-            )
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            """
+                schema = 1
+                [[operators.gates]]
+                decomp = ["PauliX", "PauliY"]
+            """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert test_gates == get_decomposable_gates(config, False)
+    assert "PauliX" in device_capabilities.to_decomp_ops
+    assert "PauliY" in device_capabilities.to_decomp_ops
+    assert "PauliZ" not in device_capabilities.to_decomp_ops
 
 
 def test_get_decomp_gates_schema2():
     """Test native decomposition gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_gates = {"TestDecompGate": {}}
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    f"""
-                        schema = 2
-                        [operators.gates]
-                        decomp = {str(list(test_gates.keys()))}
-                    """
-                )
-            )
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            """
+            schema = 2
+            [operators.gates]
+            decomp = ["PauliX", "PauliY"]
+        """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert test_gates == get_decomposable_gates(config, False)
+    assert "PauliX" in device_capabilities.to_decomp_ops
+    assert "PauliY" in device_capabilities.to_decomp_ops
 
 
 def test_get_matrix_decomposable_gates_schema1():
     """Test native matrix gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        test_gates = {"TestMatrixGate": {}}
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    f"""
-                        schema = 1
-                        [[operators.gates]]
-                        matrix = {str(list(test_gates.keys()))}
-                    """
-                )
-            )
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            """
+            schema = 1
+            [[operators.gates]]
+            matrix = ["PauliX", "PauliY"]
+        """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert test_gates == get_matrix_decomposable_gates(config, False)
+    assert "PauliX" in device_capabilities.to_matrix_ops
+    assert "PauliY" in device_capabilities.to_matrix_ops
 
 
 def test_get_matrix_decomposable_gates_schema2():
     """Test native matrix gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.matrix]
-                        TestMatrixGate = {}
-                    """
-                )
-            )
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            r"""
+            schema = 2
+            [operators.gates.matrix]
+            PauliZ = {}
+        """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-
-    assert {"TestMatrixGate": {}} == get_matrix_decomposable_gates(config, False)
+    assert "PauliZ" in device_capabilities.to_matrix_ops
 
 
 def test_check_overlap_msg():
     """Test error is raised if there is an overlap in sets."""
-    msg = "Device has overlapping gates."
+    msg = "Device 'test' has overlapping gates."
     with pytest.raises(CompileError, match=msg):
-        check_no_overlap(["A"], ["A"], ["A"])
+        check_no_overlap(["A"], ["A"], ["A"], device_name="test")
 
 
 def test_config_invalid_attr():
     """Check the gate condition handling logic"""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { unknown_attribute = 33 }
-                    """
-                )
-            )
-
-        config = read_toml_file(toml_file)
-
-        with pytest.raises(
-            CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
-        ):
-            get_native_gates(config, True)
+    with pytest.raises(
+        CompileError, match="Configuration for gate 'TestGate' has unknown attributes"
+    ):
+        get_test_device_capabilities(
+            ProgramFeatures(False),
+            dedent(
+                r"""
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { unknown_attribute = 33 }
+                """
+            ),
+        )
 
 
 def test_config_invalid_condition_unknown():
     """Check the gate condition handling logic"""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { condition = ["unknown", "analytic"] }
-                    """
-                )
-            )
-
-        config = read_toml_file(toml_file)
-
-        with pytest.raises(
-            CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
-        ):
-            get_native_gates(config, True)
+    with pytest.raises(
+        CompileError, match="Configuration for gate 'TestGate' has unknown conditions"
+    ):
+        get_test_device_capabilities(
+            ProgramFeatures(True),
+            dedent(
+                r"""
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { condition = ["unknown", "analytic"] }
+                """
+            ),
+        )
 
 
 def test_config_invalid_property_unknown():
     """Check the gate condition handling logic"""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { properties = ["unknown", "invertible"] }
-                    """
-                )
-            )
-
-        config = read_toml_file(toml_file)
-
-        with pytest.raises(
-            CompileError, match="Configuration for gate 'TestGate' has unknown properties"
-        ):
-            get_native_gates(config, True)
+    with pytest.raises(
+        CompileError, match="Configuration for gate 'TestGate' has unknown properties"
+    ):
+        get_test_device_capabilities(
+            ProgramFeatures(True),
+            dedent(
+                r"""
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { properties = ["unknown", "invertible"] }
+                """
+            ),
+        )
 
 
-def test_config_invalid_condition_duplicate():
+@pytest.mark.parametrize("shots", [True, False])
+def test_config_invalid_condition_duplicate(shots):
     """Check the gate condition handling logic"""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 2
-                        [operators.gates.native]
-                        TestGate = { condition = ["finiteshots", "analytic"] }
-                    """
-                )
-            )
+    with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
+        get_test_device_capabilities(
+            ProgramFeatures(shots),
+            dedent(
+                r"""
+                    schema = 2
+                    [operators.gates.native]
+                    TestGate = { condition = ["finiteshots", "analytic"] }
+                """
+            ),
+        )
 
-        config = read_toml_file(toml_file)
 
-        with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
-            get_native_gates(config, True)
-
-        with pytest.raises(CompileError, match="Configuration for gate 'TestGate'"):
-            get_native_gates(config, False)
+def test_config_qjit_device_operations():
+    """Check the gate condition handling logic"""
+    config = get_test_config(
+        dedent(
+            r"""
+                schema = 2
+                [operators.gates.native]
+                PauliX = {}
+                [operators.observables]
+                PauliY = {}
+            """
+        ),
+    )
+    qjit_device = QJITDevice(config, shots=1000, wires=2)
+    assert "PauliX" in qjit_device.operations
+    assert "PauliY" in qjit_device.observables
 
 
 def test_config_unsupported_schema():
     """Test native matrix gates are properly obtained from the toml."""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    r"""
-                        schema = 999
-                    """
-                )
-            )
+    program_features = ProgramFeatures(False)
+    config_text = dedent(
+        r"""
+            schema = 999
+        """
+    )
+    config = get_test_config(config_text)
 
-        config = read_toml_file(toml_file)
+    with pytest.raises(CompileError):
+        get_test_device_capabilities(program_features, config_text)
 
-        with pytest.raises(CompileError):
-            check_quantum_control_flag(config)
-        with pytest.raises(CompileError):
-            get_native_gates(config, False)
-        with pytest.raises(CompileError):
-            get_decomposable_gates(config, False)
-        with pytest.raises(CompileError):
-            get_matrix_decomposable_gates(config, False)
-        with pytest.raises(CompileError):
-            get_pennylane_operations(config, False, "device_name")
-        with pytest.raises(CompileError):
-            check_adjoint_flag(config, False)
+    with pytest.raises(CompileError):
+        get_matrix_decomposable_gates(config, program_features)
+
+    with pytest.raises(CompileError):
+        get_decomposable_gates(config, program_features)
+
+    with pytest.raises(CompileError):
+        get_native_ops(config, program_features)
+
+    with pytest.raises(CompileError):
+        check_quantum_control_flag(config)
 
 
 if __name__ == "__main__":

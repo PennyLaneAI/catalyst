@@ -21,8 +21,19 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import cond, for_loop, grad, jacobian, qjit, value_and_grad
-from catalyst.pennylane_extensions import DifferentiableCompileError
+from catalyst import (
+    CompileError,
+    DifferentiableCompileError,
+    cond,
+    for_loop,
+    grad,
+    jacobian,
+    measure,
+    mitigate_with_zne,
+    pure_callback,
+    qjit,
+    value_and_grad,
+)
 
 # pylint: disable=too-many-lines
 
@@ -1163,6 +1174,59 @@ def test_adj_qubitunitary(inp, backend):
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
+
+
+class TestGradientErrors:
+    """Test errors when an operation which does not have a valid gradient is reachable
+    from the grad op"""
+
+    def test_measure_error(self):
+        """Test with measure"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            _bool = measure(0)
+            qml.RX(_bool + 1, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_callback_error(self):
+        """Test with callback"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            y = pure_callback(jnp.sin, float)(x)
+            qml.RX(y, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_with_zne(self):
+        """Test with ZNE"""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        def g(x):
+            return mitigate_with_zne(f, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(x)
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(g)(x)
 
 
 if __name__ == "__main__":

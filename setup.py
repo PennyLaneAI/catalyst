@@ -73,23 +73,25 @@ requirements = [
     lightning_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "tomlkit;python_version<'3.11'",
-    "scipy<=1.12.0",
+    "tomlkit; python_version < '3.11'",
+    "scipy<1.13",
+    "numpy<2",
     "diastatic-malt>=2.15.1",
 ]
 
 entry_points = {
     "pennylane.plugins": [
+        "oqc.cloud = catalyst.oqc:OQCDevice",
         "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
-        "catalyst.ops = catalyst:pennylane_extensions",
+        "catalyst.ops = catalyst.api_extensions",
         "catalyst.qjit = catalyst:qjit",
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
-        "cuda_quantum.ops = catalyst:pennylane_extensions",
+        "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.cuda:cudaqjit",
     ],
 }

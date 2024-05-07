@@ -2,11 +2,11 @@ PYTHON := $(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
+NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
-CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=RelWithDebInfo
 ENABLE_WARNINGS?=ON
@@ -14,8 +14,8 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?=v0.35.0
-NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+LIGHTNING_GIT_TAG_VALUE?=5feb4a10c9cd15fa590c513fc7c6a10a0b334269
+ENABLE_LAPACK?=OFF
 
 BUILD_TARGETS := rt_capi
 TEST_TARGETS := ""
@@ -82,9 +82,11 @@ configure:
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
-		-DPython_EXECUTABLE=$(PYTHON) \
+		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
 
 lq_configure:
@@ -106,25 +108,25 @@ lq_configure:
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
 		-DENABLE_WARNINGS=OFF \
-		-DPython_EXECUTABLE=$(PYTHON) \
+		-DPYTHON_EXECUTABLE=$(PYTHON) \
+		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
 		$(CMAKE_ARGS)
-
-$(RT_BUILD_DIR)/lib/librt_capi.so: configure
-	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
 lq_target: lq_configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi rtd_lightning -j$(NPROC)
 
 .PHONY: runtime
-runtime: $(RT_BUILD_DIR)/lib/librt_capi.so
+runtime: configure
+	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
 $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: dummy_device
-dummy_device:
+dummy_device: configure
 	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
 
 .PHONY: test

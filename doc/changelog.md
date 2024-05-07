@@ -1,4 +1,68 @@
-# Release 0.6.0-dev
+# Release 0.7.0-dev
+
+<h3>New features</h3>
+
+* Support for disabling Autograph for a specific function or
+  only for the function calls inside a specific context,
+  without affecting the bare code inside such context.
+  [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
+  [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
+
+  Using `disable_autograph` as a decorator is now possible:
+
+  ```py
+  @disable_autograph
+  def f():
+    x = 6
+    if x > 5:
+      y = x ** 2
+    else:
+      y = x ** 3
+    return y
+
+  @qjit(autograph=True)
+  def g(x: float, n: int):
+    for _ in range(n):
+      x = x + f()
+    return x
+
+  ```
+
+  Applying `disable_autograph` to a context is now possible:
+
+  ```py
+  def f():
+    x = 6
+    if x > 5:
+      y = x ** 2
+    else:
+      y = x ** 3
+    return y
+
+  @qjit(autograph=True)
+  def g():
+    x = 0.4
+    with disable_autograph:
+      x += f()
+    return x
+
+  ```
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Internal changes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Raul Torres
+
+# Release 0.6.0
 
 <h3>New features</h3>
 
@@ -8,32 +72,64 @@
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
+  [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
+  [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
+  [(#204)](https://github.com/PennyLaneAI/catalyst/pull/204)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
 
   ```py
-  @callback
+  @debug.callback
   def foo(val):
-    return val
+    print(f"myval: {val}")
+
+  @pure_callback
+  def bar(val) -> int:
+    return val + 1
 
   @qjit
   def circuit(param):
-    return foo(param)
+    x = bar(param)
+    foo(x)
 
   ```
 
   ```pycon
   >>> print(circuit(123))
-  123
+  myval: 124
   ```
+
+  This includes support for the specialized `pure_callback` and `debug.callback` where
+  `pure_callback` is expected to return a value and be side effect free,
+  while `debug.callback` is expected to produce a side effect and have no return values.
+
+  Syntactic sugar on top of `debug.callback` includes `debug.print` which allows the user
+  to use string formatting (akin to `str.format()`) before printing. See https://docs.python.org/3/library/string.html#formatstrings
+
+  ```py
+  @qjit
+  def cir(a, b, c):
+      debug.print("{c} {b} {a}", a=a, b=b, c=c)
+  ```
+
+  ```pycon
+  >>> cir(1, 2, 3)
+  3 2 1
+  ```
+
+  At the moment, callbacks should not be used inside methods which are differentiated.
+  A CompileError exception will be raised if at compile time it is found that code
+  reachable from the gradient operation contains either a mid-circuit measurement,
+  a callback, or a custom call (which happens through the mitigation operation).
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+  [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
   ```py
-  from catalyst.oqc import OQCDevice
 
   import os
 
@@ -41,7 +137,7 @@
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+  device = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(device=device)
@@ -59,23 +155,47 @@
   module import.
   [(#560)](https://github.com/PennyLaneAI/catalyst/pull/560)
 
-* Catalyst compiler and runtime have now the capability to provide detailed profiling information.
-  This includes insights such as the program size at various stages within the compilation pipeline
-  and the respective time durations spent in each of these stages.
-  You can print the results by enabling the `ENABLE_DIAGNOSTICS=ON` environment variable,
-  or you can save them to a file by specifying an additional environment variable,
-  `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`.
+* Catalyst now ships with an instrumentation feature allowing to explore what steps are run during
+  compilation and execution, and for how long.
   [(#528)](https://github.com/PennyLaneAI/catalyst/pull/528)
+  [(#597)](https://github.com/PennyLaneAI/catalyst/pull/597)
+
+  Instrumentation can be enabled from the frontend with the `catalyst.debug.instrumentation`
+  context manager:
+
+  ```py
+  @qjit
+  def expensive_function(a, b):
+      return a + b
+
+  with debug.instrumentation("session_name", filename="profiling_results.txt", detailed=True):
+    expensive_function(1, 2)
+  ```
+
+  The results will be appended to the provided file if the `filename` attribute is set, and printed
+  to the console otherwise. The flag `detailed` determines whether individual steps in the compiler
+  and runtime are instrumented, or whether only high-level steps like "program capture" and
+  "compilation" are reported.
+
+  Measurements currently include wall time, cpu time, and (intermediate) program size.
 
 <h3>Improvements</h3>
+
+* `qml.sample` and `qml.counts` now produce integer arrays for the sample array and basis state
+  array when used without observables.
+  [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
+
+* Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
+  [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)
+  [(#672)](https://github.com/PennyLaneAI/catalyst/pull/672)
 
 * The compilation & execution of `@qjit` compiled functions can be aborted using an interrupt
   signal (SIGINT). This includes using `CTRL-C` from a command line and the `Interrupt` button in
   a Jupyter Notebook.
   [(#642)](https://github.com/PennyLaneAI/catalyst/pull/642)
 
-* Manually cleanup the workspace, which prevents a warning from showing up during testing.
-  [(#656)](https://github.com/PennyLaneAI/catalyst/pull/656)
+* Fix a stochastic autograph test failure due to broadly turning warnings into errors.
+  [(#652)](https://github.com/PennyLaneAI/catalyst/pull/652)
 
 * An exception is now raised when OpenBLAS cannot be found by Catalyst.
   [(#643)](https://github.com/PennyLaneAI/catalyst/pull/643)
@@ -88,12 +208,14 @@
 * Catalyst now supports devices built from the
   [new PennyLane device API](https://docs.pennylane.ai/en/stable/code/api/pennylane.devices.Device.html).
   It currently discards the preprocessing from the original device and it is replaced by Catalyst specific
-  preprocessing. This preprocessing is a decomposition based on the TOML file.
+  preprocessing. This preprocessing is a decomposition based on the TOML file. Catalyst also checks that
+  devices have the wires set.
   [(#565)](https://github.com/PennyLaneAI/catalyst/pull/565)
   [(#598)](https://github.com/PennyLaneAI/catalyst/pull/598)
   [(#599)](https://github.com/PennyLaneAI/catalyst/pull/599)
   [(#636)](https://github.com/PennyLaneAI/catalyst/pull/636)
   [(#638)](https://github.com/PennyLaneAI/catalyst/pull/638)
+  [(#664)](https://github.com/PennyLaneAI/catalyst/pull/664)
 
 * Catalyst now supports return statements inside conditionals in `@qjit(autograph=True)` compiled
   functions.
@@ -132,9 +254,21 @@
 * Add optimization that removes redundant chains of self inverse operations. This is done within a new MLIR pass called `remove-chained-self-inverse`. Currently we only match redundant Hadamard operations but the list of supported operations can be expanded.
   [(#630)](https://github.com/PennyLaneAI/catalyst/pull/630)
 
+* Remove unnecessary logic for handling wires from GlobalPhase.
+  [(#640)](https://github.com/PennyLaneAI/catalyst/pull/640)
+
+* Running tests should no longer see `ResourceWarning` from `tempfile.TemporaryDirectory`.
+  [(#676)](https://github.com/PennyLaneAI/catalyst/pull/676)
+
 <h3>Breaking changes</h3>
 
+* `catalyst.debug.print` has changed, resulting in the `memref` keyword argument being removed. Please use `catalyst.debug.print_memref` instead.
+  [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
+
 <h3>Bug fixes</h3>
+
+* Fix `measurement_from_counts` following an update of a private function in PennyLane.
+  [(#687)](https://github.com/PennyLaneAI/catalyst/pull/687)
 
 * Enable support for QNode argument `diff_method=None` with QJIT.
   [(#658)](https://github.com/PennyLaneAI/catalyst/pull/658)
@@ -158,6 +292,11 @@
 
 * Fixes adjoint lowering bug that did not take into account control wires.
   [(#591)](https://github.com/PennyLaneAI/catalyst/pull/591)
+
+<h3>Internal changes</h3>
+
+* The deprecated `@qfunc` decorator, in use mainly by the LIT test suite, has been removed.
+  [(#679)](https://github.com/PennyLaneAI/catalyst/pull/679)
 
 <h3>Contributors</h3>
 
