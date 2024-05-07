@@ -477,9 +477,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         pm.enableTiming(std::move(tm));
     }
 
-    // Maps a pass to zero or one pipelines ended by this pass
     // Maps a pass to its owning pipeline
-    std::unordered_map<const Pass *, pair<Pipeline::Name, size_t>> pipelineTailMarkers;
     std::unordered_map<const Pass *, pair<Pipeline::Name, size_t>> passPipelineNames;
 
     // Fill all the pipe-to-pipeline mappings
@@ -497,8 +495,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                     pass = &(*(pm.begin() + pn));
                     passPipelineNames[pass] = pair(pipeline.name, pipelineIdx);
                 }
-                assert(pass != nullptr);
-                pipelineTailMarkers[pass] = pair(pipeline.name, pipelineIdx);
             }
             pipelineIdx++;
         }
@@ -522,13 +518,13 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     // For each pipeline-terminating pass, print the IR into the corresponding dump file and
     // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
     auto afterPassCallback = [&](Pass *pass, Operation *op) {
-        auto res = pipelineTailMarkers.find(pass);
-        if (res != pipelineTailMarkers.end()) {
+        auto res = passPipelineNames.find(pass);
+        if (res != passPipelineNames.end()) {
             timer.dump(res->second.first, std::cerr, /*add_endl */ false);
             LineCounter::Operation(op, std::cerr);
         }
 
-        if (options.keepIntermediate && res != pipelineTailMarkers.end()) {
+        if (options.keepIntermediate && res != passPipelineNames.end()) {
             auto pipelineName = res->second.first;
             auto pipelineIdx = res->second.second;
             llvm::raw_string_ostream s{outputs[pipelineName]};
