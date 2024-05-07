@@ -98,9 +98,11 @@ struct CompilerOutput {
     PipelineOutputs pipelineOutputs;
     size_t pipelineCounter;
 
-    // Gets the next pipeline dump file name, prefixed with number.
+    /// Gets the next pipeline dump file name, prefixed with a number. This function increases the
+    /// value of `pipelineCounter`.
     std::string nextDumpFilename(std::string filenameBase, std::string ext);
-    std::string pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx);
+    /// Gets the filename to be used for dumping the MLIR pipeline item with the `pipelineIdx` id.
+    std::string pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx) const;
 };
 
 }; // namespace driver

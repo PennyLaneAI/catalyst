@@ -290,7 +290,8 @@ std::string CompilerOutput::nextDumpFilename(std::string filenameBase, std::stri
         .replace_extension(ext);
 }
 
-std::string CompilerOutput::pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx)
+std::string CompilerOutput::pipelineDumpFilename(Pipeline::Name pipelineName,
+                                                 size_t pipelineIdx) const
 {
     return std::filesystem::path(std::to_string(this->pipelineCounter) + "_" +
                                  std::to_string(pipelineIdx) + "_" + pipelineName)
