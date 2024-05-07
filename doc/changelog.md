@@ -8,7 +8,8 @@
 
 <h3>Bug fixes</h3>
 
-* Fixes incompatibility with new version of amazon braket local simulator.
+* Bumps minimum required for the amazon-braket-pennylane-plugin to 1.27.1.
+  [(#724)](https://github.com/PennyLaneAI/catalyst/pull/724)
 
 <h3>Internal changes</h3>
 
