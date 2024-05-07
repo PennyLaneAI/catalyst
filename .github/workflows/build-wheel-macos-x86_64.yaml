@@ -280,6 +280,7 @@ jobs:
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
     - name: Test Catalyst-Runtime
