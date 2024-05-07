@@ -603,7 +603,7 @@ jobs:
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-          pip install numpy amazon-braket-sdk
+          pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin>=1.27.1
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Download Catalyst-Runtime Artifact
