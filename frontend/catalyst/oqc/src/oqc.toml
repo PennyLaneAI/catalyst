@@ -50,7 +50,7 @@ Hadamard = {}
 Expval = { condition = [ "finiteshots" ] }
 Var = { condition = [ "finiteshots" ] }
 Probs = { condition = [ "finiteshots" ] }
-Count = { condition = [ "finiteshots" ] }
+Counts = { condition = [ "finiteshots" ] }
 
 
 [compilation]

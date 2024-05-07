@@ -2,6 +2,52 @@
 
 <h3>New features</h3>
 
+* Support for disabling Autograph for a specific function or
+  only for the function calls inside a specific context,
+  without affecting the bare code inside such context.
+  [(#705)](https://github.com/PennyLaneAI/catalyst/pull/705)
+  [(#710)](https://github.com/PennyLaneAI/catalyst/pull/710)
+
+  Using `disable_autograph` as a decorator is now possible:
+
+  ```py
+  @disable_autograph
+  def f():
+    x = 6
+    if x > 5:
+      y = x ** 2
+    else:
+      y = x ** 3
+    return y
+
+  @qjit(autograph=True)
+  def g(x: float, n: int):
+    for _ in range(n):
+      x = x + f()
+    return x
+
+  ```
+
+  Applying `disable_autograph` to a context is now possible:
+
+  ```py
+  def f():
+    x = 6
+    if x > 5:
+      y = x ** 2
+    else:
+      y = x ** 3
+    return y
+
+  @qjit(autograph=True)
+  def g():
+    x = 0.4
+    with disable_autograph:
+      x += f()
+    return x
+
+  ```
+
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
@@ -13,6 +59,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Raul Torres
 
 # Release 0.6.0
 
@@ -27,6 +75,7 @@ This release contains contributions from (in alphabetical order):
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
+  [(#204)](https://github.com/PennyLaneAI/catalyst/pull/204)
 
   Catalyst now supports callbacks with parameters and return values.
   The following is now possible:
@@ -71,13 +120,16 @@ This release contains contributions from (in alphabetical order):
   ```
 
   At the moment, callbacks should not be used inside methods which are differentiated.
+  A CompileError exception will be raised if at compile time it is found that code
+  reachable from the gradient operation contains either a mid-circuit measurement,
+  a callback, or a custom call (which happens through the mitigation operation).
 
 * The OQC-Catalyst device is now available and supports single counts measurement.
   [(#578)](https://github.com/PennyLaneAI/catalyst/pull/578)
   [(#579)](https://github.com/PennyLaneAI/catalyst/pull/579)
+  [(#691)](https://github.com/PennyLaneAI/catalyst/pull/691)
 
   ```py
-  from catalyst.oqc import OQCDevice
 
   import os
 
@@ -85,7 +137,7 @@ This release contains contributions from (in alphabetical order):
   os.environ["OQC_PASSWORD"] = "your_password"
   os.environ["OQC_URL"] = "oqc_url"
 
-  device = OQCDevice(backend="lucy", shots=2012, wires=2)
+  device = qml.device("oqc.cloud", backend="lucy", shots=2012, wires=2)
 
   @catalyst.qjit
   @qml.qnode(device=device)
@@ -128,6 +180,10 @@ This release contains contributions from (in alphabetical order):
   Measurements currently include wall time, cpu time, and (intermediate) program size.
 
 <h3>Improvements</h3>
+
+* `qml.sample` and `qml.counts` now produce integer arrays for the sample array and basis state
+  array when used without observables.
+  [(#648)](https://github.com/PennyLaneAI/catalyst/pull/648)
 
 * Update minimum Amazon-Braket-PennyLane-Plugin support to v1.25.0.
   [(#673)](https://github.com/PennyLaneAI/catalyst/pull/673)

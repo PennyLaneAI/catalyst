@@ -575,6 +575,7 @@ def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Calla
     return [tape], lambda res: res[0]
 
 
+# pylint: disable=too-many-statements,too-many-branches
 def trace_quantum_measurements(
     device: QubitDevice,
     qrp: QRegPromise,
@@ -595,7 +596,6 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    # pylint: disable=too-many-branches
     if isinstance(device, qml.Device):
         shots = device.shots
     else:
@@ -616,7 +616,10 @@ def trace_quantum_measurements(
 
             if o.return_type.value == "sample":
                 shape = (shots, nqubits) if using_compbasis else (shots,)
-                out_classical_tracers.append(sample_p.bind(obs_tracers, shots=shots, shape=shape))
+                result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                if using_compbasis:
+                    result = jnp.astype(result, jnp.int64)
+                out_classical_tracers.append(result)
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
@@ -627,7 +630,10 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
                 shape = (2**nqubits,) if using_compbasis else (2,)
-                out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
+                results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
+                if using_compbasis:
+                    results = (jnp.asarray(results[0], jnp.int64), results[1])
+                out_classical_tracers.extend(results)
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children):

@@ -74,13 +74,14 @@ def intersect_properties(a: OperationProperties, b: OperationProperties) -> Oper
 
 
 @dataclass
-class DeviceCapabilities:
+class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     """Quantum device capabilities"""
 
     native_ops: Dict[str, OperationProperties]
     to_decomp_ops: Dict[str, OperationProperties]
     to_matrix_ops: Dict[str, OperationProperties]
     native_obs: Dict[str, OperationProperties]
+    measurement_processes: Set[str]
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
@@ -176,6 +177,21 @@ def parse_toml_section(
 def get_observables(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
     """Override the set of supported observables."""
     return parse_toml_section(config, ["operators", "observables"], program_features)
+
+
+def get_measurement_processes(
+    config: TOMLDocument, program_features: ProgramFeatures
+) -> Dict[str, dict]:
+    """Get the measurements processes from the `native` section of the config."""
+
+    schema = int(config["schema"])
+    if schema == 1:
+        shots_string = "finiteshots" if program_features.shots_present else "exactshots"
+        return parse_toml_section(config, ["measurement_processes", shots_string], program_features)
+    if schema == 2:
+        return parse_toml_section(config, ["measurement_processes"], program_features)
+
+    raise CompileError(f"Unsupported config schema {schema}")
 
 
 def get_native_ops(config: TOMLDocument, program_features: ProgramFeatures) -> Dict[str, dict]:
@@ -334,6 +350,10 @@ def get_device_capabilities(
     for g, props in get_observables(config, program_features).items():
         observable_props[g] = get_operation_properties(props)
 
+    measurements_props = set()
+    for g, props in get_measurement_processes(config, program_features).items():
+        measurements_props.add(g)
+
     if schema == 1:
         patch_schema1_collections(
             config,
@@ -349,6 +369,7 @@ def get_device_capabilities(
         to_decomp_ops=decomp_props,
         to_matrix_ops=matrix_decomp_props,
         native_obs=observable_props,
+        measurement_processes=measurements_props,
         mid_circuit_measurement_flag=check_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=check_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=check_compilation_flag(config, "dynamic_qubit_management"),

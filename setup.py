@@ -73,13 +73,15 @@ requirements = [
     lightning_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "tomlkit;python_version<'3.11'",
-    "scipy<=1.12.0",
+    "tomlkit; python_version < '3.11'",
+    "scipy<1.13",
+    "numpy<2",
     "diastatic-malt>=2.15.1",
 ]
 
 entry_points = {
     "pennylane.plugins": [
+        "oqc.cloud = catalyst.oqc:OQCDevice",
         "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
