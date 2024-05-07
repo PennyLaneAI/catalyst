@@ -284,7 +284,7 @@ jobs:
 
     - name: Test Catalyst-Runtime
       run: |
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
@@ -367,7 +367,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
 
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
