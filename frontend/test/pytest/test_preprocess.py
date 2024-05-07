@@ -15,11 +15,12 @@
 """
 # pylint: disable=unused-argument
 import pathlib
+import pytest
+
+from functools import partial
 
 import numpy as np
 import pennylane as qml
-import pytest
-from functools import partial
 
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
@@ -44,7 +45,6 @@ from catalyst.pennylane_extensions import (
     for_loop,
     while_loop,
     cond,
-    adjoint,
 )
 import catalyst.pennylane_extensions as ex
 
@@ -85,7 +85,8 @@ class OtherHadamard(qml.Hadamard):
 
     @property
     def name(self):
-        return "OtherHadamard"
+        """name"""
+        return "UnknownOp"
 
 
 class OtherIsingXX(qml.IsingXX):
@@ -94,7 +95,8 @@ class OtherIsingXX(qml.IsingXX):
 
     @property
     def name(self):
-        return "OtherIsingXX"
+        """name"""
+        return "UnknownOp"
 
 
 class OtherRX(qml.RX):
@@ -103,9 +105,11 @@ class OtherRX(qml.RX):
 
     @property
     def name(self):
+        """Name of the operator is UnknownOp"""
         return "UnknownOp"
 
     def decomposition(self):
+        """decomposes to normal RX"""
         return [qml.RX(*self.parameters, self.wires)]
 
 
@@ -488,11 +492,11 @@ class TestPreprocessHybridOp:
         adj_region = HybridOpRegion([], adj_tape, [], [])
 
         conditional_op = Cond([], [], regions=[adj_region, region2])
-        cond_region = HybridOpRegion(
+        conditional_region = HybridOpRegion(
             [], qml.tape.QuantumScript([conditional_op, qml.Y(1)]), [], []
         )  # PauliY will decompose
 
-        for_loop_op = ForLoop([], [], [cond_region])
+        for_loop_op = ForLoop([], [], [conditional_region])
         tape = qml.tape.QuantumScript(
             [for_loop_op, qml.X(0), qml.Hadamard(3)]
         )  # Hadamard will decompose
@@ -554,7 +558,8 @@ class TestPreprocessHybridOp:
         assert np.allclose(new_op.matrix(), tape.operations[0].matrix())
 
     def test_error_for_pennylane_midmeasure_decompose(self):
-        """Test that an error is raised in decompose if a PennyLane mid-circuit measurement is encountered"""
+        """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
+        is encountered"""
 
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
 
