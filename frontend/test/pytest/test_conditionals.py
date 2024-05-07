@@ -575,7 +575,7 @@ class TestCondOperatorAccess:
                 and thus has no associated quantum operation.
                 """,
             ):
-                cond_fn.operation
+                op = cond_fn.operation
 
             return cond_fn()
 
@@ -604,7 +604,7 @@ class TestCondOperatorAccess:
                 and thus has no associated quantum operation.
                 """,
             ):
-                branch_t.operation
+                op = branch_t.operation
 
             return branch_t()
 
