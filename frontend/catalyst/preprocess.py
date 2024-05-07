@@ -68,6 +68,9 @@ def _operator_decomposition_gen(
 
 
 def catalyst_decomposer(op):
+    """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
+    returns the default decomposition, unless the operator should decompose to a QubitUnitary.
+    Raises a CompileError for MidMeasureMP"""
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
     if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
