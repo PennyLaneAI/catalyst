@@ -575,7 +575,7 @@ class TestCondOperatorAccess:
                 and thus has no associated quantum operation.
                 """,
             ):
-                op = cond_fn.operation
+                isinstance(cond_fn.operation, api_extensions.control_flow.Cond)
 
             return cond_fn()
 
@@ -604,7 +604,7 @@ class TestCondOperatorAccess:
                 and thus has no associated quantum operation.
                 """,
             ):
-                op = branch_t.operation
+                isinstance(branch_t.operation, api_extensions.control_flow.Cond)
 
             return branch_t()
 
