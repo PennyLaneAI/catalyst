@@ -1,10 +1,4 @@
-# Always update the version check in catalyst.__init__ when changing the JAX version.
-jax=0.4.23
-mhlo=4611968a5f6818e6bdfb82217b9e836e0400bba9
-llvm=cd9a641613eddf25d4b25eaa96b2c393d401d42c
+jax=0.4.26
+mhlo=3a684aa494b733d26e9faab58e80572fca937b33
+llvm=c09b6fac12b0299841bf1bf04974712963736db5
 enzyme=1beb98b51442d50652eaa3ffb9574f4720d611f1
-
-# Always remove custom PL/LQ versions before release.
-
-lightning=0.36.0-dev40
-pennylane=d7342b69f5b7829532e7d3cd8f750afa7f54d25d

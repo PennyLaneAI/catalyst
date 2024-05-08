@@ -109,7 +109,7 @@ enzyme:
 		-DCMAKE_EXE_LINKER_FLAGS=$(USE_SANITIZER_FLAGS) \
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY)
 
-	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-18
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-19
 
 .PHONY: dialects
 dialects:
