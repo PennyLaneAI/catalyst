@@ -14,6 +14,7 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -77,13 +78,33 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.programs.verification import ProgramRepresentation, verify_program
+from catalyst.programs.verification import (
+    verify_control,
+    verify_inverses,
+    verify_differentiability
+)
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
+
+
+# Global flag tracing wether the function that we trace might be used for gradients
+TRACING_GRADIENTS = False
+
+
+@contextmanager
+def mark_gradient_tracing():
+    """Wraps the inner flow with the gradient-tracing flag """
+    global TRACING_GRADIENTS
+    old = TRACING_GRADIENTS
+    try:
+        TRACING_GRADIENTS = True
+        yield
+    finally:
+        TRACING_GRADIENTS = old
 
 
 class Function:
@@ -329,6 +350,13 @@ def has_nested_tapes(op: Operation) -> bool:
         isinstance(op, HybridOp)
         and len(op.regions) > 0
         and any(r.quantum_tape is not None for r in op.regions)
+    )
+
+def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
+    """Returns the list of nested quantum regions."""
+    return (
+        [region for region in op.regions if region.quantum_tape is not None]
+        if isinstance(op, HybridOp) else []
     )
 
 
@@ -869,7 +897,10 @@ def trace_quantum_function(
 
             # Verify the program against the device capabilities
             for tape in tapes:
-                verify_program(device.capabilities, ProgramRepresentation(trace, tape))
+                verify_inverses(device, tape)
+                verify_control(device, tape)
+                if TRACING_GRADIENTS:
+                    verify_differentiability(device, tape)
 
         # (2) - Quantum tracing
         transformed_results = []

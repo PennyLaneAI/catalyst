@@ -40,7 +40,7 @@ from catalyst.jax_primitives import (
     for_p,
     cond_p,
 )
-from catalyst.jax_tracer import Function
+from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.qjit_device import AnyQJITDevice
@@ -698,7 +698,8 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     """Gets the jaxpr of a differentiable function. Perform the required additional checks and
     return the output tree."""
     method = grad_params.method
-    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    with mark_gradient_tracing():
+        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
     _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
@@ -724,10 +725,6 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
             )
 
     _verify_differentiable_child_qnodes(jaxpr, method)
-
-    if isinstance(f, QNode) and f.diff_method == "adjoint":
-        _verify_op_differentiability_on_device(jaxpr, f.qjit_device)
-
     return jaxpr, out_tree
 
 
@@ -796,13 +793,6 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         raise DifferentiableCompileError(
             "The adjoint method can only be used for QNodes which return qml.expval."
         )
-
-
-def _is_differentiable_on_device(op_name, device) -> bool:
-    """Checks if the operation `op_name` is differentiable on the `device`"""
-    if op_name not in device.capabilities.native_ops:
-        return False
-    return device.capabilities.native_ops[op_name].differentiable
 
 
 def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: AnyQJITDevice) -> None:

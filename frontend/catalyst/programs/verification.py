@@ -15,34 +15,26 @@
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional, Callable
 
 from pennylane.tape import QuantumTape
+from pennylane.operation import Operation
 
 from catalyst.jax_extras import DynamicJaxprTrace
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import DeviceCapabilities
+from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.exceptions import DifferentiableCompileError
 
 
-@dataclass
-class ProgramRepresentation:
-    """Hybrid quantum program representation used in Catalyst"""
-
-    jax_trace: DynamicJaxprTrace
-    quantum_tape: QuantumTape
-
-
-def verify_program(config: DeviceCapabilities, program: ProgramRepresentation):
+def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
     """
-    verify_inverses(config, program)
-    verify_control(config, program)
-    verify_differentiability(config, program)
+    pass
 
-
-def verify_inverses(config: DeviceCapabilities, program: ProgramRepresentation) -> None:
+def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: CompileError
@@ -50,17 +42,41 @@ def verify_inverses(config: DeviceCapabilities, program: ProgramRepresentation) 
     pass
 
 
-def verify_control(config: DeviceCapabilities, program: ProgramRepresentation) -> None:
+def _is_differentiable_on_device(op_name:str, device: "AnyQJITDevice") -> bool:
+    """Checks if the operation `op_name` is differentiable on the `device`"""
+    if op_name not in device.capabilities.native_ops:
+        return False
+    return device.capabilities.native_ops[op_name].differentiable
+
+
+def _verify_differentiability(
+    device: "AnyQJITDevice",
+    tape: QuantumTape,
+    ctx: Optional[EvaluationContext] = None,
+) -> None:
+    """Verify differentiability recursively. """
+
+    # FIXME: re-organize the code in a way that would remove the circular dependency
+    from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
+
+    ctx = ctx if ctx is not None else EvaluationContext.get_main_tracing_context()
+    ops2 = []
+    for op in tape.operations:
+        if has_nested_tapes(op):
+            for region in nested_quantum_regions(op):
+                with EvaluationContext.frame_tracing_context(ctx, region.trace) as nested_ctx:
+                    _verify_differentiability(
+                        device, region.quantum_tape, nested_ctx
+                    )
+
+        if not _is_differentiable_on_device(op.name, device):
+            raise DifferentiableCompileError(f'{op.name} is non-differentiable')
+
+
+def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     """Verify quantum program against the device capabilities.
 
-    Raises: CompileError
+    Raises: DifferentiableCompileError
     """
-    pass
+    _verify_differentiability(device, tape)
 
-
-def verify_differentiability(config: DeviceCapabilities, program: ProgramRepresentation) -> None:
-    """Verify quantum program against the device capabilities.
-
-    Raises: CompileError
-    """
-    pass
