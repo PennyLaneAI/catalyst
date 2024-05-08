@@ -310,7 +310,7 @@ jobs:
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DENABLE_LAPACK=OFF \
-              -DLIGHTNING_GIT_TAG=5feb4a10c9cd15fa590c513fc7c6a10a0b334269 \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
@@ -318,7 +318,7 @@ jobs:
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -327,6 +327,7 @@ jobs:
           CXX_COMPILER=$(which g++) \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
     # Build Quantum and Gradient Dialects

@@ -14,7 +14,7 @@
 
 """Catalyst's debug module contains functions useful for user program debugging."""
 
-from catalyst.api_extensions.callbacks import debug_callback as callback
+from catalyst.debug.callback import callback
 from catalyst.debug.compiler_functions import (
     compile_from_mlir,
     get_cmain,

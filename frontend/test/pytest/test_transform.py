@@ -432,7 +432,7 @@ class TestQFuncTransforms:
         # TODO: Test by inspecting the circuit actually produced, testing the
         #       results does not verify the transform was applied correctly.
 
-        @qml.qfunc_transform
+        @qml.transform
         def unroll_ccrz(tape):
             """Needed for lightning.qubit, as it does not natively support expansion of
             multi-controlled RZ."""
