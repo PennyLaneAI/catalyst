@@ -89,7 +89,7 @@ and those that happen at **runtime** (step 3).
 
     As a general rule of thumb, things that happen at compile-time
     are slow (or lead to slowdowns), while things that happen at
-    runtime are fast (or lead to speadups).
+    runtime are fast (or lead to speedups).
 
     However, if the same computation is repeated every time the
     compiled function is run (where the results are the same no
@@ -206,10 +206,10 @@ If we wish to print the value of variables at *runtime*, we can instead use the
 >>> from catalyst import debug
 >>> @qjit
 ... def g(x):
-...     debug.print(x)
+...     debug.print("Value of x = {x}", x=x)
 ...     return x ** 2
 >>> g(2.)
-[2.]
+Value of x = 2.0
 array(4.)
 
 Avoiding recompilation
@@ -223,20 +223,20 @@ For example, consider the following:
 
 >>> @qjit
 ... def f(x, y):
-...     print("Tracing occuring")
+...     print("Tracing occurring")
 ...     return x ** 2 + y
 >>> f(0.4, 1)
-Tracing occuring
+Tracing occurring
 array(1.16)
 >>> f(0.2, 3)
 array(3.04)
 
 However, if we change the argument types in a way where Catalyst can't perform
-auto-type promotion before passing the argument to the comppiled function
+auto-type promotion before passing the argument to the compiled function
 (e.g., passing a float instead of an integer), recompilation will occur:
 
 >>> f(0.15, 0.65)
-Tracing occuring
+Tracing occurring
 array(0.6725)
 
 However, changing a float to an integer will not cause recompilation:
@@ -247,12 +247,12 @@ array(8.65)
 Similarly, changing the shape of an array will also trigger recompilation:
 
 >>> f(jnp.array([0.2]), jnp.array([0.6]))
-Tracing occuring
+Tracing occurring
 array([0.64])
 >>> f(jnp.array([0.8]), jnp.array([1.6]))
 array([2.24])
 >>> f(jnp.array([0.8, 0.1]), jnp.array([1.6, -2.0]))
-Tracing occuring
+Tracing occurring
 array([ 2.24, -1.99])
 
 This is something to be aware of, especially when porting existing PennyLane
@@ -416,7 +416,7 @@ Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
 
 Let's switch over to `Lightning <https://docs.pennylane.ai/projects/lightning>`__,
-our high-performance statevector simulator,
+our high-performance state-vector simulator,
 alongside the adjoint differentiation method. To do so, we change the first
 two lines of the above code-block to set the device as ``"lightning.qubit"``,
 and specify ``diff_method="adjoint"`` in the QNode decorator. With this
@@ -471,7 +471,7 @@ now takes 16.4s ± 1.51s.
 
 However, while the quantum function is now compiled, and the compiled function
 is called to compute cost and gradient values, the optimization loop is still
-occuring in Python.
+occurring in Python.
 
 Instead, we can write the optimization loop itself as a function and decorate
 it with ``@qjit``; this will compile the optimization loop, and allow the full
@@ -511,6 +511,7 @@ that doesn't work with Catalyst includes:
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
 - ``jax.debug``
+- ``jax.scipy.linalg.expm``
 - ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
   indices.
 
@@ -544,6 +545,44 @@ This includes:
 
 For more details, please see the `JAX documentation
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
+
+Callbacks
+---------
+
+When coming across functionality that is not yet supported by Catalyst, such as functions like
+``jax.scipy.linalg.expm``, Python callbacks can be used to call arbitrary Python code within
+a qjit-compiled function, as long as the return shape and type is known:
+
+.. code-block:: python
+
+    @qjit
+    def fn(x):
+
+        A = jnp.sin(x) * jnp.array([0.23, 0.2], [0.43, -0.54.])
+
+        @catalyst.pure_callback
+        @jax.jit # since the callback function is pure JAX, we can jit it
+        def callback_fn(A) -> jax.ShapeDtypeStruct(A.shape, A.dtype):
+            # here we call non-Catalyst compatible code
+            return jax.scipy.linalg.expm(A)
+
+        return jnp.cos(callback_fn(A))
+
+>>> fn(0.654)
+array([[0.39385058, 0.99369752],
+       [0.97097762, 0.74283208]])
+
+Catalyst provides two callback functions:
+
+- :func:`~.pure_callback` supports callbacks of **pure** functions. That is, functions with no
+  side-effects that accept parameters and return values. However, the return type and shape of the
+  function must be known in advance, and is provided as a type signature.
+
+- :func:`~.debug.callback` supports callbacks of functions with **no** return values. This makes it
+  an easy entry point for debugging, for example via printing or logging at runtime.
+
+Note that callbacks do not currently support differentiation, and cannot be used inside
+functions that :func:`~.grad` is applied to.
 
 JAX integration
 ---------------
@@ -695,7 +734,7 @@ when working with classical control in Catalyst.
   array(6.)
 
 - There may be some cases where automatic type promotion cannot be applied; for example,
-  ommitting a return value in one branch (e.g., which by default in Python is equivalent
+  omitting a return value in one branch (e.g., which by default in Python is equivalent
   to returning ``None``) but not in others. This will result in an error ---
   if other branches do return values, the else branch must be specified.
 
@@ -888,7 +927,7 @@ the decomposition as follows:
 
 .. code-block:: python
 
-    from catalyst.autograph import autograph
+    from catalyst import run_autograph
 
     class RXX(qml.operation.Operation):
         num_params = 1
@@ -897,7 +936,7 @@ the decomposition as follows:
         def compute_decomposition(self, *params, wires=None):
             theta = params[0]
 
-            @autograph
+            @run_autograph
             def f(params):
                 if params[0] == 0.3:
                     qml.PauliRot(theta, 'XX', wires=wires)
@@ -945,7 +984,7 @@ are registered as Pytrees with compatible data types.
 >>> f(obj)
 TypeError: Unsupported argument type: <class '__main__.MyObject'>
 
-By registring it as a Pytree (that is, specifying to JAX the dynamic and
+By registering it as a Pytree (that is, specifying to JAX the dynamic and
 static compile-time information, we make this object compatible with
 Catalyst:
 
