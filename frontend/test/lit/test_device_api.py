@@ -16,7 +16,6 @@
 
 """Test for the device API.
 """
-import pathlib
 import platform
 
 import pennylane as qml
@@ -31,9 +30,7 @@ from catalyst.compiler import get_lib_path
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, wires, shots=1024):
         super().__init__(wires=wires, shots=shots)

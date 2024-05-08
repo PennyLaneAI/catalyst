@@ -17,6 +17,7 @@ Functions to interface with the filesystem.
 
 import pathlib
 import shutil
+import sys
 import tempfile
 
 
@@ -66,7 +67,10 @@ class TemporaryDirectorySilent(tempfile.TemporaryDirectory):
     def _cleanup(cls, name, warn_message, **kwargs):  # pylint: disable=arguments-differ
         """Ignore ResourceWarning during cleanup."""
         del warn_message
-
+        minor_version = sys.version_info[1]
+        if kwargs.get("delete") and minor_version >= 12:
+            # Changed in version 3.12: Removed the "delete" kwargs
+            del kwargs["delete"]  # pragma: nocover
         # pylint: disable-next=protected-access
         tempfile.TemporaryDirectory._rmtree(name, **kwargs)
 
