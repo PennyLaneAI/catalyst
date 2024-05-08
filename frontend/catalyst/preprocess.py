@@ -31,7 +31,7 @@ from pennylane.tape.tape import (
 import catalyst
 from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
-from catalyst.jax_tracer import has_nested_tapes, HybridOpRegion
+from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
@@ -114,7 +114,7 @@ def decompose(
                 stopping_condition,
                 decomposer=decomposer,
                 max_expansion=max_expansion,
-                name="catalyst on this device",
+                name = "catalyst on this device",
                 error=CompileError,
             )
         )
