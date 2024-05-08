@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
-functions. The purpose is to convert imperative style code to functional or graph-style code."""
+"""
+This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
+functions. The purpose is to convert imperative style code to functional or graph-style code.
+"""
 
 import functools
 import warnings
@@ -516,7 +518,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
 
     # TODO: eliminate the need for patching by improving the autograph interface
     with Patcher(
-        (ag_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
+        (ag_api, "_TRANSPILER", catalyst.autograph.transformer.TRANSFORMER),
         (ag_config, "CONVERSION_RULES", module_allowlist),
         (ag_py_builtins, "BUILTIN_FUNCTIONS_MAP", py_builtins_map),
     ):

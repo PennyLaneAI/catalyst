@@ -56,11 +56,16 @@
 
 <h3>Internal changes</h3>
 
+* The `ag_autograph.py` and `autograph.py` modules have been refactored into the sub-package
+  `catalyst.autograph`.
+  [(#722)](https://github.com/PennyLaneAI/catalyst/pull/722)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
-Raul Torres
+David Ittah,
+Raul Torres.
 
 # Release 0.6.0
 
