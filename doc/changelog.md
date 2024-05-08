@@ -48,6 +48,25 @@
 
   ```
 
+* Support for usage of single index JAX array assignments 
+  inside Autograph annotated functions.
+  [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
+  
+  Using `x[i] = y` in favor of `x = x.at(i).set(y)` is now possible:
+
+  ```py
+  @qjit(autograph=True)
+  def f(x):
+    first_dim = x.shape[0]
+    result = jnp.empty((first_dim,), dtype=x.dtype)
+
+    for i in range(first_dim):
+      result[i] = x[i] * 2
+
+    return result
+
+  ```
+
 <h3>Improvements</h3>
 
 <h3>Breaking changes</h3>
