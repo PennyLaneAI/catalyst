@@ -56,6 +56,10 @@
 
 <h3>Internal changes</h3>
 
+* The `qjit_device.py` and `preprocessing.py` modules have been refactored into the sub-package
+  `catalyst.device`.
+  [(#721)](https://github.com/PennyLaneAI/catalyst/pull/721)
+
 * The `ag_autograph.py` and `autograph.py` modules have been refactored into the sub-package
   `catalyst.autograph`.
   [(#722)](https://github.com/PennyLaneAI/catalyst/pull/722)
@@ -73,7 +77,7 @@ Raul Torres.
 
 * Catalyst now supports externally hosted callbacks with parameters and return values
   within qjit-compiled code. This provides the ability to insert native Python code
-  into any qjit-compiled function, allowing for the capability to include subroutines 
+  into any qjit-compiled function, allowing for the capability to include subroutines
   that do not yet support qjit-compilation and enhancing the debugging experience.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
@@ -128,7 +132,7 @@ Raul Torres.
     Value of y = 0.998710143975583
     array(0.99742195)
     ```
-  
+
   Note that callbacks do not currently support differentiation, and cannot be used inside
   functions that `catalyst.grad` is applied to.
 
@@ -197,7 +201,7 @@ Raul Torres.
   [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
   [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
   [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
-  [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms  
+  [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
   ```
 
   The results will be appended to the provided file if the `filename` attribute is set, and printed
