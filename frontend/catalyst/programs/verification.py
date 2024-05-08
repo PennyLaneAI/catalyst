@@ -56,7 +56,8 @@ def _verify_differentiability(
 ) -> None:
     """Verify differentiability recursively. """
 
-    # FIXME: re-organize the code in a way that would remove the circular dependency
+    # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
+    # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
     from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
 
     ctx = ctx if ctx is not None else EvaluationContext.get_main_tracing_context()
