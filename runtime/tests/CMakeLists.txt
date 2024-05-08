@@ -28,8 +28,6 @@ if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
     add_executable(runner_tests_lightning runner_main.cpp)
     target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
 
-    add_subdirectory(third_party)
-
     # Skip dynamic device loading test when sanitizers are enabled or when building on mac,
     # due to the fact that our current support is not fully compatible on macOS.
     # RTLD_DEEPBIND incompatibility.
@@ -44,7 +42,6 @@ if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
         # runtime (see https://github.com/google/sanitizers/issues/611 for
         # details). If you want to run this-file-does-not-exist.so library under
         # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
-        add_dependencies(runner_tests_lightning dummy_device)
         set(dl_manager_tests 
             Test_DLManager.cpp
             )

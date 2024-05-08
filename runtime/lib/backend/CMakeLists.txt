@@ -1,3 +1,5 @@
+add_subdirectory(dummy)
+configure_file(dummy/dummy_device.toml dummy_device.toml)
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
 add_subdirectory(lightning)
 endif()
