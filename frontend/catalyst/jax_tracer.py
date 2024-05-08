@@ -614,11 +614,14 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                shape = (shots, nqubits) if using_compbasis else (shots,)
-                result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
-                if using_compbasis:
-                    result = jnp.astype(result, jnp.int64)
-                out_classical_tracers.append(result)
+                if o.mv is not None:  # qml.sample(m, wires=i)
+                    out_classical_tracers.append(o.mv)
+                else:
+                    shape = (shots, nqubits) if using_compbasis else (shots,)
+                    result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                    if using_compbasis:
+                        result = jnp.astype(result, jnp.int64)
+                    out_classical_tracers.append(result)
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":

@@ -177,6 +177,39 @@ class TestMidCircuitMeasurement:
 
         assert circuit()  # measures are different
 
+    def test_return_mcm_with_sample_single(self, backend):
+        """Test that a measurement result can be returned with qml.sample and shots."""
+
+        dev = qml.device(backend, wires=1, shots=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m, wires=0)
+
+        assert circuit(0.0) == 0
+        assert circuit(jnp.pi) == 1
+
+    @pytest.mark.xfail(reason="not yet implemented, coming in one-shot support")
+    def test_return_mcm_with_sample_multiple(self, backend):
+        """Test that a measurement result can be returned with qml.sample and shots."""
+
+        dev = qml.device(backend, wires=1, shots=10)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m, wires=0)
+
+        assert circuit(0.0) == [0] * 10
+        assert circuit(jnp.pi) == [1] * 10
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
