@@ -29,7 +29,6 @@ from pennylane.tape.tape import (
 )
 
 import catalyst
-import catalyst.pennylane_extensions
 from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
 from catalyst.jax_tracer import has_nested_tapes, HybridOpRegion
@@ -37,12 +36,15 @@ from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
 
+# identical to PL version except for error type, can be removed and imported from PL as soon as PR#5669 is merged
 def _operator_decomposition_gen(
     op: qml.operation.Operator,
     acceptance_function,
     decomposer,
     max_expansion=None,
     current_depth=0,
+    name: str = "device",
+    error: Exception = RuntimeError,
 ):
     """A generator that yields the next operation that is accepted."""
     max_depth_reached = False
@@ -55,8 +57,8 @@ def _operator_decomposition_gen(
             decomp = decomposer(op)
             current_depth += 1
         except qml.operation.DecompositionUndefinedError as e:  # pragma: no cover
-            raise CompileError(
-                f"Operator {op} not supported on device and does not provide a decomposition."
+            raise error(
+                f"Operator {op} not supported with {name} and does not provide a decomposition."
             ) from e
 
         for sub_op in decomp:
@@ -66,6 +68,8 @@ def _operator_decomposition_gen(
                 decomposer=decomposer,
                 max_expansion=max_expansion,
                 current_depth=current_depth,
+                name=name,
+                error=error,
             )
 
 
@@ -110,6 +114,8 @@ def decompose(
                 stopping_condition,
                 decomposer=decomposer,
                 max_expansion=max_expansion,
+                name="catalyst on this device",
+                error=CompileError,
             )
         )
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
