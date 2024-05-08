@@ -19,7 +19,6 @@ from functools import partial
 
 import numpy as np
 import pennylane as qml
-
 import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
@@ -30,21 +29,15 @@ from catalyst import CompileError, ctrl
 from catalyst.compiler import get_lib_path
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.preprocess import (
-    catalyst_acceptance,
+    catalyst_acceptance, 
     decompose,
-    decompose_ops_to_unitary,
-    measurements_from_counts,
+    decompose_ops_to_unitary, 
+    measurements_from_counts, 
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.api_extensions.control_flow import (
-    Cond,
-    ForLoop,
-    WhileLoop,
-    cond,
-    for_loop,
-    while_loop,
-)
+from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop, cond, for_loop, while_loop
 from catalyst.api_extensions.quantum_operators import Adjoint, adjoint
+
 
 
 class DummyDevice(Device):
@@ -76,19 +69,17 @@ class DummyDevice(Device):
         transform_program.add_transform(split_non_commuting)
         return transform_program, execution_config
 
-
 class OtherHadamard(qml.Hadamard):
-    """A version of the Hadamard operator that won't be recognized by the QJit device, and will
+    """A version of the Hadamard operator that won't be recognized by the QJit device, and will 
     need to be decomposed"""
 
     @property
     def name(self):
         """name"""
         return "UnknownOp"
-
 
 class OtherIsingXX(qml.IsingXX):
-    """A version of the IsingXX operator that won't be recognized by the QJit device, and will
+    """A version of the IsingXX operator that won't be recognized by the QJit device, and will 
     need to be decomposed"""
 
     @property
@@ -96,16 +87,15 @@ class OtherIsingXX(qml.IsingXX):
         """name"""
         return "UnknownOp"
 
-
 class OtherRX(qml.RX):
-    """A version of the RX operator that won't be recognized by the QJit device, and will need to
+    """A version of the RX operator that won't be recognized by the QJit device, and will need to 
     be decomposed"""
 
     @property
     def name(self):
         """Name of the operator is UnknownOp"""
         return "UnknownOp"
-
+    
     def decomposition(self):
         """decomposes to normal RX"""
         return [qml.RX(*self.parameters, self.wires)]
@@ -248,7 +238,6 @@ class TestPreprocess:
         assert "expval" not in mlir
         assert "counts" in mlir
 
-
 # tapes and regions for generating HybridOps
 tape1 = qml.tape.QuantumScript([qml.X(0), qml.Hadamard(1)])
 tape2 = qml.tape.QuantumScript([qml.RY(1.23, 1), qml.Y(0), qml.Hadamard(2)])
@@ -271,38 +260,30 @@ cond_region = HybridOpRegion([], None, [], [])
 whileloop_op = WhileLoop([], [], regions=[cond_region, region1])
 
 # catalyst.pennylane_extensions.Cond:
-# Cond([], [], regions=[one Hybrid region per branch of the if-else tree])
+    # Cond([], [], regions=[one Hybrid region per branch of the if-else tree]) 
 cond_op = Cond([], [], regions=[region1, region2])
 
 # each entry contains (initialized_op, op_class, num_regions)
-HYBRID_OPS = [
-    (adj_op, Adjoint, 1),
-    (forloop_op, ForLoop, 1),
-    (whileloop_op, WhileLoop, 2),
-    (cond_op, Cond, 2),
-]
+HYBRID_OPS = [(adj_op, Adjoint, 1), (forloop_op, ForLoop, 1), (whileloop_op, WhileLoop, 2), (cond_op, Cond, 2)]
 
-expected_ops = [
-    "PauliX",
-    "PauliZ",
-    "RX",
-    "RY",
-    "RZ",
-    "CNOT",
-    "Adjoint",
-    "ForLoop",
-    "WhileLoop",
-    "Cond",
-    "QubitUnitary",
-]
-
+expected_ops = ["PauliX", 
+                "PauliZ", 
+                "RX", 
+                "RY",
+                "RZ", 
+                "CNOT",
+                "Adjoint", 
+                "ForLoop", 
+                "WhileLoop", 
+                "Cond", 
+                "QubitUnitary"]
 
 class TestPreprocessHybridOp:
     """Test that the operators on the tapes nested inside HybridOps are also decomposed"""
 
     @pytest.mark.parametrize("op, op_class, num_regions", HYBRID_OPS)
     def test_hybrid_op_decomposition(self, op, op_class, num_regions):
-        """Tests that for a tape containing a HybridOp that contains unsupported
+        """Tests that for a tape containing a HybridOp that contains unsupported 
         Operators, the unsupported Operators are decomposed"""
 
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
@@ -312,7 +293,7 @@ class TestPreprocessHybridOp:
             region.trace = None
 
         # create and decompose the tape
-        tape = qml.tape.QuantumScript([op, qml.X(0), qml.Hadamard(3)])
+        tape = qml.tape.QuantumScript([op, qml.X(0), qml.Hadamard(3)])        
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = decompose(tape, ctx, stopping_condition)
 
@@ -323,25 +304,21 @@ class TestPreprocessHybridOp:
         assert isinstance(old_op, op_class)
         assert isinstance(new_op, op_class)
         assert len(new_op.regions) == len(old_op.regions) == num_regions
-
+        
         # the ops on the original tape were as not modified when decomposing
         assert old_op.visited == False
         assert new_op.visited == True
 
-        # the HybridOp on the original tape is unmodified, i.e. continues to contain ops
+        # the HybridOp on the original tape is unmodified, i.e. continues to contain ops 
         # not in `expected_ops`. The post-decomposition HybridOp tape does not
         for i in range(num_regions):
             if old_op.regions[i].quantum_tape:
-                assert not np.all(
-                    [op.name in expected_ops for op in old_op.regions[i].quantum_tape.operations]
-                )
-                assert np.all(
-                    [op.name in expected_ops for op in new_op.regions[i].quantum_tape.operations]
-                )
+                assert not np.all([op.name in expected_ops for op in old_op.regions[i].quantum_tape.operations])
+                assert np.all([op.name in expected_ops for op in new_op.regions[i].quantum_tape.operations])
 
     @pytest.mark.parametrize("x, y", [(1.23, -0.4), (0.7, 0.25), (-1.51, 0.6)])
     def test_decomposition_of_adjoint_circuit(self, x, y):
-        """Test that unsupported operators nested in Adjoint are decompsed
+        """Test that unsupported operators nested in Adjoint are decompsed 
         and the resulting circuit has the expected result, obtained analytically"""
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -363,7 +340,7 @@ class TestPreprocessHybridOp:
         assert np.isclose(circuit(x, y), np.cos(-x) * np.cos(y))
 
     def test_decomposition_of_cond_circuit(self):
-        """Test that unsupported operators nested in Cond are decompsed, and the
+        """Test that unsupported operators nested in Cond are decompsed, and the 
         resulting circuit has the expected result, obtained analytically"""
 
         dev = qml.device("lightning.qubit", wires=[0, 1])
@@ -377,11 +354,11 @@ class TestPreprocessHybridOp:
             # define a conditional ansatz
             @cond(phi > 1.4)
             def ansatz():
-                OtherIsingXX(phi, wires=(0, 1))
+                OtherIsingXX(phi, wires=(0,1))
 
             @ansatz.otherwise
             def ansatz():
-                OtherIsingXX(2 * phi, wires=(0, 1))
+                OtherIsingXX(2*phi, wires=(0,1))
 
             # apply the conditional ansatz
             ansatz()
@@ -398,21 +375,21 @@ class TestPreprocessHybridOp:
 
         # results are correct for cond is True (IsingXX angle is phi)
         phi = 1.6
-        x1 = np.cos(phi / 2) / np.sqrt(2)
-        x2 = -1j * np.sin(phi / 2) / np.sqrt(2)
+        x1 = np.cos(phi/2)/np.sqrt(2)
+        x2 = -1j * np.sin(phi/2) / np.sqrt(2)
         expected_res = np.array([x1, x2, x1, x2])
         assert np.allclose(expected_res, circuit(phi))
-
+        
         # results are correct for cond is False (IsingXX angle is 2*phi)
         phi = 1.2
-        x1 = np.cos(phi) / np.sqrt(2)
+        x1 = np.cos(phi)/np.sqrt(2)
         x2 = -1j * np.sin(phi) / np.sqrt(2)
         expected_res = np.array([x1, x2, x1, x2])
         assert np.allclose(expected_res, circuit(phi))
 
     @pytest.mark.parametrize("reps, angle", [(3, 1.72), (5, 1.6), (10, 0.4)])
     def test_decomposition_of_forloop_circuit(self, reps, angle):
-        """Test that unsupported operators nested in ForLoop are decompsed, and
+        """Test that unsupported operators nested in ForLoop are decompsed, and 
         the resulting circuit has the expected result, obtained analytically"""
 
         dev = qml.device("lightning.qubit", wires=2)
@@ -424,9 +401,9 @@ class TestPreprocessHybridOp:
             OtherHadamard(wires=0)
 
             def loop_rx(i, phi):
-                OtherIsingXX(phi, wires=(0, 1))
+                OtherIsingXX(phi, wires=(0,1))
                 # update the value of phi for the next iteration
-                return phi / 2
+                return phi/2
 
             # apply the for loop
             for_loop(0, n, 1)(loop_rx)(x)
@@ -435,18 +412,18 @@ class TestPreprocessHybridOp:
 
         def expected_res(n, x):
             """Analytic result for a loop with n reps and initial angle x"""
-            phi = x * sum(1 / 2**i for i in range(0, n))
-
-            x1 = np.cos(phi / 2) / np.sqrt(2)
-            x2 = -1j * np.sin(phi / 2) / np.sqrt(2)
-
+            phi = x * sum(1/2**i for i in range(0, n))
+            
+            x1 = np.cos(phi/2)/np.sqrt(2)
+            x2 = -1j * np.sin(phi/2) / np.sqrt(2)
+            
             return np.array([x1, x2, x1, x2])
 
         assert np.allclose(circuit(reps, angle), expected_res(reps, angle))
-
+    
     @pytest.mark.parametrize("phi", [1.1, 1.6, 2.1])
     def test_decomposition_of_whileloop_circuit(self, phi):
-        """Test that unsupported operators nested in WhileLoop are decompsed, and
+        """Test that unsupported operators nested in WhileLoop are decompsed, and 
         the resulting circuit has the expected result, obtained analytically"""
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -459,7 +436,7 @@ class TestPreprocessHybridOp:
             def loop_rx(x):
                 # perform some work and update (some of) the arguments
                 OtherRX(x, wires=0)
-                return x**2
+                return x ** 2
 
             # apply the while loop
             final_x = loop_rx(x)
@@ -471,10 +448,10 @@ class TestPreprocessHybridOp:
         total_angle = 0
         while phi < 2:
             total_angle += phi
-            phi = phi**2
+            phi = phi ** 2
 
         expected_res = -np.sin(total_angle)
-
+        
         assert np.isclose(res, expected_res)
         assert final_phi > 2.0
 
@@ -484,26 +461,20 @@ class TestPreprocessHybridOp:
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
 
         adjoint_op = Adjoint([], [], [region1])
-        adj_tape = qml.tape.QuantumScript(
-            [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]
-        )  # Hadamard will decompose
+        adj_tape = qml.tape.QuantumScript([qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)])  # Hadamard will decompose
         adj_region = HybridOpRegion([], adj_tape, [], [])
 
         conditional_op = Cond([], [], regions=[adj_region, region2])
-        conditional_region = HybridOpRegion(
-            [], qml.tape.QuantumScript([conditional_op, qml.Y(1)]), [], []
-        )  # PauliY will decompose
+        conditional_region = HybridOpRegion([], qml.tape.QuantumScript([conditional_op, qml.Y(1)]), [], [])  # PauliY will decompose
 
         for_loop_op = ForLoop([], [], [conditional_region])
-        tape = qml.tape.QuantumScript(
-            [for_loop_op, qml.X(0), qml.Hadamard(3)]
-        )  # Hadamard will decompose
+        tape = qml.tape.QuantumScript([for_loop_op, qml.X(0), qml.Hadamard(3)])  # Hadamard will decompose
 
         # hack to avoid needing a full trace in unit test
-        adjoint_op.regions[0].trace = None
+        adjoint_op.regions[0].trace = None  
         for region in conditional_op.regions:
             region.trace = None
-        for_loop_op.regions[0].trace = None
+        for_loop_op.regions[0].trace = None 
 
         # do the decomposition and get the new tape
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -513,26 +484,24 @@ class TestPreprocessHybridOp:
         assert "Hadamard" in [op.name for op in tape.operations]
         assert "Hadamard" not in [op.name for op in new_tape.operations]
         assert "RZ" in [op.name for op in new_tape.operations]
-
+        
         # the first element on the top-level tape is a for-loop
-        assert isinstance(new_tape[0], ForLoop)
+        assert isinstance(new_tape[0], ForLoop)  
         # any unsupported ops on its tape have been decomposed (no more PauliY)
         forloop_subtape = new_tape[0].regions[0].quantum_tape
         assert "PauliY" in [op.name for op in forloop_subtape.operations]
         assert "PauliY" not in [op.name for op in forloop_subtape.operations]
         assert "RY" in [op.name for op in forloop_subtape.operations]
-
+        
         # first op on the for-loop tape is a cond op
         assert isinstance(forloop_subtape[0], Cond)
-        cond_subtapes = (
-            forloop_subtape[0].regions[0].quantum_tape,
-            forloop_subtape[0].regions[1].quantum_tape,
-        )
+        cond_subtapes = forloop_subtape[0].regions[0].quantum_tape, forloop_subtape[0].regions[1].quantum_tape
         # unsupported ops in the subtape decomposed (original tapes contained Hadamard)
         for subtape in cond_subtapes:
             assert np.all([op.name in expected_ops for op in subtape.operations])
             assert "Hadamard" not in [op.name for op in subtape.operations]
             assert "RZ" in [op.name for op in subtape.operations]
+
 
         assert isinstance(cond_subtapes[0][1], Adjoint)
         adj_subtape = cond_subtapes[0][1].regions[0].quantum_tape
@@ -556,7 +525,7 @@ class TestPreprocessHybridOp:
         assert np.allclose(new_op.matrix(), tape.operations[0].matrix())
 
     def test_error_for_pennylane_midmeasure_decompose(self):
-        """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
+        """Test that an error is raised in decompose if a PennyLane mid-circuit measurement 
         is encountered"""
 
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
@@ -564,18 +533,16 @@ class TestPreprocessHybridOp:
         with qml.queuing.AnnotatedQueue() as q:
             qml.RX(1.23, wires=0)
             qml.measure(0)
-
+    
         ops, measurements = qml.queuing.process_queue(q)
         tape = qml.tape.QuantumScript(ops, measurements)
 
-        with pytest.raises(
-            CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
-        ):
+        with pytest.raises(CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = decompose(tape, ctx, stopping_condition)
 
     def test_error_for_pennylane_midmeasure_decompose_nested(self):
-        """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
+        """Test that an error is raised in decompose if a PennyLane mid-circuit measurement 
         is encountered"""
 
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
@@ -583,7 +550,7 @@ class TestPreprocessHybridOp:
         with qml.queuing.AnnotatedQueue() as q:
             qml.RX(1.23, wires=0)
             qml.measure(0)
-
+    
         ops, measurements = qml.queuing.process_queue(q)
         subtape = qml.tape.QuantumScript(ops, measurements)
 
@@ -593,14 +560,12 @@ class TestPreprocessHybridOp:
 
         tape = qml.tape.QuantumScript([adjoint_op, qml.Y(1)], [])
 
-        with pytest.raises(
-            CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
-        ):
+        with pytest.raises(CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = decompose(tape, ctx, stopping_condition)
 
     def test_unsupported_op_with_no_decomposition_raises_error(self):
-        """Test that an unsupported operator that doesn't provide a decomposition
+        """Test that an unsupported operator that doesn't provide a decomposition 
         raises a CompileError"""
 
         # operations=[], all ops are unsupported
@@ -608,20 +573,18 @@ class TestPreprocessHybridOp:
 
         tape = qml.tape.QuantumScript([qml.Y(0)])
 
-        with pytest.raises(
-            CompileError,
-            match="not supported with catalyst on this device and does not provide a decomposition",
-        ):
+        with pytest.raises(CompileError, match="not supported with catalyst on this device and does not provide a decomposition"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = decompose(tape, ctx, stopping_condition)
 
     def test_decompose_to_matrix_raises_error(self):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
 
-        # operations=[], all ops are unsupported
+                # operations=[], all ops are unsupported
         stopping_condition = partial(catalyst_acceptance, operations=[])
 
         class NoMatrixMultiControlledX(qml.MultiControlledX):
+            """A version of MulitControlledX with no matrix defined"""
 
             def matrix(self):
                 """raise an error"""
@@ -632,6 +595,7 @@ class TestPreprocessHybridOp:
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
                 _ = decompose(tape, ctx, stopping_condition)
+
 
 
 class TestTransform:
