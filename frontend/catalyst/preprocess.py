@@ -114,7 +114,7 @@ def decompose(
                 stopping_condition,
                 decomposer=decomposer,
                 max_expansion=max_expansion,
-                name = "catalyst on this device",
+                name="catalyst on this device",
                 error=CompileError,
             )
         )
