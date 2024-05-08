@@ -15,12 +15,12 @@
 """
 # pylint: disable=unused-argument
 import pathlib
-import pytest
-
 from functools import partial
+
 import numpy as np
 import pennylane as qml
 
+import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.transforms import split_non_commuting
@@ -28,24 +28,23 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import CompileError, ctrl
 from catalyst.compiler import get_lib_path
+from catalyst.jax_tracer import HybridOpRegion
 from catalyst.preprocess import (
-    decompose_ops_to_unitary,
-    measurements_from_counts,
     catalyst_acceptance,
     decompose,
+    decompose_ops_to_unitary,
+    measurements_from_counts,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.jax_tracer import HybridOpRegion
-from catalyst.pennylane_extensions import (
+from catalyst.api_extensions.control_flow import (
+    Cond,
     ForLoop,
     WhileLoop,
-    Cond,
-    Adjoint,
+    cond,
     for_loop,
     while_loop,
-    cond,
 )
-import catalyst.pennylane_extensions as ex
+from catalyst.api_extensions.quantum_operators import Adjoint, adjoint
 
 
 class DummyDevice(Device):
@@ -351,7 +350,7 @@ class TestPreprocessHybridOp:
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
-            ex.adjoint(OtherRX(x, 0))
+            adjoint(OtherRX(x, 0))
             return qml.expval(qml.PauliZ(0))
 
         mlir = qml.qjit(circuit, target="mlir").mlir
@@ -616,7 +615,9 @@ class TestPreprocessHybridOp:
                 _ = decompose(tape, ctx, stopping_condition)
 
     def test_decompose_to_matrix_raises_error(self):
-        """Test that _decompose_to_matrix raises a CompileError if"""
+        """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
+
+        raise RuntimeError
 
 
 class TestTransform:

@@ -30,9 +30,9 @@ from pennylane.tape.tape import (
 
 import catalyst
 import catalyst.pennylane_extensions
-from catalyst.jax_tracer import has_nested_tapes, HybridOpRegion
 from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
+from catalyst.jax_tracer import has_nested_tapes, HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
