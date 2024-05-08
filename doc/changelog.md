@@ -56,6 +56,10 @@
 
 <h3>Internal changes</h3>
 
+* The `qjit_device.py` and `preprocessing.py` modules have been refactored into the sub-package
+  `catalyst.device`.
+  [(#721)](https://github.com/PennyLaneAI/catalyst/pull/721)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -66,13 +70,68 @@ Raul Torres
 
 <h3>New features</h3>
 
-* Support for callbacks in Catalyst.
+* Catalyst now supports externally hosted callbacks with parameters and return values
+  within qjit-compiled code. This provides the ability to insert native Python code
+  into any qjit-compiled function, allowing for the capability to include subroutines
+  that do not yet support qjit-compilation and enhancing the debugging experience.
   [(#540)](https://github.com/PennyLaneAI/catalyst/pull/540)
   [(#596)](https://github.com/PennyLaneAI/catalyst/pull/596)
   [(#610)](https://github.com/PennyLaneAI/catalyst/pull/610)
   [(#650)](https://github.com/PennyLaneAI/catalyst/pull/650)
   [(#649)](https://github.com/PennyLaneAI/catalyst/pull/649)
   [(#661)](https://github.com/PennyLaneAI/catalyst/pull/661)
+  [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
+  [(#689)](https://github.com/PennyLaneAI/catalyst/pull/689)
+
+  The following two callback functions are available:
+
+  - `catalyst.pure_callback` supports callbacks of **pure** functions. That is, functions
+    with no [side-effects](https://runestone.academy/ns/books/published/fopp/Functions/SideEffects.html) that accept parameters and return values. However, the return
+    type and shape of the function must be known in advance, and is provided as a type signature.
+
+    ```python
+    @pure_callback
+    def callback_fn(x) -> float:
+        # here we call non-JAX compatible code, such
+        # as standard NumPy
+        return np.sin(x)
+
+    @qjit
+    def fn(x):
+        return jnp.cos(callback_fn(x ** 2))
+    ```
+    ```pycon
+    >>> fn(0.654)
+    array(0.9151995)
+    ```
+
+  - `catalyst.debug.callback` supports callbacks of functions with **no** return values. This makes it
+    an easy entry point for debugging, for example via printing or logging at runtime.
+
+    ```python
+    @catalyst.debug.callback
+    def callback_fn(y):
+        print("Value of y =", y)
+
+    @qjit
+    def fn(x):
+        y = jnp.sin(x)
+        callback_fn(y)
+        return y ** 2
+    ```
+    ```pycon
+    >>> fn(0.54)
+    Value of y = 0.5141359916531132
+    array(0.26433582)
+    >>> fn(1.52)
+    Value of y = 0.998710143975583
+    array(0.99742195)
+    ```
+
+  Note that callbacks do not currently support differentiation, and cannot be used inside
+  functions that `catalyst.grad` is applied to.
+
+* More flexible runtime printing through support for format strings.
   [(#621)](https://github.com/PennyLaneAI/catalyst/pull/621)
   [(#686)](https://github.com/PennyLaneAI/catalyst/pull/686)
   [(#204)](https://github.com/PennyLaneAI/catalyst/pull/204)
@@ -163,13 +222,16 @@ Raul Torres
   Instrumentation can be enabled from the frontend with the `catalyst.debug.instrumentation`
   context manager:
 
-  ```py
-  @qjit
-  def expensive_function(a, b):
-      return a + b
-
-  with debug.instrumentation("session_name", filename="profiling_results.txt", detailed=True):
-    expensive_function(1, 2)
+  ```pycon
+  >>> @qjit
+  ... def expensive_function(a, b):
+  ...     return a + b
+  >>> with debug.instrumentation("session_name", detailed=False):
+  ...     expensive_function(1, 2)
+  [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
+  [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
+  [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+  [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
   ```
 
   The results will be appended to the provided file if the `filename` attribute is set, and printed
