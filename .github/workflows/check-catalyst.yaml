@@ -46,7 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install make clang libomp-dev
-          python -m pip install cmake scipy ninja
+          python -m pip install cmake scipy ninja pybind11
 
       - name: Build Catalyst-Runtime
         run: |
@@ -220,7 +220,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld
-        python -m pip install cmake ninja
+        python -m pip install cmake ninja pybind11
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -296,7 +296,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld
-        python -m pip install cmake ninja
+        python -m pip install cmake ninja pybind11
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -638,7 +638,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install  libomp-dev lcov libasan5
-          python -m pip install cmake ninja
+          python -m pip install cmake ninja pybind11
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -719,7 +719,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install libomp-dev lcov
-          python -m pip install cmake ninja
+          python -m pip install cmake ninja pybind11
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
