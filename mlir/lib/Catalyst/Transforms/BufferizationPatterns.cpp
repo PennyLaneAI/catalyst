@@ -82,10 +82,10 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     }
 };
 
-struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
+struct BufferizeInactiveCallbackOp : public OpConversionPattern<InactiveCallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(PythonCallOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(InactiveCallbackOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         // Add bufferized arguments
@@ -110,7 +110,7 @@ struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
             bufferArgs.push_back(newBuffer);
         }
 
-        rewriter.create<PythonCallOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(),
+        rewriter.create<InactiveCallbackOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(),
                                       op.getOperands().size());
         size_t startIndex = bufferArgs.size() - op.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
@@ -126,7 +126,7 @@ namespace catalyst {
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
-    patterns.add<BufferizePythonCallOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeInactiveCallbackOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
 }
 

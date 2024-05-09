@@ -36,7 +36,7 @@ void CustomCallOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Read::get());
 }
 
-void PythonCallOp::getEffects(
+void InactiveCallbackOp::getEffects(
     llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
 {
     // Assume all effects

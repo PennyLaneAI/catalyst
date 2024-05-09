@@ -103,7 +103,7 @@ def CustomCallOp: Catalyst_Op<"custom_call",
   }];
 }
 
-def PythonCallOp: Catalyst_Op<"pycallback",
+def InactiveCallbackOp: Catalyst_Op<"inactiveCallbackCall",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let summary = "CustomCall specialized for python callbacks.";
 

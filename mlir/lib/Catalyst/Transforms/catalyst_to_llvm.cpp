@@ -419,10 +419,10 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
-struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
+struct InactiveCallbackOpPattern : public OpConversionPattern<InactiveCallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(PythonCallOp op, PythonCallOpAdaptor adaptor,
+    LogicalResult matchAndRewrite(InactiveCallbackOp op, InactiveCallbackOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         MLIRContext *ctx = op.getContext();
@@ -496,7 +496,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
 
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
-        patterns.add<PythonCallOpPattern>(typeConverter, context);
+        patterns.add<InactiveCallbackOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
