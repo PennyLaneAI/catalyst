@@ -71,7 +71,7 @@ def _verify_differentiability(
                     )
 
         if not _is_differentiable_on_device(op.name, device):
-            raise DifferentiableCompileError(f'{op.name} is non-differentiable')
+            raise DifferentiableCompileError(f'{op.name} is non-differentiable on {device.name}')
 
 
 def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
