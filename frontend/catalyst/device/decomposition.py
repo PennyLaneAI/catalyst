@@ -168,16 +168,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
-    if isinstance(
-        op,
-        (
-            Adjoint,
-            MidCircuitMeasure,
-            ForLoop,
-            WhileLoop,
-            Cond,
-        ),
-    ):
+    if has_nested_tapes(op):
         return op.name in operations and op.visited
 
     return op.name in operations
