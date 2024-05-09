@@ -15,16 +15,15 @@
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Callable
+from typing import Callable, List, Optional
 
-from pennylane.tape import QuantumTape
 from pennylane.operation import Operation
+from pennylane.tape import QuantumTape
 
 from catalyst.jax_extras import DynamicJaxprTrace
-from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import DeviceCapabilities
 from catalyst.tracing.contexts import EvaluationContext
-from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
+from catalyst.utils.toml import DeviceCapabilities
 
 
 def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -34,6 +33,7 @@ def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     """
     pass
 
+
 def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     """Verify quantum program against the device capabilities.
 
@@ -42,7 +42,7 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     pass
 
 
-def _is_differentiable_on_device(op_name:str, device: "AnyQJITDevice") -> bool:
+def _is_differentiable_on_device(op_name: str, device: "AnyQJITDevice") -> bool:
     """Checks if the operation `op_name` is differentiable on the `device`"""
     if op_name not in device.capabilities.native_ops:
         return False
@@ -54,7 +54,7 @@ def _verify_differentiability(
     tape: QuantumTape,
     ctx: Optional[EvaluationContext] = None,
 ) -> None:
-    """Verify differentiability recursively. """
+    """Verify differentiability recursively."""
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
     # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
@@ -66,12 +66,10 @@ def _verify_differentiability(
         if has_nested_tapes(op):
             for region in nested_quantum_regions(op):
                 with EvaluationContext.frame_tracing_context(ctx, region.trace) as nested_ctx:
-                    _verify_differentiability(
-                        device, region.quantum_tape, nested_ctx
-                    )
+                    _verify_differentiability(device, region.quantum_tape, nested_ctx)
 
         if not _is_differentiable_on_device(op.name, device):
-            raise DifferentiableCompileError(f'{op.name} is non-differentiable on {device.name}')
+            raise DifferentiableCompileError(f"{op.name} is non-differentiable on {device.name}")
 
 
 def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -80,4 +78,3 @@ def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None
     Raises: DifferentiableCompileError
     """
     _verify_differentiability(device, tape)
-

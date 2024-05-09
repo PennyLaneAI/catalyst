@@ -80,8 +80,8 @@ from catalyst.jax_primitives import (
 )
 from catalyst.programs.verification import (
     verify_control,
+    verify_differentiability,
     verify_inverses,
-    verify_differentiability
 )
 from catalyst.tracing.contexts import (
     EvaluationContext,
@@ -90,14 +90,13 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
-
 # Global flag tracing wether the function that we trace might be used for gradients
 TRACING_GRADIENTS = False
 
 
 @contextmanager
 def mark_gradient_tracing():
-    """Wraps the inner flow with the gradient-tracing flag """
+    """Wraps the inner flow with the gradient-tracing flag"""
     global TRACING_GRADIENTS
     old = TRACING_GRADIENTS
     try:
@@ -352,11 +351,13 @@ def has_nested_tapes(op: Operation) -> bool:
         and any(r.quantum_tape is not None for r in op.regions)
     )
 
+
 def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
     """Returns the list of nested quantum regions."""
     return (
         [region for region in op.regions if region.quantum_tape is not None]
-        if isinstance(op, HybridOp) else []
+        if isinstance(op, HybridOp)
+        else []
     )
 
 

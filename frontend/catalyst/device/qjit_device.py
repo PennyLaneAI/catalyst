@@ -322,4 +322,3 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
 
 AnyQJITDevice = Union[QJITDevice, QJITDeviceNewAPI]
-

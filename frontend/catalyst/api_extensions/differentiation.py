@@ -29,21 +29,21 @@ import catalyst
 from catalyst.jax_extras import Jaxpr, JaxprEqn
 from catalyst.jax_primitives import (
     GradParams,
+    cond_p,
     expval_p,
+    for_p,
     func_p,
     grad_p,
     jvp_p,
     probs_p,
-    vjp_p,
     qinst_p,
+    vjp_p,
     while_p,
-    for_p,
-    cond_p,
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
+from catalyst.qjit_device import AnyQJITDevice
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
-from catalyst.qjit_device import AnyQJITDevice
 
 Differentiable = Union[Function, QNode]
 DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
@@ -801,26 +801,25 @@ def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: AnyQJITDevice) 
     Raises: CompileError
     """
 
-    def _get_inner_jaxprs(e:JaxprEqn) -> List[Jaxpr]:
+    def _get_inner_jaxprs(e: JaxprEqn) -> List[Jaxpr]:
         if e.primitive in [while_p, for_p]:
-            inner_jaxpr = e.params['jaxpr']
+            inner_jaxpr = e.params["jaxpr"]
             return [inner_jaxpr]
         elif e.primitive is cond_p:
-            return e.params['branch_jaxprs']
+            return e.params["branch_jaxprs"]
         elif e.primitive == func_p:
-            inner_jaxpr = e.params['call_jaxpr']
+            inner_jaxpr = e.params["call_jaxpr"]
             return [inner_jaxpr]
         return []
 
-    def _go(jaxpr:Jaxpr, device) -> None:
+    def _go(jaxpr: Jaxpr, device) -> None:
         for e in jaxpr.eqns:
             if e.primitive == qinst_p:
-                op_name = e.params['op']
+                op_name = e.params["op"]
                 if not _is_differentiable_on_device(op_name, device):
-                    raise DifferentiableCompileError(f'{op_name} is non-differentiable')
+                    raise DifferentiableCompileError(f"{op_name} is non-differentiable")
             elif inner_jaxprs := _get_inner_jaxprs(e):
                 for inner_jaxpr in inner_jaxprs:
                     _go(inner_jaxpr, device)
 
     _go(jaxpr, device)
-
