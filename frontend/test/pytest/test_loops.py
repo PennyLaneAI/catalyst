@@ -19,8 +19,7 @@ import pytest
 
 from catalyst import api_extensions, for_loop, measure, qjit, while_loop
 
-# pylint: disable=no-value-for-parameter
-
+# pylint: disable=no-value-for-parameter,unused-argument
 
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
@@ -227,12 +226,12 @@ class TestWhileLoops:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, m):
             @while_loop(lambda i, _: i < n)
-            def outer(i, sum):
+            def outer(i, accum):
                 @while_loop(lambda j: j < m)
                 def inner(j):
                     return j + 1
 
-                return i + 1, sum + inner(0)
+                return i + 1, accum + inner(0)
 
             return outer(0, 0)[1]
 
@@ -404,12 +403,12 @@ class TestClassicalCompilation:
         @qjit
         def mulc(x: int, n: int):
             @while_loop(lambda i, _: i < x)
-            def loop(i, sum):
+            def loop(i, accum):
                 @while_loop(lambda j: j < n)
                 def loop2(j):
                     return j + 1
 
-                return i + 1, sum + loop2(0)
+                return i + 1, accum + loop2(0)
 
             _, x_times_n = loop(0, 0)
             return x_times_n
@@ -699,9 +698,9 @@ class TestForLoopOperatorAccess:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @for_loop(0, 4, 1)
-            def body(i, sum):
+            def body(i, accum):
                 qml.PauliZ(0)
-                return sum + 1
+                return accum + 1
 
             body(0)
             assert isinstance(body.operation, api_extensions.control_flow.ForLoop)
@@ -717,8 +716,8 @@ class TestForLoopOperatorAccess:
         @qjit
         def circuit(x):
             @for_loop(0, 10, 1)
-            def body(i, sum):
-                return sum + x
+            def body(i, accum):
+                return accum + x
 
             x_times_10 = body(0)
             with pytest.raises(
@@ -788,8 +787,8 @@ class TestWhileLoopOperatorAccess:
         @qjit
         def circuit(x):
             @while_loop(lambda i, _: i < 10)
-            def body(i, sum):
-                return i + 1, sum + x
+            def body(i, accum):
+                return i + 1, accum + x
 
             _, x_times_10 = body(0, 0)
             with pytest.raises(

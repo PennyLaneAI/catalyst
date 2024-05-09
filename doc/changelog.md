@@ -94,12 +94,11 @@
 * Small changes to make pylint==3.2.0 succeed.
   [(#739)](https://github.com/PennyLaneAI/catalyst/pull/739)
 
-* The underlying objects for `cond`, `for_loop`, and `while_loop` can now be accessed
-  directly via `body_function.operation`. 
+* The underlying PennyLane `Operation` objects for `cond`, `for_loop`, and `while_loop` can now be accessed directly via `body_function.operation`. 
   [(#711)](https://github.com/PennyLaneAI/catalyst/pull/711)
 
   This can be beneficial when, among other things, 
-  writing transforms without explicitly referring to a new tape:
+  writing transforms without using the queuing mechanism:
   ```py
         @qml.transform
         def my_quantum_transform(tape):
