@@ -6,7 +6,7 @@ Architecture
    <br />
 
 The Catalyst stack leverages state-of-the-art technologies to accelerate hybrid quantum-classical
-workflows without losing the ability to quickly prototype in Python. To do so, Catalyst buils upon
+workflows without losing the ability to quickly prototype in Python. To do so, Catalyst builds upon
 the `MLIR <https://mlir.llvm.org/docs/>`_ and `LLVM <https://llvm.org/>`_ compiler frameworks,
 the `QIR <https://github.com/qir-alliance>`_ project, and the
 `JAX <https://jax.readthedocs.io/en/latest/>`_ framework for composable transforms in machine
@@ -293,7 +293,7 @@ The runtime essentially acts as a bridge between two public interfaces:
   executed on a device are also included in this list. The symbols in the user program are then
   directly linked to the definitions provided by the runtime.
   Below are some examples of functions that might be included in the QIR API, please see the
-  documentation for an `up-to-date list <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_RuntimeCAPI.h.html>`_.
+  documentation for an `up-to-date list <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_RuntimeCAPI.h.html>`__.
 
   .. code-block:: c
 
@@ -317,7 +317,7 @@ The runtime essentially acts as a bridge between two public interfaces:
   active. This interface is a bit higher level than the QIR API by abstracting away certain
   details, as well as reusing common functionality across devices.
   Below are some examples of functions that might be included in this interface, please see the
-  documentation for an `up-to-date list <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html>`_.
+  documentation for an `up-to-date list <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html>`__.
 
   .. code-block:: c++
 

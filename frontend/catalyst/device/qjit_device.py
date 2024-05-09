@@ -11,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains the qjit device classes.
+
 """
+This module contains device stubs for the old and new PennyLane device API, which facilitate
+the application of decomposition and other device pre-processing routines.
+"""
+
 from copy import deepcopy
 from functools import partial
 from typing import Optional, Set, Union
@@ -21,58 +25,60 @@ import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 from pennylane.transforms.core import TransformProgram
 
-from catalyst.preprocess import catalyst_acceptance, decompose
+from catalyst.device.decomposition import (
+    catalyst_acceptance,
+    decompose,
+    measurements_from_counts,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import BackendInfo, device_get_toml_config
+from catalyst.utils.runtime import BackendInfo
 from catalyst.utils.toml import (
     DeviceCapabilities,
     OperationProperties,
-    ProgramFeatures,
-    TOMLDocument,
-    get_device_capabilities,
     intersect_operations,
     pennylane_operation_set,
 )
 
-# fmt:off
+RUNTIME_OPERATIONS = [
+    "CNOT",
+    "ControlledPhaseShift",
+    "CRot",
+    "CRX",
+    "CRY",
+    "CRZ",
+    "CSWAP",
+    "CY",
+    "CZ",
+    "Hadamard",
+    "Identity",
+    "IsingXX",
+    "IsingXY",
+    "IsingYY",
+    "ISWAP",
+    "MultiRZ",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "PhaseShift",
+    "PSWAP",
+    "QubitUnitary",
+    "ControlledQubitUnitary",
+    "Rot",
+    "RX",
+    "RY",
+    "RZ",
+    "S",
+    "SWAP",
+    "T",
+    "Toffoli",
+    "GlobalPhase",
+]
+# The runtime interface does not care about specific gate properties, so set them all to True.
 RUNTIME_OPERATIONS = {
-    'CNOT':         OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'ControlledPhaseShift':
-                  OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CRot':         OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CRX':          OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CRY':          OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CRZ':          OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CSWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CY':           OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'CZ':           OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'Hadamard':     OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'Identity':     OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'IsingXX':      OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'IsingXY':      OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'IsingYY':      OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'ISWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'MultiRZ':      OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'PauliX':       OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'PauliY':       OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'PauliZ':       OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'PhaseShift':   OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'PSWAP':        OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'QubitUnitary': OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'ControlledQubitUnitary':
-                    OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'Rot':          OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'RX':           OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'RY':           OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'RZ':           OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'S':            OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'SWAP':         OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'T':            OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'Toffoli':      OperationProperties(invertible=True, controllable=True, differentiable=True),
-    'GlobalPhase':  OperationProperties(invertible=True, controllable=True, differentiable=True),
+    op: OperationProperties(invertible=True, controllable=True, differentiable=True)
+    for op in RUNTIME_OPERATIONS
 }
-# fmt:on
 
 
 def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
@@ -103,7 +109,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
         qjit_capabilities.native_ops.update(
             {
                 "MidCircuitMeasure": OperationProperties(
-                    invertible=True, controllable=True, differentiable=True
+                    invertible=True, controllable=True, differentiable=False
                 )
             }
         )
@@ -154,7 +160,7 @@ class QJITDevice(qml.QubitDevice):
 
     def __init__(
         self,
-        target_config: TOMLDocument,
+        original_device_capabilities: DeviceCapabilities,
         shots=None,
         wires=None,
         backend: Optional[BackendInfo] = None,
@@ -164,23 +170,18 @@ class QJITDevice(qml.QubitDevice):
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
-        device_name = backend.device_name if backend else "default"
 
-        program_features = ProgramFeatures(shots is not None)
-        target_device_capabilities = get_device_capabilities(
-            target_config, program_features, device_name
-        )
-        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
+        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations using PennyLane's syntax"""
-        return pennylane_operation_set(self.capabilities.native_ops)
+        return pennylane_operation_set(self.qjit_capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.capabilities.native_obs)
+        return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
     def apply(self, operations, **kwargs):
         """
@@ -259,6 +260,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def __init__(
         self,
         original_device,
+        original_device_capabilities: DeviceCapabilities,
         backend: Optional[BackendInfo] = None,
     ):
         self.original_device = original_device
@@ -274,24 +276,18 @@ class QJITDeviceNewAPI(qml.devices.Device):
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
-        device_name = backend.device_name if backend else "default"
 
-        target_config = device_get_toml_config(original_device)
-        program_features = ProgramFeatures(original_device.shots is not None)
-        target_device_capabilities = get_device_capabilities(
-            target_config, program_features, device_name
-        )
-        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
+        self.qjit_capabilities = get_qjit_device_capabilities(original_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return pennylane_operation_set(self.capabilities.native_ops)
+        return pennylane_operation_set(self.qjit_capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return pennylane_operation_set(self.capabilities.native_obs)
+        return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
     @property
     def measurement_processes(self) -> Set[str]:
@@ -311,6 +307,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
+
+        if self.measurement_processes == {"Counts"}:
+            program.add_transform(measurements_from_counts)
 
         # TODO: Add Catalyst program verification and validation
         return program, config

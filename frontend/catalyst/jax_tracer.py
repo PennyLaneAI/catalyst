@@ -733,7 +733,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(qnode_program, device_program, tape, flat_results):
+def apply_transform(qnode_program, device_program, device_modify_measurements, tape, flat_results):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -746,7 +746,7 @@ def apply_transform(qnode_program, device_program, tape, flat_results):
         msg = "Catalyst does not support informative transforms."
         raise CompileError(msg)
 
-    if is_program_transformed:
+    if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         total_program = qnode_program + device_program
         tapes, post_processing = total_program([tape])
@@ -891,8 +891,16 @@ def trace_quantum_function(
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
+            device_modify_measurements = "measurements_from_counts" in [
+                t.transform.__name__ for t in device_program
+            ]
+
             tapes, post_processing = apply_transform(
-                qnode_program, device_program, quantum_tape, return_values_flat
+                qnode_program,
+                device_program,
+                device_modify_measurements,
+                quantum_tape,
+                return_values_flat,
             )
 
             # Verify the program against the device capabilities
@@ -920,7 +928,7 @@ def trace_quantum_function(
                 # If the program is batched, that means that it was transformed.
                 # If it was transformed, that means that the program might have
                 # changed the output. See `split_non_commuting`
-                if qnode_transformed:
+                if qnode_transformed or device_modify_measurements:
                     # TODO: In the future support arbitrary output from the user function.
                     output = tape.measurements
                     _, trees = jax.tree_util.tree_flatten(output, is_leaf=is_leaf)
@@ -936,7 +944,7 @@ def trace_quantum_function(
                 meas_results = tree_unflatten(meas_trees, meas_tracers)
 
                 # TODO: Allow the user to return whatever types they specify.
-                if qnode_transformed:
+                if qnode_transformed or device_modify_measurements:
                     assert isinstance(meas_results, list)
                     if len(meas_results) == 1:
                         transformed_results.append(meas_results[0])

@@ -444,9 +444,9 @@ def qjit(
 
     .. note::
 
-        Currently, ``lightning.qubit`` is the only supported backend device
-        for Catalyst compilation. For a list of supported operations, observables,
-        and measurements, please see the :doc:`/dev/quick_start`.
+        The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
+        ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud``. For a list of supported
+        operations, observables, and measurements, please see the :doc:`/dev/quick_start`.
 
     Args:
         fn (Callable): the quantum or classical function

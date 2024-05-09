@@ -15,7 +15,7 @@ Roadmap
 
 - **Runtime:** We will be adding support for more devices, including quantum
   hardware devices. In addition, we will be building out support for
-  hetereogeneous execution. *If you are interested in working on connecting a
+  heterogeneous execution. *If you are interested in working on connecting a
   backend device with Catalyst, please get in touch.*
 
 To figure out the details, we need your help --- please send us your use cases by starting a

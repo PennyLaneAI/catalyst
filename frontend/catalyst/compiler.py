@@ -33,7 +33,7 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime import get_lib_path
+from catalyst.utils.toml import get_lib_path
 
 package_root = os.path.dirname(__file__)
 
@@ -537,9 +537,9 @@ class Compiler:
             (Optional[str]): output IR
         """
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
-            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
-
-        if not self.last_compiler_output:
-            return None
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no file was found.\n"
+            msg += "Are you sure the file exists?"
+            raise CompileError(msg)
 
         return self.last_compiler_output.get_pipeline_output(pipeline)

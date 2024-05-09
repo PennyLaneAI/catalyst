@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import tempfile
+from copy import deepcopy
 
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
 from catalyst import CompileError, ctrl, measure, qjit
+from catalyst.utils.runtime import pennylane_operation_set
+from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 
 class CustomDevice(qml.QubitDevice):
@@ -32,75 +33,58 @@ class CustomDevice(qml.QubitDevice):
     author = "Tester"
 
     lightning_device = qml.device("lightning.qubit", wires=0)
-    operations = lightning_device.operations.copy() - {
-        "MultiControlledX",
-        "Rot",
-        "S",
-        "C(Rot)",
-        "C(S)",
-    }
-    observables = lightning_device.observables.copy()
 
-    config = None
     backend_name = "default"
     backend_lib = "default"
     backend_kwargs = {}
 
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
-        self.toml_file = None
+        program_features = ProgramFeatures(shots_present=self.shots is not None)
+        lightning_capabilities = get_device_capabilities(self.lightning_device, program_features)
+        custom_capabilities = deepcopy(lightning_capabilities)
+        custom_capabilities.native_ops.pop("Rot")
+        custom_capabilities.native_ops.pop("S")
+        custom_capabilities.to_decomp_ops.pop("MultiControlledX")
+        self.qjit_capabilities = custom_capabilities
 
     def apply(self, operations, **kwargs):
         """Unused"""
         raise RuntimeError("Only C/C++ interface is defined")
 
-    def __enter__(self, *args, **kwargs):
-        lightning_toml = self.lightning_device.config
-        with open(lightning_toml, mode="r", encoding="UTF-8") as f:
-            toml_contents = f.readlines()
+    @property
+    def operations(self):
+        """Get PennyLane operations."""
+        return (
+            pennylane_operation_set(self.qjit_capabilities.native_ops)
+            | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
+            | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
+        )
 
-        # TODO: update once schema 2 is merged
-        updated_toml_contents = []
-        for line in toml_contents:
-            if '"MultiControlledX",' in line:
-                continue
-            if '"Rot",' in line:
-                continue
-            if '"S",' in line:
-                continue
-
-            updated_toml_contents.append(line)
-
-        self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
-        self.toml_file.writelines(updated_toml_contents)
-        self.toml_file.close()  # close for now without deleting
-
-        self.config = self.toml_file.name
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        os.unlink(self.toml_file.name)
-        self.config = None
+    @property
+    def observables(self):
+        """Get PennyLane observables."""
+        return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
 
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
-    with CustomDevice(wires=2) as dev:
+    dev = CustomDevice(wires=2)
 
-        @qjit
-        @qml.qnode(dev)
-        def mid_circuit(x: float):
-            qml.Hadamard(wires=0)
-            qml.Rot(0, 0, x, wires=0)
-            qml.Hadamard(wires=0)
-            m = measure(wires=0)
-            b = m ^ 0x1
-            qml.Hadamard(wires=1)
-            qml.Rot(0, 0, b * jnp.pi, wires=1)
-            qml.Hadamard(wires=1)
-            return measure(wires=1)
+    @qjit
+    @qml.qnode(dev)
+    def mid_circuit(x: float):
+        qml.Hadamard(wires=0)
+        qml.Rot(0, 0, x, wires=0)
+        qml.Hadamard(wires=0)
+        m = measure(wires=0)
+        b = m ^ 0x1
+        qml.Hadamard(wires=1)
+        qml.Rot(0, 0, b * jnp.pi, wires=1)
+        qml.Hadamard(wires=1)
+        return measure(wires=1)
 
-        assert mid_circuit(param) == expected
+    assert mid_circuit(param) == expected
 
 
 class TestControlledDecomposition:
