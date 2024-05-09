@@ -36,13 +36,13 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import Adjoint, adjoint
 from catalyst.compiler import get_lib_path
-from catalyst.jax_tracer import HybridOpRegion
-from catalyst.preprocess import (
+from catalyst.device.decomposition import (
     catalyst_acceptance,
     decompose,
     decompose_ops_to_unitary,
     measurements_from_counts,
 )
+from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 
@@ -635,7 +635,7 @@ class TestPreprocessHybridOp:
 
 
 class TestTransform:
-    """Test the transforms implemented in Catalyst."""
+    """Teented in Catalyst."""
 
     def test_measurements_from_counts(self):
         """Test the transfom measurements_from_counts."""
