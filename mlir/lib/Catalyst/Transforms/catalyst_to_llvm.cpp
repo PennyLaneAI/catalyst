@@ -444,7 +444,7 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
 
         bool isVarArg = true;
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "pyregistry", {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
+            mod, "inactive_callback", {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
@@ -456,10 +456,6 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
         auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
 
         auto resultsSizeAttr = op.getOperands().size() - argcint;
-        bool isDebugCallback = resultsSizeAttr == 0;
-        if (isDebugCallback) {
-            customCallFnOp->setAttr("catalyst.debugCallback", rewriter.getUnitAttr());
-        }
         auto resultsSizeVal =
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
 

@@ -29,15 +29,12 @@ namespace catalyst {
 
 struct AnnotateDebugCallbackAsEnzymeConstPass : impl::AnnotateDebugCallbackAsEnzymeConstPassBase<AnnotateDebugCallbackAsEnzymeConstPass> {
     using AnnotateDebugCallbackAsEnzymeConstPassBase::AnnotateDebugCallbackAsEnzymeConstPassBase;
-
     void runOnOperation() final
     {
-
         auto mod = getOperation();
-        StringRef pyregistryFnName = "pyregistry";
-        auto fnDecl = mod.lookupSymbol<LLVM::LLVMFuncOp>(pyregistryFnName);
+        StringRef inactive_callbackFnName = "inactive_callback";
+        auto fnDecl = mod.lookupSymbol<LLVM::LLVMFuncOp>(inactive_callbackFnName);
         if (!fnDecl) return;
-
         MLIRContext *context = &getContext();
         auto builder = OpBuilder(context);
         builder.setInsertionPointToStart(mod.getBody());
@@ -48,20 +45,15 @@ struct AnnotateDebugCallbackAsEnzymeConstPass : impl::AnnotateDebugCallbackAsEnz
         auto linkage = LLVM::Linkage::External;
         auto key = catalyst::gradient::enzyme_inactivefn_key;
         auto glb = builder.create<LLVM::GlobalOp>(loc, arrTy, isConstant, linkage, key, nullptr);
-
         // Create a block and push it to the global
-        auto *contextGlb = glb.getContext();
         Block *block = new Block();
         glb.getInitializerRegion().push_back(block);
         builder.setInsertionPointToStart(block);
-
         auto undef = builder.create<LLVM::UndefOp>(glb.getLoc(), arrTy);
-        auto fnSym = SymbolRefAttr::get(context, pyregistryFnName);
+        auto fnSym = SymbolRefAttr::get(context, inactive_callbackFnName);
         auto fnPtr = builder.create<LLVM::AddressOfOp>(glb.getLoc(), ptrTy, fnSym);
         auto filledInArray = builder.create<LLVM::InsertValueOp>(glb.getLoc(), undef, fnPtr, 0);
         builder.create<LLVM::ReturnOp>(glb.getLoc(), filledInArray);
-
-
     }
 };
 
@@ -69,5 +61,4 @@ std::unique_ptr<Pass> createAnnotateDebugCallbackAsEnzymeConstPass()
 {
     return std::make_unique<AnnotateDebugCallbackAsEnzymeConstPass>();
 }
-
 } // namespace catalyst
