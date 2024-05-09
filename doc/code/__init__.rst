@@ -20,8 +20,8 @@ Module: catalyst.debug
     :no-inheritance-diagram:
     :fullname:
 
-Module: catalyst.cuda
----------------------
+Module: catalyst.third_party.cuda
+---------------------------------
 
 .. automodapi:: catalyst.third_party.cuda
     :no-heading:
