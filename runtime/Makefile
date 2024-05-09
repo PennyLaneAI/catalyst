@@ -1,8 +1,8 @@
-PYTHON := $(shell which python3)
+PYTHON := $(shell which python)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
-NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
