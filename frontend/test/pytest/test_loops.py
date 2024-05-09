@@ -21,6 +21,7 @@ from catalyst import api_extensions, for_loop, measure, qjit, while_loop
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
+
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
