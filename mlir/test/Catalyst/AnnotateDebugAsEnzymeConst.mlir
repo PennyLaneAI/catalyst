@@ -18,9 +18,12 @@
 // run the compiler with the option
 //
 //   --annotate-debug-callback-as-enzyme-const
+// and that if there are no callbacks present
+// it doesn't change anything
 
 // CHECK-LABEL: @foo
 func.func @foo() {
+  // CHECK-NOT: llvm.mlir.global external @__enzyme_inactivefn
   return
 }
 
@@ -31,9 +34,14 @@ func.func @foo() {
 
 // CHECK-LABEL: @test1
 module @test1 {
-  // CHECK: llvm.call @pyregistry
-  // CHECK-NOT: catalyst.debugCallback
-  llvm.func @pyregistry(i64, i64, i64, ...)  attributes { catalyst.debugCallback }
+
+  // CHECK: llvm.mlir.global external @__enzyme_inactivefn
+  // CHECK: [[undef:%.+]] = llvm.mlir.undef
+  // CHECK: [[ptr:%.+]] = llvm.mlir.addressof @pyregistry
+  // CHECK: [[retval:%.+]] = llvm.insertvalue [[ptr]], [[undef]][0]
+  // CHECK: llvm.return [[retval]]
+
+  llvm.func @pyregistry(i64, i64, i64, ...)
   llvm.func @wrapper() {
     %0 = llvm.mlir.constant(139935726668624 : i64) : i64
     %1 = llvm.mlir.constant(0 : i64) : i64
