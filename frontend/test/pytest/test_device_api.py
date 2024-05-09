@@ -14,6 +14,7 @@
 """Test for the device API.
 """
 import pathlib
+import platform
 
 import pennylane as qml
 import pytest
@@ -24,7 +25,7 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.qjit_device import QJITDeviceNewAPI
+from catalyst.device import QJITDeviceNewAPI
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 
@@ -32,9 +33,7 @@ from catalyst.utils.runtime import device_get_toml_config, extract_backend_info
 class DummyDevice(Device):
     """A dummy device from the device API."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
@@ -45,8 +44,9 @@ class DummyDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
         """
-
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
@@ -62,9 +62,7 @@ class DummyDevice(Device):
 class DummyDeviceNoWires(Device):
     """A dummy device from the device API without wires."""
 
-    config = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(
-        "runtime/tests/third_party/dummy_device.toml"
-    )
+    config = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/backend/dummy_device.toml"
 
     def __init__(self, shots=1024):
         super().__init__(shots=shots)
@@ -75,17 +73,15 @@ class DummyDeviceNoWires(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        return "dummy.remote", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+        return "dummy.remote", lib_path
 
     def execute(self, circuits, execution_config):
         """Execution."""
         return circuits, execution_config
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
     device = DummyDevice(wires=10, shots=2032)
@@ -122,10 +118,6 @@ def test_qjit_device():
     assert len(device_qjit.observables) > 0
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 def test_qjit_device_no_wires():
     """Test the qjit device from a device using the new api without wires set."""
     device = DummyDeviceNoWires(shots=2032)
@@ -140,10 +132,6 @@ def test_qjit_device_no_wires():
         QJITDeviceNewAPI(device, backend_info)
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
     dev = DummyDevice(wires=2, shots=2048)

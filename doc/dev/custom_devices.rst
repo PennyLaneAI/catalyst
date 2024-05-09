@@ -189,7 +189,7 @@ With the old device API, you can simply build a QJIT compatible device:
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "CustomDevice", "absolute/path/to/libdummy_device.so"
+            return "CustomDevice", "absolute/path/to/librtd_dummy.so"
 
     @qjit
     @qml.qnode(CustomDevice(wires=1))
@@ -211,7 +211,7 @@ or with the new device API:
             the location to the shared object with the C/C++ device implementation.
             """
 
-            return "CustomDevice", "absolute/path/to/libdummy_device.so"
+            return "CustomDevice", "absolute/path/to/librtd_dummy.so"
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)

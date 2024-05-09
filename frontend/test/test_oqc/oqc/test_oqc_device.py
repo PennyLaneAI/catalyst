@@ -15,9 +15,8 @@
 """
 # pylint: disable=unused-argument,import-outside-toplevel,unused-import
 
-import pytest
-
 import pennylane as qml
+import pytest
 
 
 class TestOQCDevice:

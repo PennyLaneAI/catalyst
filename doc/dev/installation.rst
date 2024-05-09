@@ -19,7 +19,7 @@ pre-built binaries are being distributed via the Python Package Index (PyPI) for
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
     app.
 
-Pre-built packages for Windows are not yet available, and comptability with other platforms is
+Pre-built packages for Windows are not yet available, and compatibility with other platforms is
 untested and cannot be guaranteed. If you are using one of these platforms, please
 try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
 
@@ -31,7 +31,7 @@ Dev Containers
 
 
 Try out Catalyst in self-contained, ready-to-go environments called
-`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`_:
+`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`__:
 
 .. image:: https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square
   :alt: Try Catalyst in Dev Container
@@ -40,7 +40,7 @@ Try out Catalyst in self-contained, ready-to-go environments called
 
 | You will need an existing installation of `Docker <https://www.docker.com/>`_,
   `VS Code <https://code.visualstudio.com/>`_, and the VS Code
-  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`_
+  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`__
   extension.
 
 If desired, the Docker images can also be used in a standalone fashion:
@@ -48,10 +48,10 @@ If desired, the Docker images can also be used in a standalone fashion:
 | `Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`_
 | `Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`_
 
-The user image provides an officially supported enviroment and automatically installs the latest
-release of Catalyst. The developer image only provides the right enviroment to build Catalyst from
+The user image provides an officially supported environment and automatically installs the latest
+release of Catalyst. The developer image only provides the right environment to build Catalyst from
 source, and requires launching the post-install script at ``.devcontainer/dev/post-install.sh``
-from whithin the root of the running container.
+from within the root of the running container.
 
 .. note::
 
@@ -151,7 +151,7 @@ Runtime
 
 By default, the runtime builds and installs all supported backend devices, enabling the execution of
 quantum circuits on local simulators and remote services, such as Amazon Braket.
-The `PennyLane-Lightning<https://github.com/PennyLaneAI/pennylane-lightning>`_ suite devices require
+The `PennyLane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`__ suite devices require
 C++20 standard library features. Older C++ compilers may not support this, so it is recommended to use a
 modern compiler with these features.
 

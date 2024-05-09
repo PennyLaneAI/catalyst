@@ -1,4 +1,4 @@
-PYTHON := $(shell which python3)
+PYTHON?=$(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")

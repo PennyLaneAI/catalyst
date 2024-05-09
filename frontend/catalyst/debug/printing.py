@@ -19,7 +19,7 @@ from functools import partial
 
 import jax
 
-from catalyst.api_extensions.callbacks import debug_callback
+from catalyst.debug.callback import callback as debug_callback
 from catalyst.jax_primitives import print_p
 from catalyst.tracing.contexts import EvaluationContext
 
@@ -45,23 +45,30 @@ def print(fmt, *args, **kwargs):
         **args: Arguments to be passed to the format string.
         **kwargs: Keyword arguments to be passed to the format string.
 
-    .. seealso:: :func:`~.print_memref`
+    .. seealso:: :func:`~.print_memref`, :func:`~.debug.callback`.
 
     **Example**
 
-    .. code-block:: python
-
-        @qjit
-        def f(a, b, c):
-            debug.print("c={c} b={b} a={a}", a=a, b=b, c=c)
-
+    >>> @qjit
+    ... def f(a, b, c):
+    ...     debug.print("c={c} b={b} a={a}", a=a, b=b, c=c)
     >>> f(1, 2, 3)
     c=3 b=2 a=1
+
+    In addition to passing keyword arguments to the format string, we can also pass arguments
+    positionally:
+
+    >>> @qjit
+    ... def f(x, y):
+    ...     debug.print("Value of x = {0:.2f}", x)
+    >>> f(0.543, 0.23)
+    Value of x = 0.54
 
     .. note::
 
         Using Python f-strings as the ``fmt`` string will not work as expected since they will be
         treated as Python objects.
+
         This means that array values embedded in them will have their compile-time representation
         printed, instead of actual data.
     """

@@ -289,7 +289,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG=5feb4a10c9cd15fa590c513fc7c6a10a0b334269 \
+              -DLIGHTNING_GIT_TAG=latest_release \
               -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
@@ -299,14 +299,14 @@ jobs:
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
 
     - name: Test Catalyst-Runtime
       env:
         VENV_SITE_PACKAGES: ${{ steps.setup_env.outputs.venv_site_packages }}
       run: |
         export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
@@ -316,6 +316,7 @@ jobs:
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
     # Build Quantum and Gradient Dialects
@@ -397,7 +398,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
 
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}

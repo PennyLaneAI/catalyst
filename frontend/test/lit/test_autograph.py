@@ -16,11 +16,11 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit
-from catalyst.autograph import (
+from catalyst import (
     AutoGraphError,
     autograph_source,
     disable_autograph,
+    qjit,
     run_autograph,
 )
 

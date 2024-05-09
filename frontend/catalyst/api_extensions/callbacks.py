@@ -40,52 +40,84 @@ from catalyst.utils.types import convert_pytype_to_shaped_array
 
 ## API ##
 def pure_callback(callback_fn, result_type=None):
-    """Pure callback
+    """Execute and return the results of a functionally pure Python
+    function from within a qjit-compiled function.
 
-    A pure function is a function that:
+    The callback function will be quantum just-in-time compiled alongside the rest of the
+    workflow, however it will be executed at runtime by the Python virtual machine.
+    This is in contrast to functions which get directly qjit-compiled by Catalyst, which will
+    be executed at runtime as machine-native code.
 
-      1. Given the same arguments *args, the results will be the same each time the function is
-         called.
-      2. The function has no side effect.
-      3. Examples of side effects include modifying a non-local variable, printing, etc.
+    .. note::
 
-    A pure callback is a pure python function that can be executed by the python virtual machine.
-    This is in direct contrast to functions which get JIT compiled by Catalyst.
+        Callbacks do not currently support differentiation, and cannot be used inside
+        functions that :func:`.catalyst.grad` is applied to.
 
-    Using `pure_callback` allows a user to run python.
-    `pure_callback`s can be used via a decorator:
+    Args:
+        callback_fn (callable): The pure function to be used as a callback.
+            Any Python-based function is supported, as long as it:
 
-    ```python
-    @pure_callback
-    def add_1(x) -> int:
-        return x + 1
+            * is a pure function
+              (meaning it is deterministic --- for the same function arguments, the same result
+              is always returned --- and has no side effects, such as modifying a non-local
+              variable),
 
-    @qjit
-    def context(x):
-        return add_1(x)
+            * has a signature that can be inspected (that is, it is not a NumPy ufunc or Python
+              builtin),
 
-    # Can also be used outside a JIT compiled context
-    two = add_1(1)
-    ```
+            * the return type and shape is deterministic and known ahead of time.
+        result_type (type): The type returned by the function.
 
-    It can also be used through a more functional syntax:
+    .. seealso:: :func:`.debug.print`, :func:`.debug.callback`.
 
+    **Example**
 
-    ```python
-    def add_1(x):
-        return x + 1
+    ``pure_callback`` can be used as a decorator. In this case, we must specify the result type
+    via a type hint:
 
-    @qjit
-    def context(x):
-        return pure_callback(add_1, int)(x)
-    ```
+    .. code-block:: python
 
-    `pure_callback`s are expected to have a return type which matches
-    the return type of the function being called. This can be specified
-    as type hints in the decorator syntax or as the second parameter in the functional
-    syntax.
+        @catalyst.pure_callback
+        def callback_fn(x) -> float:
+            # here we call non-JAX compatible code, such
+            # as standard NumPy
+            return np.sin(x)
 
-    At the moment, `pure_callback`s should not be used inside gradients.
+        @qjit
+        def fn(x):
+            return jnp.cos(callback_fn(x ** 2))
+
+    >>> fn(0.654)
+    array(0.9151995)
+
+    It can also be used functionally:
+
+    >>> @qjit
+    >>> def add_one(x):
+    ...     return catalyst.pure_callback(lambda x: x + 1, int)(x)
+    >>> add_one(2)
+    array(3)
+
+    For callback functions that return arrays, a ``jax.ShapeDtypeStruct``
+    object can be created to specify the expected return shape and data type:
+
+    .. code-block:: python
+
+        @qjit
+        def fn(x):
+            x = jnp.cos(x)
+
+            result_shape = jax.ShapeDtypeStruct(x.shape, jnp.complex128)
+
+            @catalyst.pure_callback
+            def callback_fn(y) -> result_shape:
+                return jax.jit(jnp.fft.fft)(y)
+
+            x = callback_fn(x)
+            return x
+
+    >>> fn(jnp.array([0.1, 0.2]))
+    array([1.97507074+0.j, 0.01493759+0.j])
     """
 
     if result_type is None:
@@ -101,55 +133,6 @@ def pure_callback(callback_fn, result_type=None):
     @base_callback
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
-
-    return closure
-
-
-def debug_callback(callback_fn):
-    """A function that is useful for printing and logging and allows users to execute a Python
-    function (with no return values) at runtime within their qjitted workflows.
-
-    A debug callback is a python function that can write to stdout or to a file.
-    It is expected to return no values.
-
-    Using `debug.callback` allows a user to run a python function with side effects inside an
-    `@qjit` context. To mark a function as a `debug.callback`, one can use a decorator:
-
-    ```python
-    @debug.callback
-    def my_custom_print(x):
-        print(x)
-
-    @qjit
-    def foo(x):
-       my_custom_print(x)
-
-    # Can also be used outside of a JIT compiled context.
-    my_custom_print(x)
-    ```
-
-    or through a more functional syntax:
-
-    ```python
-    def my_custom_print(x):
-        print(x)
-
-    @qjit
-    def foo(x):
-        debug.callback(my_custom_print)(x)
-    ```
-
-    `debug.callback`s are expected to not return anything.
-    May be useful for custom printing and logging into files.
-
-    At the moment, `debug.callback`s should not be used inside gradients.
-    """
-
-    @base_callback
-    def closure(*args, **kwargs) -> None:
-        retval = callback_fn(*args, **kwargs)
-        if retval is not None:
-            raise ValueError("debug.callback is expected to return None")
 
     return closure
 
