@@ -34,6 +34,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.9'
+
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
@@ -41,7 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
-          python3 -m pip install scipy
+          python -m pip install scipy
 
       - name: Build Catalyst-Runtime
         run: |
@@ -96,6 +101,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -129,9 +139,9 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11
+        sudo apt-get install -y cmake ninja-build clang lld
+        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python -m pip install numpy pybind11
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -225,6 +235,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -295,15 +310,20 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install numpy pybind11
+        sudo apt-get install -y cmake ninja-build ccache clang lld
+        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -397,20 +417,25 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
+        sudo apt-get install -y libomp-dev libasan6 make
+        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
         # It can't be in requirements.txt as that will break
         # macOS requirements.txt
-        python3 -m pip install cuda-quantum==0.6.0
-        python3 -m pip install oqc-qcaas-client
+        python -m pip install cuda-quantum==0.6.0
+        python -m pip install oqc-qcaas-client
         make frontend
 
     - name: Get Cached LLVM Build
@@ -472,6 +497,11 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
+    
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
 
     - name: Install lightning.kokkos used in Python tests
       run: |
@@ -480,9 +510,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
+        sudo apt-get install -y libomp-dev libasan6 make
+        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python -m pip install -r requirements.txt
         make frontend
 
     - name: Get Cached LLVM Build
@@ -524,15 +554,20 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip libomp-dev libasan6 make
-        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
+        sudo apt-get install -y libomp-dev libasan6 make
+        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        python -m pip install -r requirements.txt
         make frontend
 
     - name: Get Cached LLVM Build
@@ -583,6 +618,11 @@ jobs:
     steps:
     #   - name: Collect Workflow Telemetry
     #     uses: catchpoint/workflow-telemetry-action@v2
+    
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.9'
 
       - name: Checkout the repo
         uses: actions/checkout@v4
