@@ -99,6 +99,9 @@ def _decompose_to_matrix(op):
 
 
 def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
+    if isinstance(op, QCtrl):
+        op.visited = True
+        return op
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
