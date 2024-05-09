@@ -134,35 +134,7 @@ def AnnotateDebugCallbackAsEnzymeConstPass : Pass<"annotate-debug-callback-as-en
     let summary = "Annotates debug callbacks as enzyme_const";
 
     let description = [{
-
-        This pass will:
-           1. Find all call sites to `pyregistry`.
-           2. Determine if the call to `pyregistry` corresponds to a `debug.callback`
-           3. Mark all parameters as `enzyme_const`.
-
-
-         Step 1:
-           At the LLVM stage, call sites to `pyregistry` correspond to call sites to
-           any callback implementation.
-
-         Step 2:
-           The callback calling convention is as follows:
-
-           1. The first parameter is the identifier.
-           2. The second parameter is the number of parameters.
-           3. The third parameter is the number of returned values.
-           4. The arguments that follow are variable arguments.
-           5. These three parameters are known at compile time.
-
-           Therefore, a callback with its third parameter set to zero is a callback without
-           returns. This means that a call site to `pyregistry` with its third parameter set
-           to zero corresponds to the notion of a `debug.callback` in the front end.
-
-         Step 3:
-           From EnzymeAD's documentation:
-
-               Inactive arguments are given enzyme_const metadata;
-               - https://enzyme.mit.edu/getting_started/CallingConvention/#types
+         Register all callbacks as inactive with Enzyme.
     }];
 
     let dependentDialects = [
