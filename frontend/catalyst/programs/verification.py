@@ -16,7 +16,6 @@
 
 from typing import Optional
 
-from pennylane.operation import Operation
 from pennylane.tape import QuantumTape
 
 from catalyst.tracing.contexts import EvaluationContext

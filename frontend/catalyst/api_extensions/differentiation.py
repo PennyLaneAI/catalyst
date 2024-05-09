@@ -26,20 +26,15 @@ from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
 import catalyst
-from catalyst.device.qjit_device import AnyQJITDevice
-from catalyst.jax_extras import Jaxpr, JaxprEqn
+from catalyst.jax_extras import Jaxpr
 from catalyst.jax_primitives import (
     GradParams,
-    cond_p,
     expval_p,
-    for_p,
     func_p,
     grad_p,
     jvp_p,
     probs_p,
-    qinst_p,
     vjp_p,
-    while_p,
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext
