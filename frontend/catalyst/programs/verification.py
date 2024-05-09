@@ -14,16 +14,15 @@
 """This module contains for program verification.
 """
 
-from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Optional
 
 from pennylane.operation import Operation
 from pennylane.tape import QuantumTape
 
-from catalyst.jax_extras import DynamicJaxprTrace
 from catalyst.tracing.contexts import EvaluationContext
-from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.toml import DeviceCapabilities
+from catalyst.utils.exceptions import DifferentiableCompileError
+
+# pylint: disable=unused-argument,unnecessary-pass
 
 
 def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -58,10 +57,10 @@ def _verify_differentiability(
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
     # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
+    # pylint: disable=import-outside-toplevel
     from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
 
     ctx = ctx if ctx is not None else EvaluationContext.get_main_tracing_context()
-    ops2 = []
     for op in tape.operations:
         if has_nested_tapes(op):
             for region in nested_quantum_regions(op):

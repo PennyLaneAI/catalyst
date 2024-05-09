@@ -26,6 +26,7 @@ from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
 import catalyst
+from catalyst.device.qjit_device import AnyQJITDevice
 from catalyst.jax_extras import Jaxpr, JaxprEqn
 from catalyst.jax_primitives import (
     GradParams,
@@ -41,7 +42,6 @@ from catalyst.jax_primitives import (
     while_p,
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
-from catalyst.qjit_device import AnyQJITDevice
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 
@@ -793,33 +793,3 @@ def _check_qnode_against_grad_method(f: QNode, method: str, jaxpr: Jaxpr):
         raise DifferentiableCompileError(
             "The adjoint method can only be used for QNodes which return qml.expval."
         )
-
-
-def _verify_op_differentiability_on_device(jaxpr: Jaxpr, device: AnyQJITDevice) -> None:
-    """Verify quantum program against the device capabilities.
-
-    Raises: CompileError
-    """
-
-    def _get_inner_jaxprs(e: JaxprEqn) -> List[Jaxpr]:
-        if e.primitive in [while_p, for_p]:
-            inner_jaxpr = e.params["jaxpr"]
-            return [inner_jaxpr]
-        elif e.primitive is cond_p:
-            return e.params["branch_jaxprs"]
-        elif e.primitive == func_p:
-            inner_jaxpr = e.params["call_jaxpr"]
-            return [inner_jaxpr]
-        return []
-
-    def _go(jaxpr: Jaxpr, device) -> None:
-        for e in jaxpr.eqns:
-            if e.primitive == qinst_p:
-                op_name = e.params["op"]
-                if not _is_differentiable_on_device(op_name, device):
-                    raise DifferentiableCompileError(f"{op_name} is non-differentiable")
-            elif inner_jaxprs := _get_inner_jaxprs(e):
-                for inner_jaxpr in inner_jaxprs:
-                    _go(inner_jaxpr, device)
-
-    _go(jaxpr, device)

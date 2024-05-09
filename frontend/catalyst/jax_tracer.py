@@ -97,7 +97,7 @@ TRACING_GRADIENTS = False
 @contextmanager
 def mark_gradient_tracing():
     """Wraps the inner flow with the gradient-tracing flag"""
-    global TRACING_GRADIENTS
+    global TRACING_GRADIENTS  # pylint: disable=global-statement
     old = TRACING_GRADIENTS
     try:
         TRACING_GRADIENTS = True
