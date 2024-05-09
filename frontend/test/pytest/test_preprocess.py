@@ -22,6 +22,7 @@ import pennylane as qml
 import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
+from pennylane.tape import QuantumScript
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
@@ -138,7 +139,7 @@ class TestPreprocess:
     def test_decompose_ops_to_unitary(self):
         """Test the decompose ops to unitary transform."""
         operations = [qml.CNOT(wires=[0, 1]), qml.RX(0.1, wires=0)]
-        tape = qml.tape.QuantumScript(ops=operations)
+        tape = QuantumScript(ops=operations)
         ops_to_decompose = ["CNOT"]
 
         tapes, _ = decompose_ops_to_unitary(tape, ops_to_decompose)
@@ -249,8 +250,8 @@ class TestPreprocess:
 
 
 # tapes and regions for generating HybridOps
-tape1 = qml.tape.QuantumScript([qml.X(0), qml.Hadamard(1)])
-tape2 = qml.tape.QuantumScript([qml.RY(1.23, 1), qml.Y(0), qml.Hadamard(2)])
+tape1 = QuantumScript([qml.X(0), qml.Hadamard(1)])
+tape2 = QuantumScript([qml.RY(1.23, 1), qml.Y(0), qml.Hadamard(2)])
 region1 = HybridOpRegion([], tape1, [], [])
 region2 = HybridOpRegion([], tape2, [], [])
 
@@ -311,7 +312,7 @@ class TestPreprocessHybridOp:
             region.trace = None
 
         # create and decompose the tape
-        tape = qml.tape.QuantumScript([op, qml.X(0), qml.Hadamard(3)])
+        tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             (new_tape,), _ = decompose(tape, ctx, stopping_condition)
 
@@ -482,21 +483,18 @@ class TestPreprocessHybridOp:
 
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
 
+        # make a weird nested op
         adjoint_op = Adjoint([], [], [region1])
-        adj_tape = qml.tape.QuantumScript(
-            [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]
-        )  # Hadamard will decompose
-        adj_region = HybridOpRegion([], adj_tape, [], [])
+        ops= [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]  # Hadamard will decompose
+        adj_region = HybridOpRegion([], QuantumScript(ops), [], [])
 
         conditional_op = Cond([], [], regions=[adj_region, region2])
-        conditional_region = HybridOpRegion(
-            [], qml.tape.QuantumScript([conditional_op, qml.Y(1)]), [], []
-        )  # PauliY will decompose
+        ops = [conditional_op, qml.Y(1)]  # PauliY will decompose
+        conditional_region = HybridOpRegion([], qml.tape.QuantumScript(ops), [], [])  
 
         for_loop_op = ForLoop([], [], [conditional_region])
-        tape = qml.tape.QuantumScript(
-            [for_loop_op, qml.X(0), qml.Hadamard(3)]
-        )  # Hadamard will decompose
+        ops = [for_loop_op, qml.X(0), qml.Hadamard(3)]  # Hadamard will decompose
+        tape = qml.tape.QuantumScript(ops)
 
         # hack to avoid needing a full trace in unit test
         adjoint_op.regions[0].trace = None
@@ -509,15 +507,13 @@ class TestPreprocessHybridOp:
             (new_tape,), _ = decompose(tape, ctx, stopping_condition)
 
         # unsupported ops on the top-level tape have been decomposed (no more Hadamard)
-        assert "Hadamard" in [op.name for op in tape.operations]
         assert "Hadamard" not in [op.name for op in new_tape.operations]
         assert "RZ" in [op.name for op in new_tape.operations]
 
         # the first element on the top-level tape is a for-loop
         assert isinstance(new_tape[0], ForLoop)
-        # any unsupported ops on its tape have been decomposed (no more PauliY)
+        # unsupported op on it has been decomposed (no more PauliY)
         forloop_subtape = new_tape[0].regions[0].quantum_tape
-        assert "PauliY" in [op.name for op in forloop_subtape.operations]
         assert "PauliY" not in [op.name for op in forloop_subtape.operations]
         assert "RY" in [op.name for op in forloop_subtape.operations]
 
@@ -533,7 +529,9 @@ class TestPreprocessHybridOp:
             assert "Hadamard" not in [op.name for op in subtape.operations]
             assert "RZ" in [op.name for op in subtape.operations]
 
+        # the seconds element on the first subtape of the cond op is an adjoint
         assert isinstance(cond_subtapes[0][1], Adjoint)
+        # unsupported op on it has been decomposed (no more Hadamard)
         adj_subtape = cond_subtapes[0][1].regions[0].quantum_tape
         assert "Hadamard" not in [op.name for op in adj_subtape.operations]
         assert "RZ" in [op.name for op in adj_subtape.operations]
