@@ -41,7 +41,7 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 .. warning::
 
     The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-    ``braket.local.qubit``, and ``braket.aws.qubit`` but future plans include the addition of more.
+    ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud`` but future plans include the addition of more.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
 way you are used to, as long as you ensure that all operations are added to the main tape.
@@ -111,7 +111,7 @@ more complex quantum circuits; see below for the list of currently supported ope
 
    1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
    2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-   3. The list of device-supported gates employed by Catalyst is currently different than that of the ``lightning.qubit`` device, as defined by the :class:`~.pennylane_extensions.QJITDevice`.
+   3. The list of device-supported gates employed by Catalyst is currently different than that of the ``lightning.qubit`` device, as defined by the :class:`~.qjit_device.QJITDevice`.
 
 .. raw:: html
 

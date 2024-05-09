@@ -32,11 +32,11 @@ class TestSample:
             qml.RX(x, wires=0)
             return qml.sample()
 
-        expected = np.array([[0.0]] * 1000)
+        expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
         assert np.array_equal(observed, expected)
 
-        expected = np.array([[1.0]] * 1000)
+        expected = np.array([[1]] * 1000)
         observed = sample_1qbit(np.pi)
         assert np.array_equal(observed, expected)
 
@@ -50,10 +50,10 @@ class TestSample:
             qml.RY(x, wires=1)
             return qml.sample()
 
-        expected = np.array([[0.0, 0.0]] * 1000)
+        expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
         assert np.array_equal(observed, expected)
-        expected = np.array([[1.0, 1.0]] * 1000)
+        expected = np.array([[1, 1]] * 1000)
         observed = sample_2qbits(np.pi)
         assert np.array_equal(observed, expected)
 

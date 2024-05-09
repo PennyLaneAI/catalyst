@@ -41,7 +41,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: [3.9]
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
@@ -144,11 +144,13 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build libzstd-devel
+        yum update -y && yum install -y libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
 
     # Required for MHLO and building MLIR with protected symbols.
     # (Don't forget to add the build directory to PATH in subsequent steps, so
@@ -222,7 +224,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         arch: [x86_64]
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
@@ -240,11 +242,13 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build openmpi-devel libzstd-devel
+        yum update -y && yum install -y openmpi-devel libzstd-devel
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML
+        python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -260,7 +264,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -306,6 +310,7 @@ jobs:
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DLIGHTNING_GIT_TAG= def8a26 \
+              -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_WARNINGS=OFF \
@@ -313,7 +318,7 @@ jobs:
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
@@ -322,6 +327,7 @@ jobs:
           CXX_COMPILER=$(which g++) \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
     # Build Quantum and Gradient Dialects
@@ -373,7 +379,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(format('[{0}]', needs.determine_runner.outputs.runner_group)) }}
+        os: ${{ fromJSON(format('["{0}"]', needs.determine_runner.outputs.runner_group)) }}
         python_version: ${{ fromJSON(needs.constants.outputs.python_versions) }}
 
     # To check all wheels for supported python3 versions
@@ -407,7 +413,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0' "boto3==1.26"
 
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}

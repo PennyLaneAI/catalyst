@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""callback.debug module"""
+"""
+Internal API for the device module.
+"""
 
-from .implementation import callback
+from catalyst.device.qjit_device import QJITDevice, QJITDeviceNewAPI
 
-__all__ = ["callback"]
+__all__ = (
+    "QJITDevice",
+    "QJITDeviceNewAPI",
+)

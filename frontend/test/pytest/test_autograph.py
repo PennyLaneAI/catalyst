@@ -26,10 +26,13 @@ from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 
 from catalyst import (
+    AutoGraphError,
     adjoint,
+    autograph_source,
     cond,
     ctrl,
     debug,
+    disable_autograph,
     for_loop,
     grad,
     jacobian,
@@ -38,7 +41,7 @@ from catalyst import (
     qjit,
     vjp,
 )
-from catalyst.autograph import TRANSFORMER, AutoGraphError, autograph_source
+from catalyst.autograph.transformer import TRANSFORMER
 
 check_cache = TRANSFORMER.has_cache
 
@@ -67,14 +70,13 @@ class Failing:
         return self.ref
 
 
-@pytest.mark.tf
 class TestSourceCodeInfo:
     """Unit tests for exception utilities that retrieves traceback information for the original
     source code."""
 
     def test_non_converted_function(self):
         """Test the robustness of traceback conversion on a non-converted function."""
-        from catalyst.ag_primitives import get_source_code_info
+        from catalyst.autograph.ag_primitives import get_source_code_info
 
         try:
             result = ""
@@ -149,7 +151,6 @@ class TestSourceCodeInfo:
                 assert e.args == ("Test failure",)
 
 
-@pytest.mark.tf
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
@@ -394,7 +395,6 @@ class TestIntegration:
         assert np.allclose(fn(3)[1], tuple([jnp.array(2.0), jnp.array(6.0)]))
 
 
-@pytest.mark.tf
 class TestCodePrinting:
     """Test that the transformed source code can be printed in different settings."""
 
@@ -524,7 +524,6 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
 
-@pytest.mark.tf
 class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""
@@ -690,13 +689,12 @@ class TestConditionals:
             qjit(autograph=True)(f)
 
 
-@pytest.mark.tf
 class TestForLoops:
     """Test that the autograph transformations produce correct results on for loops."""
 
     def test_python_range_fallback(self):
         """Test that the custom CRange wrapper correctly falls back to Python."""
-        from catalyst.ag_primitives import CRange
+        from catalyst.autograph.ag_primitives import CRange
 
         # pylint: disable=protected-access
 
@@ -1244,7 +1242,6 @@ class TestForLoops:
         assert f() == 9
 
 
-@pytest.mark.tf
 class TestWhileLoops:
     """Test that the autograph transformations produce correct results on while loops."""
 
@@ -1427,7 +1424,6 @@ class TestWhileLoops:
             qjit(autograph=True)(f)
 
 
-@pytest.mark.tf
 @pytest.mark.parametrize(
     "execution_context", (lambda fn: fn, qml.qnode(qml.device("lightning.qubit", wires=1)))
 )
@@ -1537,7 +1533,6 @@ class TestFallback:
         assert results[1] == (2) * 1 * 2 * 3  # i = range(1, 4)
 
 
-@pytest.mark.tf
 class TestLogicalOps:
     """Test logical operations: and, or, not"""
 
@@ -1612,7 +1607,6 @@ class TestLogicalOps:
             assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
 
 
-@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
@@ -1716,6 +1710,131 @@ class TestMixed:
 
         assert f(0.4) == 1
         assert f(0.1) == 3
+
+
+class TestDisableAutograph:
+    """Test ways of disabling autograph conversion"""
+
+    def test_disable_autograph_decorator(self):
+        """Test disabling autograph with decorator."""
+
+        @disable_autograph
+        def f():
+            x = 6
+            if x > 5:
+                y = x**2
+            else:
+                y = x**3
+            return y
+
+        @qjit(autograph=True)
+        def g(x: float, n: int):
+            for _ in range(n):
+                x = x + f()
+            return x
+
+        assert g(0.4, 6) == 216.4
+
+    def test_disable_autograph_context_manager(self):
+        """Test disabling autograph with context manager."""
+
+        def f():
+            x = 6
+            if x > 5:
+                y = x**2
+            else:
+                y = x**3
+            return y
+
+        @qjit(autograph=True)
+        def g():
+            x = 0.4
+            with disable_autograph:
+                x += f()
+            return x
+
+        assert g() == 36.4
+
+
+class TestJaxIndexAssignment:
+    """Test Jax index assignment"""
+
+    def test_single_index_assignment_one_item(self):
+        """Test single index assignment for Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def zero_last_element_single_assignment_syntax(x):
+            """Set the last element of x to 0 using single index assignment"""
+
+            last_element = x.shape[0] - 1
+            x[last_element] = 0
+            return x
+
+        @qjit(autograph=True)
+        def zero_last_element_at_set_syntax(x):
+            """Set the last element of x to 0 using at and set"""
+
+            last_element = x.shape[0] - 1
+            x = x.at[last_element].set(0)
+            return x
+
+        result_assignment_syntax = zero_last_element_single_assignment_syntax(jnp.array([5, 3, 4]))
+
+        assert jnp.allclose(result_assignment_syntax, jnp.array([5, 3, 0]))
+        assert jnp.allclose(
+            result_assignment_syntax,
+            zero_last_element_at_set_syntax(jnp.array([5, 3, 4])),
+        )
+
+    def test_single_index_assignment_all_items(self):
+        """Test single index assignment for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def double_all_single_assignment_syntax(x):
+            """Create a new array that is equal to 2 * x using single index assignment"""
+
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result[i] = x[i] * 2
+
+            return result
+
+        @qjit(autograph=True)
+        def double_all_at_set_syntax(x):
+            """Create a new array that is equal to 2 * x using at and set"""
+
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result = result.at[i].set(x[i] * 2)
+
+            return result
+
+        result_assignment_syntax = double_all_single_assignment_syntax(jnp.array([5, 3, 4]))
+
+        assert jnp.allclose(result_assignment_syntax, jnp.array([10, 6, 8]))
+        assert jnp.allclose(
+            result_assignment_syntax,
+            double_all_at_set_syntax(jnp.array([5, 3, 4])),
+        )
+
+    def test_single_index_assignment_python_array(self):
+        """Test single index assignment for Non-Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def zero_last_element_python_array(x):
+            """Set the last element of a python array to 0"""
+
+            last_element = len(x) - 1
+            x[last_element] = 0
+            return x
+
+        assert jnp.allclose(
+            jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
+        )
 
 
 if __name__ == "__main__":

@@ -73,9 +73,9 @@ class CompileOptions:
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     async_qnodes: Optional[bool] = False
-    lower_to_llvm: Optional[bool] = True
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+    lower_to_llvm: Optional[bool] = True
 
     def __post_init__(self):
         # Make the format of static_argnums easier to handle.
@@ -139,6 +139,7 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
+        "annotate-function",
         "lower-mitigation",
         "lower-gradients",
         "adjoint-lowering",
@@ -536,9 +537,9 @@ class Compiler:
             (Optional[str]): output IR
         """
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
-            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
-
-        if not self.last_compiler_output:
-            return None
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no file was found.\n"
+            msg += "Are you sure the file exists?"
+            raise CompileError(msg)
 
         return self.last_compiler_output.get_pipeline_output(pipeline)

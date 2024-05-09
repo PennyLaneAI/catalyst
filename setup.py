@@ -56,7 +56,7 @@ with open(".dep-versions", encoding="utf-8") as f:
     pl_version = next((line[10:].strip() for line in lines if "pennylane=" in line), None)
     lq_version = next((line[10:].strip() for line in lines if "lightning=" in line), None)
 
-pl_min_release = 0.35
+pl_min_release = 0.36
 lq_min_release = pl_min_release
 
 if pl_version is not None:
@@ -73,23 +73,25 @@ requirements = [
     lightning_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "tomlkit;python_version<'3.11'",
-    "scipy<=1.12.0",
+    "tomlkit; python_version < '3.11'",
+    "scipy<1.13",
+    "numpy<2",
     "diastatic-malt>=2.15.1",
 ]
 
 entry_points = {
     "pennylane.plugins": [
+        "oqc.cloud = catalyst.oqc:OQCDevice",
         "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
         "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
         "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
-        "catalyst.ops = catalyst:pennylane_extensions",
+        "catalyst.ops = catalyst.api_extensions",
         "catalyst.qjit = catalyst:qjit",
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
-        "cuda_quantum.ops = catalyst:pennylane_extensions",
+        "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.cuda:cudaqjit",
     ],
 }

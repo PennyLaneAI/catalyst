@@ -192,7 +192,7 @@ wheel:
 
 	rm -r $(MK_DIR)/build
 
-.PHONY: clean clean-mlir clean-runtime clean-oqc clean-all
+.PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -200,20 +200,34 @@ clean:
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
-clean-mlir:
-	$(MAKE) -C mlir clean
-
-clean-runtime:
-	$(MAKE) -C runtime clean
-
-clean-oqc:
-	$(MAKE) -C frontend/catalyst/oqc/src clean
-
 clean-all: clean-mlir clean-runtime clean-oqc
 	@echo "uninstall catalyst and delete all temporary, cache, and build files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
+
+.PHONY: clean-mlir clean-dialects clean-llvm clean-mhlo clean-enzyme
+clean-mlir:
+	$(MAKE) -C mlir clean
+
+clean-dialects:
+	$(MAKE) -C mlir clean-dialects
+
+clean-llvm:
+	$(MAKE) -C mlir clean-llvm
+
+clean-mhlo:
+	$(MAKE) -C mlir clean-mhlo
+
+clean-enzyme:
+	$(MAKE) -C mlir clean-enzyme
+
+.PHONY: clean-runtime clean-oqc
+clean-runtime:
+	$(MAKE) -C runtime clean
+
+clean-oqc:
+	$(MAKE) -C frontend/catalyst/oqc/src clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime

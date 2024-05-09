@@ -11,8 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains the qjit device classes.
+
 """
+This module contains device stubs for the old and new PennyLane device API, which facilitate
+the application of decomposition and other device pre-processing routines.
+"""
+
+from copy import deepcopy
 from functools import partial
 from typing import Optional, Set
 
@@ -20,21 +25,25 @@ import pennylane as qml
 from pennylane.measurements import MidMeasureMP
 from pennylane.transforms.core import TransformProgram
 
-from catalyst.preprocess import catalyst_acceptance, decompose
+from catalyst.device.decomposition import (
+    catalyst_acceptance,
+    decompose,
+    measurements_from_counts,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import (
-    BackendInfo,
-    get_pennylane_observables,
-    get_pennylane_operations,
-)
+from catalyst.utils.runtime import BackendInfo, device_get_toml_config
 from catalyst.utils.toml import (
+    DeviceCapabilities,
+    OperationProperties,
+    ProgramFeatures,
     TOMLDocument,
-    check_adjoint_flag,
-    check_mid_circuit_measurement_flag,
+    get_device_capabilities,
+    intersect_operations,
+    pennylane_operation_set,
 )
 
-RUNTIME_OPERATIONS = {
+RUNTIME_OPERATIONS = [
     "CNOT",
     "ControlledPhaseShift",
     "CRot",
@@ -57,6 +66,7 @@ RUNTIME_OPERATIONS = {
     "PhaseShift",
     "PSWAP",
     "QubitUnitary",
+    "ControlledQubitUnitary",
     "Rot",
     "RX",
     "RY",
@@ -66,52 +76,59 @@ RUNTIME_OPERATIONS = {
     "T",
     "Toffoli",
     "GlobalPhase",
-    "C(GlobalPhase)",
-    "C(Hadamard)",
-    "C(IsingXX)",
-    "C(IsingXY)",
-    "C(IsingYY)",
-    "C(ISWAP)",
-    "C(MultiRZ)",
-    "ControlledQubitUnitary",
-    "C(PauliX)",
-    "C(PauliY)",
-    "C(PauliZ)",
-    "C(PhaseShift)",
-    "C(PSWAP)",
-    "C(Rot)",
-    "C(RX)",
-    "C(RY)",
-    "C(RZ)",
-    "C(S)",
-    "C(SWAP)",
-    "C(T)",
+]
+# The runtime interface does not care about specific gate properties, so set them all to True.
+RUNTIME_OPERATIONS = {
+    op: OperationProperties(invertible=True, controllable=True, differentiable=True)
+    for op in RUNTIME_OPERATIONS
 }
 
 
-def get_qjit_pennylane_operations(
-    config: TOMLDocument, shots_present: bool, device_name: str
-) -> Set[str]:
+def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
     # Supported gates of the target PennyLane's device
-    native_gates = get_pennylane_operations(config, shots_present, device_name)
+    qjit_config = deepcopy(target_capabilities)
+
     # Gates that Catalyst runtime supports
     qir_gates = RUNTIME_OPERATIONS
-    supported_gates = set.intersection(native_gates, qir_gates)
 
-    # Control-flow gates to be lowered down to the LLVM control-flow instructions
-    supported_gates.update({"Cond", "WhileLoop", "ForLoop"})
+    # Intersection of the above
+    qjit_config.native_ops = intersect_operations(target_capabilities.native_ops, qir_gates)
+
+    # Control-flow gates to be lowered down to the LLVM control-flow instructions,
+    # all of which can be inverted, controlled, and differentiated.
+    qjit_config.native_ops.update(
+        {
+            "Cond": OperationProperties(invertible=True, controllable=True, differentiable=True),
+            "WhileLoop": OperationProperties(
+                invertible=True, controllable=True, differentiable=True
+            ),
+            "ForLoop": OperationProperties(invertible=True, controllable=True, differentiable=True),
+        }
+    )
 
     # Optionally enable runtime-powered mid-circuit measurments
-    if check_mid_circuit_measurement_flag(config):  # pragma: no branch
-        supported_gates.update({"MidCircuitMeasure"})
+    if target_capabilities.mid_circuit_measurement_flag:  # pragma: no branch
+        qjit_config.native_ops.update(
+            {
+                "MidCircuitMeasure": OperationProperties(
+                    invertible=True, controllable=True, differentiable=False
+                )
+            }
+        )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if check_adjoint_flag(config, shots_present):
-        supported_gates.update({"Adjoint"})
+    if all(ng.invertible for ng in target_capabilities.native_ops.values()):
+        qjit_config.native_ops.update(
+            {
+                "Adjoint": OperationProperties(
+                    invertible=True, controllable=True, differentiable=True
+                )
+            }
+        )
 
-    return supported_gates
+    return qjit_config
 
 
 class QJITDevice(qml.QubitDevice):
@@ -137,7 +154,7 @@ class QJITDevice(qml.QubitDevice):
     author = ""
 
     @staticmethod
-    def _get_operations_to_convert_to_matrix(_config: TOMLDocument) -> Set[str]:
+    def _get_operations_to_convert_to_matrix(_capabilities: DeviceCapabilities) -> Set[str]:
         # We currently override and only set a few gates to preserve existing behaviour.
         # We could choose to read from config and use the "matrix" gates.
         # However, that affects differentiability.
@@ -154,25 +171,26 @@ class QJITDevice(qml.QubitDevice):
     ):
         super().__init__(wires=wires, shots=shots)
 
-        self.target_config = target_config
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
-        shots_present = shots is not None
-        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
-        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        program_features = ProgramFeatures(shots is not None)
+        target_device_capabilities = get_device_capabilities(
+            target_config, program_features, device_name
+        )
+        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
-        """Get the device operations"""
-        return self._operations
+        """Get the device operations using PennyLane's syntax"""
+        return pennylane_operation_set(self.capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return self._observables
+        return pennylane_operation_set(self.capabilities.native_obs)
 
     def apply(self, operations, **kwargs):
         """
@@ -191,7 +209,7 @@ class QJITDevice(qml.QubitDevice):
             will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
         3. The list of device-supported gates employed by Catalyst is currently different than
             that of the ``lightning.qubit`` device, as defined by the
-            :class:`~.pennylane_extensions.QJITDevice`.
+            :class:`~.qjit_device.QJITDevice`.
 
         Args:
             circuit: circuit to expand
@@ -202,7 +220,7 @@ class QJITDevice(qml.QubitDevice):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
-            self.target_config
+            self.capabilities
         )
 
         def _decomp_to_unitary(self, *_args, **_kwargs):
@@ -251,7 +269,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
     def __init__(
         self,
         original_device,
-        target_config: TOMLDocument,
         backend: Optional[BackendInfo] = None,
     ):
         self.original_device = original_device
@@ -264,25 +281,32 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
-        self.target_config = target_config
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
         device_name = backend.device_name if backend else "default"
 
-        shots_present = original_device.shots is not None
-        self._operations = get_qjit_pennylane_operations(target_config, shots_present, device_name)
-        self._observables = get_pennylane_observables(target_config, shots_present, device_name)
+        target_config = device_get_toml_config(original_device)
+        program_features = ProgramFeatures(original_device.shots is not None)
+        target_device_capabilities = get_device_capabilities(
+            target_config, program_features, device_name
+        )
+        self.capabilities = get_qjit_device_capabilities(target_device_capabilities)
 
     @property
     def operations(self) -> Set[str]:
         """Get the device operations"""
-        return self._operations
+        return pennylane_operation_set(self.capabilities.native_ops)
 
     @property
     def observables(self) -> Set[str]:
         """Get the device observables"""
-        return self._observables
+        return pennylane_operation_set(self.capabilities.native_obs)
+
+    @property
+    def measurement_processes(self) -> Set[str]:
+        """Get the device measurement processes"""
+        return self.capabilities.measurement_processes
 
     def preprocess(
         self,
@@ -297,6 +321,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
+
+        if self.measurement_processes == {"Counts"}:
+            program.add_transform(measurements_from_counts)
 
         # TODO: Add Catalyst program verification and validation
         return program, config

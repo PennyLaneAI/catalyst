@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Callback module"""
+"""
+Public/internal API for the AutoGraph module.
+"""
 
-from . import debug
-from .implementation import callback, pure_callback
+from catalyst.autograph.transformer import (
+    autograph_source,
+    disable_autograph,
+    run_autograph,
+)
 
-__all__ = ["pure_callback", "callback", "debug"]
+__all__ = (
+    "autograph_source",
+    "disable_autograph",
+    "run_autograph",
+)

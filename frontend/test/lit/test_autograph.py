@@ -16,8 +16,13 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit
-from catalyst.autograph import AutoGraphError, autograph_source, run_autograph
+from catalyst import (
+    AutoGraphError,
+    autograph_source,
+    disable_autograph,
+    qjit,
+    run_autograph,
+)
 
 
 def print_code(fn):
@@ -552,3 +557,113 @@ def chain_logical_call(x: float):
 
 
 print_code(chain_logical_call)
+
+
+# -----
+
+
+@disable_autograph
+def f():
+    """Simple function with if statements"""
+    x = 6
+    if x > 5:
+        y = x**2
+    else:
+        y = x**3
+    return y
+
+
+# CHECK-LABEL: def disable_autograph_decorator_jax
+@qjit(autograph=True)
+def disable_autograph_decorator_jax(x: float, n: int):
+    """Checks that Autograph is disabled for a given function."""
+    # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:f64[] = add e 36.0 in (f,) }
+    for _ in range(n):
+        x = x + f()
+    return x
+
+
+print("def disable_autograph_decorator_jax")
+print(disable_autograph_decorator_jax.jaxpr)
+
+
+# -----
+
+
+def g():
+    """Simple function with if statements"""
+    x = 6
+    if x > 5:
+        y = x**2
+    else:
+        y = x**3
+    return y
+
+
+# CHECK-LABEL: def enable_autograph_decorator_jax
+@qjit(autograph=True)
+def enable_autograph_decorator_jax(x: float, n: int):
+    """Checks that Autograph is enabled for a given function."""
+    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
+    for _ in range(n):
+        x = x + g()
+    return x
+
+
+print("def enable_autograph_decorator_jax")
+print(enable_autograph_decorator_jax.jaxpr)
+
+
+# -----
+
+
+def h():
+    """Simple function with if statements"""
+    x = 6
+    if x > 5:
+        y = x**2
+    else:
+        y = x**3
+    return y
+
+
+# CHECK-LABEL: def disable_autograph_context_manager_jax
+@qjit(autograph=True)
+def disable_autograph_context_manager_jax():
+    """Checks that Autograph is disabled for a given context."""
+    # CHECK: { lambda ; . let  in (36.4,) }
+    x = 0.4
+    with disable_autograph:
+        x += h()
+    return x
+
+
+print("def disable_autograph_context_manager_jax")
+print(disable_autograph_context_manager_jax.jaxpr)
+
+
+# -----
+
+
+def func():
+    """Simple function with if statements"""
+    x = 6
+    if x > 5:
+        y = x**2
+    else:
+        y = x**3
+    return y
+
+
+# CHECK-LABEL: def enable_autograph_context_manager_jax
+@qjit(autograph=True)
+def enable_autograph_context_manager_jax():
+    """Checks that Autograph is enabled with no context."""
+    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
+    x = 0.4
+    x += func()
+    return x
+
+
+print("def enable_autograph_context_manager_jax")
+print(enable_autograph_context_manager_jax.jaxpr)

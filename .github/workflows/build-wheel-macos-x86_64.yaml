@@ -36,7 +36,7 @@ jobs:
       matrix:
         os: [macos-12]
         arch: [x86_64]
-        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        python_version: [3.9]
 
     name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: macos-12
@@ -216,7 +216,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.9-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -272,18 +272,19 @@ jobs:
               -DENABLE_OPENMP=OFF \
               -DLQ_ENABLE_KERNEL_OMP=OFF
 
-        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm
+        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
       run: |
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          PYTHON=$(which python${{ matrix.python_version }}) \
           make oqc
 
     - name: Test Catalyst-Runtime
       run: |
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
@@ -366,7 +367,7 @@ jobs:
     - name: Install PennyLane Plugins
       run: |
         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.25,<=1.27.0'
 
     - name: Install OQC client
       if: ${{ matrix.python_version == '3.9' || matrix.python_version == '3.10'}}
