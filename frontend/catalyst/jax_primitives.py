@@ -41,7 +41,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import InactiveCallbackOp, PrintOp
+from mlir_quantum.dialects.catalyst import ActiveCallbackOp, InactiveCallbackOp, PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -253,7 +253,9 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
-    return InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+    if not mlir_ty:
+        return InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+    return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
 #
