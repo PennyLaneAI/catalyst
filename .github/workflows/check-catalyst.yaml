@@ -45,8 +45,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
-          python -m pip install scipy
+          sudo apt-get -y -q install make clang libomp-dev
+          python -m pip install cmake scipy ninja
 
       - name: Build Catalyst-Runtime
         run: |
@@ -139,9 +139,9 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld
+        sudo apt-get install -y clang lld
         python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install numpy pybind11
+        python -m pip install cmake ninja numpy pybind11
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -165,6 +165,11 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.9'
+
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
@@ -214,7 +219,8 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld
+        sudo apt-get install -y clang lld
+        python -m pip install cmake ninja
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -289,7 +295,8 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld
+        sudo apt-get install -y clang lld
+        python -m pip install cmake ninja
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -321,9 +328,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build ccache clang lld
+        sudo apt-get install -y ccache clang lld
         python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install numpy pybind11
+        python -m pip install cmake numpy pybind11 ninja
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -630,7 +637,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
+          sudo apt-get -y -q install  libomp-dev lcov libasan5
+          python -m pip install cmake ninja
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -699,13 +707,19 @@ jobs:
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
 
     steps:
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.9'
+          
       - name: Checkout the repo
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
+          sudo apt-get -y -q install libomp-dev lcov
+          python -m pip install cmake ninja
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
