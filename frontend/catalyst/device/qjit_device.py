@@ -292,7 +292,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
     @property
     def measurement_processes(self) -> Set[str]:
         """Get the device measurement processes"""
-        return self.capabilities.measurement_processes
+        return self.qjit_capabilities.measurement_processes
 
     def preprocess(
         self,
