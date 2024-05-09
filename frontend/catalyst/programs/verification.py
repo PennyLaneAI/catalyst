@@ -40,11 +40,18 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     pass
 
 
-def _is_differentiable_on_device(op_name: str, device: "AnyQJITDevice") -> bool:
+def _op_is_differentiable_on_device(op_name: str, device: "AnyQJITDevice") -> bool:
     """Checks if the operation `op_name` is differentiable on the `device`"""
     if op_name not in device.qjit_capabilities.native_ops:
         return False
     return device.qjit_capabilities.native_ops[op_name].differentiable
+
+
+def _obs_is_differentiable_on_device(obs_name: str, device: "AnyQJITDevice") -> bool:
+    """Checks if the operation `op_name` is differentiable on the `device`"""
+    if obs_name not in device.qjit_capabilities.observables:
+        return False
+    return device.qjit_capabilities.observables[obs_name].differentiable
 
 
 def _verify_differentiability(
@@ -66,8 +73,16 @@ def _verify_differentiability(
                 with EvaluationContext.frame_tracing_context(ctx, region.trace) as nested_ctx:
                     _verify_differentiability(device, region.quantum_tape, nested_ctx)
 
-        if not _is_differentiable_on_device(op.name, device):
-            raise DifferentiableCompileError(f"{op.name} is non-differentiable on {device.name}")
+        if not _op_is_differentiable_on_device(op.name, device):
+            raise DifferentiableCompileError(
+                f"{op.name} is non-differentiable on '{device.name}' device"
+            )
+
+    for obs in tape.observables:
+        if not _obs_is_differentiable_on_device(obs.name, device):
+            raise DifferentiableCompileError(
+                f"{obs.name} is non-differentiable on '{device.name}' device"
+            )
 
 
 def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
