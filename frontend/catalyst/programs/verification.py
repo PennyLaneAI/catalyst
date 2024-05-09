@@ -14,14 +14,49 @@
 """This module contains for program verification.
 """
 
-from typing import Optional
+from typing import Any, Callable, Optional
 
+from pennylane.measurements import MeasurementProcess
+from pennylane.operation import Observable, Operation
+from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 from catalyst.tracing.contexts import EvaluationContext
-from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
+from catalyst.utils.toml import OperationProperties
 
-# pylint: disable=unused-argument,unnecessary-pass
+
+def _verify_nested(
+    tape: QuantumTape,
+    state: Any,
+    op_checker_fn: Callable[[Operation], None],
+    obs_checker_fn: Callable[[Observable], None],
+) -> Any:
+    """Traverse the nested quantum tape, carry a caller-defined state."""
+
+    # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
+    # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
+    # pylint: disable=import-outside-toplevel
+    from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
+
+    ctx = EvaluationContext.get_main_tracing_context()
+    for op in tape.operations:
+        state = op_checker_fn(op, state)
+        if has_nested_tapes(op):
+            nested_state = state
+            for region in nested_quantum_regions(op):
+                assert region.trace is not None
+                with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                    nested_state = _verify_nested(
+                        region.quantum_tape, nested_state, op_checker_fn, obs_checker_fn
+                    )
+
+    for obs in tape.observables:
+        state = obs_checker_fn(obs, state)
+    return state
+
+
+EMPTY_PROPERTIES = OperationProperties(False, False, False)
 
 
 def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -29,7 +64,23 @@ def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
 
     Raises: CompileError
     """
-    pass
+
+    # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
+    from catalyst.api_extensions.quantum_operators import Adjoint
+
+    def _op_checker(op, in_inverse):
+        if in_inverse > 0:
+            op_name = op.base.name if isinstance(op, Controlled) else op.name
+            if not device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
+                raise CompileError(
+                    f"{op_name} is not invertible on '{device.original_device.name}' device"
+                )
+        return (in_inverse + 1) if isinstance(op, Adjoint) else in_inverse
+
+    def _obs_checker(obs, state):
+        return state
+
+    _verify_nested(tape, 0, _op_checker, _obs_checker)
 
 
 def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -37,52 +88,22 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
 
     Raises: CompileError
     """
-    pass
 
+    # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
+    from catalyst.api_extensions.quantum_operators import QCtrl
 
-def _op_is_differentiable_on_device(op_name: str, device: "AnyQJITDevice") -> bool:
-    """Checks if the operation `op_name` is differentiable on the `device`"""
-    if op_name not in device.qjit_capabilities.native_ops:
-        return False
-    return device.qjit_capabilities.native_ops[op_name].differentiable
+    def _op_checker(op, in_control):
+        if in_control > 0:
+            if not device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).controllable:
+                raise CompileError(
+                    f"{op.name} is not controllable on '{device.original_device.name}' device"
+                )
+        return (in_control + 1) if isinstance(op, QCtrl) else in_control
 
+    def _obs_checker(obs, state):
+        return state
 
-def _obs_is_differentiable_on_device(obs_name: str, device: "AnyQJITDevice") -> bool:
-    """Checks if the operation `op_name` is differentiable on the `device`"""
-    if obs_name not in device.qjit_capabilities.observables:
-        return False
-    return device.qjit_capabilities.observables[obs_name].differentiable
-
-
-def _verify_differentiability(
-    device: "AnyQJITDevice",
-    tape: QuantumTape,
-    ctx: Optional[EvaluationContext] = None,
-) -> None:
-    """Verify differentiability recursively."""
-
-    # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
-    # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
-    # pylint: disable=import-outside-toplevel
-    from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
-
-    ctx = ctx if ctx is not None else EvaluationContext.get_main_tracing_context()
-    for op in tape.operations:
-        if has_nested_tapes(op):
-            for region in nested_quantum_regions(op):
-                with EvaluationContext.frame_tracing_context(ctx, region.trace) as nested_ctx:
-                    _verify_differentiability(device, region.quantum_tape, nested_ctx)
-
-        if not _op_is_differentiable_on_device(op.name, device):
-            raise DifferentiableCompileError(
-                f"{op.name} is non-differentiable on '{device.name}' device"
-            )
-
-    for obs in tape.observables:
-        if not _obs_is_differentiable_on_device(obs.name, device):
-            raise DifferentiableCompileError(
-                f"{obs.name} is non-differentiable on '{device.name}' device"
-            )
+    _verify_nested(tape, 0, _op_checker, _obs_checker)
 
 
 def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -90,4 +111,25 @@ def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None
 
     Raises: DifferentiableCompileError
     """
-    _verify_differentiability(device, tape)
+
+    def _op_checker(op, _):
+        if not device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).differentiable:
+            raise DifferentiableCompileError(
+                f"{op.name} is non-differentiable on '{device.original_device.name}' device"
+            )
+
+    def _obs_checker(obs, _):
+        if isinstance(obs, MeasurementProcess):
+            _obs_checker(obs.obs or [], _)
+        elif isinstance(obs, list):
+            for obs2 in obs:
+                _obs_checker(obs2, _)
+        else:
+            if not device.qjit_capabilities.native_obs.get(
+                obs.name, EMPTY_PROPERTIES
+            ).differentiable:
+                raise DifferentiableCompileError(
+                    f"{obs.name} is non-differentiable on '{device.original_device.name}' device"
+                )
+
+    _verify_nested(tape, None, _op_checker, _obs_checker)

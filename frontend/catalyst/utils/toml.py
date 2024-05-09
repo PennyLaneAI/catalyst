@@ -337,8 +337,11 @@ def patch_schema1_collections(
         for props in native_gate_props.values():
             props.invertible = True
 
-    # Makr all gates as differentiable
+    # Mark all gates as differentiable
     for props in native_gate_props.values():
+        props.differentiable = True
+    # Mark all observables as differentiable
+    for props in observable_props.values():
         props.differentiable = True
 
     # For toml schema 1 configs, the following condition is possible: (1) `QubitUnitary` gate is
