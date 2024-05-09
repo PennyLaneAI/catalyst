@@ -115,7 +115,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
         )
 
     # Optionally enable runtime-powered quantum gate adjointing (inversions)
-    if all(ng.invertible for ng in target_capabilities.native_ops.values()):
+    if any(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_capabilities.native_ops.update(
             {
                 "Adjoint": OperationProperties(

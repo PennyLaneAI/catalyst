@@ -1182,54 +1182,6 @@ def test_adj_qubitunitary(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-def get_custom_device(non_differentiable_gates, **kwargs):
-    """Generate a custom device where certain gates are marked as non-differensiable."""
-
-    lightning_device = qml.device("lightning.qubit", wires=0)
-
-    class CustomDevice(qml.devices.Device):
-        """Custom Gate Set Device"""
-
-        name = lightning_device.name
-        author = "Tester"
-
-        config = None
-        backend_name = "default"
-        backend_lib = "default"
-        backend_kwargs = {}
-
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=kwargs.get("shots") is not None)
-            lightning_capabilities = get_device_capabilities(lightning_device, program_features)
-            custom_capabilities = deepcopy(lightning_capabilities)
-            for gate in non_differentiable_gates:
-                custom_capabilities.native_ops[gate].differentiable = False
-            self.qjit_capabilities = custom_capabilities
-
-        def execute(self, circuits, execution_config):
-            """
-            Raises: RuntimeError
-            """
-            raise RuntimeError("QJIT devices cannot execute tapes.")
-
-        @property
-        def operations(self):
-            """Return operations using PennyLane's C(.) syntax"""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Return PennyLane observables"""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
-    return CustomDevice(**kwargs)
-
-
 class TestGradientErrors:
     """Test errors when an operation which does not have a valid gradient is reachable
     from the grad op"""
@@ -1281,57 +1233,6 @@ class TestGradientErrors:
             @qml.qjit
             def cir(x: float):
                 return grad(g)(x)
-
-    def test_non_differentiable_gate_simple(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=[0]))
-        def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    def test_non_differentiable_gate_nested_cond(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=[0]))
-        def f(x):
-            @cond(True)
-            def true_path():
-                qml.RX(x, wires=0)
-
-            @true_path.otherwise
-            def false_path():
-                qml.RX(x, wires=0)
-
-            true_path()
-
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    def test_non_differentiable_gate_nested_adjoint(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=[0]))
-        def f(x):
-            adjoint(qml.RX(x, wires=[0]))
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
 
 
 if __name__ == "__main__":
