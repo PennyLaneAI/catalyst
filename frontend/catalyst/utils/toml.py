@@ -214,7 +214,6 @@ def get_measurement_processes(
     config: TOMLDocument, program_features: ProgramFeatures
 ) -> Dict[str, dict]:
     """Get the measurements processes from the `native` section of the config."""
-
     schema = int(config["schema"])
     if schema == 1:
         shots_string = "finiteshots" if program_features.shots_present else "exactshots"

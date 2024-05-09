@@ -12,26 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Catalyst's debug module contains functions useful for user program debugging."""
-
-from catalyst.debug.callback import callback
-from catalyst.debug.compiler_functions import (
-    compile_from_mlir,
-    get_cmain,
-    print_compilation_stage,
-)
-from catalyst.debug.instruments import instrumentation
-from catalyst.debug.printing import (  # pylint: disable=redefined-builtin
-    print,
-    print_memref,
-)
-
-__all__ = (
-    "callback",
-    "print",
-    "print_memref",
-    "print_compilation_stage",
-    "get_cmain",
-    "compile_from_mlir",
-    "instrumentation",
-)
+"""
+This module contains the functions to verify quantum tapes are fully compatible
+with the compiler and device.
+"""

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
-import pathlib
+import platform
 
 import pennylane as qml
 import pytest
@@ -131,10 +131,6 @@ OBSERVABLES = [
 RUNTIME_LIB_PATH = get_lib_path("runtime", "RUNTIME_LIB_DIR")
 
 
-@pytest.mark.skipif(
-    not pathlib.Path(RUNTIME_LIB_PATH + "/libdummy_device.so").is_file(),
-    reason="lib_dummydevice.so was not found.",
-)
 def test_custom_device_load():
     """Test that custom device can run using Catalyst."""
 
@@ -163,8 +159,11 @@ def test_custom_device_load():
             """Returns a tuple consisting of the device name, and
             the location to the shared object with the C/C++ device implementation.
             """
-
-            return "DummyDevice", get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+            )
+            return "DummyDevice", lib_path
 
     device = DummyDevice(wires=1)
     capabilities = get_device_capabilities(device)
@@ -176,7 +175,7 @@ def test_custom_device_load():
     @qml.qnode(device)
     def f():
         """This function would normally return False.
-        However, DummyDevice as defined in libdummy_device.so
+        However, DummyDevice as defined in librtd_dummy.so
         has been implemented to always return True."""
         return measure(0)
 

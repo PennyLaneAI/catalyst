@@ -5,7 +5,7 @@ Catalyst Quantum Runtime
 
 The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
 quantum programs, and is currently backed by `PennyLane-Lightning <https://docs.pennylane.ai/projects/lightning/en/stable>`_
-state-vector simulators, and `Amazon Braket <https://amazon-braket-pennylane-plugin-python.readthedocs.io>`_
+state-vector simulators, and `Amazon Braket <https://amazon-braket-pennylane-plugin-python.readthedocs.io>`__
 devices. Additional hardware support, including QPUs, to come.
 
 The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
@@ -121,7 +121,7 @@ You can also use ``ENABLE_OPENQASM=OFF`` to disable building the runtime with `A
     make runtime ENABLE_OPENQASM=OFF
 
 This device currently offers generators for the `OpenQasm3 <https://openqasm.com/versions/3.0/index.html>`_ specification and
-`Amazon Braket <https://docs.aws.amazon.com/braket/latest/developerguide/braket-openqasm-supported-features.html>`_ assembly extension.
+`Amazon Braket <https://docs.aws.amazon.com/braket/latest/developerguide/braket-openqasm-supported-features.html>`__ assembly extension.
 Moreover, the generated assembly can be executed on Amazon Braket devices leveraging `amazon-braket-sdk-python <https://github.com/aws/amazon-braket-sdk-python>`_.
 
 To check the runtime test suite from the root directory:
