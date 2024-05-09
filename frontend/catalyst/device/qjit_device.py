@@ -211,7 +211,7 @@ class QJITDevice(qml.QubitDevice):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         decompose_to_qubit_unitary = QJITDevice._get_operations_to_convert_to_matrix(
-            self.capabilities
+            self.qjit_capabilities
         )
 
         def _decomp_to_unitary(self, *_args, **_kwargs):

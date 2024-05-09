@@ -42,9 +42,9 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
 
 def _is_differentiable_on_device(op_name: str, device: "AnyQJITDevice") -> bool:
     """Checks if the operation `op_name` is differentiable on the `device`"""
-    if op_name not in device.capabilities.native_ops:
+    if op_name not in device.qjit_capabilities.native_ops:
         return False
-    return device.capabilities.native_ops[op_name].differentiable
+    return device.qjit_capabilities.native_ops[op_name].differentiable
 
 
 def _verify_differentiability(
