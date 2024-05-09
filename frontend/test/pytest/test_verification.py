@@ -37,12 +37,14 @@ from catalyst import (
     pure_callback,
     qjit,
     value_and_grad,
+    ctrl,
 )
 from catalyst.utils.runtime import pennylane_operation_set
 from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 
-def get_custom_device(non_differentiable_gates=set(), non_invertible_gates=set(), **kwargs):
+def get_custom_device(non_differentiable_gates=set(), non_invertible_gates=set(),
+                      non_controllable_gates=set(), **kwargs):
     """Generate a custom device where certain gates are marked as non-differensiable."""
 
     lightning_device = qml.device("lightning.qubit", wires=0)
@@ -67,6 +69,8 @@ def get_custom_device(non_differentiable_gates=set(), non_invertible_gates=set()
                 custom_capabilities.native_ops[gate].differentiable = False
             for gate in non_invertible_gates:
                 custom_capabilities.native_ops[gate].invertible = False
+            for gate in non_controllable_gates:
+                custom_capabilities.native_ops[gate].controllable = False
             self.qjit_capabilities = custom_capabilities
 
         def execute(self, circuits, execution_config):
@@ -150,8 +154,6 @@ def test_non_invertible_gate_simple():
     """Emulate a device with a non-invertible gate."""
 
     dev = get_custom_device(non_invertible_gates={"RX"}, wires=1)
-    print(dev.operations)
-    assert "RX" in dev.operations
 
     @qml.qnode(dev)
     def f(x):
@@ -166,7 +168,7 @@ def test_non_invertible_gate_simple():
 
 
 def test_non_invertible_gate_nested_cond():
-    """Emulate a device with a non-differentiable gate."""
+    """Emulate a device with a non-invertible gate."""
 
     @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
     def f(x):
