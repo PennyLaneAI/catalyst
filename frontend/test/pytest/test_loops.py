@@ -722,7 +722,7 @@ class TestForLoopOperatorAccess:
 
             x_times_10 = body(0)
             with pytest.raises(
-                ValueError,
+                AttributeError,
                 match=r"""
                 The for_loop\(\) was not called \(or has not been called\) in a quantum context,
                 and thus has no associated quantum operation.
@@ -745,7 +745,7 @@ class TestForLoopOperatorAccess:
 
             two_to_the_n = body(1)
             with pytest.raises(
-                ValueError,
+                AttributeError,
                 match=r"""
                 The for_loop\(\) was not called \(or has not been called\) in a quantum context,
                 and thus has no associated quantum operation.
@@ -793,7 +793,7 @@ class TestWhileLoopOperatorAccess:
 
             _, x_times_10 = body(0, 0)
             with pytest.raises(
-                ValueError,
+                AttributeError,
                 match=r"""
                 The while_loop\(\) was not called \(or has not been called\) in a quantum context,
                 and thus has no associated quantum operation.
@@ -816,7 +816,7 @@ class TestWhileLoopOperatorAccess:
 
             _, two_to_the_n = body(0, 1)
             with pytest.raises(
-                ValueError,
+                AttributeError,
                 match=r"""
                 The while_loop\(\) was not called \(or has not been called\) in a quantum context,
                 and thus has no associated quantum operation.

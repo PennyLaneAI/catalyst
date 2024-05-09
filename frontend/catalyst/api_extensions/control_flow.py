@@ -440,7 +440,7 @@ class CondCallable:
         self.preds = [pred]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda: None
-        self.operation = None
+        self._operation = None
 
     @property
     def operation(self):
@@ -448,17 +448,13 @@ class CondCallable:
         @property for CondCallable.operation
         """
         if self._operation is None:
-            raise ValueError(
+            raise AttributeError(
                 """
                 The cond() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
                 """
             )
         return self._operation
-
-    @operation.setter
-    def operation(self, op):
-        self._operation = op
 
     def else_if(self, pred):
         """
@@ -518,7 +514,7 @@ class CondCallable:
         _assert_cond_result_structure(out_treedefs)
         _assert_cond_result_types(out_signatures)
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in out_signatures[0]]
-        self.operation = Cond(in_classical_tracers, out_classical_tracers, regions)
+        self._operation = Cond(in_classical_tracers, out_classical_tracers, regions)
         return tree_unflatten(out_tree(), out_classical_tracers)
 
     def _call_with_classical_ctx(self):
@@ -599,7 +595,7 @@ class ForLoopCallable:
         self.upper_bound = upper_bound
         self.step = step
         self.body_fn = body_fn
-        self.operation = None
+        self._operation = None
 
     @property
     def operation(self):
@@ -607,17 +603,13 @@ class ForLoopCallable:
         @property for ForLoopCallable.operation
         """
         if self._operation is None:
-            raise ValueError(
+            raise AttributeError(
                 """
                 The for_loop() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
                 """
             )
         return self._operation
-
-    @operation.setter
-    def operation(self, op):
-        self._operation = op
 
     def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
         quantum_tape = QuantumTape()
@@ -640,7 +632,7 @@ class ForLoopCallable:
 
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-        self.operation = ForLoop(
+        self._operation = ForLoop(
             in_classical_tracers,
             out_classical_tracers,
             [
@@ -739,7 +731,7 @@ class WhileLoopCallable:
     def __init__(self, cond_fn, body_fn):
         self.cond_fn = cond_fn
         self.body_fn = body_fn
-        self.operation = None
+        self._operation = None
 
     @property
     def operation(self):
@@ -747,17 +739,13 @@ class WhileLoopCallable:
         @property for WhileLoopCallable.operation
         """
         if self._operation is None:
-            raise ValueError(
+            raise AttributeError(
                 """
                 The while_loop() was not called (or has not been called) in a quantum context,
                 and thus has no associated quantum operation.
                 """
             )
         return self._operation
-
-    @operation.setter
-    def operation(self, op):
-        self._operation = op
 
     def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
         outer_trace = ctx.trace
@@ -790,7 +778,7 @@ class WhileLoopCallable:
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
 
-        self.operation = WhileLoop(
+        self._operation = WhileLoop(
             in_classical_tracers, out_classical_tracers, [cond_region, body_region]
         )
         return tree_unflatten(body_tree(), out_classical_tracers)

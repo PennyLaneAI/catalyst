@@ -569,7 +569,7 @@ class TestCondOperatorAccess:
 
             cond_fn()
             with pytest.raises(
-                ValueError,
+                AttributeError,
                 match=r"""
                 The cond\(\) was not called \(or has not been called\) in a quantum context,
                 and thus has no associated quantum operation.
@@ -598,7 +598,7 @@ class TestCondOperatorAccess:
 
             branch_t()
             with pytest.raises(
-                ValueError,
+                AttributeError,
                 match=r"""
                 The cond\(\) was not called \(or has not been called\) in a quantum context,
                 and thus has no associated quantum operation.
