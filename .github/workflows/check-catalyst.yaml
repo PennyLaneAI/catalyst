@@ -46,7 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install make clang libomp-dev
-          python -m pip install cmake scipy ninja pybind11
+          python -m pip install cmake scipy ninja pybind11 scipy
 
       - name: Build Catalyst-Runtime
         run: |
@@ -141,7 +141,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y clang lld
         python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install cmake ninja numpy pybind11
+        python -m pip install cmake ninja numpy pybind11 scipy
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -220,7 +220,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld
-        python -m pip install cmake ninja pybind11
+        python -m pip install cmake ninja pybind11 scipy
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -296,7 +296,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y clang lld
-        python -m pip install cmake ninja pybind11
+        python -m pip install cmake ninja pybind11 scipy
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -330,7 +330,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y ccache clang lld
         python --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python -m pip install cmake numpy pybind11 ninja
+        python -m pip install cmake numpy pybind11 ninja scipy
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -638,7 +638,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install  libomp-dev lcov libasan5
-          python -m pip install cmake ninja pybind11
+          python -m pip install cmake ninja pybind11 scipy
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -719,7 +719,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -y -q install libomp-dev lcov
-          python -m pip install cmake ninja pybind11
+          python -m pip install cmake ninja pybind11 scipy
 
       - name: Build Runtime test suite for Lightning simulator
         run: |
