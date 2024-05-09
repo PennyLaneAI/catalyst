@@ -110,8 +110,45 @@ struct BufferizeInactiveCallbackOp : public OpConversionPattern<InactiveCallback
             bufferArgs.push_back(newBuffer);
         }
 
-        rewriter.create<InactiveCallbackOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(),
-                                      op.getOperands().size());
+        rewriter.create<InactiveCallbackOp>(op.getLoc(), TypeRange{}, bufferArgs,
+                                            adaptor.getIdentifier(), op.getOperands().size());
+        size_t startIndex = bufferArgs.size() - op.getNumResults();
+        SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
+        rewriter.replaceOp(op, bufferResults);
+        return success();
+    }
+};
+
+struct BufferizeActiveCallbackOp : public OpConversionPattern<ActiveCallbackOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(ActiveCallbackOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        // Add bufferized arguments
+        SmallVector<Value> bufferArgs(adaptor.getOperands().begin(), adaptor.getOperands().end());
+
+        // Add bufferized return values to the arguments
+        auto results = op.getResults();
+
+        for (Value result : results) {
+            Type resultType = result.getType();
+            RankedTensorType tensorType = resultType.dyn_cast<RankedTensorType>();
+            if (!tensorType) {
+                return failure();
+            }
+            auto options = bufferization::BufferizationOptions();
+            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
+                rewriter, op->getLoc(), result, options, false);
+            MemRefType memrefType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            auto newBuffer =
+                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
+            bufferArgs.push_back(newBuffer);
+        }
+
+        rewriter.create<ActiveCallbackOp>(op.getLoc(), TypeRange{}, bufferArgs,
+                                          adaptor.getIdentifier(), op.getOperands().size());
         size_t startIndex = bufferArgs.size() - op.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         rewriter.replaceOp(op, bufferResults);
@@ -127,6 +164,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeInactiveCallbackOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeActiveCallbackOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
 }
 
