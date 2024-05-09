@@ -14,7 +14,7 @@
 """This module contains for program verification.
 """
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Observable, Operation
@@ -24,6 +24,8 @@ from pennylane.tape import QuantumTape
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.toml import OperationProperties
+
+# pylint: disable=import-outside-toplevel
 
 
 def _verify_nested(
@@ -36,7 +38,6 @@ def _verify_nested(
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
     # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
-    # pylint: disable=import-outside-toplevel
     from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
 
     ctx = EvaluationContext.get_main_tracing_context()
@@ -77,7 +78,7 @@ def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
                 )
         return (in_inverse + 1) if isinstance(op, Adjoint) else in_inverse
 
-    def _obs_checker(obs, state):
+    def _obs_checker(_, state):
         return state
 
     _verify_nested(tape, 0, _op_checker, _obs_checker)
@@ -100,7 +101,7 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
                 )
         return (in_control + 1) if isinstance(op, QCtrl) else in_control
 
-    def _obs_checker(obs, state):
+    def _obs_checker(_, state):
         return state
 
     _verify_nested(tape, 0, _op_checker, _obs_checker)
