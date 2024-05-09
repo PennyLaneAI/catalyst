@@ -29,6 +29,7 @@ from catalyst import (
     DifferentiableCompileError,
     adjoint,
     cond,
+    ctrl,
     for_loop,
     grad,
     jacobian,
@@ -37,14 +38,17 @@ from catalyst import (
     pure_callback,
     qjit,
     value_and_grad,
-    ctrl,
 )
 from catalyst.utils.runtime import pennylane_operation_set
 from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 
-def get_custom_device(non_differentiable_gates=set(), non_invertible_gates=set(),
-                      non_controllable_gates=set(), **kwargs):
+def get_custom_device(
+    non_differentiable_gates=set(),
+    non_invertible_gates=set(),
+    non_controllable_gates=set(),
+    **kwargs
+):
     """Generate a custom device where certain gates are marked as non-differensiable."""
 
     lightning_device = qml.device("lightning.qubit", wires=0)

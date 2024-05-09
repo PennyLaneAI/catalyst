@@ -31,8 +31,8 @@ from catalyst.utils.toml import OperationProperties
 def _verify_nested(
     tape: QuantumTape,
     state: Any,
-    op_checker_fn: Callable[[Operation], None],
-    obs_checker_fn: Callable[[Observable], None],
+    op_checker_fn: Callable[[Operation, Any], Any],
+    obs_checker_fn: Callable[[Observable, Any], Any],
 ) -> Any:
     """Traverse the nested quantum tape, carry a caller-defined state."""
 
