@@ -69,6 +69,11 @@
 
 <h3>Improvements</h3>
 
+* `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
+  as active for the computation of gradients.
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
+
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
