@@ -37,7 +37,7 @@ class TestCudaQ:
     def test_valid_device(self):
         """Test that we cannot pass lightning qubit as a compiler to @qjit decorator."""
 
-        from catalyst.cuda import cudaqjit as cjit
+        from catalyst.third_party.cuda import cudaqjit as cjit
 
         @cjit()
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -50,7 +50,7 @@ class TestCudaQ:
     def test_measurement_return(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda import cudaqjit as cjit
+        from catalyst.third_party.cuda import cudaqjit as cjit
 
         with pytest.raises(NotImplementedError, match="cannot return measurements directly"):
 
@@ -65,7 +65,7 @@ class TestCudaQ:
     def test_measurement_side_effect(self):
         """Test the measurement code is added."""
 
-        from catalyst.cuda import cudaqjit as cjit
+        from catalyst.third_party.cuda import cudaqjit as cjit
 
         @cjit
         @qml.qnode(qml.device("softwareq.qpp", wires=1, shots=30))
@@ -89,7 +89,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = catalyst.cuda.cudaqjit()(circuit_a)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit()(circuit_a)
         observed = cuda_compiled(3.14)
         catalyst_compiled = qjit(circuit_b)
         expected = catalyst_compiled(3.14)
@@ -108,7 +108,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit()(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit()(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -127,7 +127,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return qml.sample()
 
-        cuda_compiled = catalyst.cuda.cudaqjit()(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit()(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -146,7 +146,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return qml.counts()
 
-        cuda_compiled = catalyst.cuda.cudaqjit()(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit()(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -165,7 +165,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(fn=circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(fn=circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -184,7 +184,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -203,7 +203,7 @@ class TestCudaQ:
             qml.RX(a / 2, wires=[0])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -226,7 +226,7 @@ class TestCudaQ:
             qml.RX(y[0], wires=[0])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(jax.numpy.array([3.14, 0.0]))
         observed = cuda_compiled(jax.numpy.array([3.14, 0.0]))
@@ -246,7 +246,7 @@ class TestCudaQ:
             qml.RX(a, wires=[0])
             return {"a": qml.state()}
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         catalyst_compiled = qjit(circuit_lightning)
         expected = catalyst_compiled(3.14)
         observed = cuda_compiled(3.14)
@@ -277,7 +277,7 @@ class TestCudaQ:
             qml.RX(jnp.pi / 2, wires=[0])
             return qml.expval(qml.PauliZ(0))
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -296,7 +296,7 @@ class TestCudaQ:
             qml.RY(jnp.pi / 4, wires=[1])
             return qml.expval(qml.PauliZ(1) + qml.PauliX(1))
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -331,7 +331,7 @@ class TestCudaQ:
             qml.adjoint(f)(jnp.pi)
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -352,7 +352,7 @@ class TestCudaQ:
             qml.CRY(jnp.pi / 2, wires=[0, 1])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -373,7 +373,7 @@ class TestCudaQ:
             qml.SWAP(wires=[0, 1])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -394,7 +394,7 @@ class TestCudaQ:
             qml.CNOT(wires=[0, 1])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -417,7 +417,7 @@ class TestCudaQ:
             qml.CSWAP(wires=[0, 1, 2])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         catalyst_compiled = qjit(circuit_catalyst)
         expected = catalyst_compiled()
@@ -433,7 +433,7 @@ class TestCudaQ:
             qml.CSWAP(wires=[0, 1, 2])
             return qml.state()
 
-        cuda_compiled = catalyst.cuda.cudaqjit(circuit)
+        cuda_compiled = catalyst.third_party.cuda.cudaqjit(circuit)
         observed = cuda_compiled()
         assert isinstance(observed, jax.Array)
 
@@ -452,12 +452,12 @@ class TestCudaQ:
             return circuit(x)
 
         with pytest.raises(CompileError, match="Cannot translate tapes with context"):
-            catalyst.cuda.cudaqjit(wrapper)(1.0)
+            catalyst.third_party.cuda.cudaqjit(wrapper)(1.0)
 
     def test_samples(self):
         """Samples with more than one wire."""
 
-        from catalyst.cuda import cudaqjit as cjit
+        from catalyst.third_party.cuda import cudaqjit as cjit
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10))

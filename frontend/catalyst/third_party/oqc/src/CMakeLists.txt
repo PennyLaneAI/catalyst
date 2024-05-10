@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(catalyst_oqc)
 
-set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/include")
-set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/lib/backend/common")
-set(util_includes "${PROJECT_SOURCE_DIR}/../../../../runtime/utils")
+set(runtime_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/include")
+set(backend_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/lib/backend/common")
+set(util_includes "${PROJECT_SOURCE_DIR}/../../../../../runtime/utils")
 set(runtime_lib "${RUNTIME_BUILD_DIR}/lib")
 set(oqc_backend_dir "${OQC_BUILD_DIR}/backend")
 
