@@ -50,6 +50,7 @@ FetchContent_Declare(
 )
 
 function(fetch_pybind11)
+    find_package(Python COMPONENTS Interpreter Development) # Required for non-standard Python system intsalls
     find_package(pybind11 CONFIG)
     if (pybind11_FOUND)
         message(STATUS, "FOUND pybind11")
@@ -58,8 +59,8 @@ function(fetch_pybind11)
         set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
 
         FetchContent_Declare(pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.10.1
+            GIT_REPOSITORY https://github.com/pybind/pybind11.git
+            GIT_TAG        v2.12.0
         )
 
         FetchContent_MakeAvailable(pybind11)
