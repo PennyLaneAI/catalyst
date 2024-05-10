@@ -84,7 +84,7 @@ def cudaqjit(fn=None, **kwargs):
     """
     _check_version_compatibility()
     # pylint: disable-next=import-outside-toplevel
-    from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
+    from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import interpret
 
     if fn is not None:
         return interpret(fn, **kwargs)
