@@ -141,7 +141,7 @@ def verify_adjoint_differentiability(device: "AnyQJITDevice", tape: QuantumTape)
 
 
 def verify_no_mid_circuit_measurement(_, tape: QuantumTape) -> None:
-    """Verify quantum program against the device capabilities.
+    """Verify tape contains no mid-circuit measurements
 
     Raises: DifferentiableCompileError
     """
