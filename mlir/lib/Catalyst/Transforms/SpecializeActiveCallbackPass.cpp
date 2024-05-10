@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"

@@ -154,7 +154,8 @@ def SpecializeActiveCallbackPass : Pass<"specialize-active-callback-pass", "Modu
 
     let dependentDialects = [
         "catalyst::CatalystDialect",
-        "mlir::LLVM::LLVMDialect"
+        "mlir::func::FuncDialect",
+        "LLVM::LLVMDialect"
     ];
 
     let constructor = "catalyst::createSpecializeActiveCallbackPass()";
