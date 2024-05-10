@@ -215,7 +215,7 @@ def test_non_invertible_gate_nested_while():
 
     @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
     def f(x):
-        @for_loop(0,10,1)
+        @for_loop(0, 10, 1)
         def loop(i):
             adjoint(qml.RX(x, wires=0))
 
