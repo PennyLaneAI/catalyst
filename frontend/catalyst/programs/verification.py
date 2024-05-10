@@ -138,3 +138,21 @@ def verify_adjoint_differentiability(device: "AnyQJITDevice", tape: QuantumTape)
                 )
 
     _verify_nested(tape, None, _op_checker, _obs_checker)
+
+
+def verify_no_mid_circuit_measurement(_, tape: QuantumTape) -> None:
+    """Verify quantum program against the device capabilities.
+
+    Raises: DifferentiableCompileError
+    """
+
+    from catalyst.api_extensions import MidCircuitMeasure
+
+    def _op_checker(op, _):
+        if isinstance(op, MidCircuitMeasure):
+            raise DifferentiableCompileError(f"{op.name} is not allowed in gradinets")
+
+    def _obs_checker(_obs, st):
+        return st
+
+    _verify_nested(tape, None, _op_checker, _obs_checker)

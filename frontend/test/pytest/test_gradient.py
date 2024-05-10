@@ -1196,7 +1196,7 @@ class TestGradientErrors:
             qml.RX(_bool + 1, wires=0)
             return qml.expval(qml.PauliX(0))
 
-        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
             @qml.qjit
             def cir(x: float):
