@@ -2,6 +2,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
+include(ExternalProject)
 
 if(RUNTIME_CLANG_TIDY)
     if(NOT DEFINED CLANG_TIDY_BINARY)
@@ -14,12 +15,30 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
-FetchContent_Declare(
-    pennylane_lightning
-    GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-    GIT_TAG      ${LIGHTNING_GIT_TAG}
-)
+if(LIGHTNING_SRC_PATH)
+    if(NOT IS_ABSOLUTE ${LIGHTNING_SRC_PATH})
+        message(FATAL_ERROR " LIGHTNING_SRC_PATH=${LIGHTNING_SRC_PATH} must be set to an absolute path")
+    endif()
+    if(LIGHTNING_GIT_TAG)
+        message(WARN " Setting `LIGHTNING_SRC_PATH=${LIGHTNING_SRC_PATH}` overrides `LIGHTNING_GIT_TAG=${LIGHTNING_GIT_TAG}`")
+    endif()
+
+    FetchContent_Declare(
+        pennylane_lightning
+        URL file://${LIGHTNING_SRC_PATH}
+    )
+else()
+    if(NOT LIGHTNING_GIT_TAG)
+        set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
+    endif()
+    FetchContent_Declare(
+        pennylane_lightning
+        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
+        GIT_TAG      ${LIGHTNING_GIT_TAG}
+    )
+endif()
+FetchContent_MakeAvailable(pennylane_lightning)
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
 if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
@@ -30,8 +49,6 @@ elseif(ENABLE_LIGHTNING_KOKKOS)
     set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
 endif()
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
-
-FetchContent_MakeAvailable(pennylane_lightning)
 
 set(src_files)
 
