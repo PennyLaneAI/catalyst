@@ -20,7 +20,7 @@ compilation & execution on devices.
 import jax
 import pennylane as qml
 from pennylane import transform
-from pennylane.devices.preprocess import _operator_decomposition_gen
+from pennylane.devices.preprocess import _operator_decomposition_gen, decompose
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -53,7 +53,7 @@ def catalyst_decomposer(op):
 
 
 @transform
-def decompose(
+def catalyst_decompose(
     tape: qml.tape.QuantumTape,
     ctx,
     stopping_condition,
@@ -68,24 +68,13 @@ def decompose(
     the acceptance criteria and is not decomposed further,
     """
 
-    if len(tape) == 0:
-        return (tape,), lambda x: x[0]
+    (toplevel_tape,), _ = decompose(tape, stopping_condition, skip_initial_state_prep=False, decomposer=decomposer, max_expansion=max_expansion, name="catalyst on this device", error=CompileError,) 
 
     new_ops = []
-    for op in tape.operations:
+    for op in toplevel_tape.operations:
         if has_nested_tapes(op):
             op = _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion)
-        new_ops.extend(
-            op
-            for op in _operator_decomposition_gen(
-                op,
-                stopping_condition,
-                decomposer=decomposer,
-                max_expansion=max_expansion,
-                name="catalyst on this device",
-                error=CompileError,
-            )
-        )
+        new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
@@ -112,7 +101,7 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
             new_tape = None
         else:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                tapes, _ = decompose(
+                tapes, _ = catalyst_decompose(
                     region.quantum_tape,
                     ctx=ctx,
                     stopping_condition=stopping_condition,
@@ -168,9 +157,6 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
-    if has_nested_tapes(op):
-        return op.name in operations and op.visited
-
     return op.name in operations
 
 

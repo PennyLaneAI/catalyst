@@ -39,7 +39,7 @@ from catalyst.api_extensions.quantum_operators import Adjoint, adjoint
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import (
     catalyst_acceptance,
-    decompose,
+    catalyst_decompose,
     decompose_ops_to_unitary,
     measurements_from_counts,
 )
@@ -314,7 +314,7 @@ class TestPreprocessHybridOp:
         # create and decompose the tape
         tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = decompose(tape, ctx, stopping_condition)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition)
 
         old_op = tape[0]
         new_op = new_tape[0]
@@ -504,7 +504,7 @@ class TestPreprocessHybridOp:
 
         # do the decomposition and get the new tape
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = decompose(tape, ctx, stopping_condition)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition)
 
         # unsupported ops on the top-level tape have been decomposed (no more Hadamard)
         assert "Hadamard" not in [op.name for op in new_tape.operations]
@@ -544,7 +544,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = decompose(tape, ctx, stopping_condition)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition)
 
         assert len(new_tape.operations) == 1
         new_op = new_tape.operations[0]
@@ -569,7 +569,7 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition)
 
     def test_error_for_pennylane_midmeasure_decompose_nested(self):
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
@@ -594,7 +594,7 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition)
 
     def test_unsupported_op_with_no_decomposition_raises_error(self):
         """Test that an unsupported operator that doesn't provide a decomposition
@@ -610,7 +610,7 @@ class TestPreprocessHybridOp:
             match="not supported with catalyst on this device and does not provide a decomposition",
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition)
 
     def test_decompose_to_matrix_raises_error(self):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
@@ -629,7 +629,7 @@ class TestPreprocessHybridOp:
 
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition)
 
 
 class TestTransform:
