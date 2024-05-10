@@ -67,6 +67,19 @@
 
   ```
 
+* Support for including a list of previously excluded modules
+  for Autograph conversion.
+  [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
+  
+  Including previously excluded modules is now possible:
+
+  ```py
+  @qjit(autograph=True, autograph_include=["excluded_module"])
+  def f(x):
+    return excluded_module.func(x)
+
+  ```
+
 <h3>Improvements</h3>
 
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
