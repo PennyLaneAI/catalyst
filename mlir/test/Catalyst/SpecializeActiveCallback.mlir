@@ -36,7 +36,7 @@ func.func @foo() {
 module @test1 {
 
   llvm.func @cir() {
-     // CHECK: catalyst.activeCallbackCall() as @hello
+     // CHECK: catalyst.activeCallbackCall() as @active_callback_0
      catalyst.activeCallbackCall() { identifier = 0 } : () -> ()
      llvm.return
   }

@@ -20,28 +20,35 @@
 #include "Catalyst/Transforms/Patterns.h"
 
 using namespace mlir;
+using namespace catalyst;
 
 namespace {
 
-struct AddDeclarationToModulePattern : public OpRewritePattern<catalyst::ActiveCallbackOp> {
-    using OpRewritePattern<catalyst::ActiveCallbackOp>::OpRewritePattern;
+std::string getSpecializedName(ActiveCallbackOp op)
+{
+    auto id = std::to_string(op.getIdentifier());
+    return "active_callback_" + id;
+}
 
-    LogicalResult match(catalyst::ActiveCallbackOp op) const override;
-    void rewrite(catalyst::ActiveCallbackOp op, PatternRewriter &rewriter) const override;
+struct AddDeclarationToModulePattern : public OpRewritePattern<ActiveCallbackOp> {
+    using OpRewritePattern<ActiveCallbackOp>::OpRewritePattern;
+
+    LogicalResult match(ActiveCallbackOp op) const override;
+    void rewrite(ActiveCallbackOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AddDeclarationToModulePattern::match(catalyst::ActiveCallbackOp op) const
+LogicalResult AddDeclarationToModulePattern::match(ActiveCallbackOp op) const
 {
     return op.getSpecialized() ? failure() : success();
 }
 
-void AddDeclarationToModulePattern::rewrite(catalyst::ActiveCallbackOp op,
-                                            PatternRewriter &rewriter) const
+void AddDeclarationToModulePattern::rewrite(ActiveCallbackOp op, PatternRewriter &rewriter) const
 {
+    auto specializedName = getSpecializedName(op);
+    auto specializedNameAttr = rewriter.getStringAttr(specializedName);
     rewriter.updateRootInPlace(op, [&] {
-        auto specializedFakeName = rewriter.getStringAttr("hello");
-        auto specializedFake = FlatSymbolRefAttr::get(specializedFakeName);
-        op.setSpecializedAttr(specializedFake);
+        auto specializedSym = FlatSymbolRefAttr::get(specializedNameAttr);
+        op.setSpecializedAttr(specializedSym);
     });
     return;
 }
