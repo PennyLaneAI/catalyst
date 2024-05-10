@@ -476,6 +476,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
+        python -m pip install attrs
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
         PYTHON=$(which python) make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
