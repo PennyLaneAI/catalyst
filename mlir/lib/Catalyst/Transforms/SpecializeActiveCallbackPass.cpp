@@ -21,6 +21,28 @@
 
 using namespace mlir;
 
+namespace {
+
+struct AddDeclarationToModulePattern : public OpRewritePattern<catalyst::ActiveCallbackOp> {
+    using OpRewritePattern<catalyst::ActiveCallbackOp>::OpRewritePattern;
+
+    LogicalResult match(catalyst::ActiveCallbackOp op) const override;
+    void rewrite(catalyst::ActiveCallbackOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult AddDeclarationToModulePattern::match(catalyst::ActiveCallbackOp) const
+{
+    return failure();
+}
+
+void AddDeclarationToModulePattern::rewrite(catalyst::ActiveCallbackOp,
+                                            PatternRewriter &rewriter) const
+{
+    return;
+}
+
+} // namespace
+
 namespace catalyst {
 
 #define GEN_PASS_DEF_SPECIALIZEACTIVECALLBACKPASS
@@ -30,7 +52,15 @@ namespace catalyst {
 struct SpecializeActiveCallbackPass
     : impl::SpecializeActiveCallbackPassBase<SpecializeActiveCallbackPass> {
     using SpecializeActiveCallbackPassBase::SpecializeActiveCallbackPassBase;
-    void runOnOperation() final {}
+    void runOnOperation() final
+    {
+        auto ctx = &getContext();
+        RewritePatternSet patterns(ctx);
+        patterns.add<AddDeclarationToModulePattern>(ctx);
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+            signalPassFailure();
+        }
+    }
 };
 
 std::unique_ptr<Pass> createSpecializeActiveCallbackPass()

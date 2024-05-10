@@ -24,3 +24,17 @@ func.func @foo() {
   return
 }
 
+// -----
+
+// This test checks that if an active callback
+// is found, then we create a declaration
+// in the module
+
+// CHECK-LABEL: @test1
+module @test1 {
+
+  llvm.func @cir() {
+     catalyst.activeCallbackCall() { identifier = 0 } : () -> ()
+     llvm.return
+  }
+}
