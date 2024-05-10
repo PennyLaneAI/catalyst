@@ -484,6 +484,7 @@ def trace_quantum_tape(
 
     qrp = QRegPromise(qreg)
     if isinstance(device, qml.Device):
+        # FIXME: this happens after the verification call. Can we remove this expansion?
         ops = device.expand_fn(quantum_tape)
     else:
         ops = quantum_tape

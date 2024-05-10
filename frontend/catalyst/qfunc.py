@@ -75,12 +75,10 @@ class QFunc:
         # Validate decive operations against the declared capabilities
         validate_device_capabilities(device, device_capabilities)
 
-        if isinstance(self.device, qml.devices.Device):
+        if isinstance(device, qml.devices.Device):
             self.qjit_device = QJITDeviceNewAPI(device, device_capabilities, backend_info)
         else:
-            self.qjit_device = QJITDevice(
-                device_capabilities, device.shots, device.wires, backend_info
-            )
+            self.qjit_device = QJITDevice(device, device_capabilities, backend_info)
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(

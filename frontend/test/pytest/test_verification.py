@@ -64,6 +64,9 @@ def get_custom_device(
         backend_lib = "default"
         backend_kwargs = {}
 
+        # By this we disable tape expansion in the deduced QJITDevice
+        max_expansion = 0
+
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
             program_features = ProgramFeatures(shots_present=kwargs.get("shots") is not None)
@@ -186,6 +189,37 @@ def test_non_invertible_gate_nested_cond():
 
         true_path()
 
+        return qml.expval(qml.PauliX(0))
+
+    with pytest.raises(CompileError, match="RX.*not invertible"):
+
+        @qml.qjit
+        def cir(x: float):
+            return grad(f)(x)
+
+
+def test_non_controllable_gate_simple():
+    """Emulate a device with a non-controllable gate."""
+
+    with pytest.raises(CompileError, match="PauliZ.*not controllable"):
+
+        @qjit
+        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
+        def f(x: float):
+            ctrl(qml.PauliZ(wires=0), control=[1, 2])
+            return qml.expval(qml.PauliX(0))
+
+
+def test_non_invertible_gate_nested_while():
+    """Emulate a device with a non-invertible gate."""
+
+    @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
+    def f(x):
+        @for_loop(0,10,1)
+        def loop(i):
+            adjoint(qml.RX(x, wires=0))
+
+        loop()
         return qml.expval(qml.PauliX(0))
 
     with pytest.raises(CompileError, match="RX.*not invertible"):

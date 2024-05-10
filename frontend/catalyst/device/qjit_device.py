@@ -160,12 +160,12 @@ class QJITDevice(qml.QubitDevice):
 
     def __init__(
         self,
+        original_device,
         original_device_capabilities: DeviceCapabilities,
-        shots=None,
-        wires=None,
         backend: Optional[BackendInfo] = None,
     ):
-        super().__init__(wires=wires, shots=shots)
+        self.original_device = original_device
+        super().__init__(wires=original_device.wires, shots=original_device.shots)
 
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
@@ -189,7 +189,7 @@ class QJITDevice(qml.QubitDevice):
         """
         raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
 
-    def default_expand_fn(self, circuit, max_expansion=10):
+    def default_expand_fn(self, circuit, max_expansion=None):
         """
         Most decomposition logic will be equivalent to PennyLane's decomposition.
         However, decomposition logic will differ in the following cases:
@@ -206,6 +206,12 @@ class QJITDevice(qml.QubitDevice):
             circuit: circuit to expand
             max_expansion: the maximum number of expansion steps if no fixed-point is reached.
         """
+
+        max_expansion = (
+            self.original_device.max_expansion
+            if hasattr(self.original_device, "max_expansion")
+            else 10
+        )
         # Ensure catalyst.measure is used instead of qml.measure.
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
@@ -262,6 +268,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         original_device,
         original_device_capabilities: DeviceCapabilities,
         backend: Optional[BackendInfo] = None,
+        max_expansion: Optional[int] = None,
     ):
         self.original_device = original_device
 
@@ -304,9 +311,16 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # TOML files
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
+        max_expansion = (
+            self.original_device.max_expansion
+            if hasattr(self.original_device, "max_expansion")
+            else None
+        )
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(decompose, ctx=ctx, stopping_condition=ops_acceptance)
+        program.add_transform(
+            decompose, ctx=ctx, stopping_condition=ops_acceptance, max_expansion=max_expansion
+        )
 
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
