@@ -268,7 +268,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         original_device,
         original_device_capabilities: DeviceCapabilities,
         backend: Optional[BackendInfo] = None,
-        max_expansion: Optional[int] = None,
     ):
         self.original_device = original_device
 
