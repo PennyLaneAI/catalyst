@@ -138,7 +138,26 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
     ];
 
     let constructor = "catalyst::createRegisterInactiveCallbackPass()";
+}
 
+def SpecializeActiveCallbackPass : Pass<"specialize-active-callback-pass", "ModuleOp"> {
+    let summary = "Specializes active callbacks to their own function.";
+
+    let description = [{
+        1. The outermost module is walked.
+        2. For each activeCallbackOp
+           2.1 If the activeCallbackOp has been specialized: then continue.
+           2.2 If the activeCallbackOp has not been specialized:
+               2.2.1 Create a function activeCallbackOp${ID} where the first three parameters are literals.
+               2.2.2 Annotate the activeCallbackOp with a FlatSymbolRefAttr to the activeCallbackOp${ID}
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "mlir::LLVM::LLVMDialect"
+    ];
+
+    let constructor = "catalyst::createSpecializeActiveCallbackPass()";
 }
 
 #endif // CATALYST_PASSES
