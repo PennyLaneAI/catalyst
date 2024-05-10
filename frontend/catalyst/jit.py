@@ -648,6 +648,28 @@ def qjit(
 
 
     .. details::
+        :title: Adding modules for Autograph conversion
+
+        Due to the experimental state of Autograph support, the following modules have been excluded
+        from Autograph conversion: ``pennylane, catalyst, jax``. However, it is possible to
+        enable these or other previously excluded modules via the ``autograph_include`` parameter,
+        which provides a list of modules that will always be evaluated before the default conversion
+        rules, which means that any module of this list will be enabled for conversion regardless of
+        the default conversion rules that were excluding it before.
+
+        .. code-block:: python
+
+            import excluded_module_1
+            import excluded_module_2
+
+            @qjit(autograph=True, autograph_include=["excluded_module_1", "excluded_module_2"])
+            def g(x: int):
+                return excluded_module_1.f(x) + excluded_module_2.f(x)
+
+        Notice that ``autograph=True`` must be set in order to process the ``autograph_include``
+        list. Otherwise an error will be reported.
+
+    .. details::
         :title: Static arguments
 
         ``static_argnums`` defines which elements should be treated as static. If it takes an
