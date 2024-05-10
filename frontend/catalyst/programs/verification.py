@@ -111,7 +111,7 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     _verify_nested(tape, 0, _op_checker, _obs_checker)
 
 
-def verify_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
+def verify_adjoint_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     """Verify quantum program against the device capabilities.
 
     Raises: DifferentiableCompileError

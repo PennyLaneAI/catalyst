@@ -79,8 +79,8 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.programs.verification import (
+    verify_adjoint_differentiability,
     verify_control,
-    verify_differentiability,
     verify_inverses,
 )
 from catalyst.tracing.contexts import (
@@ -91,19 +91,26 @@ from catalyst.tracing.contexts import (
 from catalyst.utils.exceptions import CompileError
 
 # Global flag tracing wether the function that we trace might be used for gradients
-TRACING_GRADIENTS = False
+TRACING_GRADIENTS: List[str] = []
+
+
+def _in_gradient_tracing(qnode) -> Optional[str]:
+    """If we are tracing gradient - return the current grad method."""
+    if len(TRACING_GRADIENTS) == 0:
+        return None
+
+    method = TRACING_GRADIENTS[-1]
+    return qnode.diff_method if method == "auto" else method
 
 
 @contextmanager
-def mark_gradient_tracing():
+def mark_gradient_tracing(method: str):
     """Wraps the inner flow with the gradient-tracing flag"""
-    global TRACING_GRADIENTS  # pylint: disable=global-statement
-    old = TRACING_GRADIENTS
     try:
-        TRACING_GRADIENTS = True
+        TRACING_GRADIENTS.append(method)
         yield
     finally:
-        TRACING_GRADIENTS = old
+        TRACING_GRADIENTS.pop()
 
 
 class Function:
@@ -909,8 +916,8 @@ def trace_quantum_function(
             for tape in tapes:
                 verify_inverses(device, tape)
                 verify_control(device, tape)
-                if TRACING_GRADIENTS:
-                    verify_differentiability(device, tape)
+                if _in_gradient_tracing(qnode) == "adjoint":
+                    verify_adjoint_differentiability(device, tape)
 
         # (2) - Quantum tracing
         transformed_results = []

@@ -100,13 +100,17 @@ def get_custom_device(
             """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
+        def supports_derivatives(self, config, circuit=None):
+            """Pretend we support any derivatives"""
+            return True
+
     return CustomDevice(**kwargs)
 
 
 def test_non_differentiable_gate_simple():
     """Emulate a device with a non-differentiable gate."""
 
-    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=[0]))
+    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=[0]), diff_method="adjoint")
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliX(0))
@@ -121,7 +125,7 @@ def test_non_differentiable_gate_simple():
 def test_non_differentiable_gate_nested_cond():
     """Emulate a device with a non-differentiable gate."""
 
-    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=1))
+    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint")
     def f(x):
         @cond(True)
         def true_path():
@@ -145,7 +149,7 @@ def test_non_differentiable_gate_nested_cond():
 def test_non_differentiable_gate_nested_adjoint():
     """Emulate a device with a non-differentiable gate."""
 
-    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=1))
+    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint")
     def f(x):
         adjoint(qml.RX(x, wires=[0]))
         return qml.expval(qml.PauliX(0))
