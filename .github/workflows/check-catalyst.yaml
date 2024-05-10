@@ -440,7 +440,6 @@ jobs:
         # macOS requirements.txt
         python -m pip install cuda-quantum==0.6.0
         python -m pip install oqc-qcaas-client
-        python -m pip install lit
         make frontend
 
     - name: Get Cached LLVM Build
@@ -472,7 +471,8 @@ jobs:
 
     - name: Run Python Lit Tests
       run: |
-        llvm-lit -sv frontend/test/lit -j$(nproc)
+        python -m pip install lit
+        lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
       run: |
