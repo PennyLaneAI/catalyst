@@ -23,6 +23,7 @@ from catalyst import (
     qjit,
     run_autograph,
 )
+from catalyst.utils.dummy import dummy_func
 
 
 def print_code(fn):
@@ -667,3 +668,37 @@ def enable_autograph_context_manager_jax():
 
 print("def enable_autograph_context_manager_jax")
 print(enable_autograph_context_manager_jax.jaxpr)
+
+
+# -----
+
+
+# CHECK-LABEL: def include_module_to_autograph
+@qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+def include_module_to_autograph(x: float, n: int):
+    """Checks that a module is included to Autograph conversion."""
+    # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
+    for _ in range(n):
+        x = x + dummy_func()
+    return x
+
+
+print("def include_module_to_autograph")
+print(include_module_to_autograph.jaxpr)
+
+
+# -----
+
+
+# CHECK-LABEL: def excluded_module_from_autograph
+@qjit(autograph=True)
+def excluded_module_from_autograph(x: float, n: int):
+    """Checks that a module is excluded from Autograph conversion."""
+    # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:f64[] = add e 36.0 in (f,) }
+    for _ in range(n):
+        x = x + dummy_func()
+    return x
+
+
+print("def excluded_module_from_autograph")
+print(excluded_module_from_autograph.jaxpr)

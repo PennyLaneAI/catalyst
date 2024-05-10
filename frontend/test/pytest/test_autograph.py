@@ -42,6 +42,7 @@ from catalyst import (
     vjp,
 )
 from catalyst.autograph.transformer import TRANSFORMER
+from catalyst.utils.dummy import dummy_func
 
 check_cache = TRANSFORMER.has_cache
 
@@ -1754,6 +1755,30 @@ class TestDisableAutograph:
             return x
 
         assert g() == 36.4
+
+
+class TestAutographInclude:
+    """Test include modules to autograph conversion"""
+
+    def test_autograph_included_module(self):
+        """Test autograph included module."""
+
+        @qjit(autograph=True)
+        def excluded_by_default(x: float, n: int):
+            for _ in range(n):
+                x = x + dummy_func()
+            return x
+
+        @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+        def included(x: float, n: int):
+            for _ in range(n):
+                x = x + dummy_func()
+            return x
+
+        result_excluded_by_default = excluded_by_default(0.4, 6)
+        assert result_excluded_by_default == 216.4 and result_excluded_by_default == included(
+            0.4, 6
+        )
 
 
 class TestJaxIndexAssignment:
