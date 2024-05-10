@@ -329,7 +329,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y ccache clang lld
-        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python -m pip install cmake numpy pybind11 ninja scipy
 
     - name: Get Cached LLVM Source
