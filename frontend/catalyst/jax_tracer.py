@@ -909,7 +909,8 @@ def trace_quantum_function(
                 return_values_flat,
             )
 
-            for i in range(len(tapes)):
+            # TODO: Do we need to explicitly expand tape in the new device api?
+            for i in range(len(tapes)):  # pylint: disable=consider-using-enumerate
                 if isinstance(device, qml.Device):
                     tapes[i] = device.expand_fn(tapes[i])
 
