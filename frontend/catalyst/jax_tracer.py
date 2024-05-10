@@ -614,7 +614,7 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                if o.mv is not None:  # qml.sample(m, wires=i)
+                if o.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
