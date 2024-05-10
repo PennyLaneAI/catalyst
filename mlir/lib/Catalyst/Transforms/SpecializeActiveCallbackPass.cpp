@@ -30,14 +30,19 @@ struct AddDeclarationToModulePattern : public OpRewritePattern<catalyst::ActiveC
     void rewrite(catalyst::ActiveCallbackOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult AddDeclarationToModulePattern::match(catalyst::ActiveCallbackOp) const
+LogicalResult AddDeclarationToModulePattern::match(catalyst::ActiveCallbackOp op) const
 {
-    return failure();
+    return op.getSpecialized() ? failure() : success();
 }
 
-void AddDeclarationToModulePattern::rewrite(catalyst::ActiveCallbackOp,
+void AddDeclarationToModulePattern::rewrite(catalyst::ActiveCallbackOp op,
                                             PatternRewriter &rewriter) const
 {
+    rewriter.updateRootInPlace(op, [&] {
+        auto specializedFakeName = rewriter.getStringAttr("hello");
+        auto specializedFake = FlatSymbolRefAttr::get(specializedFakeName);
+        op.setSpecializedAttr(specializedFake);
+    });
     return;
 }
 

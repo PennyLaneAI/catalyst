@@ -27,13 +27,16 @@ func.func @foo() {
 // -----
 
 // This test checks that if an active callback
-// is found, then we create a declaration
-// in the module
+// then we also add the specialization.
+// The specialization is denoted with `as` followed by the name
+// of the specialized version.
+// Suggestions for syntax are welcomed.
 
 // CHECK-LABEL: @test1
 module @test1 {
 
   llvm.func @cir() {
+     // CHECK: catalyst.activeCallbackCall() as @hello
      catalyst.activeCallbackCall() { identifier = 0 } : () -> ()
      llvm.return
   }
