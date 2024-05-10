@@ -490,11 +490,7 @@ def trace_quantum_tape(
         return qrp
 
     qrp = QRegPromise(qreg)
-    if isinstance(device, qml.Device):
-        # FIXME: this happens after the verification call. Can we remove this expansion?
-        ops = device.expand_fn(quantum_tape)
-    else:
-        ops = quantum_tape
+    ops = quantum_tape
 
     for op in ops:
         qrp2 = None
@@ -912,7 +908,12 @@ def trace_quantum_function(
                 return_values_flat,
             )
 
-            # Verify the program against the device capabilities
+            for i in range(len(tapes)):
+                if isinstance(device, qml.Device):
+                    tapes[i] = device.expand_fn(tapes[i])
+
+            # Verify the program against the device capabilities. We should not transform quantum
+            # tapes after verification finishes.
             for tape in tapes:
                 verify_inverses(device, tape)
                 verify_control(device, tape)
