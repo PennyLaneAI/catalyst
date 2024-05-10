@@ -477,7 +477,7 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        make coverage-frontend
+        PYTHON=$(which python) make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
