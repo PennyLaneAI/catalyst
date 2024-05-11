@@ -485,12 +485,12 @@ class TestPreprocessHybridOp:
 
         # make a weird nested op
         adjoint_op = Adjoint([], [], [region1])
-        ops= [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]  # Hadamard will decompose
+        ops = [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]  # Hadamard will decompose
         adj_region = HybridOpRegion([], QuantumScript(ops), [], [])
 
         conditional_op = Cond([], [], regions=[adj_region, region2])
         ops = [conditional_op, qml.Y(1)]  # PauliY will decompose
-        conditional_region = HybridOpRegion([], qml.tape.QuantumScript(ops), [], [])  
+        conditional_region = HybridOpRegion([], qml.tape.QuantumScript(ops), [], [])
 
         for_loop_op = ForLoop([], [], [conditional_region])
         ops = [for_loop_op, qml.X(0), qml.Hadamard(3)]  # Hadamard will decompose

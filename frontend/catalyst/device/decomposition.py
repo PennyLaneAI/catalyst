@@ -68,7 +68,15 @@ def catalyst_decompose(
     the acceptance criteria and is not decomposed further,
     """
 
-    (toplevel_tape,), _ = decompose(tape, stopping_condition, skip_initial_state_prep=False, decomposer=decomposer, max_expansion=max_expansion, name="catalyst on this device", error=CompileError,) 
+    (toplevel_tape,), _ = decompose(
+        tape,
+        stopping_condition,
+        skip_initial_state_prep=False,
+        decomposer=decomposer,
+        max_expansion=max_expansion,
+        name="catalyst on this device",
+        error=CompileError,
+    )
 
     new_ops = []
     for op in toplevel_tape.operations:
