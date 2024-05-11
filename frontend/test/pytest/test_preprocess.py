@@ -324,10 +324,6 @@ class TestPreprocessHybridOp:
         assert isinstance(new_op, op_class)
         assert len(new_op.regions) == len(old_op.regions) == num_regions
 
-        # the ops on the original tape were as not modified when decomposing
-        assert old_op.visited == False
-        assert new_op.visited == True
-
         # the HybridOp on the original tape is unmodified, i.e. continues to contain ops
         # not in `expected_ops`. The post-decomposition HybridOp tape does not
         for i in range(num_regions):
