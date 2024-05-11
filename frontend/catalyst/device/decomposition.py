@@ -20,7 +20,7 @@ compilation & execution on devices.
 import jax
 import pennylane as qml
 from pennylane import transform
-from pennylane.devices.preprocess import _operator_decomposition_gen, decompose
+from pennylane.devices.preprocess import decompose
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -33,9 +33,7 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-import catalyst
-from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
-from catalyst.api_extensions.quantum_operators import Adjoint, MidCircuitMeasure, QCtrl
+from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
