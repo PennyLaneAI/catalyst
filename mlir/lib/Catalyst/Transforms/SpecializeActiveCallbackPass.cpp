@@ -37,11 +37,6 @@ LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp op, PatternRew
 {
     std::string name = "inactive_callback";
     auto moduleOp = op->getParentOfType<ModuleOp>();
-    auto maybeFuncOp = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(name);
-    if (maybeFuncOp) {
-        return maybeFuncOp;
-    }
-
     auto ctx = rewriter.getContext();
     Type i64 = rewriter.getI64Type();
 
