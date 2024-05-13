@@ -493,7 +493,8 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
         auto specializedAttr = op.getSpecializedAttr();
         auto specialized = mod.lookupSymbol<LLVM::LLVMFuncOp>(specializedAttr);
         if (!specialized) {
-            op.emitError() << "No specialized";
+            op.emitError() << "No specialized attribute was found.";
+            return failure();
         }
 
         // The argument convention is as follows:
