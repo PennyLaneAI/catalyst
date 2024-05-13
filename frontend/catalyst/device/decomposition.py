@@ -60,13 +60,13 @@ def catalyst_decompose(
 ):
     """Decompose operations until the stopping condition is met.
 
-    In a single call of the catalyst_decompose function, the PennyLane operations are decomposed 
-    in the same manner as in PennyLane (for each operator on the tape, checking if the operator 
-    passes the stopping_condition, and using its `decompostion` method if not, called recursively 
-    until a supported operation is found or an error is hit, then moving on to the next operator 
+    In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
+    in the same manner as in PennyLane (for each operator on the tape, checking if the operator
+    passes the stopping_condition, and using its `decompostion` method if not, called recursively
+    until a supported operation is found or an error is hit, then moving on to the next operator
     on the tape.)
-    
-    Once all operators on the tape are supported operators, the resulting tape is iterated over, 
+
+    Once all operators on the tape are supported operators, the resulting tape is iterated over,
     and for each HybridOp, the catalyst_decompose function is called on each of it's regions.
     This continues to call catalyst_decompose recursively until the tapes on all
     the HybridOps have been passed to the decompose function.
