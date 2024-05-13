@@ -23,7 +23,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QNode, QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
+from pennylane.measurements import MeasurementProcess, Shots
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
@@ -913,12 +913,14 @@ def trace_quantum_function(
             aggregated = post_process(storage)
             return aggregated
 
-        old = device._shots
+        old = device._shots, device.backend_kwargs['shots']
         try:
-            device._shots = 1
+            device._shots = Shots(1)
+            device.backend_kwargs['shots'] = 1
             return trace_quantum_function(ctx, _f2, device, args, kwargs, qnode)
         finally:
-            device._shots = old
+            device._shots = old[0]
+            device.backend_kwargs['shots'] = old[1]
 
     # (2) - Quantum tracing
     transformed_results = []
