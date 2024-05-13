@@ -104,6 +104,14 @@
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
 
+* `callback.pure_callback` are now lowered to `ActiveCallbackOp`s.
+  Which will be treated as active callbacks by Enzyme. During the lowering of
+  `ActiveCallbackOp`s, the callback will create a specialized function for the
+  `ActiveCallback`. This is necessary for registering custom gradients with
+  Enzyme.
+  [(#735)](https://github.com/PennyLaneAI/catalyst/pull/735)
+
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
