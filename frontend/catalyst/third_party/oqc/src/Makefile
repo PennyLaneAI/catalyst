@@ -6,7 +6,7 @@ NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 OQC_BUILD_DIR?=$(MK_DIR)/build
-RT_BUILD_DIR?=$(MK_DIR)/../../../../runtime/build
+RT_BUILD_DIR?=$(MK_DIR)/../../../../../runtime/build
 
 
 .PHONY: configure

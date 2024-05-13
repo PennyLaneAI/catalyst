@@ -11,7 +11,7 @@ LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
 MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/bazel-build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
-OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/oqc/src/build
+OQC_BUILD_DIR ?= $(MK_DIR)/frontend/catalyst/third_party/oqc/src/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 ENABLE_OPENQASM?=ON
@@ -112,7 +112,7 @@ dummy_device:
 	$(MAKE) -C runtime dummy_device
 
 oqc:
-	$(MAKE) -C frontend/catalyst/oqc/src oqc
+	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos test-toml-spec
@@ -129,7 +129,7 @@ test-mlir:
 test-frontend: lit pytest
 
 test-oqc:
-	$(MAKE) -C frontend/catalyst/oqc/src test
+	$(MAKE) -C frontend/catalyst/third_party/oqc/src test
 
 lit:
 ifeq ($(ENABLE_ASAN),ON)
@@ -227,7 +227,7 @@ clean-runtime:
 	$(MAKE) -C runtime clean
 
 clean-oqc:
-	$(MAKE) -C frontend/catalyst/oqc/src clean
+	$(MAKE) -C frontend/catalyst/third_party/oqc/src clean
 
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
