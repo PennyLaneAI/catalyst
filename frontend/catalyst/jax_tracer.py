@@ -307,7 +307,6 @@ class HybridOp(Operation):
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
         eqn = ctx.frames[trace].eqns[-1]
-        print((eqn.outvars, self.out_classical_tracers))
         assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
         for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
             eqn.outvars[i] = trace.getvar(t)
