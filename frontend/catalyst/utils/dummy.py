@@ -14,9 +14,11 @@
 """Dummy module for testing"""
 
 
-def dummy_func():
-    """Simple function with if statements for testing"""
-    x = 6
+def dummy_func(x):
+    """Simple function with if statements for testing the 'auto_include' option of @qjit.
+    The parent 'catalayst' module is excluded for autograph conversion by default, hence
+    adding this module explicitely to the inclusion list will override that restriction"""
+
     if x > 5:
         y = x**2
     else:

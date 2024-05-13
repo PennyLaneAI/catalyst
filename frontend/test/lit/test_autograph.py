@@ -679,7 +679,7 @@ def include_module_to_autograph(x: float, n: int):
     """Checks that a module is included to Autograph conversion."""
     # CHECK: branch_jaxprs=[{ lambda ; . let  in (36,) }, { lambda ; . let  in (216,) }]
     for _ in range(n):
-        x = x + dummy_func()
+        x = x + dummy_func(6)
     return x
 
 
@@ -696,7 +696,7 @@ def excluded_module_from_autograph(x: float, n: int):
     """Checks that a module is excluded from Autograph conversion."""
     # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:f64[] = add e 36.0 in (f,) }
     for _ in range(n):
-        x = x + dummy_func()
+        x = x + dummy_func(6)
     return x
 
 

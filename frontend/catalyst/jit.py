@@ -323,10 +323,10 @@ class QJIT:
         if not hasattr(self.original_function, "__name__"):
             self.__name__ = "unknown"  # allow these cases anyways?
 
-        if not self.compile_options.autograph:
-            assert (
-                len(self.compile_options.autograph_include) == 0
-            ), "In order for 'autograph_include' to work, 'autograph' must be set to True"
+        if not self.compile_options.autograph and len(self.compile_options.autograph_include) > 0:
+            raise CompileError(
+                "In order for 'autograph_include' to work, 'autograph' must be set to True"
+            )
 
     def _verify_static_argnums(self, args):
         for argnum in self.compile_options.static_argnums:
