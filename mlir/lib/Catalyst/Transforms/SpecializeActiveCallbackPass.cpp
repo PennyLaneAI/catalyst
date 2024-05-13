@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -44,44 +45,33 @@ LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp op, PatternRew
     auto ctx = rewriter.getContext();
     Type i64 = rewriter.getI64Type();
 
-    auto point = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(moduleOp.getBody());
     bool isVarArg = true;
     Type voidType = LLVM::LLVMVoidType::get(ctx);
     LLVM::LLVMFuncOp inactiveCallback = mlir::LLVM::lookupOrCreateFn(
         moduleOp, name, {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
-    // inactiveCallback.setPrivate();
-    rewriter.restoreInsertionPoint(point);
     return inactiveCallback;
 }
 
-func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rewriter)
+LLVM::LLVMFuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rewriter)
 {
     auto name = getSpecializedName(op);
     auto moduleOp = op->getParentOfType<ModuleOp>();
-    auto maybeFuncOp = moduleOp.lookupSymbol<func::FuncOp>(name);
-    if (maybeFuncOp) {
-        return maybeFuncOp;
-    }
-
-    Type i64 = rewriter.getI64Type();
     auto ctx = rewriter.getContext();
+    Location loc = op.getLoc();
     SmallVector<Type> inputs;
-    for (auto input : op.getInputs()) {
-        inputs.push_back(input.getType());
+    Type voidType = LLVM::LLVMVoidType::get(ctx);
+    Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+    auto argcLen = op.getInputs().size();
+    auto retcLen = op.getResults().size();
+    auto len = argcLen + retcLen;
+    for (size_t i = 0; i < len; i++) {
+        inputs.push_back(ptrTy);
     }
 
-    auto funcTy = FunctionType::get(ctx, inputs, {});
-    auto loc = op.getLoc();
-    func::FuncOp funcSpecialized = nullptr;
+    auto funcOp = mlir::LLVM::lookupOrCreateFn(moduleOp, name, inputs, voidType, false);
+    funcOp.setPrivate();
 
-    {
-        OpBuilder::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
-        funcSpecialized = rewriter.create<func::FuncOp>(loc, name, funcTy);
-    }
-
-    Block *entryBlock = funcSpecialized.addEntryBlock();
+    Block *entryBlock = funcOp.addEntryBlock();
     rewriter.setInsertionPointToStart(entryBlock);
 
     auto identAttr = op.getIdentifier();
@@ -91,7 +81,7 @@ func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rew
     long argcint = argcAttr ? argcAttr.value() : 0;
     auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
 
-    auto resultsSizeAttr = op.getOperands().size() - argcint;
+    auto resultsSizeAttr = len - argcint;
     auto resultsSizeVal =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
 
@@ -102,9 +92,10 @@ func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rew
 
     auto inactive = lookupOrDeclareInactiveCallback(op, rewriter);
     rewriter.create<LLVM::CallOp>(loc, inactive, args);
-    rewriter.create<func::ReturnOp>(loc);
+    SmallVector<Value> returns;
+    rewriter.create<LLVM::ReturnOp>(loc, returns);
 
-    return funcSpecialized;
+    return funcOp;
 }
 
 struct AddDeclarationToModulePattern : public OpRewritePattern<ActiveCallbackOp> {

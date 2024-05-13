@@ -48,7 +48,6 @@ module @test1 {
 // CHECK-LABEL: @test2
 module @test2 {
 
-
   // CHECK: llvm.func @inactive_callback(i64, i64, i64, ...)
   // CHECK-LABEL: @active_callback_0()
   // CHECK-NEXT: [[zero:%.+]] = llvm.mlir.constant(0 : i64)
@@ -60,3 +59,45 @@ module @test2 {
 
 }
 
+// -----
+
+// Check what happens if we put a memref here.
+
+// CHECK-LABEL: @test3
+module @test3 {
+
+  // CHECK-LABEL: @active_callback_0
+  // CHECK-SAME: %arg0: !llvm.ptr
+  // CHECK-SAME: sym_visibility = "private"
+  // CHECK-DAG: [[zero:%.+]] = llvm.mlir.constant(0 : i64)
+  // CHECK-DAG: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+
+  // CHECK: llvm.call @inactive_callback([[zero]], [[one]], [[zero]], %arg0)
+
+  func.func @cir(%arg0 : memref<f64>) {
+    catalyst.activeCallbackCall(%arg0) { identifier = 0 :i64, number_original_arg = 1 : i64} : (memref<f64>) -> ()
+    return
+  }
+
+}
+
+// -----
+
+// Test memref arguments and return values
+
+// CHECK-LABEL: @test4
+module @test4 {
+
+  // CHECK-LABEL: @active_callback_123
+  // CHECK-SAME: %arg0: !llvm.ptr
+  // CHECK-SAME: %arg1: !llvm.ptr
+  // CHECK-SAME: sym_visibility = "private"
+
+  // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+  // CHECK: llvm.call @inactive_callback({{%.+}}, [[one]], [[one]], %arg0, %arg1)
+
+  func.func public @jit_cir(%arg0: memref<i64>, %arg1: memref<i64>) -> memref<i64> {
+    catalyst.activeCallbackCall(%arg0, %arg1) {identifier = 123 : i64, number_original_arg = 1 : i64} : (memref<i64>, memref<i64>) -> ()
+    return %arg1 : memref<i64>
+  }
+}

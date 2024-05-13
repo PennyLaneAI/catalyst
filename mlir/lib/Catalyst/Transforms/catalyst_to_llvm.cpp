@@ -489,9 +489,8 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
         Location loc = op.getLoc();
 
         // Create function
-        Type voidType = LLVM::LLVMVoidType::get(ctx);
         ModuleOp mod = op->getParentOfType<ModuleOp>();
-        auto specializedAttr = adaptor.getSpecializedAttr();
+        auto specializedAttr = op.getSpecializedAttr();
         auto specialized = mod.lookupSymbol<LLVM::LLVMFuncOp>(specializedAttr);
         if (!specialized) {
             op.emitError() << "No specialized";
@@ -516,8 +515,6 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
         // }
         // where the first parameter is N
         // and the second parameter is M.
-
-        bool isVarArg = true;
 
         SmallVector<Value> callArgs;
 

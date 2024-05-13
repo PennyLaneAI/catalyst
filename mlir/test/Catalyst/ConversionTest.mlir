@@ -136,8 +136,8 @@ module @testfoo {
   }
 
   func.func @python_call () {
-    // CHECK: llvm.call @active_callback_0()
-    catalyst.activeCallbackCall() as @active_callback_0 { identifier = 0} : () -> ()
+    // CHECK: call @active_callback_0()
+    catalyst.activeCallbackCall() as @active_callback_0 { identifier = 0 : i64, number_original_arg = 0 : i64} : () -> ()
     return
   }
 }

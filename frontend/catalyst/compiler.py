@@ -142,7 +142,7 @@ HLO_LOWERING_PASS = (
 QUANTUM_COMPILATION_PASS = (
     "QuantumCompilationPass",
     [
-        # TODO: Pass here that will transform
+        "specialize-active-callback-pass",
         "annotate-function",
         "lower-mitigation",
         "lower-gradients",
