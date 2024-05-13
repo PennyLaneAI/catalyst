@@ -629,7 +629,7 @@ class TestPreprocessHybridOp:
 
 
 class TestTransform:
-    """Teented in Catalyst."""
+    """Test the transforms implemented in Catalyst."""
 
     def test_measurements_from_counts(self):
         """Test the transfom measurements_from_counts."""

@@ -60,10 +60,16 @@ def catalyst_decompose(
 ):
     """Decompose operations until the stopping condition is met.
 
-    PennyLane operations are decomposed in the same manner as in PennyLane. For
-    HybridOp (not QCtrl) we recurse and call the decompose function on each region tape. After
-    finishing the decomposition on a HybridOp we mark it as visited such that it meets
-    the acceptance criteria and is not decomposed further,
+    In a single call of the catalyst_decompose function, the PennyLane operations are decomposed 
+    in the same manner as in PennyLane (for each operator on the tape, checking if the operator 
+    passes the stopping_condition, and using its `decompostion` method if not, called recursively 
+    until a supported operation is found or an error is hit, then moving on to the next operator 
+    on the tape.)
+    
+    Once all operators on the tape are supported operators, the resulting tape is iterated over, 
+    and for each HybridOp, the catalyst_decompose function is called on each of it's regions.
+    This continues to call catalyst_decompose recursively until the tapes on all
+    the HybridOps have been passed to the decompose function.
     """
 
     (toplevel_tape,), _ = decompose(
@@ -79,7 +85,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion)
+            op = _decompose_nested_tapes(op, ctx, stopping_condition, decomposer, max_expansion)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -97,10 +103,7 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
-    if isinstance(op, QCtrl):
-        op.visited = True
-        return op
+def _decompose_nested_tapes(op, ctx, stopping_condition, decomposer, max_expansion):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
@@ -111,6 +114,7 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
                     region.quantum_tape,
                     ctx=ctx,
                     stopping_condition=stopping_condition,
+                    decomposer=decomposer,
                     max_expansion=max_expansion,
                 )
                 new_tape = tapes[0]
@@ -121,7 +125,6 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, max_expansion):
         )
 
     new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
-    new_op.visited = True
     return new_op
 
 
