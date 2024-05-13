@@ -41,3 +41,22 @@ module @test1 {
      llvm.return
   }
 }
+
+// -----
+
+// This test checks to see that the active callback is correctly defined
+// CHECK-LABEL: @test2
+module @test2 {
+
+
+  // CHECK: llvm.func @inactive_callback(i64, i64, i64, ...)
+  // CHECK-LABEL: @active_callback_0()
+  // CHECK-NEXT: [[zero:%.+]] = llvm.mlir.constant(0 : i64)
+  // CHEKC-NEXT: llvm.call @inactive_callback([[zero]], [[zero]], [[zero]])
+  llvm.func @cir() {
+     catalyst.activeCallbackCall() { identifier = 0 } : () -> ()
+     llvm.return
+  }
+
+}
+

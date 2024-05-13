@@ -490,38 +490,36 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
 
         // Create function
         Type voidType = LLVM::LLVMVoidType::get(ctx);
-        auto point = rewriter.saveInsertionPoint();
         ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
+        auto specializedAttr = adaptor.getSpecializedAttr();
+        auto specialized = mod.lookupSymbol<LLVM::LLVMFuncOp>(specializedAttr);
+        if (!specialized) {
+            op.emitError() << "No specialized";
+        }
 
-        Type i64 = rewriter.getI64Type();
         // The argument convention is as follows:
-        // arg0 =        identifier
-        // arg1 =        length of operands
-        // arg2 =        length of results
-        // arg3..N+3     varargs pointers to memrefs
-        // argN+4..N+M+4 varargs pointers to result memrefs
+        // arg0..N     varargs pointers to memrefs
+        // argN+1..N+M varargs pointers to result memrefs
+        // Why are N and Ms unknown here?
+        // because we are making a call to @active_callback which has the necessary information
+        // already embedded in it.
+        //
+        // E.g.,
+        //     catalyst.activeCallback %0, %1 { identifier = 0xdeadbeef } as
+        //     @active_callback_0xdeadbeef
+        //
+        // already has @active_callback_0xdeadbeef defined as
+        //
+        // llvm.func @active_callback_0xdeadbeef(%0, %1) {
+        //   llvm.call @inactive_callback(0xdeadbeef, 1, 1, %0, %1)
+        //   llvm.return
+        // }
+        // where the first parameter is N
+        // and the second parameter is M.
 
         bool isVarArg = true;
-        LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "inactive_callback", {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
-        customCallFnOp.setPrivate();
-        rewriter.restoreInsertionPoint(point);
 
-        auto identAttr = op.getIdentifier();
-        auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
-
-        auto argcAttr = op.getNumberOriginalArg();
-        long argcint = argcAttr ? argcAttr.value() : 0;
-        auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
-
-        auto resultsSizeAttr = op.getOperands().size() - argcint;
-        auto resultsSizeVal =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
-
-        SmallVector<Value> callArgs{ident};
-        callArgs.insert(callArgs.end(), argc);
-        callArgs.insert(callArgs.end(), resultsSizeVal);
+        SmallVector<Value> callArgs;
 
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         for (auto memref : adaptor.getInputs()) {
@@ -533,7 +531,7 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
             // add the ptr to the arguments
             callArgs.push_back(ptr);
         }
-        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.create<LLVM::CallOp>(loc, specialized, callArgs);
         rewriter.eraseOp(op);
         return success();
     }

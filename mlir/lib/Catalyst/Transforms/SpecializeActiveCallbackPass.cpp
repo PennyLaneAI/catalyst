@@ -66,7 +66,7 @@ func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rew
 
     Type i64 = rewriter.getI64Type();
     auto ctx = rewriter.getContext();
-    SmallVector<Type> inputs = {i64, i64, i64};
+    SmallVector<Type> inputs;
     for (auto input : op.getInputs()) {
         inputs.push_back(input.getType());
     }
@@ -84,7 +84,18 @@ func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rew
     Block *entryBlock = funcSpecialized.addEntryBlock();
     rewriter.setInsertionPointToStart(entryBlock);
 
-    SmallVector<Value> args;
+    auto identAttr = op.getIdentifier();
+    auto ident = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(identAttr));
+
+    auto argcAttr = op.getNumberOriginalArg();
+    long argcint = argcAttr ? argcAttr.value() : 0;
+    auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
+
+    auto resultsSizeAttr = op.getOperands().size() - argcint;
+    auto resultsSizeVal =
+        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
+
+    SmallVector<Value> args = {ident, argc, resultsSizeVal};
     for (auto arg : entryBlock->getArguments()) {
         args.push_back(arg);
     }
