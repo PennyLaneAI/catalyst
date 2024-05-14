@@ -26,7 +26,13 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
+from jax._src.tree_util import (
+    tree_flatten,
+    tree_leaves,
+    tree_map,
+    tree_structure,
+    tree_unflatten,
+)
 
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
@@ -158,6 +164,16 @@ def base_callback(func):
     return bind_callback
 
 
+class FlatCallable:
+    def __init__(self, func, *args, **kwargs):
+        self.func = func
+        self.shape = tree_structure((args, kwargs))
+
+    def __call__(self, args):
+        args, kwargs = tree_unflatten(self.shape, args)
+        return tree_leaves(self.func(*args, **kwargs))
+
+
 def callback_implementation(
     cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
 ):
@@ -169,7 +185,8 @@ def callback_implementation(
     Copyright 2022 The JAX Authors.
     """
 
-    flat_args, in_tree = tree_flatten((args, kwargs))
+    flat_args = tree_leaves((args, kwargs))
+    flat_callable = FlatCallable(cb, *args, **kwargs)
     metadata = CallbackClosure(args, kwargs)
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
@@ -183,8 +200,7 @@ def callback_implementation(
         To find out which element type it has, we use the signature obtained previously.
         """
         jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-        args, kwargs = tree_unflatten(in_tree, jnpargs)
-        retvals = tree_leaves(cb(*args, **kwargs))
+        retvals = flat_callable(jnpargs)
         return_values = []
         results_aval_sequence = (
             results_aval if isinstance(results_aval, Sequence) else [results_aval]
