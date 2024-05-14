@@ -401,7 +401,7 @@ def test_array_assignment():
 
 @pytest.mark.xfail(
     raises=OSError,
-    reason="""JAX requires BLAS to be linked with, 
+    reason="""JAX requires BLAS to be linked with,
     but we don't have it linked.""",
 )
 def test_expm():
