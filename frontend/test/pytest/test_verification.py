@@ -310,7 +310,7 @@ def test_paramshift_gate_while():
 
 
 def test_no_state_returns():
-    """Emulate a device with a non-invertible gate."""
+    """Test state returns are rejected in gradients."""
 
     @qml.qnode(get_custom_device(wires=1))
     def f(x):
@@ -325,7 +325,7 @@ def test_no_state_returns():
 
 
 def test_no_variance_returns():
-    """Emulate a device with a non-invertible gate."""
+    """Test variance returns are rejected in gradients."""
 
     @qml.qnode(get_custom_device(wires=1))
     def f(x):
