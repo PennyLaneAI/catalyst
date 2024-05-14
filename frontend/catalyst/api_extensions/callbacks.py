@@ -165,13 +165,51 @@ def base_callback(func):
 
 
 class FlatCallable:
+    """This is a simple class that wraps around a function and calls it with
+    a flat list."""
+
     def __init__(self, func, *args, **kwargs):
         self.func = func
         self.shape = tree_structure((args, kwargs))
 
     def __call__(self, args):
+        """args: flat list of arguments
+        returns flat list of return values"""
         args, kwargs = tree_unflatten(self.shape, args)
         return tree_leaves(self.func(*args, **kwargs))
+
+
+class MemrefCallable(FlatCallable):
+    def __init__(self, func, results_aval, *args, **kwargs):
+        super().__init__(func, *args, **kwargs)
+        self.metadata = CallbackClosure(args, kwargs)
+        self.results_aval = results_aval
+
+    def __call__(self, args):
+        jnpargs = self.metadata.getArgsAsJAXArrays(args)
+        retvals = super().__call__(jnpargs)
+        return_values = []
+        results_aval_sequence = (
+            self.results_aval if isinstance(self.results_aval, Sequence) else [self.results_aval]
+        )
+        for retval, exp_aval in zip(retvals, results_aval_sequence):
+
+            obs_aval = shaped_abstractify(retval)
+            if obs_aval != exp_aval:
+                raise TypeError(
+                    # pylint: disable-next=line-too-long
+                    f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+                )
+            ranked_memref = get_ranked_memref_descriptor(retval)
+            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
+            unranked_memref = get_unranked_memref_descriptor(retval)
+            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
+            # We need to keep a value of retval around
+            # Otherwise, Python's garbage collection will collect the memory
+            # before we run the memory copy in the runtime.
+            # We need to copy the unranked_memref_ptr and we need to know the element size.
+            return_values.append((unranked_memref_ptr, element_size, retval))
+        return return_values
 
 
 def callback_implementation(
@@ -186,45 +224,13 @@ def callback_implementation(
     """
 
     flat_args = tree_leaves((args, kwargs))
-    flat_callable = FlatCallable(cb, *args, **kwargs)
-    metadata = CallbackClosure(args, kwargs)
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
-
     flat_results_aval, out_tree = tree_flatten(results_aval)
-
-    def _flat_callback(flat_args):
-        """Each flat_arg is a pointer.
-
-        It is a pointer to a memref object.
-        To find out which element type it has, we use the signature obtained previously.
-        """
-        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-        retvals = flat_callable(jnpargs)
-        return_values = []
-        results_aval_sequence = (
-            results_aval if isinstance(results_aval, Sequence) else [results_aval]
-        )
-        for retval, exp_aval in zip(retvals, results_aval_sequence):
-            obs_aval = shaped_abstractify(retval)
-            if obs_aval != exp_aval:
-                raise TypeError(
-                    # pylint: disable-next=line-too-long
-                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
-                )
-            ranked_memref = get_ranked_memref_descriptor(retval)
-            element_size = ctypes.sizeof(ranked_memref.aligned.contents)
-            unranked_memref = get_unranked_memref_descriptor(retval)
-            unranked_memref_ptr = ctypes.cast(ctypes.pointer(unranked_memref), ctypes.c_void_p)
-            # We need to keep a value of retval around
-            # Otherwise, Python's garbage collection will collect the memory
-            # before we run the memory copy in the runtime.
-            # We need to copy the unranked_memref_ptr and we need to know the element size.
-            return_values.append((unranked_memref_ptr, element_size, retval))
-        return return_values
+    memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
 
     out_flat = python_callback_p.bind(
-        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
+        *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)
     )
     return tree_unflatten(out_tree, out_flat)
 
