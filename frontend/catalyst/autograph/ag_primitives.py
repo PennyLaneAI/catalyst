@@ -361,7 +361,7 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    set_state(results)
+    set_state(results)  # pylint: disable=possibly-used-before-assignment
 
 
 def _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names):
