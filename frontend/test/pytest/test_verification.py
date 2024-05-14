@@ -248,6 +248,28 @@ class PauliX2(qml.PauliX):
     grad_method = "F"
 
 
+def test_paramshift_obs_simple():
+    """Emulate a device with a non-invertible gate."""
+
+    assert qml.Hermitian.grad_method != "A"
+
+    @qml.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
+    def f(x):
+        qml.RX(x, wires=0)
+        A = np.array(
+            [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+        )
+        return qml.expval(qml.Hermitian(A, wires=0))
+
+    with pytest.raises(
+        DifferentiableCompileError, match="Hermitian does not support analytic differentiation"
+    ):
+
+        @qml.qjit
+        def cir(x: float):
+            return grad(f)(x)
+
+
 def test_paramshift_gate_simple():
     """Emulate a device with a non-invertible gate."""
 
