@@ -201,13 +201,7 @@ class MemrefCallable(FlatCallable):
             self.results_aval if isinstance(self.results_aval, Sequence) else [self.results_aval]
         )
         for retval, exp_aval in zip(retvals, results_aval_sequence):
-
-            obs_aval = shaped_abstractify(retval)
-            if obs_aval != exp_aval:
-                raise TypeError(
-                    # pylint: disable-next=line-too-long
-                    f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
-                )
+            self._check_types(retval, exp_aval)
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)
             unranked_memref = get_unranked_memref_descriptor(retval)
@@ -218,6 +212,12 @@ class MemrefCallable(FlatCallable):
             # We need to copy the unranked_memref_ptr and we need to know the element size.
             return_values.append((unranked_memref_ptr, element_size, retval))
         return return_values
+
+    def _check_types(self, obs, exp_aval):
+        obs_aval = shaped_abstractify(obs)
+        if obs_aval != exp_aval:
+            msg = f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+            raise TypeError(msg)
 
     def asarrays(self, void_ptrs):
         expected_types = self.getOperandTypes()
