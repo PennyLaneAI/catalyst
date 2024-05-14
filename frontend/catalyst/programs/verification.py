@@ -189,6 +189,8 @@ def verify_parameter_shift_differentiability(tape: QuantumTape) -> None:
 
 
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
+    """Verify that no measuremnts contain state or variance."""
+
     if any(isinstance(m, (StateMP, VnEntropyMP, MutualInfoMP)) for m in tape.measurements):
         raise DifferentiableCompileError("State returns are forbidden in gradients")
 
