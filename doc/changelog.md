@@ -69,9 +69,17 @@
 
 <h3>Improvements</h3>
 
+* Added support for IsingZZ gate in Catalyst frontend. 
+  Previously, the IsingZZ gate would be decomposed into 
+  a CNOT and RZ gates. However, this is not needed as 
+  the PennyLane-Lightning simulator supports this gate.
+  [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+* Correctly querying batching rules for ```jax.scipy.linalg.expm```
+  [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
 
 <h3>Internal changes</h3>
 
@@ -83,12 +91,18 @@
   `catalyst.autograph`.
   [(#722)](https://github.com/PennyLaneAI/catalyst/pull/722)
 
+* Small changes to make pylint==3.2.0 succeed.
+  [(#739)](https://github.com/PennyLaneAI/catalyst/pull/739)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
-Raul Torres.
+Mehrdad Malekmohammadi,
+Erick Ochoa,
+Raul Torres,
+Haochen Paul Wang.
 
 # Release 0.6.0
 

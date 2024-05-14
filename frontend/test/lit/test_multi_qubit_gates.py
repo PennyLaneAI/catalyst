@@ -76,3 +76,16 @@ def circuit(x: float):
 
 
 print(circuit.mlir)
+
+
+# CHECK-LABEL: public @jit_isingZZ_circuit
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2, shots=100))
+def isingZZ_circuit(x: float):
+    """Circuit that applies an IsingZZ gate to a pair of qubits."""
+    # CHECK: {{%.+}} = quantum.custom "IsingZZ"({{%.+}}) {{.+}} : !quantum.bit, !quantum.bit
+    qml.IsingZZ(x, wires=[0, 1])
+    return qml.state()
+
+
+print(isingZZ_circuit.mlir)
