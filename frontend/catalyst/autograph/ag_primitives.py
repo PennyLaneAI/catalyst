@@ -269,6 +269,9 @@ def for_stmt(
     # - an exception is raised during the tracing of the loop body after conversion
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
+    class EmptyResult: ...
+
+    results = EmptyResult()
     fallback = False
     init_state = get_state()
     assert len(init_state) == len(symbol_names)
@@ -361,7 +364,8 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    set_state(results)  # pylint: disable=possibly-used-before-assignment
+    assert not isinstance(results, EmptyResult), "results variable must have neen set"
+    set_state(results)
 
 
 def _call_catalyst_while(loop_test, loop_body, get_state, set_state, symbol_names):
