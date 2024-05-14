@@ -83,6 +83,7 @@ from catalyst.programs.verification import (
     verify_control,
     verify_inverses,
     verify_no_mid_circuit_measurement,
+    verify_parameter_shift_differentiability,
 )
 from catalyst.tracing.contexts import (
     EvaluationContext,
@@ -924,6 +925,8 @@ def trace_quantum_function(
                     verify_no_mid_circuit_measurement(device, tape)
                     if grad_method == "adjoint":
                         verify_adjoint_differentiability(device, tape)
+                    elif grad_method == "parameter-shift":
+                        verify_parameter_shift_differentiability(device, tape)
 
         # (2) - Quantum tracing
         transformed_results = []

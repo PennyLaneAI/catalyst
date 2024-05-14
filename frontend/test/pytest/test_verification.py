@@ -38,15 +38,21 @@ from catalyst import (
     pure_callback,
     qjit,
     value_and_grad,
+    while_loop,
 )
 from catalyst.utils.runtime import pennylane_operation_set
-from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
+from catalyst.utils.toml import (
+    OperationProperties,
+    ProgramFeatures,
+    get_device_capabilities,
+)
 
 
 def get_custom_device(
     non_differentiable_gates=set(),
     non_invertible_gates=set(),
     non_controllable_gates=set(),
+    native_gates=set(),
     **kwargs
 ):
     """Generate a custom device where certain gates are marked as non-differensiable."""
@@ -72,6 +78,8 @@ def get_custom_device(
             program_features = ProgramFeatures(shots_present=kwargs.get("shots") is not None)
             lightning_capabilities = get_device_capabilities(lightning_device, program_features)
             custom_capabilities = deepcopy(lightning_capabilities)
+            for gate in native_gates:
+                custom_capabilities.native_ops[gate] = OperationProperties(True, True, True)
             for gate in non_differentiable_gates:
                 custom_capabilities.native_ops[gate].differentiable = False
             for gate in non_invertible_gates:
@@ -214,7 +222,7 @@ def test_non_controllable_gate_simple():
             return qml.expval(qml.PauliX(0))
 
 
-def test_non_invertible_gate_nested_while():
+def test_non_invertible_gate_nested_for():
     """Emulate a device with a non-invertible gate."""
 
     @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
@@ -227,6 +235,52 @@ def test_non_invertible_gate_nested_while():
         return qml.expval(qml.PauliX(0))
 
     with pytest.raises(CompileError, match="RX.*not invertible"):
+
+        @qml.qjit
+        def cir(x: float):
+            return grad(f)(x)
+
+
+class PauliX2(qml.PauliX):
+    """Test operation without the analytic gradient"""
+
+    name = "PauliX2"
+    grad_method = "F"
+
+
+def test_paramshift_gate_simple():
+    """Emulate a device with a non-invertible gate."""
+
+    @qml.qnode(get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift")
+    def f(x):
+        PauliX2(wires=0)
+        return qml.expval(qml.PauliX(0))
+
+    with pytest.raises(
+        DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
+    ):
+
+        @qml.qjit
+        def cir(x: float):
+            return grad(f)(x)
+
+
+def test_paramshift_gate_while():
+    """Emulate a device with a non-invertible gate."""
+
+    @qml.qnode(get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift")
+    def f(x):
+        @while_loop(lambda s: s > 0)
+        def loop(s):
+            PauliX2(wires=0)
+            return s + 1
+
+        loop(0)
+        return qml.expval(qml.PauliX(0))
+
+    with pytest.raises(
+        DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
+    ):
 
         @qml.qjit
         def cir(x: float):

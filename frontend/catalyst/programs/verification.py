@@ -156,3 +156,27 @@ def verify_no_mid_circuit_measurement(_, tape: QuantumTape) -> None:
         return st
 
     _verify_nested(tape, None, _op_checker, _obs_checker)
+
+
+def verify_parameter_shift_differentiability(_, tape: QuantumTape) -> None:
+    """Verify tape contains operations which support parameter-shift method.
+
+    Raises: DifferentiableCompileError
+    """
+
+    from catalyst.jax_tracer import HybridOp
+
+    def _op_checker(op, _):
+        if not isinstance(op, HybridOp):
+            if op.grad_method != "A":
+                raise DifferentiableCompileError(
+                    f"{op.name} does not support analytic differentiation"
+                )
+
+    def _obs_checker(obs, _):
+        if obs.grad_method != "A":
+            raise DifferentiableCompileError(
+                f"{obs.name} does not support analytic differentiation"
+            )
+
+    _verify_nested(tape, None, _op_checker, _obs_checker)
