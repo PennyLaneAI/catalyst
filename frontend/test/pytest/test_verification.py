@@ -309,5 +309,35 @@ def test_paramshift_gate_while():
             return grad(f)(x)
 
 
+def test_no_state_returns():
+    """Emulate a device with a non-invertible gate."""
+
+    @qml.qnode(get_custom_device(wires=1))
+    def f(x):
+        qml.PauliX(wires=0)
+        return qml.state()
+
+    with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
+
+        @qml.qjit
+        def cir(x: float):
+            return grad(f)(x)
+
+
+def test_no_variance_returns():
+    """Emulate a device with a non-invertible gate."""
+
+    @qml.qnode(get_custom_device(wires=1))
+    def f(x):
+        qml.PauliX(wires=0)
+        return qml.var(qml.PauliX(0))
+
+    with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
+
+        @qml.qjit
+        def cir(x: float):
+            return grad(f)(x)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

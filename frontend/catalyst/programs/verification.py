@@ -16,7 +16,13 @@
 
 from typing import Any, Callable
 
-from pennylane.measurements import MeasurementProcess
+from pennylane.measurements import (
+    MeasurementProcess,
+    MutualInfoMP,
+    StateMP,
+    VarianceMP,
+    VnEntropyMP,
+)
 from pennylane.operation import Observable, Operation
 from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
@@ -158,7 +164,7 @@ def verify_no_mid_circuit_measurement(_, tape: QuantumTape) -> None:
     _verify_nested(tape, None, _op_checker, _obs_checker)
 
 
-def verify_parameter_shift_differentiability(_, tape: QuantumTape) -> None:
+def verify_parameter_shift_differentiability(tape: QuantumTape) -> None:
     """Verify tape contains operations which support parameter-shift method.
 
     Raises: DifferentiableCompileError
@@ -180,3 +186,11 @@ def verify_parameter_shift_differentiability(_, tape: QuantumTape) -> None:
             )
 
     _verify_nested(tape, None, _op_checker, _obs_checker)
+
+
+def verify_no_state_variance_returns(tape: QuantumTape) -> None:
+    if any(isinstance(m, (StateMP, VnEntropyMP, MutualInfoMP)) for m in tape.measurements):
+        raise DifferentiableCompileError("State returns are forbidden in gradients")
+
+    if any(isinstance(m, VarianceMP) for m in tape.measurements):
+        raise DifferentiableCompileError("Variance returns are forbidden in gradients")
