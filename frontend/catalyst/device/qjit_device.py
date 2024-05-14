@@ -58,6 +58,7 @@ RUNTIME_OPERATIONS = [
     "IsingXX",
     "IsingXY",
     "IsingYY",
+    "IsingZZ",
     "ISWAP",
     "MultiRZ",
     "PauliX",

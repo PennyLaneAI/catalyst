@@ -69,6 +69,11 @@
 
 <h3>Improvements</h3>
 
+* Added support for IsingZZ gate in Catalyst frontend. 
+  Previously, the IsingZZ gate would be decomposed into 
+  a CNOT and RZ gates. However, this is not needed as 
+  the PennyLane-Lightning simulator supports this gate.
+  [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 <h3>Breaking changes</h3>
 
@@ -92,6 +97,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Mehrdad Malekmohammadi,
 Erick Ochoa,
 Raul Torres.
 
