@@ -33,6 +33,18 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
 )
 
+package_root = os.path.dirname(__file__)
+
+
+# Default paths to dep libraries
+DEFAULT_LIB_PATHS = {
+    "llvm": os.path.join(package_root, "../../../mlir/llvm-project/build/lib"),
+    "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
+    "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
+    "oqc_runtime": os.path.join(package_root, "../../catalyst/third_party/oqc/src/build"),
+}
+
+
 # TODO: This should be removed after implementing `get_c_interface`
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
