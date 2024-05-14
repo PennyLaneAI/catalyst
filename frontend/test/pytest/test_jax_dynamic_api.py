@@ -399,7 +399,11 @@ def test_array_assignment():
     assert_array_and_dtype_equal(result, expected)
 
 
-@pytest.mark.xfail(raises=OSError, reason="JAX requires BLAS to be linked with, but we don't have it linked.")
+@pytest.mark.xfail(
+    raises=OSError,
+    reason="""JAX requires BLAS to be linked with, 
+    but we don't have it linked.""",
+)
 def test_expm():
     """Test jax.scipy.linalg.expm"""
 
