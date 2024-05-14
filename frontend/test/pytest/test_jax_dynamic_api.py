@@ -398,5 +398,29 @@ def test_array_assignment():
     assert_array_and_dtype_equal(result, expected)
 
 
+@pytest.mark.xfail(reason="JAX requires BLAS to be linked with, but we don't have it linked.")
+def test_expm():
+    """Test jax.scipy.linalg.expm"""
+
+    @qjit
+    def f1(x):
+        return jax.scipy.linalg.expm(-2.0 * x)
+
+    y1 = jnp.array([[0.1, 0.2], [5.3, 1.2]])
+    res1 = f1(y1)
+    expected1 = jnp.array([[2.0767685, -0.23879551], [-6.32808103, 0.76339319]])
+
+    @qjit
+    def f2(x):
+        return jax.scipy.linalg.expm(x)
+
+    y2 = jnp.array([[1.0, 0.0], [0.0, 1.0]])
+    res2 = f2(y2)
+    expected2 = jnp.array([[2.71828183, 0.0], [0.0, 2.71828183]])
+
+    assert_allclose(res1, expected1)
+    assert_allclose(res2, expected2)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
