@@ -69,6 +69,7 @@
 
 <h3>Improvements</h3>
 
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -83,11 +84,15 @@
   `catalyst.autograph`.
   [(#722)](https://github.com/PennyLaneAI/catalyst/pull/722)
 
+* Small changes to make pylint==3.2.0 succeed.
+  [(#739)](https://github.com/PennyLaneAI/catalyst/pull/739)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Erick Ochoa,
 Raul Torres.
 
 # Release 0.6.0
