@@ -394,6 +394,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install 'autoray<0.6.10'
 
     - name: Install PennyLane Plugins
       run: |

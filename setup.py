@@ -81,10 +81,10 @@ requirements = [
 
 entry_points = {
     "pennylane.plugins": [
-        "oqc.cloud = catalyst.oqc:OQCDevice",
-        "softwareq.qpp = catalyst.cuda:SoftwareQQPP",
-        "nvidia.custatevec = catalyst.cuda:NvidiaCuStateVec",
-        "nvidia.cutensornet = catalyst.cuda:NvidiaCuTensorNet",
+        "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
+        "softwareq.qpp = catalyst.third_party.cuda:SoftwareQQPP",
+        "nvidia.custatevec = catalyst.third_party.cuda:NvidiaCuStateVec",
+        "nvidia.cutensornet = catalyst.third_party.cuda:NvidiaCuTensorNet",
     ],
     "pennylane.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
@@ -92,7 +92,7 @@ entry_points = {
         "catalyst.qjit = catalyst:qjit",
         "cuda_quantum.context = catalyst.tracing.contexts:EvaluationContext",
         "cuda_quantum.ops = catalyst.api_extensions",
-        "cuda_quantum.qjit = catalyst.cuda:cudaqjit",
+        "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
 }
 
@@ -217,7 +217,7 @@ setup(
     packages=find_namespace_packages(
         where="frontend",
         include=["catalyst", "catalyst.*", "mlir_quantum"],
-        exclude=["catalyst.oqc.*"],
+        exclude=["catalyst.third_party.oqc.*"],
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
