@@ -186,7 +186,7 @@ class MemrefCallable(FlatCallable):
         self.results_aval = results_aval
 
     def __call__(self, args):
-        jnpargs = self.metadata.getArgsAsJAXArrays(args)
+        jnpargs = self.asarrays(args)
         retvals = super().__call__(jnpargs)
         return_values = []
         results_aval_sequence = (
@@ -210,6 +210,21 @@ class MemrefCallable(FlatCallable):
             # We need to copy the unranked_memref_ptr and we need to know the element size.
             return_values.append((unranked_memref_ptr, element_size, retval))
         return return_values
+
+    def asarrays(self, args):
+        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
+        it is best for the user if we continue with that idea and forward JAX arrays."""
+        jnpargs = []
+        for void_ptr, ty in zip(args, self.metadata.low_level_sig):
+            jnparray = MemrefCallable.asarray(void_ptr, ty)
+            jnpargs.append(jnparray)
+        return jnpargs
+
+    @staticmethod
+    def asarray(void_ptr, ptr_ty):
+        typed_ptr = ctypes.cast(void_ptr, ptr_ty)
+        array = ranked_memref_to_numpy(typed_ptr)
+        return jnp.asarray(array)
 
 
 def callback_implementation(
@@ -258,14 +273,3 @@ class CallbackClosure:
             ptr_ty = ctypes.POINTER(memref_type)
             low_level_flat_params.append(ptr_ty)
         return low_level_flat_params
-
-    def getArgsAsJAXArrays(self, flat_args):
-        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
-        it is best for the user if we continue with that idea and forward JAX arrays."""
-        jnpargs = []
-        for void_ptr, ty in zip(flat_args, self.low_level_sig):
-            memref_ty = ctypes.cast(void_ptr, ty)
-            nparray = ranked_memref_to_numpy(memref_ty)
-            jnparray = jnp.asarray(nparray)
-            jnpargs.append(jnparray)
-        return jnpargs
