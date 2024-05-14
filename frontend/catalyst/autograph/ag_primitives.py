@@ -269,6 +269,8 @@ def for_stmt(
     # - an exception is raised during the tracing of the loop body after conversion
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
+
+    # pylint: disable=multiple-statements,missing-class-docstring,too-many-statements
     class EmptyResult: ...
 
     results = EmptyResult()
