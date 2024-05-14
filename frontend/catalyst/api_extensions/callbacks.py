@@ -185,7 +185,7 @@ class FlatCallable:
         return self.flat_params
 
     def getOperandTypes(self):
-        return list(map(type, self.getOperands()))
+        return map(type, self.getOperands())
 
 
 class MemrefCallable(FlatCallable):
@@ -247,7 +247,7 @@ class MemrefCallable(FlatCallable):
         return [get_ranked_memref_descriptor(operand) for operand in operands]
 
     def getOperandTypes(self):
-        operandTys = list(map(type, self.getOperands()))
+        operandTys = map(type, self.getOperands())
         return list(map(ctypes.POINTER, operandTys))
 
 
