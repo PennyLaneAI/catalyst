@@ -16,11 +16,11 @@
 # pylint: disable=unused-argument
 import os
 import pathlib
-from functools import partial
 
 # pylint: disable=unused-argument
 import platform
 import tempfile
+from functools import partial
 
 import numpy as np
 import pennylane as qml
