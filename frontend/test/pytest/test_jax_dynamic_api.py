@@ -18,6 +18,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from jax import scipy as jsp
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
@@ -404,7 +405,7 @@ def test_expm():
 
     @qjit
     def f1(x):
-        return jax.scipy.linalg.expm(-2.0 * x)
+        return jsp.linalg.expm(-2.0 * x)
 
     y1 = jnp.array([[0.1, 0.2], [5.3, 1.2]])
     res1 = f1(y1)
@@ -412,7 +413,7 @@ def test_expm():
 
     @qjit
     def f2(x):
-        return jax.scipy.linalg.expm(x)
+        return jsp.linalg.expm(x)
 
     y2 = jnp.array([[1.0, 0.0], [0.0, 1.0]])
     res2 = f2(y2)
