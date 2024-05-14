@@ -168,14 +168,14 @@ class FlatCallable:
     """This is a simple class that wraps around a function and calls it with
     a flat list."""
 
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func, *params, **kwparams):
         self.func = func
-        self.shape = tree_structure((args, kwargs))
+        self.flat_params, self.shape = tree_flatten((params, kwparams))
 
-    def __call__(self, args):
+    def __call__(self, flat_args):
         """args: flat list of arguments
         returns flat list of return values"""
-        args, kwargs = tree_unflatten(self.shape, args)
+        args, kwargs = tree_unflatten(self.shape, flat_args)
         return tree_leaves(self.func(*args, **kwargs))
 
 
