@@ -186,7 +186,7 @@ class MemrefCallable(FlatCallable):
         self.results_aval = results_aval
 
     def __call__(self, args):
-        jnpargs = self.asarrays(args)
+        jnpargs = MemrefCallable.asarrays(args, self.metadata.low_level_sig)
         retvals = super().__call__(jnpargs)
         return_values = []
         results_aval_sequence = (
@@ -211,19 +211,17 @@ class MemrefCallable(FlatCallable):
             return_values.append((unranked_memref_ptr, element_size, retval))
         return return_values
 
-    def asarrays(self, args):
+    @staticmethod
+    def asarrays(void_ptrs, ptr_tys):
         """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
         it is best for the user if we continue with that idea and forward JAX arrays."""
-        jnpargs = []
-        for void_ptr, ty in zip(args, self.metadata.low_level_sig):
-            jnparray = MemrefCallable.asarray(void_ptr, ty)
-            jnpargs.append(jnparray)
-        return jnpargs
+        asarray = MemrefCallable.asarray
+        return [asarray(mem, ty) for mem, ty in zip(void_ptrs, ptr_tys)]
 
     @staticmethod
     def asarray(void_ptr, ptr_ty):
-        typed_ptr = ctypes.cast(void_ptr, ptr_ty)
-        array = ranked_memref_to_numpy(typed_ptr)
+        ptr_to_memref_descriptor = ctypes.cast(void_ptr, ptr_ty)
+        array = ranked_memref_to_numpy(ptr_to_memref_descriptor)
         return jnp.asarray(array)
 
 
