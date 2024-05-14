@@ -366,7 +366,7 @@ def for_stmt(
         set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
-    assert not isinstance(results, EmptyResult), "results variable must have neen set"
+    assert not isinstance(results, EmptyResult), "results variable must be assigned to"
     set_state(results)
 
 
