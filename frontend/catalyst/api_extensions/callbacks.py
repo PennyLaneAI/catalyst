@@ -179,12 +179,15 @@ class FlatCallable:
         return tree_leaves(self.func(*args, **kwargs))
 
     def getOperand(self, i):
+        """Get operand at position i"""
         return self.flat_params[i]
 
     def getOperands(self):
+        """Get all operands"""
         return self.flat_params
 
     def getOperandTypes(self):
+        """Get operand types"""
         return map(type, self.getOperands())
 
 
@@ -214,24 +217,26 @@ class MemrefCallable(FlatCallable):
         return return_values
 
     def _check_types(self, obs, exp_aval):
+        """Raise error if observed value is different than expected abstract value"""
         obs_aval = shaped_abstractify(obs)
         if obs_aval != exp_aval:
             msg = f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
             raise TypeError(msg)
 
     def asarrays(self, void_ptrs):
+        """cast void_ptrs to jax arrays"""
         expected_types = self.getOperandTypes()
         return MemrefCallable._asarrays(void_ptrs, expected_types)
 
     @staticmethod
     def _asarrays(void_ptrs, ptr_tys):
-        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
-        it is best for the user if we continue with that idea and forward JAX arrays."""
+        """cast void_ptrs to jax arrays"""
         asarray = MemrefCallable.asarray
         return [asarray(mem, ty) for mem, ty in zip(void_ptrs, ptr_tys)]
 
     @staticmethod
     def asarray(void_ptr, ptr_ty):
+        """cast a single void pointer to a jax array"""
         # The type is guaranteed by JAX, so we don't need
         # to check here.
         ptr_to_memref_descriptor = ctypes.cast(void_ptr, ptr_ty)
@@ -239,14 +244,17 @@ class MemrefCallable(FlatCallable):
         return jnp.asarray(array)
 
     def getOperand(self, i):
+        """Get operand at position i"""
         array = super().getOperand(i)
         return get_ranked_memref_descriptor(array)
 
     def getOperands(self):
+        """Get operands"""
         operands = super().getOperands()
         return [get_ranked_memref_descriptor(operand) for operand in operands]
 
     def getOperandTypes(self):
+        """Get operand types"""
         operandTys = map(type, self.getOperands())
         return list(map(ctypes.POINTER, operandTys))
 
