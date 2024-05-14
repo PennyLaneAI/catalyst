@@ -84,7 +84,7 @@ class OtherHadamard(qml.Hadamard):
     @property
     def name(self):
         """name"""
-        return "UnknownOp"
+        return "OtherHadamard"
 
 
 class OtherIsingXX(qml.IsingXX):
@@ -94,7 +94,7 @@ class OtherIsingXX(qml.IsingXX):
     @property
     def name(self):
         """name"""
-        return "UnknownOp"
+        return "OtherIsingXX"
 
 
 class OtherRX(qml.RX):
@@ -354,7 +354,7 @@ class TestPreprocessHybridOp:
         assert "quantum.adjoint" in mlir
         assert "RX" in mlir
         assert "RY" in mlir
-        assert "OtherRY" not in mlir
+        assert "OtherRX" not in mlir
 
         assert np.isclose(circuit(x, y), np.cos(-x) * np.cos(y))
 
