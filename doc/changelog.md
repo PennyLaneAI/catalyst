@@ -78,6 +78,8 @@
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+* Correctly querying batching rules for ```jax.scipy.linalg.expm```
+  [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
 
 <h3>Internal changes</h3>
 
@@ -99,7 +101,8 @@ This release contains contributions from (in alphabetical order):
 David Ittah,
 Mehrdad Malekmohammadi,
 Erick Ochoa,
-Raul Torres.
+Raul Torres,
+Haochen Paul Wang.
 
 # Release 0.6.0
 
