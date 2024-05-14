@@ -23,6 +23,7 @@ from numpy import array_equal
 from numpy.testing import assert_allclose
 
 from catalyst import qjit, while_loop
+from catalyst.utils.exceptions import CompileError
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -400,7 +401,7 @@ def test_array_assignment():
 
 
 @pytest.mark.xfail(
-    raises=OSError,
+    raises=(OSError, CompileError),
     reason="""JAX requires BLAS to be linked with,
     but we don't have it linked.""",
 )
