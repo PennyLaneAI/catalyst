@@ -95,7 +95,8 @@ This release contains contributions from (in alphabetical order):
 
 David Ittah,
 Erick Ochoa,
-Raul Torres.
+Raul Torres,
+Haochen Paul Wang.
 
 # Release 0.6.0
 
