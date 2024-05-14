@@ -249,7 +249,7 @@ class PauliX2(qml.PauliX):
 
 
 def test_paramshift_obs_simple():
-    """Emulate a device with a non-invertible gate."""
+    """Emulate a device with a non-invertible observable."""
 
     assert qml.Hermitian.grad_method != "A"
 
