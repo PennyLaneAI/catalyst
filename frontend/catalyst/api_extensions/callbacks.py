@@ -178,15 +178,23 @@ class FlatCallable:
         args, kwargs = tree_unflatten(self.shape, flat_args)
         return tree_leaves(self.func(*args, **kwargs))
 
+    def getOperand(self, i):
+        return self.flat_params[i]
+
+    def getOperands(self):
+        return self.flat_params
+
+    def getOperandTypes(self):
+        return list(map(type, self.getOperands()))
+
 
 class MemrefCallable(FlatCallable):
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
-        self.metadata = CallbackClosure(args, kwargs)
         self.results_aval = results_aval
 
     def __call__(self, args):
-        jnpargs = MemrefCallable.asarrays(args, self.metadata.low_level_sig)
+        jnpargs = MemrefCallable.asarrays(args, self.getOperandTypes())
         retvals = super().__call__(jnpargs)
         return_values = []
         results_aval_sequence = (
@@ -224,6 +232,18 @@ class MemrefCallable(FlatCallable):
         array = ranked_memref_to_numpy(ptr_to_memref_descriptor)
         return jnp.asarray(array)
 
+    def getOperand(self, i):
+        array = super().getOperand(i)
+        return get_ranked_memref_descriptor(array)
+
+    def getOperands(self):
+        operands = super().getOperands()
+        return [get_ranked_memref_descriptor(operand) for operand in operands]
+
+    def getOperandTypes(self):
+        operandTys = list(map(type, self.getOperands()))
+        return list(map(ctypes.POINTER, operandTys))
+
 
 def callback_implementation(
     cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
@@ -246,28 +266,3 @@ def callback_implementation(
         *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)
     )
     return tree_unflatten(out_tree, out_flat)
-
-
-class CallbackClosure:
-    """This is just a class containing data that is important for the callback."""
-
-    def __init__(self, *absargs, **abskwargs):
-        self.absargs = absargs
-        self.abskwargs = abskwargs
-
-    @property
-    def tree_flatten(self):
-        """Flatten args and kwargs."""
-        return tree_flatten((self.absargs, self.abskwargs))
-
-    @property
-    def low_level_sig(self):
-        """Get the memref descriptor types"""
-        flat_params, _ = self.tree_flatten
-        low_level_flat_params = []
-        for param in flat_params:
-            empty_memref_descriptor = get_ranked_memref_descriptor(param)
-            memref_type = type(empty_memref_descriptor)
-            ptr_ty = ctypes.POINTER(memref_type)
-            low_level_flat_params.append(ptr_ty)
-        return low_level_flat_params
