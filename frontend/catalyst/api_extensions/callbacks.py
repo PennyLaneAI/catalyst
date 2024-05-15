@@ -61,7 +61,7 @@ class ActiveCallback:
         if self.callback:
             self.callback(*args, **kwargs)
 
-        def closure(*args, **kwargs) -> restype:
+        def closure(*args, **kwargs) -> self.restype:
             return self.func(*args, **kwargs)
 
         self.callback = base_callback(closure, fwd=self.fwd, bwd=self.bwd)
