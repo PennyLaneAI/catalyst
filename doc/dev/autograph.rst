@@ -896,3 +896,36 @@ the context will be converted anyways:
 ...     with disable_autograph:
 ...         x += f()
 ...     return x
+
+
+In-place JAX array assignments
+------------------------------
+
+To update array values when using JAX, the `JAX syntax for array assignment
+<https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#array-updates-x-at-idx-set-y>`__
+(which uses the array ``at`` and ``set`` methods) must be used:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.empty((first_dim,), dtype=x.dtype)
+...
+...     for i in range(first_dim):
+...         result = result.at[i].set(x[i]* 2)
+...
+...     return result 
+    
+However, if updating a single index of the array, Autograph supports conversion of 
+standard Python array assignment syntax:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.empty((first_dim,), dtype=x.dtype)
+...
+...     for i in range(first_dim):
+...         result[i] = x[i] * 2
+...
+...     return result
+
+Under the hood, Catalyst converts anything coming in the latter notation into the former one.
