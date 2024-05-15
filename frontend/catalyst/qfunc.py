@@ -30,7 +30,6 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.runtime import (
     BackendInfo,
     device_get_toml_config,
