@@ -229,24 +229,26 @@ python_callback_p.multiple_results = True
 
 
 @python_callback_p.def_abstract_eval
-def _python_callback_abstract_eval(*avals, callback, results_aval):
+def _python_callback_abstract_eval(*avals, callback, fwd, bwd, results_aval):
     """Abstract evaluation"""
     return results_aval
 
 
 @python_callback_p.def_impl
-def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cover
+def _python_callback_def_impl(*avals, callback, fwd, bwd, results_aval):  # pragma: no cover
     """Concrete evaluation"""
     raise NotImplementedError()
 
 
-def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
+def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, fwd, bwd, results_aval):
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
 
     callback_id = registry.register(callback)
+    fwd_id = registry.register(fwd) if fwd else None
+    bwd_id = registry.register(bwd) if bwd else None
 
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
@@ -255,7 +257,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
     if not mlir_ty:
         return InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
-    return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+    return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args), fwd=fwd_id, bwd=bwd_id).results
 
 
 #

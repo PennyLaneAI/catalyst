@@ -38,6 +38,36 @@ from catalyst.utils.jnp_to_memref import (
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
+class ActiveCallback:
+
+    def __init__(self, func, restype):
+        self.func = func
+        self.restype = restype
+        self.fwd = None
+        self.fwd_restype = None
+        self.bwd = None
+        self.bwd_restype = None
+        self.callback = None
+
+    def fwd(self, func, restype):
+        self.fwd = func
+        self.fwd_restype = restype
+
+    def bwd(self, func, restype):
+        self.bwd = func
+        self.bwd_restype = restype
+
+    def __call__(self, *args, **kwargs):
+        if self.callback:
+            self.callback(*args, **kwargs)
+
+        def closure(*args, **kwargs) -> restype:
+            return self.func(*args, **kwargs)
+
+        self.callback = base_callback(closure, fwd=self.fwd, bwd=self.bwd)
+        return self.callback(*args, **kwargs)
+
+
 ## API ##
 def pure_callback(callback_fn, result_type=None):
     """Execute and return the results of a functionally pure Python
@@ -130,15 +160,11 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    @base_callback
-    def closure(*args, **kwargs) -> result_type:
-        return callback_fn(*args, **kwargs)
-
-    return closure
+    return ActiveCallback(callback_fn, result_type)
 
 
 ## IMPL ##
-def base_callback(func):
+def base_callback(func, fwd=None, bwd=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -153,7 +179,7 @@ def base_callback(func):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        return callback_implementation(func, retty, *args, **kwargs)
+        return callback_implementation(func, retty, *args, fwd=fwd, bwd=bwd, **kwargs)
 
     return bind_callback
 
@@ -257,7 +283,12 @@ class MemrefCallable(FlatCallable):
 
 
 def callback_implementation(
-    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
+    cb: Callable[..., Any],
+    result_shape_dtypes: Any,
+    *args: Any,
+    fwd: None,
+    bwd: None,
+    **kwargs: Any,
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -272,8 +303,14 @@ def callback_implementation(
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
     memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+    fwd_closure = MemrefCallable(fwd, results_aval, *args, **kwargs) if fwd else None
+    bwd_closure = MemrefCallable(bwd, results_aval, *args, **kwargs) if bwd else None
 
     out_flat = python_callback_p.bind(
-        *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)
+        *flat_args,
+        callback=memref_callable,
+        fwd=fwd_closure,
+        bwd=bwd_closure,
+        results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)
