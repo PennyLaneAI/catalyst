@@ -26,13 +26,7 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import (
-    tree_flatten,
-    tree_leaves,
-    tree_map,
-    tree_structure,
-    tree_unflatten,
-)
+from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
@@ -192,6 +186,8 @@ class FlatCallable:
 
 
 class MemrefCallable(FlatCallable):
+    """Callable that receives void ptrs."""
+
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
         self.results_aval = results_aval
@@ -220,6 +216,7 @@ class MemrefCallable(FlatCallable):
         """Raise error if observed value is different than expected abstract value"""
         obs_aval = shaped_abstractify(obs)
         if obs_aval != exp_aval:
+            # pylint: disable-next=line-too-long
             msg = f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
             raise TypeError(msg)
 
