@@ -78,7 +78,7 @@
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
-* Correctly querying batching rules for ```jax.scipy.linalg.expm```
+* Correctly querying batching rules for `jax.scipy.linalg.expm`
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
 
 <h3>Internal changes</h3>
@@ -94,6 +94,44 @@
 * Small changes to make pylint==3.2.0 succeed.
   [(#739)](https://github.com/PennyLaneAI/catalyst/pull/739)
 
+* The underlying PennyLane `Operation` objects for `cond`, `for_loop`, and `while_loop` can now be accessed directly via `body_function.operation`. 
+  [(#711)](https://github.com/PennyLaneAI/catalyst/pull/711)
+
+  This can be beneficial when, among other things, 
+  writing transforms without using the queuing mechanism:
+  ```py
+        @qml.transform
+        def my_quantum_transform(tape):
+            ops = tape.operations.copy()
+
+            @for_loop(0, 4, 1)
+            def f(i, sum):
+                qml.Hadamard(0)
+                return sum+1
+
+            res = f(0)
+            ops.append(f.operation)   # This is now supported!
+
+            def post_processing_fn(results):
+                return results
+            modified_tape = qml.tape.QuantumTape(ops, tape.measurements)
+            print(res)
+            print(modified_tape.operations)
+            return [modified_tape], post_processing_fn
+
+        @qml.qjit
+        @my_quantum_transform
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def main():
+            qml.Hadamard(0)
+            return qml.probs()
+
+        >>> main()
+        Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
+        [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
+        (array([0.5, 0. , 0.5, 0. ]),)  
+  ```
+  
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):

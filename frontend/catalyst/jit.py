@@ -581,6 +581,44 @@ def qjit(
         be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
         appearing as is.
 
+
+    .. details::
+        :title: In-place JAX array assignments with Autograph
+
+        To update array values when using JAX, the JAX syntax for array assignment
+        (which uses the array ``at`` and ``set`` methods) must be used:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result = result.at[i].set(x[i]* 2)
+
+            return result
+
+        However, if updating a single index of the array, Autograph supports conversion of
+        standard Python array assignment syntax:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result[i] = x[i] * 2
+
+            return result
+
+        Under the hood, Catalyst converts anything coming in the latter notation into the
+        former one.
+
+
     .. details::
         :title: Static arguments
 
