@@ -95,6 +95,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 
+
 class Function:
     """An object that represents a compiled function.
 
@@ -817,6 +818,7 @@ def reset_qubit(qreg_in, w):
 
     return qreg_out
 
+
 def is_mcm(operation):
     """Returns True if the operation is a mid-circuit measurement and False otherwise."""
     mcm = isinstance(operation, MidMeasureMP)
@@ -844,8 +846,11 @@ def dynamic_one_shot(f):
                         else:
                             new_measurements.append(m)
                 for op in circuit:
-                    if is_mcm(op):
-                        new_measurements.append(qml.sample(MeasurementValue([op], lambda res: res)))
+                    # if is_mcm(op):
+                    #     new_measurements.append(qml.sample(MeasurementValue([op], lambda res: res)))
+                    if "MidCircuitMeasure" in str(type(op)):
+                        new_measurements.append(qml.sample(op.out_classical_tracers[0]))
+
                 new_tape = QuantumTape(
                     circuit.operations,
                     new_measurements,
@@ -871,7 +876,7 @@ def dynamic_one_shot(f):
                     mcm_sample = tape2.measurements[-1]
                     assert isinstance(mcm_sample, SampleMP)
                     # FIXME: Can not make this line work, hopefully due to an unrelated problem
-                    s = s.at[i].set(mcm_sample)
+                    s = s.at[i].set(mcm_sample.mv)
                     return s
 
                 storage = loop(jnp.zeros(old_shots.total_shots))
