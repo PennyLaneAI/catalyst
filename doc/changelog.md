@@ -132,9 +132,6 @@
         (array([0.5, 0. , 0.5, 0. ]),)  
   ```
   
-* Fix decomposition tests.
-  [(#745)](https://github.com/PennyLaneAI/catalyst/pull/745)
-
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
