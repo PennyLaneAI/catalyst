@@ -63,11 +63,11 @@ class CustomDevice(qml.QubitDevice):
         # TODO: update once schema 2 is merged
         updated_toml_contents = []
         for line in toml_contents:
-            if re.match("^MultiControlledX\s", line):
+            if re.match(r"^MultiControlledX\s", line):
                 continue
-            if re.match("^Rot\s", line):
+            if re.match(r"^Rot\s", line):
                 continue
-            if re.match("^S\s", line):
+            if re.match(r"^S\s", line):
                 continue
 
             updated_toml_contents.append(line)
