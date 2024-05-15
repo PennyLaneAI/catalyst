@@ -48,10 +48,10 @@
 
   ```
 
-* Support for usage of single index JAX array assignments 
+* Support for usage of single index JAX array assignments
   inside Autograph annotated functions.
   [(#717)](https://github.com/PennyLaneAI/catalyst/pull/717)
-  
+
   Using `x[i] = y` in favor of `x = x.at(i).set(y)` is now possible:
 
   ```py
@@ -69,13 +69,17 @@
 
 <h3>Improvements</h3>
 
-* Added support for IsingZZ gate in Catalyst frontend. 
-  Previously, the IsingZZ gate would be decomposed into 
-  a CNOT and RZ gates. However, this is not needed as 
-  the PennyLane-Lightning simulator supports this gate.
+* Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
+  decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
+  simulator supports this gate.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
 <h3>Breaking changes</h3>
+
+* Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
+  As a result, Catalyst will only be compatible on systems with `glibc` versions `2.28` and above
+  (e.g. Ubuntu 20.04 and above).
+  [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
 * Correctly querying batching rules for `jax.scipy.linalg.expm`
@@ -94,10 +98,11 @@
 * Small changes to make pylint==3.2.0 succeed.
   [(#739)](https://github.com/PennyLaneAI/catalyst/pull/739)
 
-* The underlying PennyLane `Operation` objects for `cond`, `for_loop`, and `while_loop` can now be accessed directly via `body_function.operation`. 
+* The underlying PennyLane `Operation` objects for `cond`, `for_loop`, and `while_loop` can now be
+  accessed directly via `body_function.operation`.
   [(#711)](https://github.com/PennyLaneAI/catalyst/pull/711)
 
-  This can be beneficial when, among other things, 
+  This can be beneficial when, among other things,
   writing transforms without using the queuing mechanism:
   ```py
         @qml.transform
@@ -129,9 +134,9 @@
         >>> main()
         Traced<ShapedArray(int64[], weak_type=True)>with<DynamicJaxprTrace(level=2/1)>
         [Hadamard(wires=[0]), ForLoop(tapes=[[Hadamard(wires=[0])]])]
-        (array([0.5, 0. , 0.5, 0. ]),)  
+        (array([0.5, 0. , 0.5, 0. ]),)
   ```
-  
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
