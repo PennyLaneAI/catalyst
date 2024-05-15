@@ -76,7 +76,7 @@ class QFunc:
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                ctx, self.func, device, args, kwargs, qnode=self
+                self.func, device, args, kwargs, qnode=self
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)

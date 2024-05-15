@@ -849,7 +849,7 @@ def dynamic_one_shot(f):
 
 
 def trace_quantum_function(
-    ctx, f: Callable, device: QubitDevice, args, kwargs, qnode=None
+    f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
