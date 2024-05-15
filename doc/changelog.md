@@ -160,6 +160,9 @@
         (array([0.5, 0. , 0.5, 0. ]),)
   ```
 
+* Callback refactoring.
+  [(#742)](https://github.com/PennyLaneAI/catalyst/pull/742)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
