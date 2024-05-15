@@ -852,3 +852,47 @@ rather than runtime.
 
 For more details, see the :ref:`compile-time vs. runtime <compile_time>`
 documentation.
+
+
+Disabling AutoGraph for a specific function or for calls inside a context
+-------------------------------------------------------------------------
+
+As mentioned before, Autograph support in Catalyst is still experimental, 
+reason for which certain functions could produce errors when converted. 
+We can avoid this by disabling Autograph conversion for a specific
+function via the ``disable_autograph`` function decorator: 
+
+>>> @disable_autograph
+... def f():
+...     x = 6
+...     if x > 5:
+...         y = x ** 2
+...     else:
+...         y = x ** 3
+...     return y
+...
+... @qjit(autograph=True)
+... def g(x: float, n: int):
+...     for _ in range(n):
+...         x = x + f()
+...     return x
+
+It is also possible to disable Autograph for all the function calls 
+inside a determined scope by using ``disable_autograph`` as a context
+decorator. However, take into account that the bare code inside 
+the context will be converted anyways:
+
+>>> def f():
+...     x = 6
+...     if x > 5:
+...         y = x ** 2
+...     else:
+...         y = x ** 3
+...     return y
+...
+... @qjit(autograph=True)
+... def g():
+...     x = 0.4
+...     with disable_autograph:
+...         x += f()
+...     return x
