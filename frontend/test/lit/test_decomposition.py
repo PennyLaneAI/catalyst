@@ -16,6 +16,7 @@
 # pylint: disable=line-too-long
 
 import os
+import re
 import tempfile
 
 import jax
@@ -61,7 +62,13 @@ def get_custom_device_without(num_wires, discards):
             # TODO: update once schema 2 is merged
             updated_toml_contents = []
             for line in toml_contents:
-                if any(f'"{gate}",' in line for gate in discards):
+                skip = False
+                for gate in discards:
+                    regex = fr"^{gate}\s"
+                    skip |= bool(re.match(regex, line))
+                    if skip:
+                        break
+                if skip:
                     continue
                 updated_toml_contents.append(line)
 
@@ -181,7 +188,7 @@ test_decompose_multicontrolledx_in_for_loop()
 
 def test_decompose_rot():
     """Test decomposition of Rot gate."""
-    with get_custom_device_without(1, {"Rot", "C(Rot)"}) as dev:
+    with get_custom_device_without(1, {"Rot", "CRot", "C(Rot)"}) as dev:
 
         @qjit(target="mlir")
         @qml.qnode(dev)
