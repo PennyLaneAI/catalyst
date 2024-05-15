@@ -836,31 +836,8 @@ def dynamic_one_shot(f):
         try:
             # TODO: Move to the top-level and solve circular dependency
             from catalyst import for_loop
+            from pennylane.transforms.dynamic_one_shot import init_auxiliary_tape, parse_native_mid_circuit_measurements
 
-            def _tape_postprocess(circuit):
-                new_measurements = []
-                for m in circuit.measurements:
-                    if not m.mv:
-                        if isinstance(m, VarianceMP):
-                            new_measurements.append(SampleMP(obs=m.obs))
-                        else:
-                            new_measurements.append(m)
-                for op in circuit:
-                    # if is_mcm(op):
-                    #     new_measurements.append(qml.sample(MeasurementValue([op], lambda res: res)))
-                    if "MidCircuitMeasure" in str(type(op)):
-                        new_measurements.append(qml.sample(op.out_classical_tracers[0]))
-
-                new_tape = QuantumTape(
-                    circuit.operations,
-                    new_measurements,
-                    shots=[1] * circuit.shots.total_shots,
-                    trainable_params=circuit.trainable_params,
-                )
-                return new_tape
-
-            def _loop_postprocess(val):
-                return jnp.sum(val)
 
             def _f2(*args2, **kwargs2):
                 @for_loop(0, old_shots.total_shots, 1)
@@ -869,10 +846,9 @@ def dynamic_one_shot(f):
                     with QueuingManager.stop_recording(), tape:
                         _ = old_func(*args2, **kwargs2)
 
-                    tape2 = _tape_postprocess(tape)
+                    tape2 = init_auxiliary_tape(tape)
                     QueuingManager.remove_active_queue()
                     QueuingManager.add_active_queue(tape2)
-
                     mcm_sample = tape2.measurements[-1]
                     assert isinstance(mcm_sample, SampleMP)
                     # FIXME: Can not make this line work, hopefully due to an unrelated problem
@@ -880,7 +856,15 @@ def dynamic_one_shot(f):
                     return s
 
                 storage = loop(jnp.zeros(old_shots.total_shots))
-                aggregated = _loop_postprocess(storage)
+
+                # FIXME: the post-processing needs tape and tape2
+                # tape = QuantumTape(shots=qnode.device.shots)
+                # with QueuingManager.stop_recording(), tape:
+                #     _ = old_func(*args2, **kwargs2)
+
+                # tape2 = init_auxiliary_tape(tape)
+
+                aggregated = parse_native_mid_circuit_measurements(tape, [tape2], storage)
                 return aggregated
 
             setattr(qnode, "needs_dynamic_one_shot", True)
