@@ -811,13 +811,36 @@ def reset_qubit(qreg_in, w):
 
 def dynamic_one_shot(f):
     assert isinstance(f, QNode)
+    qnode = f
     def _f(*args, **kwargs):
-        old = getattr(f, "needs_dynamic_one_shot", False)
+        old_flag = getattr(qnode, "needs_dynamic_one_shot", False)
+        old_func = qnode.func
+        old_shots = qnode.device._shots
         try:
-            setattr(f, "needs_dynamic_one_shot", True)
-            result = f(*args, **kwargs)
+            # TODO: Move to the top-level and solve circular dependency
+            from catalyst import for_loop
+
+            def post_process(val):
+                return jnp.sum(val)
+
+            def _f2(*args2, **kwargs2):
+                @for_loop(0, old_shots.total_shots, 1)
+                def loop(i, s):
+                    r = old_func(*args2, **kwargs2)
+                    s = s.at[i].set(r)
+                    return s
+                storage = loop(jnp.zeros(old_shots.total_shots))
+                aggregated = post_process(storage)
+                return aggregated
+
+            setattr(qnode, "needs_dynamic_one_shot", True)
+            qnode.func = _f2
+            qnode.device._shots = Shots(1)
+            result = qnode(*args, **kwargs)
         finally:
-            setattr(f, "needs_dynamic_one_shot", old)
+            setattr(qnode, "needs_dynamic_one_shot", old_flag)
+            qnode.func = old_func
+            qnode.device._shots = old_shots
         return result
     return _f
 
@@ -890,37 +913,6 @@ def trace_quantum_function(
             quantum_tape,
             return_values_flat,
         )
-
-
-    # (1.5) If user wanted the `dynamic_one_shot` transformation we apply it by re-tracing the
-    # function using the wrapper loop.
-    if qnode.needs_dynamic_one_shot and device.shots.total_shots != 1:
-        orig_shots = device.shots.total_shots
-
-        # TODO: Move to the top-level and solve circular dependency
-        from catalyst import for_loop
-
-        def post_process(val):
-            return jnp.sum(val)
-
-        def _f2(*args2, **kwargs2):
-            @for_loop(0, orig_shots, 1)
-            def loop(i, s):
-                r = f(*args2, **kwargs2)
-                s = s.at[i].set(r)
-                return s
-            storage = loop(jnp.zeros(orig_shots))
-            aggregated = post_process(storage)
-            return aggregated
-
-        old = device._shots, device.backend_kwargs['shots']
-        try:
-            device._shots = Shots(1)
-            device.backend_kwargs['shots'] = 1
-            return trace_quantum_function(ctx, _f2, device, args, kwargs, qnode)
-        finally:
-            device._shots = old[0]
-            device.backend_kwargs['shots'] = old[1]
 
     # (2) - Quantum tracing
     transformed_results = []
