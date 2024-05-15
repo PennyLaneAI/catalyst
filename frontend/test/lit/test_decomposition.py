@@ -59,7 +59,6 @@ def get_custom_device_without(num_wires, discards):
             with open(lightning_toml, mode="r", encoding="UTF-8") as f:
                 toml_contents = f.readlines()
 
-            # TODO: update once schema 2 is merged
             updated_toml_contents = []
             for line in toml_contents:
                 skip = False
