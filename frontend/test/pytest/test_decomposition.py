@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 import tempfile
 
 import pennylane as qml
@@ -62,11 +63,11 @@ class CustomDevice(qml.QubitDevice):
         # TODO: update once schema 2 is merged
         updated_toml_contents = []
         for line in toml_contents:
-            if '"MultiControlledX",' in line:
+            if re.match("^MultiControlledX\s", line):
                 continue
-            if '"Rot",' in line:
+            if re.match("^Rot\s", line):
                 continue
-            if '"S",' in line:
+            if re.match("^S\s", line):
                 continue
 
             updated_toml_contents.append(line)
