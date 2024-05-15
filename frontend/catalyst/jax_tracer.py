@@ -85,6 +85,15 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementValue,
+    MidMeasureMP,
+    ProbabilityMP,
+    SampleMP,
+    VarianceMP,
+)
 
 class Function:
     """An object that represents a compiled function.
@@ -808,6 +817,11 @@ def reset_qubit(qreg_in, w):
 
     return qreg_out
 
+def is_mcm(operation):
+    """Returns True if the operation is a mid-circuit measurement and False otherwise."""
+    mcm = isinstance(operation, MidMeasureMP)
+    return mcm or "MidCircuitMeasure" in str(type(operation))
+
 
 def dynamic_one_shot(f):
     assert isinstance(f, QNode)
@@ -821,24 +835,55 @@ def dynamic_one_shot(f):
             # TODO: Move to the top-level and solve circular dependency
             from catalyst import for_loop
 
-            def post_process(val):
+            def _tape_postprocess(circuit):
+                new_measurements = []
+                for m in circuit.measurements:
+                    if not m.mv:
+                        if isinstance(m, VarianceMP):
+                            new_measurements.append(SampleMP(obs=m.obs))
+                        else:
+                            new_measurements.append(m)
+                for op in circuit:
+                    if is_mcm(op):
+                        new_measurements.append(qml.sample(MeasurementValue([op], lambda res: res)))
+                new_tape = QuantumTape(
+                    circuit.operations,
+                    new_measurements,
+                    shots=[1] * circuit.shots.total_shots,
+                    trainable_params=circuit.trainable_params,
+                )
+                return new_tape
+
+            def _loop_postprocess(val):
                 return jnp.sum(val)
 
             def _f2(*args2, **kwargs2):
                 @for_loop(0, old_shots.total_shots, 1)
                 def loop(i, s):
-                    r = old_func(*args2, **kwargs2)
-                    s = s.at[i].set(r)
+                    tape = QuantumTape(shots=qnode.device.shots)
+                    with QueuingManager.stop_recording(), tape:
+                        _ = old_func(*args2, **kwargs2)
+
+                    tape2 = _tape_postprocess(tape)
+                    QueuingManager.remove_active_queue()
+                    QueuingManager.add_active_queue(tape2)
+
+                    mcm_sample = tape2.measurements[-1]
+                    assert isinstance(mcm_sample, SampleMP)
+                    # FIXME: Can not make this line work, hopefully due to an unrelated problem
+                    s = s.at[i].set(mcm_sample)
                     return s
 
                 storage = loop(jnp.zeros(old_shots.total_shots))
-                aggregated = post_process(storage)
+                aggregated = _loop_postprocess(storage)
                 return aggregated
 
             setattr(qnode, "needs_dynamic_one_shot", True)
             qnode.func = _f2
-            qnode.device._shots = Shots(1)
+            qnode.device._shots = Shots([1] * old_shots.total_shots)
+
             result = qnode(*args, **kwargs)
+
         finally:
             setattr(qnode, "needs_dynamic_one_shot", old_flag)
             qnode.func = old_func
