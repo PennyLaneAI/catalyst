@@ -970,9 +970,9 @@ def trace_quantum_function(
             # Deallocate the register before tracing the post-processing.
             qdealloc_p.bind(qreg_out)
 
-    closed_jaxpr, out_type, out_tree = trace_post_processing(
-        ctx, trace, post_processing, transformed_results
-    )
-    # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
-    # check_jaxpr(jaxpr)
-    return closed_jaxpr, out_type, out_tree
+        closed_jaxpr, out_type, out_tree = trace_post_processing(
+            ctx, trace, post_processing, transformed_results
+        )
+        # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+        # check_jaxpr(jaxpr)
+        return closed_jaxpr, out_type, out_tree
