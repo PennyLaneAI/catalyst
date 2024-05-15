@@ -64,7 +64,7 @@ def get_custom_device_without(num_wires, discards):
             for line in toml_contents:
                 skip = False
                 for gate in discards:
-                    regex = fr"^{gate}\s"
+                    regex = rf"^{gate}\s"
                     skip |= bool(re.match(regex, line))
                     if skip:
                         break
