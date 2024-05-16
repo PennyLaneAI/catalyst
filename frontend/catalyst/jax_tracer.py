@@ -304,9 +304,6 @@ class HybridOp(Operation):
             JAX primitive binder function to call when the quantum tracing is complete.
     """
 
-    # Added as a criteria for the decomposition of HybridOp: see the qjit device preprocessing
-    visited = False
-
     def _no_binder(self, *_):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
 

@@ -18,10 +18,12 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from jax import scipy as jsp
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
 from catalyst import qjit, while_loop
+from catalyst.utils.exceptions import CompileError
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
@@ -396,6 +398,34 @@ def test_array_assignment():
     result = fun(5, 2, 33)
     expected = jnp.ones((5, 3, 5), dtype=int).at[2, 0, 2].set(33)
     assert_array_and_dtype_equal(result, expected)
+
+
+@pytest.mark.xfail(
+    raises=(OSError, CompileError),
+    reason="""JAX requires BLAS to be linked with,
+    but we don't have it linked.""",
+)
+def test_expm():
+    """Test jax.scipy.linalg.expm"""
+
+    @qjit
+    def f1(x):
+        return jsp.linalg.expm(-2.0 * x)
+
+    y1 = jnp.array([[0.1, 0.2], [5.3, 1.2]])
+    res1 = f1(y1)
+    expected1 = jnp.array([[2.0767685, -0.23879551], [-6.32808103, 0.76339319]])
+
+    @qjit
+    def f2(x):
+        return jsp.linalg.expm(x)
+
+    y2 = jnp.array([[1.0, 0.0], [0.0, 1.0]])
+    res2 = f2(y2)
+    expected2 = jnp.array([[2.71828183, 0.0], [0.0, 2.71828183]])
+
+    assert_allclose(res1, expected1)
+    assert_allclose(res2, expected2)
 
 
 if __name__ == "__main__":

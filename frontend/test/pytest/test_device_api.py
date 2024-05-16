@@ -25,9 +25,8 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDeviceNewAPI
+from catalyst.device import QJITDeviceNewAPI, extract_backend_info
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.runtime import extract_backend_info
 from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 
@@ -107,7 +106,7 @@ def test_qjit_device():
     # assert t == "split_non_commuting"
 
     t = transform_program[0].transform.__name__
-    assert t == "decompose"
+    assert t == "catalyst_decompose"
 
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):

@@ -39,6 +39,7 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
+from catalyst.device import BackendInfo
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
@@ -75,7 +76,6 @@ from catalyst.jax_tracer import trace_to_jaxpr
 from catalyst.qfunc import QFunc
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import BackendInfo
 
 from .primitives import (
     cuda_inst,

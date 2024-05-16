@@ -21,22 +21,22 @@ import jax.numpy as jnp
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.utils.runtime import pennylane_operation_set
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
     get_device_capabilities,
+    pennylane_operation_set,
 )
 
 
 def get_custom_qjit_device(num_wires, discards, additions):
     """Generate a custom device without gates in discards."""
 
-    class CustomDevice(qml.QubitDevice):
+    class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
-        name = "Custom Device"
-        short_name = "lightning.qubit"
+        # name = "Custom Device"
+        name = "lightning.qubit"
         pennylane_requires = "0.35.0"
         version = "0.0.2"
         author = "Tester"
@@ -73,9 +73,12 @@ def get_custom_qjit_device(num_wires, discards, additions):
             """Get PennyLane observables."""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
-        def apply(self, operations, **kwargs):
-            """Unused"""
-            raise RuntimeError("Only C/C++ interface is defined")
+        def execute(
+            self,
+            circuits,
+            execution_config
+        ):
+            raise RuntimeError("No execution for the custom device")
 
     return CustomDevice(wires=num_wires)
 

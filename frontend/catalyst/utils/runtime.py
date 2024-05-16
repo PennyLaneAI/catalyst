@@ -26,11 +26,14 @@ from typing import Any, Dict
 
 import pennylane as qml
 
+from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
-    DeviceCapabilities,
-    get_lib_path,
+    ProgramFeatures,
+    TOMLDocument,
+    get_device_capabilities,
     pennylane_operation_set,
+    read_toml_file,
 )
 
 package_root = os.path.dirname(__file__)
@@ -53,6 +56,13 @@ SUPPORTED_RT_DEVICES = {
     "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
     "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
 }
+
+
+def get_lib_path(project, env_var):
+    """Get the library path."""
+    if INSTALLED:
+        return os.path.join(package_root, "..", "lib")  # pragma: no cover
+    return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def check_no_overlap(*args, device_name):
@@ -99,9 +109,7 @@ def filter_out_adjoint(operations):
     return set(operations_no_adj)
 
 
-def validate_device_capabilities(
-    device: qml.QubitDevice, device_capabilities: DeviceCapabilities
-) -> None:
+def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -> None:
     """Validate configuration document against the device attributes.
     Raise CompileError in case of mismatch:
     * If device is not qjit-compatible.
@@ -116,14 +124,17 @@ def validate_device_capabilities(
 
     Raises: CompileError
     """
+    # pylint: disable=too-many-function-args
 
-    if not device_capabilities.qjit_compatible_flag:
+    if not config["compilation"]["qjit_compatible"]:
         raise CompileError(
             f"Attempting to compile program for incompatible device '{device.name}': "
             f"Config is not marked as qjit-compatible"
         )
 
     device_name = device.short_name if isinstance(device, qml.Device) else device.name
+    program_features = ProgramFeatures(device.shots is not None)
+    device_capabilities = get_device_capabilities(config, program_features, device_name)
 
     native = pennylane_operation_set(device_capabilities.native_ops)
     decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)
@@ -153,6 +164,34 @@ def validate_device_capabilities(
             )
 
 
+def device_get_toml_config(device) -> TOMLDocument:
+    """Get the contents of the device config file."""
+    if hasattr(device, "config"):
+        # The expected case: device specifies its own config.
+        toml_file = device.config
+    else:
+        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # field.
+        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+
+        name = device.short_name if isinstance(device, qml.Device) else device.name
+        # The toml files name convention we follow is to replace
+        # the dots with underscores in the device short name.
+        toml_file_name = name.replace(".", "_") + ".toml"
+        # And they are currently saved in the following directory.
+        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
+
+    try:
+        config = read_toml_file(toml_file)
+    except FileNotFoundError as e:
+        raise CompileError(
+            "Attempting to compile program for incompatible device: "
+            f"Config file ({toml_file}) does not exist"
+        ) from e
+
+    return config
+
+
 @dataclass
 class BackendInfo:
     """Backend information"""
@@ -163,7 +202,7 @@ class BackendInfo:
     kwargs: Dict[str, Any]
 
 
-def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
+def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
 
@@ -217,7 +256,8 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
                 device._s3_folder  # pylint: disable=protected-access
             )
 
-    for k, v in capabilities.options.items():
+    options = config.get("options", {})
+    for k, v in options.items():
         if hasattr(device, v):
             device_kwargs[k] = getattr(device, v)
 

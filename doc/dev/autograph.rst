@@ -852,3 +852,80 @@ rather than runtime.
 
 For more details, see the :ref:`compile-time vs. runtime <compile_time>`
 documentation.
+
+
+Disabling AutoGraph for a specific function or for calls inside a context
+-------------------------------------------------------------------------
+
+As mentioned before, Autograph support in Catalyst is still experimental, 
+reason for which certain functions could produce errors when converted. 
+We can avoid this by disabling Autograph conversion for a specific
+function via the ``disable_autograph`` function decorator: 
+
+>>> @disable_autograph
+... def f():
+...     x = 6
+...     if x > 5:
+...         y = x ** 2
+...     else:
+...         y = x ** 3
+...     return y
+...
+... @qjit(autograph=True)
+... def g(x: float, n: int):
+...     for _ in range(n):
+...         x = x + f()
+...     return x
+
+It is also possible to disable Autograph for all the function calls 
+inside a determined scope by using ``disable_autograph`` as a context
+decorator. However, take into account that the bare code inside 
+the context will be converted anyways:
+
+>>> def f():
+...     x = 6
+...     if x > 5:
+...         y = x ** 2
+...     else:
+...         y = x ** 3
+...     return y
+...
+... @qjit(autograph=True)
+... def g():
+...     x = 0.4
+...     with disable_autograph:
+...         x += f()
+...     return x
+
+
+In-place JAX array assignments
+------------------------------
+
+To update array values when using JAX, the `JAX syntax for array assignment
+<https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#array-updates-x-at-idx-set-y>`__
+(which uses the array ``at`` and ``set`` methods) must be used:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.empty((first_dim,), dtype=x.dtype)
+...
+...     for i in range(first_dim):
+...         result = result.at[i].set(x[i]* 2)
+...
+...     return result 
+    
+However, if updating a single index of the array, Autograph supports conversion of 
+standard Python array assignment syntax:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.empty((first_dim,), dtype=x.dtype)
+...
+...     for i in range(first_dim):
+...         result[i] = x[i] * 2
+...
+...     return result
+
+Under the hood, Catalyst converts anything coming in the latter notation into the former one.
