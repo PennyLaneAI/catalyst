@@ -75,6 +75,10 @@
   the PennyLane-Lightning simulator supports this gate.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
 
+* Can now compile functions that have been annotated with return type
+  annotations.
+  [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
