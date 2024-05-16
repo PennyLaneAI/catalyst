@@ -23,11 +23,11 @@ import pytest
 
 from catalyst.device import QJITDevice
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import check_no_overlap, validate_device_capabilities
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
     TOMLDocument,
+    check_no_overlap,
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
@@ -35,6 +35,7 @@ from catalyst.utils.toml import (
     load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
+    validate_device_capabilities,
 )
 
 
