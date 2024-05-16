@@ -28,7 +28,6 @@ from pennylane.transforms.core import TransformProgram
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
-    catalyst_decomposer,
     measurements_from_counts,
 )
 from catalyst.utils.exceptions import CompileError
