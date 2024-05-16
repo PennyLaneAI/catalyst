@@ -272,8 +272,7 @@ def for_stmt(
     #      to succeed, for example because they forgot to use a list instead of an array
 
     # pylint: disable=multiple-statements,missing-class-docstring
-    class EmptyResult:
-        ...
+    class EmptyResult: ...
 
     results = EmptyResult()
     fallback = False
