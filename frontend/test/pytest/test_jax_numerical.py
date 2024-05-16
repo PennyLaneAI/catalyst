@@ -24,73 +24,49 @@ from jax import scipy as jsp
 from catalyst import qjit
 
 
-def test_expm_numerical():
-    """Test jax.scipy.linalg.expm is numerically correct"""
+class TestExpmNumerical:
+    """Test jax.scipy.linalg.expm is numerically correct for float, int, and complex"""
 
-    """Test floating point numerics with jax.scipy.linalg.expm"""
+    _float = jnp.array([[0.1, 0.2], [5.3, 1.2]])
+    _int = jnp.array([[1, 2], [3, 4]])
+    _complex = jnp.array([[1.0, -1.0j], [1.0j, -1.0]])
+    _expected = [
+        (_float, -2.0, sp.linalg.expm(-2.0 * _float)),
+        (_int, 1, sp.linalg.expm(1 * _int)),
+        (_complex, 3.5j, sp.linalg.expm(3.5j * _complex)),
+    ]
 
-    @qjit
-    def f1(x):
-        return jsp.linalg.expm(-2.0 * x)
+    @pytest.mark.parametrize("test_input,exp_factor,expected", _expected)
+    def test_expm_numerical(self, test_input, exp_factor, expected):
+        @qjit
+        def f(x):
+            return jsp.linalg.expm(exp_factor * x)
 
-    y1 = jnp.array([[0.1, 0.2], [5.3, 1.2]])
-    res1 = f1(y1)
-    # expected1 = jnp.array([[2.0767685, -0.23879551], [-6.32808103, 0.76339319]])
-    expected1 = sp.linalg.expm(-2.0 * y1)
+        assert np.allclose(f(test_input), expected)
 
-    """Test integer numerics with jax.scipy.linalg.expm"""
 
-    @qjit
-    def f2(x):
-        return jsp.linalg.expm(x)
+class TestExpmInCircuit:
+    """Test entire quantum workflows with jax.scipy.linag.expm"""
 
-    y2 = jnp.array([[1, 0], [0, 1]])
-    res2 = f2(y2)
-    # expected2 = jnp.array([[2.71828183, 0.0], [0.0, 2.71828183]])
-    expected2 = sp.linalg.expm(y2)
+    def test_expm_in_circuit(self):
+        """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
 
-    """Test complex numerics with jax.scipy.linalg.expm"""
-    """
-	Note: a common usage pattern in Hamiltonian simulation is 
-	   exp(-iHt)
-	where H is a (Hermitian) matrix.
-	"""
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_expm():
+            generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
+            unitary = jsp.linalg.expm(generator)
+            qml.QubitUnitary(unitary, wires=[0])
+            return qml.probs()
 
-    @qjit
-    def f3(x):
-        return jsp.linalg.expm(-2j * x)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit_rot():
+            qml.RX(np.pi, wires=[0])
+            return qml.probs()
 
-    y3 = jnp.array([[1, -1j], [1j, -1]])  # This is PauliY + PauliZ
-    res3 = f3(y3)
-    # expected3 = jnp.array([[-0.95136313-0.21783962j, -0.21783962+0.j],
-    #                       [ 0.21783962+0.j, -0.95136313+0.21783962j]])
-    expected3 = sp.linalg.expm(-2j * y3)
-
-    """Test an entire quantum workflow with jax.scipy.linag.expm"""
-    """Rotate |0> about Bloch x axis for 180 degrees to get |1>"""
-
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def circuit_expm():
-        generator = -1j * jnp.pi * jnp.array([[0, 1], [1, 0]]) / 2
-        unitary = jsp.linalg.expm(generator)
-        qml.QubitUnitary(unitary, wires=[0])
-        return qml.probs()
-
-    res4 = circuit_expm()
-
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def circuit_rot():
-        qml.RX(np.pi, wires=[0])
-        return qml.probs()
-
-    # expected4 = [0,1]
-    expected4 = circuit_rot()
-
-    assert np.allclose(res1, expected1)
-    assert np.allclose(res2, expected2)
-    assert np.allclose(res3, expected3)
-    assert np.allclose(res4, expected4)
+        res = circuit_expm()
+        expected = circuit_rot()  # expected = [0,1]
+        assert np.allclose(res, expected)
 
 
 if __name__ == "__main__":
