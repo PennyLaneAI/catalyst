@@ -107,7 +107,7 @@ def test_qjit_device():
     # assert t == "split_non_commuting"
 
     t = transform_program[0].transform.__name__
-    assert t == "decompose"
+    assert t == "catalyst_decompose"
 
     # Check that the device cannot execute tapes
     with pytest.raises(RuntimeError, match="QJIT devices cannot execute tapes"):

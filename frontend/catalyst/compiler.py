@@ -300,7 +300,9 @@ class LinkerDriver:
         if platform.system() == "Linux":
             file_path_within_package = "../scipy.libs/"
             file_extension = ".so"
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            msg = "Attempting to use catalyst on an unsupported system"
+            assert platform.system() == "Darwin", msg
             file_path_within_package = ".dylibs/"
             file_extension = ".dylib"
 
