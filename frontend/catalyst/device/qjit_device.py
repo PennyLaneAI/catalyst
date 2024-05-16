@@ -22,8 +22,7 @@ import platform
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from typing import Optional, Set, Union
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
@@ -403,8 +402,12 @@ class QJITDeviceNewAPI(qml.devices.Device):
         )
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(catalyst_decompose, ctx=ctx, stopping_condition=ops_acceptance,
-                              max_expansion=max_expansion)
+        program.add_transform(
+            catalyst_decompose,
+            ctx=ctx,
+            stopping_condition=ops_acceptance,
+            max_expansion=max_expansion,
+        )
 
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
