@@ -840,18 +840,20 @@ def dynamic_one_shot(f):
 
 
             def _f2(*args2, **kwargs2):
+                tape = QuantumTape(shots=qnode.device.shots)
+                tape2 = QuantumTape(shots=qnode.device.shots)
+
                 @for_loop(0, old_shots.total_shots, 1)
                 def loop(i, s):
-                    tape = QuantumTape(shots=qnode.device.shots)
+                    nonlocal tape, tape2
                     with QueuingManager.stop_recording(), tape:
                         _ = old_func(*args2, **kwargs2)
 
-                    tape2 = init_auxiliary_tape(tape)
                     QueuingManager.remove_active_queue()
+                    tape2 = init_auxiliary_tape(tape)
                     QueuingManager.add_active_queue(tape2)
                     mcm_sample = tape2.measurements[-1]
                     assert isinstance(mcm_sample, SampleMP)
-                    # FIXME: Can not make this line work, hopefully due to an unrelated problem
                     s = s.at[i].set(mcm_sample.mv)
                     return s
 
@@ -861,9 +863,10 @@ def dynamic_one_shot(f):
                 # tape = QuantumTape(shots=qnode.device.shots)
                 # with QueuingManager.stop_recording(), tape:
                 #     _ = old_func(*args2, **kwargs2)
-
                 # tape2 = init_auxiliary_tape(tape)
 
+                print('tape.meas', tape.measurements)
+                print('tape2.meas', tape2.measurements)
                 aggregated = parse_native_mid_circuit_measurements(tape, [tape2], storage)
                 return aggregated
 
