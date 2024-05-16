@@ -124,6 +124,7 @@ def validate_config_with_device(device: qml.QubitDevice, config: TOMLDocument) -
 
     Raises: CompileError
     """
+    # pylint: disable=too-many-function-args
 
     if not config["compilation"]["qjit_compatible"]:
         raise CompileError(

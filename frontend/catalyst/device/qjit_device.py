@@ -84,8 +84,6 @@ RUNTIME_OPERATIONS = {
     for op in RUNTIME_OPERATIONS
 }
 
-from catalyst.utils.paths import get_lib_path
-
 # TODO: This should be removed after implementing `get_c_interface`
 # for the following backend devices:
 SUPPORTED_RT_DEVICES = {
@@ -109,6 +107,7 @@ class BackendInfo:
 def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
+    # pylint: disable=too-many-branches
 
     dname = device.name
     if isinstance(device, qml.Device):

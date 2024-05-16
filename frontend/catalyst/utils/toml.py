@@ -16,7 +16,6 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-import os
 import pathlib
 import re
 from dataclasses import dataclass
@@ -26,7 +25,6 @@ from typing import Any, Dict, List, Optional, Set
 
 import pennylane as qml
 
-from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.paths import get_lib_path
 
@@ -40,8 +38,7 @@ tomllib = importlib.util.find_spec("tomllib")
 tomlkit = importlib.util.find_spec("tomlkit")
 # We need at least one of these to make sure we can read toml files.
 if tomllib is None and tomlkit is None:  # pragma: nocover
-    msg = "Either tomllib or tomlkit need to be installed."
-    raise ImportError(msg)
+    raise ImportError("Either tomllib or tomlkit need to be installed.")
 
 # Give preference to tomllib
 if tomllib:  # pragma: nocover
