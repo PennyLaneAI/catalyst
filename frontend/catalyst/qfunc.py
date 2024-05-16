@@ -22,7 +22,12 @@ import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from catalyst.device import QJITDevice, QJITDeviceNewAPI
+from catalyst.device import (
+    BackendInfo,
+    QJITDevice,
+    QJITDeviceNewAPI,
+    extract_backend_info,
+)
 from catalyst.jax_extras import (
     deduce_avals,
     get_implicit_and_explicit_flat_args,
@@ -30,15 +35,11 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
-from catalyst.utils.runtime import (
-    BackendInfo,
-    extract_backend_info,
-    validate_device_capabilities,
-)
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
     get_device_capabilities,
+    validate_device_capabilities,
 )
 
 

@@ -23,7 +23,7 @@ import pytest
 
 from catalyst.device import QJITDevice
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import check_no_overlap, validate_device_capabilities
+from catalyst.utils.toml import check_no_overlap, validate_device_capabilities
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,

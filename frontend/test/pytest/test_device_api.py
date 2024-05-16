@@ -27,7 +27,7 @@ from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDeviceNewAPI
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.runtime import extract_backend_info
+from catalyst.device import extract_backend_info
 from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
 
 

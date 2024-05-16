@@ -16,10 +16,13 @@
 This module contains device stubs for the old and new PennyLane device API, which facilitate
 the application of decomposition and other device pre-processing routines.
 """
-
+import os
+import pathlib
+import platform
 from copy import deepcopy
+from dataclasses import dataclass
 from functools import partial
-from typing import Optional, Set
+from typing import Any, Dict, Optional, Set
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
@@ -32,7 +35,7 @@ from catalyst.device.decomposition import (
 )
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.runtime import BackendInfo
+from catalyst.utils.paths import get_lib_path
 from catalyst.utils.toml import (
     DeviceCapabilities,
     OperationProperties,
@@ -79,6 +82,88 @@ RUNTIME_OPERATIONS = {
     op: OperationProperties(invertible=True, controllable=True, differentiable=True)
     for op in RUNTIME_OPERATIONS
 }
+
+from catalyst.utils.paths import get_lib_path
+
+# TODO: This should be removed after implementing `get_c_interface`
+# for the following backend devices:
+SUPPORTED_RT_DEVICES = {
+    "lightning.qubit": ("LightningSimulator", "librtd_lightning"),
+    "lightning.kokkos": ("LightningKokkosSimulator", "librtd_lightning"),
+    "braket.aws.qubit": ("OpenQasmDevice", "librtd_openqasm"),
+    "braket.local.qubit": ("OpenQasmDevice", "librtd_openqasm"),
+}
+
+
+@dataclass
+class BackendInfo:
+    """Backend information"""
+
+    device_name: str
+    c_interface_name: str
+    lpath: str
+    kwargs: Dict[str, Any]
+
+
+def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
+    """Extract the backend info from a quantum device. The device is expected to carry a reference
+    to a valid TOML config file."""
+
+    dname = device.name
+    if isinstance(device, qml.Device):
+        dname = device.short_name
+
+    device_name = ""
+    device_lpath = ""
+    device_kwargs = {}
+
+    if dname in SUPPORTED_RT_DEVICES:
+        # Support backend devices without `get_c_interface`
+        device_name = SUPPORTED_RT_DEVICES[dname][0]
+        device_lpath = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        sys_platform = platform.system()
+
+        if sys_platform == "Linux":
+            device_lpath = os.path.join(device_lpath, SUPPORTED_RT_DEVICES[dname][1] + ".so")
+        elif sys_platform == "Darwin":  # pragma: no cover
+            device_lpath = os.path.join(device_lpath, SUPPORTED_RT_DEVICES[dname][1] + ".dylib")
+        else:  # pragma: no cover
+            raise NotImplementedError(f"Platform not supported: {sys_platform}")
+    elif hasattr(device, "get_c_interface"):
+        # Support third party devices with `get_c_interface`
+        device_name, device_lpath = device.get_c_interface()
+    else:
+        raise CompileError(f"The {dname} device does not provide C interface for compilation.")
+
+    if not pathlib.Path(device_lpath).is_file():
+        raise CompileError(f"Device at {device_lpath} cannot be found!")
+
+    if hasattr(device, "shots"):
+        if isinstance(device, qml.Device):
+            device_kwargs["shots"] = device.shots if device.shots else 0
+        else:
+            # TODO: support shot vectors
+            device_kwargs["shots"] = device.shots.total_shots if device.shots else 0
+
+    if dname == "braket.local.qubit":  # pragma: no cover
+        device_kwargs["device_type"] = dname
+        device_kwargs["backend"] = (
+            # pylint: disable=protected-access
+            device._device._delegate.DEVICE_ID
+        )
+    elif dname == "braket.aws.qubit":  # pragma: no cover
+        device_kwargs["device_type"] = dname
+        device_kwargs["device_arn"] = device._device._arn  # pylint: disable=protected-access
+        if device._s3_folder:  # pylint: disable=protected-access
+            device_kwargs["s3_destination_folder"] = str(
+                device._s3_folder  # pylint: disable=protected-access
+            )
+
+    for k, v in capabilities.options.items():
+        if hasattr(device, v):
+            device_kwargs[k] = getattr(device, v)
+
+    return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
 
 def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
