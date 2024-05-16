@@ -67,16 +67,17 @@
 
   ```
 
-* Support for including a list of previously excluded modules
-  for Autograph conversion.
+* Support for including a list of (sub)modules to be allow-listed for autograph conversion.
   [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
-  
-  Including previously excluded modules is now possible:
+
+  Although library code is not meant to be targeted by Autograph conversion,
+  it sometimes make sense to enable it for specific submodules that might 
+  benefit from such conversion:
 
   ```py
-  @qjit(autograph=True, autograph_include=["excluded_module"])
+  @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
   def f(x):
-    return excluded_module.func(x)
+    return excluded_module.submodule.func(x)
 
   ```
 
