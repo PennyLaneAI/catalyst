@@ -493,7 +493,13 @@ def trace_quantum_tape(
         return qrp
 
     qrp = QRegPromise(qreg)
-    ops = quantum_tape
+
+    if isinstance(device, qml.Device):
+        # Old device API expands tapes here. Note: this way some ops might bypass the verification.
+        # We decided to ignore this since we are aiming new device API.
+        ops = device.expand_fn(quantum_tape)
+    else:
+        ops = quantum_tape
 
     for op in ops:
         qrp2 = None
@@ -910,11 +916,6 @@ def trace_quantum_function(
                 quantum_tape,
                 return_values_flat,
             )
-
-            # TODO: Do we need to explicitly expand tape in the new device api?
-            for i in range(len(tapes)):  # pylint: disable=consider-using-enumerate
-                if isinstance(device, qml.Device):
-                    tapes[i] = device.expand_fn(tapes[i])
 
             # Verify the program against the device capabilities. We should not transform quantum
             # tapes after verification finishes.
