@@ -38,6 +38,8 @@ class TestExpmNumerical:
 
     @pytest.mark.parametrize("test_input,exp_factor,expected", _expected)
     def test_expm_numerical(self, test_input, exp_factor, expected):
+        """Test basic numerical correctness for jax.scipy.linalg.expm"""
+
         @qjit
         def f(x):
             return jsp.linalg.expm(exp_factor * x)
