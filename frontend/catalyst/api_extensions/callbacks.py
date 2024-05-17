@@ -43,19 +43,27 @@ class ActiveCallback:
     def __init__(self, func, restype):
         self.func = func
         self.restype = restype
-        self.fwd = None
-        self.fwd_restype = None
-        self.bwd = None
-        self.bwd_restype = None
+        self._fwd = None
+        self._fwd_restype = None
+        self._bwd = None
+        self._bwd_restype = None
         self.callback = None
 
-    def fwd(self, func, restype):
-        self.fwd = func
-        self.fwd_restype = restype
+    @staticmethod
+    def _get_return_signature(func, result_type):
+        if result_type is None:
+            signature = inspect.signature(func)
+            result_type = signature.return_annotation
+        result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+        return result_type
 
-    def bwd(self, func, restype):
-        self.bwd = func
-        self.bwd_restype = restype
+    def fwd(self, func, restype=None):
+        self._fwd = func
+        self._fwd_restype = ActiveCallback._get_return_signature(func, restype)
+
+    def bwd(self, func, restype=None):
+        self._bwd = func
+        self._bwd_restype = ActiveCallback._get_return_signature(func, restype)
 
     def __call__(self, *args, **kwargs):
         if self.callback:
@@ -64,7 +72,7 @@ class ActiveCallback:
         def closure(*args, **kwargs) -> self.restype:
             return self.func(*args, **kwargs)
 
-        self.callback = base_callback(closure, fwd=self.fwd, bwd=self.bwd)
+        self.callback = base_callback(closure, fwd=self._fwd, bwd=self._bwd)
         return self.callback(*args, **kwargs)
 
 

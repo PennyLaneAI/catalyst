@@ -156,7 +156,9 @@ def ActiveCallbackOp: Catalyst_Op<"activeCallbackCall",
         OptionalAttr<I64Attr>: $number_original_arg,
         OptionalAttr<FlatSymbolRefAttr>: $specialized,
         OptionalAttr<I64Attr>: $fwd,
-        OptionalAttr<I64Attr>: $bwd
+        OptionalAttr<TypeAttr>: $fwdSig,
+        OptionalAttr<I64Attr>: $bwd,
+        OptionalAttr<TypeAttr>: $bwdSig
   );
 
   let results = (outs Variadic<AnyType>);

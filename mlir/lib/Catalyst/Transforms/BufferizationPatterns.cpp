@@ -150,7 +150,7 @@ struct BufferizeActiveCallbackOp : public OpConversionPattern<ActiveCallbackOp> 
         auto originalArgsSize = rewriter.getI64IntegerAttr(op.getOperands().size());
         rewriter.create<ActiveCallbackOp>(op.getLoc(), TypeRange{}, bufferArgs,
                                           adaptor.getIdentifier(), originalArgsSize,
-                                          adaptor.getSpecializedAttr(), adaptor.getFwdAttr(), adaptor.getBwdAttr());
+                                          adaptor.getSpecializedAttr(), adaptor.getFwdAttr(), adaptor.getFwdSigAttr(), adaptor.getBwdAttr(), adaptor.getBwdSigAttr());
         size_t startIndex = bufferArgs.size() - op.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         rewriter.replaceOp(op, bufferResults);
