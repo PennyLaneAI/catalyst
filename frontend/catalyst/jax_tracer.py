@@ -904,8 +904,8 @@ def dynamic_one_shot(f):
                     s = s.at[i].set(mcm_sample.mv)
                     return s
 
-                # 2. Use `tape_info` to initialize the storage correctly. Trace `old_func`,
-                # this time for real, inside a loop.
+                # 2. Use `tape_info` to initialize the storage correctly. Trace `old_func`
+                # again, this time for real, inside a loop.
                 storage = jnp.zeros(old_shots.total_shots) # TODO: Use `tape_info` here
                 storage = loop(storage)
                 aggregated = parse_native_mid_circuit_measurements(tape, [tape2], storage)
