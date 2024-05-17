@@ -377,12 +377,19 @@ def make_jaxpr2(
     )
     register_lowering(gather2_p, _gather_lower)
 
+    primitive_batchers2 = jax._src.interpreters.batching.primitive_batchers.copy()
+    for primitive in jax._src.interpreters.batching.primitive_batchers.keys():
+        if primitive.name == "gather":
+            gather_batching_rule = jax._src.interpreters.batching.primitive_batchers[primitive]
+            primitive_batchers2[gather2_p] = gather_batching_rule
+
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
         # TODO: re-use `deduce_avals` here.
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
+            (jax._src.interpreters.batching, "primitive_batchers", primitive_batchers2),
         ), ExitStack():
             f = wrap_init(fun)
             if static_argnums:
