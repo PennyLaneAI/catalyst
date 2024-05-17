@@ -17,7 +17,6 @@
 import numpy as np
 import pennylane as qml
 import pytest
-import scipy as sp
 from jax import numpy as jnp
 from jax import scipy as jsp
 
