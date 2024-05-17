@@ -27,24 +27,25 @@ from catalyst import qjit
 class TestExpmNumerical:
     """Test jax.scipy.linalg.expm is numerically correct for float, int, and complex"""
 
-    _float = jnp.array([[0.1, 0.2], [5.3, 1.2]])
-    _int = jnp.array([[1, 2], [3, 4]])
-    _complex = jnp.array([[1.0, -1.0j], [1.0j, -1.0]])
-    _expected = [
-        (_float, -2.0, sp.linalg.expm(-2.0 * _float)),
-        (_int, 1, sp.linalg.expm(1 * _int)),
-        (_complex, 3.5j, sp.linalg.expm(3.5j * _complex)),
-    ]
-
-    @pytest.mark.parametrize("test_input,exp_factor,expected", _expected)
-    def test_expm_numerical(self, test_input, exp_factor, expected):
+    @pytest.mark.parametrize(
+        "inp",
+        [
+            (jnp.array([[0.1, 0.2], [5.3, 1.2]]), np.array([[0.1, 0.2], [5.3, 1.2]])),
+            (jnp.array([[1, 2], [3, 4]]), np.array([[1, 2], [3, 4]])),
+            (jnp.array([[1.0, -1.0j], [1.0j, -1.0]]), np.array([[1.0, -1.0j], [1.0j, -1.0]])),
+        ],
+    )
+    def test_expm_numerical(self, inp):
         """Test basic numerical correctness for jax.scipy.linalg.expm"""
 
         @qjit
         def f(x):
-            return jsp.linalg.expm(exp_factor * x)
+            return jsp.linalg.expm(x)
 
-        assert np.allclose(f(test_input), expected)
+        observed = f(inp[0])
+        expected = sp.linalg.expm(inp[1])
+
+        assert np.allclose(observed, expected)
 
 
 class TestExpmInCircuit:
