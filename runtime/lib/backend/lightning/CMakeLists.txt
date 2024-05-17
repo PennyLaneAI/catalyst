@@ -26,14 +26,13 @@ if(LIGHTNING_SRC_PATH)
         pennylane_lightning
         URL file://${LIGHTNING_SRC_PATH}
     )
-    set(LIGHTNING_GIT_TAG "" CACHE STRING "GIT_TAG value to build Lightning")
 
     # Acquire local git hash and use for LIGHTNING_GIT_TAG
     execute_process(COMMAND git rev-parse --short HEAD
         WORKING_DIRECTORY ${LIGHTNING_SRC_PATH}
-        RESULT_VARIABLE LIGHTNING_GIT_TAG
+        OUTPUT_VARIABLE LIGHTNING_GIT_TAG
     )
-    message(INFO "Building against Lightning #${LIGHTNING_GIT_TAG}")
+    message(INFO " Building against Lightning commit ${LIGHTNING_GIT_TAG}")
 
 else()
     if(NOT LIGHTNING_GIT_TAG)
