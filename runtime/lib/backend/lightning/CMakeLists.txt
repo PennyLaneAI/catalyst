@@ -2,7 +2,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
-include(ExternalProject)
 
 if(RUNTIME_CLANG_TIDY)
     if(NOT DEFINED CLANG_TIDY_BINARY)
@@ -27,6 +26,15 @@ if(LIGHTNING_SRC_PATH)
         pennylane_lightning
         URL file://${LIGHTNING_SRC_PATH}
     )
+    set(LIGHTNING_GIT_TAG "" CACHE STRING "GIT_TAG value to build Lightning")
+
+    # Acquire local git hash and use for LIGHTNING_GIT_TAG
+    execute_process(COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY ${LIGHTNING_SRC_PATH}
+        RESULT_VARIABLE LIGHTNING_GIT_TAG
+    )
+    message(INFO "Building against Lightning #${LIGHTNING_GIT_TAG}")
+
 else()
     if(NOT LIGHTNING_GIT_TAG)
         set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
@@ -37,8 +45,6 @@ else()
         GIT_TAG      ${LIGHTNING_GIT_TAG}
     )
 endif()
-FetchContent_MakeAvailable(pennylane_lightning)
-
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
 if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
@@ -50,6 +56,8 @@ elseif(ENABLE_LIGHTNING_KOKKOS)
 endif()
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 
+FetchContent_MakeAvailable(pennylane_lightning)
+
 set(src_files)
 
 if(ENABLE_LIGHTNING)
@@ -60,12 +68,11 @@ if(ENABLE_LIGHTNING)
 endif()
 if(ENABLE_LIGHTNING_KOKKOS)
     list(APPEND src_files
-    lightning_kokkos/LightningKokkosSimulator.cpp
+        lightning_kokkos/LightningKokkosSimulator.cpp
     )
 endif()
 
 add_library(rtd_lightning SHARED ${src_files})
-
 add_dependencies(rtd_lightning pennylane_lightning)
 
 target_include_directories(rtd_lightning PRIVATE .

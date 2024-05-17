@@ -50,7 +50,6 @@ FetchContent_Declare(
 )
 
 function(fetch_pybind11)
-    find_package(Python COMPONENTS Interpreter Development) # Required for non-standard Python system intsalls
     find_package(pybind11 CONFIG)
     if (pybind11_FOUND)
         message(STATUS, "FOUND pybind11")
@@ -60,7 +59,7 @@ function(fetch_pybind11)
 
         FetchContent_Declare(pybind11
             GIT_REPOSITORY https://github.com/pybind/pybind11.git
-            GIT_TAG        v2.12.0
+            GIT_TAG        v2.10.1
         )
 
         FetchContent_MakeAvailable(pybind11)
