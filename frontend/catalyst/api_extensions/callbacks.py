@@ -27,6 +27,7 @@ from typing import Any, Callable
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
+import jax
 
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
@@ -45,8 +46,10 @@ class ActiveCallback:
         self.restype = restype
         self._fwd = None
         self._fwd_restype = None
+        self._fwd_jaxpr = None
         self._bwd = None
         self._bwd_restype = None
+        self._bwd_jaxpr = None
         self.callback = None
 
     @staticmethod
@@ -67,12 +70,38 @@ class ActiveCallback:
 
     def __call__(self, *args, **kwargs):
         if self.callback:
-            self.callback(*args, **kwargs)
+            return self.callback(*args, **kwargs)
 
         def closure(*args, **kwargs) -> self.restype:
             return self.func(*args, **kwargs)
 
-        self.callback = base_callback(closure, fwd=self._fwd, bwd=self._bwd)
+        # We need this here to avoid infinite recursion
+        self.callback = base_callback(closure)
+
+        # The arguments here are tracers.
+        # And we want to just get the abstraction of the tracers (i.e., the types)
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        # Once we have the types, we can call this self.func with the absargs and abskwargs.
+        # We don't need the jaxpr representation but the output is the shape of the cotangents.
+        _, cotangents = jax.make_jaxpr(self.func, return_shape=True)(*absargs, **abskwargs)
+
+        # The forward pass must have the same input types as the original function
+        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+
+        # But its output is always going to be two pairs.
+        primal, residuals = shape
+
+        # The input for the bwd pass is the residuals and the cotangents.
+        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+
+        self.callback = base_callback(
+            closure,
+            fwd=self._fwd_jaxpr,
+            fwd_func=self._fwd,
+            bwd=self._bwd_jaxpr,
+            bwd_func=self._bwd,
+        )
+
         return self.callback(*args, **kwargs)
 
 
@@ -172,7 +201,7 @@ def pure_callback(callback_fn, result_type=None):
 
 
 ## IMPL ##
-def base_callback(func, fwd=None, bwd=None):
+def base_callback(func, fwd=None, fwd_func=None, bwd=None, bwd_func=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -187,7 +216,9 @@ def base_callback(func, fwd=None, bwd=None):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        return callback_implementation(func, retty, *args, fwd=fwd, bwd=bwd, **kwargs)
+        return callback_implementation(
+            func, retty, *args, fwd=fwd, fwd_func=fwd_func, bwd=bwd, bwd_func=bwd_func, **kwargs
+        )
 
     return bind_callback
 
@@ -296,6 +327,8 @@ def callback_implementation(
     *args: Any,
     fwd: None,
     bwd: None,
+    fwd_func: None,
+    bwd_func: None,
     **kwargs: Any,
 ):
     """
@@ -311,14 +344,14 @@ def callback_implementation(
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
     memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
-    fwd_closure = MemrefCallable(fwd, results_aval, *args, **kwargs) if fwd else None
-    bwd_closure = MemrefCallable(bwd, results_aval, *args, **kwargs) if bwd else None
 
     out_flat = python_callback_p.bind(
         *flat_args,
         callback=memref_callable,
-        fwd=fwd_closure,
-        bwd=bwd_closure,
+        fwd=fwd,
+        fwd_func=fwd_func,
+        bwd=bwd,
+        bwd_func=bwd_func,
         results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)

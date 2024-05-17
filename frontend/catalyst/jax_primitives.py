@@ -229,26 +229,33 @@ python_callback_p.multiple_results = True
 
 
 @python_callback_p.def_abstract_eval
-def _python_callback_abstract_eval(*avals, callback, fwd, bwd, results_aval):
+def _python_callback_abstract_eval(*avals, callback, fwd, fwd_func, bwd, bwd_func, results_aval):
     """Abstract evaluation"""
     return results_aval
 
 
 @python_callback_p.def_impl
-def _python_callback_def_impl(*avals, callback, fwd, bwd, results_aval):  # pragma: no cover
+def _python_callback_def_impl(
+    *avals, callback, fwd, fwd_func, bwd, bwd_func, results_aval
+):  # pragma: no cover
     """Concrete evaluation"""
     raise NotImplementedError()
 
 
-def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, fwd, bwd, results_aval):
+def _python_callback_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *args, callback, fwd, fwd_func, bwd, bwd_func, results_aval
+):
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
 
     callback_id = registry.register(callback)
-    fwd_id = registry.register(fwd) if fwd else None
-    bwd_id = registry.register(bwd) if bwd else None
+    breakpoint()
+    if fwd:
+        _func_lowering(jax_ctx, call_jaxpr=fwd, fn=fwd_func, call=False)
+    if bwd:
+        _func_lowering(jax_ctx, call_jaxpr=bwd, fn=bwd_func, call=False)
 
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
@@ -257,7 +264,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
     if not mlir_ty:
         return InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
-    return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args), fwd=fwd_id, bwd=bwd_id).results
+    return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
 #
@@ -328,7 +335,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     Args:
       ctx: the MLIR context
       args: list of arguments or abstract arguments to the function
-      name: name of the function
       call_jaxpr: the jaxpr representation of the fn
       fn: the function being compiled
     """
