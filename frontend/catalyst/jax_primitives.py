@@ -1047,7 +1047,7 @@ def _namedobs_def_impl(qubit, kind):  # pragma: no cover
 
 @namedobs_p.def_abstract_eval
 def _namedobs_abstract_eval(qubit, kind):
-    assert isinstance(qubit, AbstractQbit)
+    assert isinstance(qubit, AbstractQbit), qubit
     return AbstractObs()
 
 
