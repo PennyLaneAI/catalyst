@@ -154,11 +154,7 @@ def ActiveCallbackOp: Catalyst_Op<"activeCallbackCall",
         Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
         I64Attr: $identifier,
         OptionalAttr<I64Attr>: $number_original_arg,
-        OptionalAttr<FlatSymbolRefAttr>: $specialized,
-        OptionalAttr<I64Attr>: $fwd,
-        OptionalAttr<TypeAttr>: $fwdSig,
-        OptionalAttr<I64Attr>: $bwd,
-        OptionalAttr<TypeAttr>: $bwdSig
+        OptionalAttr<FlatSymbolRefAttr>: $specialized
   );
 
   let results = (outs Variadic<AnyType>);
