@@ -477,9 +477,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         pm.enableTiming(std::move(tm));
     }
 
-    // Maps a pass to zero or one pipelines ended by this pass
-    // Maps a pass to its owning pipeline
+    // Maps a pass to zero or one pipeline it terminates
     std::unordered_map<const Pass *, pair<Pipeline::Name, size_t>> pipelineTailMarkers;
+    // Maps a pass to its owning pipeline
     std::unordered_map<const Pass *, pair<Pipeline::Name, size_t>> passPipelineNames;
 
     // Fill all the pipe-to-pipeline mappings
@@ -498,6 +498,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                     passPipelineNames[pass] = pair(pipeline.name, pipelineIdx);
                 }
                 assert(pass != nullptr);
+                // The last pass surely terminates some pipeline
                 pipelineTailMarkers[pass] = pair(pipeline.name, pipelineIdx);
             }
             pipelineIdx++;
