@@ -91,7 +91,8 @@ On **Linux Debian/Ubuntu**:
   # Build Catalyst
   make all
 
-  # If you are building Catalyst components in custom locations, set environment variables. This step should not be required if you are simply following the instructions above. 
+  # If you are building Catalyst components in custom locations, set environment variables. 
+  # This step should not be required if you are simply following the instructions above. 
   export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
   export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
   export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
@@ -124,7 +125,8 @@ On **macOS**:
   # Build Catalyst
   make all
 
-  # If you are building Catalyst components in custom locations, set environment variables. This step should not be required if you are simply following the instructions above. 
+  # If you are building Catalyst components in custom locations, set environment variables. 
+  # This step should not be required if you are simply following the instructions above. 
   export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
   export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
   export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
