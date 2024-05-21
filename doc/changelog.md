@@ -82,8 +82,13 @@
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
+
 * Correctly querying batching rules for `jax.scipy.linalg.expm`
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
+
+* Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
+  In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
+  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)    
 
 <h3>Internal changes</h3>
 
