@@ -229,30 +229,30 @@ python_callback_p.multiple_results = True
 
 
 @python_callback_p.def_abstract_eval
-def _python_callback_abstract_eval(*avals, callback, active_callback, results_aval):
+def _python_callback_abstract_eval(*avals, callback, custom_grad, results_aval):
     """Abstract evaluation"""
     return results_aval
 
 
 @python_callback_p.def_impl
-def _python_callback_def_impl(*avals, callback, active_callback, results_aval):  # pragma: no cover
+def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # pragma: no cover
     """Concrete evaluation"""
     raise NotImplementedError()
 
 
-python_callback_cache: Dict[Callable, str] = {}
+functions_with_custom_grad_cache: Dict[Callable, str] = {}
 
 
 def _python_callback_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *args, callback, active_callback, results_aval
+    jax_ctx: mlir.LoweringRuleContext, *args, callback, custom_grad, results_aval
 ):
     """Callback lowering"""
 
-    if active_callback in python_callback_cache:
-        call_me = python_callback_cache[active_callback]
-        result_ty = [result.type for result in call_me.results]
+    if custom_grad in functions_with_custom_grad_cache:
+        function = functions_with_custom_grad_cache[custom_grad]
+        result_ty = [result.type for result in function.results]
         return InactiveCallbackOp(
-            result_ty, args, call_me.identifier, number_original_arg=call_me.number_original_arg
+            result_ty, args, function.identifier, number_original_arg=function.number_original_arg
         ).results
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
@@ -266,15 +266,12 @@ def _python_callback_lowering(
 
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
     retval = InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
-    python_callback_cache[active_callback] = retval
+    functions_with_custom_grad_cache[custom_grad] = retval
 
-    if active_callback:
-        _func_lowering(
-            jax_ctx, call_jaxpr=active_callback._fwd_jaxpr, fn=active_callback._fwd, call=False
-        )
-        _func_lowering(
-            jax_ctx, call_jaxpr=active_callback._bwd_jaxpr, fn=active_callback._bwd, call=False
-        )
+    if custom_grad:
+        assert custom_grad._fwd and custom_grad._bwd
+        _func_lowering(jax_ctx, call_jaxpr=custom_grad._fwd_jaxpr, fn=custom_grad._fwd, call=False)
+        _func_lowering(jax_ctx, call_jaxpr=custom_grad._bwd_jaxpr, fn=custom_grad._bwd, call=False)
 
     return retval.results
 

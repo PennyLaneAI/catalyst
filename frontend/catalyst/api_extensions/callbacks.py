@@ -69,7 +69,7 @@ class ActiveCallback:
         # Where does the infinite recursion happen?
         # It happens if the fwd or bwd passes have a call to
         # the pure_callback implementation.
-        self.callback = base_callback(closure, active_callback=self)
+        self.callback = base_callback(closure, custom_grad=self)
 
         # No custom gradient specified:
         # we will let either the frontend verification or the middle end
@@ -206,7 +206,7 @@ def pure_callback(callback_fn, result_type=None):
 
 
 ## IMPL ##
-def base_callback(func, active_callback=None):
+def base_callback(func, custom_grad=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -219,9 +219,7 @@ def base_callback(func, active_callback=None):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        return callback_implementation(
-            func, retty, *args, active_callback=active_callback, **kwargs
-        )
+        return callback_implementation(func, retty, *args, custom_grad=custom_grad, **kwargs)
 
     return bind_callback
 
@@ -328,7 +326,7 @@ def callback_implementation(
     cb: Callable[..., Any],
     result_shape_dtypes: Any,
     *args: Any,
-    active_callback: None,
+    custom_grad: None,
     **kwargs: Any,
 ):
     """
@@ -348,7 +346,7 @@ def callback_implementation(
     out_flat = python_callback_p.bind(
         *flat_args,
         callback=memref_callable,
-        active_callback=active_callback,
+        custom_grad=custom_grad,
         results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)
