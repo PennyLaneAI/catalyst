@@ -107,18 +107,6 @@ On **macOS**, it is strongly recommended to install the official XCode Command L
   pip install cmake ninja
   brew install libomp
 
-All additional build and developer dependencies are managed via the repository's
-``requirements.txt`` and can be installed as follows:
-
-.. code-block:: console
-
-  pip install -r requirements.txt
-
-.. Note::
-
-  Please ensure that your local site-packages for Python are available on the ``PATH`` - watch out
-  for the corresponding warning that ``pip`` may give you during installation.
-
 Once the pre-requisites are installed, start by cloning the project repository including all its
 submodules:
 
@@ -131,6 +119,18 @@ For an existing copy of the repository without its submodules, they can also be 
 .. code-block:: console
 
   git submodule update --init --depth=1
+
+All additional build and developer dependencies are managed via the repository's
+``requirements.txt`` and can be installed as follows:
+
+.. code-block:: console
+
+  pip install -r requirements.txt
+
+.. Note::
+
+  Please ensure that your local site-packages for Python are available on the ``PATH`` - watch out
+  for the corresponding warning that ``pip`` may give you during installation.
 
 Catalyst
 ^^^^^^^^
