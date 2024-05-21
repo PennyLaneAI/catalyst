@@ -76,7 +76,7 @@ class ActiveCallback:
             return self.func(*args, **kwargs)
 
         # We need this here to avoid infinite recursion
-        self.callback = base_callback(closure)
+        self.callback = base_callback(closure, fwd=self)
 
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
@@ -94,13 +94,13 @@ class ActiveCallback:
         # The input for the bwd pass is the residuals and the cotangents.
         self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
-        self.callback = base_callback(
-            closure,
-            fwd=self._fwd_jaxpr,
-            fwd_func=self._fwd,
-            bwd=self._bwd_jaxpr,
-            bwd_func=self._bwd,
-        )
+        #self.callback = base_callback(
+        #    closure,
+        #    fwd=self._fwd_jaxpr,
+        #    fwd_func=self._fwd,
+        #    bwd=self._bwd_jaxpr,
+        #    bwd_func=self._bwd,
+        #)
 
         return self.callback(*args, **kwargs)
 

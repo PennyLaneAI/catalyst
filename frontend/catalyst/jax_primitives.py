@@ -18,7 +18,7 @@ of quantum operations, measurements, and observables to JAXPR.
 import sys
 from dataclasses import dataclass
 from itertools import chain
-from typing import Dict, Iterable, List, Union
+from typing import Callable, Dict, Iterable, List, Union
 
 import jax
 import numpy as np
@@ -242,30 +242,36 @@ def _python_callback_def_impl(
     raise NotImplementedError()
 
 
+python_callback_cache: Dict[Callable, str] = {}
 def _python_callback_lowering(
     jax_ctx: mlir.LoweringRuleContext, *args, callback, fwd, fwd_func, bwd, bwd_func, results_aval
 ):
     """Callback lowering"""
 
+    if fwd in python_callback_cache:
+        call_me = python_callback_cache[fwd]
+        result_ty = [result.type for result in call_me.results]
+        return InactiveCallbackOp(result_ty, args, call_me.identifier, number_original_arg=call_me.number_original_arg).results
+        
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
 
     callback_id = registry.register(callback)
-    breakpoint()
-    if fwd:
-        _func_lowering(jax_ctx, call_jaxpr=fwd, fn=fwd_func, call=False)
-    if bwd:
-        _func_lowering(jax_ctx, call_jaxpr=bwd, fn=bwd_func, call=False)
 
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
-    if not mlir_ty:
-        return InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
-    return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+    retval = InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
+    #retval = ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
+    python_callback_cache[fwd] = retval
 
+    if fwd:
+        _func_lowering(jax_ctx, call_jaxpr=fwd._fwd_jaxpr, fn=fwd._fwd, call=False)
+        _func_lowering(jax_ctx, call_jaxpr=fwd._bwd_jaxpr, fn=fwd._bwd, call=False)
+
+    return retval.results
 
 #
 # print
@@ -300,6 +306,7 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
+
     func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
 
     if isinstance(fn, qml.QNode):

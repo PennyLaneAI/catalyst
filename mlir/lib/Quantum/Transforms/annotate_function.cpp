@@ -36,7 +36,7 @@ bool isAnnotated(func::FuncOp op, const char *attr)
 bool invalidGradientOperation(func::FuncOp op)
 {
     auto res = op.walk([](Operation *o) {
-        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::InactiveCallbackOp>(o) ||
+        if (dyn_cast<MeasureOp>(o) || 
             dyn_cast<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
