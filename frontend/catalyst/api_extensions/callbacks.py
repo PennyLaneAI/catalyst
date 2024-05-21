@@ -47,28 +47,16 @@ class ActiveCallback:
         self.func = func
         self.restype = restype
         self._fwd = None
-        self._fwd_restype = None
         self._fwd_jaxpr = None
         self._bwd = None
-        self._bwd_restype = None
         self._bwd_jaxpr = None
         self.callback = None
 
-    @staticmethod
-    def _get_return_signature(func, result_type):
-        if result_type is None:
-            signature = inspect.signature(func)
-            result_type = signature.return_annotation
-        result_type = tree_map(convert_pytype_to_shaped_array, result_type)
-        return result_type
-
     def fwd(self, func, restype=None):
         self._fwd = func
-        self._fwd_restype = ActiveCallback._get_return_signature(func, restype)
 
     def bwd(self, func, restype=None):
         self._bwd = func
-        self._bwd_restype = ActiveCallback._get_return_signature(func, restype)
 
     def __call__(self, *args, **kwargs):
         if self.callback:
