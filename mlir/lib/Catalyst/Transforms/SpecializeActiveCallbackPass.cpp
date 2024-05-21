@@ -64,6 +64,10 @@ LLVM::LLVMFuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter 
     }
 
     auto funcOp = mlir::LLVM::lookupOrCreateFn(moduleOp, name, inputs, voidType, false);
+    auto alreadyDefined = funcOp.getBody().begin() != funcOp.getBody().end();
+    if (alreadyDefined) {
+        return funcOp;
+    }
     funcOp.setPrivate();
 
     Block *entryBlock = funcOp.addEntryBlock();

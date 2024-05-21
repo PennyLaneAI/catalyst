@@ -162,6 +162,23 @@ def ActiveCallbackOp: Catalyst_Op<"activeCallbackCall",
   let assemblyFormat = [{
     `(` $inputs `)` (`as` $specialized^ )? attr-dict `:` functional-type(operands, results)
   }];
+
+}
+
+def GradTriple : Catalyst_Op<"gradtriple", []> {
+   let summary = "Global operation that denotes a custom gradient with Enzyme.";
+
+   let description = [{ TODO }];
+
+   let arguments = (ins
+       I64Attr: $identifier,
+       FlatSymbolRefAttr: $fwd,
+       FlatSymbolRefAttr: $bwd
+   );
+
+   let assemblyFormat = [{
+       `(` $identifier `,` $fwd `,` $bwd `)` attr-dict
+   }];
 }
 
 #endif // GRADIENT_OPS

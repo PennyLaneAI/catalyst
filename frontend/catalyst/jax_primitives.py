@@ -41,7 +41,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import ActiveCallbackOp, InactiveCallbackOp, PrintOp
+from mlir_quantum.dialects.catalyst import ActiveCallbackOp, InactiveCallbackOp, PrintOp, GradTriple
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -251,7 +251,7 @@ def _python_callback_lowering(
     if custom_grad in functions_with_custom_grad_cache:
         function = functions_with_custom_grad_cache[custom_grad]
         result_ty = [result.type for result in function.results]
-        return InactiveCallbackOp(
+        return function.__class__(
             result_ty, args, function.identifier, number_original_arg=function.number_original_arg
         ).results
 
@@ -265,14 +265,22 @@ def _python_callback_lowering(
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
-    retval = InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
+    if mlir_ty:
+        retval = ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
+    else:
+        assert not custom_grad, "Inactive callbacks should never have custom gradients."
+        retval = InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
+
     functions_with_custom_grad_cache[custom_grad] = retval
 
     if custom_grad:
         assert custom_grad._fwd and custom_grad._bwd
         _func_lowering(jax_ctx, call_jaxpr=custom_grad._fwd_jaxpr, fn=custom_grad._fwd, call=False)
         _func_lowering(jax_ctx, call_jaxpr=custom_grad._bwd_jaxpr, fn=custom_grad._bwd, call=False)
-
+        mlir_fwd = mlir_fn_cache[custom_grad._fwd]
+        mlir_bwd = mlir_fn_cache[custom_grad._bwd]
+        with ir.InsertionPoint(jax_ctx.module_context.module.body):
+            GradTriple(callback_id, mlir_fwd, mlir_bwd)
     return retval.results
 
 
