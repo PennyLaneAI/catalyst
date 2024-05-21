@@ -75,7 +75,7 @@ Just Tell Me How To Build Catalyst From Source
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 (This section title is a tribute to the llvm new pass manager guide's section `Just Tell Me How To Run The Default Optimization Pipeline With The New Pass Manager <https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager>`_)
 
-On **Linux**:
+On **Linux Debian/Ubuntu**:
 
 .. code-block:: console
 
