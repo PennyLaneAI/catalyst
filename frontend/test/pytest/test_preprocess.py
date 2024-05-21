@@ -21,6 +21,9 @@ import pathlib
 import platform
 import tempfile
 from functools import partial
+from os.path import join
+from tempfile import TemporaryDirectory
+from textwrap import dedent
 
 import numpy as np
 import pennylane as qml
@@ -50,6 +53,35 @@ from catalyst.device.decomposition import (
 )
 from catalyst.jax_tracer import HybridOpRegion
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.utils.toml import (
+    DeviceCapabilities,
+    OperationProperties,
+    ProgramFeatures,
+    TOMLDocument,
+    get_device_capabilities,
+    load_device_capabilities,
+    pennylane_operation_set,
+    read_toml_file,
+)
+
+
+def get_test_config(config_text: str) -> TOMLDocument:
+    """Parse test config into the TOMLDocument structure"""
+    with TemporaryDirectory() as d:
+        toml_file = join(d, "test.toml")
+        with open(toml_file, "w", encoding="utf-8") as f:
+            f.write(config_text)
+        config = read_toml_file(toml_file)
+        return config
+
+
+def get_test_device_capabilities(
+    program_features: ProgramFeatures, config_text: str
+) -> DeviceCapabilities:
+    """Parse test config into the DeviceCapabilities structure"""
+    config = get_test_config(config_text)
+    device_capabilities = load_device_capabilities(config, program_features, "dummy")
+    return device_capabilities
 
 
 class DummyDevice(Device):
@@ -60,6 +92,11 @@ class DummyDevice(Device):
     def __init__(self, wires, shots=1024):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
+        program_features = ProgramFeatures(shots is not None)
+        capabilities = get_device_capabilities(self, program_features)
+        capabilities.native_ops.pop("BlockEncode")
+        capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
+        self.qjit_capabilities = capabilities
 
     @staticmethod
     def get_c_interface():
@@ -327,19 +364,28 @@ HYBRID_OPS = [
     (cond_op, Cond, 2),
 ]
 
-expected_ops = [
-    "PauliX",
-    "PauliZ",
-    "RX",
-    "RY",
-    "RZ",
-    "CNOT",
-    "Adjoint",
-    "ForLoop",
-    "WhileLoop",
-    "Cond",
-    "QubitUnitary",
-]
+capabilities = get_test_device_capabilities(
+    ProgramFeatures(False),
+    dedent(
+        """
+        schema = 2
+        [operators.gates.native]
+        PauliX = { }
+        PauliZ = { }
+        RX = { }
+        RY = { }
+        RZ = { }
+        CNOT = { }
+        Adjoint = { }
+        ForLoop = { }
+        WhileLoop = { }
+        Cond = { }
+        QubitUnitary = { }
+    """
+    ),
+)
+
+expected_ops = pennylane_operation_set(capabilities.native_ops)
 
 
 class TestPreprocessHybridOp:
@@ -359,7 +405,7 @@ class TestPreprocessHybridOp:
         # create and decompose the tape
         tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
         old_op = tape[0]
         new_op = new_tape[0]
@@ -542,7 +588,7 @@ class TestPreprocessHybridOp:
 
         # do the decomposition and get the new tape
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
         # unsupported ops on the top-level tape have been decomposed (no more Hadamard)
         assert "Hadamard" not in [op.name for op in new_tape.operations]
@@ -582,7 +628,7 @@ class TestPreprocessHybridOp:
         tape = qml.tape.QuantumScript([qml.ctrl(qml.RX(1.23, 0), 1)])
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition)
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
         assert len(new_tape.operations) == 1
         new_op = new_tape.operations[0]
@@ -607,7 +653,7 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
     def test_error_for_pennylane_midmeasure_decompose_nested(self):
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
@@ -632,7 +678,7 @@ class TestPreprocessHybridOp:
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
     def test_unsupported_op_with_no_decomposition_raises_error(self):
         """Test that an unsupported operator that doesn't provide a decomposition
@@ -648,7 +694,7 @@ class TestPreprocessHybridOp:
             match="not supported with catalyst on this device and does not provide a decomposition",
         ):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
     def test_decompose_to_matrix_raises_error(self):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
@@ -667,7 +713,7 @@ class TestPreprocessHybridOp:
 
         with pytest.raises(CompileError, match="could not be decomposed, it might be unsupported"):
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                _ = catalyst_decompose(tape, ctx, stopping_condition)
+                _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
 
 
 class TestTransform:

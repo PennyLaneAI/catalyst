@@ -396,7 +396,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
             catalyst_decompose,
             ctx=ctx,
             stopping_condition=ops_acceptance,
-            capabilities=self.capabilities,
+            capabilities=self.qjit_capabilities,
         )
 
         if self.measurement_processes == {"Counts"}:
