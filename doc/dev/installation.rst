@@ -70,6 +70,75 @@ Building from source
 To build Catalyst from source, developers should follow the instructions provided below for building
 all three modules: the Python frontend, the MLIR compiler, and the runtime library.
 
+
+Just Tell Me How To Build Catalyst From Source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(This section title is a tribute to the llvm new pass manager guide's section `Just Tell Me How To Run The Default Optimization Pipeline With The New Pass Manager <https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager>`_)
+
+On **Linux**:
+.. code-block:: console
+
+  # Install common requirements
+  sudo apt install clang lld ccache libomp-dev ninja-build make cmake 
+
+  # Clone the Catalyst repository  
+  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+  # Install specific requirements for Catalyst
+  pip install -r requirements.txt
+
+  # Build Catalyst
+  make all
+
+  # If you are building Catalyst components in custom locations, set environment variables. This step should not be required if you are simply following the instructions above. 
+  export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
+  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
+  export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
+  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+
+  # Optional: test that everything is built properly
+  make test
+
+  # Optional: build and test documentation for Catalyst
+  pip install -r doc/requirements.txt
+  sudo apt install doxygen pandoc
+
+
+On **macOS**:
+.. code-block:: console
+
+  # Install XCode Command Line Tools and common requirements
+  xcode-select --install
+  pip install cmake ninja
+  brew install libomp
+
+  # Clone the Catalyst repository  
+  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+  # install specific requirements for Catalyst
+  pip install -r requirements.txt 
+
+  # Build Catalyst
+  make all
+
+  # If you are building Catalyst components in custom locations, set environment variables. This step should not be required if you are simply following the instructions above. 
+  export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
+  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
+  export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
+  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+
+  # Optional: test that everything is built properly
+  make test
+
+  # Optional: build and test documentation for Catalyst
+  pip install -r doc/requirements.txt
+  brew install doxygen pandoc
+
+Below is a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst can be built and tested indenpendently. 
+
+
 Requirements
 ^^^^^^^^^^^^
 
@@ -121,7 +190,7 @@ For an existing copy of the repository without its submodules, they can also be 
   git submodule update --init --depth=1
 
 All additional build and developer dependencies are managed via the repository's
-``requirements.txt`` and can be installed as follows:
+``requirements.txt`` and can be installed as follows once the repository is cloned:
 
 .. code-block:: console
 
