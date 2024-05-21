@@ -1,4 +1,4 @@
-PYTHON := $(shell which python3)
+PYTHON?=$(shell which python3)
 C_COMPILER?=$(shell which clang)
 CXX_COMPILER?=$(shell which clang++)
 COMPILER_LAUNCHER?=$(shell which ccache)
@@ -14,10 +14,10 @@ ENABLE_LIGHTNING?=ON
 ENABLE_LIGHTNING_KOKKOS?=ON
 ENABLE_OPENQASM?=ON
 ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?=5feb4a10c9cd15fa590c513fc7c6a10a0b334269
+LIGHTNING_GIT_TAG_VALUE?=latest_release
 ENABLE_LAPACK?=OFF
 
-BUILD_TARGETS := rt_capi
+BUILD_TARGETS := rt_capi rtd_dummy
 TEST_TARGETS := ""
 
 ifeq ($(ENABLE_LIGHTNING), ON)
@@ -126,8 +126,8 @@ $(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
 .PHONY: dummy_device
-dummy_device: configure
-	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC)
+dummy_device:
+	cmake --build $(RT_BUILD_DIR) --target rtd_dummy -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests_lightning

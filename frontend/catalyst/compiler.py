@@ -309,7 +309,9 @@ class LinkerDriver:
         if platform.system() == "Linux":
             file_path_within_package = "../scipy.libs/"
             file_extension = ".so"
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            msg = "Attempting to use catalyst on an unsupported system"
+            assert platform.system() == "Darwin", msg
             file_path_within_package = ".dylibs/"
             file_extension = ".dylib"
 
@@ -547,9 +549,9 @@ class Compiler:
             (Optional[str]): output IR
         """
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
-            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
-
-        if not self.last_compiler_output:
-            return None
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no file was found.\n"
+            msg += "Are you sure the file exists?"
+            raise CompileError(msg)
 
         return self.last_compiler_output.get_pipeline_output(pipeline)

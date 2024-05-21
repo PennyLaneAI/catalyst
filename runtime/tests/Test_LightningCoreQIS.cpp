@@ -1939,3 +1939,42 @@ TEST_CASE("Test that an exception if CNOT is controlled with the same qubit", "[
     __catalyst__rt__device_release();
     __catalyst__rt__finalize();
 }
+
+TEST_CASE("Test __catalyst__qis__ Hadamard, IsingZZ", "[CoreQIS]")
+{
+    for (const auto &[rtd_lib, rtd_name, rtd_kwargs] : getDevices()) {
+        __catalyst__rt__initialize();
+        __catalyst__rt__device_init((int8_t *)rtd_lib.c_str(), (int8_t *)rtd_name.c_str(),
+                                    (int8_t *)rtd_kwargs.c_str());
+
+        QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
+
+        QUBIT **wire0 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **wire1 = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+
+        // qml.Hadamard(wires=0)
+        __catalyst__qis__Hadamard(*wire0, NO_MODIFIERS);
+        // qml.Hadamard(wires=1)
+        __catalyst__qis__Hadamard(*wire1, NO_MODIFIERS);
+        // qml.IsingZZ(M_PI_4, wires=[1,0])
+        __catalyst__qis__IsingZZ(M_PI_4, *wire1, *wire0, NO_MODIFIERS);
+
+        MemRefT_CplxT_double_1d result = getState(4);
+        __catalyst__qis__State(&result, 0);
+        CplxT_double *state = result.data_allocated;
+
+        CHECK(state[0].real == Approx(0.4619397663).margin(1e-5));
+        CHECK(state[0].imag == Approx(-0.1913417162).margin(1e-5));
+        CHECK(state[1].real == Approx(0.4619397663).margin(1e-5));
+        CHECK(state[1].imag == Approx(0.1913417162).margin(1e-5));
+        CHECK(state[2].real == Approx(0.4619397663).margin(1e-5));
+        CHECK(state[2].imag == Approx(0.1913417162).margin(1e-5));
+        CHECK(state[3].real == Approx(0.4619397663).margin(1e-5));
+        CHECK(state[3].imag == Approx(-0.1913417162).margin(1e-5));
+
+        freeState(result);
+        __catalyst__rt__qubit_release_array(qs);
+        __catalyst__rt__device_release();
+        __catalyst__rt__finalize();
+    }
+}
