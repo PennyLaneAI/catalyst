@@ -23,7 +23,47 @@ import pennylane as qml
 import pytest
 
 from catalyst import debug, pure_callback
-from catalyst.api_extensions.callbacks import base_callback
+from catalyst.api_extensions.callbacks import ActiveCallback, base_callback
+from catalyst.utils.exceptions import DifferentiableCompileError
+
+
+class TestActiveCallback:
+
+    def test_allow_no_custom_gradient(self):
+        f = lambda x: x
+        active_callback = ActiveCallback(f, float)
+        observed_jaxpr = jax.make_jaxpr(active_callback)(1.0)
+        expected_jaxpr = jax.make_jaxpr(f)(1.0)
+        assert str(observed_jaxpr) == str(expected_jaxpr)
+
+    def test_error_message_only_fwd_defined(self):
+        f = lambda x: x
+        fwd = lambda x: 1.0
+        active_callback = ActiveCallback(f, float)
+        active_callback.fwd(fwd)
+        msg = ".*differentiated but missing reverse pass"
+        with pytest.raises(DifferentiableCompileError, match=msg):
+            jax.make_jaxpr(active_callback)(1.0)
+
+    def test_error_message_only_bwd_defined(self):
+        f = lambda x: x
+        bwd = lambda x: x
+        active_callback = ActiveCallback(f, float)
+        active_callback.bwd(bwd)
+        msg = ".*differentiated but missing forward pass"
+        with pytest.raises(DifferentiableCompileError, match=msg):
+            jax.make_jaxpr(active_callback)(1.0)
+
+    def test_fwd_bwd_jaxpr_fields_are_set(self):
+        f = lambda x: x
+        fwd = lambda x: (x, 1.0)
+        bwd = lambda res, cotangents: res * cotangents
+        active_callback = ActiveCallback(f, float)
+        active_callback.fwd(fwd)
+        active_callback.bwd(bwd)
+        jax.make_jaxpr(active_callback)(1.0)
+        assert active_callback._fwd_jaxpr
+        assert active_callback._bwd_jaxpr
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
