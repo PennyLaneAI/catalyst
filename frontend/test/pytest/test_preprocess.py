@@ -93,10 +93,10 @@ class DummyDevice(Device):
         print(pathlib.Path(__file__).parent.parent.parent.parent)
         super().__init__(wires=wires, shots=shots)
         program_features = ProgramFeatures(shots is not None)
-        capabilities = get_device_capabilities(self, program_features)
-        capabilities.native_ops.pop("BlockEncode")
-        capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
-        self.qjit_capabilities = capabilities
+        dummy_capabilities = get_device_capabilities(self, program_features)
+        dummy_capabilities.native_ops.pop("BlockEncode")
+        dummy_capabilities.to_matrix_ops["BlockEncode"] = OperationProperties(False, False, False)
+        self.qjit_capabilities = dummy_capabilities
 
     @staticmethod
     def get_c_interface():
