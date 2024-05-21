@@ -77,13 +77,13 @@ class QFunc:
         validate_device_capabilities(device, device_capabilities)
 
         if isinstance(device, qml.devices.Device):
-            self.qjit_device = QJITDeviceNewAPI(device, device_capabilities, backend_info)
+            qjit_device = QJITDeviceNewAPI(device, device_capabilities, backend_info)
         else:
-            self.qjit_device = QJITDevice(device, device_capabilities, backend_info)
+            qjit_device = QJITDevice(device, device_capabilities, backend_info)
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, self.qjit_device, args, kwargs, qnode=self
+                self.func, qjit_device, args, kwargs, qnode=self
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
