@@ -22,6 +22,7 @@ import ctypes
 import inspect
 from collections.abc import Sequence
 from functools import wraps
+from operator import not_
 from typing import Any, Callable
 
 import jax.numpy as jnp
@@ -31,6 +32,7 @@ import jax
 
 from catalyst.jax_primitives import python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
+from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
     get_ranked_memref_descriptor,
     get_unranked_memref_descriptor,
@@ -76,8 +78,31 @@ class ActiveCallback:
             return self.func(*args, **kwargs)
 
         # We need this here to avoid infinite recursion
-        self.callback = base_callback(closure, fwd=self)
+        # Where does the infinite recursion happen?
+        # It happens if the fwd or bwd passes have a call to
+        # the pure_callback implementation.
+        self.callback = base_callback(closure, active_callback=self)
 
+        # No custom gradient specified:
+        # we will let either the frontend verification or the middle end
+        # verification check whether or not we are taking the derivative
+        # of this pure_callback. For now, since we don't have them, we just
+        # assume the user will never request the gradient of this pure_callback.
+        no_custom_grad = all(map(not_, [self._fwd, self._bwd]))
+        if no_custom_grad:
+            return self.callback(*args, **kwargs)
+
+        incomplete_grad = not all([self._fwd, self._bwd])
+        if incomplete_grad:
+            # If we are here, then we have either _fwd and _bwd but not both
+            msg = f"Function {self.func} differentiated but missing "
+            msg += "forward" if not self._fwd else "reverse"
+            msg += " pass"
+            raise DifferentiableCompileError(msg)
+
+        # Here, we are guaranteed that forward and reverse passes are
+        # available.
+        #
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
@@ -93,14 +118,6 @@ class ActiveCallback:
 
         # The input for the bwd pass is the residuals and the cotangents.
         self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
-
-        #self.callback = base_callback(
-        #    closure,
-        #    fwd=self._fwd_jaxpr,
-        #    fwd_func=self._fwd,
-        #    bwd=self._bwd_jaxpr,
-        #    bwd_func=self._bwd,
-        #)
 
         return self.callback(*args, **kwargs)
 
@@ -201,15 +218,13 @@ def pure_callback(callback_fn, result_type=None):
 
 
 ## IMPL ##
-def base_callback(func, fwd=None, fwd_func=None, bwd=None, bwd_func=None):
+def base_callback(func, active_callback=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
     signature = inspect.signature(func)
     retty = signature.return_annotation
 
-    # We just disable inconsistent return statements
-    # Since we are building this feature step by step.
     @wraps(func)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
@@ -217,7 +232,7 @@ def base_callback(func, fwd=None, fwd_func=None, bwd=None, bwd_func=None):
             return func(*args, **kwargs)
 
         return callback_implementation(
-            func, retty, *args, fwd=fwd, fwd_func=fwd_func, bwd=bwd, bwd_func=bwd_func, **kwargs
+            func, retty, *args, active_callback=active_callback, **kwargs
         )
 
     return bind_callback
@@ -325,10 +340,7 @@ def callback_implementation(
     cb: Callable[..., Any],
     result_shape_dtypes: Any,
     *args: Any,
-    fwd: None,
-    bwd: None,
-    fwd_func: None,
-    bwd_func: None,
+    active_callback: None,
     **kwargs: Any,
 ):
     """
@@ -348,10 +360,7 @@ def callback_implementation(
     out_flat = python_callback_p.bind(
         *flat_args,
         callback=memref_callable,
-        fwd=fwd,
-        fwd_func=fwd_func,
-        bwd=bwd,
-        bwd_func=bwd_func,
+        active_callback=active_callback,
         results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)
