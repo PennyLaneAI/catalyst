@@ -118,7 +118,7 @@ On **macOS**:
   # Clone the Catalyst repository  
   git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
-  # install specific requirements for Catalyst
+  # Install specific requirements for Catalyst
   pip install -r requirements.txt 
 
   # Build Catalyst
