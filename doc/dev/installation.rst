@@ -110,10 +110,10 @@ On **macOS**:
 
 .. code-block:: console
 
-  # Install XCode Command Line Tools and common requirements \
-  xcode-select --install \
-  pip install cmake ninja \
-  brew install libomp \
+  # Install XCode Command Line Tools and common requirements
+  xcode-select --install
+  pip install cmake ninja
+  brew install libomp
 
   # Clone the Catalyst repository  
   git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
