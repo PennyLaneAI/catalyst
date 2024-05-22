@@ -63,84 +63,92 @@ from within the root of the running container.
   first, open it as a VS Code Workspace, and then reopen the Workspace in a Dev Container via the
   ``Reopen in Container`` command.
 
-Building from source
---------------------
+
+
+Just Tell Me How To Build Catalyst From Source
+----------------------------------------------
+(This section title is a tribute to the llvm new pass manager guide's section `Just Tell Me How To Run The Default Optimization Pipeline With The New Pass Manager <https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager>`_)
+
+
+In this section we present a minimal installation guide. The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
+
+
+.. tabs::
+
+   .. tab:: Linux Debian/Ubuntu
+
+      .. code-block:: console
+
+        # Install common requirements
+        sudo apt install clang lld ccache libomp-dev ninja-build make cmake 
+
+        # Clone the Catalyst repository  
+        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+        # Install specific requirements for Catalyst
+        cd catalyst
+        pip install -r requirements.txt
+
+        # Build Catalyst
+        make all
+
+        # If you are building Catalyst components in custom locations, set environment variables. 
+        # This step should not be required if you are simply following the instructions above. 
+        export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
+        export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
+        export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
+        export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
+        export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+
+        # Optional: test that everything is built properly
+        make test
+
+        # Optional: build and test documentation for Catalyst
+        pip install -r doc/requirements.txt
+        sudo apt install doxygen pandoc
+
+   .. tab:: macOS
+
+      .. code-block:: console
+
+        # Install XCode Command Line Tools and common requirements
+        xcode-select --install
+        pip install cmake ninja
+        brew install libomp
+
+        # Clone the Catalyst repository  
+        git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
+
+        # Install specific requirements for Catalyst
+        cd catalyst
+        pip install -r requirements.txt 
+
+        # Build Catalyst
+        make all
+
+        # If you are building Catalyst components in custom locations, set environment variables. 
+        # This step should not be required if you are simply following the instructions above. 
+        export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
+        export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
+        export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
+        export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
+        export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+
+        # Optional: test that everything is built properly
+        make test
+
+        # Optional: build and test documentation for Catalyst
+        pip install -r doc/requirements.txt
+        brew install doxygen pandoc
+
+
+
+Detailed Building From Source Guide
+-----------------------------------
 
 
 To build Catalyst from source, developers should follow the instructions provided below for building
 all three modules: the Python frontend, the MLIR compiler, and the runtime library.
-
-
-Just Tell Me How To Build Catalyst From Source
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-(This section title is a tribute to the llvm new pass manager guide's section `Just Tell Me How To Run The Default Optimization Pipeline With The New Pass Manager <https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager>`_)
-
-On **Linux Debian/Ubuntu**:
-
-.. code-block:: console
-
-  # Install common requirements
-  sudo apt install clang lld ccache libomp-dev ninja-build make cmake 
-
-  # Clone the Catalyst repository  
-  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
-
-  # Install specific requirements for Catalyst
-  pip install -r requirements.txt
-
-  # Build Catalyst
-  make all
-
-  # If you are building Catalyst components in custom locations, set environment variables. 
-  # This step should not be required if you are simply following the instructions above. 
-  export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
-  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
-  export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
-  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
-
-  # Optional: test that everything is built properly
-  make test
-
-  # Optional: build and test documentation for Catalyst
-  pip install -r doc/requirements.txt
-  sudo apt install doxygen pandoc
-
-
-On **macOS**:
-
-.. code-block:: console
-
-  # Install XCode Command Line Tools and common requirements
-  xcode-select --install
-  pip install cmake ninja
-  brew install libomp
-
-  # Clone the Catalyst repository  
-  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
-
-  # Install specific requirements for Catalyst
-  pip install -r requirements.txt 
-
-  # Build Catalyst
-  make all
-
-  # If you are building Catalyst components in custom locations, set environment variables. 
-  # This step should not be required if you are simply following the instructions above. 
-  export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
-  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
-  export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
-  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
-
-  # Optional: test that everything is built properly
-  make test
-
-  # Optional: build and test documentation for Catalyst
-  pip install -r doc/requirements.txt
-  brew install doxygen pandoc
-
-Below is a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst can be built and tested indenpendently. 
 
 
 Requirements
@@ -167,7 +175,7 @@ They can be installed on **Debian/Ubuntu** via:
 
   sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
-.. Note::
+.. note::
 
   If the CMake version available in your system is too old, you can also install up-to-date
   versions of it via ``pip install cmake``.
@@ -200,7 +208,7 @@ All additional build and developer dependencies are managed via the repository's
 
   pip install -r requirements.txt
 
-.. Note::
+.. note::
 
   Please ensure that your local site-packages for Python are available on the ``PATH`` - watch out
   for the corresponding warning that ``pip`` may give you during installation.
@@ -326,7 +334,7 @@ them, but using the ``test-runtime`` target instead:
 
   make test-runtime ENABLE_LIGHTNING_KOKKOS=ON ENABLE_OPENQASM=ON
 
-.. Note::
+.. note::
 
   The ``test-runtime`` targets rebuilds the runtime with the specified flags. Therefore,
   running ``make runtime OPENQASM=ON`` and ``make test-runtime`` in succession will leave you
