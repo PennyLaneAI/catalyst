@@ -898,6 +898,29 @@ the context will be converted anyways:
 ...     return x
 
 
+Adding modules for Autograph conversion
+---------------------------------------
+
+Library code is not meant to be targeted by Autograph conversion, hence 
+``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
+But sometimes it might make sense enabling specific submodules from the 
+excluded modules for which conversion may be appropriate. For these cases 
+one can use the ``autograph_include`` parameter, which provides a list 
+of modules/submodules that will always be enabled for conversion no matter
+if the default conversion rules were excluding them before.
+
+This example shows how you can enable a previously excluded submodule:
+
+>>> import excluded_module
+...
+... @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
+... def g(x: int):
+...     return excluded_module.submodule.f(x)
+
+Notice that ``autograph=True`` must be set in order to process the 
+``autograph_include`` list. Otherwise an error will be reported.
+
+
 In-place JAX array assignments
 ------------------------------
 

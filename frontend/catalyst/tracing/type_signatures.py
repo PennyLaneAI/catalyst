@@ -31,19 +31,27 @@ from catalyst.jax_extras import get_aval2
 from catalyst.utils.patching import Patcher
 
 
-def params_are_annotated(fn: Callable):
-    """Return true if all parameters are typed-annotated, or no parameters are present."""
+def get_param_annotations(fn: Callable):
+    """Return true all parameters typed-annotations."""
     assert isinstance(fn, Callable)
     signature = inspect.signature(fn)
     parameters = signature.parameters
-    return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
+    return (p.annotation for p in parameters.values())
+
+
+def params_are_annotated(fn: Callable):
+    """Return true if all parameters are typed-annotated, or no parameters are present."""
+    assert isinstance(fn, Callable)
+    annotations = get_param_annotations(fn)
+    return all(annotation is not inspect.Parameter.empty for annotation in annotations)
 
 
 def get_type_annotations(fn: Callable):
     """Get type annotations if all parameters are annotated."""
     assert isinstance(fn, Callable)
     if fn is not None and params_are_annotated(fn):
-        return tuple(getattr(fn, "__annotations__", {}).values())
+        annotations = get_param_annotations(fn)
+        return tuple(annotations)
 
     return None
 
