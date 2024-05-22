@@ -70,7 +70,7 @@ Just Tell Me How To Build Catalyst From Source
 (This section title is a tribute to the llvm new pass manager guide's section `Just Tell Me How To Run The Default Optimization Pipeline With The New Pass Manager <https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager>`_)
 
 
-In this section we present a minimal installation guide. The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
+Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
 
 
 .. tabs::
