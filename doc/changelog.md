@@ -67,6 +67,20 @@
 
   ```
 
+* Support for including a list of (sub)modules to be allow-listed for autograph conversion.
+  [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
+
+  Although library code is not meant to be targeted by Autograph conversion,
+  it sometimes make sense to enable it for specific submodules that might 
+  benefit from such conversion:
+
+  ```py
+  @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
+  def f(x):
+    return excluded_module.submodule.func(x)
+
+  ```
+
 <h3>Improvements</h3>
 
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
