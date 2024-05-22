@@ -129,7 +129,7 @@ def test_qjit_device_no_wires():
     with pytest.raises(
         AttributeError, match="Catalyst does not support devices without set wires."
     ):
-        QJITDeviceNewAPI(device, backend_info)
+        QJITDeviceNewAPI(device, capabilities, backend_info)
 
 
 def test_simple_circuit():
