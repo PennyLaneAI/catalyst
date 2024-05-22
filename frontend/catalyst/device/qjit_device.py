@@ -295,7 +295,7 @@ class QJITDevice(qml.QubitDevice):
         max_expansion = (
             self.original_device.max_expansion
             if hasattr(self.original_device, "max_expansion")
-            else 10
+            else (max_expansion if max_expansion is not None else 10)
         )
         # Ensure catalyst.measure is used instead of qml.measure.
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
