@@ -80,18 +80,18 @@ def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     from catalyst.api_extensions.quantum_operators import Adjoint
 
     def _op_checker(op, in_inverse):
-        if in_inverse > 0:
+        if in_inverse:
             op_name = op.base.name if isinstance(op, Controlled) else op.name
             if not device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
                 raise CompileError(
                     f"{op_name} is not invertible on '{device.original_device.name}' device"
                 )
-        return (in_inverse + 1) if isinstance(op, Adjoint) else in_inverse
+        return True if isinstance(op, Adjoint) else in_inverse
 
     def _obs_checker(_, state):
         return state
 
-    _verify_nested(tape, 0, _op_checker, _obs_checker)
+    _verify_nested(tape, False, _op_checker, _obs_checker)
 
 
 def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
@@ -104,17 +104,17 @@ def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
     from catalyst.api_extensions.quantum_operators import QCtrl
 
     def _op_checker(op, in_control):
-        if in_control > 0:
+        if in_control:
             if not device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).controllable:
                 raise CompileError(
                     f"{op.name} is not controllable on '{device.original_device.name}' device"
                 )
-        return (in_control + 1) if isinstance(op, QCtrl) else in_control
+        return True if isinstance(op, QCtrl) else in_control
 
     def _obs_checker(_, state):
         return state
 
-    _verify_nested(tape, 0, _op_checker, _obs_checker)
+    _verify_nested(tape, False, _op_checker, _obs_checker)
 
 
 def verify_adjoint_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
