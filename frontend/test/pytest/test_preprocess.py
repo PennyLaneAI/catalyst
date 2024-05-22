@@ -381,6 +381,9 @@ capabilities = get_test_device_capabilities(
         WhileLoop = { }
         Cond = { }
         QubitUnitary = { }
+
+        [operators.gates.matrix]
+        S = { }
     """
     ),
 )
@@ -620,7 +623,21 @@ class TestPreprocessHybridOp:
         assert "Hadamard" not in [op.name for op in adj_subtape.operations]
         assert "RZ" in [op.name for op in adj_subtape.operations]
 
-    def test_controlled_decomposes_to_unitary(self):
+    def test_controlled_decomposes_to_unitary_listed(self):
+        """Test that a PennyLane toml-listed operation is decomposed to a QubitUnitary"""
+
+        stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
+
+        tape = qml.tape.QuantumScript([qml.PauliX(0), qml.S(0)])
+
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            (new_tape,), _ = catalyst_decompose(tape, ctx, stopping_condition, capabilities)
+
+        assert len(new_tape.operations) == 2
+        assert isinstance(new_tape.operations[0], qml.PauliX)
+        assert isinstance(new_tape.operations[1], qml.QubitUnitary)
+
+    def test_controlled_decomposes_to_unitary_controlled(self):
         """Test that a PennyLane controlled operation is decomposed to a QubitUnitary"""
 
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
