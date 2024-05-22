@@ -94,6 +94,9 @@ The essential steps are:
         # Build Catalyst
         make all
 
+        # Test that everything is built properly
+        make test
+
 
    .. group-tab:: macOS
 
@@ -113,6 +116,9 @@ The essential steps are:
 
         # Build Catalyst
         make all
+
+        # Test that everything is built properly
+        make test
 
 
 
@@ -134,12 +140,7 @@ The essential steps should give you the full functionality of Catalyst. There ar
         export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
         export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
 
-        # Optional: test that everything is built properly
-        make test
 
-        # Optional: build and test documentation for Catalyst
-        pip install -r doc/requirements.txt
-        sudo apt install doxygen pandoc
 
    .. group-tab:: macOS
 
@@ -154,12 +155,7 @@ The essential steps should give you the full functionality of Catalyst. There ar
         export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
         export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
 
-        # Optional: test that everything is built properly
-        make test
 
-        # Optional: build and test documentation for Catalyst
-        pip install -r doc/requirements.txt
-        brew install doxygen pandoc
 
 
 Detailed Building From Source Guide
@@ -397,7 +393,7 @@ To build and test documentation for Catalyst, you will need to install
 
 .. code-block:: console
 
-  pip install -r doc/requirements.txt   # already in minimal guide
+  pip install -r doc/requirements.txt
 
 Additionally, `doxygen <https://www.doxygen.nl>`_ is required to build C++ documentation, and
 `pandoc <https://pandoc.org>`_ to render Jupyter Notebooks.
@@ -411,7 +407,7 @@ They can be installed via
 
       .. code-block:: console
 
-        sudo apt install doxygen pandoc   # already in minimal guide
+        sudo apt install doxygen pandoc
 
 
    .. group-tab:: macOS
@@ -420,5 +416,5 @@ They can be installed via
 
       .. code-block:: console
 
-        brew install doxygen pandoc   # already in minimal guide
+        brew install doxygen pandoc
 
