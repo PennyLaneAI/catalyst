@@ -127,6 +127,7 @@ extensions = [
     "sphinxext.opengraph",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
+    "sphinx_tabs.tabs",
     "m2r2",
 ]
 
