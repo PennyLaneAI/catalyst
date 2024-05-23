@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --annotate-debug-callback-as-enzyme-const --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --register-inactive-callback --split-input-file --verify-diagnostics | FileCheck %s
 
 // This test just makes sure that we can
 // run the compiler with the option
 //
-//   --annotate-debug-callback-as-enzyme-const
+//   --register-inactive-callback
+//
 // and that if there are no callbacks present
 // it doesn't change anything
 

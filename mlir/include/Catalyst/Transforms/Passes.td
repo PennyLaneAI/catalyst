@@ -130,18 +130,14 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let constructor = "catalyst::GEPInboundsPass()";
 }
 
-def AnnotateDebugCallbackAsEnzymeConstPass : Pass<"annotate-debug-callback-as-enzyme-const", "ModuleOp"> {
-    let summary = "Annotates debug callbacks as enzyme_const";
-
-    let description = [{
-         Register all callbacks as inactive with Enzyme.
-    }];
+def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
+    let summary = "Register `inactive_callback` as inactive with Enzyme";
 
     let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
     ];
 
-    let constructor = "catalyst::createAnnotateDebugCallbackAsEnzymeConstPass()";
+    let constructor = "catalyst::createRegisterInactiveCallbackPass()";
 
 }
 

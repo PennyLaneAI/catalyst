@@ -23,12 +23,12 @@ using namespace mlir;
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_ANNOTATEDEBUGCALLBACKASENZYMECONSTPASS
-#define GEN_PASS_DECL_ANNOTATEDEBUGCALLBACKASENZYMECONSTPASS
+#define GEN_PASS_DEF_REGISTERINACTIVECALLBACKPASS
+#define GEN_PASS_DECL_REGISTERINACTIVECALLBACKPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct AnnotateDebugCallbackAsEnzymeConstPass : impl::AnnotateDebugCallbackAsEnzymeConstPassBase<AnnotateDebugCallbackAsEnzymeConstPass> {
-    using AnnotateDebugCallbackAsEnzymeConstPassBase::AnnotateDebugCallbackAsEnzymeConstPassBase;
+struct RegisterInactiveCallbackPass : impl::RegisterInactiveCallbackPassBase<RegisterInactiveCallbackPass> {
+    using RegisterInactiveCallbackPassBase::RegisterInactiveCallbackPassBase;
     void runOnOperation() final
     {
         auto mod = getOperation();
@@ -57,8 +57,8 @@ struct AnnotateDebugCallbackAsEnzymeConstPass : impl::AnnotateDebugCallbackAsEnz
     }
 };
 
-std::unique_ptr<Pass> createAnnotateDebugCallbackAsEnzymeConstPass()
+std::unique_ptr<Pass> createRegisterInactiveCallbackPass()
 {
-    return std::make_unique<AnnotateDebugCallbackAsEnzymeConstPass>();
+    return std::make_unique<RegisterInactiveCallbackPass>();
 }
 } // namespace catalyst

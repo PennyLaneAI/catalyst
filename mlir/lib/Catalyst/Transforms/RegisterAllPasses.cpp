@@ -40,5 +40,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createGEPInboundsPass);
     mlir::registerPass(catalyst::createRemoveChainedSelfInversePass);
     mlir::registerPass(catalyst::createAnnotateFunctionPass);
-    mlir::registerPass(catalyst::createAnnotateDebugCallbackAsEnzymeConstPass);
+    mlir::registerPass(catalyst::createRegisterInactiveCallbackPass);
 }
