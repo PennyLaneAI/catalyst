@@ -130,7 +130,7 @@ Detailed Building From Source Guide
 
 
 .. note::
-  This section is a detailed building-from-source guide. Some commands in this section has already been included in the minimal guide. These command will be marked with a comment after them. 
+  This section is a detailed building-from-source guide. Some commands in this section has already been included in the minimal guide. 
 
 
 To build Catalyst from source, developers should follow the instructions provided below for building
