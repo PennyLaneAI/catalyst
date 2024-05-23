@@ -36,6 +36,7 @@ from catalyst.utils.runtime import (
     extract_backend_info,
     validate_config_with_device,
 )
+from catalyst.tracing.contexts import (EvaluationContext, EvaluationMode)
 from catalyst.utils.toml import TOMLDocument
 
 
@@ -71,10 +72,13 @@ class QFunc:
         else:
             device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
 
+        self.qjit_device = device
+
         def _eval_quantum(*args):
-            closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, device, args, kwargs, qnode=self
-            )
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+                closed_jaxpr, out_type, out_tree = trace_quantum_function(
+                    ctx, self.func, device, args, kwargs, qnode=self
+                )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
             _, out_keep = unzip2(out_type)

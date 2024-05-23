@@ -94,6 +94,7 @@ from catalyst.utils.exceptions import (
     CompileError,
     DifferentiableCompileError,
 )
+from catalyst.jax_tracer import dynamic_one_shot
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
