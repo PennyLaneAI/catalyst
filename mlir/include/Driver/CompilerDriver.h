@@ -41,7 +41,7 @@ struct FunctionAttributes {
 /// Verbosity level
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
 // low-level messages, we might want to hide these.
-enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
+enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, Timing = 3, All = 4 };
 
 /// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \
@@ -78,6 +78,7 @@ struct CompilerOptions {
     std::vector<Pipeline> pipelinesCfg;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool lowerToLLVM;
+    bool enableMultiThreadedCompilation;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
@@ -89,19 +90,19 @@ struct CompilerOptions {
 
 struct CompilerOutput {
     typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
+    CompilerOutput(int counter = 0) : pipelineCounter(counter) {}
     std::string objectFilename;
     std::string outIR;
     std::string diagnosticMessages;
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
-    size_t pipelineCounter = 0;
+    size_t pipelineCounter;
 
-    // Gets the next pipeline dump file name, prefixed with number.
-    std::string nextPipelineDumpFilename(Pipeline::Name pipelineName, std::string ext = ".mlir")
-    {
-        return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
-            .replace_extension(ext);
-    };
+    /// Gets the next pipeline dump file name, prefixed with a number. This function increases the
+    /// value of `pipelineCounter`.
+    std::string nextDumpFilename(std::string filenameBase, std::string ext);
+    /// Gets the filename to be used for dumping the MLIR pipeline item with the `pipelineIdx` id.
+    std::string pipelineDumpFilename(Pipeline::Name pipelineName, size_t pipelineIdx) const;
 };
 
 }; // namespace driver

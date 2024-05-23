@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <csignal>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -46,6 +47,25 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
     return out;
 }
 
+/// Count the number of files in a workspace. Return the next available counter.
+size_t initDumpCounter(const char *workspace)
+{
+    using namespace std;
+    try {
+        size_t maxDump = 0;
+        auto dirIter = std::filesystem::directory_iterator(workspace);
+        for (const filesystem::directory_entry &entry : dirIter) {
+            if (entry.is_regular_file()) {
+                maxDump = std::max(maxDump, size_t(stoul(entry.path().filename().string())));
+            }
+        }
+        return maxDump > 0 ? maxDump + 1 : 0;
+    }
+    catch (std::filesystem::filesystem_error &e) {
+        return 0;
+    }
+}
+
 PYBIND11_MODULE(compiler_driver, m)
 {
     //===--------------------------------------------------------------------===//
@@ -77,13 +97,13 @@ PYBIND11_MODULE(compiler_driver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool verbose, py::list pipelines,
-           bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
+           bool verbose, py::list pipelines, bool lower_to_llvm,
+           bool multi_threaded_compilation) -> std::unique_ptr<CompilerOutput> {
             // Install signal handler to catch user interrupts (e.g. CTRL-C).
             signal(SIGINT,
                    [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
 
-            std::unique_ptr<CompilerOutput> output(new CompilerOutput());
+            std::unique_ptr<CompilerOutput> output(new CompilerOutput(initDumpCounter(workspace)));
             assert(output);
 
             llvm::raw_string_ostream errStream{output->diagnosticMessages};
@@ -95,7 +115,8 @@ PYBIND11_MODULE(compiler_driver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .lowerToLLVM = lower_to_llvm};
+                                    .lowerToLLVM = lower_to_llvm,
+                                    .enableMultiThreadedCompilation = multi_threaded_compilation};
 
             errStream.flush();
 
@@ -106,5 +127,6 @@ PYBIND11_MODULE(compiler_driver, m)
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("keep_intermediate") = false, py::arg("verbose") = false,
-        py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true);
+        py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true,
+        py::arg("multi_threaded_compilation") = false);
 }

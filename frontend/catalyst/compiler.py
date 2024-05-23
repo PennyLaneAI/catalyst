@@ -66,6 +66,8 @@ class CompileOptions:
         static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
             Default is ``None``.
         abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
+        multi_threaded_compilation (bool): Enable MLIR multi-threaded compilation. Disabled by
+            default.
     """
 
     verbose: Optional[bool] = False
@@ -78,6 +80,7 @@ class CompileOptions:
     async_qnodes: Optional[bool] = False
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
+    multi_threaded_compilation: bool = True
     lower_to_llvm: Optional[bool] = True
 
     def __post_init__(self):
@@ -127,10 +130,14 @@ HLO_LOWERING_PASS = (
         "canonicalize",
         "func.func(chlo-legalize-to-hlo)",
         "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-shapeops-to-standard)",
-        "func.func(hlo-legalize-to-linalg)",
-        "func.func(mhlo-legalize-to-std)",
+        (
+            "func.func("
+            "mhlo-legalize-control-flow,"
+            "hlo-legalize-shapeops-to-standard,"
+            "hlo-legalize-to-linalg,"
+            "mhlo-legalize-to-std"
+            ")"
+        ),
         "convert-to-signless",
         "canonicalize",
         "scatter-lowering",
@@ -160,17 +167,19 @@ BUFFERIZATION_PASS = (
         "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
         "arith-bufferize",
         "empty-tensor-to-alloc-tensor",
-        "func.func(bufferization-bufferize)",
-        "func.func(tensor-bufferize)",
+        "func.func(bufferization-bufferize,tensor-bufferize)",
         "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        "func.func(linalg-bufferize)",
-        "func.func(tensor-bufferize)",
+        "func.func(linalg-bufferize,tensor-bufferize)",
         "quantum-bufferize",
         "func-bufferize",
-        "func.func(finalizing-bufferize)",
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
-        "func.func(buffer-deallocation)",
+        (
+            "func.func("
+            "finalizing-bufferize,"
+            "buffer-hoisting,"
+            "buffer-loop-hoisting,"
+            "buffer-deallocation"
+            ")"
+        ),
         "convert-arraylist-to-memref",
         "convert-bufferization-to-memref",
         "canonicalize",
@@ -487,6 +496,7 @@ class Compiler:
                 verbose=self.options.verbose,
                 pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
+                multi_threaded_compilation=self.options.multi_threaded_compilation,
             )
         except RuntimeError as e:
             raise CompileError(*e.args) from e

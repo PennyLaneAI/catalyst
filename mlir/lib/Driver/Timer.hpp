@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <ios>
 #include <iostream>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -45,7 +46,7 @@ namespace catalyst::utils {
  * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
  * along with `ENABLE_DIAGNOSTICS=ON`.
  */
-class Timer {
+template <class Stream> class Timer {
   private:
     // Toggle the support w.r.t. the value of `ENABLE_DIAGNOSTICS`
     bool debug_timer;
@@ -104,20 +105,22 @@ class Timer {
         }
     }
 
-    void print(const std::string &name, bool add_endl = true) noexcept
+    void print(const std::string &name, Stream &stream, bool add_endl = true) noexcept
     {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
         const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
 
-        std::cerr << "[DIAGNOSTICS] Running " << std::setw(23) << std::left << name;
-        std::cerr << "\t" << std::fixed << "walltime: " << std::setprecision(3) << wall_elapsed
-                  << std::fixed << " ms";
-        std::cerr << "\t" << std::fixed << "cputime: " << std::setprecision(3) << cpu_elapsed
-                  << std::fixed << " ms";
+        std::ostringstream oss;
+        oss << "[DIAGNOSTICS] Running " << std::setw(23) << std::left << name;
+        oss << "\t" << std::fixed << "walltime: " << std::setprecision(3) << wall_elapsed
+            << std::fixed << " ms";
+        oss << "\t" << std::fixed << "cputime: " << std::setprecision(3) << cpu_elapsed
+            << std::fixed << " ms";
         if (add_endl) {
-            std::cerr << "\n";
+            oss << std::endl;
         }
+        stream << oss.str();
     }
 
     void store(const std::string &name, const std::filesystem::path &file_path)
@@ -149,7 +152,7 @@ class Timer {
         ofile.close();
     }
 
-    void dump(const std::string &name, bool add_endl = true)
+    void dump(const std::string &name, Stream &stream, bool add_endl = true)
     {
         if (!debug_timer) {
             return;
@@ -157,7 +160,7 @@ class Timer {
 
         char *file = getenv("DIAGNOSTICS_RESULTS_PATH");
         if (!file) {
-            print(name, add_endl);
+            print(name, stream, add_endl);
             return;
         }
         // else
@@ -165,7 +168,8 @@ class Timer {
     }
 
     template <typename Function, typename... Args>
-    static auto timer(Function func, const std::string &name, bool add_endl, Args &&...args)
+    static auto timer(Function func, const std::string &fileName, Stream &stream, bool add_endl,
+                      Args &&...args)
     {
         if (!enable_debug_timer()) {
             return func(std::forward<Args>(args)...);
@@ -175,7 +179,7 @@ class Timer {
 
         timer.start();
         auto result = func(std::forward<Args>(args)...);
-        timer.dump(name, add_endl);
+        timer.dump(fileName, stream, add_endl);
 
         return result;
     }

@@ -106,7 +106,7 @@ void deactivateDevice()
 extern "C" {
 
 using namespace Catalyst::Runtime;
-using timer = catalyst::utils::Timer;
+using timer = catalyst::utils::Timer<std::ostream>;
 
 void pyregistry(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
@@ -263,8 +263,8 @@ static int __catalyst__rt__device_init__impl(int8_t *rtd_lib, int8_t *rtd_name, 
 
 void __catalyst__rt__device_init(int8_t *rtd_lib, int8_t *rtd_name, int8_t *rtd_kwargs)
 {
-    timer::timer(__catalyst__rt__device_init__impl, "device_init", /* add_endl */ true, rtd_lib,
-                 rtd_name, rtd_kwargs);
+    timer::timer(__catalyst__rt__device_init__impl, "device_init", std::cerr, /* add_endl */ true,
+                 rtd_lib, rtd_name, rtd_kwargs);
 }
 
 static int __catalyst__rt__device_release__impl()
@@ -277,7 +277,8 @@ static int __catalyst__rt__device_release__impl()
 
 void __catalyst__rt__device_release()
 {
-    timer::timer(__catalyst__rt__device_release__impl, "device_release", /* add_endl */ true);
+    timer::timer(__catalyst__rt__device_release__impl, "device_release", std::cerr,
+                 /* add_endl */ true);
 }
 
 void __catalyst__rt__print_state() { getQuantumDevicePtr()->PrintState(); }
@@ -307,7 +308,7 @@ static QUBIT *__catalyst__rt__qubit_allocate__impl()
 
 QUBIT *__catalyst__rt__qubit_allocate()
 {
-    return timer::timer(__catalyst__rt__qubit_allocate__impl, "qubit_allocate",
+    return timer::timer(__catalyst__rt__qubit_allocate__impl, "qubit_allocate", std::cerr,
                         /* add_endl */ true);
 }
 
@@ -344,6 +345,7 @@ static QirArray *__catalyst__rt__qubit_allocate_array__impl(int64_t num_qubits)
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t num_qubits)
 {
     return timer::timer(__catalyst__rt__qubit_allocate_array__impl, "qubit_allocate_array",
+                        std::cerr,
                         /* add_endl */ true, num_qubits);
 }
 
@@ -355,7 +357,7 @@ static int __catalyst__rt__qubit_release__impl(QUBIT *qubit)
 
 void __catalyst__rt__qubit_release(QUBIT *qubit)
 {
-    timer::timer(__catalyst__rt__qubit_release__impl, "qubit_release",
+    timer::timer(__catalyst__rt__qubit_release__impl, "qubit_release", std::cerr,
                  /* add_endl */ true, qubit);
 }
 
@@ -370,7 +372,7 @@ static int __catalyst__rt__qubit_release_array__impl(QirArray *qubit_array)
 
 void __catalyst__rt__qubit_release_array(QirArray *qubit_array)
 {
-    timer::timer(__catalyst__rt__qubit_release_array__impl, "qubit_release_array",
+    timer::timer(__catalyst__rt__qubit_release_array__impl, "qubit_release_array", std::cerr,
                  /* add_endl */ true, qubit_array);
 }
 
