@@ -67,12 +67,30 @@
 
   ```
 
+* Support for including a list of (sub)modules to be allow-listed for autograph conversion.
+  [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
+
+  Although library code is not meant to be targeted by Autograph conversion,
+  it sometimes make sense to enable it for specific submodules that might 
+  benefit from such conversion:
+
+  ```py
+  @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
+  def f(x):
+    return excluded_module.submodule.func(x)
+
+  ```
+
 <h3>Improvements</h3>
 
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
   simulator supports this gate.
   [(#730)](https://github.com/PennyLaneAI/catalyst/pull/730)
+
+* Can now compile functions that have been annotated with return type
+  annotations.
+  [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
 <h3>Breaking changes</h3>
 
