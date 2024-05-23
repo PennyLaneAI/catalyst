@@ -160,8 +160,30 @@
         (array([0.5, 0. , 0.5, 0. ]),)
   ```
 
-* Callback refactoring.
+* Callback refactoring. This refactoring creates the classes `FlatCallable`
+  and `MemrefCallable`.
   [(#742)](https://github.com/PennyLaneAI/catalyst/pull/742)
+
+  The `FlatCallable` class is a `Callable` that is
+  initialized by providing some parameters and kwparameters that match the
+  the expected shapes that will be received at the callsite. Instead of taking
+  shaped `*args` and `**kwargs`, it receives flattened arguments. The flattened
+  arguments are unflattened with the shapes with which the function was
+  initialized. The `FlatCallable` return values will allways be flattened
+  before returning to the caller.
+
+  The `MemrefCallable` is a subclass of `FlatCallable`. It takes a result type
+  parameter during initialization that corresponds to the expected return type.
+  This class is expected to be called only from the Catalyst runtime. It
+  expects all arguments to be `void*` to memrefs. These `void*` are casted
+  to MemrefStructDescriptors using ctypes, numpy arrays, and finally jax
+  arrays. These flat jax arrays are then sent to the `FlatCallable`.
+  `MemrefCallable` is again expected to be called only from within the Catalyst
+  runtime. And the return values match those expected by Catalyst runtime.
+
+  This separation allows for a better separation of concerns, provides a nicer
+  interface and allows for multiple `MemrefCallable` to be defined for a single
+  callback, which is necessary for custom gradient of `pure_callbacks`.
 
 <h3>Contributors</h3>
 
