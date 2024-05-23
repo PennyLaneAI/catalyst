@@ -69,7 +69,9 @@ Minimal Building From Source Guide
 ----------------------------------
 
 
-Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
+Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. 
+
+The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
 
 
 The essential steps are:
@@ -122,7 +124,7 @@ The essential steps are:
 
 
 
-The essential steps should give you the full functionality of Catalyst. 
+These steps should give you the full functionality of Catalyst. 
 
 
 Detailed Building From Source Guide
