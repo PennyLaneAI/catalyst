@@ -17,7 +17,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, measure, qjit
+from catalyst import api_extensions, cond, measure, qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -515,6 +515,101 @@ class TestClassicalCompilation:
 
         with pytest.raises(TypeError, match="Conditional 'False'"):
             qjit(arithc1)
+
+
+class TestCondOperatorAccess:
+    """Test suite for accessing the Cond operation in quantum contexts in Catalyst."""
+
+    def test_cond_access_quantum(self, backend):
+        """Test Cond operation access in quantum context."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n):
+            @cond(n > 4)
+            def cond_fn():
+                qml.PauliZ(0)
+                return 1
+
+            @cond_fn.otherwise
+            def else_fn():
+                qml.PauliX(0)
+                return 0
+
+            cond_fn()
+            assert isinstance(cond_fn.operation, api_extensions.control_flow.Cond)
+
+            return qml.probs()
+
+        assert circuit(2)[0] == 0
+        assert circuit(2)[1] == 1
+        assert circuit(5)[0] == 1
+        assert circuit(5)[1] == 0
+
+    def test_cond_access_classical(self):
+        """Test Cond operation access in classical context."""
+
+        @qjit
+        def circuit(x):
+            @cond(x > 4.8)
+            def cond_fn():
+                return x * 16
+
+            @cond_fn.else_if(x > 2.7)
+            def cond_elif():
+                return x * 8
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif2():
+                return x * 4
+
+            @cond_fn.otherwise
+            def cond_else():
+                return x
+
+            cond_fn()
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The cond\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(cond_fn.operation, api_extensions.control_flow.Cond)
+
+            return cond_fn()
+
+        assert circuit(5) == 80
+        assert circuit(3) == 24
+        assert circuit(2) == 8
+        assert circuit(-3) == -3
+
+    def test_cond_access_interpreted(self):
+        """Test Cond operation access in interpreted context."""
+
+        def func(flag: bool):
+            @cond(flag)
+            def branch_t():
+                return 1
+
+            @branch_t.otherwise
+            def branch_f():
+                return 0
+
+            branch_t()
+            with pytest.raises(
+                AttributeError,
+                match=r"""
+                The cond\(\) was not called \(or has not been called\) in a quantum context,
+                and thus has no associated quantum operation.
+                """,
+            ):
+                isinstance(branch_t.operation, api_extensions.control_flow.Cond)
+
+            return branch_t()
+
+        assert func(True) == 1
+        assert func(False) == 0
 
 
 if __name__ == "__main__":

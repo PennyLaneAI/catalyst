@@ -15,8 +15,6 @@
 """
 # pylint: disable=unused-argument,import-outside-toplevel,unused-import
 
-import sys
-
 import pennylane as qml
 import pytest
 
@@ -35,7 +33,7 @@ class TestOQCDevice:
 
     def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""
-        from catalyst.oqc import OQCDevice
+        from catalyst.third_party.oqc import OQCDevice
 
         device = OQCDevice(backend="lucy", shots=1000, wires=8)
 
@@ -51,14 +49,14 @@ class TestOQCDevice:
 
     def test_wrong_backend(self, set_dummy_oqc_env):
         """Test the backend check."""
-        from catalyst.oqc import OQCDevice
+        from catalyst.third_party.oqc import OQCDevice
 
         with pytest.raises(ValueError, match="The backend falcon is not supported."):
             OQCDevice(backend="falcon", shots=1000, wires=8)
 
     def test_execute_not_implemented(self, set_dummy_oqc_env):
         """Test the python execute is not implemented."""
-        from catalyst.oqc import OQCDevice
+        from catalyst.third_party.oqc import OQCDevice
 
         with pytest.raises(NotImplementedError, match="The OQC device only supports Catalyst."):
             dev = OQCDevice(backend="lucy", shots=1000, wires=8)
@@ -66,7 +64,7 @@ class TestOQCDevice:
 
     def test_preprocess(self, set_dummy_oqc_env):
         """Test the device preprocessing"""
-        from catalyst.oqc import OQCDevice
+        from catalyst.third_party.oqc import OQCDevice
 
         dev = OQCDevice(backend="lucy", shots=1000, wires=8)
         tranform_program, _ = dev.preprocess()
@@ -74,7 +72,7 @@ class TestOQCDevice:
 
     def test_get_c_interface(self, set_dummy_oqc_env):
         """Test the device get_c_interface method."""
-        from catalyst.oqc import OQCDevice
+        from catalyst.third_party.oqc import OQCDevice
 
         dev = OQCDevice(backend="lucy", shots=1000, wires=8)
         name, _ = dev.get_c_interface()
@@ -82,7 +80,7 @@ class TestOQCDevice:
 
     def test_no_envvar(self):
         """Test the device get_c_interface method."""
-        from catalyst.oqc import OQCDevice
+        from catalyst.third_party.oqc import OQCDevice
 
         with pytest.raises(
             ValueError, match="You must set url, email and password as environment variables."

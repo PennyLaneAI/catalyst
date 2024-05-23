@@ -37,7 +37,7 @@ def f_aot_builder(backend, wires=1, shots=1000):
 
     @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
-    def f(x: float):
+    def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
 
