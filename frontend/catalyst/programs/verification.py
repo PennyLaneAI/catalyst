@@ -174,16 +174,22 @@ def verify_parameter_shift_differentiability(tape: QuantumTape) -> None:
 
     def _op_checker(op, _):
         if not isinstance(op, HybridOp):
-            if op.grad_method != "A":
+            if op.grad_method not in {"A", None}:
                 raise DifferentiableCompileError(
                     f"{op.name} does not support analytic differentiation"
                 )
 
     def _obs_checker(obs, _):
-        if obs.grad_method != "A":
-            raise DifferentiableCompileError(
-                f"{obs.name} does not support analytic differentiation"
-            )
+        if isinstance(obs, MeasurementProcess):
+            _obs_checker(obs.obs or [], _)
+        elif isinstance(obs, list):
+            for obs2 in obs:
+                _obs_checker(obs2, _)
+        else:
+            if obs.grad_method not in {"A", None}:
+                raise DifferentiableCompileError(
+                    f"{obs.name} does not support analytic differentiation"
+                )
 
     _verify_nested(tape, None, _op_checker, _obs_checker)
 

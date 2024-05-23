@@ -255,6 +255,7 @@ def test_paramshift_obs_simple():
 
     @qml.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
     def f(x):
+        qml.PauliX(wires=1)
         qml.RX(x, wires=0)
         A = np.array(
             [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
