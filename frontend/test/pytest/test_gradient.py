@@ -14,8 +14,6 @@
 
 """Test built-in differentiation support in Catalyst."""
 
-from copy import deepcopy
-
 import jax
 import numpy as np
 import pennylane as qml
@@ -27,7 +25,6 @@ import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
     CompileError,
     DifferentiableCompileError,
-    adjoint,
     cond,
     for_loop,
     grad,
@@ -37,11 +34,6 @@ from catalyst import (
     pure_callback,
     qjit,
     value_and_grad,
-)
-from catalyst.utils.toml import (
-    ProgramFeatures,
-    get_device_capabilities,
-    pennylane_operation_set,
 )
 
 # pylint: disable=too-many-lines

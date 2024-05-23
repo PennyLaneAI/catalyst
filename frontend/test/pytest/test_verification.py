@@ -16,12 +16,9 @@
 
 from copy import deepcopy
 
-import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from jax import numpy as jnp
-from jax.tree_util import tree_flatten
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
@@ -32,12 +29,7 @@ from catalyst import (
     ctrl,
     for_loop,
     grad,
-    jacobian,
-    measure,
-    mitigate_with_zne,
-    pure_callback,
     qjit,
-    value_and_grad,
     while_loop,
 )
 from catalyst.utils.toml import (
@@ -49,9 +41,9 @@ from catalyst.utils.toml import (
 
 
 def get_custom_device(
-    non_differentiable_gates=set(),
-    non_invertible_gates=set(),
-    non_controllable_gates=set(),
+    non_differentiable_gates=frozenset(),
+    non_invertible_gates=frozenset(),
+    non_controllable_gates=frozenset(),
     native_gates=set(),
     **kwargs
 ):
@@ -88,7 +80,7 @@ def get_custom_device(
                 custom_capabilities.native_ops[gate].controllable = False
             self.qjit_capabilities = custom_capabilities
 
-        def execute(self, circuits, execution_config):
+        def execute(self, _circuits, _execution_config):
             """
             Raises: RuntimeError
             """
@@ -314,7 +306,7 @@ def test_no_state_returns():
     """Test state returns are rejected in gradients."""
 
     @qml.qnode(get_custom_device(wires=1))
-    def f(x):
+    def f(_):
         qml.PauliX(wires=0)
         return qml.state()
 
@@ -329,7 +321,7 @@ def test_no_variance_returns():
     """Test variance returns are rejected in gradients."""
 
     @qml.qnode(get_custom_device(wires=1))
-    def f(x):
+    def f(_):
         qml.PauliX(wires=0)
         return qml.var(qml.PauliX(0))
 
