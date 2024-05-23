@@ -92,6 +92,11 @@
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
+* Refactored `vmap` decorator in order to follow a unified pattern that uses a callable 
+  class that implements the decorator's logic. This prevents having to excessively define 
+  functions in a nested fashion.
+  [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
