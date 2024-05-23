@@ -92,6 +92,9 @@
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
+* The installation guide page for Catalyst now includes a new summary section, allowing users to easily see together all the commands to run depending on their OS.
+  [(#756)](https://github.com/PennyLaneAI/catalyst/pull/756)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
