@@ -22,10 +22,14 @@
 // and that if there are no callbacks present
 // it doesn't change anything
 
-// CHECK-LABEL: @foo
-func.func @foo() {
+// CHECK-LABEL: @test0
+module @test0 {
   // CHECK-NOT: llvm.mlir.global external @__enzyme_inactivefn
-  return
+  // CHECK-LABEL: @foo
+  func.func @foo() {
+    return
+  }
+  // CHECK-NOT: llvm.mlir.global external @__enzyme_inactivefn
 }
 
 // -----
