@@ -88,6 +88,7 @@ from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
+from catalyst.jax_tracer import dynamic_one_shot
 from catalyst.jit import QJIT, qjit
 from catalyst.utils.exceptions import (
     AutoGraphError,

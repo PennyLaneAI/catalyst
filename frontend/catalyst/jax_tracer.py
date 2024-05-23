@@ -14,6 +14,7 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -21,8 +22,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
+from pennylane import QNode, QubitDevice, QubitUnitary, QueuingManager
+from pennylane.measurements import MeasurementProcess, Shots
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
@@ -84,6 +85,15 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementValue,
+    MidMeasureMP,
+    ProbabilityMP,
+    SampleMP,
+    VarianceMP,
+)
 
 class Function:
     """An object that represents a compiled function.
@@ -611,11 +621,14 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                shape = (shots, nqubits) if using_compbasis else (shots,)
-                result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
-                if using_compbasis:
-                    result = jnp.astype(result, jnp.int64)
-                out_classical_tracers.append(result)
+                if o.mv is not None:  # qml.sample(m, wires=i)
+                    out_classical_tracers.append(o.mv)
+                else:
+                    shape = (shots, nqubits) if using_compbasis else (shots,)
+                    result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
+                    if using_compbasis:
+                        result = jnp.astype(result, jnp.int64)
+                    out_classical_tracers.append(result)
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
@@ -800,6 +813,81 @@ def reset_qubit(qreg_in, w):
     qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
 
     return qreg_out
+
+def is_mcm(operation):
+    """Returns True if the operation is a mid-circuit measurement and False otherwise."""
+    mcm = isinstance(operation, MidMeasureMP)
+    return mcm or "MidCircuitMeasure" in str(type(operation))
+
+
+def dynamic_one_shot(f):
+    assert isinstance(f, QNode)
+    qnode = f
+
+    def _f(*args, **kwargs):
+        old_flag = getattr(qnode, "needs_dynamic_one_shot", False)
+        old_func = qnode.func
+        old_shots = qnode.device._shots
+        try:
+            # TODO: Move to the top-level and solve circular dependency
+            from catalyst import for_loop
+
+            def _tape_postprocess(circuit):
+                new_measurements = []
+                for m in circuit.measurements:
+                    if not m.mv:
+                        if isinstance(m, VarianceMP):
+                            new_measurements.append(SampleMP(obs=m.obs))
+                        else:
+                            new_measurements.append(m)
+                for op in circuit:
+                    if is_mcm(op):
+                        new_measurements.append(qml.sample(MeasurementValue([op], lambda res: res)))
+                new_tape = QuantumTape(
+                    circuit.operations,
+                    new_measurements,
+                    shots=[1] * circuit.shots.total_shots,
+                    trainable_params=circuit.trainable_params,
+                )
+                return new_tape
+
+            def _loop_postprocess(val):
+                return jnp.sum(val)
+
+            def _f2(*args2, **kwargs2):
+                @for_loop(0, old_shots.total_shots, 1)
+                def loop(i, s):
+                    tape = QuantumTape(shots=qnode.device.shots)
+                    with QueuingManager.stop_recording(), tape:
+                        _ = old_func(*args2, **kwargs2)
+
+                    tape2 = _tape_postprocess(tape)
+                    QueuingManager.remove_active_queue()
+                    QueuingManager.add_active_queue(tape2)
+
+                    mcm_sample = tape2.measurements[-1]
+                    assert isinstance(mcm_sample, SampleMP)
+                    # FIXME: Can not make this line work, hopefully due to an unrelated problem
+                    s = s.at[i].set(mcm_sample)
+                    return s
+
+                storage = loop(jnp.zeros(old_shots.total_shots))
+                aggregated = _loop_postprocess(storage)
+                return aggregated
+
+            setattr(qnode, "needs_dynamic_one_shot", True)
+            qnode.func = _f2
+            qnode.device._shots = Shots([1] * old_shots.total_shots)
+
+            result = qnode(*args, **kwargs)
+
+        finally:
+            setattr(qnode, "needs_dynamic_one_shot", old_flag)
+            qnode.func = old_func
+            qnode.device._shots = old_shots
+        return result
+
+    return _f
 
 
 def trace_quantum_function(
