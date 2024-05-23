@@ -16,6 +16,7 @@
 """ Test the lowering cases involving quantum control """
 
 import os
+import re
 import tempfile
 
 import jax.numpy as jnp
@@ -24,7 +25,7 @@ import pennylane as qml
 from catalyst import qjit
 
 
-def get_custom_qjit_device(num_wires, discards, additions):
+def get_custom_qjit_device(num_wires, discards):
     """Generate a custom device without gates in discards."""
 
     class CustomDevice(qml.QubitDevice):
@@ -37,7 +38,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
         author = "Tester"
 
         lightning_device = qml.device("lightning.qubit", wires=0)
-        operations = lightning_device.operations.copy() - discards | additions
+        operations = lightning_device.operations.copy() - discards
         observables = lightning_device.observables.copy()
 
         config = None
@@ -58,17 +59,17 @@ def get_custom_qjit_device(num_wires, discards, additions):
             with open(lightning_toml, mode="r", encoding="UTF-8") as f:
                 toml_contents = f.readlines()
 
-            # TODO: update once schema 2 is merged
             updated_toml_contents = []
             for line in toml_contents:
-                if any(f'"{gate}",' in line for gate in discards):
+                skip = False
+                for gate in discards:
+                    regex = rf"^{gate}\s"
+                    skip |= bool(re.match(regex, line))
+                    if skip:
+                        break
+                if skip:
                     continue
-
                 updated_toml_contents.append(line)
-                if "native = [" in line:
-                    for gate in additions:
-                        if not gate.startswith("C("):
-                            updated_toml_contents.append(f'        "{gate}",\n')
 
             self.toml_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
             self.toml_file.writelines(updated_toml_contents)
@@ -86,7 +87,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
 
 def test_named_controlled():
     """Test that named-controlled operations are passed as-is."""
-    with get_custom_qjit_device(2, set(), set()) as dev:
+    with get_custom_qjit_device(2, set()) as dev:
 
         @qjit(target="mlir")
         @qml.qnode(dev)
@@ -108,7 +109,7 @@ test_named_controlled()
 
 def test_native_controlled_custom():
     """Test native control of a custom operation."""
-    with get_custom_qjit_device(3, {"CRot"}, {"Rot", "C(Rot)"}) as dev:
+    with get_custom_qjit_device(3, {"CRot"}) as dev:
 
         @qjit(target="mlir")
         @qml.qnode(dev)
@@ -128,7 +129,7 @@ test_native_controlled_custom()
 
 def test_native_controlled_unitary():
     """Test native control of the unitary operation."""
-    with get_custom_qjit_device(4, set(), set()) as dev:
+    with get_custom_qjit_device(4, set()) as dev:
 
         @qjit(target="mlir")
         @qml.qnode(dev)
@@ -160,7 +161,7 @@ test_native_controlled_unitary()
 
 def test_native_controlled_multirz():
     """Test native control of the multirz operation."""
-    with get_custom_qjit_device(3, set(), {"C(MultiRZ)"}) as dev:
+    with get_custom_qjit_device(3, set()) as dev:
 
         @qjit(target="mlir")
         @qml.qnode(dev)
