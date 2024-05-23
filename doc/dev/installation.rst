@@ -122,40 +122,7 @@ The essential steps are:
 
 
 
-The essential steps should give you the full functionality of Catalyst. There are also some optional steps:
-
-
-.. tabs::
-
-   .. group-tab:: Linux Debian/Ubuntu
-
-      .. code-block:: console
-
-        # If you are building Catalyst components in custom locations, set environment variables. 
-        # This step should not be required if you are simply following the instructions above. 
-        # However, performing this step anyway should not cause any failures. 
-        export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
-        export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
-        export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
-        export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
-        export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
-
-
-
-   .. group-tab:: macOS
-
-      .. code-block:: console
-
-        # If you are building Catalyst components in custom locations, set environment variables. 
-        # This step should not be required if you are simply following the instructions above. 
-        # However, performing this step anyway should not cause any failures. 
-        export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
-        export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
-        export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
-        export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
-        export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
-
-
+The essential steps should give you the full functionality of Catalyst. 
 
 
 Detailed Building From Source Guide
@@ -197,7 +164,7 @@ They can be installed via:
 
       .. code-block:: console
 
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake  # already in minimal guide
+        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
       .. note::
 
@@ -211,9 +178,9 @@ They can be installed via:
 
       .. code-block:: console
 
-        xcode-select --install      # already in minimal guide
-        pip install cmake ninja     # already in minimal guide
-        brew install libomp         # already in minimal guide
+        xcode-select --install
+        pip install cmake ninja
+        brew install libomp
 
 
 
@@ -222,7 +189,7 @@ submodules:
 
 .. code-block:: console
 
-  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git   # already in minimal guide
+  git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
 For an existing copy of the repository without its submodules, they can also be fetched via:
 
@@ -235,7 +202,7 @@ All additional build and developer dependencies are managed via the repository's
 
 .. code-block:: console
 
-  pip install -r requirements.txt   # already in minimal guide
+  pip install -r requirements.txt
 
 .. note::
 
@@ -251,7 +218,7 @@ directory:
 
 .. code-block:: console
 
-  make all   # already in minimal guide
+  make all
 
 To build each component one by one starting from the runtime, or to build additional backend devices
 beyond ``lightning.qubit``, please follow the instructions below.
@@ -313,32 +280,31 @@ To make the MLIR bindings from the Catalyst dialects discoverable to the compile
 
 .. code-block:: console
 
-  export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"   # already in minimal guide
-
+  export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
 To make runtime libraries discoverable to the compiler:
 
 .. code-block:: console
 
-  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"   # already in minimal guide
+  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
 
 To make MLIR libraries discoverable to the compiler:
 
 .. code-block:: console
 
-  export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"   # already in minimal guide
+  export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
 
 To make Enzyme libraries discoverable to the compiler:
 
 .. code-block:: console
 
-  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"   # already in minimal guide
+  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
 To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
 ``mlir/build`` discoverable to the compiler:
 
 .. code-block:: console
 
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"   # already in minimal guide
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
 
 Tests
 ^^^^^
@@ -347,7 +313,7 @@ The following target runs all available test suites with the default execution d
 
 .. code-block:: console
 
-  make test   # already in minimal guide
+  make test
 
 You can also test each module separately by using running the ``test-frontend``,
 ``test-dialects``, and ``test-runtime`` targets instead. Jupyter Notebook demos are also testable
