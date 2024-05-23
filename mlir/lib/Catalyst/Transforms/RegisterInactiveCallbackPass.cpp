@@ -27,14 +27,17 @@ namespace catalyst {
 #define GEN_PASS_DECL_REGISTERINACTIVECALLBACKPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
-struct RegisterInactiveCallbackPass : impl::RegisterInactiveCallbackPassBase<RegisterInactiveCallbackPass> {
+struct RegisterInactiveCallbackPass
+    : impl::RegisterInactiveCallbackPassBase<RegisterInactiveCallbackPass> {
     using RegisterInactiveCallbackPassBase::RegisterInactiveCallbackPassBase;
     void runOnOperation() final
     {
         auto mod = getOperation();
         StringRef inactive_callbackFnName = "inactive_callback";
         auto fnDecl = mod.lookupSymbol<LLVM::LLVMFuncOp>(inactive_callbackFnName);
-        if (!fnDecl) return;
+        if (!fnDecl) {
+            return;
+        }
         MLIRContext *context = &getContext();
         auto builder = OpBuilder(context);
         builder.setInsertionPointToStart(mod.getBody());
