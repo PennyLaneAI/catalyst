@@ -24,7 +24,7 @@ untested and cannot be guaranteed. If you are using one of these platforms, plea
 try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-building from source are also included `further down <#building-from-source>`_.
+building from source are also included `further down <#minimal-building-from-source-guide>`_.
 
 Dev Containers
 --------------
@@ -66,7 +66,7 @@ from within the root of the running container.
 
 
 Minimal Building From Source Guide
-----------------------------------------------
+----------------------------------
 
 
 Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
