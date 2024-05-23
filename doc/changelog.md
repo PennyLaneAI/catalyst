@@ -110,6 +110,9 @@
 
 <h3>Internal changes</h3>
 
+* Add support to use a locally cloned PennyLane Lightning repository with the runtime.
+  [(#732)](https://github.com/PennyLaneAI/catalyst/pull/732)
+
 * The `qjit_device.py` and `preprocessing.py` modules have been refactored into the sub-package
   `catalyst.device`.
   [(#721)](https://github.com/PennyLaneAI/catalyst/pull/721)
@@ -192,6 +195,7 @@ This release contains contributions from (in alphabetical order):
 David Ittah,
 Mehrdad Malekmohammadi,
 Erick Ochoa,
+Lee James O'Riordan,
 Raul Torres,
 Haochen Paul Wang.
 
