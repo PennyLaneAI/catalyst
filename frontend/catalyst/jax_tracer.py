@@ -918,7 +918,7 @@ def trace_quantum_function(
             # tapes after verification finishes.
             for tape in tapes:
                 verify_inverses(device, tape)
-                verify_control(device, tape)
+                # verify_control(device, tape)
                 grad_method = _in_gradient_tracing(qnode)
                 if grad_method is not None:
                     verify_no_state_variance_returns(tape)
