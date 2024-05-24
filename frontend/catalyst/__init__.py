@@ -85,7 +85,8 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
 from catalyst import debug
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list
-from catalyst.autograph import autograph_source
+from catalyst.autograph import *
+from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.jit import QJIT, qjit
 from catalyst.utils.exceptions import (
@@ -177,7 +178,6 @@ while processing the following with AutoGraph:
 __all__ = (
     "qjit",
     "QJIT",
-    "autograph_source",
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
@@ -186,4 +186,5 @@ __all__ = (
     "CompileOptions",
     "debug",
     *_api_extension_list,
+    *_autograph_functions,
 )

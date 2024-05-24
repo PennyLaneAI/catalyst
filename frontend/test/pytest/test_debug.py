@@ -22,7 +22,7 @@ from catalyst import debug, for_loop, qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug import compile_from_mlir, get_cmain, print_compilation_stage
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 
 
 class TestDebugPrint:
