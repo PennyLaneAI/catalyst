@@ -92,10 +92,13 @@
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
-* Refactored `vmap` decorator in order to follow a unified pattern that uses a callable 
-  class that implements the decorator's logic. This prevents having to excessively define 
+* Refactored `vmap` decorator in order to follow a unified pattern that uses a callable
+  class that implements the decorator's logic. This prevents having to excessively define
   functions in a nested fashion.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
+
+* Catalyst tests now manipulate device capabilities rather than text configurations files.
+  [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
 
 <h3>Breaking changes</h3>
 
@@ -198,11 +201,12 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
-Mehrdad Malekmohammadi,
 Erick Ochoa,
+Haochen Paul Wang,
 Lee James O'Riordan,
+Mehrdad Malekmohammadi,
 Raul Torres,
-Haochen Paul Wang.
+Sergei Mironov.
 
 # Release 0.6.0
 
