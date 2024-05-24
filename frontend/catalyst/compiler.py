@@ -33,7 +33,7 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.paths import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 
 package_root = os.path.dirname(__file__)
 

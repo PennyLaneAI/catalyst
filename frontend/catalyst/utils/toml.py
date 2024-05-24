@@ -17,7 +17,6 @@ Module for abstracting which toml_load to use.
 
 import importlib.util
 import pathlib
-import re
 from dataclasses import dataclass
 from functools import reduce
 from itertools import repeat
@@ -26,7 +25,7 @@ from typing import Any, Dict, List, Optional, Set
 import pennylane as qml
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.paths import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
@@ -437,101 +436,3 @@ def load_device_capabilities(
         dynamic_qubit_management_flag=get_compilation_flag(config, "dynamic_qubit_management"),
         options=get_options(config),
     )
-
-
-def check_no_overlap(*args, device_name):
-    """Check items in *args are mutually exclusive.
-
-    Args:
-        *args (List[Str]): List of strings.
-        device_name (str): Device name for error reporting.
-
-    Raises:
-        CompileError
-    """
-    set_of_sets = [set(arg) for arg in args]
-    union = set.union(*set_of_sets)
-    len_of_sets = [len(arg) for arg in args]
-    if sum(len_of_sets) == len(union):
-        return
-
-    overlaps = set()
-    for s in set_of_sets:
-        overlaps.update(s - union)
-        union = union - s
-
-    msg = f"Device '{device_name}' has overlapping gates: {overlaps}"
-    raise CompileError(msg)
-
-
-def filter_out_adjoint(operations):
-    """Remove Adjoint from operations.
-
-    Args:
-        operations (List[Str]): List of strings with names of supported operations
-
-    Returns:
-        List: A list of strings with names of supported operations with Adjoint and C gates
-        removed.
-    """
-    adjoint = re.compile(r"^Adjoint\(.*\)$")
-
-    def is_not_adj(op):
-        return not re.match(adjoint, op)
-
-    operations_no_adj = filter(is_not_adj, operations)
-    return set(operations_no_adj)
-
-
-def validate_device_capabilities(
-    device: qml.QubitDevice, device_capabilities: DeviceCapabilities
-) -> None:
-    """Validate configuration document against the device attributes.
-    Raise CompileError in case of mismatch:
-    * If device is not qjit-compatible.
-    * If configuration file does not exists.
-    * If decomposable, matrix, and native gates have some overlap.
-    * If decomposable, matrix, and native gates do not match gates in ``device.operations`` and
-      ``device.observables``.
-
-    Args:
-        device (qml.Device): An instance of a quantum device.
-        config (TOMLDocument): A TOML document representation.
-
-    Raises: CompileError
-    """
-
-    if not device_capabilities.qjit_compatible_flag:
-        raise CompileError(
-            f"Attempting to compile program for incompatible device '{device.name}': "
-            f"Config is not marked as qjit-compatible"
-        )
-
-    device_name = device.short_name if isinstance(device, qml.Device) else device.name
-
-    native = pennylane_operation_set(device_capabilities.native_ops)
-    decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)
-    matrix = pennylane_operation_set(device_capabilities.to_matrix_ops)
-
-    check_no_overlap(native, decomposable, matrix, device_name=device_name)
-
-    if hasattr(device, "operations") and hasattr(device, "observables"):
-        # For gates, we require strict match
-        device_gates = filter_out_adjoint(set(device.operations))
-        spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
-        if device_gates != spec_gates:
-            raise CompileError(
-                "Gates in qml.device.operations and specification file do not match.\n"
-                f"Gates that present only in the device: {device_gates - spec_gates}\n"
-                f"Gates that present only in spec: {spec_gates - device_gates}\n"
-            )
-
-        # For observables, we do not have `non-native` section in the config, so we check that
-        # device data supercedes the specification.
-        device_observables = set(device.observables)
-        spec_observables = pennylane_operation_set(device_capabilities.native_obs)
-        if (spec_observables - device_observables) != set():
-            raise CompileError(
-                "Observables in qml.device.observables and specification file do not match.\n"
-                f"Observables that present only in spec: {spec_observables - device_observables}\n"
-            )
