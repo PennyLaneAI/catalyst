@@ -27,7 +27,7 @@ from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
+from pennylane.transforms.core import TransformContainer, TransformProgram
 
 import catalyst
 from catalyst.jax_extras import (
@@ -78,14 +78,7 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.programs.verification import (
-    verify_adjoint_differentiability,
-    verify_control,
-    verify_inverses,
-    verify_no_mid_circuit_measurement,
-    verify_no_state_variance_returns,
-    verify_parameter_shift_differentiability,
-)
+from catalyst.programs.verification import verify_program
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -744,7 +737,14 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
-def apply_transform(qnode_program, device_program, device_modify_measurements, tape, flat_results):
+def apply_transform(
+    qnode_program,
+    device_program,
+    verification_program,
+    device_modify_measurements,
+    tape,
+    flat_results,
+):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -759,14 +759,16 @@ def apply_transform(qnode_program, device_program, device_modify_measurements, t
 
     if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        total_program = qnode_program + device_program
-        tapes, post_processing = total_program([tape])
-        if not is_valid_for_batch and len(tapes) > 1:
-            msg = "Multiple tapes are generated, but each run might produce different results."
-            raise CompileError(msg)
+        total_program = qnode_program + device_program + verification_program
     else:
+        is_valid_for_batch = True
         # Apply the identity transform in order to keep generalization
-        tapes, post_processing = device_program([tape])
+        total_program = device_program + verification_program
+
+    tapes, post_processing = total_program([tape])
+    if not is_valid_for_batch and len(tapes) > 1:
+        msg = "Multiple tapes are generated, but each run might produce different results."
+        raise CompileError(msg)
     return tapes, post_processing
 
 
@@ -897,8 +899,20 @@ def trace_quantum_function(
 
             if isinstance(device, qml.devices.Device):
                 device_program, _ = device.preprocess(ctx)
+                verification_program = TransformProgram(
+                    [
+                        TransformContainer(
+                            verify_program,
+                            kwargs={
+                                "grad_method": _in_gradient_tracing(qnode),
+                                "qjit_device": device,
+                            },
+                        )
+                    ]
+                )
             else:
                 device_program = TransformProgram()
+                verification_program = TransformProgram()
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
@@ -909,23 +923,11 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 qnode_program,
                 device_program,
+                verification_program,
                 device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
             )
-
-            # Verify the program against the device capabilities. We should not transform quantum
-            # tapes after verification finishes.
-            for tape in tapes:
-                verify_inverses(device, tape)
-                grad_method = _in_gradient_tracing(qnode)
-                if grad_method is not None:
-                    verify_no_state_variance_returns(tape)
-                    verify_no_mid_circuit_measurement(device, tape)
-                    if grad_method == "adjoint":
-                        verify_adjoint_differentiability(device, tape)
-                    elif grad_method == "parameter-shift":
-                        verify_parameter_shift_differentiability(tape)
 
         # (2) - Quantum tracing
         transformed_results = []

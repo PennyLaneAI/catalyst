@@ -16,6 +16,7 @@
 
 from typing import Any, Callable
 
+from pennylane import transform
 from pennylane.measurements import (
     MeasurementProcess,
     MutualInfoMP,
@@ -70,130 +71,6 @@ def _verify_nested(
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
 
 
-def verify_inverses(device: "AnyQJITDevice", tape: QuantumTape) -> None:
-    """Verify quantum program against the device capabilities.
-
-    Raises: CompileError
-    """
-
-    # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
-    from catalyst.api_extensions.quantum_operators import Adjoint
-
-    def _op_checker(op, in_inverse):
-        if in_inverse:
-            op_name = op.base.name if isinstance(op, Controlled) else op.name
-            if not device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
-                raise CompileError(
-                    f"{op_name} is not invertible on '{device.original_device.name}' device"
-                )
-        return True if isinstance(op, Adjoint) else in_inverse
-
-    def _obs_checker(_, state):
-        return state
-
-    _verify_nested(tape, False, _op_checker, _obs_checker)
-
-
-def verify_control(device: "AnyQJITDevice", tape: QuantumTape) -> None:
-    """Verify quantum program against the device capabilities.
-
-    Raises: CompileError
-    """
-
-    # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
-    from catalyst.api_extensions.quantum_operators import QCtrl
-
-    def _op_checker(op, in_control):
-        if in_control:
-            if not device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).controllable:
-                raise CompileError(
-                    f"{op.name} is not controllable on '{device.original_device.name}' device"
-                )
-        return True if isinstance(op, QCtrl) else in_control
-
-    def _obs_checker(_, state):
-        return state
-
-    _verify_nested(tape, False, _op_checker, _obs_checker)
-
-
-def verify_adjoint_differentiability(device: "AnyQJITDevice", tape: QuantumTape) -> None:
-    """Verify quantum program against the device capabilities.
-
-    Raises: DifferentiableCompileError
-    """
-
-    def _op_checker(op, _):
-        if not device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).differentiable:
-            raise DifferentiableCompileError(
-                f"{op.name} is non-differentiable on '{device.original_device.name}' device"
-            )
-
-    def _obs_checker(obs, _):
-        if isinstance(obs, MeasurementProcess):
-            _obs_checker(obs.obs or [], _)
-        elif isinstance(obs, list):
-            for obs2 in obs:
-                _obs_checker(obs2, _)
-        else:
-            if not device.qjit_capabilities.native_obs.get(
-                obs.name, EMPTY_PROPERTIES
-            ).differentiable:
-                raise DifferentiableCompileError(
-                    f"{obs.name} is non-differentiable on '{device.original_device.name}' device"
-                )
-
-    _verify_nested(tape, None, _op_checker, _obs_checker)
-
-
-def verify_no_mid_circuit_measurement(_, tape: QuantumTape) -> None:
-    """Verify tape contains no mid-circuit measurements
-
-    Raises: DifferentiableCompileError
-    """
-
-    from catalyst.api_extensions import MidCircuitMeasure
-
-    def _op_checker(op, _):
-        if isinstance(op, MidCircuitMeasure):
-            raise DifferentiableCompileError(f"{op.name} is not allowed in gradinets")
-
-    def _obs_checker(_obs, st):
-        return st
-
-    _verify_nested(tape, None, _op_checker, _obs_checker)
-
-
-def verify_parameter_shift_differentiability(tape: QuantumTape) -> None:
-    """Verify tape contains operations which support parameter-shift method.
-
-    Raises: DifferentiableCompileError
-    """
-
-    from catalyst.jax_tracer import HybridOp
-
-    def _op_checker(op, _):
-        if not isinstance(op, HybridOp):
-            if op.grad_method not in {"A", None}:
-                raise DifferentiableCompileError(
-                    f"{op.name} does not support analytic differentiation"
-                )
-
-    def _obs_checker(obs, _):
-        if isinstance(obs, MeasurementProcess):
-            _obs_checker(obs.obs or [], _)
-        elif isinstance(obs, list):
-            for obs2 in obs:
-                _obs_checker(obs2, _)
-        else:
-            if obs.grad_method not in {"A", None}:
-                raise DifferentiableCompileError(
-                    f"{obs.name} does not support analytic differentiation"
-                )
-
-    _verify_nested(tape, None, _op_checker, _obs_checker)
-
-
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     """Verify that no measuremnts contain state or variance."""
 
@@ -202,3 +79,114 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
 
     if any(isinstance(m, VarianceMP) for m in tape.measurements):
         raise DifferentiableCompileError("Variance returns are forbidden in gradients")
+
+
+@transform
+def verify_program(tape: QuantumTape, grad_method, qjit_device):
+
+    # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
+    from catalyst.api_extensions import MidCircuitMeasure
+    from catalyst.api_extensions.quantum_operators import Adjoint, QCtrl
+    from catalyst.jax_tracer import HybridOp
+
+    def _paramshift_op_checker(op):
+        if not isinstance(op, HybridOp):
+            if op.grad_method not in {"A", None}:
+                raise DifferentiableCompileError(
+                    f"{op.name} does not support analytic differentiation"
+                )
+
+    def _paramshift_obs_checker(obs):
+        if isinstance(obs, MeasurementProcess):
+            _obs_checker(obs.obs or [])
+        elif isinstance(obs, list):
+            for obs2 in obs:
+                _obs_checker(obs2)
+        else:
+            if obs.grad_method not in {"A", None}:
+                raise DifferentiableCompileError(
+                    f"{obs.name} does not support analytic differentiation"
+                )
+
+    def _mcm_op_checker(op):
+        if isinstance(op, MidCircuitMeasure):
+            raise DifferentiableCompileError(f"{op.name} is not allowed in gradinets")
+
+    def _adj_op_checker(op):
+        if not qjit_device.qjit_capabilities.native_ops.get(
+            op.name, EMPTY_PROPERTIES
+        ).differentiable:
+            raise DifferentiableCompileError(
+                f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
+            )
+
+    def _adj_obs_checker(obs, _):
+        if isinstance(obs, MeasurementProcess):
+            _obs_checker(obs.obs or [], _)
+        elif isinstance(obs, list):
+            for obs2 in obs:
+                _obs_checker(obs2, _)
+        else:
+            if not qjit_device.qjit_capabilities.native_obs.get(
+                obs.name, EMPTY_PROPERTIES
+            ).differentiable:
+                raise DifferentiableCompileError(
+                    f"{obs.name} is non-differentiable on '{qjit_device.original_device.name}' device"
+                )
+
+    def _ctrl_op_checker(op, in_control):
+        if in_control:
+            if not qjit_device.qjit_capabilities.native_ops.get(
+                op.name, EMPTY_PROPERTIES
+            ).controllable:
+                raise CompileError(
+                    f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
+                )
+        return True if isinstance(op, QCtrl) else in_control
+
+    def _ctrl_obs_checker(_, state):
+        return state
+
+    def _inv_op_checker(op, in_inverse):
+        if in_inverse:
+            op_name = op.base.name if isinstance(op, Controlled) else op.name
+            if not qjit_device.qjit_capabilities.native_ops.get(
+                op_name, EMPTY_PROPERTIES
+            ).invertible:
+                raise CompileError(
+                    f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
+                )
+        return True if isinstance(op, Adjoint) else in_inverse
+
+    def _inv_obs_checker(_, state):
+        return state
+
+    def _op_checker(op, state):
+        in_inverse, in_control = state
+        in_inverse = _inv_op_checker(op, in_inverse)
+        # in_control = _ctrl_op_checker(op, in_control)
+        if grad_method is not None:
+            _mcm_op_checker(op)
+            if grad_method == "adjoint":
+                _adj_op_checker(op)
+            elif grad_method == "parameter-shift":
+                _paramshift_op_checker(op)
+        return (in_inverse, in_control)
+
+    def _obs_checker(obs, state):
+        in_inverse, in_control = state
+        in_inverse = _inv_obs_checker(obs, in_inverse)
+        # in_control = _ctrl_obs_checker(obs, in_control)
+        if grad_method is not None:
+            if grad_method == "adjoint":
+                _adj_obs_checker(obs)
+            elif grad_method == "parameter-shift":
+                _paramshift_obs_checker(obs)
+        return (in_inverse, in_control)
+
+    if grad_method is not None:
+        verify_no_state_variance_returns(tape)
+
+    _verify_nested(tape, (False, False), _op_checker, _obs_checker)
+
+    return [tape], lambda x: x[0]
