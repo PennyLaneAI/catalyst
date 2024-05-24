@@ -168,7 +168,10 @@ def ActiveCallbackOp: Catalyst_Op<"activeCallbackCall",
 def GradTriple : Catalyst_Op<"gradtriple", []> {
    let summary = "Global operation that denotes a custom gradient with Enzyme.";
 
-   let description = [{ TODO }];
+   let description = [{
+     Three functions. One is the function to be differeniated, the second one
+     is the forward pass, and the third is the reverse pass.
+   }];
 
    let arguments = (ins
        I64Attr: $identifier,
