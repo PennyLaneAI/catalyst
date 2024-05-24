@@ -158,44 +158,49 @@ def base_callback(func):
     return bind_callback
 
 
-def callback_implementation(
-    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
-):
-    """
-    This function has been modified from its original form in the JAX project at
-    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
-    version released under the Apache License, Version 2.0, with the following copyright notice:
+class FlatCallable:
+    """This is a simple class that wraps around a function and calls it with
+    a flat list."""
 
-    Copyright 2022 The JAX Authors.
-    """
+    def __init__(self, func, *params, **kwparams):
+        self.func = func
+        self.flat_params, self.shape = tree_flatten((params, kwparams))
 
-    flat_args, in_tree = tree_flatten((args, kwargs))
-    metadata = CallbackClosure(args, kwargs)
+    def __call__(self, flat_args):
+        """args: flat list of arguments
+        returns flat list of return values"""
+        args, kwargs = tree_unflatten(self.shape, flat_args)
+        return tree_leaves(self.func(*args, **kwargs))
 
-    results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
+    def getOperand(self, i):
+        """Get operand at position i"""
+        return self.flat_params[i]
 
-    flat_results_aval, out_tree = tree_flatten(results_aval)
+    def getOperands(self):
+        """Get all operands"""
+        return self.flat_params
 
-    def _flat_callback(flat_args):
-        """Each flat_arg is a pointer.
+    def getOperandTypes(self):
+        """Get operand types"""
+        return map(type, self.getOperands())
 
-        It is a pointer to a memref object.
-        To find out which element type it has, we use the signature obtained previously.
-        """
-        jnpargs = metadata.getArgsAsJAXArrays(flat_args)
-        args, kwargs = tree_unflatten(in_tree, jnpargs)
-        retvals = tree_leaves(cb(*args, **kwargs))
+
+class MemrefCallable(FlatCallable):
+    """Callable that receives void ptrs."""
+
+    def __init__(self, func, results_aval, *args, **kwargs):
+        super().__init__(func, *args, **kwargs)
+        self.results_aval = results_aval
+
+    def __call__(self, args):
+        jnpargs = self.asarrays(args)
+        retvals = super().__call__(jnpargs)
         return_values = []
         results_aval_sequence = (
-            results_aval if isinstance(results_aval, Sequence) else [results_aval]
+            self.results_aval if isinstance(self.results_aval, Sequence) else [self.results_aval]
         )
         for retval, exp_aval in zip(retvals, results_aval_sequence):
-            obs_aval = shaped_abstractify(retval)
-            if obs_aval != exp_aval:
-                raise TypeError(
-                    # pylint: disable-next=line-too-long
-                    f"Callback {cb.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
-                )
+            self._check_types(retval, exp_aval)
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)
             unranked_memref = get_unranked_memref_descriptor(retval)
@@ -207,43 +212,68 @@ def callback_implementation(
             return_values.append((unranked_memref_ptr, element_size, retval))
         return return_values
 
+    def _check_types(self, obs, exp_aval):
+        """Raise error if observed value is different than expected abstract value"""
+        obs_aval = shaped_abstractify(obs)
+        if obs_aval != exp_aval:
+            # pylint: disable-next=line-too-long
+            msg = f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
+            raise TypeError(msg)
+
+    def asarrays(self, void_ptrs):
+        """cast void_ptrs to jax arrays"""
+        expected_types = self.getOperandTypes()
+        return MemrefCallable._asarrays(void_ptrs, expected_types)
+
+    @staticmethod
+    def _asarrays(void_ptrs, ptr_tys):
+        """cast void_ptrs to jax arrays"""
+        asarray = MemrefCallable.asarray
+        return [asarray(mem, ty) for mem, ty in zip(void_ptrs, ptr_tys)]
+
+    @staticmethod
+    def asarray(void_ptr, ptr_ty):
+        """cast a single void pointer to a jax array"""
+        # The type is guaranteed by JAX, so we don't need
+        # to check here.
+        ptr_to_memref_descriptor = ctypes.cast(void_ptr, ptr_ty)
+        array = ranked_memref_to_numpy(ptr_to_memref_descriptor)
+        return jnp.asarray(array)
+
+    def getOperand(self, i):
+        """Get operand at position i"""
+        array = super().getOperand(i)
+        return get_ranked_memref_descriptor(array)
+
+    def getOperands(self):
+        """Get operands"""
+        operands = super().getOperands()
+        return [get_ranked_memref_descriptor(operand) for operand in operands]
+
+    def getOperandTypes(self):
+        """Get operand types"""
+        operandTys = map(type, self.getOperands())
+        return list(map(ctypes.POINTER, operandTys))
+
+
+def callback_implementation(
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
+):
+    """
+    This function has been modified from its original form in the JAX project at
+    github.com/google/jax/blob/ce0d0c17c39cb78debc78b5eaf9cc3199264a438/jax/_src/callback.py#L231
+    version released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2022 The JAX Authors.
+    """
+
+    flat_args = tree_leaves((args, kwargs))
+
+    results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
+    flat_results_aval, out_tree = tree_flatten(results_aval)
+    memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+
     out_flat = python_callback_p.bind(
-        *flat_args, callback=_flat_callback, results_aval=tuple(flat_results_aval)
+        *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)
     )
     return tree_unflatten(out_tree, out_flat)
-
-
-class CallbackClosure:
-    """This is just a class containing data that is important for the callback."""
-
-    def __init__(self, *absargs, **abskwargs):
-        self.absargs = absargs
-        self.abskwargs = abskwargs
-
-    @property
-    def tree_flatten(self):
-        """Flatten args and kwargs."""
-        return tree_flatten((self.absargs, self.abskwargs))
-
-    @property
-    def low_level_sig(self):
-        """Get the memref descriptor types"""
-        flat_params, _ = self.tree_flatten
-        low_level_flat_params = []
-        for param in flat_params:
-            empty_memref_descriptor = get_ranked_memref_descriptor(param)
-            memref_type = type(empty_memref_descriptor)
-            ptr_ty = ctypes.POINTER(memref_type)
-            low_level_flat_params.append(ptr_ty)
-        return low_level_flat_params
-
-    def getArgsAsJAXArrays(self, flat_args):
-        """Get arguments as JAX arrays. Since our integration is mostly compatible with JAX,
-        it is best for the user if we continue with that idea and forward JAX arrays."""
-        jnpargs = []
-        for void_ptr, ty in zip(flat_args, self.low_level_sig):
-            memref_ty = ctypes.cast(void_ptr, ty)
-            nparray = ranked_memref_to_numpy(memref_ty)
-            jnparray = jnp.asarray(nparray)
-            jnpargs.append(jnparray)
-        return jnpargs
