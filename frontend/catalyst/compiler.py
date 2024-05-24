@@ -213,6 +213,7 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "add-exception-handling",
+        "register-inactive-callback",
     ],
 )
 

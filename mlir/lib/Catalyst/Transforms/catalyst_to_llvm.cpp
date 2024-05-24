@@ -444,7 +444,7 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
 
         bool isVarArg = true;
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
-            mod, "pyregistry", {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
+            mod, "inactive_callback", {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
         customCallFnOp.setPrivate();
         rewriter.restoreInsertionPoint(point);
 
