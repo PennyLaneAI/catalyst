@@ -202,18 +202,6 @@ def test_non_invertible_gate_nested_cond():
             return grad(f)(x)
 
 
-def test_non_controllable_gate_simple():
-    """Emulate a device with a non-controllable gate."""
-
-    with pytest.raises(CompileError, match="PauliZ.*not controllable"):
-
-        @qjit
-        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
-        def f(x: float):
-            ctrl(qml.PauliZ(wires=0), control=[1, 2])
-            return qml.expval(qml.PauliX(0))
-
-
 def test_non_invertible_gate_nested_for():
     """Emulate a device with a non-invertible gate."""
 

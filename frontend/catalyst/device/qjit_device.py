@@ -34,7 +34,6 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
 )
-
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
