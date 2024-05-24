@@ -27,6 +27,7 @@ from catalyst.device import (
     QJITDevice,
     QJITDeviceNewAPI,
     extract_backend_info,
+    get_device_capabilities,
     validate_device_capabilities,
 )
 from catalyst.jax_extras import (
@@ -36,11 +37,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    ProgramFeatures,
-    get_device_capabilities,
-)
+from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 
 class QFunc:

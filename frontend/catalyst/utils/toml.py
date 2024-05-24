@@ -343,50 +343,6 @@ def patch_schema1_collections(
             decomp_props.pop("ControlledPhaseShift")
 
 
-def get_device_toml_config(device) -> TOMLDocument:
-    """Get the contents of the device config file."""
-    if hasattr(device, "config"):
-        # The expected case: device specifies its own config.
-        toml_file = device.config
-    else:
-        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
-        # field.
-        device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-
-        name = device.short_name if isinstance(device, qml.Device) else device.name
-        # The toml files name convention we follow is to replace
-        # the dots with underscores in the device short name.
-        toml_file_name = name.replace(".", "_") + ".toml"
-        # And they are currently saved in the following directory.
-        toml_file = device_lpath.parent / "lib" / "backend" / toml_file_name
-
-    try:
-        config = read_toml_file(toml_file)
-    except FileNotFoundError as e:
-        raise CompileError(
-            "Attempting to compile program for incompatible device: "
-            f"Config file ({toml_file}) does not exist"
-        ) from e
-
-    return config
-
-
-def get_device_capabilities(
-    device, program_features: Optional[ProgramFeatures] = None
-) -> DeviceCapabilities:
-    """Get or load DeviceCapabilities structure from device"""
-
-    if hasattr(device, "qjit_capabilities"):
-        return device.qjit_capabilities
-    else:
-        program_features = (
-            program_features if program_features else ProgramFeatures(device.shots is not None)
-        )
-        device_name = device.short_name if isinstance(device, qml.Device) else device.name
-        device_config = get_device_toml_config(device)
-        return load_device_capabilities(device_config, program_features, device_name)
-
-
 def load_device_capabilities(
     config: TOMLDocument, program_features: ProgramFeatures, device_name: str
 ) -> DeviceCapabilities:

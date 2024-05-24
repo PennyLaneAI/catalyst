@@ -22,6 +22,8 @@ from catalyst.device.qjit_device import (
     QJITDeviceNewAPI,
     extract_backend_info,
     validate_device_capabilities,
+    get_device_capabilities,
+    get_device_toml_config,
 )
 
 __all__ = (
@@ -30,4 +32,6 @@ __all__ = (
     "BackendInfo",
     "extract_backend_info",
     "validate_device_capabilities",
+    "get_device_capabilities",
+    "get_device_toml_config",
 )
