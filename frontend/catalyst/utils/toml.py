@@ -16,16 +16,12 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-import pathlib
 from dataclasses import dataclass
 from functools import reduce
 from itertools import repeat
-from typing import Any, Dict, List, Optional, Set
-
-import pennylane as qml
+from typing import Any, Dict, List, Set
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import get_lib_path
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
