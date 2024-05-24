@@ -27,6 +27,7 @@ from catalyst.device import (
     QJITDevice,
     QJITDeviceNewAPI,
     extract_backend_info,
+    validate_device_capabilities,
 )
 from catalyst.jax_extras import (
     deduce_avals,
@@ -39,7 +40,6 @@ from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
     get_device_capabilities,
-    validate_device_capabilities,
 )
 
 

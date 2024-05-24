@@ -21,7 +21,7 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
-from catalyst.device import QJITDevice
+from catalyst.device import QJITDevice, validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     DeviceCapabilities,
@@ -35,7 +35,6 @@ from catalyst.utils.toml import (
     load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
-    validate_device_capabilities,
 )
 
 
