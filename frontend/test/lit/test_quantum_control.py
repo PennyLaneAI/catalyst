@@ -74,6 +74,7 @@ def get_custom_qjit_device(num_wires, discards, additions):
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         def execute(self, circuits, execution_config):
+            """Exececute the device (no)."""
             raise RuntimeError("No execution for the custom device")
 
     return CustomDevice(wires=num_wires)

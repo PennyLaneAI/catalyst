@@ -26,10 +26,8 @@ from catalyst import (
     DifferentiableCompileError,
     adjoint,
     cond,
-    ctrl,
     for_loop,
     grad,
-    qjit,
     while_loop,
 )
 from catalyst.utils.toml import (
@@ -44,7 +42,7 @@ def get_custom_device(
     non_differentiable_gates=frozenset(),
     non_invertible_gates=frozenset(),
     non_controllable_gates=frozenset(),
-    native_gates=set(),
+    native_gates=frozenset(),
     **kwargs
 ):
     """Generate a custom device where certain gates are marked as non-differensiable."""
@@ -100,7 +98,7 @@ def get_custom_device(
             """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
-        def supports_derivatives(self, config, circuit=None):
+        def supports_derivatives(self, _config, _circuit=None):
             """Pretend we support any derivatives"""
             return True
 
@@ -208,7 +206,7 @@ def test_non_invertible_gate_nested_for():
     @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
     def f(x):
         @for_loop(0, 10, 1)
-        def loop(i):
+        def loop(_i):
             adjoint(qml.RX(x, wires=0))
 
         loop()
@@ -255,7 +253,7 @@ def test_paramshift_gate_simple():
     """Emulate a device with a non-invertible gate."""
 
     @qml.qnode(get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift")
-    def f(x):
+    def f(_):
         PauliX2(wires=0)
         return qml.expval(qml.PauliX(0))
 
@@ -272,7 +270,7 @@ def test_paramshift_gate_while():
     """Emulate a device with a non-invertible gate."""
 
     @qml.qnode(get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift")
-    def f(x):
+    def f(_):
         @while_loop(lambda s: s > 0)
         def loop(s):
             PauliX2(wires=0)
