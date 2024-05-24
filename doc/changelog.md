@@ -83,6 +83,12 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
+  measurement. For now the feature is equivalent to returning `m` directly from a quantum
+  function, but will be improved to return an array with one measurement result for each
+  shot in a shots-based execution mode.
+  [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
+
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
   simulator supports this gate.
