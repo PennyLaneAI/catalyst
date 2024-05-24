@@ -274,11 +274,16 @@ def _python_callback_lowering(
     functions_with_custom_grad_cache[custom_grad] = retval
 
     if custom_grad:
-        assert custom_grad._fwd and custom_grad._bwd
-        _func_lowering(jax_ctx, call_jaxpr=custom_grad._fwd_jaxpr, fn=custom_grad._fwd, call=False)
-        _func_lowering(jax_ctx, call_jaxpr=custom_grad._bwd_jaxpr, fn=custom_grad._bwd, call=False)
-        mlir_fwd = mlir_fn_cache[custom_grad._fwd]
-        mlir_bwd = mlir_fn_cache[custom_grad._bwd]
+        assert custom_grad.forward and custom_grad.reverse
+        assert custom_grad.forward_jaxpr and custom_grad.reverse_jaxpr
+        forward = custom_grad.forward
+        reverse = custom_grad.reverse
+        forward_jaxpr = custom_grad.forward_jaxpr
+        reverse_jaxpr = custom_grad.reverse_jaxpr
+        _func_lowering(jax_ctx, call_jaxpr=forward_jaxpr, fn=forward, call=False)
+        _func_lowering(jax_ctx, call_jaxpr=reverse_jaxpr, fn=reverse, call=False)
+        mlir_fwd = mlir_fn_cache[custom_grad.forward]
+        mlir_bwd = mlir_fn_cache[custom_grad.reverse]
         with ir.InsertionPoint(jax_ctx.module_context.module.body):
             GradTriple(callback_id, mlir_fwd, mlir_bwd)
     return retval.results

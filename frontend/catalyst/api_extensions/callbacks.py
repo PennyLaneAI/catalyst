@@ -42,21 +42,27 @@ from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
 class ActiveCallback:
+    """Python object that corresponds to the three functions needed for Enzyme.
+    The function to be differentiated, the function corresponding to the
+    forward pass and the function corresponding to the reverse pass.
+    """
 
     def __init__(self, func, restype):
         self.func = func
         self.restype = restype
-        self._fwd = None
-        self._fwd_jaxpr = None
-        self._bwd = None
-        self._bwd_jaxpr = None
+        self.forward = None
+        self.forward_jaxpr = None
+        self.reverse = None
+        self.reverse_jaxpr = None
         self.callback = None
 
-    def fwd(self, func, restype=None):
-        self._fwd = func
+    def fwd(self, func):
+        """Register the forward pass"""
+        self.forward = func
 
-    def bwd(self, func, restype=None):
-        self._bwd = func
+    def bwd(self, func):
+        """Register the reverse pass"""
+        self.reverse = func
 
     def __call__(self, *args, **kwargs):
         if self.callback:
@@ -65,26 +71,28 @@ class ActiveCallback:
         def closure(*args, **kwargs) -> self.restype:
             return self.func(*args, **kwargs)
 
-        # We need this here to avoid infinite recursion
-        # Where does the infinite recursion happen?
-        # It happens if the fwd or bwd passes have a call to
-        # the pure_callback implementation.
-        self.callback = base_callback(closure, custom_grad=self)
-
         # No custom gradient specified:
         # we will let either the frontend verification or the middle end
         # verification check whether or not we are taking the derivative
         # of this pure_callback. For now, since we don't have them, we just
         # assume the user will never request the gradient of this pure_callback.
-        no_custom_grad = all(map(not_, [self._fwd, self._bwd]))
+        no_custom_grad = all(map(not_, [self.forward, self.reverse]))
+
+        # We need this here to avoid infinite recursion
+        # Where does the infinite recursion happen?
+        # It happens if the fwd or bwd passes have a call to
+        # the pure_callback implementation.
+        custom_grad = None if no_custom_grad else self
+        self.callback = base_callback(closure, custom_grad=custom_grad)
+
         if no_custom_grad:
             return self.callback(*args, **kwargs)
 
-        incomplete_grad = not all([self._fwd, self._bwd])
+        incomplete_grad = not all([self.forward, self.reverse])
         if incomplete_grad:
-            # If we are here, then we have either _fwd and _bwd but not both
+            # If here, then we have either forward and reverse but not both
             msg = f"Function {self.func} differentiated but missing "
-            msg += "forward" if not self._fwd else "reverse"
+            msg += "forward" if not self.forward else "reverse"
             msg += " pass"
             raise DifferentiableCompileError(msg)
 
@@ -99,13 +107,13 @@ class ActiveCallback:
         _, cotangents = jax.make_jaxpr(self.func, return_shape=True)(*absargs, **abskwargs)
 
         # The forward pass must have the same input types as the original function
-        self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
+        self.forward_jaxpr , shape = jax.make_jaxpr(self.forward, return_shape=True)(*absargs, **abskwargs)
 
         # But its output is always going to be two pairs.
-        primal, residuals = shape
+        _, residuals = shape
 
         # The input for the bwd pass is the residuals and the cotangents.
-        self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
+        self.reverse_jaxpr = jax.make_jaxpr(self.reverse)(residuals, cotangents)
 
         return self.callback(*args, **kwargs)
 
