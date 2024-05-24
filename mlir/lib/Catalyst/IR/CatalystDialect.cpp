@@ -35,6 +35,11 @@ void CatalystDialect::initialize()
 #include "Catalyst/IR/CatalystOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Catalyst/IR/CatalystAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
@@ -47,3 +52,5 @@ void CatalystDialect::initialize()
 
 #define GET_TYPEDEF_CLASSES
 #include "Catalyst/IR/CatalystOpsTypes.cpp.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Catalyst/IR/CatalystAttributes.cpp.inc"

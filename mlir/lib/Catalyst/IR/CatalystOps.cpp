@@ -23,6 +23,7 @@
 using namespace mlir;
 using namespace catalyst;
 
+#include "Catalyst/IR/CatalystEnums.cpp.inc"
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.cpp.inc"
 

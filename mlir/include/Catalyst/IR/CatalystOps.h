@@ -25,5 +25,9 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 
+#include "Catalyst/IR/CatalystEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Catalyst/IR/CatalystAttributes.h.inc"
+
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.h.inc"

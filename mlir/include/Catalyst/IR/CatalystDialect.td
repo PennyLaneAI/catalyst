@@ -39,6 +39,7 @@ def Catalyst_Dialect : Dialect {
 
     /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
     let useDefaultTypePrinterParser = 1;
+
 }
 
 //===----------------------------------------------------------------------===//
