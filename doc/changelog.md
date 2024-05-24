@@ -83,6 +83,10 @@
 
 <h3>Improvements</h3>
 
+* `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
+  as active for the computation of gradients.
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
+
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
   simulator supports this gate.
