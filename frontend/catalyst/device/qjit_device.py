@@ -35,7 +35,7 @@ from catalyst.device.decomposition import (
 )
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.paths import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 from catalyst.utils.toml import (
     DeviceCapabilities,
     OperationProperties,
