@@ -62,8 +62,8 @@ class TestActiveCallback:
         active_callback.fwd(fwd)
         active_callback.bwd(bwd)
         jax.make_jaxpr(active_callback)(1.0)
-        assert active_callback._fwd_jaxpr
-        assert active_callback._bwd_jaxpr
+        assert active_callback.forward_jaxpr
+        assert active_callback.reverse_jaxpr
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])

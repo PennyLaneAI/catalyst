@@ -271,9 +271,9 @@ def _python_callback_lowering(
         assert not custom_grad, "Inactive callbacks should never have custom gradients."
         retval = InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args))
 
-    functions_with_custom_grad_cache[custom_grad] = retval
 
     if custom_grad:
+        functions_with_custom_grad_cache[custom_grad] = retval
         assert custom_grad.forward and custom_grad.reverse
         assert custom_grad.forward_jaxpr and custom_grad.reverse_jaxpr
         forward = custom_grad.forward
