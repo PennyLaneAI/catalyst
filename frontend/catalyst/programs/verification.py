@@ -120,12 +120,12 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
 
-    def _adj_obs_checker(obs, _):
+    def _adj_obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
-            _obs_checker(obs.obs or [], _)
+            _obs_checker(obs.obs or [])
         elif isinstance(obs, list):
             for obs2 in obs:
-                _obs_checker(obs2, _)
+                _obs_checker(obs2)
         else:
             if not qjit_device.qjit_capabilities.native_obs.get(
                 obs.name, EMPTY_PROPERTIES
@@ -144,9 +144,6 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                 )
         return True if isinstance(op, QCtrl) else in_control
 
-    def _ctrl_obs_checker(_, state):
-        return state
-
     def _inv_op_checker(op, in_inverse):
         if in_inverse:
             op_name = op.base.name if isinstance(op, Controlled) else op.name
@@ -157,9 +154,6 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                     f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
                 )
         return True if isinstance(op, Adjoint) else in_inverse
-
-    def _inv_obs_checker(_, state):
-        return state
 
     def _op_checker(op, state):
         in_inverse, in_control = state
@@ -175,8 +169,6 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
 
     def _obs_checker(obs, state):
         in_inverse, in_control = state
-        in_inverse = _inv_obs_checker(obs, in_inverse)
-        # in_control = _ctrl_obs_checker(obs, in_control)
         if grad_method is not None:
             if grad_method == "adjoint":
                 _adj_obs_checker(obs)
