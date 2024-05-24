@@ -83,6 +83,13 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
 
 @transform
 def verify_program(tape: QuantumTape, grad_method, qjit_device):
+    """verify the quantum program against Catalyst requuirements. This transform makes no
+    transformations.
+
+    Raises:
+        DifferentiableCompileError: gradient-related error
+        CompileError: compilation error
+    """
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
     from catalyst.api_extensions import MidCircuitMeasure
@@ -131,7 +138,8 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                 obs.name, EMPTY_PROPERTIES
             ).differentiable:
                 raise DifferentiableCompileError(
-                    f"{obs.name} is non-differentiable on '{qjit_device.original_device.name}' device"
+                    f"{obs.name} is non-differentiable on "
+                    f"'{qjit_device.original_device.name}' device"
                 )
 
     def _ctrl_op_checker(op, in_control):

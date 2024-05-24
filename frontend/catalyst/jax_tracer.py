@@ -744,7 +744,7 @@ def apply_transform(
     device_modify_measurements,
     tape,
     flat_results,
-):
+):  # pylint: disable=too-many-arguments
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
