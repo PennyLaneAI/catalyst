@@ -83,9 +83,6 @@
 
 <h3>Improvements</h3>
 
-* `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
-  as active for the computation of gradients.
-  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
 
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
@@ -104,13 +101,42 @@
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
 
-* `callback.pure_callback` are now lowered to `ActiveCallbackOp`s.
-  Which will be treated as active callbacks by Enzyme. During the lowering of
-  `ActiveCallbackOp`s, the callback will create a specialized function for the
-  `ActiveCallback`. This is necessary for registering custom gradients with
-  Enzyme.
+* `debug.callbacks` are lowered to `InactiveCallbackOp`.
+  `pure_callback`s are lowered to `ActiveCallbackOp`.
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
   [(#735)](https://github.com/PennyLaneAI/catalyst/pull/735)
 
+  `InactiveCallbackOp`s will lower to function calls to `inactive_callback`
+   which is defined in the runtime. `inactive_callback` is registered as an
+   inactive function with Enzyme.
+
+   `ActiveCallbackOp` are lowered to a specialized function that will contain
+   a call to `inactive_callback`. `ActiveCallbackOp` are lowered from:
+
+   ```mlir
+   catalyst.activeCallbackCall(%arg0, ... %argN) { identifier = 0xdeadbeef }
+                               -> (memref0, ... memrefM)
+   ```
+
+   to:
+
+   ```mlir
+   // This function has been declared in the module
+   llvm.func @active_callback_0xdeadbeef(%arg0 : !llvm.ptr, ... %argN : !llvm.ptr, ...
+                                         %res0 : !llvm.ptr, ... %resM : !llvm.ptr)
+   {
+       %id = llvm.mlir.constant(0xdeadbeef : i64)
+       %argc = llvm.mlir.constant(N: i64)
+       %retc = llvm.mlir.constant(M: i64)
+       llvm.call @inactive_callback(%id, %argc, %retc, %arg0, ..., %argN, %res0, ..., %resM)
+   }
+
+   // there will be a call to the function above where catalyst.activeCallbackCall was.
+   llvm.call @active_callback_0xdeadbeef(%arg0, ..., %argN, %res0, ... %resM)
+   ```
+
+   This will allow for custom functions to be defined as forward and reverse passes for
+   `@active_callback_0xdeadbeef`.
 
 <h3>Breaking changes</h3>
 
