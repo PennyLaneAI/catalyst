@@ -101,42 +101,64 @@
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
 
-* `debug.callbacks` are lowered to `InactiveCallbackOp`.
-  `pure_callback`s are lowered to `ActiveCallbackOp`.
+* `debug.callback`s are lowered to `InactiveCallbackOp`.
   [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
-  [(#735)](https://github.com/PennyLaneAI/catalyst/pull/735)
 
   `InactiveCallbackOp`s will lower to function calls to `inactive_callback`
-   which is defined in the runtime. `inactive_callback` is registered as an
-   inactive function with Enzyme.
+  which is defined in the runtime. `inactive_callback` is registered as an
+  inactive function with Enzyme.
 
-   `ActiveCallbackOp` are lowered to a specialized function that will contain
-   a call to `inactive_callback`. `ActiveCallbackOp` are lowered from:
+* `pure_callback`s have the ability to register a `fwd` and `bwd` custom
+  gradient in the frontend.
+  `pure_callback`s are lowered to `ActiveCallbackOp`.
+  [(#735)](https://github.com/PennyLaneAI/catalyst/pull/735)
+  [(#743)](https://github.com/PennyLaneAI/catalyst/pull/743)
 
-   ```mlir
-   catalyst.activeCallbackCall(%arg0, ... %argN) { identifier = 0xdeadbeef }
-                               -> (memref0, ... memrefM)
-   ```
+  Users can now specify custom gradients for `pure_callback`s using the
+  following API:
 
-   to:
+  ```python
+  @pure_callback
+  def identity(x) -> float:
+      return x
 
-   ```mlir
-   // This function has been declared in the module
-   llvm.func @active_callback_0xdeadbeef(%arg0 : !llvm.ptr, ... %argN : !llvm.ptr, ...
-                                         %res0 : !llvm.ptr, ... %resM : !llvm.ptr)
-   {
-       %id = llvm.mlir.constant(0xdeadbeef : i64)
-       %argc = llvm.mlir.constant(N: i64)
-       %retc = llvm.mlir.constant(M: i64)
-       llvm.call @inactive_callback(%id, %argc, %retc, %arg0, ..., %argN, %res0, ..., %resM)
-   }
+  @identity.fwd
+  def fwd(x):
+      return identity(x), 1.0
 
-   // there will be a call to the function above where catalyst.activeCallbackCall was.
-   llvm.call @active_callback_0xdeadbeef(%arg0, ..., %argN, %res0, ... %resM)
-   ```
+  @identity.bwd
+  def bwd(residuals, cotangents):
+      return residuals * cotangents
+  ```
 
-   This will allow for custom functions to be defined as forward and reverse passes for
-   `@active_callback_0xdeadbeef`.
+  `pure_callback`s are lowered to `ActiveCallbackOp` and then to a 
+  specialized function that will contain a call to `inactive_callback`.
+  `ActiveCallbackOp` are lowered from:
+
+  ```mlir
+  catalyst.activeCallbackCall(%arg0, ... %argN) { identifier = 0xdeadbeef }
+                              -> (memref0, ... memrefM)
+  ```
+
+  to:
+
+  ```mlir
+  // This function has been declared in the module
+  llvm.func @active_callback_0xdeadbeef(%arg0 : !llvm.ptr, ... %argN : !llvm.ptr, ...
+                                        %res0 : !llvm.ptr, ... %resM : !llvm.ptr)
+  {
+      %id = llvm.mlir.constant(0xdeadbeef : i64)
+      %argc = llvm.mlir.constant(N: i64)
+      %retc = llvm.mlir.constant(M: i64)
+      llvm.call @inactive_callback(%id, %argc, %retc, %arg0, ..., %argN, %res0, ..., %resM)
+  }
+
+  // there will be a call to the function above where catalyst.activeCallbackCall was.
+  llvm.call @active_callback_0xdeadbeef(%arg0, ..., %argN, %res0, ... %resM)
+  ```
+
+  This will allow for custom functions to be defined as forward and reverse passes for
+  `@active_callback_0xdeadbeef`.
 
 <h3>Breaking changes</h3>
 
