@@ -21,13 +21,9 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
-from catalyst.device import QJITDevice
+from catalyst.device import QJITDevice, validate_device_capabilities
+from catalyst.device.qjit_device import check_no_overlap
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import (
-    check_no_overlap,
-    get_device_capabilities,
-    validate_config_with_device,
-)
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
@@ -36,6 +32,7 @@ from catalyst.utils.toml import (
     get_decomposable_gates,
     get_matrix_decomposable_gates,
     get_native_ops,
+    load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
 )
@@ -76,33 +73,30 @@ def get_test_device_capabilities(
 ) -> DeviceCapabilities:
     """Parse test config into the DeviceCapabilities structure"""
     config = get_test_config(config_text)
-    device_capabilities = get_device_capabilities(config, program_features, "dummy")
+    device_capabilities = load_device_capabilities(config, program_features, "dummy")
     return device_capabilities
 
 
 @pytest.mark.parametrize("schema", ALL_SCHEMAS)
-def test_validate_config_with_device(schema):
+def test_config_qjit_incompatible_device(schema):
     """Test error is raised if checking for qjit compatibility and field is false in toml file."""
-    with TemporaryDirectory() as d:
-        toml_file = join(d, "test.toml")
-        with open(toml_file, "w", encoding="utf-8") as f:
-            f.write(
-                dedent(
-                    f"""
-                        schema = {schema}
-                        [compilation]
-                        qjit_compatible = false
-                    """
-                )
-            )
+    device_capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
+        dedent(
+            f"""
+                schema = {schema}
+                [compilation]
+                qjit_compatible = false
+            """
+        ),
+    )
 
-        config = read_toml_file(toml_file)
-        name = DeviceToBeTested.name
-        with pytest.raises(
-            CompileError,
-            match=f"Attempting to compile program for incompatible device '{name}'",
-        ):
-            validate_config_with_device(DeviceToBeTested(), config)
+    name = DeviceToBeTested.name
+    with pytest.raises(
+        CompileError,
+        match=f"Attempting to compile program for incompatible device '{name}'",
+    ):
+        validate_device_capabilities(DeviceToBeTested(), device_capabilities)
 
 
 def test_get_observables_schema1():
@@ -384,7 +378,8 @@ def test_config_invalid_condition_duplicate(shots):
 
 def test_config_qjit_device_operations():
     """Check the gate condition handling logic"""
-    config = get_test_config(
+    capabilities = get_test_device_capabilities(
+        ProgramFeatures(False),
         dedent(
             r"""
                 schema = 2
@@ -395,7 +390,7 @@ def test_config_qjit_device_operations():
             """
         ),
     )
-    qjit_device = QJITDevice(config, shots=1000, wires=2)
+    qjit_device = QJITDevice(capabilities, shots=1000, wires=2)
     assert "PauliX" in qjit_device.operations
     assert "PauliY" in qjit_device.observables
 

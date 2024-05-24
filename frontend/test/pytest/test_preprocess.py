@@ -412,7 +412,6 @@ class TestPreprocessHybridOp:
         @qml.qjit
         @qml.qnode(dev)
         def circuit(phi: float):
-
             OtherHadamard(wires=0)
 
             # define a conditional ansatz
@@ -461,7 +460,6 @@ class TestPreprocessHybridOp:
         @qml.qjit
         @qml.qnode(dev)
         def circuit(n: int, x: float):
-
             OtherHadamard(wires=0)
 
             def loop_rx(i, phi):
@@ -495,7 +493,6 @@ class TestPreprocessHybridOp:
         @qml.qjit
         @qml.qnode(dev)
         def circuit(x: float):
-
             @while_loop(lambda x: x < 2.0)
             def loop_rx(x):
                 # perform some work and update (some of) the arguments

@@ -22,7 +22,13 @@ import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from catalyst.device import QJITDevice, QJITDeviceNewAPI
+from catalyst.device import (
+    BackendInfo,
+    QJITDevice,
+    QJITDeviceNewAPI,
+    extract_backend_info,
+    validate_device_capabilities,
+)
 from catalyst.jax_extras import (
     deduce_avals,
     get_implicit_and_explicit_flat_args,
@@ -30,13 +36,11 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
-from catalyst.utils.runtime import (
-    BackendInfo,
-    device_get_toml_config,
-    extract_backend_info,
-    validate_config_with_device,
+from catalyst.utils.toml import (
+    DeviceCapabilities,
+    ProgramFeatures,
+    get_device_capabilities,
 )
-from catalyst.utils.toml import TOMLDocument
 
 
 class QFunc:
@@ -54,26 +58,35 @@ class QFunc:
         raise NotImplementedError()  # pragma: no-cover
 
     @staticmethod
-    def extract_backend_info(device: qml.QubitDevice, config: TOMLDocument) -> BackendInfo:
+    def extract_backend_info(
+        device: qml.QubitDevice, capabilities: DeviceCapabilities
+    ) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
-        return extract_backend_info(device, config)
+        return extract_backend_info(device, capabilities)
 
-    # pylint: disable=no-member
+    # pylint: disable=no-member, attribute-defined-outside-init
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
-        config = device_get_toml_config(self.device)
-        validate_config_with_device(self.device, config)
-        backend_info = QFunc.extract_backend_info(self.device, config)
+        # TODO: Move the capability loading and validation to the device constructor when the
+        # support for old device api is dropped.
+        program_features = ProgramFeatures(self.device.shots is not None)
+        device_capabilities = get_device_capabilities(self.device, program_features)
+        backend_info = QFunc.extract_backend_info(self.device, device_capabilities)
+
+        # Validate decive operations against the declared capabilities
+        validate_device_capabilities(self.device, device_capabilities)
 
         if isinstance(self.device, qml.devices.Device):
-            device = QJITDeviceNewAPI(self.device, backend_info)
+            qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
         else:
-            device = QJITDevice(config, self.device.shots, self.device.wires, backend_info)
+            qjit_device = QJITDevice(
+                device_capabilities, self.device.shots, self.device.wires, backend_info
+            )
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, device, args, kwargs, qnode=self
+                self.func, qjit_device, args, kwargs, qnode=self
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
