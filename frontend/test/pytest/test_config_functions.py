@@ -22,12 +22,12 @@ import pennylane as qml
 import pytest
 
 from catalyst.device import QJITDevice, validate_device_capabilities
+from catalyst.device.qjit_device import check_no_overlap
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
     TOMLDocument,
-    check_no_overlap,
     check_quantum_control_flag,
     get_decomposable_gates,
     get_matrix_decomposable_gates,
