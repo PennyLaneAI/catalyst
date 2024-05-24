@@ -30,10 +30,10 @@ from catalyst import (
     grad,
     while_loop,
 )
+from catalyst.device import get_device_capabilities
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
-    get_device_capabilities,
     pennylane_operation_set,
 )
 
@@ -98,7 +98,7 @@ def get_custom_device(
             """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
-        def supports_derivatives(self, _config, _circuit=None):
+        def supports_derivatives(self, config, circuit=None):
             """Pretend we support any derivatives"""
             return True
 

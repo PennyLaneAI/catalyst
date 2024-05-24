@@ -39,13 +39,13 @@ from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
 from catalyst.utils.toml import (
     DeviceCapabilities,
-    TOMLDocument,
-    ProgramFeatures,
     OperationProperties,
+    ProgramFeatures,
+    TOMLDocument,
     intersect_operations,
+    load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
-    load_device_capabilities,
 )
 
 RUNTIME_OPERATIONS = [

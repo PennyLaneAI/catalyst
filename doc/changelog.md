@@ -97,6 +97,9 @@
   functions in a nested fashion.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
 
+* Catalyst tests now manipulate device capabilities rather than text configurations files.
+  [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
