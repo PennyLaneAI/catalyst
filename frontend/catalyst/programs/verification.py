@@ -105,10 +105,10 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
 
     def _paramshift_obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
-            _obs_checker(obs.obs or [])
+            _paramshift_obs_checker(obs.obs or [])
         elif isinstance(obs, list):
             for obs2 in obs:
-                _obs_checker(obs2)
+                _paramshift_obs_checker(obs2)
         else:
             if obs.grad_method not in {"A", None}:
                 raise DifferentiableCompileError(
@@ -129,10 +129,10 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
 
     def _adj_obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
-            _obs_checker(obs.obs or [])
+            _adj_obs_checker(obs.obs or [])
         elif isinstance(obs, list):
             for obs2 in obs:
-                _obs_checker(obs2)
+                _adj_obs_checker(obs2)
         else:
             if not qjit_device.qjit_capabilities.native_obs.get(
                 obs.name, EMPTY_PROPERTIES
