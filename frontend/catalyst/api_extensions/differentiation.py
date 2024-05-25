@@ -296,7 +296,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
     return Grad(fn, GradParams(method, scalar_out, h, argnum, with_value=True))
 
 
-def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+def jacobian(fn=None, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
 
     This function allows the Jacobian of a hybrid quantum-classical function to be computed within
@@ -304,7 +304,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     JAX counterpart ``jax.jacobian``. The function ``f`` can return any pytree-like shape.
 
     Args:
-        f (Callable): a function or a function object to differentiate
+        fn (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
@@ -357,8 +357,15 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     array([[ 3.48786850e-16 -4.20735492e-01]
            [-8.71967125e-17  4.20735492e-01]])
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(grad, **kwargs)
+
     scalar_out = False
-    return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+    return Grad(fn, GradParams(method, scalar_out, h, argnum))
 
 
 # pylint: disable=too-many-arguments
