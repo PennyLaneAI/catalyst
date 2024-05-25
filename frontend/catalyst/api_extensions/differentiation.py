@@ -18,6 +18,8 @@ capabilities for hybrid quantum programs. This includes the computation
 of gradients, jacobians, jacobian-vector products, and more.
 """
 
+import copy
+import functools
 import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
@@ -45,7 +47,7 @@ DifferentiableLike = Union[Differentiable, Callable, "catalyst.QJIT"]
 
 
 ## API ##
-def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+def grad(fn=None, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function to be computed within
@@ -58,7 +60,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         method.
 
     Args:
-        f (Callable): a function or a function object to differentiate
+        fn (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
@@ -171,8 +173,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     >>> dsquare(2.3)
     array(4.6)
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(grad, **kwargs)
+
     scalar_out = True
-    return Grad(f, GradParams(method, scalar_out, h, argnum))
+
+    return Grad(fn, GradParams(method, scalar_out, h, argnum))
 
 
 def value_and_grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
