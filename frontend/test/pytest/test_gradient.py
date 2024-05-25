@@ -1248,6 +1248,23 @@ class TestGradientUsagePatterns:
         assert np.allclose(res_pattern_fn_as_argument, expected)
         assert np.allclose(res_pattern_partial, expected)
 
+    def test_value_and_grad_usage_patterns(self):
+        """Test usage patterns of catalyst.value_and_grad."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        fn_as_argument_val, fn_as_argument_grad = value_and_grad(fn)(x)
+        partial_val, partial_grad = value_and_grad()(fn)(x)
+        expected_val, expected_grad = jax.value_and_grad(fn)(x)
+
+        assert np.allclose(fn_as_argument_val, expected_val)
+        assert np.allclose(partial_val, expected_val)
+        assert np.allclose(fn_as_argument_grad, expected_grad)
+        assert np.allclose(partial_grad, expected_grad)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
