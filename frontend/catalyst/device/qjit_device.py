@@ -123,7 +123,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     if all(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_config.native_ops.update(
             {
-                "Adjoint": OperationProperties(
+                "HybridAdjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }

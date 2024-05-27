@@ -255,7 +255,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
 
-        return Adjoint(
+        return HybridAdjoint(
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=[],
             regions=[adjoint_region],
@@ -403,7 +403,7 @@ class MidCircuitMeasure(HybridOp):
         return qrp
 
 
-class Adjoint(HybridOp):
+class HybridAdjoint(HybridOp):
     """PennyLane's adjoint operation"""
 
     binder = adjoint_p.bind
