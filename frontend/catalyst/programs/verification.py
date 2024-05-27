@@ -24,7 +24,7 @@ from pennylane.measurements import (
     VarianceMP,
     VnEntropyMP,
 )
-from pennylane.operation import Observable, Operation
+from pennylane.operation import Operation
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
