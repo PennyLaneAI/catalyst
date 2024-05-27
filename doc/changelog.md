@@ -102,11 +102,12 @@
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
-* Refactored `vmap` and `qjit` decorators in order to follow a unified pattern 
+* Refactored `vmap`,`qjit` and gradient decorators in order to follow a unified pattern 
   that uses a callable class that implements the decorator's logic. This prevents having to 
   excessively define functions in a nested fashion.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
   [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
+  [(#762)](https://github.com/PennyLaneAI/catalyst/pull/762)
 
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
