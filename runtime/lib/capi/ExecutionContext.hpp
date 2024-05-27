@@ -33,7 +33,7 @@ extern void callbackCall(int64_t, int64_t, int64_t, va_list);
 
 namespace Catalyst::Runtime {
 
-extern "C" void pyregistry(int64_t identifier, int64_t argc, int64_t retc, ...);
+extern "C" void inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...);
 
 class MemoryManager final {
   private:

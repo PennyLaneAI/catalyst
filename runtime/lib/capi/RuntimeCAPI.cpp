@@ -108,7 +108,7 @@ extern "C" {
 using namespace Catalyst::Runtime;
 using timer = catalyst::utils::Timer;
 
-void pyregistry(int64_t identifier, int64_t argc, int64_t retc, ...)
+void inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
 {
     // We need to guard calls to callback.
     // These are implemented in Python.

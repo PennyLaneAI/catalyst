@@ -34,6 +34,7 @@
 
 #include "Catalyst/Utils/CallGraph.h"
 #include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/EnzymeConstants.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Gradient/Utils/DestinationPassingStyle.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
@@ -148,13 +149,6 @@ struct EnzymeMemRefInterfaceOptions {
     /// Mark memref as dupnoneed, allowing Enzyme to avoid computing its primal value.
     bool dupNoNeed = false;
 };
-
-static constexpr const char *enzyme_autodiff_func_name = "__enzyme_autodiff";
-static constexpr const char *enzyme_allocation_key = "__enzyme_allocation_like";
-static constexpr const char *enzyme_custom_gradient_key = "__enzyme_register_gradient_";
-static constexpr const char *enzyme_like_free_key = "__enzyme_function_like_free";
-static constexpr const char *enzyme_const_key = "enzyme_const";
-static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
 /// Enzyme custom gradients appear to exhibit better stability when they are registered for
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
