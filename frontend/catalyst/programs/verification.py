@@ -39,7 +39,6 @@ def _verify_nested(
     tape: QuantumTape,
     state: Any,
     op_checker_fn: Callable[[Operation, Any], Any],
-    obs_checker_fn: Callable[[Observable, Any], Any],
 ) -> Any:
     """Traverse the nested quantum tape, carry a caller-defined state."""
 
@@ -51,26 +50,22 @@ def _verify_nested(
     for op in tape.operations:
         state = op_checker_fn(op, state)
         if has_nested_tapes(op):
-            nested_state = state
             for region in nested_quantum_regions(op):
                 if region.trace is not None:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        nested_state = _verify_nested(
-                            region.quantum_tape, nested_state, op_checker_fn, obs_checker_fn
+                        state = _verify_nested(
+                            region.quantum_tape, state, op_checker_fn
                         )
                 else:
-                    nested_state = _verify_nested(
-                        region.quantum_tape, nested_state, op_checker_fn, obs_checker_fn
+                    state = _verify_nested(
+                        region.quantum_tape, state, op_checker_fn
                     )
-
-    for obs in tape.observables:
-        state = obs_checker_fn(obs, state)
     return state
 
 
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
 
-
+@transform
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     """Verify that no measuremnts contain state or variance."""
 
@@ -80,10 +75,12 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     if any(isinstance(m, VarianceMP) for m in tape.measurements):
         raise DifferentiableCompileError("Variance returns are forbidden in gradients")
 
+    return [tape], lambda x: x[0]
+
 
 @transform
-def verify_program(tape: QuantumTape, grad_method, qjit_device):
-    """verify the quantum program against Catalyst requuirements. This transform makes no
+def verify_operations(tape: QuantumTape, grad_method, qjit_device):
+    """verify the quantum program against Catalyst requirements. This transform makes no
     transformations.
 
     Raises:
@@ -103,18 +100,6 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                     f"{op.name} does not support analytic differentiation"
                 )
 
-    def _paramshift_obs_checker(obs):
-        if isinstance(obs, MeasurementProcess):
-            _paramshift_obs_checker(obs.obs or [])
-        elif isinstance(obs, list):
-            for obs2 in obs:
-                _paramshift_obs_checker(obs2)
-        else:
-            if obs.grad_method not in {"A", None}:
-                raise DifferentiableCompileError(
-                    f"{obs.name} does not support analytic differentiation"
-                )
-
     def _mcm_op_checker(op):
         if isinstance(op, MidCircuitMeasure):
             raise DifferentiableCompileError(f"{op.name} is not allowed in gradinets")
@@ -126,21 +111,6 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
             raise DifferentiableCompileError(
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
-
-    def _adj_obs_checker(obs):
-        if isinstance(obs, MeasurementProcess):
-            _adj_obs_checker(obs.obs or [])
-        elif isinstance(obs, list):
-            for obs2 in obs:
-                _adj_obs_checker(obs2)
-        else:
-            if not qjit_device.qjit_capabilities.native_obs.get(
-                obs.name, EMPTY_PROPERTIES
-            ).differentiable:
-                raise DifferentiableCompileError(
-                    f"{obs.name} is non-differentiable on "
-                    f"'{qjit_device.original_device.name}' device"
-                )
 
     def _ctrl_op_checker(op, in_qctrl, in_controllable):
         if not (in_qctrl or in_controllable):
@@ -183,18 +153,50 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                 _paramshift_op_checker(op)
         return (in_inverse, in_control)
 
-    def _obs_checker(obs, state):
-        in_inverse, in_control = state
-        if grad_method is not None:
-            if grad_method == "adjoint":
-                _adj_obs_checker(obs)
-            elif grad_method == "parameter-shift":
-                _paramshift_obs_checker(obs)
-        return (in_inverse, in_control)
+    _verify_nested(tape, (False, False), _op_checker)
 
-    if grad_method is not None:
-        verify_no_state_variance_returns(tape)
+    return [tape], lambda x: x[0]
 
-    _verify_nested(tape, (False, False), _op_checker, _obs_checker)
+@transform
+def validate_observables_parameter_shift(tape: QuantumTape, qjit_device):
+
+    def _obs_checker(obs):
+        if isinstance(obs, MeasurementProcess):
+            _obs_checker(obs.obs or [])
+        elif isinstance(obs, list):
+            for obs2 in obs:
+                _obs_checker(obs2)
+        else:
+            if obs.grad_method not in {"A", None}:
+                raise DifferentiableCompileError(
+                    f"{obs.name} does not support analytic differentiation"
+                )
+
+    for obs in tape.observables:
+        _obs_checker(obs)
+
+    return [tape], lambda x: x[0]
+
+
+@transform
+def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
+
+    def _obs_checker(obs):
+        if isinstance(obs, MeasurementProcess):
+            _obs_checker(obs.obs or [])
+        elif isinstance(obs, list):
+            for obs2 in obs:
+                _obs_checker(obs2)
+        else:
+            if not qjit_device.qjit_capabilities.native_obs.get(
+                obs.name, EMPTY_PROPERTIES
+            ).differentiable:
+                raise DifferentiableCompileError(
+                    f"{obs.name} is non-differentiable on "
+                    f"'{qjit_device.original_device.name}' device"
+                )
+
+    for obs in tape.observables:
+        _obs_checker(obs)
 
     return [tape], lambda x: x[0]
