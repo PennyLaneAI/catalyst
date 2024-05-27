@@ -948,6 +948,49 @@ the decomposition as follows:
 
             return tape.operations
 
+
+Directly accessing QNode for PennyLane
+--------------------------------------
+
+Despite all the compatibility restrictions discussed above, if you really wish to access the QNode compiled by :func:`@qjit <~.qjit>` and pass them into various PennyLane methods, you can access them via the ``original_function`` attribute of the compiled function. The new QNodes can always be recompiled:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qjit
+    @qml.qnode(dev)
+    def f():
+        qml.PauliX(0)
+        qml.PauliX(0)
+        qml.Hadamard(0)
+        return qml.state()
+
+    # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
+    g = qml.transforms.cancel_inverses(f.original_function)  
+    # Compile the transformed QNode again with qjit 
+    g = qjit(g)
+
+
+
+>>> f
+<catalyst.jit.QJIT object at ...>
+>>> qml.matrix(f)()  # Error since qml.matrix expects a QNode, not a qjit compiled function
+ValueError: wire_order is required by qml.matrix() for quantum functions.
+>>> f.original_function
+<QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
+>>> qml.matrix(f.original_function)()
+[[ 0.70710678  0.70710678]
+ [ 0.70710678 -0.70710678]]
+>>> g
+<catalyst.jit.QJIT object at ...>
+>>> qml.draw(f)()
+0: ──X──X──H─┤  State
+>>> qml.draw(g)()
+0: ──H─┤  State
+
+
+
 Function argument restrictions
 ------------------------------
 
