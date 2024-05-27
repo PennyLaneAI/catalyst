@@ -71,11 +71,6 @@ def _verify_nested(
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
 
 
-def lowering_natively_controlled(op) -> bool:
-    """Are we going to lower this operation as a natively-controlled op for some device"""
-    return op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}
-
-
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     """Verify that no measuremnts contain state or variance."""
 

@@ -78,7 +78,7 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.programs.verification import lowering_natively_controlled, verify_program
+from catalyst.programs.verification import verify_program
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
