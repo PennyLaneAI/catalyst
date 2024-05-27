@@ -26,7 +26,8 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Operator
+from pennylane.operation import Operation, Operator, Wires
+from pennylane.ops.op_math.adjoint import AdjointOperation
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
@@ -372,8 +373,8 @@ class AdjointCallable:
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
             # We still want to be able to trace a "body function" for the HybridOp, while ensuring
             # the produced operation behaves exactly like Adjoint(f) from PennyLane.
-            QueuingManager.remove(target)
-            self.callee = lambda: QueuingManager.append(target)
+            # Allow invoking callee to get the target, similar to the constructor case.
+            self.callee = lambda: QueuingManager.append(target) or target
             self.single_op = True
         elif isinstance(target, type) and issubclass(target, Operator):
             # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
@@ -393,6 +394,12 @@ class AdjointCallable:
 
     def __call__(self, *args, **kwargs):
         tracing_artifacts = self.trace_body(args, kwargs)
+
+        if self.single_op:
+            with QueuingManager.stop_recording():
+                base_op = self.callee(*args, **kwargs)
+            return Adjoint(base_op, tracing_artifacts)
+
         return HybridAdjoint(*tracing_artifacts)
 
     def trace_body(self, args, kwargs):
@@ -433,11 +440,25 @@ class AdjointCallable:
 
 
 class HybridAdjoint(HybridOp):
-    """PennyLane's adjoint operation"""
+    """This class provides Catalyst-specific adjoint functionality, including tracing to a JAX
+    primitive and managing the nested scope/tape, while also being a PennyLane operation itself
+    than can be queued in a quantum context."""
 
     binder = adjoint_p.bind
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    def __init__(self, in_classical_tracers, out_classical_tracers, regions):
+        self.in_classical_tracers = in_classical_tracers
+        self.out_classical_tracers = out_classical_tracers
+        self.regions = regions
+
+        # Only call the parent constructor if this class is initialized directly.
+        # Calling Operation.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
+        # class, because both Operation and SymbolicOp init methods are used. Since PL doesn't do
+        # this either they are probably not meant to be initialized together.
+        if type(self) is HybridAdjoint:
+            Operation.__init__(self, wires=Wires(self.num_wires))
+
+    def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
         op = self
         body_trace = op.regions[0].trace
         body_tape = op.regions[0].quantum_tape
@@ -467,6 +488,23 @@ class HybridAdjoint(HybridOp):
         assert len(self.regions) == 1, "Adjoint is expected to have one region"
         total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
         return total_wires
+
+
+class Adjoint(AdjointOperation, HybridAdjoint):
+    """This class provides near identical behaviour as PennyLane for adjoint instances with only a
+    single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
+
+    def __init__(self, base_op, tracing_artifacts):
+        AdjointOperation.__init__(self, base_op)
+        HybridAdjoint.__init__(self, *tracing_artifacts)
+
+    def _flatten(self):
+        tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
+        return (self.base, tracing_artifacts), tuple()
+
+    @classmethod
+    def _unflatten(cls, data, _):
+        return cls(*data)
 
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches

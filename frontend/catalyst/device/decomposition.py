@@ -34,6 +34,7 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
+from catalyst.api_extensions import HybridAdjoint
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
@@ -167,6 +168,11 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
+    # `Adjoint(op)` does not pass the acceptance criteria, since it inherits the PL name attribute,
+    # we should move away from name-based matching of operations to instance-based matching.
+    # Alternatively, overwrite `.name` in `HybridAdjoint` to "Adjoint"?
+    if isinstance(op, HybridAdjoint):
+        return True
     return op.name in operations
 
 
