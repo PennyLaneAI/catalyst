@@ -19,6 +19,7 @@ from copy import deepcopy
 import numpy as np
 import pennylane as qml
 import pytest
+from unittest.mock import patch
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
@@ -39,9 +40,9 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
 )
 
-
 def get_custom_device(
     non_differentiable_gates=frozenset(),
+    non_differentiable_obs=frozenset(),
     non_invertible_gates=frozenset(),
     non_controllable_gates=frozenset(),
     native_gates=frozenset(),
@@ -62,9 +63,6 @@ def get_custom_device(
         backend_lib = "default"
         backend_kwargs = {}
 
-        # By this we disable tape expansion in the deduced QJITDevice
-        max_expansion = 0
-
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
             program_features = ProgramFeatures(shots_present=kwargs.get("shots") is not None)
@@ -78,6 +76,8 @@ def get_custom_device(
                 custom_capabilities.native_ops[gate].invertible = False
             for gate in non_controllable_gates:
                 custom_capabilities.native_ops[gate].controllable = False
+            for obs in non_differentiable_obs:
+                custom_capabilities.native_obs[obs].differentiable = False
             self.qjit_capabilities = custom_capabilities
 
         def execute(self, _circuits, _execution_config):
@@ -106,131 +106,166 @@ def get_custom_device(
 
     return CustomDevice(**kwargs)
 
+@qml.transform
+def null_transform(tape, *args, **kwargs):
+    """A null transform that passes on the tape and the null post processing function.
+    Used to overwrite transforms in the device preprocess with mocker when we want to 
+    skip them for testing purproses"""
 
-def test_non_differentiable_gate_simple():
-    """Emulate a device with a non-differentiable gate."""
-
-    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=[0]), diff_method="adjoint")
-    def f(x):
-        qml.RX(x, wires=0)
-        return qml.expval(qml.PauliX(0))
-
-    with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
+    return (tape,), lambda x: x[0]
 
 
-def test_non_differentiable_gate_nested_cond():
-    """Emulate a device with a non-differentiable gate."""
+@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+class TestAdjointMethodVerification:
 
-    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint")
-    def f(x):
-        @cond(True)
-        def true_path():
+    def test_non_differentiable_gate_simple(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_gates={"RX"}, wires=[0]), diff_method="adjoint"
+        )
+        def f(x):
             qml.RX(x, wires=0)
-
-        @true_path.otherwise
-        def false_path():
-            qml.RX(x, wires=0)
-
-        true_path()
-
-        return qml.expval(qml.PauliX(0))
-
-    with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
-
-
-def test_non_differentiable_gate_nested_adjoint():
-    """Emulate a device with a non-differentiable gate."""
-
-    @qml.qnode(get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint")
-    def f(x):
-        adjoint(qml.RX(x, wires=[0]))
-        return qml.expval(qml.PauliX(0))
-
-    with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
-
-
-def test_non_invertible_gate_simple():
-    """Emulate a device with a non-invertible gate."""
-
-    dev = get_custom_device(non_invertible_gates={"RX"}, wires=1)
-
-    @qml.qnode(dev)
-    def f(x):
-        adjoint(qml.RX(x, wires=0))
-        return qml.expval(qml.PauliX(0))
-
-    with pytest.raises(CompileError, match="RX.*not invertible"):
-
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
-
-
-def test_non_controllable_gate_simple():
-    """Emulate a device with a non-controllable gate."""
-
-    with pytest.raises(CompileError, match="PauliZ.*not controllable"):
-
-        @qjit
-        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
-        def f(x: float):
-            ctrl(qml.PauliZ(wires=0), control=[1, 2])
             return qml.expval(qml.PauliX(0))
 
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
 
-def test_non_invertible_gate_nested_cond():
-    """Emulate a device with a non-invertible gate."""
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
 
-    @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
-    def f(x):
-        @cond(True)
-        def true_path():
+    def test_non_differentiable_observable(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
+        )
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_non_differentiable_gate_nested_cond(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
+        )
+        def f(x):
+            @cond(True)
+            def true_path():
+                qml.RX(x, wires=0)
+
+            @true_path.otherwise
+            def false_path():
+                qml.RX(x, wires=0)
+
+            true_path()
+
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_non_differentiable_gate_nested_adjoint(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
+        )
+        def f(x):
+            adjoint(qml.RX(x, wires=[0]))
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+
+@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+class TestHybridOpVerification:
+    """Test that the verification catches situations where a HybridOp subtape contains
+    an operation the given device can't support inside that HybridOp"""
+
+    def test_non_invertible_gate_simple(self):
+        """Emulate a device with a non-invertible gate applied inside an Adjoint HybridOp."""
+
+        dev = get_custom_device(non_invertible_gates={"RX"}, wires=1)
+
+        @qml.qnode(dev)
+        def f(x):
             adjoint(qml.RX(x, wires=0))
+            return qml.expval(qml.PauliX(0))
 
-        @true_path.otherwise
-        def false_path():
-            adjoint(qml.RX(x, wires=0))
+        with pytest.raises(CompileError, match="RX.*not invertible"):
 
-        true_path()
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
 
-        return qml.expval(qml.PauliX(0))
+    def test_non_invertible_gate_nested_cond(self):
+        """Emulate a device with a non-invertible gate inside an Adjoint that
+        is further nested in a Cond operation."""
 
-    with pytest.raises(CompileError, match="RX.*not invertible"):
+        @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
+        def f(x):
+            @cond(True)
+            def true_path():
+                adjoint(qml.RX(x, wires=0))
 
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
+            @true_path.otherwise
+            def false_path():
+                adjoint(qml.RX(x, wires=0))
 
+            true_path()
 
-def test_non_invertible_gate_nested_for():
-    """Emulate a device with a non-invertible gate."""
+            return qml.expval(qml.PauliX(0))
 
-    @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
-    def f(x):
-        @for_loop(0, 10, 1)
-        def loop(_i):
-            adjoint(qml.RX(x, wires=0))
+        with pytest.raises(CompileError, match="RX.*not invertible"):
 
-        loop()
-        return qml.expval(qml.PauliX(0))
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
 
-    with pytest.raises(CompileError, match="RX.*not invertible"):
+    def test_non_invertible_gate_nested_for(self):
+        """Emulate a device with a non-invertible gate inside an Adjoint that
+        is further nested in a For operation."""
 
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
+        @qml.qnode(get_custom_device(non_invertible_gates={"RX"}, wires=1))
+        def f(x):
+            @for_loop(0, 10, 1)
+            def loop(_i):
+                adjoint(qml.RX(x, wires=0))
+
+            loop()
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(CompileError, match="RX.*not invertible"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_non_controllable_gate_simple(self):
+        """Emulate a device with a non-controllable gate applied inside a QCtrl."""
+
+        with pytest.raises(CompileError, match="PauliZ.*not controllable"):
+
+            @qjit
+            @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
+            def f(x: float):
+                ctrl(qml.PauliZ(wires=0), control=[1, 2])
+                return qml.expval(qml.PauliX(0))
 
 
 class PauliX2(qml.PauliX):
@@ -240,66 +275,73 @@ class PauliX2(qml.PauliX):
     grad_method = "F"
 
 
-def test_paramshift_obs_simple():
-    """Emulate a device with a non-invertible observable."""
+@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+class TestParameterShiftMethodVerification:
+    """Test the verification of operators and observables when the parameter shift method
+    is used for differentiation"""
 
-    assert qml.Hermitian.grad_method != "A"
+    def test_paramshift_obs_simple(self):
+        """Emulate a device with a non-invertible observable."""
 
-    @qml.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
-    def f(x):
-        qml.PauliX(wires=1)
-        qml.RX(x, wires=0)
-        A = np.array(
-            [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+        assert qml.Hermitian.grad_method != "A"
+
+        @qml.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
+        def f(x):
+            qml.PauliX(wires=1)
+            qml.RX(x, wires=0)
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(qml.Hermitian(A, wires=0))
+
+        with pytest.raises(
+            DifferentiableCompileError, match="Hermitian does not support analytic differentiation"
+        ):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_paramshift_gate_simple(self):
+        """Emulate a device with a non-invertible gate."""
+
+        @qml.qnode(
+            get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift"
         )
-        return qml.expval(qml.Hermitian(A, wires=0))
-
-    with pytest.raises(
-        DifferentiableCompileError, match="Hermitian does not support analytic differentiation"
-    ):
-
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
-
-
-def test_paramshift_gate_simple():
-    """Emulate a device with a non-invertible gate."""
-
-    @qml.qnode(get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift")
-    def f(_):
-        PauliX2(wires=0)
-        return qml.expval(qml.PauliX(0))
-
-    with pytest.raises(
-        DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
-    ):
-
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
-
-
-def test_paramshift_gate_while():
-    """Emulate a device with a non-invertible gate."""
-
-    @qml.qnode(get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift")
-    def f(_):
-        @while_loop(lambda s: s > 0)
-        def loop(s):
+        def f(_):
             PauliX2(wires=0)
-            return s + 1
+            return qml.expval(qml.PauliX(0))
 
-        loop(0)
-        return qml.expval(qml.PauliX(0))
+        with pytest.raises(
+            DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
+        ):
 
-    with pytest.raises(
-        DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
-    ):
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
 
-        @qml.qjit
-        def cir(x: float):
-            return grad(f)(x)
+    def test_paramshift_gate_while(self):
+        """Emulate a device with a non-invertible gate."""
+
+        @qml.qnode(
+            get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift"
+        )
+        def f(_):
+            @while_loop(lambda s: s > 0)
+            def loop(s):
+                PauliX2(wires=0)
+                return s + 1
+
+            loop(0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(
+            DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
+        ):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
 
 
 def test_no_state_returns():
