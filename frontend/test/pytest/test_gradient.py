@@ -1241,8 +1241,8 @@ class TestGradientUsagePatterns:
 
         x = 4.0
 
-        res_pattern_fn_as_argument = grad(fn)(x)
-        res_pattern_partial = grad()(fn)(x)
+        res_pattern_fn_as_argument = grad(fn, method="fd")(x)
+        res_pattern_partial = grad(method="fd")(fn)(x)
         expected = jax.grad(fn)(x)
 
         assert np.allclose(res_pattern_fn_as_argument, expected)
@@ -1256,8 +1256,8 @@ class TestGradientUsagePatterns:
 
         x = 4.0
 
-        fn_as_argument_val, fn_as_argument_grad = value_and_grad(fn)(x)
-        partial_val, partial_grad = value_and_grad()(fn)(x)
+        fn_as_argument_val, fn_as_argument_grad = value_and_grad(fn, method="fd")(x)
+        partial_val, partial_grad = value_and_grad(method="fd")(fn)(x)
         expected_val, expected_grad = jax.value_and_grad(fn)(x)
 
         assert np.allclose(fn_as_argument_val, expected_val)
@@ -1273,8 +1273,8 @@ class TestGradientUsagePatterns:
 
         x = 4.0
 
-        res_pattern_fn_as_argument = jacobian(fn)(x)
-        res_pattern_partial = jacobian()(fn)(x)
+        res_pattern_fn_as_argument = jacobian(fn, method="fd")(x)
+        res_pattern_partial = jacobian(method="fd")(fn)(x)
         expected = jax.jacobian(fn)(x)
 
         assert np.allclose(res_pattern_fn_as_argument, expected)
