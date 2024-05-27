@@ -228,58 +228,13 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
-    def _call_handler(*args, _callee: Callable, **kwargs):
-        # Allow the creation of HybridAdjoint instances outside of any contexts.
-        simulate_tracing_ctx = not EvaluationContext.is_tracing()
-        if simulate_tracing_ctx:
-            eval_ctx = EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION)
-            ctx = eval_ctx.__enter__()
-        else:
-            ctx = EvaluationContext.get_main_tracing_context()
+    adj = AdjointCallable(f)
 
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _, _ = deduce_avals(_callee, args, kwargs)
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
-            quantum_tape = QuantumTape()
-            with QueuingManager.stop_recording(), quantum_tape:
-                # FIXME: move all full_raise calls into a separate function
-                res_classical_tracers = [
-                    inner_trace.full_raise(t)
-                    for t in wffa.call_wrapped(*arg_classical_tracers)
-                    if isinstance(t, DynamicJaxprTracer)
-                ]
+    if isinstance(f, Operator):
+        # Return an instantiated version of the Adjoint class if we receive an operator instance.
+        adj = adj()
 
-            _check_no_measurements(quantum_tape)
-
-            adjoint_region = HybridOpRegion(
-                inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
-            )
-
-        if simulate_tracing_ctx:
-            eval_ctx.__exit__(None, None, None)
-
-        return HybridAdjoint(
-            in_classical_tracers=in_classical_tracers,
-            out_classical_tracers=[],
-            regions=[adjoint_region],
-        )
-
-    if isinstance(f, Callable):
-
-        def _callable(*args, **kwargs):
-            return _call_handler(*args, _callee=f, **kwargs)
-
-        return _callable
-    elif isinstance(f, Operator):
-        QueuingManager.remove(f)
-
-        def _callee():
-            QueuingManager.append(f)
-
-        return _call_handler(_callee=_callee)
-    else:
-        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
+    return adj
 
 
 def ctrl(
@@ -405,6 +360,76 @@ class MidCircuitMeasure(HybridOp):
         qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
+
+
+class AdjointCallable:
+    """Callable wrapper to produce an adjoint instance."""
+
+    def __init__(self, target):
+        self.target = target
+
+        if isinstance(target, Operator):
+            # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
+            # We still want to be able to trace a "body function" for the HybridOp, while ensuring
+            # the produced operation behaves exactly like Adjoint(f) from PennyLane.
+            QueuingManager.remove(target)
+            self.callee = lambda: QueuingManager.append(target)
+            self.single_op = True
+        elif isinstance(target, type) and issubclass(target, Operator):
+            # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
+            # This case should be identical to the one above except we can use the constructor
+            # directly to trace the body function.
+            self.callee = target
+            self.single_op = True
+        elif isinstance(target, Callable):
+            # Case 3: User passed an arbitrary callable that will instantiate operations.
+            # We want to create a callable that will generate an "opaque" Adjoint object.
+            # This object differs from the Adjoint in PennyLane because that one can only be
+            # instantiated on single operations.
+            self.callee = target
+            self.single_op = False
+        else:
+            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
+
+    def __call__(self, *args, **kwargs):
+        tracing_artifacts = self.trace_body(args, kwargs)
+        return HybridAdjoint(*tracing_artifacts)
+
+    def trace_body(self, args, kwargs):
+        """Generate a HybridOpRegion for use by Catalyst."""
+
+        # Allow the creation of HybridAdjoint instances outside of any contexts.
+        simulate_tracing_ctx = not EvaluationContext.is_tracing()
+        if simulate_tracing_ctx:
+            eval_ctx = EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION)
+            ctx = eval_ctx.__enter__()
+        else:
+            ctx = EvaluationContext.get_main_tracing_context()
+
+        # Create a nested jaxpr scope for the body of the adjoint.
+        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+            in_classical_tracers, _ = tree_flatten((args, kwargs))
+            wffa, in_avals, _, _ = deduce_avals(self.callee, args, kwargs)
+            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            quantum_tape = QuantumTape()
+            with QueuingManager.stop_recording(), quantum_tape:
+                # FIXME: move all full_raise calls into a separate function
+                res_classical_tracers = [
+                    inner_trace.full_raise(t)
+                    for t in wffa.call_wrapped(*arg_classical_tracers)
+                    if isinstance(t, DynamicJaxprTracer)
+                ]
+
+            _check_no_measurements(quantum_tape)
+
+            adjoint_region = HybridOpRegion(
+                inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
+            )
+
+        if simulate_tracing_ctx:
+            eval_ctx.__exit__(None, None, None)
+
+        return in_classical_tracers, [], [adjoint_region]
 
 
 class HybridAdjoint(HybridOp):
