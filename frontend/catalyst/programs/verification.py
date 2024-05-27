@@ -162,9 +162,6 @@ def validate_observables_parameter_shift(tape: QuantumTape):
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
-        elif isinstance(obs, list):
-            for obs2 in obs:
-                _obs_checker(obs2)
         else:
             if obs.grad_method not in {"A", None}:
                 raise DifferentiableCompileError(
@@ -184,9 +181,6 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
-        elif isinstance(obs, list):
-            for obs2 in obs:
-                _obs_checker(obs2)
         else:
             if not qjit_device.qjit_capabilities.native_obs.get(
                 obs.name, EMPTY_PROPERTIES
