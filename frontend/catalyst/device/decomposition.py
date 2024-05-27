@@ -127,18 +127,8 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
             )
         )
 
-    # Copy the hybrid operation. QCtrl needs a special branch only due to its custom parameters.
-    if isinstance(op, QCtrl):
-        new_op = QCtrl(
-            op.in_classical_tracers,
-            op.out_classical_tracers,
-            new_regions,
-            control_wires=op.control_wires,
-            control_values=op.control_values,
-            work_wires=op.work_wires,
-        )
-    else:
-        new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    
     return new_op
 
 
