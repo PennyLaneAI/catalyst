@@ -168,7 +168,7 @@ def measure(
     return m
 
 
-def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
+def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator]:
     """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
@@ -182,6 +182,11 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
+        lazy (bool): Whether to delay the computation of the Hermitian conjugate until a later time
+                     (typically during decomposition or compilation). The default is ``True``,
+                     whereas ``False`` will immediately produce a new operator implementing the
+                     adjoint. Note that ``False`` is only supported when the adjoint is applied to
+                     a single Operator, rather than a quantum function.
 
     Returns:
         If an Operator is provided, returns an Operator that is the adjoint. If
@@ -229,7 +234,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
-    adj = AdjointCallable(f)
+    adj = AdjointCallable(f, lazy=lazy)
 
     if isinstance(f, Operator):
         # Return an instantiated version of the Adjoint class if we receive an operator instance.
@@ -366,8 +371,9 @@ class MidCircuitMeasure(HybridOp):
 class AdjointCallable:
     """Callable wrapper to produce an adjoint instance."""
 
-    def __init__(self, target):
+    def __init__(self, target, lazy):
         self.target = target
+        self.lazy = lazy
 
         if isinstance(target, Operator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
@@ -392,7 +398,22 @@ class AdjointCallable:
         else:
             raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
+        if not self.lazy and not self.single_op:
+            raise ValueError(
+                "Eagerly computing the adjoint (lazy=False) is only supported on single operators."
+            )
+
     def __call__(self, *args, **kwargs):
+        # Eager computation of the adjoint, does not create a Adjoint/HybridAdjoint instance.
+        if not self.lazy and self.target.has_adjoint:
+            with QueuingManager.stop_recording():
+                base_op = self.callee(*args, **kwargs)
+
+            adj = base_op.adjoint()
+            QueuingManager.remove(base_op)
+            QueuingManager.append(adj)
+            return adj
+
         tracing_artifacts = self.trace_body(args, kwargs)
 
         if self.single_op:
