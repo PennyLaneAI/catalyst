@@ -53,17 +53,14 @@ def _verify_nested(
             for region in nested_quantum_regions(op):
                 if region.trace is not None:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        state = _verify_nested(
-                            region.quantum_tape, state, op_checker_fn
-                        )
+                        state = _verify_nested(region.quantum_tape, state, op_checker_fn)
                 else:
-                    state = _verify_nested(
-                        region.quantum_tape, state, op_checker_fn
-                    )
+                    state = _verify_nested(region.quantum_tape, state, op_checker_fn)
     return state
 
 
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
+
 
 @transform
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
@@ -157,8 +154,10 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     return [tape], lambda x: x[0]
 
+
 @transform
-def validate_observables_parameter_shift(tape: QuantumTape, qjit_device):
+def validate_observables_parameter_shift(tape: QuantumTape):
+    """Validate that the observables on the tape support parameter shift"""
 
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
@@ -180,6 +179,7 @@ def validate_observables_parameter_shift(tape: QuantumTape, qjit_device):
 
 @transform
 def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
+    """Validate that the observables on the tape support adjoint differentiation"""
 
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
