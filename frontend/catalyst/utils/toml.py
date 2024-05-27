@@ -264,15 +264,13 @@ def patch_schema1_collections(
 ):  # pylint: disable=too-many-arguments, too-many-branches
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
 
-    # TODO: remove after PR #642 is merged in lightning
-    # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
+    # We mark GlobalPhase as controllables even if `quantum_control` flag is False. This
     # is what actual device reports.
     if device_name == "lightning.kokkos":  # pragma: nocover
         native_gate_props["GlobalPhase"] = OperationProperties(
             invertible=False, controllable=True, differentiable=True
         )
 
-    # TODO: remove after PR #642 is merged in lightning
     if device_name == "lightning.kokkos":  # pragma: nocover
         observable_props["Projector"] = OperationProperties(
             invertible=False, controllable=False, differentiable=False
