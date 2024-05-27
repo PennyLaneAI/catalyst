@@ -83,6 +83,12 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
+  measurement. For now the feature is equivalent to returning `m` directly from a quantum
+  function, but will be improved to return an array with one measurement result for each
+  shot in a shots-based execution mode.
+  [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
+
 * `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
   as active for the computation of gradients.
   [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
