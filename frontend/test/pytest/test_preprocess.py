@@ -45,6 +45,7 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import Adjoint, adjoint
 from catalyst.compiler import get_lib_path
+from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
@@ -58,7 +59,6 @@ from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
     TOMLDocument,
-    get_device_capabilities,
     load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
