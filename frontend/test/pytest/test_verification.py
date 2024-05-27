@@ -15,13 +15,12 @@
 """ Test program verification routines """
 
 from copy import deepcopy
+from unittest.mock import patch
 
 import numpy as np
 import pennylane as qml
 import pytest
-from unittest.mock import patch
 
-import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
     CompileError,
     DifferentiableCompileError,
@@ -100,96 +99,19 @@ def get_custom_device(
             """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
-        def supports_derivatives(self, config, circuit=None):
+        def supports_derivatives(self, config, circuit=None):  #pylint: disable=unused-argument
             """Pretend we support any derivatives"""
             return True
 
     return CustomDevice(**kwargs)
 
 @qml.transform
-def null_transform(tape, *args, **kwargs):
+def null_transform(tape, *args, **kwargs):  
     """A null transform that passes on the tape and the null post processing function.
     Used to overwrite transforms in the device preprocess with mocker when we want to 
     skip them for testing purproses"""
 
     return (tape,), lambda x: x[0]
-
-
-@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
-class TestAdjointMethodVerification:
-
-    def test_non_differentiable_gate_simple(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(
-            get_custom_device(non_differentiable_gates={"RX"}, wires=[0]), diff_method="adjoint"
-        )
-        def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    def test_non_differentiable_observable(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(
-            get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
-        )
-        def f(x):
-            qml.RX(x, wires=0)
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    def test_non_differentiable_gate_nested_cond(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(
-            get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
-        )
-        def f(x):
-            @cond(True)
-            def true_path():
-                qml.RX(x, wires=0)
-
-            @true_path.otherwise
-            def false_path():
-                qml.RX(x, wires=0)
-
-            true_path()
-
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    def test_non_differentiable_gate_nested_adjoint(self):
-        """Emulate a device with a non-differentiable gate."""
-
-        @qml.qnode(
-            get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
-        )
-        def f(x):
-            adjoint(qml.RX(x, wires=[0]))
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
 
 
 @patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
@@ -266,6 +188,86 @@ class TestHybridOpVerification:
             def f(x: float):
                 ctrl(qml.PauliZ(wires=0), control=[1, 2])
                 return qml.expval(qml.PauliX(0))
+
+
+@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+class TestAdjointMethodVerification:
+    """Test the verification of operators and observables when the adjoint diff method
+    is used for differentiation"""
+
+    def test_non_differentiable_gate_simple(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_gates={"RX"}, wires=[0]), diff_method="adjoint"
+        )
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_non_differentiable_observable(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
+        )
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_non_differentiable_gate_nested_cond(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
+        )
+        def f(x):
+            @cond(True)
+            def true_path():
+                qml.RX(x, wires=0)
+
+            @true_path.otherwise
+            def false_path():
+                qml.RX(x, wires=0)
+
+            true_path()
+
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
+    def test_non_differentiable_gate_nested_adjoint(self):
+        """Emulate a device with a non-differentiable gate."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
+        )
+        def f(x):
+            adjoint(qml.RX(x, wires=[0]))
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
 
 
 class PauliX2(qml.PauliX):
