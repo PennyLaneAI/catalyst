@@ -511,6 +511,8 @@ class HybridAdjoint(HybridOp):
         return total_wires
 
 
+# TODO: Should we inherit from AdjointOperation? Maybe better to mixin the different behaviours like
+# PennyLane does (AdjointOperation, AdjointObs, AdjointOperationObs).
 class Adjoint(AdjointOperation, HybridAdjoint):
     """This class provides near identical behaviour as PennyLane for adjoint instances with only a
     single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
