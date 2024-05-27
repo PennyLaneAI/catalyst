@@ -47,7 +47,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_tape,
 )
-from catalyst.tracing.contexts import EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 
 ## API ##
@@ -228,14 +228,15 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
-    if not EvaluationContext.is_tracing():
-        return qml.adjoint(f)
-
     def _call_handler(*args, _callee: Callable, **kwargs):
-        EvaluationContext.check_is_quantum_tracing(
-            "catalyst.adjoint can only be used from within a qml.qnode."
-        )
-        ctx = EvaluationContext.get_main_tracing_context()
+        # Allow the creation of HybridAdjoint instances outside of any contexts.
+        simulate_tracing_ctx = not EvaluationContext.is_tracing()
+        if simulate_tracing_ctx:
+            eval_ctx = EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION)
+            ctx = eval_ctx.__enter__()
+        else:
+            ctx = EvaluationContext.get_main_tracing_context()
+
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _, _ = deduce_avals(_callee, args, kwargs)
@@ -254,6 +255,9 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
             adjoint_region = HybridOpRegion(
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
+
+        if simulate_tracing_ctx:
+            eval_ctx.__exit__(None, None, None)
 
         return HybridAdjoint(
             in_classical_tracers=in_classical_tracers,
