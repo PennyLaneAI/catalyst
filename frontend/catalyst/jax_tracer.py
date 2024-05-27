@@ -79,8 +79,8 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.programs.verification import (
-    validate_observables_parameter_shift,
     validate_observables_adjoint_diff,
+    validate_observables_parameter_shift,
     verify_no_state_variance_returns,
     verify_operations,
 )
