@@ -17,7 +17,6 @@ Module for abstracting which toml_load to use.
 
 import importlib.util
 import pathlib
-import re
 from dataclasses import dataclass
 from functools import reduce
 from itertools import repeat
