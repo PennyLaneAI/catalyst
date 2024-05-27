@@ -279,7 +279,7 @@ class QJITDevice(qml.QubitDevice):
         """
         raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
 
-    def default_expand_fn(self, circuit, max_expansion=None):
+    def default_expand_fn(self, circuit, max_expansion=10):
         """
         Most decomposition logic will be equivalent to PennyLane's decomposition.
         However, decomposition logic will differ in the following cases:
@@ -296,12 +296,6 @@ class QJITDevice(qml.QubitDevice):
             circuit: circuit to expand
             max_expansion: the maximum number of expansion steps if no fixed-point is reached.
         """
-
-        max_expansion = (
-            self.original_device.max_expansion
-            if hasattr(self.original_device, "max_expansion")
-            else (max_expansion if max_expansion is not None else 10)
-        )
         # Ensure catalyst.measure is used instead of qml.measure.
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
             raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
@@ -400,18 +394,12 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # TOML files
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
-        max_expansion = (
-            self.original_device.max_expansion
-            if hasattr(self.original_device, "max_expansion")
-            else None
-        )
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(
             catalyst_decompose,
             ctx=ctx,
             stopping_condition=ops_acceptance,
-            max_expansion=max_expansion,
             capabilities=self.qjit_capabilities,
         )
 
