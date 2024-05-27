@@ -393,7 +393,12 @@ class QJITDeviceNewAPI(qml.devices.Device):
         program = TransformProgram()
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(catalyst_decompose, ctx=ctx, stopping_condition=ops_acceptance)
+        program.add_transform(
+            catalyst_decompose,
+            ctx=ctx,
+            stopping_condition=ops_acceptance,
+            capabilities=self.qjit_capabilities,
+        )
 
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
