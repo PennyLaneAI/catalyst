@@ -16,7 +16,6 @@ Module for abstracting which toml_load to use.
 """
 
 import importlib.util
-import os
 import pathlib
 from dataclasses import dataclass
 from functools import reduce
@@ -25,8 +24,8 @@ from typing import Any, Dict, List, Optional, Set
 
 import pennylane as qml
 
-from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import get_lib_path
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit
@@ -38,8 +37,7 @@ tomllib = importlib.util.find_spec("tomllib")
 tomlkit = importlib.util.find_spec("tomlkit")
 # We need at least one of these to make sure we can read toml files.
 if tomllib is None and tomlkit is None:  # pragma: nocover
-    msg = "Either tomllib or tomlkit need to be installed."
-    raise ImportError(msg)
+    raise ImportError("Either tomllib or tomlkit need to be installed.")
 
 # Give preference to tomllib
 if tomllib:  # pragma: nocover
@@ -51,25 +49,6 @@ else:  # pragma: nocover
     from tomlkit import TOMLDocument
     from tomlkit import load as toml_load
     from tomlkit.exceptions import TOMLKitError as TOMLException
-
-
-package_root = os.path.dirname(__file__)
-
-
-# Default paths to dep libraries
-DEFAULT_LIB_PATHS = {
-    "llvm": os.path.join(package_root, "../../../mlir/llvm-project/build/lib"),
-    "runtime": os.path.join(package_root, "../../../runtime/build/lib"),
-    "enzyme": os.path.join(package_root, "../../../mlir/Enzyme/build/Enzyme"),
-    "oqc_runtime": os.path.join(package_root, "../../catalyst/oqc/src/build"),
-}
-
-
-def get_lib_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "lib")  # pragma: no cover
-    return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
 
 
 def read_toml_file(toml_file: str) -> TOMLDocument:
@@ -214,7 +193,6 @@ def get_measurement_processes(
     config: TOMLDocument, program_features: ProgramFeatures
 ) -> Dict[str, dict]:
     """Get the measurements processes from the `native` section of the config."""
-
     schema = int(config["schema"])
     if schema == 1:
         shots_string = "finiteshots" if program_features.shots_present else "exactshots"
@@ -291,7 +269,7 @@ def patch_schema1_collections(
     # is what actual device reports.
     if device_name == "lightning.kokkos":  # pragma: nocover
         native_gate_props["GlobalPhase"] = OperationProperties(
-            invertible=False, controllable=False, differentiable=True
+            invertible=False, controllable=True, differentiable=True
         )
 
     # TODO: remove after PR #642 is merged in lightning
@@ -299,11 +277,6 @@ def patch_schema1_collections(
         observable_props["Projector"] = OperationProperties(
             invertible=False, controllable=False, differentiable=False
         )
-
-    # TODO: remove after PR #642 is merged in lightning
-    # CPhase is an alias, which might exist in a toml schema 1 configs. We remove it here.
-    if 'CPhase' in matrix_decomp_props:
-        matrix_decomp_props.pop("CPhase")
 
     # The deduction logic is the following:
     # * Most of the gates have their `C(Gate)` controlled counterparts.

@@ -16,12 +16,19 @@ This module contains a CudaQDevice and the qjit
 entry point.
 """
 
+from importlib.metadata import version
 from pathlib import Path
 
-import cudaq
 import pennylane as qml
 
-from catalyst.cuda.catalyst_to_cuda_interpreter import interpret
+
+def _check_version_compatibility():
+    installed_version = version("cuda_quantum")
+    compatible_version = "0.6.0"
+    if installed_version != compatible_version:
+        msg = f"Compiling with incompatible version cuda_quantum=={installed_version}. "
+        msg += f"Please install compatible version cuda_quantum=={compatible_version}."
+        raise ModuleNotFoundError(msg)
 
 
 def cudaqjit(fn=None, **kwargs):
@@ -75,6 +82,9 @@ def cudaqjit(fn=None, **kwargs):
     compilation; in particular, AutoGraph, control flow, differentiation, and various measurement
     statistics (such as probabilities and variance) are not yet supported.
     """
+    _check_version_compatibility()
+    # pylint: disable-next=import-outside-toplevel
+    from catalyst.third_party.cuda.catalyst_to_cuda_interpreter import interpret
 
     if fn is not None:
         return interpret(fn, **kwargs)
@@ -122,6 +132,7 @@ class BaseCudaInstructionSet(qml.QubitDevice):
     config = Path(__file__).parent / "cuda_quantum.toml"
 
     def __init__(self, shots=None, wires=None):
+        _check_version_compatibility()
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
@@ -151,7 +162,7 @@ class SoftwareQQPP(BaseCudaInstructionSet):
 
         dev = qml.device("softwareq.qpp", wires=2)
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(dev)
         def circuit(x):
           qml.RX(x[0], wires=0)
@@ -191,7 +202,7 @@ class NvidiaCuStateVec(BaseCudaInstructionSet):
 
         dev = qml.device("nvidia.custatevec", wires=2)
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(dev)
         def circuit(x):
           qml.RX(x[0], wires=0)
@@ -235,7 +246,7 @@ class NvidiaCuTensorNet(BaseCudaInstructionSet):
 
         dev = qml.device("nvidia.cutensornet", wires=2)
 
-        @catalyst.cuda.cudaqjit
+        @catalyst.third_party.cuda.cudaqjit
         @qml.qnode(dev)
         def circuit(x):
           qml.RX(x[0], wires=0)

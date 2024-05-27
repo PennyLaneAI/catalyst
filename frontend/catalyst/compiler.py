@@ -33,7 +33,7 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.toml import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 
 package_root = os.path.dirname(__file__)
 
@@ -57,6 +57,8 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
+        autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
+        for autograph conversion.
         async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
             of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
@@ -72,6 +74,7 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
+    autograph_include: Optional[Iterable[str]] = ()
     async_qnodes: Optional[bool] = False
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
@@ -210,6 +213,7 @@ MLIR_TO_LLVM_PASS = (
         "reconcile-unrealized-casts",
         "gep-inbounds",
         "add-exception-handling",
+        "register-inactive-callback",
     ],
 )
 
@@ -300,7 +304,9 @@ class LinkerDriver:
         if platform.system() == "Linux":
             file_path_within_package = "../scipy.libs/"
             file_extension = ".so"
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            msg = "Attempting to use catalyst on an unsupported system"
+            assert platform.system() == "Darwin", msg
             file_path_within_package = ".dylibs/"
             file_extension = ".dylib"
 
@@ -537,9 +543,9 @@ class Compiler:
             (Optional[str]): output IR
         """
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
-            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
-
-        if not self.last_compiler_output:
-            return None
+            msg = f"Attempting to get output for pipeline: {pipeline},"
+            msg += " but no file was found.\n"
+            msg += "Are you sure the file exists?"
+            raise CompileError(msg)
 
         return self.last_compiler_output.get_pipeline_output(pipeline)

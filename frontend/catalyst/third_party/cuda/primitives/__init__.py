@@ -16,6 +16,8 @@
 This module implements JAXPR primitives for CUDA-quantum.
 """
 
+from importlib.metadata import version
+
 import cudaq
 import jax
 from jax import numpy as jnp

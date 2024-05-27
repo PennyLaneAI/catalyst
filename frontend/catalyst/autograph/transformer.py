@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""AutoGraph is a source-to-source transformation system for converting imperative code into
+"""
+AutoGraph is a source-to-source transformation system for converting imperative code into
 traceable code for compute graph generation. The system is implemented in the Diastatic-Malt
 package (originally from TensorFlow).
 Here, we integrate AutoGraph into Catalyst to improve the UX and allow programmers to use built-in
 Python control flow and other imperative expressions rather than the functional equivalents provided
-by Catalyst."""
+by Catalyst.
+"""
 
 import inspect
 from contextlib import ContextDecorator
@@ -27,7 +29,7 @@ from malt.core import ag_ctx, converter
 from malt.impl.api import PyToPy
 
 import catalyst
-from catalyst import ag_primitives
+from catalyst.autograph import ag_primitives
 from catalyst.utils.exceptions import AutoGraphError
 
 
@@ -265,18 +267,21 @@ class DisableAutograph(ag_ctx.ControlStatusCtx, ContextDecorator):
 # Singleton instance of DisableAutograph
 disable_autograph = DisableAutograph()
 
+# converter.Feature.LISTS permits overloading the 'set_item' function in 'ag_primitives.py'
+OPTIONAL_FEATURES = [converter.Feature.BUILTIN_FUNCTIONS, converter.Feature.LISTS]
+
 TOPLEVEL_OPTIONS = converter.ConversionOptions(
     recursive=True,
     user_requested=True,
     internal_convert_user_code=True,
-    optional_features=[converter.Feature.BUILTIN_FUNCTIONS],
+    optional_features=OPTIONAL_FEATURES,
 )
 
 NESTED_OPTIONS = converter.ConversionOptions(
     recursive=True,
     user_requested=False,
     internal_convert_user_code=True,
-    optional_features=[converter.Feature.BUILTIN_FUNCTIONS],
+    optional_features=OPTIONAL_FEATURES,
 )
 
 STANDARD_OPTIONS = converter.STANDARD_OPTIONS

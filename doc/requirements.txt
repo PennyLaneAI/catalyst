@@ -8,9 +8,10 @@ sphinxcontrib-htmlhelp==2.0.1
 sphinxcontrib-serializinghtml==1.1.5
 ipykernel
 nbsphinx==0.7
-Jinja2==3.1.3
+Jinja2==3.1.4
 version_information
 sphinx-copybutton
+sphinx-tabs
 markupsafe==2.1.1
 pennylane-sphinx-theme
 nbconvert
@@ -29,4 +30,5 @@ lxml_html_clean
 
 # Pre-install development lightning wheels
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning==0.36.0-dev40
+pennylane-lightning==0.36.0
+pennylane==0.36.0

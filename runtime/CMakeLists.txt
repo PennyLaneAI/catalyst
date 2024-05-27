@@ -58,8 +58,8 @@ function(fetch_pybind11)
         set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
 
         FetchContent_Declare(pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.10.1
+            GIT_REPOSITORY https://github.com/pybind/pybind11.git
+            GIT_TAG        v2.10.1
         )
 
         FetchContent_MakeAvailable(pybind11)
@@ -76,6 +76,7 @@ message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 
 set(devices_list)
+list(APPEND devices_list rtd_dummy)
 
 if(ENABLE_LIGHTNING OR ENABLE_LIGHTNING_KOKKOS)
     list(APPEND devices_list pennylane_lightning rtd_lightning)

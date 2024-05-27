@@ -21,9 +21,9 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
-from catalyst.qjit_device import QJITDevice, QJITDeviceNewAPI
+from catalyst.device import QJITDevice, validate_device_capabilities
+from catalyst.device.qjit_device import check_no_overlap
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime import check_no_overlap, validate_device_capabilities
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
@@ -38,7 +38,7 @@ from catalyst.utils.toml import (
 )
 
 
-class DummyDevice(qml.QubitDevice):
+class DeviceToBeTested(qml.QubitDevice):
     """Test device"""
 
     name = "Dummy Device"
@@ -91,12 +91,12 @@ def test_config_qjit_incompatible_device(schema):
         ),
     )
 
-    device = DummyDevice()
+    name = DeviceToBeTested.name
     with pytest.raises(
         CompileError,
-        match=f"Attempting to compile program for incompatible device '{device.name}'",
+        match=f"Attempting to compile program for incompatible device '{name}'",
     ):
-        validate_device_capabilities(device, device_capabilities)
+        validate_device_capabilities(DeviceToBeTested(), device_capabilities)
 
 
 def test_get_observables_schema1():

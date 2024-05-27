@@ -21,8 +21,11 @@ import jax
 import pennylane as qml
 
 from catalyst import cond, for_loop, measure, qjit, while_loop
-from catalyst.utils.runtime import pennylane_operation_set
-from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
+from catalyst.utils.toml import (
+    ProgramFeatures,
+    get_device_capabilities,
+    pennylane_operation_set,
+)
 
 
 def get_custom_device_without(num_wires, discards):

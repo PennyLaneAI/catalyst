@@ -27,9 +27,10 @@ import jax.numpy as jnp
 import pennylane as qml
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
+from malt.core import config as ag_config
 
 import catalyst
-from catalyst.autograph import run_autograph
+from catalyst.autograph import ag_primitives, run_autograph
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
@@ -96,7 +97,17 @@ class QJIT:
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
 
-        self.user_function = self.pre_compilation()
+        # Patch the conversion rules by adding the included modules before the block list
+        include_convertlist = tuple(
+            ag_config.Convert(rule) for rule in self.compile_options.autograph_include
+        )
+        self.patched_module_allowlist = include_convertlist + ag_primitives.module_allowlist
+
+        # Pre-compile with the patched conversion rules
+        with Patcher(
+            (ag_primitives, "module_allowlist", self.patched_module_allowlist),
+        ):
+            self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
@@ -128,7 +139,11 @@ class QJIT:
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "binary"):
-            self.jaxpr, self.out_treedef, self.c_sig = self.capture(self.user_sig or ())
+            # Capture with the patched conversion rules
+            with Patcher(
+                (ag_primitives, "module_allowlist", self.patched_module_allowlist),
+            ):
+                self.jaxpr, self.out_treedef, self.c_sig = self.capture(self.user_sig or ())
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()
@@ -166,7 +181,12 @@ class QJIT:
             if self.compiled_function and self.compiled_function.shared_object:
                 self.compiled_function.shared_object.close()
 
-            self.jaxpr, self.out_treedef, self.c_sig = self.capture(args)
+            # Capture with the patched conversion rules
+            with Patcher(
+                (ag_primitives, "module_allowlist", self.patched_module_allowlist),
+            ):
+                self.jaxpr, self.out_treedef, self.c_sig = self.capture(args)
+
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
 
@@ -303,6 +323,11 @@ class QJIT:
         if not hasattr(self.original_function, "__name__"):
             self.__name__ = "unknown"  # allow these cases anyways?
 
+        if not self.compile_options.autograph and len(self.compile_options.autograph_include) > 0:
+            raise CompileError(
+                "In order for 'autograph_include' to work, 'autograph' must be set to True"
+            )
+
     def _verify_static_argnums(self, args):
         for argnum in self.compile_options.static_argnums:
             if argnum < 0 or argnum >= len(args):
@@ -428,6 +453,7 @@ def qjit(
     fn=None,
     *,
     autograph=False,
+    autograph_include=(),
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
@@ -444,9 +470,9 @@ def qjit(
 
     .. note::
 
-        Currently, ``lightning.qubit`` is the only supported backend device
-        for Catalyst compilation. For a list of supported operations, observables,
-        and measurements, please see the :doc:`/dev/quick_start`.
+        The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
+        ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud``. For a list of supported
+        operations, observables, and measurements, please see the :doc:`/dev/quick_start`.
 
     Args:
         fn (Callable): the quantum or classical function
@@ -455,6 +481,7 @@ def qjit(
             ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
             available TensorFlow installation. For more details, see the
             :doc:`AutoGraph guide </dev/autograph>`.
+        autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
         target (str): the compilation target
@@ -580,6 +607,67 @@ def qjit(
         ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
         be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
         appearing as is.
+
+
+    .. details::
+        :title: Adding modules for Autograph conversion
+
+        Library code is not meant to be targeted by Autograph conversion, hence
+        ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
+        But sometimes it might make sense enabling specific submodules from the
+        excluded modules for which conversion may be appropriate. For these cases
+        one can use the ``autograph_include`` parameter, which provides a list
+        of modules/submodules that will always be enabled for conversion no matter
+        if the default conversion rules were excluding them before.
+
+        .. code-block:: python
+
+            import excluded_module
+
+            @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
+            def g(x: int):
+                return excluded_module.submodule.f(x)
+
+        Notice that ``autograph=True`` must be set in order to process the
+        ``autograph_include`` list. Otherwise an error will be reported.
+
+
+    .. details::
+        :title: In-place JAX array assignments with Autograph
+
+        To update array values when using JAX, the JAX syntax for array assignment
+        (which uses the array ``at`` and ``set`` methods) must be used:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result = result.at[i].set(x[i]* 2)
+
+            return result
+
+        However, if updating a single index of the array, Autograph supports conversion of
+        standard Python array assignment syntax:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result[i] = x[i] * 2
+
+            return result
+
+        Under the hood, Catalyst converts anything coming in the latter notation into the
+        former one.
+
 
     .. details::
         :title: Static arguments

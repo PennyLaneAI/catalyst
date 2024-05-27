@@ -909,3 +909,34 @@ TEMPLATE_LIST_TEST_CASE("Controlled gates", "[GateSet]", SimTypes)
     }
     __catalyst__rt__finalize();
 }
+
+TEMPLATE_LIST_TEST_CASE("IsingZZ Gate Test", "[GateSet]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> qubits;
+    qubits.reserve(n);
+
+    for (size_t i = 0; i < n; i++) {
+        qubits.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("Hadamard", {}, {qubits[0]}, false);
+    sim->NamedOperation("Hadamard", {}, {qubits[1]}, false);
+    sim->NamedOperation("IsingZZ", {M_PI_4}, {qubits[0], qubits[1]}, false);
+
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
+
+    CHECK(state.at(0).real() == Approx(0.4619397663).epsilon(1e-5));
+    CHECK(state.at(0).imag() == Approx(-0.1913417162).epsilon(1e-5));
+    CHECK(state.at(1).real() == Approx(0.4619397663).epsilon(1e-5));
+    CHECK(state.at(1).imag() == Approx(0.1913417162).epsilon(1e-5));
+    CHECK(state.at(2).real() == Approx(0.4619397663).epsilon(1e-5));
+    CHECK(state.at(2).imag() == Approx(0.1913417162).epsilon(1e-5));
+    CHECK(state.at(3).real() == Approx(0.4619397663).epsilon(1e-5));
+    CHECK(state.at(3).imag() == Approx(-0.1913417162).epsilon(1e-5));
+}
