@@ -21,8 +21,8 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
-from catalyst.device import QJITDevice, QJITDeviceNewAPI, validate_device_capabilities
-from catalyst.device.qjit_device import check_no_overlap
+from catalyst.device import QJITDevice, QJITDeviceNewAPI
+from catalyst.device.qjit_device import check_no_overlap, validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
     DeviceCapabilities,

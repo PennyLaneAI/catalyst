@@ -941,5 +941,22 @@ class TestTwoQJITsOneName:
         foo_2.workspace.cleanup()
 
 
+class TestQJITUsagePatterns:
+    """Test usage patterns of catalyst.qjit."""
+
+    def test_usage_patterns(self):
+        """Test two usage patterns of catalyst.qjit."""
+
+        def fn(x, y):
+            return x * y
+
+        res_pattern_fn_as_argument = qjit(fn, autograph=False)(5, 6)
+        res_pattern_partial = qjit(autograph=False)(fn)(5, 6)
+
+        expected = 30
+        assert res_pattern_fn_as_argument == expected
+        assert res_pattern_partial == expected
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

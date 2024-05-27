@@ -412,6 +412,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
             ctx=ctx,
             stopping_condition=ops_acceptance,
             max_expansion=max_expansion,
+            capabilities=self.qjit_capabilities,
         )
 
         if self.measurement_processes == {"Counts"}:

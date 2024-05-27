@@ -83,6 +83,12 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
+  measurement. For now the feature is equivalent to returning `m` directly from a quantum
+  function, but will be improved to return an array with one measurement result for each
+  shot in a shots-based execution mode.
+  [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
+
 * `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
   as active for the computation of gradients.
   [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
@@ -96,10 +102,13 @@
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
-* Refactored `vmap` decorator in order to follow a unified pattern that uses a callable
-  class that implements the decorator's logic. This prevents having to excessively define
-  functions in a nested fashion.
+* Refactored `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators in order to follow
+  a unified pattern that uses a callable class implementing the decorator's logic. This 
+  prevents having to excessively define functions in a nested fashion.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
+  [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
+  [(#762)](https://github.com/PennyLaneAI/catalyst/pull/762)
+  [(#763)](https://github.com/PennyLaneAI/catalyst/pull/763)
 
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)

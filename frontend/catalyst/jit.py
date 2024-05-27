@@ -59,6 +59,383 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 jax.config.update("jax_enable_x64", True)
 
 
+## API ##
+def qjit(
+    fn=None,
+    *,
+    autograph=False,
+    autograph_include=(),
+    async_qnodes=False,
+    target="binary",
+    keep_intermediate=False,
+    verbose=False,
+    logfile=None,
+    pipelines=None,
+    static_argnums=None,
+    abstracted_axes=None,
+):  # pylint: disable=too-many-arguments,unused-argument
+    """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
+
+    This decorator enables both just-in-time and ahead-of-time compilation,
+    depending on whether function argument type hints are provided.
+
+    .. note::
+
+        The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
+        ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud``. For a list of supported
+        operations, observables, and measurements, please see the :doc:`/dev/quick_start`.
+
+    Args:
+        fn (Callable): the quantum or classical function
+        autograph (bool): Experimental support for automatically converting Python control
+            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
+            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
+            available TensorFlow installation. For more details, see the
+            :doc:`AutoGraph guide </dev/autograph>`.
+        autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
+        async_qnodes (bool): Experimental support for automatically executing
+            QNodes asynchronously, if supported by the device runtime.
+        target (str): the compilation target
+        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
+            compilation. If ``True``, intermediate representations are available via the
+            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
+            different stages in the optimization process.
+        verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
+            printed out.
+        logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
+            ``sys.stderr``).
+        pipelines (Optional(List[Tuple[str,List[str]]])): A list of pipelines to be executed. The
+            elements of this list are named sequences of MLIR passes to be executed. A ``None``
+            value (the default) results in the execution of the default pipeline. This option is
+            considered to be used by advanced users for low-level debugging purposes.
+        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+            positions of static arguments.
+        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
+            An experimental option to specify dynamic tensor shapes.
+            This option affects the compilation of the annotated function.
+            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
+            with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
+            below.
+
+    Returns:
+        QJIT object.
+
+    Raises:
+        FileExistsError: Unable to create temporary directory
+        PermissionError: Problems creating temporary directory
+        OSError: Problems while creating folder for intermediate files
+        AutoGraphError: Raised if there was an issue converting the given the function(s).
+        ImportError: Raised if AutoGraph is turned on and TensorFlow could not be found.
+
+    **Example**
+
+    In just-in-time (JIT) mode, the compilation is triggered at the call site the
+    first time the quantum function is executed. For example, ``circuit`` is
+    compiled as early as the first call.
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(theta):
+            qml.Hadamard(wires=0)
+            qml.RX(theta, wires=1)
+            qml.CNOT(wires=[0,1])
+            return qml.expval(qml.PauliZ(wires=1))
+
+    >>> circuit(0.5)  # the first call, compilation occurs here
+    array(0.)
+    >>> circuit(0.5)  # the precompiled quantum function is called
+    array(0.)
+
+    Alternatively, if argument type hints are provided, compilation
+    can occur 'ahead of time' when the function is decorated.
+
+    .. code-block:: python
+
+        from jax.core import ShapedArray
+
+        @qjit  # compilation happens at definition
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
+            theta = jnp.abs(x)
+            qml.RY(theta, wires=0)
+            qml.Rot(z[0], z[1], z[2], wires=0)
+            return qml.state()
+
+    >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
+    array([0.75634905-0.52801002j, 0. +0.j,
+           0.35962678+0.14074839j, 0. +0.j])
+
+    For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
+
+    .. important::
+
+        Most decomposition logic will be equivalent to PennyLane's decomposition.
+        However, decomposition logic will differ in the following cases:
+
+        1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose
+            to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+
+        2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations will
+            decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+
+        3. The list of device-supported gates employed by Catalyst is currently different than that
+            of the ``lightning.qubit`` device, as defined by the
+            :class:`~.qjit_device.QJITDevice`.
+
+    .. details::
+        :title: AutoGraph and Python control flow
+
+        Catalyst also supports capturing imperative Python control flow in compiled programs. You
+        can enable this feature via the ``autograph=True`` parameter. Note that it does come with
+        some restrictions, in particular whenever global state is involved. Refer to the
+        :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
+        supported and unsupported use-cases.
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def circuit(x: int):
+
+                if x < 5:
+                    qml.Hadamard(wires=0)
+                else:
+                    qml.T(wires=0)
+
+                return qml.expval(qml.PauliZ(0))
+
+        >>> circuit(3)
+        array(0.)
+
+        >>> circuit(5)
+        array(1.)
+
+        Note that imperative control flow will still work in Catalyst even when the AutoGraph
+        feature is turned off, it just won't be captured in the compiled program and cannot involve
+        traced values. The example above would then raise a tracing error, as there is no value for
+        ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
+        be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
+        appearing as is.
+
+
+    .. details::
+        :title: Adding modules for Autograph conversion
+
+        Library code is not meant to be targeted by Autograph conversion, hence
+        ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
+        But sometimes it might make sense enabling specific submodules from the
+        excluded modules for which conversion may be appropriate. For these cases
+        one can use the ``autograph_include`` parameter, which provides a list
+        of modules/submodules that will always be enabled for conversion no matter
+        if the default conversion rules were excluding them before.
+
+        .. code-block:: python
+
+            import excluded_module
+
+            @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
+            def g(x: int):
+                return excluded_module.submodule.f(x)
+
+        Notice that ``autograph=True`` must be set in order to process the
+        ``autograph_include`` list. Otherwise an error will be reported.
+
+
+    .. details::
+        :title: In-place JAX array assignments with Autograph
+
+        To update array values when using JAX, the JAX syntax for array assignment
+        (which uses the array ``at`` and ``set`` methods) must be used:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result = result.at[i].set(x[i]* 2)
+
+            return result
+
+        However, if updating a single index of the array, Autograph supports conversion of
+        standard Python array assignment syntax:
+
+        .. code-block:: python
+
+            @qjit(autograph=True)
+            def f(x):
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result[i] = x[i] * 2
+
+            return result
+
+        Under the hood, Catalyst converts anything coming in the latter notation into the
+        former one.
+
+
+    .. details::
+        :title: Static arguments
+
+        ``static_argnums`` defines which elements should be treated as static. If it takes an
+        integer, it means the argument whose index is equal to the integer is static. If it takes
+        an iterable of integers, arguments whose index is contained in the iterable are static.
+        Changing static arguments will introduce re-compilation.
+
+        A valid static argument must be hashable and its ``__hash__`` method must be able to
+        reflect any changes of its attributes.
+
+        .. code-block:: python
+
+            @dataclass
+            class MyClass:
+                val: int
+
+                def __hash__(self):
+                    return hash(str(self))
+
+            @qjit(static_argnums=1)
+            def f(
+                x: int,
+                y: MyClass,
+            ):
+                return x + y.val
+
+            f(1, MyClass(5))
+            f(1, MyClass(6)) # re-compilation
+            f(2, MyClass(5)) # no re-compilation
+
+        In the example above, ``y`` is static. Note that the second function call triggers
+        re-compilation since the input object is different from the previous one. However,
+        the third function call direcly uses the previous compiled one and does not introduce
+        re-compilation.
+
+        .. code-block:: python
+
+            @dataclass
+            class MyClass:
+                val: int
+
+                def __hash__(self):
+                    return hash(str(self))
+
+            @qjit(static_argnums=(1, 2))
+            def f(
+                x: int,
+                y: MyClass,
+                z: MyClass,
+            ):
+                return x + y.val + z.val
+
+            my_obj_1 = MyClass(5)
+            my_obj_2 = MyClass(6)
+            f(1, my_obj_1, my_obj_2)
+            my_obj_1.val = 7
+            f(1, my_obj_1, my_obj_2) # re-compilation
+
+        In the example above, ``y`` and ``z`` are static. The second function should make
+        function ``f`` be re-compiled because ``my_obj_1`` is changed. This requires that
+        the mutation is properly reflected in the hash value.
+
+        Note that even when ``static_argnums`` is used in conjunction with type hinting,
+        ahead-of-time compilation will not be possible since the static argument values
+        are not yet available. Instead, compilation will be just-in-time.
+
+
+    .. details::
+        :title: Dynamically-shaped arrays
+
+        There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
+        dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
+
+        .. code-block:: python
+
+            abstracted_axes=((), ('n',), ('m', 'n'))
+
+        Each tuple in the sequence corresponds to one of the arguments in the annotated
+        function. Empty tuples can
+        be used and correspond to parameters with statically known shapes.
+        Non-empty tuples correspond to parameters with dynamically known shapes.
+
+        In this example above,
+
+        - the first argument will have a statically known shape,
+
+        - the second argument has its zeroth axis have dynamic
+          shape ``n``, and
+
+        - the third argument will have its zeroth axis with dynamic shape
+          ``m`` and first axis with dynamic shape ``n``.
+
+        Passing a dictionary:
+
+        .. code-block:: python
+
+            abstracted_axes={0: 'n'}
+
+        This approach allows a concise expression of the relationships
+        between axes for different function arguments. In this example,
+        it specifies that for all function arguments, the zeroth axis will
+        have dynamic shape ``n``.
+
+        Passing a sequence of dictionaries:
+
+        .. code-block:: python
+
+            abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
+
+        The example here is a more verbose version of the tuple example. This convention
+        allows axes to be omitted from the list of abstracted axes.
+
+        Using ``abstracted_axes`` can help avoid the cost of recompilation.
+        By using ``abstracted_axes``, a more general version of the compiled function will be
+        generated. This more general version is parametrized over the abstracted axes and
+        allows results to be computed over tensors independently of their axes lengths.
+
+        For example:
+
+        .. code-block:: python
+
+            @qjit
+            def sum(arr):
+                return jnp.sum(arr)
+
+            sum(jnp.array([1]))     # Compilation happens here.
+            sum(jnp.array([1, 1]))  # And here!
+
+        The ``sum`` function would recompile each time an array of different size is passed
+        as an argument.
+
+        .. code-block:: python
+
+            @qjit(abstracted_axes={0: "n"})
+            def sum_abstracted(arr):
+                return jnp.sum(arr)
+
+            sum(jnp.array([1]))     # Compilation happens here.
+            sum(jnp.array([1, 1]))  # No need to recompile.
+
+        the ``sum_abstracted`` function would only compile once and its definition would be
+        reused for subsequent function calls.
+    """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(qjit, **kwargs)
+
+    return QJIT(fn, CompileOptions(**kwargs))
+
+
+## IMPL ##
+
+
 # pylint: disable=too-many-instance-attributes
 class QJIT:
     """Class representing a just-in-time compiled hybrid quantum-classical function.
@@ -447,376 +824,3 @@ class JAX_QJIT:
 
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
-
-
-def qjit(
-    fn=None,
-    *,
-    autograph=False,
-    autograph_include=(),
-    async_qnodes=False,
-    target="binary",
-    keep_intermediate=False,
-    verbose=False,
-    logfile=None,
-    pipelines=None,
-    static_argnums=None,
-    abstracted_axes=None,
-):  # pylint: disable=too-many-arguments,unused-argument
-    """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
-
-    This decorator enables both just-in-time and ahead-of-time compilation,
-    depending on whether function argument type hints are provided.
-
-    .. note::
-
-        The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
-        ``braket.local.qubit``, ``braket.aws.qubit``, and ``oqc.cloud``. For a list of supported
-        operations, observables, and measurements, please see the :doc:`/dev/quick_start`.
-
-    Args:
-        fn (Callable): the quantum or classical function
-        autograph (bool): Experimental support for automatically converting Python control
-            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
-            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
-            available TensorFlow installation. For more details, see the
-            :doc:`AutoGraph guide </dev/autograph>`.
-        autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
-        async_qnodes (bool): Experimental support for automatically executing
-            QNodes asynchronously, if supported by the device runtime.
-        target (str): the compilation target
-        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
-            compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
-            different stages in the optimization process.
-        verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
-            printed out.
-        logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
-            ``sys.stderr``).
-        pipelines (Optional(List[Tuple[str,List[str]]])): A list of pipelines to be executed. The
-            elements of this list are named sequences of MLIR passes to be executed. A ``None``
-            value (the default) results in the execution of the default pipeline. This option is
-            considered to be used by advanced users for low-level debugging purposes.
-        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
-            positions of static arguments.
-        abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
-            An experimental option to specify dynamic tensor shapes.
-            This option affects the compilation of the annotated function.
-            Function arguments with ``abstracted_axes`` specified will be compiled to ranked tensors
-            with dynamic shapes. For more details, please see the Dynamically-shaped Arrays section
-            below.
-
-    Returns:
-        QJIT object.
-
-    Raises:
-        FileExistsError: Unable to create temporary directory
-        PermissionError: Problems creating temporary directory
-        OSError: Problems while creating folder for intermediate files
-        AutoGraphError: Raised if there was an issue converting the given the function(s).
-        ImportError: Raised if AutoGraph is turned on and TensorFlow could not be found.
-
-    **Example**
-
-    In just-in-time (JIT) mode, the compilation is triggered at the call site the
-    first time the quantum function is executed. For example, ``circuit`` is
-    compiled as early as the first call.
-
-    .. code-block:: python
-
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit(theta):
-            qml.Hadamard(wires=0)
-            qml.RX(theta, wires=1)
-            qml.CNOT(wires=[0,1])
-            return qml.expval(qml.PauliZ(wires=1))
-
-    >>> circuit(0.5)  # the first call, compilation occurs here
-    array(0.)
-    >>> circuit(0.5)  # the precompiled quantum function is called
-    array(0.)
-
-    Alternatively, if argument type hints are provided, compilation
-    can occur 'ahead of time' when the function is decorated.
-
-    .. code-block:: python
-
-        from jax.core import ShapedArray
-
-        @qjit  # compilation happens at definition
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
-            theta = jnp.abs(x)
-            qml.RY(theta, wires=0)
-            qml.Rot(z[0], z[1], z[2], wires=0)
-            return qml.state()
-
-    >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
-    array([0.75634905-0.52801002j, 0. +0.j,
-           0.35962678+0.14074839j, 0. +0.j])
-
-    For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
-
-    .. important::
-
-        Most decomposition logic will be equivalent to PennyLane's decomposition.
-        However, decomposition logic will differ in the following cases:
-
-        1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose
-            to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-
-        2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations will
-            decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
-
-        3. The list of device-supported gates employed by Catalyst is currently different than that
-            of the ``lightning.qubit`` device, as defined by the
-            :class:`~.qjit_device.QJITDevice`.
-
-    .. details::
-        :title: AutoGraph and Python control flow
-
-        Catalyst also supports capturing imperative Python control flow in compiled programs. You
-        can enable this feature via the ``autograph=True`` parameter. Note that it does come with
-        some restrictions, in particular whenever global state is involved. Refer to the
-        :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
-        supported and unsupported use-cases.
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
-            def circuit(x: int):
-
-                if x < 5:
-                    qml.Hadamard(wires=0)
-                else:
-                    qml.T(wires=0)
-
-                return qml.expval(qml.PauliZ(0))
-
-        >>> circuit(3)
-        array(0.)
-
-        >>> circuit(5)
-        array(1.)
-
-        Note that imperative control flow will still work in Catalyst even when the AutoGraph
-        feature is turned off, it just won't be captured in the compiled program and cannot involve
-        traced values. The example above would then raise a tracing error, as there is no value for
-        ``x`` yet than can be compared in the if statement. A loop like ``for i in range(5)`` would
-        be unrolled during tracing, "copy-pasting" the body 5 times into the program rather than
-        appearing as is.
-
-
-    .. details::
-        :title: Adding modules for Autograph conversion
-
-        Library code is not meant to be targeted by Autograph conversion, hence
-        ``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
-        But sometimes it might make sense enabling specific submodules from the
-        excluded modules for which conversion may be appropriate. For these cases
-        one can use the ``autograph_include`` parameter, which provides a list
-        of modules/submodules that will always be enabled for conversion no matter
-        if the default conversion rules were excluding them before.
-
-        .. code-block:: python
-
-            import excluded_module
-
-            @qjit(autograph=True, autograph_include=["excluded_module.submodule"])
-            def g(x: int):
-                return excluded_module.submodule.f(x)
-
-        Notice that ``autograph=True`` must be set in order to process the
-        ``autograph_include`` list. Otherwise an error will be reported.
-
-
-    .. details::
-        :title: In-place JAX array assignments with Autograph
-
-        To update array values when using JAX, the JAX syntax for array assignment
-        (which uses the array ``at`` and ``set`` methods) must be used:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result = result.at[i].set(x[i]* 2)
-
-            return result
-
-        However, if updating a single index of the array, Autograph supports conversion of
-        standard Python array assignment syntax:
-
-        .. code-block:: python
-
-            @qjit(autograph=True)
-            def f(x):
-            first_dim = x.shape[0]
-            result = jnp.empty((first_dim,), dtype=x.dtype)
-
-            for i in range(first_dim):
-                result[i] = x[i] * 2
-
-            return result
-
-        Under the hood, Catalyst converts anything coming in the latter notation into the
-        former one.
-
-
-    .. details::
-        :title: Static arguments
-
-        ``static_argnums`` defines which elements should be treated as static. If it takes an
-        integer, it means the argument whose index is equal to the integer is static. If it takes
-        an iterable of integers, arguments whose index is contained in the iterable are static.
-        Changing static arguments will introduce re-compilation.
-
-        A valid static argument must be hashable and its ``__hash__`` method must be able to
-        reflect any changes of its attributes.
-
-        .. code-block:: python
-
-            @dataclass
-            class MyClass:
-                val: int
-
-                def __hash__(self):
-                    return hash(str(self))
-
-            @qjit(static_argnums=1)
-            def f(
-                x: int,
-                y: MyClass,
-            ):
-                return x + y.val
-
-            f(1, MyClass(5))
-            f(1, MyClass(6)) # re-compilation
-            f(2, MyClass(5)) # no re-compilation
-
-        In the example above, ``y`` is static. Note that the second function call triggers
-        re-compilation since the input object is different from the previous one. However,
-        the third function call direcly uses the previous compiled one and does not introduce
-        re-compilation.
-
-        .. code-block:: python
-
-            @dataclass
-            class MyClass:
-                val: int
-
-                def __hash__(self):
-                    return hash(str(self))
-
-            @qjit(static_argnums=(1, 2))
-            def f(
-                x: int,
-                y: MyClass,
-                z: MyClass,
-            ):
-                return x + y.val + z.val
-
-            my_obj_1 = MyClass(5)
-            my_obj_2 = MyClass(6)
-            f(1, my_obj_1, my_obj_2)
-            my_obj_1.val = 7
-            f(1, my_obj_1, my_obj_2) # re-compilation
-
-        In the example above, ``y`` and ``z`` are static. The second function should make
-        function ``f`` be re-compiled because ``my_obj_1`` is changed. This requires that
-        the mutation is properly reflected in the hash value.
-
-        Note that even when ``static_argnums`` is used in conjunction with type hinting,
-        ahead-of-time compilation will not be possible since the static argument values
-        are not yet available. Instead, compilation will be just-in-time.
-
-
-    .. details::
-        :title: Dynamically-shaped arrays
-
-        There are three ways to use ``abstracted_axes``; by passing a sequence of tuples, a
-        dictionary, or a sequence of dictionaries. Passing a sequence of tuples:
-
-        .. code-block:: python
-
-            abstracted_axes=((), ('n',), ('m', 'n'))
-
-        Each tuple in the sequence corresponds to one of the arguments in the annotated
-        function. Empty tuples can
-        be used and correspond to parameters with statically known shapes.
-        Non-empty tuples correspond to parameters with dynamically known shapes.
-
-        In this example above,
-
-        - the first argument will have a statically known shape,
-
-        - the second argument has its zeroth axis have dynamic
-          shape ``n``, and
-
-        - the third argument will have its zeroth axis with dynamic shape
-          ``m`` and first axis with dynamic shape ``n``.
-
-        Passing a dictionary:
-
-        .. code-block:: python
-
-            abstracted_axes={0: 'n'}
-
-        This approach allows a concise expression of the relationships
-        between axes for different function arguments. In this example,
-        it specifies that for all function arguments, the zeroth axis will
-        have dynamic shape ``n``.
-
-        Passing a sequence of dictionaries:
-
-        .. code-block:: python
-
-            abstracted_axes=({}, {0: 'n'}, {1: 'm', 0: 'n'})
-
-        The example here is a more verbose version of the tuple example. This convention
-        allows axes to be omitted from the list of abstracted axes.
-
-        Using ``abstracted_axes`` can help avoid the cost of recompilation.
-        By using ``abstracted_axes``, a more general version of the compiled function will be
-        generated. This more general version is parametrized over the abstracted axes and
-        allows results to be computed over tensors independently of their axes lengths.
-
-        For example:
-
-        .. code-block:: python
-
-            @qjit
-            def sum(arr):
-                return jnp.sum(arr)
-
-            sum(jnp.array([1]))     # Compilation happens here.
-            sum(jnp.array([1, 1]))  # And here!
-
-        The ``sum`` function would recompile each time an array of different size is passed
-        as an argument.
-
-        .. code-block:: python
-
-            @qjit(abstracted_axes={0: "n"})
-            def sum_abstracted(arr):
-                return jnp.sum(arr)
-
-            sum(jnp.array([1]))     # Compilation happens here.
-            sum(jnp.array([1, 1]))  # No need to recompile.
-
-        the ``sum_abstracted`` function would only compile once and its definition would be
-        reused for subsequent function calls.
-    """
-    kwargs = copy.copy(locals())
-    kwargs.pop("fn")
-
-    if fn is None:
-        return functools.partial(qjit, **kwargs)
-
-    return QJIT(fn, CompileOptions(**kwargs))

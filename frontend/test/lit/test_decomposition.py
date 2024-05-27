@@ -15,24 +15,30 @@
 # RUN: %PYTHON %s | FileCheck %s
 # pylint: disable=line-too-long
 
+import platform
 from copy import deepcopy
 
 import jax
 import pennylane as qml
 
 from catalyst import cond, for_loop, measure, qjit, while_loop
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import ProgramFeatures, pennylane_operation_set
+from catalyst.utils.toml import (
+    OperationProperties,
+    ProgramFeatures,
+    get_device_capabilities,
+    pennylane_operation_set,
+)
 
 
-def get_custom_device_without(num_wires, discards):
+def get_custom_device_without(num_wires, discards=frozenset(), force_matrix=frozenset()):
     """Generate a custom device without gates in discards."""
 
-    class CustomDevice(qml.QubitDevice):
+    class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
         name = "Custom Device"
-        short_name = "lightning.qubit"
         pennylane_requires = "0.35.0"
         version = "0.0.2"
         author = "Tester"
@@ -52,12 +58,13 @@ def get_custom_device_without(num_wires, discards):
             )
             custom_capabilities = deepcopy(lightning_capabilities)
             for gate in discards:
-                if gate in custom_capabilities.native_ops:
-                    custom_capabilities.native_ops.pop(gate)
-                if gate in custom_capabilities.to_decomp_ops:
-                    custom_capabilities.to_decomp_ops.pop(gate)
-                if gate in custom_capabilities.to_matrix_ops:
-                    custom_capabilities.to_matrix_ops.pop(gate)
+                custom_capabilities.native_ops.pop(gate, None)
+                custom_capabilities.to_decomp_ops.pop(gate, None)
+                custom_capabilities.to_matrix_ops.pop(gate, None)
+            for gate in force_matrix:
+                custom_capabilities.native_ops.pop(gate, None)
+                custom_capabilities.to_decomp_ops.pop(gate, None)
+                custom_capabilities.to_matrix_ops[gate] = OperationProperties(False, False, False)
             self.qjit_capabilities = custom_capabilities
 
         def apply(self, operations, **kwargs):
@@ -78,12 +85,27 @@ def get_custom_device_without(num_wires, discards):
             """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_dummy" + system_extension
+            )
+            return "dummy.remote", lib_path
+
+        def execute(self, circuits, execution_config):
+            """Execution."""
+            return circuits, execution_config
+
     return CustomDevice(wires=num_wires)
 
 
 def test_decompose_multicontrolledx():
     """Test decomposition of MultiControlledX."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
+    dev = get_custom_device_without(5, discards={"MultiControlledX"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -104,7 +126,7 @@ test_decompose_multicontrolledx()
 
 def test_decompose_multicontrolledx_in_conditional():
     """Test decomposition of MultiControlledX in conditional."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
+    dev = get_custom_device_without(5, discards={"MultiControlledX"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -130,7 +152,7 @@ test_decompose_multicontrolledx_in_conditional()
 
 def test_decompose_multicontrolledx_in_while_loop():
     """Test decomposition of MultiControlledX in while loop."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
+    dev = get_custom_device_without(5, discards={"MultiControlledX"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -157,7 +179,7 @@ test_decompose_multicontrolledx_in_while_loop()
 
 def test_decompose_multicontrolledx_in_for_loop():
     """Test decomposition of MultiControlledX in for loop."""
-    dev = get_custom_device_without(5, {"MultiControlledX"})
+    dev = get_custom_device_without(5, discards={"MultiControlledX"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -183,7 +205,7 @@ test_decompose_multicontrolledx_in_for_loop()
 
 def test_decompose_rot():
     """Test decomposition of Rot gate."""
-    dev = get_custom_device_without(1, {"Rot", "C(Rot)"})
+    dev = get_custom_device_without(1, discards={"Rot", "C(Rot)"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -213,7 +235,7 @@ test_decompose_rot()
 
 def test_decompose_s():
     """Test decomposition of S gate."""
-    dev = get_custom_device_without(1, {"S", "C(S)"})
+    dev = get_custom_device_without(1, discards={"S", "C(S)"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -235,7 +257,7 @@ test_decompose_s()
 
 def test_decompose_qubitunitary():
     """Test decomposition of QubitUnitary"""
-    dev = get_custom_device_without(1, {"QubitUnitary"})
+    dev = get_custom_device_without(1, discards={"QubitUnitary"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -257,7 +279,7 @@ test_decompose_qubitunitary()
 
 def test_decompose_singleexcitationplus():
     """Test decomposition of single excitation plus."""
-    dev = get_custom_device_without(2, {"SingleExcitationPlus", "C(SingleExcitationPlus)"})
+    dev = get_custom_device_without(2, discards={"SingleExcitationPlus", "C(SingleExcitationPlus)"})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -301,3 +323,25 @@ def test_decompose_singleexcitationplus():
 
 
 test_decompose_singleexcitationplus()
+
+
+def test_decompose_to_matrix():
+    """Test decomposition of QubitUnitary"""
+    dev = get_custom_device_without(1, force_matrix={"PauliY"})
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_decompose_to_matrix
+    def decompose_to_matrix():
+        # CHECK: quantum.custom "PauliX"
+        qml.PauliX(wires=0)
+        # CHECK: quantum.unitary
+        qml.PauliY(wires=0)
+        # CHECK: quantum.custom "PauliZ"
+        qml.PauliZ(wires=0)
+        return measure(wires=0)
+
+    print(decompose_to_matrix.mlir)
+
+
+test_decompose_to_matrix()

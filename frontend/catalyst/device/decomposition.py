@@ -17,6 +17,8 @@ This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
 
+from functools import partial
+
 import jax
 import pennylane as qml
 from pennylane import transform
@@ -37,15 +39,16 @@ from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.toml import DeviceCapabilities
 
 
-def catalyst_decomposer(op):
+def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
     returns the default decomposition, unless the operator should decompose to a QubitUnitary.
     Raises a CompileError for MidMeasureMP"""
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-    if op.name in {"MultiControlledX", "BlockEncode"} or isinstance(op, qml.ops.Controlled):
+    if capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled):
         return _decompose_to_matrix(op)
     return op.decomposition()
 
@@ -55,7 +58,7 @@ def catalyst_decompose(
     tape: qml.tape.QuantumTape,
     ctx,
     stopping_condition,
-    decomposer=catalyst_decomposer,
+    capabilities,
     max_expansion=None,
 ):
     """Decompose operations until the stopping condition is met.
@@ -76,7 +79,7 @@ def catalyst_decompose(
         tape,
         stopping_condition,
         skip_initial_state_prep=False,
-        decomposer=decomposer,
+        decomposer=partial(catalyst_decomposer, capabilities=capabilities),
         max_expansion=max_expansion,
         name="catalyst on this device",
         error=CompileError,
@@ -85,7 +88,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, stopping_condition, decomposer, max_expansion)
+            op = _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -103,7 +106,7 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, stopping_condition, decomposer, max_expansion):
+def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
@@ -114,7 +117,7 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, decomposer, max_expansi
                     region.quantum_tape,
                     ctx=ctx,
                     stopping_condition=stopping_condition,
-                    decomposer=decomposer,
+                    capabilities=capabilities,
                     max_expansion=max_expansion,
                 )
                 new_tape = tapes[0]
