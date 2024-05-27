@@ -21,10 +21,10 @@ import jax.numpy as jnp
 import pennylane as qml
 
 from catalyst import qjit
+from catalyst.device import get_device_capabilities
 from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
-    get_device_capabilities,
     pennylane_operation_set,
 )
 
