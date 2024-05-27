@@ -1,0 +1,418 @@
+name: Build Catalyst Wheel on Linux (arm64)
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: 14.0
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check_if_wheel_build_required:
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
+  constants:
+    needs: [check_if_wheel_build_required]
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+
+  build-dependencies:
+    needs: [constants, check_if_wheel_build_required]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: [3.9]
+        python_sub_version: [19]
+        python_container_path: ["/usr/bin/python3"]
+        numpy_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/numpy/core/include"]
+        container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
+        container_name: ["manylinux_2_28_aarch64"]
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
+
+    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+
+    continue-on-error: true
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
+
+    - name: Setup Colima VM
+      run: |
+        set -x
+        colima stop
+        colima start --cpu 4 --memory 16
+
+    # Cache external project sources
+    - name: Cache LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v4
+      with:
+        path:  mlir/llvm-project
+        key: ${{ runner.os }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        enableCrossOsArchive: True
+
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        enableCrossOsArchive: True
+        
+    - name: Cache Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v4
+      with:
+        path:  mlir/Enzyme
+        key: ${{ runner.os }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        enableCrossOsArchive: True
+
+    - name: Clone LLVM Submodule
+      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ needs.constants.outputs.llvm_version }}
+        path: mlir/llvm-project
+
+    - name: Clone MHLO Submodule
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ needs.constants.outputs.mhlo_version }}
+        path: mlir/mlir-hlo
+
+    - name: Clone Enzyme Submodule
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
+    # Cache external project builds
+    - name: Cache LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v4
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+
+    - name: Cache MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache@v4
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+
+    - name: Cache Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v4
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+
+    - name: Build LLVM / MLIR
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        set -x
+        docker run --platform linux/aarch64 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v `pwd`:/catalyst \
+            -i ${{ matrix.container_img }} \
+            bash -c "   set -x && \
+                        cd /catalyst && \
+                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
+                        dnf update -y && \
+                        dnf install -y libzstd-devel gcc-toolset-12 && \
+                        dnf clean all -y && \
+                        source /opt/rh/gcc-toolset-12/enable -y && \
+                        export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
+                        export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
+                        rm -rf ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        export PYTHON=${{ matrix.python_container_path }} && \
+                        export PATH=/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
+                        cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_TARGETS_TO_BUILD=\"host\" -DLLVM_ENABLE_PROJECTS=\"mlir\" -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INSTALL_UTILS=ON -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=FORCE_ON -DLLVM_ENABLE_LLD=OFF -DMLIR_ENABLE_BINDINGS_PYTHON=ON -DPython3_EXECUTABLE=${{ matrix.python_container_path }} -DPython3_NumPy_INCLUDE_DIRS=${{ matrix.numpy_include_path }} -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
+                        LIT_FILTER_OUT=\"Bytecode\" cmake --build /catalyst/llvm-build --target check-mlir;"
+
+    - name: Build MHLO Dialect
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
+      run: |
+        set -x
+        docker run --platform linux/aarch64 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v `pwd`:/catalyst \
+            -i ${{ matrix.container_img }} \
+            bash -c "   set -x && \
+                        cd /catalyst && \
+                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
+                        dnf update -y && \
+                        dnf install -y libzstd-devel gcc-toolset-12 && \
+                        dnf clean all -y && \
+                        source /opt/rh/gcc-toolset-12/enable -y && \
+                        export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
+                        export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
+                        rm -rf ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        export PYTHON=${{ matrix.python_container_path }} && \
+                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
+                        sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mlir-hlo/deallocation/transforms/CMakeLists.txt && \
+                        cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir -DPython3_EXECUTABLE=${{ matrix.python_container_path }} -DLLVM_ENABLE_LLD=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=FORCE_ON -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
+                        cmake --build /catalyst/mhlo-build --target check-mlir-hlo;"                        
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      run: |
+        set -x
+        docker run --platform linux/aarch64 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v `pwd`:/catalyst \
+            -i ${{ matrix.container_img }} \
+            bash -c "   set -x && \
+                        cd /catalyst && \
+                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
+                        dnf update -y && \
+                        dnf install -y libzstd-devel gcc-toolset-12 && \
+                        dnf clean all -y && \
+                        source /opt/rh/gcc-toolset-12/enable -y && \
+                        export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
+                        export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
+                        rm -rf ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        export PYTHON=${{ matrix.python_container_path }} && \
+                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
+                        cmake -S /catalyst/mlir/Enzyme/enzyme -B /catalyst/enzyme-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm -DENZYME_STATIC_LIB=ON -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
+                        cmake --build /catalyst/enzyme-build --target EnzymeStatic-18;"
+
+  catalyst-linux-wheels-arm64:
+    needs: [constants, build-dependencies]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: [3.9]
+        python_sub_version: [19]
+        python_container_path: ["/usr/bin/python3"]
+        numpy_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/numpy/core/include"]
+        pybind_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/pybind11/share/cmake/pybind11"]
+        python_include_path: ["/opt/_internal/cpython-3.9.19/include/python3.9"]
+        python_library_path: ["/opt/_internal/cpython-3.9.19/lib"]
+        container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
+        container_name: ["manylinux_2_28_aarch64"]
+
+    name: Build Wheels (Python ${{ matrix.python_version }})
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
+    
+    continue-on-error: true
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
+
+    - name: Setup Colima VM
+      run: |
+        set -x
+        colima stop
+        colima start --cpu 4 --memory 16
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/llvm-project
+        key: ${{ runner.os }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v4
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache@v4
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/Enzyme
+        key: ${{ runner.os }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-source
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v4
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        fail-on-cache-miss: True
+
+    # Build Catalyst Wheel
+    - name: Build Catalyst Wheel
+      run: |
+        set -x
+        docker run --platform linux/aarch64 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v `pwd`:/catalyst \
+            -i ${{ matrix.container_img }} \
+            bash -c "   set -x && \
+                        cd /catalyst && \
+                        git config --global --add safe.directory '*' && \
+                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
+                        dnf update -y && \
+                        dnf install -y libzstd-devel gcc-toolset-13 python39-devel.aarch64 && \
+                        dnf clean all -y && \
+                        source /opt/rh/gcc-toolset-13/enable -y && \
+                        export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
+                        export CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++ && \
+                        rm -rf ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        export PYTHON=${{ matrix.python_container_path }} && \
+                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1' && \
+                        cmake -S runtime -B runtime-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib -DCMAKE_CXX_STANDARD_LIBRARIES=\"-lpython3.9\" -DPYTHON_EXECUTABLE=${{ matrix.python_container_path }} -DPYTHON_INCLUDE_DIR=${{ matrix.python_include_path }} -DPYTHON_LIBRARY=${{ matrix.python_library_path }} -Dpybind11_DIR=${{ matrix.pybind_include_path }} -DENABLE_LIGHTNING_KOKKOS=ON -DLIGHTNING_GIT_TAG=latest_release -DENABLE_LAPACK=OFF -DKokkos_ENABLE_SERIAL=ON -DKokkos_ENABLE_OPENMP=ON -DKokkos_ENABLE_COMPLEX_ALIGN=OFF -DENABLE_WARNINGS=OFF -DENABLE_OPENQASM=ON -DENABLE_OPENMP=OFF -DLQ_ENABLE_KERNEL_OMP=OFF && \
+                        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy && \
+                        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm && \
+                        echo \"target_link_directories(rtd_oqc PRIVATE /catalyst/runtime-build/utils/runtime-build/lib)\" >> frontend/catalyst/third_party/oqc/src/CMakeLists.txt && \
+                        export OQC_BUILD_DIR=\"/catalyst/oqc-build\" && \
+                        export RT_BUILD_DIR=\"/catalyst/runtime-build\" && \
+                        make oqc && \
+                        cmake -S mlir -B quantum-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON -DPython3_EXECUTABLE=${{ matrix.python_container_path }} -DPython3_NumPy_INCLUDE_DIRS=${{ matrix.numpy_include_path }} -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir -DMHLO_DIR=/catalyst/mhlo-build/lib/cmake/mlir-hlo -DMHLO_BINARY_DIR=/catalyst/mhlo-build/bin -DEnzyme_DIR=/catalyst/enzyme-build -DENZYME_SRC_DIR=/catalyst/mlir/Enzyme -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=FORCE_ON -DLLVM_ENABLE_LLD=OFF -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm && \
+                        cmake --build quantum-build --target check-dialects compiler_driver && \
+                        cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib && \
+                        cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-39-aarch64-linux-gnu.so /catalyst/runtime-build/lib && \
+                        cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/ && \
+                        export LLVM_BUILD_DIR=/catalyst/llvm-build && \
+                        export MHLO_BUILD_DIR=/catalyst/mhlo-build && \
+                        export DIALECTS_BUILD_DIR=/catalyst/quantum-build && \
+                        export RT_BUILD_DIR=/catalyst/runtime-build && \
+                        export OQC_BUILD_DIR=/catalyst/oqc-build && \
+                        export ENZYME_BUILD_DIR=/catalyst/enzyme-build && \
+                        make wheel && \
+                        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so;"
+
+    - name: Upload Wheel Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version }}.zip
+        path: wheel/
+        retention-days: 14
+
+  test-wheels:
+    needs: [constants, catalyst-linux-wheels-arm64]
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: [3.9]
+        python_sub_version: [19]
+        python_container_path: ["/usr/bin/python3"]
+        container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
+
+    # To check all wheels for supported python3 versions
+    name: Test Wheels (Python ${{ matrix.python_version }}) on Xanadu M2 Mac
+    runs-on:
+      group: 'Office 24th floor M2 Mac'
+    
+    continue-on-error: true
+    
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Setup Runner Environment
+      id: setup_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      with:
+        python_version: ${{ matrix.python_version }}
+    
+    - name: Setup Colima VM
+      run: |
+        set -x
+        colima stop
+        colima start --cpu 4 --memory 16
+
+    - name: Download Wheel Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: catalyst-linux_arm64-wheel-py-${{ matrix.python_version }}.zip
+        path: dist
+    
+    - name: Run Python Pytest Tests
+      run: |
+        set -x
+        docker run --platform linux/aarch64 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v `pwd`:/catalyst \
+            -i ${{ matrix.container_img }} \
+            bash -c "   set -x && \
+                        cd /catalyst && \
+                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
+                        dnf update -y && \
+                        dnf install -y libzstd-devel gcc-toolset-13 && \
+                        dnf clean all -y && \
+                        source /opt/rh/gcc-toolset-13/enable -y && \
+                        export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
+                        export CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++ && \
+                        rm -rf ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        export PYTHON=${{ matrix.python_container_path }} && \
+                        export PATH=/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja pytest pytest-xdist 'autoray<0.6.10' oqc-qcaas-client PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1' && \
+                        ${{ matrix.python_container_path }} -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple && \
+                        ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest -n auto && \
+                        ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest --backend="lightning.kokkos" -n auto && \
+                        ${{ matrix.python_container_path }} -m pytest /catalyst/frontend/test/async_tests && \
+                        ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest --runbraket=LOCAL -n auto && \
+                        ${{ matrix.python_container_path }} -m pytest /catalyst/frontend/test/test_oqc/oqc -n auto;"
