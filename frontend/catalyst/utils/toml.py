@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Set
 import pennylane as qml
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.paths import get_lib_path
+from catalyst.utils.runtime_environment import get_lib_path
 
 # TODO:
 # Once Python version 3.11 is the oldest supported Python version, we can remove tomlkit

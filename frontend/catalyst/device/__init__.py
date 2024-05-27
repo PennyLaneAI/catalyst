@@ -21,6 +21,14 @@ from catalyst.device.qjit_device import (
     QJITDevice,
     QJITDeviceNewAPI,
     extract_backend_info,
+    validate_device_capabilities,
 )
 
-__all__ = ("QJITDevice", "QJITDeviceNewAPI", "BackendInfo", "extract_backend_info")
+__all__ = (
+    "QJITDevice",
+    "QJITDeviceNewAPI",
+    "BackendInfo",
+    "extract_backend_info",
+    "validate_device_capabilities",
+)
+

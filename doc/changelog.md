@@ -83,6 +83,10 @@
 
 <h3>Improvements</h3>
 
+* `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
+  as active for the computation of gradients.
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
+
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
   simulator supports this gate.
@@ -91,6 +95,14 @@
 * Can now compile functions that have been annotated with return type
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
+
+* Refactored `vmap` decorator in order to follow a unified pattern that uses a callable
+  class that implements the decorator's logic. This prevents having to excessively define
+  functions in a nested fashion.
+  [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
+
+* Catalyst tests now manipulate device capabilities rather than text configurations files.
+  [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
 
 <h3>Breaking changes</h3>
 
@@ -109,6 +121,9 @@
   [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)    
 
 <h3>Internal changes</h3>
+
+* Add support to use a locally cloned PennyLane Lightning repository with the runtime.
+  [(#732)](https://github.com/PennyLaneAI/catalyst/pull/732)
 
 * The `qjit_device.py` and `preprocessing.py` modules have been refactored into the sub-package
   `catalyst.device`.
@@ -160,15 +175,42 @@
         (array([0.5, 0. , 0.5, 0. ]),)
   ```
 
+* Callback refactoring. This refactoring creates the classes `FlatCallable`
+  and `MemrefCallable`.
+  [(#742)](https://github.com/PennyLaneAI/catalyst/pull/742)
+
+  The `FlatCallable` class is a `Callable` that is
+  initialized by providing some parameters and kwparameters that match the
+  the expected shapes that will be received at the callsite. Instead of taking
+  shaped `*args` and `**kwargs`, it receives flattened arguments. The flattened
+  arguments are unflattened with the shapes with which the function was
+  initialized. The `FlatCallable` return values will allways be flattened
+  before returning to the caller.
+
+  The `MemrefCallable` is a subclass of `FlatCallable`. It takes a result type
+  parameter during initialization that corresponds to the expected return type.
+  This class is expected to be called only from the Catalyst runtime. It
+  expects all arguments to be `void*` to memrefs. These `void*` are casted
+  to MemrefStructDescriptors using ctypes, numpy arrays, and finally jax
+  arrays. These flat jax arrays are then sent to the `FlatCallable`.
+  `MemrefCallable` is again expected to be called only from within the Catalyst
+  runtime. And the return values match those expected by Catalyst runtime.
+
+  This separation allows for a better separation of concerns, provides a nicer
+  interface and allows for multiple `MemrefCallable` to be defined for a single
+  callback, which is necessary for custom gradient of `pure_callbacks`.
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
-Mehrdad Malekmohammadi,
 Erick Ochoa,
+Haochen Paul Wang,
+Lee James O'Riordan,
+Mehrdad Malekmohammadi,
 Raul Torres,
-Haochen Paul Wang.
+Sergei Mironov.
 
 # Release 0.6.0
 

@@ -14,12 +14,36 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
-FetchContent_Declare(
-    pennylane_lightning
-    GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-    GIT_TAG      ${LIGHTNING_GIT_TAG}
-)
+if(LIGHTNING_SRC_PATH)
+    if(NOT IS_ABSOLUTE ${LIGHTNING_SRC_PATH})
+        message(FATAL_ERROR " LIGHTNING_SRC_PATH=${LIGHTNING_SRC_PATH} must be set to an absolute path")
+    endif()
+    if(LIGHTNING_GIT_TAG)
+        message(WARN " Setting `LIGHTNING_SRC_PATH=${LIGHTNING_SRC_PATH}` overrides `LIGHTNING_GIT_TAG=${LIGHTNING_GIT_TAG}`")
+    endif()
+
+    FetchContent_Declare(
+        pennylane_lightning
+        URL file://${LIGHTNING_SRC_PATH}
+    )
+
+    # Acquire local git hash and use for LIGHTNING_GIT_TAG
+    execute_process(COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY ${LIGHTNING_SRC_PATH}
+        OUTPUT_VARIABLE LIGHTNING_GIT_TAG
+    )
+    message(INFO " Building against Lightning commit ${LIGHTNING_GIT_TAG}")
+
+else()
+    if(NOT LIGHTNING_GIT_TAG)
+        set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
+    endif()
+    FetchContent_Declare(
+        pennylane_lightning
+        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
+        GIT_TAG      ${LIGHTNING_GIT_TAG}
+    )
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 
 if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
@@ -43,12 +67,11 @@ if(ENABLE_LIGHTNING)
 endif()
 if(ENABLE_LIGHTNING_KOKKOS)
     list(APPEND src_files
-    lightning_kokkos/LightningKokkosSimulator.cpp
+        lightning_kokkos/LightningKokkosSimulator.cpp
     )
 endif()
 
 add_library(rtd_lightning SHARED ${src_files})
-
 add_dependencies(rtd_lightning pennylane_lightning)
 
 target_include_directories(rtd_lightning PRIVATE .
