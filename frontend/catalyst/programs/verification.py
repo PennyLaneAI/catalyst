@@ -72,7 +72,7 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     if any(isinstance(m, VarianceMP) for m in tape.measurements):
         raise DifferentiableCompileError("Variance returns are forbidden in gradients")
 
-    return [tape], lambda x: x[0]
+    return (tape,), lambda x: x[0]
 
 
 @transform
@@ -152,7 +152,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     _verify_nested(tape, (False, False), _op_checker)
 
-    return [tape], lambda x: x[0]
+    return (tape,), lambda x: x[0]
 
 
 @transform
@@ -174,7 +174,7 @@ def validate_observables_parameter_shift(tape: QuantumTape):
     for obs in tape.observables:
         _obs_checker(obs)
 
-    return [tape], lambda x: x[0]
+    return (tape,), lambda x: x[0]
 
 
 @transform
@@ -199,4 +199,4 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     for obs in tape.observables:
         _obs_checker(obs)
 
-    return [tape], lambda x: x[0]
+    return (tape,), lambda x: x[0]

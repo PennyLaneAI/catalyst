@@ -27,7 +27,7 @@ from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformContainer, TransformProgram
+from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.jax_extras import (

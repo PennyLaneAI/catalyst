@@ -39,6 +39,7 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
 )
 
+
 def get_custom_device(
     non_differentiable_gates=frozenset(),
     non_differentiable_obs=frozenset(),
@@ -99,22 +100,23 @@ def get_custom_device(
             """Return PennyLane observables"""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
-        def supports_derivatives(self, config, circuit=None):  #pylint: disable=unused-argument
+        def supports_derivatives(self, config, circuit=None):  # pylint: disable=unused-argument
             """Pretend we support any derivatives"""
             return True
 
     return CustomDevice(**kwargs)
 
+
 @qml.transform
-def null_transform(tape, *args, **kwargs):  
+def null_transform(tape, *args, **kwargs):
     """A null transform that passes on the tape and the null post processing function.
-    Used to overwrite transforms in the device preprocess with mocker when we want to 
+    Used to overwrite transforms in the device preprocess with mocker when we want to
     skip them for testing purproses"""
 
     return (tape,), lambda x: x[0]
 
 
-@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+@patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
     """Test that the verification catches situations where a HybridOp subtape contains
     an operation the given device can't support inside that HybridOp"""
@@ -190,7 +192,7 @@ class TestHybridOpVerification:
                 return qml.expval(qml.PauliX(0))
 
 
-@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+@patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestAdjointMethodVerification:
     """Test the verification of operators and observables when the adjoint diff method
     is used for differentiation"""
@@ -269,7 +271,6 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
 
-
 class PauliX2(qml.PauliX):
     """Test operation without the analytic gradient"""
 
@@ -277,7 +278,7 @@ class PauliX2(qml.PauliX):
     grad_method = "F"
 
 
-@patch('catalyst.device.qjit_device.catalyst_decompose', null_transform)
+@patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestParameterShiftMethodVerification:
     """Test the verification of operators and observables when the parameter shift method
     is used for differentiation"""
