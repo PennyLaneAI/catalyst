@@ -31,4 +31,3 @@ __all__ = (
     "extract_backend_info",
     "validate_device_capabilities",
 )
-
