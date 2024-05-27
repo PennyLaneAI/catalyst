@@ -25,7 +25,7 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.operation import Observable, Operation
-from pennylane.ops import Controlled
+from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 from catalyst.tracing.contexts import EvaluationContext
@@ -69,6 +69,11 @@ def _verify_nested(
 
 
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
+
+
+def lowering_natively_controlled(op) -> bool:
+    """Are we going to lower this operation as a natively-controlled op for some device"""
+    return op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}
 
 
 def verify_no_state_variance_returns(tape: QuantumTape) -> None:
@@ -142,15 +147,23 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
                     f"'{qjit_device.original_device.name}' device"
                 )
 
-    def _ctrl_op_checker(op, in_control):
-        if in_control:
+    def _ctrl_op_checker(op, in_qctrl, in_controllable):
+        if not (in_qctrl or in_controllable):
+            # PennyLane has many flavors of controlled operations. Here we check if the operation is
+            # supported as a self-contained native operation for a device.
+            if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
+                if not qjit_device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES):
+                    return _ctrl_op_checker(op.base, in_qctrl, in_controllable=True)
+        else:
+            # Otherwise we check that the operation is supported and is marked as
+            # 'controllable'.
             if not qjit_device.qjit_capabilities.native_ops.get(
                 op.name, EMPTY_PROPERTIES
             ).controllable:
                 raise CompileError(
                     f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
                 )
-        return True if isinstance(op, QCtrl) else in_control
+        return True if isinstance(op, QCtrl) else in_qctrl
 
     def _inv_op_checker(op, in_inverse):
         if in_inverse:
@@ -166,7 +179,7 @@ def verify_program(tape: QuantumTape, grad_method, qjit_device):
     def _op_checker(op, state):
         in_inverse, in_control = state
         in_inverse = _inv_op_checker(op, in_inverse)
-        # in_control = _ctrl_op_checker(op, in_control)
+        in_control = _ctrl_op_checker(op, in_control, False)
         if grad_method is not None:
             _mcm_op_checker(op)
             if grad_method == "adjoint":
