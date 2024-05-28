@@ -84,8 +84,6 @@ class QFunc:
                 device_capabilities, self.device.shots, self.device.wires, backend_info
             )
 
-        self.qjit_device = device
-
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
                 self.func, qjit_device, args, kwargs, qnode=self

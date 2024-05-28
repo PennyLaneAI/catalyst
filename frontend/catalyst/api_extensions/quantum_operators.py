@@ -390,14 +390,7 @@ def ctrl(
 class MidCircuitMeasure(HybridOp):
     """Operation representing a mid-circuit measurement."""
 
-
     binder = qmeasure_p.bind
-
-    def __init__(self, *args, **kwargs):
-        self.postselect = kwargs.pop("postselect", None)
-        self.reset = kwargs.pop("reset", False)
-        super().__init__(*args, **kwargs)
-        
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self

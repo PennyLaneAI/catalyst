@@ -14,17 +14,15 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-from jax.core import find_top_trace
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QNode, QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess, Shots
+from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
@@ -85,16 +83,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
-
-from pennylane.measurements import (
-    CountsMP,
-    ExpectationMP,
-    MeasurementValue,
-    MidMeasureMP,
-    ProbabilityMP,
-    SampleMP,
-    VarianceMP,
-)
 
 
 class Function:
@@ -194,17 +182,14 @@ def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
 
     return [retrace_with_result_types(jaxpr, promoted_types) for jaxpr in jaxprs]
 
-def default_binder(prim, *args, **kwargs):
-    return prim.bind(*args, **kwargs)
 
 class QRegPromise:
     """QReg adaptor tracing the qubit extractions and insertions. The adaptor works by postponing
     the insertions in order to re-use qubits later thus skipping the extractions."""
 
-    def __init__(self, qreg: DynamicJaxprTracer, binder=default_binder):
+    def __init__(self, qreg: DynamicJaxprTracer):
         self.base: DynamicJaxprTracer = qreg
         self.cache: Dict[Any, DynamicJaxprTracer] = {}
-        self.binder = binder
 
     def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
         """Extract qubits from the wrapped quantum register or get the already extracted qubits
@@ -226,7 +211,7 @@ class QRegPromise:
                 if not allow_reuse:
                     qrp.cache[w] = None
             else:
-                qubits.append(self.binder(qextract_p, qrp.base, w))
+                qubits.append(qextract_p.bind(qrp.base, w))
         return qubits
 
     def insert(self, wires, qubits) -> None:
@@ -245,7 +230,7 @@ class QRegPromise:
         qreg = qrp.base
         for w, qubit in qrp.cache.items():
             if qubit is not None:
-                qreg = self.binder(qinsert_p, qreg, w, qubit)
+                qreg = qinsert_p.bind(qreg, w, qubit)
         qrp.cache = {}
         qrp.base = qreg
         return qreg
@@ -488,7 +473,7 @@ def trace_quantum_tape(
 
 
 def trace_observables(
-    obs: Operation, qrp: QRegPromise, m_wires: int, binder
+    obs: Operation, qrp: QRegPromise, m_wires: int
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
@@ -505,31 +490,31 @@ def trace_observables(
     qubits = None
     if obs is None:
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = binder(compbasis_p, *qubits)
+        obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = binder(namedobs_p, qubits[0], kind=type(obs).__name__)
+        obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
     elif isinstance(obs, qml.Hermitian):
         # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = binder(hermitian_p, jax.numpy.asarray(*obs.parameters), *qubits)
+        obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
-        nested_obs = [trace_observables(o, qrp, m_wires, binder)[0] for o in obs.obs]
-        obs_tracers = binder(tensorobs_p, *nested_obs)
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.obs]
+        obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
-        nested_obs = [trace_observables(o, qrp, m_wires, binder)[0] for o in obs.ops]
-        obs_tracers = binder(hamiltonian_p, jax.numpy.asarray(obs.coeffs), *nested_obs)
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.coeffs), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Prod):
-        nested_obs = [trace_observables(o, qrp, m_wires, binder)[0] for o in obs]
-        obs_tracers = binder(tensorobs_p, *nested_obs)
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
+        obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
-        nested_obs = [trace_observables(o, qrp, m_wires, binder)[0] for o in obs]
-        obs_tracers = binder(hamiltonian_p, jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
+        nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
+        obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.SProd):
         terms = obs.terms()
         coeffs = jax.numpy.array(terms[0])
-        nested_obs = trace_observables(terms[1][0], qrp, m_wires, binder)[0]
-        obs_tracers = binder(hamiltonian_p, coeffs, nested_obs)
+        nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
+        obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
     else:
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
@@ -593,7 +578,6 @@ def trace_quantum_measurements(
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
     tape: QuantumTape,
-    binder: Callable = default_binder
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurement. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -622,8 +606,7 @@ def trace_quantum_measurements(
             else:
                 m_wires = o.wires if o.wires else range(len(device.wires))
 
-            # FIXME: do something with it
-            obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires, binder)
+            obs_tracers, nqubits = trace_observables(o.obs, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
@@ -637,16 +620,16 @@ def trace_quantum_measurements(
                         result = jnp.astype(result, jnp.int64)
                     out_classical_tracers.append(result)
             elif o.return_type.value == "expval":
-                out_classical_tracers.append(binder(expval_p, obs_tracers, shots=shots))
+                out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
-                out_classical_tracers.append(binder(var_p, obs_tracers, shots=shots))
+                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
                 shape = (2**nqubits,)
-                out_classical_tracers.append(binder(probs_p, obs_tracers, shape=shape))
+                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
                 shape = (2**nqubits,) if using_compbasis else (2,)
-                results = binder(counts_p, obs_tracers, shots=shots, shape=shape)
+                results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
                 if using_compbasis:
                     results = (jnp.asarray(results[0], jnp.int64), results[1])
                 out_classical_tracers.extend(results)
@@ -664,7 +647,7 @@ def trace_quantum_measurements(
             elif o.return_type.value == "state":
                 assert using_compbasis
                 shape = (2**nqubits,)
-                out_classical_tracers.append(binder(state_p, obs_tracers, shape=shape))
+                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(
                     f"Measurement {o.return_type.value} is not impemented"
@@ -676,32 +659,6 @@ def trace_quantum_measurements(
             out_classical_tracers.append(o)
 
     return out_classical_tracers, out_tree
-
-
-def trace_quantum_measurements_for_oneshot(
-    device: QubitDevice,
-    outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
-    out_tree: PyTreeDef,
-    tape: QuantumTape,
-):
-    trace = find_top_trace(outputs)
-
-    def _fake_binder(prim, *args, **kwargs):
-        avals = [(a.aval if isinstance(a, DynamicJaxprTracer) else a) for a in args]
-        avals2 = prim.abstract_eval(*avals, **kwargs)[0]
-        return (
-            [DynamicJaxprTracer(trace, aval=a) for a in avals2]
-            if isinstance(avals2, list) else DynamicJaxprTracer(trace, aval=avals2)
-        )
-
-    qrp = QRegPromise( DynamicJaxprTracer(trace, aval=AbstractQreg()) , binder=_fake_binder)
-    return trace_quantum_measurements(
-        device,
-        qrp,
-        outputs,
-        out_tree,
-        tape,
-        binder=_fake_binder)
 
 
 def is_transform_valid_for_batch_transforms(tape, flat_results):
@@ -846,81 +803,6 @@ def reset_qubit(qreg_in, w):
     qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
 
     return qreg_out
-
-
-def is_mcm(operation):
-    """Returns True if the operation is a mid-circuit measurement and False otherwise."""
-    mcm = isinstance(operation, MidMeasureMP)
-    return mcm or "MidCircuitMeasure" in str(type(operation))
-
-def is_leaf(obj):
-    return isinstance(obj, qml.measurements.MeasurementProcess)
-
-def dynamic_one_shot(f):
-    assert isinstance(f, QNode)
-    qnode = f
-
-    def _f(*args, **kwargs):
-        old_flag = getattr(qnode, "needs_dynamic_one_shot", False)
-        old_func = qnode.func
-        old_shots = qnode.device._shots
-        try:
-            # TODO: Move to the top-level and solve circular dependency
-            from catalyst import for_loop
-            from pennylane.transforms.dynamic_one_shot import init_auxiliary_tape, parse_native_mid_circuit_measurements
-
-
-            def _f2(*args2, **kwargs2):
-
-                # 1. Trace `old_func` once to access `tape`, pre-trace it and deduce `tape_info`.
-                tape = QuantumTape(shots=qnode.device.shots)
-                with QueuingManager.stop_recording(), tape:
-                    _ = old_func(*args2, **kwargs2)
-                with QueuingManager.stop_recording():
-                    tape2 = init_auxiliary_tape(tape)
-                outputs = tape2.measurements
-                trees = jax.tree_util.tree_flatten(outputs, is_leaf=is_leaf)[1]
-                print('tape.meas', tape.measurements)
-                print('tape2.meas', tape2.measurements)
-                tape_info = trace_quantum_measurements_for_oneshot(
-                    qnode.device, outputs, trees, tape2
-                )
-                print("tape_info", tape_info)
-
-                @for_loop(0, old_shots.total_shots, 1)
-                def loop(i, s):
-                    tape = QuantumTape(shots=qnode.device.shots)
-                    with QueuingManager.stop_recording(), tape:
-                        _ = old_func(*args2, **kwargs2)
-                    with QueuingManager.stop_recording():
-                        tape2 = init_auxiliary_tape(tape)
-                    QueuingManager.remove_active_queue()
-                    QueuingManager.add_active_queue(tape2)
-                    mcm_sample = tape2.measurements[-1]
-                    assert isinstance(mcm_sample, SampleMP)
-                    s = s.at[i].set(mcm_sample.mv)
-                    return s
-
-                # 2. Use `tape_info` to initialize the storage correctly. Trace `old_func`
-                # again, this time for real, inside a loop.
-                storage = jnp.zeros(old_shots.total_shots) # TODO: Use `tape_info` here
-                storage = loop(storage)
-                aggregated = parse_native_mid_circuit_measurements(tape, [tape2], storage)
-                return aggregated
-
-            setattr(qnode, "needs_dynamic_one_shot", True)
-            qnode.func = _f2
-            qnode.device._shots = Shots([1] * old_shots.total_shots)
-
-            result = qnode(*args, **kwargs)
-
-        finally:
-            setattr(qnode, "needs_dynamic_one_shot", old_flag)
-            qnode.func = old_func
-            qnode.device._shots = old_shots
-        return result
-
-    return _f
 
 
 def trace_quantum_function(
