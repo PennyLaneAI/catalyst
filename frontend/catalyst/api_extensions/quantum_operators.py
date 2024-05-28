@@ -339,11 +339,11 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    return QCtrlCallable(op, control, control_values, work_wires)
+    return QCtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
 
 
 class QCtrlCallable:
-    """Callable wrapper to produce a HybridControlled instance."""
+    """Callable wrapper to produce a ctrl instance."""
 
     def __init__(self, op, control, control_values, work_wires):
         self.op = op
@@ -353,7 +353,7 @@ class QCtrlCallable:
 
         if isinstance(op, Operator):
             # Support initialized operation
-            self.op = lambda: QueuingManager.append(op)
+            self.op = lambda: QueuingManager.append(op) or op
             self.single_op = True
         else:
             # Support callables or uninitialized operations

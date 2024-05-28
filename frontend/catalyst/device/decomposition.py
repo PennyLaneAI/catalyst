@@ -17,6 +17,8 @@ This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
 
+import copy
+
 from functools import partial
 
 import jax
@@ -127,7 +129,8 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
             )
         )
 
-    new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    new_op = copy.copy(op)
+    new_op.regions = new_regions
     return new_op
 
 
