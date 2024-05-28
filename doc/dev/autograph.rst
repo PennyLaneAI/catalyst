@@ -948,8 +948,8 @@ Notice that ``autograph=True`` must be set in order to process the
 ``autograph_include`` list, otherwise an error will be reported.
 
 
-In-place JAX array assignments
-------------------------------
+In-place JAX array updates
+--------------------------
 
 To update array values when using JAX, the `JAX syntax for array assignment
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#array-updates-x-at-idx-set-y>`__
@@ -985,5 +985,35 @@ of standard Python array assignment syntax:
 >>> y = jnp.zeros([11])
 >>> f(x, y)
 Array([25.,  2.,  0.,  2.75,  0.,  3.5,  0.,  4.25,  0., 5.,  0.], dtype=float64)
+
+Under the hood, Catalyst converts anything coming in the latter notation into the former one.
+
+Similarly, to update array values with an operation when using JAX, the JAX syntax for array
+update (which uses the array `at` and the `add`, `multiply`, etc. methods) must be used:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.copy(x)
+...
+...     for i in range(first_dim):
+...         result = result.at[i].multiply(2)
+...
+...     return result
+
+Again, if updating a single index of the array, Autograph supports conversion of
+standard Python array operator assignment syntax for the equivalent in-place expressions
+listed in the `JAX documentation for jax.numpy.ndarray.at
+<https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html#jax.numpy.ndarray.at>`__:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.copy(x)
+...
+...     for i in range(first_dim):
+...         result[i] *= 2
+...
+...     return result
 
 Under the hood, Catalyst converts anything coming in the latter notation into the former one.

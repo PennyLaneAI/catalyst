@@ -113,6 +113,28 @@
 
   Available MLIR passes are now documented and available within the
   [catalyst.passes module documentation](https://docs.pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes).
+  * Support for usage of single index JAX array operator update
+    inside Autograph annotated functions.
+    [(#769)](https://github.com/PennyLaneAI/catalyst/pull/769)
+
+    Using operator assignment syntax in favor of at...operation expressions is now possible for the following operations:
+    * `x[i] += y` in favor of `x.at[i].add(y)`
+    * `x[i] -= y` in favor of `x.at[i].add(-y)`
+    * `x[i] *= y` in favor of `x.at[i].multiply(y)`
+    * `x[i] /= y` in favor of `x.at[i].divide(y)`
+    * `x[i] **= y` in favor of `x.at[i].power(y)`
+
+    ```py
+    @qjit(autograph=True)
+    def f(x):
+      first_dim = x.shape[0]
+      result = jnp.copy(x)
+
+      for i in range(first_dim):
+        result[i] *= 2  # This is now supported
+
+      return result
+    ```
 
 <h3>Improvements</h3>
 
