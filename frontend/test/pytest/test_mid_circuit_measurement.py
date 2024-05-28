@@ -15,8 +15,8 @@
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-
-from catalyst import CompileError, measure, qjit
+from catalyst import CompileError, dynamic_one_shot, measure, qjit
+from conftest import validate_measurements
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -209,6 +209,59 @@ class TestMidCircuitMeasurement:
 
         assert circuit(0.0) == [0] * 10
         assert circuit(jnp.pi) == [1] * 10
+
+    def test_return_mcm_with_sample_single(self, backend):
+        """Test that a measurement result can be returned with qml.sample and shots."""
+
+        dev = qml.device(backend, wires=1, shots=10)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m)
+
+        assert jnp.allclose(circuit(0.0), 0)
+        assert jnp.allclose(circuit(jnp.pi), 1)
+
+    @pytest.mark.parametrize("shots", [3000, [3000, 3001]])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
+    @pytest.mark.parametrize("reset", [False, True])
+    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
+    def test_single_mcm_single_measure_mcm(self, backend, shots, postselect, reset, measure_f):
+        """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement and a
+        conditional gate. A single measurement of the mid-circuit measurement value is performed at
+        the end."""
+
+        dq = qml.device("default.qubit", shots=shots)
+
+        @qml.defer_measurements
+        @qml.qnode(dq)
+        def ref_func(x, y):
+            qml.RX(x, wires=0)
+            m0 = qml.measure(0, reset=reset, postselect=postselect)
+            qml.cond(m0, qml.RY)(y, wires=1)
+            return measure_f(op=m0)
+
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, wires=0)
+            m0 = measure(0, reset=reset, postselect=postselect)
+            # qml.cond(m0, qml.RY)(y, wires=1)
+            return measure_f(op=m0)
+
+        params = jnp.pi / 4 * jnp.ones(2)
+        results0 = ref_func(*params)
+        results1 = func(*params)
+
+        validate_measurements(measure_f, shots, results1, results0)
 
 
 if __name__ == "__main__":

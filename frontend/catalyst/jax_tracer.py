@@ -18,17 +18,10 @@ from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+import catalyst
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operation, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
-from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
-
-import catalyst
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -83,6 +76,12 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
+from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane.measurements import MeasurementProcess
+from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.tape import QuantumTape
+from pennylane.transforms.core import TransformProgram
 
 
 class Function:
@@ -946,7 +945,13 @@ def is_mcm(operation):
     return mcm or "MidCircuitMeasure" in str(type(operation))
 
 
-from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    ProbabilityMP,
+    SampleMP,
+    VarianceMP,
+)
 from pennylane.transforms.dynamic_one_shot import (
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,
@@ -1052,6 +1057,8 @@ def dynamic_one_shot(qnode):
             return single_shot_qnode(*args, **kwargs)
 
         results = vmap(wrap_single_shot_qnode)(arg_vmap)
+        if not isinstance(results[0], tuple):
+            results = (results,)
         results = tuple(zip(*results[0]))
         return post_process(shots, results)
 
