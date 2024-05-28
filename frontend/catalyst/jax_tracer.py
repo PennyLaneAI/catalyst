@@ -78,12 +78,6 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
-from catalyst.programs.verification import (
-    validate_observables_adjoint_diff,
-    validate_observables_parameter_shift,
-    verify_no_state_variance_returns,
-    verify_operations,
-)
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -925,19 +919,6 @@ def trace_quantum_function(
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
                 verification_program = TransformProgram()
-                grad_method = config.gradient_method
-                verification_program.add_transform(
-                    verify_operations, grad_method=grad_method, qjit_device=device
-                )
-                if grad_method is not None:
-                    verification_program.add_transform(verify_no_state_variance_returns)
-                if grad_method == "adjoint":
-                    verification_program.add_transform(
-                        validate_observables_adjoint_diff, qjit_device=device
-                    )
-                elif grad_method == "parameter-shift":
-                    verification_program.add_transform(validate_observables_parameter_shift)
-
             else:
                 device_program = TransformProgram()
                 verification_program = TransformProgram()
