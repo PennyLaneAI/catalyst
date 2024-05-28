@@ -160,13 +160,13 @@ def validate_observables_parameter_shift(tape: QuantumTape):
     """Validate that the observables on the tape support parameter shift"""
 
     def _obs_checker(obs):
+        print(obs)
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
-        else:
-            if obs.grad_method not in {"A", None}:
-                raise DifferentiableCompileError(
-                    f"{obs.name} does not support analytic differentiation"
-                )
+        elif obs and obs.grad_method not in {"A", None}:
+            raise DifferentiableCompileError(
+                f"{obs.name} does not support analytic differentiation"
+            )
 
     for obs in tape.observables:
         _obs_checker(obs)
@@ -181,7 +181,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
-        else:
+        elif obs:
             if not qjit_device.qjit_capabilities.native_obs.get(
                 obs.name, EMPTY_PROPERTIES
             ).differentiable:
