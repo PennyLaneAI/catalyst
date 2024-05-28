@@ -450,7 +450,11 @@ class QJIT:
         compile_options (CompileOptions): compilation options to use
 
     :ivar original_function: This attribute stores `fn`, the quantum or classical function
-                             to compile, as is, without any modifications
+                             object to compile, as is, without any modifications
+    :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string. 
+    :ivar mlir: This attribute stores the MLIR compiled from the function as a string. 
+    :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string. 
+    
     """
 
     def __init__(self, fn, compile_options):
