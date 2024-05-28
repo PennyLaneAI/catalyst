@@ -21,6 +21,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+from pennylane.ops import Controlled
+
 from catalyst import (
     CompileError,
     DifferentiableCompileError,
@@ -180,7 +182,7 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_non_controllable_gate_simple(self):
+    def test_non_controllable_gate_simple_qctrl(self):
         """Emulate a device with a non-controllable gate applied inside a QCtrl."""
 
         with pytest.raises(CompileError, match="PauliZ.*not controllable"):
@@ -189,6 +191,18 @@ class TestHybridOpVerification:
             @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
             def f(x: float):
                 ctrl(qml.PauliZ(wires=0), control=[1, 2])
+                return qml.expval(qml.PauliX(0))
+
+    def test_non_controllable_gate_simple_pennylane_ctrl(self):
+        """Test that a Controlled PennyLane op that is not natively supported by the device
+        and has a non-controllable base raises an error"""
+
+        with pytest.raises(CompileError, match="PauliZ.*not controllable"):
+
+            @qjit
+            @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
+            def f(x: float):
+                Controlled(qml.PauliZ(wires=0), control_wires=[1, 2])
                 return qml.expval(qml.PauliX(0))
 
 
@@ -229,6 +243,19 @@ class TestAdjointMethodVerification:
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
+
+    def test_empty_observable(self):
+        """Test that taking the adjoint diff of a circuit with an empyt observable with adjoint
+        adjoint passes the validation."""
+
+        @qml.qnode(
+            get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
+        )
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.probs()
+
+        qml.qjit(f)(1.2)
 
     def test_non_differentiable_gate_nested_cond(self):
         """Test that taking the adjoint diff of a tape containing a parameterized operation
