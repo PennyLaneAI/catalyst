@@ -160,7 +160,6 @@ def validate_observables_parameter_shift(tape: QuantumTape):
     """Validate that the observables on the tape support parameter shift"""
 
     def _obs_checker(obs):
-        print(obs)
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
         elif obs and obs.grad_method not in {"A", None}:
