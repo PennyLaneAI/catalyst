@@ -214,7 +214,8 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
     def test_non_differentiable_observable(self):
-        """Emulate a device with a non-differentiable gate."""
+        """Test that taking the adjoint diff of a circuit with an observable that doesn't support
+        adjoint differentiation raises an error."""
 
         @qml.qnode(
             get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
@@ -230,7 +231,8 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
     def test_non_differentiable_gate_nested_cond(self):
-        """Emulate a device with a non-differentiable gate."""
+        """Test that taking the adjoint diff of a tape containing a parameterized operation 
+        that doesn't support adjoint differentiation raises an error."""
 
         @qml.qnode(
             get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
@@ -255,7 +257,9 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
     def test_non_differentiable_gate_nested_adjoint(self):
-        """Emulate a device with a non-differentiable gate."""
+        """Test that taking the adjoint diff of a tape containing a HybridOp with a 
+        parameterized operation that doesn't support adjoint differentiation raises 
+        an error."""
 
         @qml.qnode(
             get_custom_device(non_differentiable_gates={"RX"}, wires=1), diff_method="adjoint"
@@ -284,7 +288,8 @@ class TestParameterShiftMethodVerification:
     is used for differentiation"""
 
     def test_paramshift_obs_simple(self):
-        """Emulate a device with a non-invertible observable."""
+        """Test that taking a parameter-shift gradient of an observable that doesn't support
+        analytic differentiation raises an error."""
 
         assert qml.Hermitian.grad_method != "A"
 
@@ -306,7 +311,8 @@ class TestParameterShiftMethodVerification:
                 return grad(f)(x)
 
     def test_paramshift_gate_simple(self):
-        """Emulate a device with a non-invertible gate."""
+        """Test that taking a parameter-shift gradient of a tape containing a parameterized operation 
+        that doesn't support analytic differentiation raises an error."""
 
         @qml.qnode(
             get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift"
@@ -324,7 +330,9 @@ class TestParameterShiftMethodVerification:
                 return grad(f)(x)
 
     def test_paramshift_gate_while(self):
-        """Emulate a device with a non-invertible gate."""
+        """Test that taking a parameter-shift gradient of a tape containing a WhileLoop HybridOp
+        containing a parameterized operation that doesn't support analytic differentiation raises 
+        an error."""
 
         @qml.qnode(
             get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift"
