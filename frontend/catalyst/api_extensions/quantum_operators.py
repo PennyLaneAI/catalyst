@@ -339,7 +339,13 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    return QCtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
+    res = QCtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
+
+    if isinstance(op, Operator):
+        # Instantiate the ctrl op to keep the consistency with `qml.ctrl`
+        res = res()
+
+    return res
 
 
 class QCtrlCallable:
