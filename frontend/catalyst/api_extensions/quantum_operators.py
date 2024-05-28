@@ -26,7 +26,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Operator, Operation, Wires
+from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import ControlledOp, create_controlled_op
 from pennylane.tape import QuantumTape
 
@@ -341,6 +341,7 @@ def ctrl(
 
     return QCtrlCallable(op, control, control_values, work_wires)
 
+
 class QCtrlCallable:
     """Callable wrapper to produce a HybridControlled instance."""
 
@@ -366,9 +367,20 @@ class QCtrlCallable:
         if self.single_op:
             with QueuingManager.stop_recording():
                 base_op = self.op(*args, **kwargs)
-            return QCtrl(base_op,  tracing_artifacts=tracing_artifacts, control_wires=self.control, control_values=self.control_values, work_wires=self.work_wires)
+            return QCtrl(
+                base_op,
+                tracing_artifacts=tracing_artifacts,
+                control_wires=self.control,
+                control_values=self.control_values,
+                work_wires=self.work_wires,
+            )
 
-        return HybridControlled(*tracing_artifacts, control_wires=self.control, control_values=self.control_values, work_wires=self.work_wires)
+        return HybridControlled(
+            *tracing_artifacts,
+            control_wires=self.control,
+            control_values=self.control_values,
+            work_wires=self.work_wires,
+        )
 
     def trace_body(self, *args, **kwargs):
         """Generate a HybridOpRegion for `catalyst.ctrl` to be used by Catalyst."""
@@ -393,6 +405,7 @@ class QCtrlCallable:
             eval_ctx.__exit__(None, None, None)
 
         return in_classical_tracers, out_classical_tracers, [ctrl_region]
+
 
 ## IMPL ##
 class MidCircuitMeasure(HybridOp):
@@ -451,7 +464,15 @@ class Adjoint(HybridOp):
 class HybridControlled(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions, control_wires=None, control_values=None, work_wires=None):
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions,
+        control_wires=None,
+        control_values=None,
+        work_wires=None,
+    ):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions = regions
@@ -468,7 +489,9 @@ class HybridControlled(HybridOp):
             self._control_values = control_values
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        raise NotImplementedError("HybridControlled does not support JAX quantum tracing")  # pragma: no cover
+        raise NotImplementedError(
+            "HybridControlled does not support JAX quantum tracing"
+        )  # pragma: no cover
 
     def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
@@ -521,13 +544,29 @@ class HybridControlled(HybridOp):
         self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
         return self
 
+
 class QCtrl(ControlledOp, HybridControlled):
     """This class inherits `qml.ops.op_math.controlled.ControlledOp` to provide identical support as PL for calculating the control of single operations.
     It is also derived from `HybridControlled` to maintain the Catalyst support for `HybridOp`."""
 
-    def __init__(self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None):
-        ControlledOp.__init__(self, base=base, control_wires=control_wires, control_values=control_values, work_wires=work_wires)
-        HybridControlled.__init__(self, *tracing_artifacts, control_wires=control_wires, control_values=control_values, work_wires=work_wires)
+    def __init__(
+        self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
+    ):
+        ControlledOp.__init__(
+            self,
+            base=base,
+            control_wires=control_wires,
+            control_values=control_values,
+            work_wires=work_wires,
+        )
+        HybridControlled.__init__(
+            self,
+            *tracing_artifacts,
+            control_wires=control_wires,
+            control_values=control_values,
+            work_wires=work_wires,
+        )
+
 
 def qctrl_distribute(
     tape: QuantumTape,
