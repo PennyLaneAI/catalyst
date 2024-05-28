@@ -231,7 +231,7 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
     def test_non_differentiable_gate_nested_cond(self):
-        """Test that taking the adjoint diff of a tape containing a parameterized operation 
+        """Test that taking the adjoint diff of a tape containing a parameterized operation
         that doesn't support adjoint differentiation raises an error."""
 
         @qml.qnode(
@@ -257,8 +257,8 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
     def test_non_differentiable_gate_nested_adjoint(self):
-        """Test that taking the adjoint diff of a tape containing a HybridOp with a 
-        parameterized operation that doesn't support adjoint differentiation raises 
+        """Test that taking the adjoint diff of a tape containing a HybridOp with a
+        parameterized operation that doesn't support adjoint differentiation raises
         an error."""
 
         @qml.qnode(
@@ -311,7 +311,7 @@ class TestParameterShiftMethodVerification:
                 return grad(f)(x)
 
     def test_paramshift_gate_simple(self):
-        """Test that taking a parameter-shift gradient of a tape containing a parameterized operation 
+        """Test that taking a parameter-shift gradient of a tape containing a parameterized operation
         that doesn't support analytic differentiation raises an error."""
 
         @qml.qnode(
@@ -331,7 +331,7 @@ class TestParameterShiftMethodVerification:
 
     def test_paramshift_gate_while(self):
         """Test that taking a parameter-shift gradient of a tape containing a WhileLoop HybridOp
-        containing a parameterized operation that doesn't support analytic differentiation raises 
+        containing a parameterized operation that doesn't support analytic differentiation raises
         an error."""
 
         @qml.qnode(
