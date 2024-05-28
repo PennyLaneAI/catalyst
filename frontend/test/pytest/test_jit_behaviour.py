@@ -37,7 +37,7 @@ def f_aot_builder(backend, wires=1, shots=1000):
 
     @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
-    def f(x: float):
+    def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
 
@@ -939,6 +939,23 @@ class TestTwoQJITsOneName:
         assert foo_2() == 2
         foo_1.workspace.cleanup()
         foo_2.workspace.cleanup()
+
+
+class TestQJITUsagePatterns:
+    """Test usage patterns of catalyst.qjit."""
+
+    def test_usage_patterns(self):
+        """Test two usage patterns of catalyst.qjit."""
+
+        def fn(x, y):
+            return x * y
+
+        res_pattern_fn_as_argument = qjit(fn, autograph=False)(5, 6)
+        res_pattern_partial = qjit(autograph=False)(fn)(5, 6)
+
+        expected = 30
+        assert res_pattern_fn_as_argument == expected
+        assert res_pattern_partial == expected
 
 
 if __name__ == "__main__":

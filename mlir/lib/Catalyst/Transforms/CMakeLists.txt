@@ -16,6 +16,7 @@ file(GLOB SRC
     AsyncUtils.cpp
     GEPInboundsPatterns.cpp
     GEPInboundsPass.cpp
+    RegisterInactiveCallbackPass.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

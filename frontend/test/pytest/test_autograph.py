@@ -42,6 +42,8 @@ from catalyst import (
     vjp,
 )
 from catalyst.autograph.transformer import TRANSFORMER
+from catalyst.utils.dummy import dummy_func
+from catalyst.utils.exceptions import CompileError
 
 check_cache = TRANSFORMER.has_cache
 
@@ -1754,6 +1756,131 @@ class TestDisableAutograph:
             return x
 
         assert g() == 36.4
+
+
+class TestAutographInclude:
+    """Test include modules to autograph conversion"""
+
+    def test_dummy_func(self):
+        """Test dummy function branches."""
+
+        assert dummy_func(6) == 36
+        assert dummy_func(4) == 64
+
+    def test_autograph_included_module(self):
+        """Test autograph included module."""
+
+        @qjit(autograph=True)
+        def excluded_by_default(x: float, n: int):
+            for _ in range(n):
+                x = x + dummy_func(6)
+            return x
+
+        @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+        def included(x: float, n: int):
+            for _ in range(n):
+                x = x + dummy_func(6)
+            return x
+
+        result_excluded_by_default = excluded_by_default(0.4, 6)
+        assert result_excluded_by_default == 216.4 and result_excluded_by_default == included(
+            0.4, 6
+        )
+
+    def test_invalid_autograph_include_with_no_autograph(self):
+        """Test including modules when autograph is disabled as invalid input."""
+
+        def fn(x: float, n: int):
+            for _ in range(n):
+                x = x + dummy_func(6)
+            return x
+
+        with pytest.raises(
+            CompileError,
+            match="In order for 'autograph_include' to work, 'autograph' must be set to True",
+        ):
+            qjit(autograph_include=["catalyst.utils.dummy"])(fn)
+
+
+class TestJaxIndexAssignment:
+    """Test Jax index assignment"""
+
+    def test_single_index_assignment_one_item(self):
+        """Test single index assignment for Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def zero_last_element_single_assignment_syntax(x):
+            """Set the last element of x to 0 using single index assignment"""
+
+            last_element = x.shape[0] - 1
+            x[last_element] = 0
+            return x
+
+        @qjit(autograph=True)
+        def zero_last_element_at_set_syntax(x):
+            """Set the last element of x to 0 using at and set"""
+
+            last_element = x.shape[0] - 1
+            x = x.at[last_element].set(0)
+            return x
+
+        result_assignment_syntax = zero_last_element_single_assignment_syntax(jnp.array([5, 3, 4]))
+
+        assert jnp.allclose(result_assignment_syntax, jnp.array([5, 3, 0]))
+        assert jnp.allclose(
+            result_assignment_syntax,
+            zero_last_element_at_set_syntax(jnp.array([5, 3, 4])),
+        )
+
+    def test_single_index_assignment_all_items(self):
+        """Test single index assignment for Jax arrays for all array items."""
+
+        @qjit(autograph=True)
+        def double_all_single_assignment_syntax(x):
+            """Create a new array that is equal to 2 * x using single index assignment"""
+
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result[i] = x[i] * 2
+
+            return result
+
+        @qjit(autograph=True)
+        def double_all_at_set_syntax(x):
+            """Create a new array that is equal to 2 * x using at and set"""
+
+            first_dim = x.shape[0]
+            result = jnp.empty((first_dim,), dtype=x.dtype)
+
+            for i in range(first_dim):
+                result = result.at[i].set(x[i] * 2)
+
+            return result
+
+        result_assignment_syntax = double_all_single_assignment_syntax(jnp.array([5, 3, 4]))
+
+        assert jnp.allclose(result_assignment_syntax, jnp.array([10, 6, 8]))
+        assert jnp.allclose(
+            result_assignment_syntax,
+            double_all_at_set_syntax(jnp.array([5, 3, 4])),
+        )
+
+    def test_single_index_assignment_python_array(self):
+        """Test single index assignment for Non-Jax arrays for one array item."""
+
+        @qjit(autograph=True)
+        def zero_last_element_python_array(x):
+            """Set the last element of a python array to 0"""
+
+            last_element = len(x) - 1
+            x[last_element] = 0
+            return x
+
+        assert jnp.allclose(
+            jnp.array(zero_last_element_python_array([5, 3, 4])), jnp.array([5, 3, 0])
+        )
 
 
 if __name__ == "__main__":

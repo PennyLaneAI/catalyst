@@ -288,9 +288,6 @@ class HybridOp(Operation):
             JAX primitive binder function to call when the quantum tracing is complete.
     """
 
-    # Added as a criteria for the decomposition of HybridOp: see the qjit device preprocessing
-    visited = False
-
     def _no_binder(self, *_):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
 
@@ -631,11 +628,11 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
-                if o.mv is not None:  # qml.sample(m, wires=i)
+                if o.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(o.mv)
                 else:
                     shape = (shots, nqubits) if using_compbasis else (shots,)
-                    result = binder(sample_p, obs_tracers, shots=shots, shape=shape)
+                    result = sample_p.bind(obs_tracers, shots=shots, shape=shape)
                     if using_compbasis:
                         result = jnp.astype(result, jnp.int64)
                     out_classical_tracers.append(result)

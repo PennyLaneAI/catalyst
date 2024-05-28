@@ -188,7 +188,7 @@ class TestMidCircuitMeasurement:
             qml.RY(x, wires=0)
             m = measure(0)
             qml.PauliX(0)
-            return qml.sample(m, wires=0)
+            return qml.sample(m)
 
         assert circuit(0.0) == 0
         assert circuit(jnp.pi) == 1
@@ -205,7 +205,7 @@ class TestMidCircuitMeasurement:
             qml.RY(x, wires=0)
             m = measure(0)
             qml.PauliX(0)
-            return qml.sample(m, wires=0)
+            return qml.sample(m)
 
         assert circuit(0.0) == [0] * 10
         assert circuit(jnp.pi) == [1] * 10
