@@ -114,7 +114,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             # PennyLane has many flavors of controlled operations. Here we check if the operation is
             # supported as a self-contained native operation for a device.
             if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
-                if not qjit_device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES):
+                if not qjit_device.qjit_capabilities.native_ops.get(op.name):
                     return _ctrl_op_checker(op.base, in_qctrl, in_controllable=True)
         else:
             # Otherwise we check that the operation is supported and is marked as
