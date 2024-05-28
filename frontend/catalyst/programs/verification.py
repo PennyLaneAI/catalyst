@@ -28,11 +28,12 @@ from pennylane.operation import Operation
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
+from catalyst.api_extensions import MidCircuitMeasure
+from catalyst.api_extensions.quantum_operators import Adjoint, QCtrl
+from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.toml import OperationProperties
-
-# pylint: disable=import-outside-toplevel
 
 
 def _verify_nested(
@@ -41,10 +42,6 @@ def _verify_nested(
     op_checker_fn: Callable[[Operation, Any], Any],
 ) -> Any:
     """Traverse the nested quantum tape, carry a caller-defined state."""
-
-    # FIXME: How should we re-organize the code to avoid this kind of circular dependency.
-    # Another candidate: `from catalyst.qjit_device import AnyQJITDevice`
-    from catalyst.jax_tracer import has_nested_tapes, nested_quantum_regions
 
     ctx = EvaluationContext.get_main_tracing_context()
     for op in tape.operations:
@@ -84,11 +81,6 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         DifferentiableCompileError: gradient-related error
         CompileError: compilation error
     """
-
-    # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
-    from catalyst.api_extensions import MidCircuitMeasure
-    from catalyst.api_extensions.quantum_operators import Adjoint, QCtrl
-    from catalyst.jax_tracer import HybridOp
 
     def _paramshift_op_checker(op):
         if not isinstance(op, HybridOp):
@@ -162,11 +154,10 @@ def validate_observables_parameter_shift(tape: QuantumTape):
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
-        else:
-            if obs.grad_method not in {"A", None}:
-                raise DifferentiableCompileError(
-                    f"{obs.name} does not support analytic differentiation"
-                )
+        elif obs and obs.grad_method not in {"A", None}:
+            raise DifferentiableCompileError(
+                f"{obs.name} does not support analytic differentiation"
+            )
 
     for obs in tape.observables:
         _obs_checker(obs)
@@ -181,7 +172,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     def _obs_checker(obs):
         if isinstance(obs, MeasurementProcess):
             _obs_checker(obs.obs or [])
-        else:
+        elif obs:
             if not qjit_device.qjit_capabilities.native_obs.get(
                 obs.name, EMPTY_PROPERTIES
             ).differentiable:
