@@ -255,11 +255,7 @@ class TestAdjointMethodVerification:
             qml.RX(x, wires=0)
             return qml.probs()
 
-        # with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
-
         qml.qjit(f)(1.2)
-        # def cir(x: float):
-        #     return grad(f)(x)
 
     def test_non_differentiable_gate_nested_cond(self):
         """Test that taking the adjoint diff of a tape containing a parameterized operation
