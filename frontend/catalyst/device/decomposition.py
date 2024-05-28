@@ -128,7 +128,6 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
         )
 
     new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
-    
     return new_op
 
 
