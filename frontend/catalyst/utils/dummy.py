@@ -11,23 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Dummy module for testing"""
 
-"""
-Internal API for the device module.
-"""
 
-from catalyst.device.qjit_device import (
-    BackendInfo,
-    QJITDevice,
-    QJITDeviceNewAPI,
-    extract_backend_info,
-    validate_device_capabilities,
-)
+def dummy_func(x):
+    """Simple function with if statements for testing the 'auto_include' option of @qjit.
+    The parent 'catalayst' module is excluded for autograph conversion by default, hence
+    adding this module explicitely to the inclusion list will override that restriction"""
 
-__all__ = (
-    "QJITDevice",
-    "QJITDeviceNewAPI",
-    "BackendInfo",
-    "extract_backend_info",
-    "validate_device_capabilities",
-)
+    if x > 5:
+        y = x**2
+    else:
+        y = x**3
+    return y

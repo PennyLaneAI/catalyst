@@ -18,6 +18,8 @@ capabilities for quantum programs. Error mitigation techniques improve the
 reliability of noisy quantum computers without relying on error correction.
 """
 
+import copy
+import functools
 from typing import Callable
 
 import jax
@@ -29,7 +31,7 @@ from catalyst.jax_primitives import zne_p
 
 
 ## API ##
-def mitigate_with_zne(f, *, scale_factors: jnp.ndarray, deg: int = None):
+def mitigate_with_zne(fn=None, *, scale_factors=None, deg=None):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -42,7 +44,7 @@ def mitigate_with_zne(f, *, scale_factors: jnp.ndarray, deg: int = None):
     `Li et al. <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.7.021050>`__.
 
     Args:
-        f (qml.QNode): the circuit to be mitigated.
+        fn (qml.QNode): the circuit to be mitigated.
         scale_factors (array[int]): the range of noise scale factors used.
         deg (int): the degree of the polymonial used for fitting.
 
@@ -80,9 +82,15 @@ def mitigate_with_zne(f, *, scale_factors: jnp.ndarray, deg: int = None):
             s = jax.numpy.array([1, 2, 3])
             return mitigate_with_zne(circuit, scale_factors=s)(args, n)
     """
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(mitigate_with_zne, **kwargs)
+
     if deg is None:
         deg = len(scale_factors) - 1
-    return ZNE(f, scale_factors, deg)
+    return ZNE(fn, scale_factors, deg)
 
 
 ## IMPL ##
