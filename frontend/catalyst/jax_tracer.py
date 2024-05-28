@@ -114,6 +114,22 @@ def mark_gradient_tracing(method: str):
         TRACING_GRADIENTS.pop()
 
 
+def _make_execution_config(qnode):
+    """Updates the execution_config object with information about execution. This is 
+    used in preprocess to determine what decomposition and validation is needed."""
+
+    if qnode:
+        # prioritze _in_gradient_tracing unless its None (we haven't started tracing yet)
+        # if its None, default to qnode.diff_method
+        _gradient_method = _in_gradient_tracing(qnode) or qnode.diff_method
+    else:
+        _gradient_method = None
+
+    return qml.devices.ExecutionConfig(
+        gradient_method=_gradient_method,
+    )
+
+
 class Function:
     """An object that represents a compiled function.
 
@@ -904,11 +920,12 @@ def trace_quantum_function(
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-
+            
             if isinstance(device, qml.devices.Device):
-                device_program, _ = device.preprocess(ctx)
+                config = _make_execution_config(qnode)
+                device_program, config = device.preprocess(ctx, config)
                 verification_program = TransformProgram()
-                grad_method = _in_gradient_tracing(qnode)
+                grad_method = config.gradient_method
                 verification_program.add_transform(
                     verify_operations, grad_method=grad_method, qjit_device=device
                 )
