@@ -37,7 +37,7 @@ from catalyst.api_extensions.function_maps import vmap
 from catalyst.api_extensions.quantum_operators import (
     Adjoint,
     MidCircuitMeasure,
-    HybridQCtrl,
+    HybridControlled,
     adjoint,
     ctrl,
     measure,
