@@ -32,7 +32,7 @@ from catalyst import adjoint as C_adjoint
 from catalyst import cond
 from catalyst import ctrl as C_ctrl
 from catalyst import for_loop, measure, qjit, while_loop
-from catalyst.api_extensions.quantum_operators import QCtrl
+from catalyst.api_extensions.quantum_operators import HybridQCtrl
 from catalyst.jax_tracer import HybridOpRegion
 
 
@@ -304,7 +304,7 @@ def test_control_outside_qjit():
 
 
 def test_qctrl_wires(backend):
-    """Test the wires property of QCtrl"""
+    """Test the wires property of HybridQCtrl"""
 
     @qml.qjit
     @qml.qnode(qml.device(backend, wires=3))
@@ -322,7 +322,7 @@ def test_qctrl_wires(backend):
 
 
 def test_qctrl_wires_arg_fun(backend):
-    """Test the wires property of QCtrl with argument wires"""
+    """Test the wires property of HybridQCtrl with argument wires"""
 
     @qml.qjit
     @qml.qnode(qml.device(backend, wires=4))
@@ -340,7 +340,7 @@ def test_qctrl_wires_arg_fun(backend):
 
 
 def test_qctrl_var_wires(backend):
-    """Test the wires property of QCtrl with variable wires"""
+    """Test the wires property of HybridQCtrl with variable wires"""
 
     @qml.qjit
     @qml.qnode(qml.device(backend, wires=4))
@@ -358,7 +358,7 @@ def test_qctrl_var_wires(backend):
 
 
 def test_qctrl_wires_nested(backend):
-    """Test the wires property of QCtrl with nested branches"""
+    """Test the wires property of HybridQCtrl with nested branches"""
 
     @qml.qjit
     @qml.qnode(qml.device(backend, wires=4))
@@ -380,7 +380,7 @@ def test_qctrl_wires_nested(backend):
 
 
 def test_qctrl_work_wires(backend):
-    """Test the wires property of QCtrl with work-wires"""
+    """Test the wires property of HybridQCtrl with work-wires"""
 
     @qml.qjit
     @qml.qnode(qml.device(backend, wires=5))
@@ -403,7 +403,7 @@ def test_qctrl_work_wires(backend):
 
 @pytest.mark.xfail(reason="ctrl.wires fails in control-flow branches is not supported")
 def test_qctrl_wires_controlflow(backend):
-    """Test the wires property of QCtrl with control flow branches"""
+    """Test the wires property of HybridQCtrl with control flow branches"""
 
     @qml.qjit
     @qml.qnode(qml.device(backend, wires=3))
@@ -436,7 +436,7 @@ def test_map_wires():
         res_classical_tracers=[],
         trace=None,
     )
-    qctrl = QCtrl(
+    qctrl = HybridQCtrl(
         control_wires=[0], regions=[X], in_classical_tracers=[], out_classical_tracers=[0]
     )
     new_qctrl = qctrl.map_wires({1: 0, 0: 1})

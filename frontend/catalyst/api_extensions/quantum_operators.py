@@ -358,7 +358,7 @@ def ctrl(
         region = HybridOpRegion(None, quantum_tape, [], [])
 
         # Return the operation instance since PL expects this for qml.ctrl(op).
-        return QCtrl(
+        return HybridQCtrl(
             control_wires=control,
             control_values=control_values,
             work_wires=work_wires,
@@ -442,7 +442,7 @@ class Adjoint(HybridOp):
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
 #       to this class whenever a qjit context is active.
-class QCtrl(HybridOp):
+class HybridQCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
     def __init__(self, *args, control_wires, control_values=None, work_wires=None, **kwargs):
@@ -458,7 +458,7 @@ class QCtrl(HybridOp):
         super().__init__(*args, **kwargs)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        raise NotImplementedError("QCtrl does not support JAX quantum tracing")  # pragma: no cover
+        raise NotImplementedError("HybridQCtrl does not support JAX quantum tracing")  # pragma: no cover
 
     def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
@@ -532,7 +532,7 @@ def qctrl_distribute(
     ops2 = []
     for op in tape.operations:
         if has_nested_tapes(op):
-            if isinstance(op, QCtrl):
+            if isinstance(op, HybridQCtrl):
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     tape2 = qctrl_distribute(
                         region.quantum_tape,

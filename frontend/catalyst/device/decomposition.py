@@ -35,7 +35,7 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-from catalyst.api_extensions.quantum_operators import QCtrl
+from catalyst.api_extensions.quantum_operators import HybridQCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
@@ -146,7 +146,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, HybridQCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
