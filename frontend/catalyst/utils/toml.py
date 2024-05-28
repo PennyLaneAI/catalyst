@@ -271,11 +271,6 @@ def patch_schema1_collections(
             invertible=False, controllable=True, differentiable=True
         )
 
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        observable_props["Projector"] = OperationProperties(
-            invertible=False, controllable=False, differentiable=False
-        )
-
     # The deduction logic is the following:
     # * Most of the gates have their `C(Gate)` controlled counterparts.
     # * Some gates have to be decomposed if controlled version is used. Typically these are
