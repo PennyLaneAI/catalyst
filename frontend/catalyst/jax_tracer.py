@@ -963,7 +963,15 @@ def null_postprocessing(results):
 def dynamic_one_shot(qnode):
     from catalyst import vmap
 
+    cpy_tape = None
+    aux_tapes = None
+
     def transform_to_single_shot(qnode):
+        nonlocal cpy_tape
+        nonlocal aux_tapes
+        cpy_tape = None
+        aux_tapes = None
+
         @qml.transform
         def dynamic_one_shot_partial(
             tape: qml.tape.QuantumTape, **kwargs
@@ -997,6 +1005,9 @@ def dynamic_one_shot(qnode):
                     "measurements with broadcasting"
                 )
 
+            nonlocal cpy_tape
+            cpy_tape = tape
+            nonlocal aux_tapes
             aux_tapes = [
                 init_auxiliary_tape(tape)
             ]  # <----------------------------------------------- change here
@@ -1025,9 +1036,9 @@ def dynamic_one_shot(qnode):
                 )
                 del results[0:s]
             return tuple(final_results)
-        if not shots.has_partitioned_shots:
-            results = results[0]
-        return parse_native_mid_circuit_measurements(tape, aux_tapes, results)
+        # if not shots.has_partitioned_shots:
+        #     results = results[0]
+        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
 
     aux_qnode = transform_to_single_shot(qnode)
     shots = qnode.device.shots
@@ -1040,7 +1051,8 @@ def dynamic_one_shot(qnode):
         def wrap_single_shot_qnode(x):
             return single_shot_qnode(*args, **kwargs)
 
-        batched_results = vmap(wrap_single_shot_qnode)(arg_vmap)
-        return post_process(shots, batched_results)
+        results = vmap(wrap_single_shot_qnode)(arg_vmap)
+        results = tuple(zip(*results[0]))
+        return post_process(shots, results)
 
     return one_shot_wrapper
