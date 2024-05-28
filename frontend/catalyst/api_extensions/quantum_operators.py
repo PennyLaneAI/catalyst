@@ -392,6 +392,11 @@ class MidCircuitMeasure(HybridOp):
 
     binder = qmeasure_p.bind
 
+    def __init__(self, *args, **kwargs):
+        self.postselect = kwargs.pop("postselect", None)
+        self.reset = kwargs.pop("reset", False)
+        super().__init__(*args, **kwargs)
+
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
         wire = op.in_classical_tracers[0]

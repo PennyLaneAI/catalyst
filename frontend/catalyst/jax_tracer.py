@@ -932,3 +932,115 @@ def trace_quantum_function(
         # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
         # check_jaxpr(jaxpr)
     return closed_jaxpr, out_type, out_tree
+
+
+def is_leaf(obj):
+    return isinstance(obj, qml.measurements.MeasurementProcess)
+
+
+def is_mcm(operation):
+    from pennylane.measurements.mid_measure import MidMeasureMP
+
+    """Returns True if the operation is a mid-circuit measurement and False otherwise."""
+    mcm = isinstance(operation, MidMeasureMP)
+    return mcm or "MidCircuitMeasure" in str(type(operation))
+
+
+from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
+from pennylane.transforms.dynamic_one_shot import (
+    init_auxiliary_tape,
+    parse_native_mid_circuit_measurements,
+)
+
+
+def null_postprocessing(results):
+    """A postprocessing function returned by a transform that only converts the batch of results
+    into a result for a single ``QuantumTape``.
+    """
+    return results[0]
+
+
+def dynamic_one_shot(qnode):
+    from catalyst import vmap
+
+    def transform_to_single_shot(qnode):
+        @qml.transform
+        def dynamic_one_shot_partial(
+            tape: qml.tape.QuantumTape, **kwargs
+        ) -> (Sequence[qml.tape.QuantumTape], Callable):
+
+            if not any(is_mcm(o) for o in tape.operations):
+                return (tape,), null_postprocessing
+
+            for m in tape.measurements:
+                if not isinstance(
+                    m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)
+                ):
+                    raise TypeError(
+                        f"Native mid-circuit measurement mode does not support {type(m).__name__} "
+                        "measurements."
+                    )
+            _ = kwargs.get("device", None)
+
+            if not tape.shots:
+                raise qml.QuantumFunctionError(
+                    "dynamic_one_shot is only supported with finite shots."
+                )
+
+            samples_present = any(isinstance(mp, SampleMP) for mp in tape.measurements)
+            postselect_present = any(
+                op.postselect is not None for op in tape.operations if is_mcm(op)
+            )
+            if postselect_present and samples_present and tape.batch_size is not None:
+                raise ValueError(
+                    "Returning qml.sample is not supported when postselecting mid-circuit "
+                    "measurements with broadcasting"
+                )
+
+            aux_tapes = [
+                init_auxiliary_tape(tape)
+            ]  # <----------------------------------------------- change here
+
+            def processing_fn(
+                results, has_partitioned_shots=None, batched_results=None
+            ):  # <------ change here
+                return results
+
+            return aux_tapes, processing_fn
+
+        return dynamic_one_shot_partial(qnode)
+
+    def post_process(
+        shots, results, has_partitioned_shots=None, batched_results=None
+    ):  # <---------------- moved from above
+
+        if has_partitioned_shots is None and shots.has_partitioned_shots:
+            # If using shot vectors, recursively process the results for each shot bin. The length
+            # of the first axis of final_results will be the length of the shot vector.
+            results = list(results[0])
+            final_results = []
+            for s in shots:
+                final_results.append(
+                    post_process(results[0:s], has_partitioned_shots=False, batched_results=False)
+                )
+                del results[0:s]
+            return tuple(final_results)
+        if not shots.has_partitioned_shots:
+            results = results[0]
+        return parse_native_mid_circuit_measurements(tape, aux_tapes, results)
+
+    aux_qnode = transform_to_single_shot(qnode)
+    shots = qnode.device.shots
+    single_shot_qnode = aux_qnode
+    single_shot_qnode.device._shots = qml.measurements.Shots(1)
+
+    def one_shot_wrapper(*args, **kwargs):
+        arg_vmap = jnp.empty((shots.total_shots,), dtype=float)
+
+        def wrap_single_shot_qnode(x):
+            return single_shot_qnode(*args, **kwargs)
+
+        batched_results = vmap(wrap_single_shot_qnode)(arg_vmap)
+        return post_process(shots, batched_results)
+
+    return one_shot_wrapper
