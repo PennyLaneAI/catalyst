@@ -47,7 +47,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_tape,
 )
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.tracing.contexts import EvaluationContext
 
 
 ## API ##
@@ -552,6 +552,7 @@ class HybridControlledOp(ControlledOp, HybridControlled):
     to maintain the Catalyst support for `HybridOp`.
     """
 
+    # pylint: disable=super-init-not-called,too-many-arguments,abstract-method
     def __init__(
         self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
     ):

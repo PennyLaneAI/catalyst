@@ -76,7 +76,7 @@ from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,abstract-method,too-many-lines
+# pylint: disable=unused-argument,abstract-method,too-many-lines,useless-suppression
 
 #########
 # Types #
