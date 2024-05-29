@@ -490,8 +490,8 @@ class HybridControlled(HybridOp):
         else:
             self._control_values = control_values
 
-        # raises the following `ValueError` when calling `HyperOp.__init__` in
-        # `HybridControlled.__init__` when is called indirectly from `QCtrl`:
+        # Calling `HyperOp.__init__` instead will raise the following `ValueError`
+        # in `HybridControlled.__init__` when is called indirectly from `QCtrl`:
         # "QCtrl: wrong number of parameters. 0 parameters passed, 1 expected"
         if type(self) is HybridControlled:
             Operation.__init__(self, wires=Wires(self.num_wires))

@@ -298,9 +298,15 @@ def test_qctrl_no_end_circuit_measurements(backend):
 def test_control_outside_qjit():
     """Test that the Catalyst control function can be used without jitting."""
 
-    assert C_ctrl(
-        qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3
-    ) == PL_ctrl(qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3)
+    result = C_ctrl(qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3)
+    expected = PL_ctrl(qml.T(wires=0), control=[1, 2], control_values=[False, True], work_wires=3)
+
+    assert isinstance(result, type(expected))
+    assert result.name == expected.name
+    assert result.base == expected.base
+    assert result.control_wires == expected.control_wires
+    assert result.control_values == expected.control_values
+    assert result.work_wires == expected.work_wires
 
 
 def test_qctrl_wires(backend):
@@ -481,8 +487,10 @@ def test_native_controlled_unitary():
         )
         return qml.state()
 
+    # The code will be lowered to `QubitUnitary` of an updated
+    # matrix that represents the `ControlledQubitUnitary`.
+
     compiled = qjit()(native_controlled)
-    assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
     result = compiled()
     expected = native_controlled()
     assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
