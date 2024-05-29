@@ -27,7 +27,7 @@ from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops.op_math.controlled import ControlledOp, create_controlled_op
+from pennylane.ops.op_math.controlled import Controlled, ControlledOp, create_controlled_op
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
@@ -367,10 +367,9 @@ class QCtrlCallable:
 
     def __call__(self, *args, **kwargs):
 
-        tracing_artifacts = self.trace_body(*args, **kwargs)
+        tracing_artifacts = self.trace_body(args, kwargs)
 
         if self.single_op:
-            QueuingManager.remove(self.op) # TODO(ali): remove it
             with QueuingManager.stop_recording():
                 base_op = self.op(*args, **kwargs)
             return QCtrl(
@@ -388,7 +387,7 @@ class QCtrlCallable:
             work_wires=self.work_wires,
         )
 
-    def trace_body(self, *args, **kwargs):
+    def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for `catalyst.ctrl` to be used by Catalyst."""
 
         # Allow the creation of `HybridAdjoint` instances outside of any contexts.
@@ -555,14 +554,14 @@ class HybridControlled(HybridOp):
         return self
 
 
-class QCtrl(ControlledOp, HybridControlled):
+class QCtrl(Controlled, HybridControlled):
     """This class inherits `qml.ops.op_math.controlled.ControlledOp` to provide identical support as PL for calculating the control of single operations.
     It is also derived from `HybridControlled` to maintain the Catalyst support for `HybridOp`."""
 
     def __init__(
         self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
     ):
-        ControlledOp.__init__(
+        Controlled.__init__(
             self,
             base=base,
             control_wires=control_wires,
@@ -577,6 +576,13 @@ class QCtrl(ControlledOp, HybridControlled):
             work_wires=work_wires,
         )
 
+    def _flatten(self):
+        tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
+        return (self.base, tracing_artifacts), tuple()
+
+    @classmethod
+    def _unflatten(cls, data, _):
+        return cls(*data)
 
 def qctrl_distribute(
     tape: QuantumTape,
