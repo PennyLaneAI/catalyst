@@ -1057,9 +1057,8 @@ def dynamic_one_shot(qnode):
             return single_shot_qnode(*args, **kwargs)
 
         results = vmap(wrap_single_shot_qnode)(arg_vmap)
-        if not isinstance(results[0], tuple):
-            results = (results,)
-        results = tuple(zip(*results[0]))
+        if isinstance(results[0], tuple) and len(results) == 1:
+            results = results[0]
         return post_process(shots, results)
 
     return one_shot_wrapper
