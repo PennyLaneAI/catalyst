@@ -364,10 +364,12 @@ class QCtrlCallable:
             # Case 2: Support an operation constructor as the base op
             self.op = op
             self.single_op = True
-        else:
+        elif isinstance(op, Callable):
             # Case 3: Support a callable as the base op
             self.op = op
             self.single_op = False
+        else:
+            raise ValueError(f"Expected a callable or a qml.Operator, not {op}")
 
     def __call__(self, *args, **kwargs):
 
@@ -394,11 +396,6 @@ class QCtrlCallable:
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for `catalyst.ctrl` to be used by Catalyst."""
 
-        # Allow the creation of `HybridAdjoint` instances outside of any contexts.
-        simulate_tracing_ctx = not EvaluationContext.is_tracing()
-        if simulate_tracing_ctx:
-            eval_ctx = EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION)
-
         # Create a nested jaxpr scope for the body of the adjoint.
         in_classical_tracers, _ = tree_flatten((args, kwargs))
         quantum_tape = QuantumTape()
@@ -409,9 +406,6 @@ class QCtrlCallable:
         _check_no_measurements(quantum_tape)
 
         ctrl_region = HybridOpRegion(None, quantum_tape, [], [])
-
-        if simulate_tracing_ctx:
-            eval_ctx.__exit__(None, None, None)
 
         return in_classical_tracers, out_classical_tracers, [ctrl_region]
 
@@ -482,9 +476,9 @@ class HybridControlled(HybridOp):
         control_values=None,
         work_wires=None,
     ):
-        # self.in_classical_tracers = in_classical_tracers
-        # self.out_classical_tracers = out_classical_tracers
-        # self.regions = regions
+        self.in_classical_tracers = in_classical_tracers
+        self.out_classical_tracers = out_classical_tracers
+        self.regions = regions
 
         self._control_wires = qml.wires.Wires(control_wires)
         self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
@@ -496,9 +490,11 @@ class HybridControlled(HybridOp):
         else:
             self._control_values = control_values
 
-        super().__init__(in_classical_tracers, out_classical_tracers, regions=regions)
-        # if isinstance(self, HybridControlled):
-        #     Operation.__init__(self, wires=Wires(self.num_wires))
+        # raises the following `ValueError` when calling `HyperOp.__init__` in
+        # `HybridControlled.__init__` when is called indirectly from `QCtrl`:
+        # "QCtrl: wrong number of parameters. 0 parameters passed, 1 expected"
+        if type(self) is HybridControlled:
+            Operation.__init__(self, wires=Wires(self.num_wires))
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError(
@@ -557,14 +553,14 @@ class HybridControlled(HybridOp):
         return self
 
 
-class QCtrl(Controlled, HybridControlled):
+class QCtrl(ControlledOp, HybridControlled):
     """This class inherits `qml.ops.op_math.controlled.ControlledOp` to provide identical support as PL for calculating the control of single operations.
     It is also derived from `HybridControlled` to maintain the Catalyst support for `HybridOp`."""
 
     def __init__(
         self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
     ):
-        Controlled.__init__(
+        ControlledOp.__init__(
             self,
             base=base,
             control_wires=control_wires,
@@ -581,11 +577,18 @@ class QCtrl(Controlled, HybridControlled):
 
     def _flatten(self):
         tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
-        return (self.base, tracing_artifacts), tuple()
+        return (self.base,), (
+            tracing_artifacts,
+            self.control_wires,
+            tuple(self.control_values),
+            self.work_wires,
+        )
 
     @classmethod
-    def _unflatten(cls, data, _):
-        return cls(*data)
+    def _unflatten(cls, data, metadata):
+        return cls(
+            data[0], control_wires=metadata[1], control_values=metadata[2], work_wires=metadata[3]
+        )
 
 
 def qctrl_distribute(

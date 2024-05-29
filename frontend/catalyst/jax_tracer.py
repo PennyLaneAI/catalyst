@@ -416,7 +416,9 @@ def trace_quantum_tape(
     def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # `Controlled(OP)` bind OP with native quantum control syntax.
-        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
+        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary} or isinstance(
+            op, catalyst.api_extensions.quantum_operators.QCtrl
+        ):
             return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
@@ -457,7 +459,9 @@ def trace_quantum_tape(
 
     for op in ops:
         qrp2 = None
-        if isinstance(op, HybridOp):
+        if isinstance(op, HybridOp) and not isinstance(
+            op, catalyst.api_extensions.quantum_operators.HybridControlled
+        ):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
         else:
             if isinstance(op, MeasurementProcess):
