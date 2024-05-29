@@ -340,12 +340,7 @@ def ctrl(
         )
 
     res = QCtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
-
-    if isinstance(op, Operator):
-        # Instantiate the ctrl op to keep the consistency with `qml.ctrl`
-        res = res()
-
-    return res
+    return res() if isinstance(op, Operator) else res
 
 
 class QCtrlCallable:
@@ -353,37 +348,42 @@ class QCtrlCallable:
 
     def __init__(self, op, control, control_values, work_wires):
         self.op = op
-        self.control = control
+        self.control_wires = control
         self.control_values = control_values
         self.work_wires = work_wires
 
         if isinstance(op, Operator):
-            # Support initialized operation
+            # Case 1. Support an initialized operation as the base op
             self.op = lambda: QueuingManager.append(op) or op
             self.single_op = True
+        elif isinstance(op, type) and issubclass(op, Operator):
+            # Case 2: Support an operation constructor as the base op
+            self.op = op
+            self.single_op = True
         else:
-            # Support callables or uninitialized operations
+            # Case 3: Support a callable as the base op
             self.op = op
             self.single_op = False
 
     def __call__(self, *args, **kwargs):
 
-        tracing_artifacts = self.trace_body(args, kwargs)
+        tracing_artifacts = self.trace_body(*args, **kwargs)
 
         if self.single_op:
+            QueuingManager.remove(self.op) # TODO(ali): remove it
             with QueuingManager.stop_recording():
                 base_op = self.op(*args, **kwargs)
             return QCtrl(
                 base_op,
                 tracing_artifacts=tracing_artifacts,
-                control_wires=self.control,
+                control_wires=self.control_wires,
                 control_values=self.control_values,
                 work_wires=self.work_wires,
             )
 
         return HybridControlled(
             *tracing_artifacts,
-            control_wires=self.control,
+            control_wires=self.control_wires,
             control_values=self.control_values,
             work_wires=self.work_wires,
         )
@@ -479,11 +479,10 @@ class HybridControlled(HybridOp):
         control_values=None,
         work_wires=None,
     ):
-        self.in_classical_tracers = in_classical_tracers
-        self.out_classical_tracers = out_classical_tracers
-        self.regions = regions
+        # self.in_classical_tracers = in_classical_tracers
+        # self.out_classical_tracers = out_classical_tracers
+        # self.regions = regions
 
-        # TODO(ali): remove these variables
         self._control_wires = qml.wires.Wires(control_wires)
         self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
         if control_values is None:
@@ -493,6 +492,11 @@ class HybridControlled(HybridOp):
             self._control_values = [control_values]
         else:
             self._control_values = control_values
+
+        super().__init__(in_classical_tracers, out_classical_tracers, regions=regions)
+        # if isinstance(self, HybridControlled):
+        #     Operation.__init__(self, wires=Wires(self.num_wires))
+
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError(
