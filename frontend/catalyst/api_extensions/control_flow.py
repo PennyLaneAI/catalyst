@@ -33,17 +33,26 @@ from catalyst.jax_extras import (
     ShapedArray,
     _initial_style_jaxpr,
     _input_type_to_tracers,
+    collapse,
     convert_constvars_jaxpr,
     deduce_avals,
+    deduce_signatures,
+    expand_args,
+    expand_results,
+    find_top_trace,
+    for_loop_expansion_strategy,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
+    input_type_to_tracers,
     new_inner_tracer,
+    output_type_to_tracers,
 )
 from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
+    trace_function,
     trace_quantum_tape,
     unify_jaxpr_result_types,
 )
@@ -590,12 +599,17 @@ class ForLoopCallable:
     (array([0.5, 0. , 0.5, 0. ]),)
     """
 
-    def __init__(self, lower_bound, upper_bound, step, body_fn):
+    def __init__(
+        self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions: bool = True
+    ):
+
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.step = step
         self.body_fn = body_fn
         self._operation = None
+        self.expansion_strategy = for_loop_expansion_strategy(experimental_preserve_dimensions)
+        self.apply_reverse_transform = isinstance(self.step, int) and self.step < 0
 
     @property
     def operation(self):
@@ -614,36 +628,54 @@ class ForLoopCallable:
     def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
         quantum_tape = QuantumTape()
         outer_trace = ctx.trace
+        aux_classical_tracers = [
+            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+        ]
+        wfun, in_sig, out_sig = deduce_signatures(
+            self.body_fn,
+            (aux_classical_tracers[0], *init_state),
+            {},
+            self.expansion_strategy,
+        )
+        in_type = in_sig.in_type
+
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            in_classical_tracers = [
-                self.lower_bound,
-                self.upper_bound,
-                self.step,
-                self.lower_bound,
-            ] + tree_flatten(init_state)[0]
-            wffa, in_avals, _, body_tree = deduce_avals(
-                self.body_fn, [self.lower_bound] + list(init_state), {}
-            )
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            arg_classical_tracers = input_type_to_tracers(in_type, inner_trace.new_arg)
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
-                    inner_trace.full_raise(t) for t in wffa.call_wrapped(*arg_classical_tracers)
+                    inner_trace.full_raise(t) for t in wfun.call_wrapped(*arg_classical_tracers)
                 ]
+                out_type = out_sig.out_type()
+                out_tree = out_sig.out_tree()
+                out_consts = out_sig.out_consts()
 
-        res_avals = list(map(shaped_abstractify, res_classical_tracers))
-        out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+        in_expanded_classical_tracers, in_type2 = expand_args(
+            aux_classical_tracers + collapse(in_type, in_sig.in_expanded_args),
+            self.expansion_strategy,
+        )
+        out_expanded_classical_tracers = output_type_to_tracers(
+            out_type,
+            out_consts,
+            in_expanded_classical_tracers,
+            maker=lambda aval: new_inner_tracer(outer_trace, aval),
+        )
         self._operation = ForLoop(
-            in_classical_tracers,
-            out_classical_tracers,
+            collapse(in_type2, in_expanded_classical_tracers),
+            collapse(out_type, out_expanded_classical_tracers),
             [
                 HybridOpRegion(
-                    inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
+                    inner_trace,
+                    quantum_tape,
+                    collapse(in_type, arg_classical_tracers),
+                    collapse(out_type, res_classical_tracers),
                 )
             ],
+            apply_reverse_transform=self.apply_reverse_transform,
+            expansion_strategy=self.expansion_strategy,
         )
-        return tree_unflatten(body_tree(), out_classical_tracers)
+        return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx(self, *init_state):
+    def _call_with_classical_ctx1(self, *init_state):
         iter_arg = self.lower_bound
         init_vals, in_tree = tree_flatten((iter_arg, *init_state))
         init_avals = tuple(_abstractify(val) for val in init_vals)
@@ -651,7 +683,6 @@ class ForLoopCallable:
             self.body_fn, in_tree, init_avals, "for_loop"
         )
 
-        apply_reverse_transform = isinstance(self.step, int) and self.step < 0
         out_classical_tracers = for_p.bind(
             self.lower_bound,
             self.upper_bound,
@@ -659,10 +690,48 @@ class ForLoopCallable:
             *(body_consts + init_vals),
             body_jaxpr=body_jaxpr,
             body_nconsts=len(body_consts),
-            apply_reverse_transform=apply_reverse_transform,
+            apply_reverse_transform=self.apply_reverse_transform,
         )
 
         return tree_unflatten(body_tree, out_classical_tracers)
+
+    def _call_with_classical_ctx(self, ctx, *init_state):
+        # iter_arg = self.lower_bound
+        # init_vals, in_tree = tree_flatten((iter_arg, *init_state))
+        # init_avals = tuple(_abstractify(val) for val in init_vals)
+
+        outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
+        aux_tracers = [
+            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+        ]
+
+        _, in_sig, out_sig = trace_function(
+            ctx,
+            self.body_fn,
+            *(aux_tracers[0], *init_state),
+            expansion_strategy=self.expansion_strategy,
+        )
+
+        in_expanded_tracers = [
+            *out_sig.out_consts(),
+            *expand_args(
+                aux_tracers + collapse(in_sig.in_type, in_sig.in_expanded_args),
+                expansion_strategy=self.expansion_strategy,
+            )[0],
+        ]
+
+        out_expanded_tracers = for_p.bind(
+            *in_expanded_tracers,
+            body_jaxpr=out_sig.out_jaxpr(),
+            body_nconsts=len(out_sig.out_consts()),
+            apply_reverse_transform=self.apply_reverse_transform,
+            nimplicit=in_sig.num_implicit_inputs(),
+            preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
+        )
+
+        return tree_unflatten(
+            out_sig.out_tree(), collapse(out_sig.out_type(), out_expanded_tracers)
+        )
 
     def _call_during_interpretation(self, *init_state):
         args = init_state
@@ -677,7 +746,7 @@ class ForLoopCallable:
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(ctx, *init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(*init_state)
+            return self._call_with_classical_ctx(ctx, *init_state)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation(*init_state)
@@ -861,7 +930,7 @@ class ForLoop(HybridOp):
 
     binder = for_p.bind
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    def trace_quantum1(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
         inner_trace = op.regions[0].trace
         inner_tape = op.regions[0].quantum_tape
@@ -874,7 +943,6 @@ class ForLoop(HybridOp):
             jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_classical_tracers + [qreg_out])
 
         step = op.in_classical_tracers[2]
-        apply_reverse_transform = isinstance(step, int) and step < 0
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
@@ -886,7 +954,63 @@ class ForLoop(HybridOp):
                 *(consts + op.in_classical_tracers[3:] + [qreg]),
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                 body_nconsts=len(consts),
-                apply_reverse_transform=apply_reverse_transform,
+                apply_reverse_transform=self.apply_reverse_transform,
+            )
+        )
+        return qrp2
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        op = self
+        inner_trace = op.regions[0].trace
+        inner_tape = op.regions[0].quantum_tape
+        expansion_strategy = self.expansion_strategy
+
+        with EvaluationContext.frame_tracing_context(ctx, inner_trace):
+            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
+            qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+            qreg_out = qrp_out.actualize()
+
+            arg_expanded_tracers = expand_args(
+                self.regions[0].arg_classical_tracers + [qreg_in],
+                expansion_strategy=expansion_strategy,
+            )[0]
+
+            nimplicit = len(arg_expanded_tracers) - len(self.regions[0].arg_classical_tracers) - 1
+
+            res_expanded_tracers, _ = expand_results(
+                [],
+                arg_expanded_tracers,
+                self.regions[0].res_classical_tracers + [qreg_out],
+                expansion_strategy=expansion_strategy,
+                num_implicit_inputs=nimplicit,
+            )
+            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
+
+        in_expanded_tracers = [
+            *[trace.full_raise(c) for c in consts],
+            *expand_args(op.in_classical_tracers, expansion_strategy=expansion_strategy)[0],
+            qrp.actualize(),
+        ]
+
+        out_expanded_classical_tracers = expand_results(
+            [],
+            in_expanded_tracers,
+            self.out_classical_tracers,
+            expansion_strategy=expansion_strategy,
+            num_implicit_inputs=nimplicit,
+        )[0]
+
+        qrp2 = QRegPromise(
+            op.bind_overwrite_classical_tracers2(
+                ctx,
+                trace,
+                in_expanded_tracers=in_expanded_tracers,
+                out_expanded_tracers=out_expanded_classical_tracers,
+                body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
+                body_nconsts=len(consts),
+                apply_reverse_transform=self.apply_reverse_transform,
+                nimplicit=nimplicit,
+                preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
         return qrp2

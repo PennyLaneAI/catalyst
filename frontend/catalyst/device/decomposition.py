@@ -33,6 +33,7 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
+from catalyst.api_extensions.control_flow import ForLoop
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
@@ -124,7 +125,14 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, decomposer, max_expansi
             )
         )
 
-    new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    new_op = op.__class__(
+        op.in_classical_tracers,
+        op.out_classical_tracers,
+        new_regions,
+        apply_reverse_transform=op.apply_reverse_transform,
+        expansion_strategy=op.expansion_strategy,
+    )
+
     return new_op
 
 
