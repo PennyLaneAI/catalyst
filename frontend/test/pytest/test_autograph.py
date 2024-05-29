@@ -72,7 +72,7 @@ class Failing:
         return self.ref
 
 
-class TestSourceCodeXXXInfo:
+class TestSourceCodeInfo:
     """Unit tests for exception utilities that retrieves traceback information for the original
     source code."""
 
