@@ -81,6 +81,19 @@
 
   ```
 
+* Restructure `catalyst.ctrl` to inherit from the PL `ControlledOp` class.
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+
+  This provides feature parity for single operations. For quantum functions, however,
+  this support is not fully compatible with PL because PL only instantiates the `ControlledOp`
+  class of a single base operation and returns a list of `ControlledOp` instances while Catalyst
+  intends to return a single controlled instance with a list of ops nested inside of it.
+
+  Benefits:
+
+  - `catalyst.ctrl` feature parity with PL's ctrl for single ops.
+  - Allow `catalyst.ctrl` to be used outside the QJIT or QNode context similar to the PL ctrl method.
+
 <h3>Improvements</h3>
 
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
@@ -213,6 +226,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 David Ittah,
 Erick Ochoa,
 Haochen Paul Wang,
