@@ -230,19 +230,20 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("shots", [5000])
     @pytest.mark.parametrize("postselect", [None])
     @pytest.mark.parametrize("reset", [False, True])
-    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.sample, qml.var])
+    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
         "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
     def test_simple_mcm(self, backend, shots, postselect, reset, measure_f, meas_obj):
-        """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement and a
-        conditional gate. A single measurement of the mid-circuit measurement value is performed at
-        the end."""
+        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
+        circuit with a mid-circuit measurement."""
         print(reset, measure_f, meas_obj)
         if measure_f in (qml.counts, qml.sample) and (
             not isinstance(meas_obj, list) and not meas_obj == "mcm"
         ):
             pytest.skip("Can't use observables with counts or sample")
+        if measure_f in (qml.probs,) and (not isinstance(meas_obj, list) and not meas_obj == "mcm"):
+            pytest.skip("Can't use observables or mcms with probs")
         if measure_f in (qml.var, qml.expval) and (
             isinstance(meas_obj, list) or meas_obj == "mcm_list"
         ):
