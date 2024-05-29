@@ -27,7 +27,7 @@ from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 from catalyst import adjoint, cond, for_loop, qjit, while_loop
 
 
-class CatalystTests:
+class TestCatalyst:
     """Integration tests for Catalyst adjoint functionality."""
 
     def verify_catalyst_adjoint_against_pennylane(self, quantum_func, device, *args):
