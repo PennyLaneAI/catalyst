@@ -242,9 +242,7 @@ class TestMidCircuitMeasurement:
         ):
             pytest.skip("Can't use observables with counts, probs or sample")
 
-        if measure_f in (qml.var, qml.expval) and (
-            isinstance(meas_obj, list)
-        ):
+        if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
         if measure_f == qml.var and (not isinstance(meas_obj, list) and not meas_obj == "mcm"):
@@ -355,7 +353,6 @@ class TestMidCircuitMeasurement:
         for r1, r0 in zip(results1, results0):
             r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
             qml.math.allclose(r1, r0)
-
 
 
 if __name__ == "__main__":
