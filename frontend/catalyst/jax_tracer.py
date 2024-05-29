@@ -113,9 +113,7 @@ def _make_execution_config(qnode):
     used in preprocess to determine what decomposition and validation is needed."""
 
     if qnode:
-        # prioritze _in_gradient_tracing unless its None (we haven't started tracing yet)
-        # if its None, default to qnode.diff_method
-        _gradient_method = _in_gradient_tracing(qnode) or qnode.diff_method
+        _gradient_method = _in_gradient_tracing(qnode)
     else:
         _gradient_method = None
 
