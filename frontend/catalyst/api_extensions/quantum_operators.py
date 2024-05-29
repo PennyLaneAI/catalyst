@@ -27,7 +27,11 @@ from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops.op_math.controlled import Controlled, ControlledOp, create_controlled_op
+from pennylane.ops.op_math.controlled import (
+    Controlled,
+    ControlledOp,
+    create_controlled_op,
+)
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
@@ -496,7 +500,6 @@ class HybridControlled(HybridOp):
         # if isinstance(self, HybridControlled):
         #     Operation.__init__(self, wires=Wires(self.num_wires))
 
-
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError(
             "HybridControlled does not support JAX quantum tracing"
@@ -583,6 +586,7 @@ class QCtrl(Controlled, HybridControlled):
     @classmethod
     def _unflatten(cls, data, _):
         return cls(*data)
+
 
 def qctrl_distribute(
     tape: QuantumTape,

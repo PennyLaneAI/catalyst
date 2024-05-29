@@ -18,7 +18,6 @@ compilation & execution on devices.
 """
 
 import copy
-
 from functools import partial
 
 import jax
