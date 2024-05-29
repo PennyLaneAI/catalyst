@@ -756,7 +756,6 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 def apply_transform(
     qnode_program,
     device_program,
-    verification_program,
     device_modify_measurements,
     tape,
     flat_results,
@@ -775,11 +774,11 @@ def apply_transform(
 
     if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        total_program = qnode_program + device_program + verification_program
+        total_program = qnode_program + device_program
     else:
         is_valid_for_batch = True
         # Apply the identity transform in order to keep generalization
-        total_program = device_program + verification_program
+        total_program = device_program
 
     tapes, post_processing = total_program([tape])
     if not is_valid_for_batch and len(tapes) > 1:
@@ -916,10 +915,8 @@ def trace_quantum_function(
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)
-                verification_program = TransformProgram()
             else:
                 device_program = TransformProgram()
-                verification_program = TransformProgram()
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
@@ -930,7 +927,6 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 qnode_program,
                 device_program,
-                verification_program,
                 device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
