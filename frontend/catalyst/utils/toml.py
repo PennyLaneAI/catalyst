@@ -264,13 +264,6 @@ def patch_schema1_collections(
 ):  # pylint: disable=too-many-arguments, too-many-branches
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
 
-    # We mark GlobalPhase as controllables even if `quantum_control` flag is False. This
-    # is what actual device reports.
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        native_gate_props["GlobalPhase"] = OperationProperties(
-            invertible=False, controllable=True, differentiable=True
-        )
-
     # The deduction logic is the following:
     # * Most of the gates have their `C(Gate)` controlled counterparts.
     # * Some gates have to be decomposed if controlled version is used. Typically these are
