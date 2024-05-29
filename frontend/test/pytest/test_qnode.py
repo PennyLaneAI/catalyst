@@ -120,33 +120,33 @@ def test_qfunc_output_shape_list():
         return res[0] * 1j
 
 
-# @pytest.mark.parametrize("grad_method", ["adjoint", "parameter-shift", None])
-# def test_qnode_grad_method_stored_on_execution_config(grad_method):
-#     """Test that the grad_method specified on the qnode is updated on the ExecutionConfig 
-#     that is passed to the preprocess method"""
+@pytest.mark.parametrize("grad_method", ["adjoint", "parameter-shift", None])
+def test_qnode_grad_method_stored_on_execution_config(grad_method):
+    """Test that the grad_method specified on the qnode is updated on the ExecutionConfig 
+    that is passed to the preprocess method"""
 
-#     @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=grad_method)
-#     def circ(x):
-#         qml.RX(x, wires=0)
-#         return qml.expval(qml.PauliX(0))
+    @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=grad_method)
+    def circ(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliX(0))
 
-#     def grad_circ(x: float):
-#         return grad(circ)(x)
+    def grad_circ(x: float):
+        return grad(circ)(x)
 
-#     def dummy_preprocess(self, ctx, execution_config = qml.devices.DefaultExecutionConfig):
-#         """A dummpy preprocess method that asserts that the gradient method on the execution_config 
-#         matches what was passed to the qnode before raising a RuntimeError so we can confirm the 
-#         dummy preproces was called"""
-#         assert execution_config.gradient_method == grad_method
-#         raise RuntimeError("dummy_preprocess was called and the assert passed")
+    def dummy_preprocess(self, ctx, execution_config = qml.devices.DefaultExecutionConfig):
+        """A dummpy preprocess method that asserts that the gradient method on the execution_config 
+        matches what was passed to the qnode before raising a RuntimeError so we can confirm the 
+        dummy preproces was called"""
+        assert execution_config.gradient_method == grad_method
+        raise RuntimeError("dummy_preprocess was called and the assert passed")
 
-#     with patch.object(catalyst.device.qjit_device.QJITDeviceNewAPI, "preprocess", dummy_preprocess):
-#         with pytest.raises(RuntimeError, match="dummy_preprocess was called and the assert passed"):
-#             qml.qjit(circ)(1.2)
+    with patch.object(catalyst.device.qjit_device.QJITDeviceNewAPI, "preprocess", dummy_preprocess):
+        with pytest.raises(RuntimeError, match="dummy_preprocess was called and the assert passed"):
+            qml.qjit(circ)(1.2)
 
-#     with patch.object(catalyst.device.qjit_device.QJITDeviceNewAPI, "preprocess", dummy_preprocess):
-#         with pytest.raises(RuntimeError, match="dummy_preprocess was called and the assert passed"):
-#             qml.qjit(grad_circ)(1.2)
+    with patch.object(catalyst.device.qjit_device.QJITDeviceNewAPI, "preprocess", dummy_preprocess):
+        with pytest.raises(RuntimeError, match="dummy_preprocess was called and the assert passed"):
+            qml.qjit(grad_circ)(1.2)
 
 
 
