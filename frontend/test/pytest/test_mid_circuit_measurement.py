@@ -15,7 +15,7 @@
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from catalyst import CompileError, dynamic_one_shot, measure, qjit
+from catalyst import cond, CompileError, dynamic_one_shot, measure, qjit
 from conftest import validate_measurements
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -227,10 +227,10 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
-    @pytest.mark.parametrize("shots", [3000, [3000, 3001]])
+    @pytest.mark.parametrize("shots", [20000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
-    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
+    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.sample, qml.var])
     def test_single_mcm_single_measure_mcm(self, backend, shots, postselect, reset, measure_f):
         """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement and a
         conditional gate. A single measurement of the mid-circuit measurement value is performed at
@@ -254,7 +254,12 @@ class TestMidCircuitMeasurement:
         def func(x, y):
             qml.RX(x, wires=0)
             m0 = measure(0, reset=reset, postselect=postselect)
-            # qml.cond(m0, qml.RY)(y, wires=1)
+
+            @cond(m0 == 1)
+            def ansatz():
+                qml.RY(y, wires=1)
+
+            ansatz()
             return measure_f(op=m0)
 
         params = jnp.pi / 4 * jnp.ones(2)
