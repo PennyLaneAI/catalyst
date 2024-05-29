@@ -71,7 +71,7 @@
   [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
 
   Although library code is not meant to be targeted by Autograph conversion,
-  it sometimes make sense to enable it for specific submodules that might 
+  it sometimes make sense to enable it for specific submodules that might
   benefit from such conversion:
 
   ```py
@@ -116,7 +116,7 @@
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
 * Refactored `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators in order to follow
-  a unified pattern that uses a callable class implementing the decorator's logic. This 
+  a unified pattern that uses a callable class implementing the decorator's logic. This
   prevents having to excessively define functions in a nested fashion.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
   [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
@@ -125,6 +125,11 @@
 
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
+
+* The built-in instrumentation with `detailed` output will no longer report the cumulative time for
+  MLIR pipelines, since was being reported as just another step alongside the individual timings for
+  each pipeline.
+  [(#772)](https://github.com/PennyLaneAI/catalyst/pull/772)
 
 <h3>Breaking changes</h3>
 
@@ -140,7 +145,7 @@
 
 * Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
   In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
-  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)    
+  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
 <h3>Internal changes</h3>
 
