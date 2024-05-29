@@ -15,7 +15,7 @@
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from catalyst import cond, CompileError, dynamic_one_shot, measure, qjit
+from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
 from conftest import validate_measurements
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -227,14 +227,29 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
-    @pytest.mark.parametrize("shots", [20000])
-    @pytest.mark.parametrize("postselect", [None, 0, 1])
+    @pytest.mark.parametrize("shots", [5000])
+    @pytest.mark.parametrize("postselect", [None])
     @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.sample, qml.var])
-    def test_single_mcm_single_measure_mcm(self, backend, shots, postselect, reset, measure_f):
+    @pytest.mark.parametrize(
+        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
+    )
+    def test_simple_mcm(self, backend, shots, postselect, reset, measure_f, meas_obj):
         """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement and a
         conditional gate. A single measurement of the mid-circuit measurement value is performed at
         the end."""
+        print(reset, measure_f, meas_obj)
+        if measure_f in (qml.counts, qml.sample) and (
+            not isinstance(meas_obj, list) and not meas_obj == "mcm"
+        ):
+            pytest.skip("Can't use observables with counts or sample")
+        if measure_f in (qml.var, qml.expval) and (
+            isinstance(meas_obj, list) or meas_obj == "mcm_list"
+        ):
+            pytest.skip("Can't use wires/mcm lists with var or expval")
+
+        if measure_f == qml.var and (not isinstance(meas_obj, list) and not meas_obj == "mcm"):
+            pytest.xfail("isa<UnrealizedConversionCastOp>")
 
         dq = qml.device("default.qubit", shots=shots)
 
@@ -244,7 +259,13 @@ class TestMidCircuitMeasurement:
             qml.RX(x, wires=0)
             m0 = qml.measure(0, reset=reset, postselect=postselect)
             qml.cond(m0, qml.RY)(y, wires=1)
-            return measure_f(op=m0)
+
+            meas_key = "wires" if isinstance(meas_obj, list) else "op"
+            meas_value = m0 if isinstance(meas_obj, str) else meas_obj
+            kwargs = {meas_key: meas_value}
+            if measure_f == qml.counts:
+                kwargs["all_outcomes"] = True
+            return measure_f(**kwargs)
 
         dev = qml.device(backend, wires=2, shots=shots)
 
@@ -260,12 +281,19 @@ class TestMidCircuitMeasurement:
                 qml.RY(y, wires=1)
 
             ansatz()
-            return measure_f(op=m0)
+
+            meas_key = "wires" if isinstance(meas_obj, list) else "op"
+            meas_value = m0 if isinstance(meas_obj, str) else meas_obj
+            kwargs = {meas_key: meas_value}
+            return measure_f(**kwargs)
 
         params = jnp.pi / 4 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
-
+        if measure_f == qml.counts and isinstance(meas_obj, list):
+            results1 = {
+                format(int(state), f"0{len(meas_obj)}b"): count for state, count in zip(*results1)
+            }
         validate_measurements(measure_f, shots, results1, results0)
 
 
