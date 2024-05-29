@@ -491,7 +491,7 @@ def validate_device_capabilities(
         # gate before calling the validation.
         # See https://github.com/PennyLaneAI/pennylane-lightning/pull/642#discussion_r1535478642
         if device_name == "lightning-kokkos":
-            device_gates = device_gates - { "C(GlobalPhase)" }
+            device_gates = device_gates - {"C(GlobalPhase)"}
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
         if device_gates != spec_gates:
             raise CompileError(
