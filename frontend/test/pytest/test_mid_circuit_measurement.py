@@ -237,15 +237,13 @@ class TestMidCircuitMeasurement:
     def test_simple_mcm(self, backend, shots, postselect, reset, measure_f, meas_obj):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
-        print(reset, measure_f, meas_obj)
-        if measure_f in (qml.counts, qml.sample) and (
+        if measure_f in (qml.counts, qml.probs, qml.sample) and (
             not isinstance(meas_obj, list) and not meas_obj == "mcm"
         ):
-            pytest.skip("Can't use observables with counts or sample")
-        if measure_f in (qml.probs,) and (not isinstance(meas_obj, list) and not meas_obj == "mcm"):
-            pytest.skip("Can't use observables or mcms with probs")
+            pytest.skip("Can't use observables with counts, probs or sample")
+
         if measure_f in (qml.var, qml.expval) and (
-            isinstance(meas_obj, list) or meas_obj == "mcm_list"
+            isinstance(meas_obj, list)
         ):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
@@ -296,6 +294,68 @@ class TestMidCircuitMeasurement:
                 format(int(state), f"0{len(meas_obj)}b"): count for state, count in zip(*results1)
             }
         validate_measurements(measure_f, shots, results1, results0)
+
+    @pytest.mark.parametrize("shots", [5000])
+    @pytest.mark.parametrize("postselect", [None])
+    @pytest.mark.parametrize("reset", [False, True])
+    def test_mcm_multiple_measurements(self, backend, shots, postselect, reset):
+        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
+        circuit with a mid-circuit measurement and several terminal measurements."""
+        obs = qml.PauliY(0)
+
+        dq = qml.device("default.qubit", shots=shots)
+
+        @qml.defer_measurements
+        @qml.qnode(dq)
+        def ref_func(x, y):
+            qml.RX(x, wires=0)
+            m0 = qml.measure(0, reset=reset, postselect=postselect)
+            qml.cond(m0, qml.RY)(y, wires=1)
+
+            return (
+                qml.expval(op=m0),
+                qml.probs(wires=[1]),
+                qml.probs(wires=[0, 1]),
+                qml.probs(op=m0),
+                qml.sample(wires=[1]),
+                qml.sample(wires=[0, 1]),
+                qml.sample(op=m0),
+                qml.expval(obs),
+            )
+
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, wires=0)
+            m0 = measure(0, reset=reset, postselect=postselect)
+
+            @cond(m0 == 1)
+            def ansatz():
+                qml.RY(y, wires=1)
+
+            ansatz()
+
+            return (
+                qml.expval(op=m0),
+                qml.probs(wires=[1]),
+                qml.probs(wires=[0, 1]),
+                qml.probs(op=m0),
+                qml.sample(wires=[1]),
+                qml.sample(wires=[0, 1]),
+                qml.sample(op=m0),
+                qml.expval(obs),
+            )
+
+        params = jnp.pi / 4 * jnp.ones(2)
+        results0 = ref_func(*params)
+        results1 = func(*params)
+        for r1, r0 in zip(results1, results0):
+            r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
+            qml.math.allclose(r1, r0)
+
 
 
 if __name__ == "__main__":
