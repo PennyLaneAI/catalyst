@@ -496,7 +496,7 @@ def validate_device_capabilities(
         if device_gates != spec_gates:
             raise CompileError(
                 "Gates in qml.device.operations and specification file do not match for "
-                f"\"{device_name}\".\n"
+                f'"{device_name}".\n'
                 f"Gates that present only in the device: {device_gates - spec_gates}\n"
                 f"Gates that present only in spec: {spec_gates - device_gates}\n"
             )
