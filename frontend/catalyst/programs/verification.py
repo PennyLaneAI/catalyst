@@ -145,9 +145,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             # Controlled and QCtrl are checked in _ctrl_op_checker
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
-                raise CompileError(
-                    f"{op.name} is not supported on '{qjit_device.original_device.name}' device"
-                )
+            raise CompileError(
+                f"{op.name} is not supported on '{qjit_device.original_device.name}' device"
+            )
 
         # check validity of ops nested inside control or adjoint
         in_inverse, in_control = state

@@ -138,7 +138,6 @@ def test_unsupported_ops_raise_an_error():
         qml.qjit(f)(1.2)
 
 
-
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
     """Test that the verification catches situations where a HybridOp subtape contains
@@ -158,6 +157,7 @@ class TestHybridOpVerification:
             qml.qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
+
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
@@ -184,6 +184,7 @@ class TestHybridOpVerification:
             qml.qjit(f)(1.2)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
+
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
@@ -227,7 +228,6 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-
     def test_non_controllable_gate_simple_pennylane_ctrl(self):
         """Test that a Controlled PennyLane op that is not natively supported by the device
         and has a non-controllable base raises an error"""
@@ -236,7 +236,7 @@ class TestHybridOpVerification:
         def f(x: float):
             Controlled(qml.PauliZ(wires=0), control_wires=[1, 2])
             return qml.expval(qml.PauliX(0))
-            
+
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             qml.qjit(f)(1.2)
 
@@ -245,7 +245,6 @@ class TestHybridOpVerification:
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
-
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
