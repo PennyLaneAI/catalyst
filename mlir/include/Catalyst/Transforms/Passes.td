@@ -150,7 +150,7 @@ def SpecializeActiveCallbackPass : Pass<"specialize-active-callback-pass", "Modu
            2.1 If the activeCallbackOp has been specialized: then continue.
            2.2 If the activeCallbackOp has not been specialized:
                2.2.1 Create a function activeCallbackOp${ID} where the first three parameters are literals.
-               2.2.2 Annotate the activeCallbackOp with a FlatSymbolRefAttr to the activeCallbackOp${ID}
+           2.3 Annotate the activeCallbackOp with a FlatSymbolRefAttr to the activeCallbackOp${ID}
     }];
 
     let dependentDialects = [
