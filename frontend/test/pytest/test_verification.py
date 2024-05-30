@@ -30,7 +30,6 @@ from catalyst import (
     ctrl,
     for_loop,
     grad,
-    qjit,
     while_loop,
 )
 from catalyst.device import get_device_capabilities
@@ -40,6 +39,7 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
 )
 
+# pylint: disable = unused-argument
 
 def get_custom_device(
     non_differentiable_gates=frozenset(),
@@ -119,6 +119,7 @@ def null_transform(tape, *args, **kwargs):
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 def test_unsupported_ops_raise_an_error():
+    """Test that an unsupported op raises an error"""
 
     class MyOp(qml.operation.Operator):
 
@@ -373,8 +374,8 @@ class TestParameterShiftMethodVerification:
 
     @patch.object(qml.RX, "grad_method", "F")
     def test_paramshift_gate_simple(self):
-        """Test that taking a parameter-shift gradient of a tape containing a parameterized operation
-        that doesn't support analytic differentiation raises an error."""
+        """Test that taking a parameter-shift gradient of a tape containing a parameterized 
+        operation that doesn't support analytic differentiation raises an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
         def f(_):
