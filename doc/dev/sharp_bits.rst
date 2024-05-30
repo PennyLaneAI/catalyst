@@ -952,7 +952,7 @@ the decomposition as follows:
 Directly accessing QNode for PennyLane
 --------------------------------------
 
-Despite all the compatibility restrictions discussed above, if you really wish to access the QNode compiled by :func:`@qjit <~.qjit>` and pass them into various PennyLane methods, you can access them via the ``original_function`` attribute of the compiled function. The new QNodes can always be recompiled:
+In cases where the :func:`@qjit <~.qjit>` decorator is directly applied to a QNode object, it can be useful to retrieve the wrapped entity when interacting with PennyLane functions. Note that the :func:`@qjit <~.qjit>` decorator changes the type of the wrapped object, for example from ``function`` to :class:`QJIT <~.QJIT>`, or in this case from ``QNode`` to :class:`QJIT <~.QJIT>`. The original entity is accessible via the ``.original_function`` attribute on the compiled function, and can be used as follows:
 
 .. code-block:: python
 
@@ -968,28 +968,33 @@ Despite all the compatibility restrictions discussed above, if you really wish t
 
     # Explicitly accessing the QNode for PenneLane transforms, which takes in a QNode and returns a QNode
     g = qml.transforms.cancel_inverses(f.original_function)  
-    # Compile the transformed QNode again with qjit 
-    g = qjit(g)
-
 
 
 >>> f
 <catalyst.jit.QJIT object at ...>
->>> qml.matrix(f)()  # Error since qml.matrix expects a QNode, not a qjit compiled function
-ValueError: wire_order is required by qml.matrix() for quantum functions.
 >>> f.original_function
+<QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
+>>> g
 <QNode: device='<lightning.qubit device (wires=1) at ...>', ...>
 >>> qml.matrix(f.original_function)()
 [[ 0.70710678  0.70710678]
  [ 0.70710678 -0.70710678]]
->>> g
-<catalyst.jit.QJIT object at ...>
+
+
+Note that some PennyLane functions may be able to extract the QNode automatically, like ``qml.draw`` and ``qml.matrix``:
+
+>>> qml.matrix(f)()
+[[ 0.70710678  0.70710678]
+ [ 0.70710678 -0.70710678]]
 >>> qml.draw(f)()
 0: ──X──X──H─┤  State
+>>> g = qjit(g)   # Compile the transformed QNode again with qjit 
+>>> g
+<catalyst.jit.QJIT object at ...>
 >>> qml.draw(g)()
 0: ──H─┤  State
 
-
+But in general, you will need to pass in the QNode explicitly.
 
 Function argument restrictions
 ------------------------------
