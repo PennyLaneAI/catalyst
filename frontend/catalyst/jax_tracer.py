@@ -13,6 +13,7 @@
 # limitations under the License.
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
+# pylint: disable=too-many-lines
 
 from dataclasses import dataclass
 from functools import partial, reduce
@@ -953,7 +954,7 @@ def null_postprocessing(results):
     return results[0]
 
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,no-member,not-callable
 def dynamic_one_shot(qnode):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 

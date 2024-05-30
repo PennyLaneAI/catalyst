@@ -261,7 +261,7 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
 
 def patch_schema1_collections(
     config, _device_name, native_gate_props, matrix_decomp_props, decomp_props
-):  # pylint: disable=too-many-arguments, too-many-branches
+):
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
 
     # The deduction logic is the following:
