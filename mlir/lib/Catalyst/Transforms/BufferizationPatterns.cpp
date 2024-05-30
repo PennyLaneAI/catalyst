@@ -91,30 +91,9 @@ struct BufferizeInactiveCallbackOp : public OpConversionPattern<InactiveCallback
         // Add bufferized arguments
         SmallVector<Value> bufferArgs(adaptor.getOperands().begin(), adaptor.getOperands().end());
 
-        // Add bufferized return values to the arguments
-        auto results = op.getResults();
-
-        for (Value result : results) {
-            Type resultType = result.getType();
-            RankedTensorType tensorType = resultType.dyn_cast<RankedTensorType>();
-            if (!tensorType) {
-                return failure();
-            }
-            auto options = bufferization::BufferizationOptions();
-            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
-                rewriter, op->getLoc(), result, options, false);
-            MemRefType memrefType =
-                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-            auto newBuffer =
-                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
-            bufferArgs.push_back(newBuffer);
-        }
-
-        rewriter.create<InactiveCallbackOp>(op.getLoc(), TypeRange{}, bufferArgs,
-                                            adaptor.getIdentifier(), op.getOperands().size());
-        size_t startIndex = bufferArgs.size() - op.getNumResults();
-        SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
-        rewriter.replaceOp(op, bufferResults);
+        auto newOp = rewriter.create<InactiveCallbackOp>(
+            op.getLoc(), bufferArgs, adaptor.getIdentifier(), op.getOperands().size());
+        rewriter.replaceOp(op, newOp);
         return success();
     }
 };

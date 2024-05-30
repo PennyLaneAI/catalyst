@@ -252,9 +252,9 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
     i64_type = ir.IntegerType.get_signless(64, ctx)
     identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
+    if not results_aval:
+        return InactiveCallbackOp(args, identifier, number_original_arg=len(args)).results
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
-    if not mlir_ty:
-        return InactiveCallbackOp([], args, identifier, number_original_arg=len(args)).results
     return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 

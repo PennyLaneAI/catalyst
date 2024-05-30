@@ -119,19 +119,17 @@ def InactiveCallbackOp: Catalyst_Op<"inactiveCallbackCall",
         OptionalAttr<I64Attr>: $number_original_arg
   );
 
-  let results = (outs Variadic<AnyType>);
-
   let builders = [
-        OpBuilder<(ins "mlir::TypeRange":$resultTypes, "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier), [{
+        OpBuilder<(ins "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier), [{
             auto id = $_builder.getI64IntegerAttr(identifier);
             auto argc = $_builder.getI64IntegerAttr(inputs.size());
-            return build($_builder, $_state, resultTypes, inputs, id, argc);
+            return build($_builder, $_state, inputs, id, argc);
         }]>,
 
-        OpBuilder<(ins "mlir::TypeRange":$resultTypes, "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier, "int64_t": $size), [{
+        OpBuilder<(ins "llvm::SmallVector<mlir::Value>":$inputs, "int64_t":$identifier, "int64_t": $size), [{
             auto id = $_builder.getI64IntegerAttr(identifier);
             auto argc = $_builder.getI64IntegerAttr(size);
-            return build($_builder, $_state, resultTypes, inputs, id, argc);
+            return build($_builder, $_state, inputs, id, argc);
         }]>
     ];
 

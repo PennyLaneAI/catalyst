@@ -455,9 +455,7 @@ struct InactiveCallbackOpPattern : public OpConversionPattern<InactiveCallbackOp
         long argcint = argcAttr ? argcAttr.value() : 0;
         auto argc = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(argcint));
 
-        auto resultsSizeAttr = op.getOperands().size() - argcint;
-        auto resultsSizeVal =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(resultsSizeAttr));
+        auto resultsSizeVal = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
 
         SmallVector<Value> callArgs{ident};
         callArgs.insert(callArgs.end(), argc);
