@@ -18,10 +18,29 @@ from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-import catalyst
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    MeasurementProcess,
+    ProbabilityMP,
+    SampleMP,
+    VarianceMP,
+)
+from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.tape import QuantumTape
+from pennylane.transforms.core import TransformProgram
+from pennylane.transforms.dynamic_one_shot import (
+    init_auxiliary_tape,
+    is_mcm,
+    parse_native_mid_circuit_measurements,
+)
+
+import catalyst
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -76,12 +95,6 @@ from catalyst.tracing.contexts import (
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
-from pennylane import QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operation, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
-from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
 
 
 class Function:
@@ -933,31 +946,6 @@ def trace_quantum_function(
     return closed_jaxpr, out_type, out_tree
 
 
-def is_leaf(obj):
-    return isinstance(obj, qml.measurements.MeasurementProcess)
-
-
-def is_mcm(operation):
-    from pennylane.measurements.mid_measure import MidMeasureMP
-
-    """Returns True if the operation is a mid-circuit measurement and False otherwise."""
-    mcm = isinstance(operation, MidMeasureMP)
-    return mcm or "MidCircuitMeasure" in str(type(operation))
-
-
-from pennylane.measurements import (
-    CountsMP,
-    ExpectationMP,
-    ProbabilityMP,
-    SampleMP,
-    VarianceMP,
-)
-from pennylane.transforms.dynamic_one_shot import (
-    init_auxiliary_tape,
-    parse_native_mid_circuit_measurements,
-)
-
-
 def null_postprocessing(results):
     """A postprocessing function returned by a transform that only converts the batch of results
     into a result for a single ``QuantumTape``.
@@ -965,8 +953,46 @@ def null_postprocessing(results):
     return results[0]
 
 
+# pylint: disable=protected-access
 def dynamic_one_shot(qnode):
-    from catalyst import vmap
+    """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
+
+    Args:
+        qnode (QNode): a quantum circuit which will run n-shot times
+
+    Returns:
+        qnode (QNode):
+
+        The transformed circuit to be run n-shot times such as to simulate dynamic execution.
+
+
+    **Example**
+
+    Consider the following circuit:
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", shots=100)
+        params = np.pi / 4 * np.ones(2)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev, diff_method=None)
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            m0 = measure(0, reset=reset, postselect=postselect)
+
+            @cond(m0 == 1)
+            def ansatz():
+                qml.RY(y, wires=1)
+
+            ansatz()
+            return measure_f(wires=[0, 1])
+
+    The ``dynamic_one_shot`` decorator prompts the QNode to perform a hundred one-shot
+    calculations, where in each calculation the ``measure`` operations dynamically
+    measures the 0-wire and collapse the state vector stochastically.
+    """
 
     cpy_tape = None
     aux_tapes = None
@@ -1013,37 +1039,14 @@ def dynamic_one_shot(qnode):
             nonlocal cpy_tape
             cpy_tape = tape
             nonlocal aux_tapes
-            aux_tapes = [
-                init_auxiliary_tape(tape)
-            ]  # <----------------------------------------------- change here
+            aux_tapes = [init_auxiliary_tape(tape)]
 
-            def processing_fn(
-                results, has_partitioned_shots=None, batched_results=None
-            ):  # <------ change here
+            def processing_fn(results):
                 return results
 
             return aux_tapes, processing_fn
 
         return dynamic_one_shot_partial(qnode)
-
-    def post_process(
-        shots, results, has_partitioned_shots=None, batched_results=None
-    ):  # <---------------- moved from above
-
-        if has_partitioned_shots is None and shots.has_partitioned_shots:
-            # If using shot vectors, recursively process the results for each shot bin. The length
-            # of the first axis of final_results will be the length of the shot vector.
-            results = list(results[0])
-            final_results = []
-            for s in shots:
-                final_results.append(
-                    post_process(results[0:s], has_partitioned_shots=False, batched_results=False)
-                )
-                del results[0:s]
-            return tuple(final_results)
-        # if not shots.has_partitioned_shots:
-        #     results = results[0]
-        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
 
     aux_qnode = transform_to_single_shot(qnode)
     shots = qnode.device.shots
@@ -1053,12 +1056,12 @@ def dynamic_one_shot(qnode):
     def one_shot_wrapper(*args, **kwargs):
         arg_vmap = jnp.empty((shots.total_shots,), dtype=float)
 
-        def wrap_single_shot_qnode(x):
+        def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 
-        results = vmap(wrap_single_shot_qnode)(arg_vmap)
+        results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        return post_process(shots, results)
+        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
 
     return one_shot_wrapper

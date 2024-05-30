@@ -211,7 +211,7 @@ class TestMidCircuitMeasurement:
         assert circuit(0.0) == [0] * 10
         assert circuit(jnp.pi) == [1] * 10
 
-    def test_return_mcm_with_sample_single(self, backend):
+    def test_dynamic_one_shot_with_sample_single(self, backend):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
         dev = qml.device(backend, wires=1, shots=10)
@@ -228,14 +228,15 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
-    @pytest.mark.parametrize("shots", [5000])
+    @pytest.mark.parametrize("shots", [8000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
         "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
-    def test_simple_mcm(self, backend, shots, postselect, reset, measure_f, meas_obj):
+    # pylint: disable=too-many-arguments
+    def test_dynamic_one_shot_simple(self, backend, shots, postselect, reset, measure_f, meas_obj):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
         if measure_f in (qml.counts, qml.probs, qml.sample) and (
@@ -304,7 +305,7 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("shots", [5000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
-    def test_mcm_multiple_measurements(self, backend, shots, postselect, reset):
+    def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
         obs = qml.PauliY(0)

@@ -16,12 +16,12 @@ Pytest configuration file for Catalyst test suite.
 """
 # pylint: disable=unused-import
 import platform
-import pytest
-
-import pennylane as qml
-import numpy as np
 from functools import reduce
 from typing import Iterable, Sequence
+
+import numpy as np
+import pennylane as qml
+import pytest
 
 
 def is_cuda_available():
