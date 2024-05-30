@@ -915,10 +915,13 @@ class Cond(HybridOp):
 
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
+            op.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                *(op.in_classical_tracers + combined_consts + [qreg]),
+                in_expanded_tracers=[
+                    *(op.in_classical_tracers + combined_consts + [qreg]),
+                ],
+                out_expanded_tracers=op.out_classical_tracers,
                 branch_jaxprs=unify_jaxpr_result_types(jaxprs2),
             )
         )
@@ -929,35 +932,6 @@ class ForLoop(HybridOp):
     """PennyLane ForLoop Operation."""
 
     binder = for_p.bind
-
-    def trace_quantum1(self, ctx, device, trace, qrp) -> QRegPromise:
-        op = self
-        inner_trace = op.regions[0].trace
-        inner_tape = op.regions[0].quantum_tape
-        res_classical_tracers = op.regions[0].res_classical_tracers
-
-        with EvaluationContext.frame_tracing_context(ctx, inner_trace):
-            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-            qreg_out = qrp_out.actualize()
-            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_classical_tracers + [qreg_out])
-
-        step = op.in_classical_tracers[2]
-        qreg = qrp.actualize()
-        qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
-                ctx,
-                trace,
-                op.in_classical_tracers[0],
-                op.in_classical_tracers[1],
-                step,
-                *(consts + op.in_classical_tracers[3:] + [qreg]),
-                body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-                body_nconsts=len(consts),
-                apply_reverse_transform=self.apply_reverse_transform,
-            )
-        )
-        return qrp2
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
@@ -1041,10 +1015,13 @@ class WhileLoop(HybridOp):
 
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
-            self.bind_overwrite_classical_tracers(
+            self.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                *(cond_consts + body_consts + self.in_classical_tracers + [qreg]),
+                in_expanded_tracers=[
+                    *(cond_consts + body_consts + self.in_classical_tracers + [qreg]),
+                ],
+                out_expanded_tracers=self.out_classical_tracers,
                 cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                 cond_nconsts=len(cond_consts),

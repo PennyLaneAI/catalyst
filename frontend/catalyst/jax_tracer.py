@@ -306,24 +306,6 @@ class HybridOp(Operation):
         nested_ops = [r.quantum_tape.operations for r in self.regions if r.quantum_tape]
         return f"{self.name}(tapes={nested_ops})"
 
-    def bind_overwrite_classical_tracers(
-        self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
-    ) -> DynamicJaxprTracer:
-        """Binds the JAX primitive but override the returned classical tracers with the already
-        existing output tracers, stored in the operations."""
-        # Notes:
-        # [1] - We are interested in a new quantum tracer only, so we ignore all other (classical)
-        #       tracers returned by JAX.
-        # [2] - We add the already existing classical tracers into the last JAX equation created by
-        #       JAX bind handler of the ``trace`` object.
-        assert self.binder is not None, "HybridOp should set a binder"
-        out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
-        eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
-            eqn.outvars[i] = trace.getvar(t)
-        return out_quantum_tracer
-
     def bind_overwrite_classical_tracers2(
         # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
         self,
