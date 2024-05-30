@@ -193,5 +193,31 @@ def test_shape_error():
         mitigated_qnode(0.1)
 
 
+@pytest.mark.parametrize("params", [0.1, 0.2, 0.3, 0.4, 0.5])
+def test_zne_usage_patterns(params):
+    """Test usage patterns of catalyst.zne."""
+    dev = qml.device("lightning.qubit", wires=2)
+
+    @qml.qnode(device=dev)
+    def fn(x):
+        qml.Hadamard(wires=0)
+        qml.RZ(x, wires=0)
+        qml.RZ(x, wires=0)
+        qml.CNOT(wires=[1, 0])
+        qml.Hadamard(wires=1)
+        return qml.expval(qml.PauliY(wires=0))
+
+    @catalyst.qjit
+    def mitigated_qnode_fn_as_argument(args):
+        return catalyst.mitigate_with_zne(fn, scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(args)
+
+    @catalyst.qjit
+    def mitigated_qnode_partial(args):
+        return catalyst.mitigate_with_zne(scale_factors=jax.numpy.array([1, 2, 3]), deg=2)(fn)(args)
+
+    assert np.allclose(mitigated_qnode_fn_as_argument(params), fn(params))
+    assert np.allclose(mitigated_qnode_partial(params), fn(params))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

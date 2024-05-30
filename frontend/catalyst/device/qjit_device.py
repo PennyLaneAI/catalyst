@@ -393,7 +393,12 @@ class QJITDeviceNewAPI(qml.devices.Device):
         program = TransformProgram()
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
-        program.add_transform(catalyst_decompose, ctx=ctx, stopping_condition=ops_acceptance)
+        program.add_transform(
+            catalyst_decompose,
+            ctx=ctx,
+            stopping_condition=ops_acceptance,
+            capabilities=self.qjit_capabilities,
+        )
 
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
@@ -487,10 +492,16 @@ def validate_device_capabilities(
     if hasattr(device, "operations") and hasattr(device, "observables"):
         # For gates, we require strict match
         device_gates = filter_out_adjoint(set(device.operations))
+        # Lightning-kokkis might support C(GlobalPhase) in Python, but not in C++. We remove this
+        # gate before calling the validation.
+        # See https://github.com/PennyLaneAI/pennylane-lightning/pull/642#discussion_r1535478642
+        if device_name == "lightning.kokkos":
+            device_gates = device_gates - {"C(GlobalPhase)"}
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
         if device_gates != spec_gates:
             raise CompileError(
-                "Gates in qml.device.operations and specification file do not match.\n"
+                "Gates in qml.device.operations and specification file do not match for "
+                f'"{device_name}".\n'
                 f"Gates that present only in the device: {device_gates - spec_gates}\n"
                 f"Gates that present only in spec: {spec_gates - device_gates}\n"
             )

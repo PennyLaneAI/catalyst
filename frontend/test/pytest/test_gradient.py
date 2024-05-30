@@ -1230,5 +1230,56 @@ class TestGradientErrors:
                 return grad(g)(x)
 
 
+class TestGradientUsagePatterns:
+    """Test usage patterns of Gradient functions"""
+
+    def test_grad_usage_patterns(self):
+        """Test usage patterns of catalyst.grad."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        res_pattern_fn_as_argument = grad(fn, method="fd")(x)
+        res_pattern_partial = grad(method="fd")(fn)(x)
+        expected = jax.grad(fn)(x)
+
+        assert np.allclose(res_pattern_fn_as_argument, expected)
+        assert np.allclose(res_pattern_partial, expected)
+
+    def test_value_and_grad_usage_patterns(self):
+        """Test usage patterns of catalyst.value_and_grad."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        fn_as_argument_val, fn_as_argument_grad = value_and_grad(fn, method="fd")(x)
+        partial_val, partial_grad = value_and_grad(method="fd")(fn)(x)
+        expected_val, expected_grad = jax.value_and_grad(fn)(x)
+
+        assert np.allclose(fn_as_argument_val, expected_val)
+        assert np.allclose(partial_val, expected_val)
+        assert np.allclose(fn_as_argument_grad, expected_grad)
+        assert np.allclose(partial_grad, expected_grad)
+
+    def test_jacobian_usage_patterns(self):
+        """Test usage patterns of catalyst.jacobian."""
+
+        def fn(x):
+            return x**2
+
+        x = 4.0
+
+        res_pattern_fn_as_argument = jacobian(fn, method="fd")(x)
+        res_pattern_partial = jacobian(method="fd")(fn)(x)
+        expected = jax.jacobian(fn)(x)
+
+        assert np.allclose(res_pattern_fn_as_argument, expected)
+        assert np.allclose(res_pattern_partial, expected)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
