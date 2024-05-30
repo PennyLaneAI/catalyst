@@ -254,7 +254,7 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
     if not mlir_ty:
-        return InactiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+        return InactiveCallbackOp([], args, identifier, number_original_arg=len(args)).results
     return ActiveCallbackOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
 
 
