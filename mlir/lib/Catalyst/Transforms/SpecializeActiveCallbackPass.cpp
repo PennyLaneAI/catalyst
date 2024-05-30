@@ -47,7 +47,7 @@ LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp &op, PatternRe
     return inactiveCallback;
 }
 
-LLVM::LLVMFuncOp lookupOrCreateSpecialized(ActiveCallbackOp &op, PatternRewriter &rewriter)
+func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp &op, PatternRewriter &rewriter)
 {
     auto name = getSpecializedName(op);
     auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -63,7 +63,15 @@ LLVM::LLVMFuncOp lookupOrCreateSpecialized(ActiveCallbackOp &op, PatternRewriter
         inputs.push_back(ptrTy);
     }
 
-    auto funcOp = mlir::LLVM::lookupOrCreateFn(moduleOp, name, inputs, voidType, false);
+    auto funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(name));
+    if (funcOp) {
+       return funcOp;
+    }
+
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
+    auto fnTy = FunctionType::get(ctx, inputs, TypeRange{});
+    funcOp = rewriter.create<func::FuncOp>(loc, name, fnTy);
     funcOp.setPrivate();
 
     Block *entryBlock = funcOp.addEntryBlock();

@@ -66,9 +66,8 @@ module @test2 {
 // CHECK-LABEL: @test3
 module @test3 {
 
-  // CHECK-LABEL: @active_callback_0
+  // CHECK-LABEL: private @active_callback_0
   // CHECK-SAME: %arg0: !llvm.ptr
-  // CHECK-SAME: sym_visibility = "private"
   // CHECK-DAG: [[zero:%.+]] = llvm.mlir.constant(0 : i64)
   // CHECK-DAG: [[one:%.+]] = llvm.mlir.constant(1 : i64)
 
@@ -88,10 +87,9 @@ module @test3 {
 // CHECK-LABEL: @test4
 module @test4 {
 
-  // CHECK-LABEL: @active_callback_123
+  // CHECK-LABEL: private @active_callback_123
   // CHECK-SAME: %arg0: !llvm.ptr
   // CHECK-SAME: %arg1: !llvm.ptr
-  // CHECK-SAME: sym_visibility = "private"
 
   // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
   // CHECK: llvm.call @inactive_callback({{%.+}}, [[one]], [[one]], %arg0, %arg1)
