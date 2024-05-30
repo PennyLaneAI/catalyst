@@ -302,7 +302,7 @@ class TestMidCircuitMeasurement:
         validate_measurements(measure_f, shots, results1, results0)
 
     @pytest.mark.parametrize("shots", [5000])
-    @pytest.mark.parametrize("postselect", [None])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
     def test_mcm_multiple_measurements(self, backend, shots, postselect, reset):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
@@ -311,7 +311,6 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots)
 
-        @qml.defer_measurements
         @qml.qnode(dq)
         def ref_func(x, y):
             qml.RX(x, wires=0)
@@ -328,6 +327,11 @@ class TestMidCircuitMeasurement:
                 qml.sample(op=m0),
                 qml.expval(obs),
             )
+
+        if postselect is None:
+            ref_func = qml.defer_measurements(ref_func)
+        else:
+            ref_func = qml.dynamic_one_shot(ref_func)
 
         dev = qml.device(backend, wires=2, shots=shots)
 
@@ -355,10 +359,22 @@ class TestMidCircuitMeasurement:
                 qml.expval(obs),
             )
 
+        measures = (
+            qml.expval,
+            qml.probs,
+            qml.probs,
+            qml.probs,
+            qml.sample,
+            qml.sample,
+            qml.sample,
+            qml.expval,
+        )
         params = jnp.pi / 4 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
-        for r1, r0 in zip(results1, results0):
+        for m, r1, r0 in zip(measures, results1, results0):
+            if postselect is not None and m == qml.sample:
+                continue
             r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
             qml.math.allclose(r1, r0)
 
