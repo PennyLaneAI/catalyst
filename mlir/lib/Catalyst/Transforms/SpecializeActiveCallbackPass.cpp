@@ -32,7 +32,7 @@ std::string getSpecializedName(ActiveCallbackOp op)
     return "active_callback_" + id;
 }
 
-LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp op, PatternRewriter &rewriter)
+LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp &op, PatternRewriter &rewriter)
 {
     std::string name = "inactive_callback";
     auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -46,7 +46,7 @@ LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp op, PatternRew
     return inactiveCallback;
 }
 
-LLVM::LLVMFuncOp lookupOrCreateSpecialized(ActiveCallbackOp op, PatternRewriter &rewriter)
+LLVM::LLVMFuncOp lookupOrCreateSpecialized(ActiveCallbackOp &op, PatternRewriter &rewriter)
 {
     auto name = getSpecializedName(op);
     auto moduleOp = op->getParentOfType<ModuleOp>();
