@@ -567,8 +567,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     catalyst::utils::LinesCount::ModuleOp(*op);
 
     if (op) {
-        if (failed(timer::timer(runLowering, "runMLIRPasses", /* add_endl */ true, options, &ctx,
-                                *op, output))) {
+        if (failed(runLowering(options, &ctx, *op, output))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }

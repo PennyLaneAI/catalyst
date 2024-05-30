@@ -59,7 +59,6 @@ OPERATIONS = [
     "PSWAP",
     "SISWAP",
     "SQISW",
-    "CPhase",
     "BasisState",
     "QubitStateVector",
     "StatePrep",

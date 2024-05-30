@@ -256,23 +256,9 @@ def get_operation_properties(config_props: dict) -> OperationProperties:
 
 
 def patch_schema1_collections(
-    config, device_name, native_gate_props, matrix_decomp_props, decomp_props, observable_props
+    config, _device_name, native_gate_props, matrix_decomp_props, decomp_props
 ):  # pylint: disable=too-many-arguments, too-many-branches
     """For old schema1 config files we deduce some information which was not explicitly encoded."""
-
-    # TODO: remove after PR #642 is merged in lightning
-    # NOTE: we mark GlobalPhase as controllables even if `quantum_control` flag is False. This
-    # is what actual device reports.
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        native_gate_props["GlobalPhase"] = OperationProperties(
-            invertible=False, controllable=True, differentiable=True
-        )
-
-    # TODO: remove after PR #642 is merged in lightning
-    if device_name == "lightning.kokkos":  # pragma: nocover
-        observable_props["Projector"] = OperationProperties(
-            invertible=False, controllable=False, differentiable=False
-        )
 
     # The deduction logic is the following:
     # * Most of the gates have their `C(Gate)` controlled counterparts.
@@ -373,7 +359,6 @@ def load_device_capabilities(
             native_gate_props,
             matrix_decomp_props,
             decomp_props,
-            observable_props,
         )
 
     return DeviceCapabilities(
