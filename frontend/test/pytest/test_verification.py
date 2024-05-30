@@ -41,6 +41,7 @@ from catalyst.utils.toml import (
 
 # pylint: disable = unused-argument
 
+
 def get_custom_device(
     non_differentiable_gates=frozenset(),
     non_differentiable_obs=frozenset(),
@@ -374,7 +375,7 @@ class TestParameterShiftMethodVerification:
 
     @patch.object(qml.RX, "grad_method", "F")
     def test_paramshift_gate_simple(self):
-        """Test that taking a parameter-shift gradient of a tape containing a parameterized 
+        """Test that taking a parameter-shift gradient of a tape containing a parameterized
         operation that doesn't support analytic differentiation raises an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
