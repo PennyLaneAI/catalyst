@@ -41,9 +41,9 @@ LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp &op, PatternRe
 
     bool isVarArg = true;
     Type retTy = LLVM::LLVMVoidType::get(ctx);
-    SmallVector<Type> paramTys = { i64, i64, i64 };
-    LLVM::LLVMFuncOp inactiveCallback = mlir::LLVM::lookupOrCreateFn(
-        moduleOp, name, paramTys, retTy, isVarArg);
+    SmallVector<Type> paramTys = {i64, i64, i64};
+    LLVM::LLVMFuncOp inactiveCallback =
+        mlir::LLVM::lookupOrCreateFn(moduleOp, name, paramTys, retTy, isVarArg);
     return inactiveCallback;
 }
 
@@ -63,9 +63,10 @@ func::FuncOp lookupOrCreateSpecialized(ActiveCallbackOp &op, PatternRewriter &re
         inputs.push_back(ptrTy);
     }
 
-    auto funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(name));
+    auto funcOp =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(name));
     if (funcOp) {
-       return funcOp;
+        return funcOp;
     }
 
     PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -147,7 +148,6 @@ struct SpecializeActiveCallbackPass
         if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns), config))) {
             signalPassFailure();
         }
-
     }
 };
 
