@@ -15,9 +15,10 @@
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
 from conftest import validate_measurements
 from pennylane.transforms.dynamic_one_shot import fill_in_value
+
+from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
