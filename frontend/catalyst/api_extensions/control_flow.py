@@ -241,7 +241,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step):
+def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=True):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -318,7 +318,9 @@ def for_loop(lower_bound, upper_bound, step):
     """
 
     def _decorator(body_fn):
-        return ForLoopCallable(lower_bound, upper_bound, step, body_fn)
+        return ForLoopCallable(
+            lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
+        )
 
     return _decorator
 
@@ -599,9 +601,7 @@ class ForLoopCallable:
     (array([0.5, 0. , 0.5, 0. ]),)
     """
 
-    def __init__(
-        self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions: bool = True
-    ):
+    def __init__(self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions):
 
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound

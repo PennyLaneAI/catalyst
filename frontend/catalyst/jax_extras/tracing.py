@@ -205,16 +205,18 @@ def transient_jax_config() -> Generator[None, None, None]:
     want_vals = {"jax_dynamic_shapes": True}
     prev_vals = {}
 
-    for name, val in want_vals.items():
-        # Using ``read()`` to retrieve the value of an option is not permitted
-        # for JAX context manager flags.
-        prev_vals[name] = jax.config.values[name]
-        jax.config.update(name, val)
+    try:
+        for name, val in want_vals.items():
+            # Using ``read()`` to retrieve the value of an option is not permitted
+            # for JAX context manager flags.
+            prev_vals[name] = jax.config.values[name]
+            jax.config.update(name, val)
 
-    yield
+        yield
 
-    for name, val in prev_vals.items():
-        jax.config.update(name, val)
+    finally:
+        for name, val in prev_vals.items():
+            jax.config.update(name, val)
 
 
 @contextmanager

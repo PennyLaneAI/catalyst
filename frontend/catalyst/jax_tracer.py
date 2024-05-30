@@ -396,9 +396,9 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
                 "static_argnums": static_argnums,
                 "abstracted_axes": abstracted_axes,
             }
-            jaxpr, _, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    return jaxpr, out_treedef
+    return jaxpr, out_type, out_treedef
 
 
 def lower_jaxpr_to_mlir(jaxpr, func_name):
