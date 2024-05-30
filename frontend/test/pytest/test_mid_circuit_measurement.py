@@ -17,6 +17,7 @@ import pennylane as qml
 import pytest
 from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
 from conftest import validate_measurements
+from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -228,7 +229,7 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(jnp.pi), 1)
 
     @pytest.mark.parametrize("shots", [5000])
-    @pytest.mark.parametrize("postselect", [None])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
@@ -250,7 +251,6 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots)
 
-        @qml.defer_measurements
         @qml.qnode(dq)
         def ref_func(x, y):
             qml.RX(x, wires=0)
@@ -263,6 +263,11 @@ class TestMidCircuitMeasurement:
             if measure_f == qml.counts:
                 kwargs["all_outcomes"] = True
             return measure_f(**kwargs)
+
+        if postselect is None:
+            ref_func = qml.defer_measurements(ref_func)
+        else:
+            ref_func = qml.dynamic_one_shot(ref_func)
 
         dev = qml.device(backend, wires=2, shots=shots)
 
@@ -291,6 +296,9 @@ class TestMidCircuitMeasurement:
             results1 = {
                 format(int(state), f"0{len(meas_obj)}b"): count for state, count in zip(*results1)
             }
+        if measure_f == qml.sample:
+            results0 = results0[results0 != fill_in_value]
+            results1 = results1[results1 != fill_in_value]
         validate_measurements(measure_f, shots, results1, results0)
 
     @pytest.mark.parametrize("shots", [5000])

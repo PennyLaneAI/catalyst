@@ -153,6 +153,8 @@ def measure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
         regions=[],
+        reset=reset,
+        postselect=postselect,
     )
 
     # If reset was requested, reset qubit only if the measurement result was 1
@@ -393,6 +395,7 @@ class MidCircuitMeasure(HybridOp):
     binder = qmeasure_p.bind
 
     def __init__(self, *args, **kwargs):
+        self._override_postselect = False
         self.postselect = kwargs.pop("postselect", None)
         self.reset = kwargs.pop("reset", False)
         super().__init__(*args, **kwargs)
@@ -401,9 +404,11 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        postselect = op.in_classical_tracers[1]
-
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
+        if self._override_postselect:
+            qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+        else:
+            postselect = op.in_classical_tracers[1]
+            qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
