@@ -118,6 +118,28 @@ def null_transform(tape, *args, **kwargs):
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
+def test_unsupported_ops_raise_an_error():
+
+    class MyOp(qml.operation.Operator):
+
+        @property
+        def name(self):
+            return "UnsupportedOp"
+
+        def decomposition(self):
+            raise NotImplementedError()
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def f(_):
+        MyOp(wires=0)
+        return qml.expval(qml.PauliX(0))
+
+    with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
+        qml.qjit(f)(1.2)
+
+
+
+@patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
     """Test that the verification catches situations where a HybridOp subtape contains
     an operation the given device can't support inside that HybridOp"""
@@ -133,7 +155,9 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
+            qml.qjit(f)(1.2)
 
+        with pytest.raises(CompileError, match="RX.*not invertible"):
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
@@ -157,7 +181,9 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
+            qml.qjit(f)(1.2)
 
+        with pytest.raises(CompileError, match="RX.*not invertible"):
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
@@ -176,6 +202,9 @@ class TestHybridOpVerification:
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
+            qml.qjit(f)(1.2)
+
+        with pytest.raises(CompileError, match="RX.*not invertible"):
 
             @qml.qjit
             def cir(x: float):
@@ -184,25 +213,39 @@ class TestHybridOpVerification:
     def test_non_controllable_gate_simple_qctrl(self):
         """Emulate a device with a non-controllable gate applied inside a QCtrl."""
 
-        with pytest.raises(CompileError, match="PauliZ.*not controllable"):
+        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
+        def f(x: float):
+            ctrl(qml.PauliZ(wires=0), control=[1, 2])
+            return qml.expval(qml.PauliX(0))
 
-            @qjit
-            @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
-            def f(x: float):
-                ctrl(qml.PauliZ(wires=0), control=[1, 2])
-                return qml.expval(qml.PauliX(0))
+        with pytest.raises(CompileError, match="PauliZ is not controllable"):
+            qml.qjit(f)(1.2)
+
+        with pytest.raises(CompileError, match="PauliZ is not controllable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
 
     def test_non_controllable_gate_simple_pennylane_ctrl(self):
         """Test that a Controlled PennyLane op that is not natively supported by the device
         and has a non-controllable base raises an error"""
 
-        with pytest.raises(CompileError, match="PauliZ.*not controllable"):
+        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
+        def f(x: float):
+            Controlled(qml.PauliZ(wires=0), control_wires=[1, 2])
+            return qml.expval(qml.PauliX(0))
+            
+        with pytest.raises(CompileError, match="PauliZ is not controllable"):
+            qml.qjit(f)(1.2)
 
-            @qjit
-            @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
-            def f(x: float):
-                Controlled(qml.PauliZ(wires=0), control_wires=[1, 2])
-                return qml.expval(qml.PauliX(0))
+        with pytest.raises(CompileError, match="PauliZ is not controllable"):
+
+            @qml.qjit
+            def cir(x: float):
+                return grad(f)(x)
+
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
@@ -301,13 +344,6 @@ class TestAdjointMethodVerification:
                 return grad(f)(x)
 
 
-class PauliX2(qml.PauliX):
-    """Test operation without the analytic gradient"""
-
-    name = "PauliX2"
-    grad_method = "F"
-
-
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestParameterShiftMethodVerification:
     """Test the verification of operators and observables when the parameter shift method
@@ -336,44 +372,42 @@ class TestParameterShiftMethodVerification:
             def cir(x: float):
                 return grad(f)(x)
 
+    @patch.object(qml.RX, "grad_method", "F")
     def test_paramshift_gate_simple(self):
         """Test that taking a parameter-shift gradient of a tape containing a parameterized operation
         that doesn't support analytic differentiation raises an error."""
 
-        @qml.qnode(
-            get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift"
-        )
+        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
         def f(_):
-            PauliX2(wires=0)
+            qml.RX(1.23, 0)
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(
-            DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
+            DifferentiableCompileError, match="RX does not support analytic differentiation"
         ):
 
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
 
+    @patch.object(qml.RX, "grad_method", "F")
     def test_paramshift_gate_while(self):
         """Test that taking a parameter-shift gradient of a tape containing a WhileLoop HybridOp
         containing a parameterized operation that doesn't support analytic differentiation raises
         an error."""
 
-        @qml.qnode(
-            get_custom_device(native_gates={"PauliX2"}, wires=1), diff_method="parameter-shift"
-        )
+        @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
         def f(_):
             @while_loop(lambda s: s > 0)
             def loop(s):
-                PauliX2(wires=0)
+                qml.RX(1.23, 0)
                 return s + 1
 
             loop(0)
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(
-            DifferentiableCompileError, match="PauliX2 does not support analytic differentiation"
+            DifferentiableCompileError, match="RX does not support analytic differentiation"
         ):
 
             @qml.qjit
