@@ -139,15 +139,29 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         return True if isinstance(op, Adjoint) else in_inverse
 
     def _op_checker(op, state):
+
+        # all non-controlled ops are in the native ops of the device
+        if isinstance(op, (Controlled, QCtrl)):
+            # Controlled and QCtrl are checked in _ctrl_op_checker
+            pass
+        elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
+                raise CompileError(
+                    f"{op.name} is not supported on '{qjit_device.original_device.name}' device"
+                )
+
+        # check validity of ops nested inside control or adjoint
         in_inverse, in_control = state
         in_inverse = _inv_op_checker(op, in_inverse)
         in_control = _ctrl_op_checker(op, in_control, False)
+
+        # check validity based on grad method if using
         if grad_method is not None:
             _mcm_op_checker(op)
             if grad_method == "adjoint":
                 _adj_op_checker(op)
             elif grad_method == "parameter-shift":
                 _paramshift_op_checker(op)
+
         return (in_inverse, in_control)
 
     _verify_nested(tape, (False, False), _op_checker)
