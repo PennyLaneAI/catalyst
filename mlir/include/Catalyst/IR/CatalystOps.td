@@ -105,12 +105,10 @@ def CustomCallOp: Catalyst_Op<"custom_call",
 
 def InactiveCallbackOp: Catalyst_Op<"inactiveCallbackCall",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
-  let summary = "CustomCall specialized for python callbacks.";
+  let summary = "Operation denoting a `debug.callback` call in the user program.";
 
   let description = [{
-    A custom call invokes code external to Catalyst. The `inputs` are passed to the
-    external code, and the external code is expected to produce a result of the
-    given type.
+        This operation is lowered to `inactive_callback` defined in the Catalyst runtime.
   }];
 
   let arguments = (ins
@@ -140,12 +138,22 @@ def InactiveCallbackOp: Catalyst_Op<"inactiveCallbackCall",
 
 def ActiveCallbackOp: Catalyst_Op<"activeCallbackCall",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
-  let summary = "CustomCall specialized for python callbacks.";
+  let summary = "Operation denoting a `pure_callback` call in the user program.";
 
   let description = [{
-    A custom call invokes code external to Catalyst. The `inputs` are passed to the
-    external code, and the external code is expected to produce a result of the
-    given type.
+        This operation is lowered to a compile time generated function that looks like the following:
+
+        ```mlir
+        func.func @active_callback_0xdeadbeef(%arg0: !llvm.ptr, ..., %argN: !llvm.ptr,
+                                                 %res0: !llvm.ptr, ..., %resM: !llvm.ptr)
+        {
+            %id = llvm.mlir.constant(0xdeadbeef : i64)
+            %argc = llvm.mlir.constant(N: i64)
+            %retc = llvm.mlir.constant(M: i64)
+            llvm.call @inactive_callback(%id, %argc, %retc, %arg0, ..., %argN, %res0, ..., %resM)
+            return
+        }
+        ```
   }];
 
   let arguments = (ins

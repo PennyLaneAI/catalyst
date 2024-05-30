@@ -438,9 +438,8 @@ struct InactiveCallbackOpPattern : public OpConversionPattern<InactiveCallbackOp
         // The argument convention is as follows:
         // arg0 =        identifier
         // arg1 =        length of operands
-        // arg2 =        length of results
+        // arg2 =        length of results (always 0)
         // arg3..N+3     varargs pointers to memrefs
-        // argN+4..N+M+4 varargs pointers to result memrefs
 
         bool isVarArg = true;
         LLVM::LLVMFuncOp customCallFnOp = mlir::LLVM::lookupOrCreateFn(
