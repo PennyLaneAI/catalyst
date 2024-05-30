@@ -40,9 +40,10 @@ LLVM::LLVMFuncOp lookupOrDeclareInactiveCallback(ActiveCallbackOp &op, PatternRe
     Type i64 = rewriter.getI64Type();
 
     bool isVarArg = true;
-    Type voidType = LLVM::LLVMVoidType::get(ctx);
+    Type retTy = LLVM::LLVMVoidType::get(ctx);
+    SmallVector<Type> paramTys = { i64, i64, i64 };
     LLVM::LLVMFuncOp inactiveCallback = mlir::LLVM::lookupOrCreateFn(
-        moduleOp, name, {/*args=*/i64, i64, i64}, /*ret_type=*/voidType, isVarArg);
+        moduleOp, name, paramTys, retTy, isVarArg);
     return inactiveCallback;
 }
 
