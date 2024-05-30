@@ -99,3 +99,26 @@ module @test4 {
     return %arg1 : memref<i64>
   }
 }
+
+// -----
+
+// Test same callback multiple times
+
+// CHECK-LABEL: @test5
+module @test5 {
+
+  // CHECK-LABEL: func.func private @active_callback_123
+  // CHECK-SAME: %arg0: !llvm.ptr
+  // CHECK-SAME: %arg1: !llvm.ptr
+
+  // CHECK: [[one:%.+]] = llvm.mlir.constant(1 : i64)
+  // CHECK: llvm.call @inactive_callback({{%.+}}, [[one]], [[one]], %arg0, %arg1)
+
+  // CHECK-NOT: func.func private @active_callback
+
+  func.func public @jit_cir(%arg0: memref<i64>, %arg1: memref<i64>) -> memref<i64> {
+    catalyst.activeCallbackCall(%arg0, %arg1) {identifier = 123 : i64, number_original_arg = 1 : i64} : (memref<i64>, memref<i64>) -> ()
+    catalyst.activeCallbackCall(%arg0, %arg1) {identifier = 123 : i64, number_original_arg = 1 : i64} : (memref<i64>, memref<i64>) -> ()
+    return %arg1 : memref<i64>
+  }
+}
