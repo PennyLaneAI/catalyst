@@ -122,17 +122,18 @@
 
    ```mlir
    // This function has been declared in the module
-   llvm.func @active_callback_0xdeadbeef(%arg0 : !llvm.ptr, ... %argN : !llvm.ptr, ...
+   func.func @active_callback_0xdeadbeef(%arg0 : !llvm.ptr, ... %argN : !llvm.ptr, ...
                                          %res0 : !llvm.ptr, ... %resM : !llvm.ptr)
    {
        %id = llvm.mlir.constant(0xdeadbeef : i64)
        %argc = llvm.mlir.constant(N: i64)
        %retc = llvm.mlir.constant(M: i64)
        llvm.call @inactive_callback(%id, %argc, %retc, %arg0, ..., %argN, %res0, ..., %resM)
+       return
    }
 
    // there will be a call to the function above where catalyst.activeCallbackCall was.
-   llvm.call @active_callback_0xdeadbeef(%arg0, ..., %argN, %res0, ... %resM)
+   func.call @active_callback_0xdeadbeef(%arg0, ..., %argN, %res0, ... %resM)
    ```
 
    This will allow for custom functions to be defined as forward and reverse passes for
