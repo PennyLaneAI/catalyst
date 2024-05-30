@@ -129,7 +129,7 @@ func.func @python_call () {
 module @testfoo {
 
   llvm.func @inactive_callback(i64, i64, i64, ...)
-  llvm.func @active_callback_0() {
+  func.func @active_callback_0() {
     %0 = llvm.mlir.constant(0 : i64) : i64
     llvm.call @inactive_callback(%0, %0, %0) vararg(!llvm.func<void (i64, i64, i64, ...)>) : (i64, i64, i64) -> ()
     llvm.return

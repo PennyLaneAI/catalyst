@@ -491,7 +491,7 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
         // Create function
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         auto specializedAttr = op.getSpecializedAttr();
-        auto specialized = mod.lookupSymbol<LLVM::LLVMFuncOp>(specializedAttr);
+        auto specialized = mod.lookupSymbol<func::FuncOp>(specializedAttr);
         if (!specialized) {
             op.emitError() << "No specialized attribute was found.";
             return failure();
@@ -529,7 +529,7 @@ struct ActiveCallbackOpPattern : public OpConversionPattern<ActiveCallbackOp> {
             // add the ptr to the arguments
             callArgs.push_back(ptr);
         }
-        rewriter.create<LLVM::CallOp>(loc, specialized, callArgs);
+        rewriter.create<func::CallOp>(loc, specialized, callArgs);
         rewriter.eraseOp(op);
         return success();
     }
@@ -557,6 +557,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         patterns.add<PrintOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
+        target.addLegalDialect<func::FuncDialect>();
         target.addIllegalDialect<CatalystDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {

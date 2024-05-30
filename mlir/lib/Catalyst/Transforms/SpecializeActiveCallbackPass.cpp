@@ -141,9 +141,13 @@ struct SpecializeActiveCallbackPass
         auto ctx = &getContext();
         RewritePatternSet patterns(ctx);
         patterns.add<AddDeclarationToModulePattern>(ctx);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        GreedyRewriteConfig config;
+        config.strictMode = GreedyRewriteStrictness::ExistingOps;
+        auto moduleOp = getOperation();
+        if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns), config))) {
             signalPassFailure();
         }
+
     }
 };
 
