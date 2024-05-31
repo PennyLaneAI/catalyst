@@ -17,6 +17,8 @@ This module contains public API functions that enabling quantum programming
 with control flow, including conditionals, for loops, and while loops.
 """
 
+# pylint: disable=too-many-lines
+
 from typing import Any, Callable, List
 
 import jax.numpy as jnp
@@ -601,7 +603,9 @@ class ForLoopCallable:
     (array([0.5, 0. , 0.5, 0. ]),)
     """
 
-    def __init__(self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions):
+    def __init__(
+        self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
+    ):  # pylint:disable=too-many-arguments
 
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound

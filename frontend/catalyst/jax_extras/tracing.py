@@ -69,7 +69,6 @@ from jax.core import (
     OutDBIdx,
     OutputType,
 )
-from jax.core import Primitive
 from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
     ShapedArray,
@@ -81,7 +80,6 @@ from jax.core import (
     new_jaxpr_eqn,
     thread_local_state,
 )
-from jax.extend.linear_util import wrap_init
 from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -102,7 +100,7 @@ from jaxlib.xla_extension import PyTreeRegistry
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
 from catalyst.utils.patching import Patcher
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines
 
 __all__ = (
     "ClosedJaxpr",
@@ -986,7 +984,7 @@ def out_type_force_outdbidx(
     return out_type2
 
 
-class DynshapePrimitive(Primitive):
+class DynshapePrimitive(JaxprPrimitive):
     """Primitive containing nested Jaxpr programs accepting and returning Jax values with shapes
     containing dynamic dimensions."""
 

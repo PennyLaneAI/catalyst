@@ -42,13 +42,11 @@ from catalyst.jax_extras import (
     ShapedArray,
     _abstractify,
     _input_type_to_tracers,
-    cond_expansion_strategy,
     convert_element_type,
     deduce_avals,
     deduce_signatures,
     eval_jaxpr,
     input_type_to_tracers,
-    jaxpr_remove_implicit,
     jaxpr_to_mlir,
     make_jaxpr2,
     sort_eqns,
@@ -293,7 +291,7 @@ class HybridOp(Operation):
         regions: List[HybridOpRegion],
         apply_reverse_transform=False,
         expansion_strategy=None,
-    ):
+    ):  # pylint: disable=too-many-arguments
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions

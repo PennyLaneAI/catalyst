@@ -33,7 +33,6 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-from catalyst.api_extensions.control_flow import ForLoop
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext

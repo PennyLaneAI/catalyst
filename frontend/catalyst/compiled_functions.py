@@ -128,7 +128,9 @@ class CompiledFunction:
         compile_options (CompileOptions): compilation options used
     """
 
-    def __init__(self, shared_object_file, func_name, restype, out_type, compile_options):
+    def __init__(
+        self, shared_object_file, func_name, restype, out_type, compile_options
+    ):  # pylint: disable=too-many-arguments
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.compile_options = compile_options
         self.return_type_c_abi = None
@@ -143,6 +145,7 @@ class CompiledFunction:
         Args:
             lib: Shared object
             has_return: whether the function returns a value or not
+            out_type: Jaxpr output type holding information about implicit outputs
             numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
 
@@ -154,8 +157,9 @@ class CompiledFunction:
             result_desc = type(args[0].contents) if has_return else None
             retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
 
-        keep_outputs = [k for _, k in out_type]
-        retval = [r for (k, r) in zip(keep_outputs, retval) if k]
+        if out_type is not None:
+            keep_outputs = [k for _, k in out_type]
+            retval = [r for (k, r) in zip(keep_outputs, retval) if k]
         return retval
 
     @staticmethod

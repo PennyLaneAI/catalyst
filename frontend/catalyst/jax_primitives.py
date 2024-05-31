@@ -75,10 +75,8 @@ from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynshapePrimitive,
-    cond_expansion_strategy,
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
-    while_loop_expansion_strategy,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
