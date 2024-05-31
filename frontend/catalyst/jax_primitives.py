@@ -28,6 +28,7 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
+from jaxlib.hlo_helpers import shape_dtype_to_ir_type
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
@@ -408,10 +409,15 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
     # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
     # such constants to numpy array types.
-    constants = [
-        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
-        for const in jaxpr.consts
-    ]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        constants.append(
+            StableHLOConstantOp(
+                ir.DenseElementsAttr.get(np.asarray(const), type=const_type)
+            ).results
+        )
     args_and_consts = constants + list(args)
 
     return GradOp(
@@ -451,10 +457,14 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [
-        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
-        for const in jaxpr.consts
-    ]
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        constants.append(
+            StableHLOConstantOp(
+                ir.DenseElementsAttr.get(np.asarray(const), type=const_type)
+            ).results
+        )
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
@@ -507,10 +517,14 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [
-        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
-        for const in jaxpr.consts
-    ]
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        constants.append(
+            StableHLOConstantOp(
+                ir.DenseElementsAttr.get(np.asarray(const), type=const_type)
+            ).results
+        )
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
