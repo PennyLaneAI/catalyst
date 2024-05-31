@@ -401,13 +401,6 @@ def while_loop(cond_fn, experimental_preserve_dimensions: bool = True):
     return _decorator
 
 
-def _check_cond_same_shapes(trees: List[PyTreeDef]) -> None:
-    expected_tree = trees[0]
-    for tree in list(trees)[1:]:
-        if tree != expected_tree:
-            raise TypeError("Conditional requires consistent return types across all branches")
-
-
 ## IMPL ##
 class CondCallable:
     """User-facing wrapper provoding "else_if" and "otherwise" public methods.
@@ -547,7 +540,8 @@ class CondCallable:
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
 
-        _check_cond_same_shapes([s.out_tree() for s in out_sigs])
+        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
+        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
@@ -582,7 +576,8 @@ class CondCallable:
             return in_sig, out_sig
 
         in_sigs, out_sigs = unzip2(_trace(fun) for fun in (*self.branch_fns, self.otherwise_fn))
-        _check_cond_same_shapes([s.out_tree() for s in out_sigs])
+        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
+        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
         num_implicit_outputs = out_sigs[-1].num_implicit_outputs()

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from textwrap import dedent
+
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -28,13 +30,19 @@ class TestCondToJaxpr:
     def test_basic_cond_to_jaxpr(self):
         """Check the JAXPR of simple conditional function."""
 
-        expected = """{ lambda ; a:i64[]. let
-    b:bool[] = eq a 5
-    c:i64[] = cond[
-      branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                     { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-    ] b a a
-  in (c,) }"""
+        expected = dedent(
+            """
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5
+                c:i64[] = cond[
+                  branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                 { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                  nimplicit_inputs=0
+                  nimplicit_outputs=0
+                ] b a a
+              in (c,) }
+        """
+        )
 
         @qjit
         def circuit(n: int):
@@ -50,7 +58,7 @@ class TestCondToJaxpr:
             return out
 
         def asline(text):
-            return " ".join(map(lambda x: x.strip(), str(text).split("\n")))
+            return " ".join(map(lambda x: x.strip(), str(text).split("\n"))).strip()
 
         assert asline(expected) == asline(circuit.jaxpr)
 
