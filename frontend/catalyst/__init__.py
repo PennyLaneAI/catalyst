@@ -39,6 +39,7 @@ from catalyst._version import __version__
 
 try:
     if INSTALLED:
+        # pylint: disable=no-name-in-module
         from catalyst._revision import __revision__  # pragma: no cover
     else:
         from subprocess import check_output
@@ -87,13 +88,13 @@ from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
-from catalyst.jax_tracer import dynamic_one_shot
 from catalyst.jit import QJIT, qjit
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
 )
+from catalyst.qfunc import dynamic_one_shot
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising

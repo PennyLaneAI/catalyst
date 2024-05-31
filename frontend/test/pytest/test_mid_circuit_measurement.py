@@ -195,7 +195,6 @@ class TestMidCircuitMeasurement:
         assert circuit(0.0) == 0
         assert circuit(jnp.pi) == 1
 
-    @pytest.mark.xfail(reason="not yet implemented, coming in one-shot support")
     def test_return_mcm_with_sample_multiple(self, backend):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
@@ -209,8 +208,8 @@ class TestMidCircuitMeasurement:
             qml.PauliX(0)
             return qml.sample(m)
 
-        assert circuit(0.0) == [0] * 10
-        assert circuit(jnp.pi) == [1] * 10
+        assert jnp.allclose(circuit(0.0), 0)
+        assert jnp.allclose(circuit(jnp.pi), 1)
 
     def test_dynamic_one_shot_with_sample_single(self, backend):
         """Test that a measurement result can be returned with qml.sample and shots."""
