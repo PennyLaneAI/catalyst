@@ -19,6 +19,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 
 import logging
+
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -37,7 +38,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,

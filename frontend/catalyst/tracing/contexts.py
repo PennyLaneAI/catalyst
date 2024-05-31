@@ -34,7 +34,7 @@ from jax.core import find_top_trace
 from pennylane.queuing import QueuingManager
 
 from catalyst.jax_extras import new_dynamic_main2
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger_init
 from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)

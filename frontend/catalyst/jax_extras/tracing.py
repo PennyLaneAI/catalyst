@@ -13,9 +13,9 @@
 # limitations under the License.
 """ Jax extras module containing functions related to the Python program tracing  """
 
-import logging
 from __future__ import annotations
 
+import logging
 from contextlib import ExitStack, contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
 

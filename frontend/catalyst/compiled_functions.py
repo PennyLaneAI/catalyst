@@ -29,7 +29,7 @@ from mlir_quantum.runtime import (
 )
 
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger_init
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     filter_static_args,

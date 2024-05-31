@@ -36,8 +36,8 @@ from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
-from catalyst.qfunc import QFunc
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
     filter_static_args,

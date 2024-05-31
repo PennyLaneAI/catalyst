@@ -37,7 +37,7 @@ from pennylane.tape.tape import (
 
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import DeviceCapabilities

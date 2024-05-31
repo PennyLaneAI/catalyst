@@ -13,8 +13,9 @@
 # limitations under the License.
 """ Jax extras module containing functions related to the StableHLO lowering """
 
-import logging
 from __future__ import annotations
+
+import logging
 
 import jax
 from jax._src.dispatch import jaxpr_replicas
@@ -34,7 +35,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
