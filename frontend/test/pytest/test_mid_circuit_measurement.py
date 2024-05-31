@@ -211,10 +211,11 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
-    def test_dynamic_one_shot_with_sample_single(self, backend):
+    @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
+    def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qml.sample and shots."""
-
-        dev = qml.device(backend, wires=1, shots=10)
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
 
         @qjit
         @dynamic_one_shot
@@ -225,8 +226,9 @@ class TestMidCircuitMeasurement:
             qml.PauliX(0)
             return qml.sample(m)
 
-        assert jnp.allclose(circuit(0.0), 0)
-        assert jnp.allclose(circuit(jnp.pi), 1)
+        result = circuit(param)
+        assert result.shape == (shots,)
+        assert jnp.allclose(result, expected)
 
     @pytest.mark.parametrize("shots", [8000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])

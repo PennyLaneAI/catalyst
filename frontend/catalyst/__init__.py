@@ -89,12 +89,12 @@ from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.jit import QJIT, qjit
+from catalyst.qfunc import dynamic_one_shot
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
 )
-from catalyst.qfunc import dynamic_one_shot
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising

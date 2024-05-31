@@ -12,6 +12,7 @@ extend-exclude = '''
 '''
 
 [tool.isort]
+py_version=311
 profile = "black"
 skip = ["frontend/test/conftest.py", "frontend/catalyst/test/test_oqc/conftest.py"]
 extend_skip_glob = [
@@ -21,8 +22,12 @@ extend_skip_glob = [
   "mlir/build/*",
   "runtime/build/*",
   ".git/*",
-  ".vscode/*"
+  ".vscode/*",
+  "*venv*/*",
+  "_deps/*",
 ]
+known_first_party = ["catalyst"]
+known_third_party = ["autoray", "jax", "pennylane"]
 
 [tool.bandit]
 skips = ["B607"]

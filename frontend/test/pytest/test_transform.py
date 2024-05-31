@@ -40,6 +40,7 @@ try:
     from pennylane import qcut
 except:  # pylint: disable=bare-except
     from pennylane.transforms import qcut
+
 from pennylane.transforms import hamiltonian_expand, merge_rotations, sum_expand
 
 from catalyst import measure, qjit
