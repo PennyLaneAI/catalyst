@@ -520,29 +520,6 @@ class CondCallable:
         self.otherwise_fn = otherwise_fn
         return self
 
-    # def _call_with_quantum_ctx(self, ctx):
-    #     outer_trace = ctx.trace
-    #     in_classical_tracers = self.preds
-    #     regions: List[HybridOpRegion] = []
-
-    #     out_treedefs, out_signatures = [], []
-    #     for branch in self.branch_fns + [self.otherwise_fn]:
-    #         quantum_tape = QuantumTape()
-    #         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-    #             wffa, _, _, out_tree = deduce_avals(branch, [], {})
-    #             with QueuingManager.stop_recording(), quantum_tape:
-    #                 res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
-    #                 res_avals = [shaped_abstractify(res) for res in res_classical_tracers]
-    #         regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
-    #         out_treedefs.append(out_tree())
-    #         out_signatures.append(res_avals)
-
-    #     _assert_cond_result_structure(out_treedefs)
-    #     _assert_cond_result_types(out_signatures)
-    #     out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in out_signatures[0]]
-    #     self._operation = Cond(in_classical_tracers, out_classical_tracers, regions)
-    #     return tree_unflatten(out_tree(), out_classical_tracers)
-
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace
         in_classical_tracers = self.preds
