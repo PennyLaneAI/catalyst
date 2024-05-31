@@ -17,7 +17,7 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Sequence
 
 import jax.numpy as jnp
 import pennylane as qml
