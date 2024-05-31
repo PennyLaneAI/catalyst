@@ -1157,7 +1157,7 @@ def test_adj_qubitunitary(inp, backend):
 
     def f(x):
         qml.RX(x, wires=0)
-        U1 = (np.array([[0.5+0.5j, -0.5-0.5j], [0.5-0.5j, 0.5-0.5j]], dtype=complex))
+        U1 = np.array([[0.5 + 0.5j, -0.5 - 0.5j], [0.5 - 0.5j, 0.5 - 0.5j]], dtype=complex)
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
