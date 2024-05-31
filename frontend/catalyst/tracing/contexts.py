@@ -16,6 +16,7 @@
 This module provides context classes to manage and query Catalyst's and JAX's tracing state.
 """
 
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -33,7 +34,11 @@ from jax.core import find_top_trace
 from pennylane.queuing import QueuingManager
 
 from catalyst.jax_extras import new_dynamic_main2
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class EvaluationMode(Enum):
@@ -69,6 +74,7 @@ class JaxTracingContext:
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
     trace: Optional[DynamicJaxprTrace]
 
+    @debug_logger_init
     def __init__(self, main: JaxMainTrace):
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
@@ -82,6 +88,7 @@ class EvaluationContext:
 
     _tracing_stack: List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
 
+    @debug_logger_init
     def __init__(self, mode: EvaluationMode):
         """Initialise a new instance of the Evaluation context.
         Args:

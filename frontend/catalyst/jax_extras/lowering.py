@@ -13,6 +13,7 @@
 # limitations under the License.
 """ Jax extras module containing functions related to the StableHLO lowering """
 
+import logging
 from __future__ import annotations
 
 import jax
@@ -33,6 +34,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access
@@ -41,7 +43,11 @@ __all__ = ("jaxpr_to_mlir", "custom_lower_jaxpr_to_module")
 
 from catalyst.jax_extras.patches import _no_clean_up_dead_vars, get_aval2
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
+
+@debug_logger
 def jaxpr_to_mlir(func_name, jaxpr):
     """Lower a Jaxpr into an MLIR module.
 
@@ -76,6 +82,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
 
 
 # pylint: disable=too-many-arguments
+@debug_logger
 def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,
