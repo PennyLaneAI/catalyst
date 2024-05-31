@@ -26,6 +26,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
@@ -147,14 +148,15 @@ def measure(
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
     in_classical_tracers.append(postselect)
+    in_classical_tracers.append(reset)
 
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
         regions=[],
-        reset=reset,
-        postselect=postselect,
+        # reset=reset,
+        # postselect=postselect,
     )
 
     # If reset was requested, reset qubit only if the measurement result was 1
@@ -389,31 +391,55 @@ def ctrl(
 
 
 ## IMPL ##
-class MidCircuitMeasure(HybridOp):
+class MidCircuitMeasure(HybridOp, MidMeasureMP):
     """Operation representing a mid-circuit measurement."""
 
     binder = qmeasure_p.bind
 
-    def __init__(self, *args, **kwargs):
-        self.bypass_postselect = kwargs.pop("bypass_postselect", False)
-        self.postselect = kwargs.pop("postselect", None)
-        self.reset = kwargs.pop("reset", False)
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        bypass_postselect=False,
+    ):
+        self.bypass_postselect = bypass_postselect
+        HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
+        MidMeasureMP.__init__(
+            self,
+            wires=[in_classical_tracers[0]],
+            postselect=in_classical_tracers[1],
+            reset=in_classical_tracers[2],
+        )
+        # self.wires = [self.in_classical_tracers[0]]
+        # self.postselect = in_classical_tracers[1]
+        # self.reset = in_classical_tracers[2]
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        op = self
-        wire = op.in_classical_tracers[0]
-        qubit = qrp.extract([wire])[0]
+        qubit = qrp.extract(self.wires)[0]
         if self.bypass_postselect:
-            qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+            qubit2 = self.bind_overwrite_classical_tracers(ctx, trace, qubit)
         else:
-            postselect = op.in_classical_tracers[1]
-            qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
-        qrp.insert([wire], [qubit2])
+            qubit2 = self.bind_overwrite_classical_tracers(
+                ctx, trace, qubit, postselect=self.postselect
+            )
+        qrp.insert(self.wires, [qubit2])
         return qrp
+        # def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
+        #     HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
+        #     # Initializing MidMeasureMP attributes
+        #     self.wires = [in_classical_tracers[0]]
+        #     self.postselect = in_classical_tracers[1]
+        #     # TODO: Check if we need to initialize other MidMeasureMP attributes as well
+
+        # def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        #     op = self
+        #     qubit = qrp.extract(op.wires)[0]
+        #     qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=op.postselect)
+        #     qrp.insert(op.wires, [qubit2])
 
     def __hash__(self):
-        hsh = super().__hash__()
+        hsh = HybridOp.__hash__(self)
         return hash(hsh + hash(self.out_classical_tracers[0]))
 
 
