@@ -71,7 +71,7 @@
   [(#725)](https://github.com/PennyLaneAI/catalyst/pull/725)
 
   Although library code is not meant to be targeted by Autograph conversion,
-  it sometimes make sense to enable it for specific submodules that might 
+  it sometimes make sense to enable it for specific submodules that might
   benefit from such conversion:
 
   ```py
@@ -82,6 +82,12 @@
   ```
 
 <h3>Improvements</h3>
+
+* Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
+  measurement. For now the feature is equivalent to returning `m` directly from a quantum
+  function, but will be improved to return an array with one measurement result for each
+  shot in a shots-based execution mode.
+  [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
 
 * `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
   as active for the computation of gradients.
@@ -96,13 +102,21 @@
   annotations.
   [(#751)](https://github.com/PennyLaneAI/catalyst/pull/751)
 
-* Refactored `vmap` decorator in order to follow a unified pattern that uses a callable
-  class that implements the decorator's logic. This prevents having to excessively define
-  functions in a nested fashion.
+* Refactored `vmap`,`qjit`, `mitigate_with_zne` and gradient decorators in order to follow
+  a unified pattern that uses a callable class implementing the decorator's logic. This
+  prevents having to excessively define functions in a nested fashion.
   [(#758)](https://github.com/PennyLaneAI/catalyst/pull/758)
+  [(#761)](https://github.com/PennyLaneAI/catalyst/pull/761)
+  [(#762)](https://github.com/PennyLaneAI/catalyst/pull/762)
+  [(#763)](https://github.com/PennyLaneAI/catalyst/pull/763)
 
 * Catalyst tests now manipulate device capabilities rather than text configurations files.
   [(#712)](https://github.com/PennyLaneAI/catalyst/pull/712)
+
+* The built-in instrumentation with `detailed` output will no longer report the cumulative time for
+  MLIR pipelines, since was being reported as just another step alongside the individual timings for
+  each pipeline.
+  [(#772)](https://github.com/PennyLaneAI/catalyst/pull/772)
 
 <h3>Breaking changes</h3>
 
@@ -118,7 +132,7 @@
 
 * Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
   In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
-  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)    
+  [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
 <h3>Internal changes</h3>
 
