@@ -1049,9 +1049,8 @@ def dynamic_one_shot(qnode):
 
         return dynamic_one_shot_partial(qnode)
 
-    aux_qnode = transform_to_single_shot(qnode)
+    single_shot_qnode = transform_to_single_shot(qnode)
     shots = qnode.device.shots
-    single_shot_qnode = aux_qnode
     single_shot_qnode.device._shots = qml.measurements.Shots(1)
 
     def one_shot_wrapper(*args, **kwargs):
