@@ -918,7 +918,13 @@ def reset_qubit(qreg_in, w):
 
     jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
     jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
+    qreg_out = cond_p.bind(
+        m,
+        qreg_mid,
+        branch_jaxprs=[jaxpr_true, jaxpr_false],
+        nimplicit_inputs=0,
+        nimplicit_outputs=0,
+    )[0]
 
     return qreg_out
 
