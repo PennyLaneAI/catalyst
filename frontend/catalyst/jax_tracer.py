@@ -42,6 +42,7 @@ from catalyst.jax_extras import (
     ShapedArray,
     _abstractify,
     _input_type_to_tracers,
+    cond_expansion_strategy,
     convert_element_type,
     deduce_avals,
     deduce_signatures,
@@ -166,7 +167,98 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     return ClosedJaxpr(jaxpr2, consts)
 
 
+def _apply_result_type_conversion(
+    ctx: JaxTracingContext,
+    jaxpr: ClosedJaxpr,
+    consts: List[Any],
+    target_types: List[ShapedArray],
+    num_implicit_outputs: int,
+) -> Tuple[InputSignature, OutputSignature]:
+    """Apply type conversion to the results of a Jaxpr program. Return full information about the
+    modified Jaxpr program.
+
+    Args:
+        ctx: Jax tracing context object.
+        jaxpr: The Jaxpr program to apply the conversion to. As any Jaxpr program, it might contain
+               both implicit and explicit arguments and results.
+        consts: List of constant values we need to know to trace this program.
+        target_types: List of types we want to convert the outputs of the program to. The list must
+                      match the number of outputs, except maybe the very last output if it is Qreg.
+        num_implicit_outputs: Number of implicit outputs found in the Jaxpr program.
+
+    Returns:
+        InputSignature: new input signature of the function
+        OutputSignature: new output signature of the function
+    """
+    with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
+    args = [AbstractQreg()] if with_qreg else []
+
+    def _fun(*in_tracers):
+        out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
+        out_tracers_, target_types_ = (
+            (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
+        )
+        out_promoted_tracers = [
+            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            for tr, ty in zip(out_tracers_, target_types_)
+        ]
+        return out_promoted_tracers[num_implicit_outputs:] + (
+            [out_tracers[-1]] if with_qreg else []
+        )
+
+    _, in_sig, out_sig = trace_function(
+        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+    )
+
+    return in_sig, out_sig
+
+
+def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
+    # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid abstact
+    # value. One need to investigate how to use it correctly and remove the condition [1]. Should we
+    # add AbstractQreg into the `_weak_types` list of JAX?
+    assert len(types) > 0, "Expected one or more set of types"
+    assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
+
+    def _shapes(ts):
+        return [t.shape for t in ts if isinstance(t, ShapedArray)]
+
+    assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
+    all_ends_with_qreg = all(len(t) > 0 and isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(len(t) == 0 or not isinstance(t[-1], AbstractQreg) for t in types)
+    assert (
+        all_ends_with_qreg or all_not_ends_with_qreg
+    ), "We require either all-qregs or all-non-qregs as last items of the type lists"
+    if all_ends_with_qreg:
+        types = [t[:-1] for t in types]
+    results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
+
+
 @debug_logger
+def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
+    """Unify result types of the jaxpr programs given.
+    Args:
+        jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
+                                      matching sizes and numpy array shapes but dtypes might be
+                                      different.
+
+    Returns (list of ClosedJaxpr):
+        Same number of jaxprs with equal result dtypes.
+
+    Raises:
+        TypePromotionError: Unification is not possible.
+
+    """
+    promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
+    jaxpr_acc, consts2 = [], []
+    for j, a in zip(jaxprs, consts):
+        _, out_sig = _apply_result_type_conversion(ctx, j, a, promoted_types, num_implicit_outputs)
+        jaxpr_acc.append(out_sig.out_initial_jaxpr())
+        consts2.append(out_sig.out_consts())
+    return jaxpr_acc, out_sig.out_type(), consts2
+
+
 def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
     """Unify result signatures across a set of JAXPRs by promoting to common types.
 
