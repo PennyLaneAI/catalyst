@@ -82,7 +82,7 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.Modul
     "mlir_quantum._mlir_libs._quantumDialects.mitigation"
 )
 
-from catalyst import debug
+from catalyst import debug, logging
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *
@@ -185,6 +185,7 @@ __all__ = (
     "DifferentiableCompileError",
     "CompileOptions",
     "debug",
+    "logging",
     *_api_extension_list,
     *_autograph_functions,
 )
