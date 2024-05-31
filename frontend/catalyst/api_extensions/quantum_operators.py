@@ -412,6 +412,10 @@ class MidCircuitMeasure(HybridOp):
         qrp.insert([wire], [qubit2])
         return qrp
 
+    def __hash__(self):
+        hsh = super().__hash__()
+        return hash(hsh + hash(self.out_classical_tracers[0]))
+
 
 class Adjoint(HybridOp):
     """PennyLane's adjoint operation"""
