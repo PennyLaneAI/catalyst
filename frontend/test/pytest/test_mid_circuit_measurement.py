@@ -335,7 +335,7 @@ class TestMidCircuitMeasurement:
             m0 = qml.measure(0)
             qml.RX(0.5 * x, 1)
             m1 = qml.measure(1, reset=reset, postselect=postselect)
-            qml.cond(m1 == 0, qml.RY)(2.0 * y, 0)
+            qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
             m2 = qml.measure(0)
 
             meas_key = "wires" if isinstance(meas_obj, list) else "op"
@@ -361,7 +361,7 @@ class TestMidCircuitMeasurement:
             qml.RX(0.5 * x, 1)
             m1 = measure(1, reset=reset, postselect=postselect)
 
-            @cond(m1 == 0)
+            @cond(m0 & m1)
             def cfun0():
                 qml.RY(2.0 * y, 0)
 
