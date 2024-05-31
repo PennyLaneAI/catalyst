@@ -1157,11 +1157,7 @@ def test_adj_qubitunitary(inp, backend):
 
     def f(x):
         qml.RX(x, wires=0)
-        U1 = (
-            1
-            / np.sqrt(2)
-            * np.array([[1.0 + 2.0j, 3.0 - 4.5j], [9.8 - 7.6j, -1.0 + 3j]], dtype=complex)
-        )
+        U1 = (np.array([[0.5+0.5j, -0.5-0.5j], [0.5-0.5j, 0.5-0.5j]], dtype=complex))
         qml.QubitUnitary(U1, wires=0)
         return qml.expval(qml.PauliY(0))
 
@@ -1173,7 +1169,7 @@ def test_adj_qubitunitary(inp, backend):
 
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
-        g = qml.QNode(f, device, diff_method="adjoint")
+        g = qml.QNode(f, device, diff_method="backprop")
         h = qml.grad(g, argnum=0)
         return h(x)
 
