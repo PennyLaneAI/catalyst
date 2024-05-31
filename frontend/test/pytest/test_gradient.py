@@ -1163,13 +1163,13 @@ def test_adj_qubitunitary(inp, backend):
 
     @qjit()
     def compiled(x: float):
-        g = qml.qnode(qml.device(backend, wires=1))(f)
+        g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
         h = grad(g, method="auto")
         return h(x)
 
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
-        g = qml.QNode(f, device)
+        g = qml.QNode(f, device, diff_method="adjoint")
         h = qml.grad(g, argnum=0)
         return h(x)
 
