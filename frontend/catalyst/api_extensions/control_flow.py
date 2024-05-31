@@ -682,7 +682,6 @@ class ForLoopCallable:
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
     def _call_with_classical_ctx(self, ctx, *init_state):
-
         outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
         aux_tracers = [
             outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
