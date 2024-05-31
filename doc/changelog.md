@@ -2,6 +2,10 @@
 
 <h3>New features</h3>
 
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated n-shot times to simulate hardware-like results.
+  The loop over shots is executed with `catalyst.vmap`.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+
 * Support for disabling Autograph for a specific function or
   only for the function calls inside a specific context,
   without affecting the bare code inside such context.
