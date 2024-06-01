@@ -68,3 +68,22 @@ module @test0 {
   catalyst.callback @callback_1(tensor<f64>) -> tensor<f64> attributes { argc = 1:i64, resc = 1 : i64, id = 1:i64}
 }
 
+// -----
+
+// CHECK-LABEL: @test1
+module @test1 {
+  catalyst.callback @callback_1(tensor<f64>) -> tensor<f64> attributes { argc = 1:i64, resc = 1 : i64, id = 1:i64}
+
+  // CHECK-LABEL: @foo(
+  // CHECK-SAME: [[arg0:%.+]]: tensor<f64>)
+  func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
+    // CHECK-DAG: [[memref0:%.+]] = bufferization.to_memref [[arg0]]
+    // CHECK-DAG: [[tensor1:%.+]] = bufferization.alloc_tensor
+    // CHECK:     [[memref1:%.+]] = bufferization.to_memref [[tensor1]]
+    // CHECK:     catalyst.callback_call @callback_1([[memref0]], [[memref1]])
+    %1 = catalyst.callback_call @callback_1(%arg0) : (tensor<f64>) -> (tensor<f64>)
+    // CHECK:     [[retval:%.+]] = bufferization.to_tensor [[memref1]]
+    // CHECK:     return [[retval]]
+    return %1 : tensor<f64>
+  }
+}
