@@ -52,7 +52,7 @@ namespace gradient {
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
 void wrapMemRefArgs(func::FuncOp func, const LLVMTypeConverter *typeConverter,
-                    PatternRewriter &rewriter, Location loc, bool volatileArgs = false)
+                    RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
