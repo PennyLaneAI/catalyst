@@ -21,7 +21,6 @@ using namespace mlir;
 
 namespace catalyst {
 namespace gradient {
-void wrapMemRefArgs(func::FuncOp, const LLVMTypeConverter *, RewriterBase &, Location,
-                    bool = false);
+void wrapMemRefArgs(func::FuncOp, const TypeConverter *, RewriterBase &, Location, bool = false);
 } // namespace gradient
 } // namespace catalyst
