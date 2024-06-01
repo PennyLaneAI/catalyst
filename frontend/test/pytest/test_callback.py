@@ -395,5 +395,18 @@ def test_numpy_ufuncs():
     assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
 
 
+def test_callback_cache():
+    """Test callback cache. This test is for coverage."""
+
+    @debug.callback
+    def hello_world():
+        print("hello world")
+
+    @qml.qjit
+    def wrapper():
+        hello_world()
+        hello_world()
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

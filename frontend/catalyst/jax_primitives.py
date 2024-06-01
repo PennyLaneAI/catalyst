@@ -41,7 +41,7 @@ from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import CallbackOp, CallbackCallOp, PrintOp
+from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
 from mlir_quantum.dialects.gradient import CustomGradOp, ForwardOp, GradOp, JVPOp, ReverseOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -240,7 +240,7 @@ def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # p
     raise NotImplementedError()
 
 
-CALLBACK_OP_CACHE = dict()
+CALLBACK_OP_CACHE = {}
 
 
 def _python_callback_lowering(
@@ -252,10 +252,6 @@ def _python_callback_lowering(
     import catalyst_callback_registry as registry  # pylint: disable=import-outside-toplevel
 
     callback_id = registry.register(callback)
-
-    ctx = jax_ctx.module_context.context
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
     params_ty = [arg.type for arg in args]
     results_ty = list(convert_shaped_arrays_to_tensors(results_aval))

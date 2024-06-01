@@ -271,8 +271,26 @@ class FlatCallable:
         return map(type, self.getOperands())
 
 
+def clear_callback_cache():
+    """Clear the memref callable cache"""
+    MemrefCallable.CACHE.clear()
+
+
 class MemrefCallable(FlatCallable):
     """Callable that receives void ptrs."""
+
+    CACHE = {}
+
+    def __new__(cls, func, results_aval, *_args, **_kwargs):
+        # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        flat_results_aval, _ = tree_flatten(results_aval)
+        cache_key = (func, *flat_results_aval)
+        if cls.CACHE.get(cache_key):
+            return cls.CACHE.get(cache_key)
+
+        instance = super().__new__(cls)
+        cls.CACHE[cache_key] = instance
+        return instance
 
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
