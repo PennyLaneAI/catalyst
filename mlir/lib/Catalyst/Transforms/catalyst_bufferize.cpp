@@ -51,8 +51,6 @@ struct CatalystBufferizationPass : impl::CatalystBufferizationPassBase<CatalystB
             [&](PrintOp op) { return typeConverter.isLegal(op); });
         target.addDynamicallyLegalOp<CustomCallOp>(
             [&](CustomCallOp op) { return typeConverter.isLegal(op); });
-        target.addDynamicallyLegalOp<PythonCallOp>(
-            [&](PythonCallOp op) { return typeConverter.isLegal(op); });
         target.addDynamicallyLegalOp<CallbackOp>([&](CallbackOp op) {
             return typeConverter.isSignatureLegal(op.getFunctionType()) &&
                    typeConverter.isLegal(&op.getBody()) && op.getResultTypes().empty();

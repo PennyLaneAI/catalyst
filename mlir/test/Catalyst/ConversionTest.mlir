@@ -111,19 +111,6 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
 
 // -----
 
-// A python without parameters and without returns.
-
-func.func @python_call () {
-    // CHECK: [[identifier:%.+]] = llvm.mlir.constant(0 : i64)
-    // CHECK: [[argcount:%.+]] = llvm.mlir.constant(0 : i64)
-    // CHECK: [[rescount:%.+]] = llvm.mlir.constant(0 : i64)
-    // CHECK: llvm.call @inactive_callback([[identifier]], [[argcount]], [[rescount]])
-    catalyst.pycallback() { identifier = 0} : () -> ()
-    return
-}
-
-// -----
-
 // CHECK-LABEL @test0
 module @test0 {
 

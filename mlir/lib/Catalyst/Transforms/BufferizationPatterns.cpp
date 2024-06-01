@@ -82,43 +82,6 @@ struct BufferizeCustomCallOp : public OpConversionPattern<CustomCallOp> {
     }
 };
 
-struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
-    using OpConversionPattern::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(PythonCallOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        // Add bufferized arguments
-        SmallVector<Value> bufferArgs(adaptor.getOperands().begin(), adaptor.getOperands().end());
-
-        // Add bufferized return values to the arguments
-        auto results = op.getResults();
-
-        for (Value result : results) {
-            Type resultType = result.getType();
-            RankedTensorType tensorType = resultType.dyn_cast<RankedTensorType>();
-            if (!tensorType) {
-                return failure();
-            }
-            auto options = bufferization::BufferizationOptions();
-            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
-                rewriter, op->getLoc(), result, options, false);
-            MemRefType memrefType =
-                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-            auto newBuffer =
-                rewriter.create<bufferization::ToMemrefOp>(op->getLoc(), memrefType, *tensorAlloc);
-            bufferArgs.push_back(newBuffer);
-        }
-
-        rewriter.create<PythonCallOp>(op.getLoc(), TypeRange{}, bufferArgs, adaptor.getIdentifier(),
-                                      op.getOperands().size());
-        size_t startIndex = bufferArgs.size() - op.getNumResults();
-        SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
-        rewriter.replaceOp(op, bufferResults);
-        return success();
-    }
-};
-
 struct BufferizeCallbackOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -158,7 +121,6 @@ namespace catalyst {
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
-    patterns.add<BufferizePythonCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeCallbackOp>(typeConverter, patterns.getContext());
 }
