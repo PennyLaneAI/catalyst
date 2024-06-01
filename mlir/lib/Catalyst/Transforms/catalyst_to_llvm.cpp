@@ -497,6 +497,34 @@ struct CallbackOpPatternTwo : public OpConversionPattern<CallbackOp> {
     }
 };
 
+struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(CallbackCallOp op, CallbackCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+
+        // Just change the calling convention from scalar replacement of aggregates
+        // to pointer to struct.
+        auto loc = op.getLoc();
+        auto ctx = rewriter.getContext();
+        SmallVector<Value> callArgs;
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        for (auto structVal : adaptor.getInputs()) {
+            Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+            // allocate a memref descriptor on the stack
+            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structVal.getType(), c1);
+            // store the memref descriptor on the pointer
+            rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
+            // add the ptr to the arguments
+            callArgs.push_back(ptr);
+        }
+        rewriter.create<func::CallOp>(loc, adaptor.getCallee(), TypeRange{}, callArgs);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -517,6 +545,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         patterns.add<PrintOpPattern>(typeConverter, context);
         patterns.add<CallbackOpPatternOne>(typeConverter, context);
         patterns.add<CallbackOpPatternTwo>(typeConverter, context);
+        patterns.add<CallbackCallOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
         target.addLegalDialect<func::FuncDialect>();

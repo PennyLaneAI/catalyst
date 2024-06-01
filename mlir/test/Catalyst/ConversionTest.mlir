@@ -111,7 +111,7 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
 
 // -----
 
-// CHECK-LABEL @test0
+// CHECK-LABEL: @test0
 module @test0 {
 
   // Make sure that arguments are !llvm.ptrs.
@@ -127,4 +127,35 @@ module @test0 {
   // CHECK: llvm.call @inactive_callback([[id]], [[argc]], [[resc]]
   catalyst.callback @callback_4(memref<f64>, memref<f64>) attributes {argc = 2 : i64, id = 4 : i64, resc = 3 : i64}
 }
+
+// -----
+
+// CHECK-LABEL: @test1
+module @test1 {
+  catalyst.callback @callback_1(memref<f64>, memref<f64>) attributes {argc = 1 : i64, id = 1 : i64, resc = 1 : i64}
+  // CHECK-LABEL: func.func private @foo(
+  // CHECK-SAME: [[arg0:%.+]]: tensor<f64>
+  // CHECK-SAME:)
+  func.func private @foo(%arg0: tensor<f64>) -> tensor<f64> {
+    // CHECK: [[memref0:%.+]] = bufferization.to_memref [[arg0]]
+    %0 = bufferization.to_memref %arg0 : memref<f64>
+    // CHECK: [[struct0:%.+]] = builtin.unrealized_conversion_cast [[memref0]]
+    // CHECK: [[tensor1:%.+]] = bufferization.alloc_tensor()
+    %1 = bufferization.alloc_tensor() {memory_space = 0 : i64} : tensor<f64>
+    // CHECK: [[memref1:%.+]] = bufferization.to_memref [[tensor1]]
+    %2 = bufferization.to_memref %1 : memref<f64>
+    // CHECK: [[struct1:%.+]] = builtin.unrealized_conversion_cast [[memref1]]
+
+    // CHECK: [[ptr0:%.+]] = llvm.alloca {{.*}}
+    // CHECK: llvm.store [[struct0]], [[ptr0]]
+    // CHECK: [[ptr1:%.+]] = llvm.alloca {{.*}}
+    // CHECK: llvm.store [[struct1]], [[ptr1]]
+
+    // call @callback_1([[ptr0]], [[ptr1]])
+    catalyst.callback_call @callback_1(%0, %2) : (memref<f64>, memref<f64>) -> ()
+    %3 = bufferization.to_tensor %2 : memref<f64>
+    return %3 : tensor<f64>
+  }
+}
+
 
