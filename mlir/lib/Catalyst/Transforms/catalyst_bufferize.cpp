@@ -52,6 +52,10 @@ struct CatalystBufferizationPass : impl::CatalystBufferizationPassBase<CatalystB
             [&](CustomCallOp op) { return typeConverter.isLegal(op); });
         target.addDynamicallyLegalOp<PythonCallOp>(
             [&](PythonCallOp op) { return typeConverter.isLegal(op); });
+        target.addDynamicallyLegalOp<CallbackOp>([&](CallbackOp op) {
+            return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+                   typeConverter.isLegal(&op.getBody()) && op.getResultTypes().empty();
+        });
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
