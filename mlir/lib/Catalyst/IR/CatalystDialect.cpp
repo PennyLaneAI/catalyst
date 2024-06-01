@@ -16,6 +16,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
@@ -39,6 +40,28 @@ void CatalystDialect::initialize()
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
+}
+
+//===----------------------------------------------------------------------===//
+// CallbackOp
+//===----------------------------------------------------------------------===//
+
+ParseResult CallbackOp::parse(OpAsmParser &parser, OperationState &result)
+{
+    auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+                            function_interface_impl::VariadicFlag,
+                            std::string &) { return builder.getFunctionType(argTypes, results); };
+
+    return function_interface_impl::parseFunctionOp(
+        parser, result, /*allowVariadic=*/false, getFunctionTypeAttrName(result.name),
+        buildFuncType, getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
+}
+
+void CallbackOp::print(OpAsmPrinter &p)
+{
+    function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false,
+                                             getFunctionTypeAttrName(), getArgAttrsAttrName(),
+                                             getResAttrsAttrName());
 }
 
 //===----------------------------------------------------------------------===//
