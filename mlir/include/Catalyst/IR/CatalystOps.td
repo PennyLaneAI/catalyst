@@ -16,6 +16,7 @@
 #ifndef CATALYST_OPS
 #define CATALYST_OPS
 
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -148,6 +149,22 @@ def CallbackOp : Catalyst_Op<"callback",
 
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;
+
+}
+
+def CallbackCallOp : Catalyst_Op<"callback_call",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>, DeclareOpInterfaceMethods<CallOpInterface>]> {
+
+  let arguments = (ins
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs
+  );
+
+  let results = (outs Variadic<AnyType>);
+
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
 
 }
 

@@ -65,6 +65,24 @@ void CallbackOp::print(OpAsmPrinter &p)
 }
 
 //===----------------------------------------------------------------------===//
+// CallbackCallOp
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable CallbackCallOp::getCallableForCallee()
+{
+    return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+void CallbackCallOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+}
+
+Operation::operand_range CallbackCallOp::getArgOperands() { return getInputs(); }
+
+MutableOperandRange CallbackCallOp::getArgOperandsMutable() { return getInputsMutable(); }
+
+//===----------------------------------------------------------------------===//
 // Catalyst type definitions.
 //===----------------------------------------------------------------------===//
 
