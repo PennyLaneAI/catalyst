@@ -27,6 +27,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Gradient/Transforms/Utils.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -479,6 +480,84 @@ struct PythonCallOpPattern : public OpConversionPattern<PythonCallOp> {
     }
 };
 
+struct CallbackOpPatternOne : public OpConversionPattern<CallbackOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(CallbackOp op) const override
+    {
+        // Only match with ops without an entry block
+        return !op.empty() ? failure() : success();
+    }
+
+    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        Block *entry;
+        rewriter.updateRootInPlace(op, [&] { entry = op.addEntryBlock(); });
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(entry);
+
+        auto ctx = rewriter.getContext();
+        Type ptrTy = LLVM::LLVMPointerType::get(ctx);
+        auto one = rewriter.getI64IntegerAttr(1);
+        auto loc = op.getLoc();
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, one);
+        auto idAttr = op.getIdAttr();
+        auto constantId = rewriter.create<LLVM::ConstantOp>(loc, idAttr);
+        auto argcAttr = op.getArgcAttr();
+        auto constantArgc = rewriter.create<LLVM::ConstantOp>(loc, argcAttr);
+        auto rescAttr = op.getRescAttr();
+        auto constantResc = rewriter.create<LLVM::ConstantOp>(loc, rescAttr);
+
+        SmallVector<Value> callArgs = {constantId, constantArgc, constantResc};
+
+        Type i64 = rewriter.getI64Type();
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
+        bool isVarArg = true;
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto typeConverter = getTypeConverter();
+        LLVM::LLVMFuncOp customCallFnOp =
+            mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
+                                         /*ret_type=*/voidType, isVarArg);
+
+        for (auto arg : llvm::enumerate(op.getArguments())) {
+            auto val = arg.value();
+            Type structTy = typeConverter->convertType(val.getType());
+            auto structVal =
+                rewriter.create<UnrealizedConversionCastOp>(loc, structTy, val).getResult(0);
+            Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structTy, c1);
+            rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
+            callArgs.push_back(ptr);
+        }
+        rewriter.create<LLVM::CallOp>(loc, customCallFnOp, callArgs);
+        rewriter.create<func::ReturnOp>(loc, TypeRange{}, ValueRange{});
+    }
+};
+
+struct CallbackOpPatternTwo : public OpConversionPattern<CallbackOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(CallbackOp op) const override
+    {
+        // Only match with ops with an entry block
+        return !op.empty() ? success() : failure();
+    }
+    void rewrite(CallbackOp op, CallbackOpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto func =
+            rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
+        rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+        auto typeConverter = getTypeConverter();
+        // This one also modifies the callers...
+        gradient::wrapMemRefArgs(func, typeConverter, rewriter, op.getLoc());
+        rewriter.eraseOp(op);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -498,8 +577,11 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PythonCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
+        patterns.add<CallbackOpPatternOne>(typeConverter, context);
+        patterns.add<CallbackOpPatternTwo>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
+        target.addLegalDialect<func::FuncDialect>();
         target.addIllegalDialect<CatalystDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {

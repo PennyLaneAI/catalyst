@@ -121,3 +121,23 @@ func.func @python_call () {
     catalyst.pycallback() { identifier = 0} : () -> ()
     return
 }
+
+// -----
+
+// CHECK-LABEL @test0
+module @test0 {
+
+  // Make sure that arguments are !llvm.ptrs.
+  // CHECK-LABEL: func.func @callback_4(
+  // CHECK-SAME: [[arg0:%.+]]: !llvm.ptr,
+  // CHECK-SAME: [[arg1:%.+]]: !llvm.ptr)
+
+  // Make sure that we pass the constants that we need.
+  // CHECK-DAG: [[id:%.+]] = llvm.mlir.constant(4
+  // CHECK-DAG: [[argc:%.+]] = llvm.mlir.constant(2
+  // CHECK-DAG: [[resc:%.+]] = llvm.mlir.constant(3
+
+  // CHECK: llvm.call @inactive_callback([[id]], [[argc]], [[resc]]
+  catalyst.callback @callback_4(memref<f64>, memref<f64>) attributes {argc = 2 : i64, id = 4 : i64, resc = 3 : i64}
+}
+
