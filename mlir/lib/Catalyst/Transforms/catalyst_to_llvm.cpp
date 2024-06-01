@@ -492,8 +492,7 @@ struct CallbackOpPatternTwo : public OpConversionPattern<CallbackOp> {
             rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
         auto typeConverter = getTypeConverter();
-        // This one also modifies the callers...
-        gradient::wrapMemRefArgs(func, typeConverter, rewriter, op.getLoc());
+        gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
     }
 };
