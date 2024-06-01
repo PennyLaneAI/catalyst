@@ -42,6 +42,7 @@ struct CatalystBufferizationPass : impl::CatalystBufferizationPassBase<CatalystB
 
         RewritePatternSet patterns(context);
         populateBufferizationPatterns(typeConverter, patterns);
+        populateFunctionOpInterfaceTypeConversionPattern<CallbackOp>(patterns, typeConverter);
 
         ConversionTarget target(*context);
         bufferization::populateBufferizeMaterializationLegality(target);

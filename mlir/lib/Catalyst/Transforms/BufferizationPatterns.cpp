@@ -119,6 +119,38 @@ struct BufferizePythonCallOp : public OpConversionPattern<PythonCallOp> {
     }
 };
 
+struct BufferizeCallbackOp : public OpConversionPattern<CallbackOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(CallbackOp op) const override
+    {
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+
+        // Only match if we have result types.
+        return op.getResultTypes().empty() ? failure() : success();
+    }
+
+    void rewrite(CallbackOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto argTys = op.getArgumentTypes();
+        auto retTys = op.getResultTypes();
+        SmallVector<Type> emptyRets;
+        SmallVector<Type> args(argTys.begin(), argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end());
+        auto callbackTy = rewriter.getFunctionType(args, emptyRets);
+        rewriter.updateRootInPlace(op, [&] { op.setFunctionType(callbackTy); });
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -128,6 +160,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<BufferizeCustomCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePythonCallOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizePrintOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeCallbackOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace catalyst

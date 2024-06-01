@@ -59,3 +59,12 @@ func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
 
     return %0 : tensor<3x3xf64>
 }
+
+// -----
+
+// CHECK-LABEL: @test0
+module @test0 {
+  // CHECK: catalyst.callback @callback_1(memref<f64>, memref<f64>)
+  catalyst.callback @callback_1(tensor<f64>) -> tensor<f64> attributes { argc = 1:i64, resc = 1 : i64, id = 1:i64}
+}
+
