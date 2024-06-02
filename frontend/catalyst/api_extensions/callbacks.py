@@ -324,6 +324,9 @@ class MemrefCallable(FlatCallable):
         return list(map(ctypes.POINTER, operandTys))
 
 
+MEMREF_CACHE = dict()
+
+
 def callback_implementation(
     cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, custom_grad=None, **kwargs: Any
 ):
@@ -339,7 +342,12 @@ def callback_implementation(
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
-    memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+    cache_key = (cb, *flat_results_aval)
+    if cache_key in MEMREF_CACHE:
+        memref_callable = MEMREF_CACHE[cache_key]
+    else:
+        memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+        MEMREF_CACHE[cache_key] = memref_callable
 
     out_flat = python_callback_p.bind(
         *flat_args,
