@@ -245,13 +245,13 @@ def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
 
 
 @python_callback_p.def_abstract_eval
-def _python_callback_abstract_eval(*avals, callback, results_aval):
+def _python_callback_abstract_eval(*avals, callback, custom_grad, results_aval):
     """Abstract evaluation"""
     return results_aval
 
 
 @python_callback_p.def_impl
-def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cover
+def _python_callback_def_impl(*avals, callback, custom_grad, results_aval):  # pragma: no cover
     """Concrete evaluation"""
     raise NotImplementedError()
 
@@ -259,7 +259,9 @@ def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cov
 CALLBACK_OP_CACHE = {}
 
 
-def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
+def _python_callback_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *args, callback, custom_grad, results_aval
+):
     """Callback lowering"""
 
     sys.path.append(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
