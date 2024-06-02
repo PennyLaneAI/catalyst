@@ -73,3 +73,25 @@ void ForwardOp::print(OpAsmPrinter &p)
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());
 }
+
+//===----------------------------------------------------------------------===//
+// ReverseOp
+//===----------------------------------------------------------------------===//
+
+ParseResult ReverseOp::parse(OpAsmParser &parser, OperationState &result)
+{
+    auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+                            function_interface_impl::VariadicFlag,
+                            std::string &) { return builder.getFunctionType(argTypes, results); };
+
+    return function_interface_impl::parseFunctionOp(
+        parser, result, /*allowVariadic=*/false, getFunctionTypeAttrName(result.name),
+        buildFuncType, getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
+}
+
+void ReverseOp::print(OpAsmPrinter &p)
+{
+    function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false,
+                                             getFunctionTypeAttrName(), getArgAttrsAttrName(),
+                                             getResAttrsAttrName());
+}
