@@ -16,6 +16,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "mlir/Dialect/Index/IR/IndexOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
@@ -153,6 +154,83 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
     }
 };
 
+struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(ForwardOp op) const override
+    {
+        if (!op.empty()) {
+            return failure();
+        }
+
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+
+        // Only match if we have result types.
+        return op.getResultTypes().empty() ? failure() : success();
+    }
+
+    void rewrite(ForwardOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        // Remove the # tape arguments from the results
+        auto tapeCount = op.getTape();
+        auto argTys = op.getArgumentTypes();
+        auto retTys = op.getResultTypes();
+        SmallVector<Type> args(argTys.begin(), argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end() - tapeCount);
+        SmallVector<Type> tapeRet(retTys.end() - tapeCount, retTys.end());
+        SmallVector<Type> dupArgs;
+
+        // We are guaranteed bu the match above that all types are memrefs.
+        for (auto arg : args) {
+            dupArgs.push_back(arg);
+            dupArgs.push_back(arg);
+        }
+
+        auto callbackTy = rewriter.getFunctionType(dupArgs, tapeRet);
+        Block *block;
+        rewriter.updateRootInPlace(op, [&] {
+            op.setFunctionType(callbackTy);
+            block = op.addEntryBlock();
+        });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto params = op.getArguments();
+        SmallVector<Value> nonDupParams;
+        for (auto [idx, param] : llvm::enumerate(params)) {
+            if ((idx % 2) == 0)
+                nonDupParams.push_back(param);
+        }
+
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        SmallVector<Value> inputs(nonDupParams.begin(), nonDupParams.begin() + argc);
+        SmallVector<Value> outputs(nonDupParams.end() - resc, nonDupParams.end());
+        auto loc = op.getLoc();
+        auto impl = adaptor.getImplementation();
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, retTys, inputs);
+        SmallVector<Value> callResults(callOp.getResults());
+
+        for (auto [resCall, resParam] : llvm::zip(callResults, outputs)) {
+            rewriter.create<memref::CopyOp>(loc, resCall, resParam);
+        }
+
+        SmallVector<Value> tapeResults(callResults.end() - tapeCount, callResults.end());
+
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeResults);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -162,6 +240,8 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
 {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeForwardOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeReverseOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient
