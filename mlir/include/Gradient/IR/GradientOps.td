@@ -15,6 +15,7 @@
 #ifndef GRADIENT_OPS
 #define GRADIENT_OPS
 
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
@@ -189,6 +190,51 @@ def VJPOp : Gradient_Op<"vjp", [
     }];
 
     let hasVerifier = 1;
+}
+
+def ForwardOp : Gradient_Op<"forward",
+    [FunctionOpInterface, IsolatedFromAbove]> {
+
+  let summary = "Operation denoting the forwrad pass that is registered with Enzyme.";
+
+  let description = [{
+    Wrapper around the concrete function. This wrapper ensures calling convention.
+  }];
+
+  let arguments = (ins
+     SymbolNameAttr: $sym_name,
+     TypeAttrOf<FunctionType>: $function_type,
+     FlatSymbolRefAttr: $implementation,
+     I64Attr: $argc,
+     I64Attr: $resc,
+     I64Attr: $tape,
+     OptionalAttr<DictArrayAttr>: $arg_attrs,
+     OptionalAttr<DictArrayAttr>: $res_attrs
+  );
+
+  let regions = (region AnyRegion: $body);
+
+  let builders = [OpBuilder<(ins
+    "mlir::StringRef":$name, "mlir::FunctionType":$type,
+    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
+  >];
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // FunctionOpInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Returns the argument types of this function.
+    mlir::ArrayRef<mlir::Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+    /// Returns the result types of this function.
+    mlir::ArrayRef<mlir::Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    mlir::Region *getCallableRegion() { return &getBody(); }
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
 }
 
 #endif // GRADIENT_OPS
