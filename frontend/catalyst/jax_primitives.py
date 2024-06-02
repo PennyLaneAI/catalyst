@@ -43,7 +43,7 @@ from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
-from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
+from mlir_quantum.dialects.gradient import ForwardOp, GradOp, JVPOp, ReverseOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -287,7 +287,30 @@ def _python_callback_lowering(
     callbackOp = CALLBACK_OP_CACHE[cache_key]
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
-    return CallbackCallOp(results_ty, symbol_attr, args).results
+    retval = CallbackCallOp(results_ty, symbol_attr, args).results
+
+    if not custom_grad:
+        return retval
+
+    assert custom_grad._fwd and custom_grad._bwd
+    fwd = custom_grad._fwd
+    rev = custom_grad._bwd
+    fwd_jaxpr = custom_grad._fwd_jaxpr
+    rev_jaxpr = custom_grad._bwd_jaxpr
+    ctx = jax_ctx.module_context
+    mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd)
+    mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev)
+    sym_fwd = mlir_fwd.sym_name.value + ".fwd"
+    fwd_fn_ty_attr = ir.TypeAttr.get(mlir_fwd.type)
+    fwd_callee_attr = ir.FlatSymbolRefAttr.get(mlir_fwd.sym_name.value)
+    sym_rev = mlir_rev.sym_name.value + ".rev"
+    rev_fn_ty_attr = ir.TypeAttr.get(mlir_rev.type)
+    rev_callee_attr = ir.FlatSymbolRefAttr.get(mlir_rev.sym_name.value)
+    with ir.InsertionPoint(ip):
+        forward = ForwardOp(sym_fwd, fwd_fn_ty_attr, fwd_callee_attr)
+        reverse = ReverseOp(sym_rev, rev_fn_ty_attr, rev_callee_attr)
+
+    return retval
 
 
 #
