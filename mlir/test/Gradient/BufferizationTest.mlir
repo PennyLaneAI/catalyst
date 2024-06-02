@@ -72,3 +72,23 @@ func.func @backprop3(%arg0: tensor<10xf64>, %arg1: tensor<2xf64>, %arg2: tensor<
     %grad:2 = gradient.backprop @circuit4(%arg0, %arg1) cotangents(%arg2: tensor<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>}: (tensor<10xf64>, tensor<2xf64>) -> (tensor<10xf64>, tensor<2xf64>)
     return
 }
+
+// -----
+
+// CHECK-LABEL: @test0
+module @test0 {
+
+  func.func private @fwd(tensor<f64>) -> (tensor<f64>, tensor<f64>)
+
+  // CHECK-LABEL: gradient.forward @fwd.fwd(
+  // CHECK:[[in0:%.+]]: memref<f64>, [[diff0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[cotang0:%.+]]: memref<f64>) -> memref<f64> 
+  gradient.forward @fwd.fwd(tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>) -> (tensor<f64>) attributes {implementation = @fwd, argc = 1: i64, resc = 1 : i64, tape = 1: i64}
+  // CHECK: [[tensor0:%.+]] = bufferization.to_tensor [[in0]]
+  // CHECK: [[outAndTape:%.+]]:2 = func.call @fwd([[tensor0]])
+  // CHECK: [[outMemref:%.+]] = bufferization.to_memref [[outAndTape]]#0
+  // CHECK: memref.copy [[outMemref]], [[out0]]
+  // CHECK: [[tapeMemref:%.+]] = bufferization.to_memref [[outAndTape]]#1
+  // CHECK: gradient.return {empty = false} [[tapeMemref]]
+
+}
+
