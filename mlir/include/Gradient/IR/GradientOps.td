@@ -275,4 +275,24 @@ def ReverseOp : Gradient_Op<"reverse",
   let skipDefaultBuilders = 1;
 }
 
+def CustomGradOp : Gradient_Op<"custom_grad", []> {
+
+  let summary = "Operation denoting the registration of the custom gradient with Enzyme.";
+
+  let description = [{
+    A triple of three functions. The function itself, the forward and reverse pass.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr: $callee,
+    FlatSymbolRefAttr: $forward,
+    FlatSymbolRefAttr: $reverse
+  );
+
+  let assemblyFormat = [{
+    $callee $forward $reverse attr-dict
+  }];
+
+}
+
 #endif // GRADIENT_OPS
