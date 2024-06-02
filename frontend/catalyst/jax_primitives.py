@@ -262,18 +262,21 @@ def _python_callback_lowering(
     fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
     fn_ty_attr = ir.TypeAttr.get(fn_ty)
     cache_key = (callback_id, *params_ty, *results_ty)
-    if cache_key not in CALLBACK_OP_CACHE:
-        module = jax_ctx.module_context.module
-        ip = module.body
-        attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
-        with ir.InsertionPoint(ip):
-            callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
-        CALLBACK_OP_CACHE[cache_key] = callbackOp
+    if cache_key in CALLBACK_OP_CACHE:
+        callbackOp = CALLBACK_OP_CACHE[cache_key]
+        symbol = callbackOp.sym_name.value
+        symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
+        return CallbackCallOp(results_ty, symbol_attr, args).results
 
+    module = jax_ctx.module_context.module
+    ip = module.body
+    attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
+    with ir.InsertionPoint(ip):
+        callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
+    CALLBACK_OP_CACHE[cache_key] = callbackOp
     callbackOp = CALLBACK_OP_CACHE[cache_key]
     symbol = callbackOp.sym_name.value
     symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
-
     return CallbackCallOp(results_ty, symbol_attr, args).results
 
 
