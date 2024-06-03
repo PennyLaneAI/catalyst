@@ -215,6 +215,10 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
         __catalyst__rt__array_get_element_ptr_1d(qs, 0);
         __catalyst__rt__array_get_element_ptr_1d(qs, 2);
 
+        REQUIRE_THROWS_WITH(
+            __catalyst__rt__array_get_element_ptr_1d(qs, 3),
+            Catch::Contains("The qubit register does not contain the requested wire: 3"));
+
         __catalyst__rt__qubit_release_array(qs); // The `qs` is a dangling pointer from now on.
         __catalyst__rt__device_release();
     }
