@@ -137,6 +137,9 @@
   In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
   [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
+* Correctly recording types of constant array when lowering `catalyst.grad` to mlir
+  [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
+
 <h3>Internal changes</h3>
 
 * Add support to use a locally cloned PennyLane Lightning repository with the runtime.
