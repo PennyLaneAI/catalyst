@@ -45,3 +45,26 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
     return %alloc0, %alloc1 : memref<?xf64>, memref<?xf64>
 }
+
+// -----
+
+// CHECK-LABEL: @test0
+module @test0 {
+  memref.global "private" constant @__constant_xf64 : memref<f64> = dense<1.000000e+00>
+  func.func private @fwd(%arg0: memref<f64>) -> (memref<f64>, memref<f64>) {
+    %0 = memref.get_global @__constant_xf64 : memref<f64>
+    %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
+    catalyst.callback_call @callback_140505513630752(%arg0, %alloc) : (memref<f64>, memref<f64>) -> ()
+    return %alloc, %0 : memref<f64>, memref<f64>
+  }
+  // CHECK-LABEL: func.func private @fwd.fwd(
+  // CHECK-SAME: [[arg0:%.+]]: !llvm.ptr, [[ash0:%.+]]: !llvm.ptr, [[out0:%.+]]: !llvm.ptr, [[osh0:%.+]]: !llvm.ptr)
+  // CHECK-NOT: gradient.return
+  gradient.forward @fwd.fwd(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>) -> (memref<f64>) attributes {argc = 1 : i64, implementation = @fwd, resc = 1 : i64, tape = 1 : i64} {
+    %0:2 = func.call @fwd(%arg0) : (memref<f64>) -> (memref<f64>, memref<f64>)
+    memref.copy %0#0, %arg2 : memref<f64> to memref<f64>
+    gradient.return %0#1 : memref<f64>
+  }
+
+}
+
