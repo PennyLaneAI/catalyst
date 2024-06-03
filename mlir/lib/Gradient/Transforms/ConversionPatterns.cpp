@@ -860,6 +860,29 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
     }
 };
 
+struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+    LogicalResult match(ReverseOp op) const override { return success(); }
+
+    void rewrite(ReverseOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        // convert all arguments to pointers...
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto func =
+            rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
+        func.setPrivate();
+
+        rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+        auto typeConverter = getTypeConverter();
+        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        rewriter.eraseOp(op);
+    }
+};
+
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
@@ -883,6 +906,7 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<AdjointOpPattern>(typeConverter);
     patterns.add<BackpropOpPattern>(typeConverter);
     patterns.add<ForwardOpPattern>(typeConverter);
+    patterns.add<ReverseOpPattern>(typeConverter);
     patterns.add<ReturnOpPattern>(typeConverter);
 }
 
