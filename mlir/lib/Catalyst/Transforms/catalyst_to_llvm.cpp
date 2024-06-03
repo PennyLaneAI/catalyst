@@ -24,6 +24,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Gradient/IR/GradientDialect.h"
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
@@ -550,6 +551,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         LLVMConversionTarget target(*context);
         target.addLegalDialect<func::FuncDialect>();
         target.addIllegalDialect<CatalystDialect>();
+        target.addIllegalDialect<catalyst::gradient::GradientDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
