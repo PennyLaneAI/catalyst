@@ -14,7 +14,7 @@
 """This module contains for program verification.
 """
 
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 from pennylane import transform
 from pennylane.measurements import (
@@ -24,8 +24,8 @@ from pennylane.measurements import (
     VarianceMP,
     VnEntropyMP,
 )
-from pennylane.operation import Operation
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.operation import Operation, Tensor
+from pennylane.ops import CompositeOp, Controlled, ControlledOp, ControlledQubitUnitary, Hamiltonian, SymbolicOp
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions import MidCircuitMeasure
@@ -183,5 +183,56 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
     for obs in tape.observables:
         _obs_checker(obs)
+
+    return (tape,), lambda x: x[0]
+
+
+@transform
+def validate_observables(
+    tape: QuantumTape, qjit_capabilities: dict, name: str) -> (Sequence[QuantumTape], Callable):
+    """Validates the observables and measurements for a circuit against the capabilites 
+    from the TOML file.
+
+    Args:
+        tape (QuantumTape or QNode or Callable): a quantum circuit.
+        qjit_capabilities (dict): specifies the capabilities of the qjitted device
+        name (str): the name of the device to use in error messages.
+
+    Returns:
+        qnode (QNode) or quantum function (Callable) or tuple[List[.QuantumTape], function]:
+        The unaltered input circuit.
+
+    Raises:
+        CompileError: if an observable is not supported by the device with Catalyst
+
+    """
+
+    def _observable_is_supported(obs) -> bool:
+        """Specifies whether or not an observable is accepted by QJITDevice. 
+        
+        If the observable is built on one or multiple other observables, check 
+        both that the overall observable is supported, and that its component 
+        parts are supported."""
+
+        if isinstance(obs, (Tensor, Hamiltonian, CompositeOp, SymbolicOp)):
+
+            if not qjit_capabilities.native_obs.get(obs.name):
+                return False
+            
+            if hasattr(obs, "operands"):
+                return all([_observable_is_supported(o) for o in obs.operands])
+            elif hasattr(obs, "obs"):
+                return _observable_is_supported(obs.obs)
+            elif hasattr(obs, "base"):
+                return _observable_is_supported(obs.base)
+        
+        return qjit_capabilities.native_obs.get(obs.name)
+        
+        
+    for m in tape.measurements:
+        if m.obs and not _observable_is_supported(m.obs):
+            raise CompileError(
+                    f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
+                )
 
     return (tape,), lambda x: x[0]
