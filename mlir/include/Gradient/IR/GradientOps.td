@@ -275,6 +275,18 @@ def ReverseOp : Gradient_Op<"reverse",
   let skipDefaultBuilders = 1;
 }
 
+def ReturnOp : Gradient_Op<"return",
+    [Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
+
+  let summary = "Return tapes or nothing";
+
+  let arguments = (ins
+    Variadic<AnyTypeOf<[MemRefOf<[AnyType]>]>>: $tape
+  );
+
+  let assemblyFormat = [{ attr-dict ($tape^ `:` type($tape))? }];
+}
+
 def CustomGradOp : Gradient_Op<"custom_grad", []> {
 
   let summary = "Operation denoting the registration of the custom gradient with Enzyme.";
