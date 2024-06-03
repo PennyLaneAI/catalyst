@@ -281,7 +281,8 @@ def ReturnOp : Gradient_Op<"return",
   let summary = "Return tapes or nothing";
 
   let arguments = (ins
-    Variadic<AnyTypeOf<[MemRefOf<[AnyType]>]>>: $tape
+    Variadic<AnyTypeOf<[MemRefOf<[AnyType]>]>>: $tape,
+    I1Attr: $empty
   );
 
   let assemblyFormat = [{ attr-dict ($tape^ `:` type($tape))? }];

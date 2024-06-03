@@ -88,7 +88,7 @@ module @test0 {
   // CHECK: [[memref0:%.+]] = bufferization.to_memref [[call0]]#0
   // CHECK: memref.copy [[memref0]], [[out0]]
   // CHECK: [[memref1:%.+]] = bufferization.to_memref [[call0]]#1
-  // CHECK: gradient.return [[memref1]]
+  // CHECK: gradient.return {empty = false} [[memref1]]
 
 }
 
@@ -107,6 +107,6 @@ module @test1 {
   // CHECK: [[tensor2:%.+]] = func.call @rev([[tensor0]], [[tensor1]])
   // CHECK: [[memref2:%.+]] = bufferization.to_memref [[tensor2]]
   // CHECK: memref.copy [[memref2]], [[inpshd0]]
-  // CHECK: gradient.return
+  // CHECK: gradient.return {empty = true}
 
 }
