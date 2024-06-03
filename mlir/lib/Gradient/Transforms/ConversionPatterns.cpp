@@ -847,12 +847,23 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        auto func =
-            rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
+        auto tapeMemrefTys = op.getResultTypes();
+        SmallVector<Type> tapeStructTys;
+        auto ctx = rewriter.getContext();
+        auto typeConverter = getTypeConverter();
+        for (auto tapeMemrefTy : tapeMemrefTys) {
+            Type structType = typeConverter->convertType(tapeMemrefTy);
+            tapeStructTys.push_back(structType);
+        }
+
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
+        auto oldFuncTy = op.getFunctionType();
+        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {tapeTy});
+
+        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
         func.setPrivate();
 
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-        auto typeConverter = getTypeConverter();
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
     }
@@ -889,7 +900,36 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     void rewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
     {
         auto loc = op.getLoc();
-        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, adaptor.getTape());
+        if (op.getEmpty()) {
+            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, ValueRange{});
+            rewriter.replaceOp(op, returnOp);
+            return;
+        }
+
+        auto tape = adaptor.getTape();
+        auto tapeMemrefTys = tape.getTypes();
+
+        SmallVector<Type> tapeStructTys;
+        auto ctx = rewriter.getContext();
+        auto typeConverter = getTypeConverter();
+        for (auto tapeMemrefTy : tapeMemrefTys) {
+            Type structType = typeConverter->convertType(tapeMemrefTy);
+            tapeStructTys.push_back(structType);
+        }
+
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
+        Value tapeVal = rewriter.create<LLVM::UndefOp>(loc, tapeTy);
+
+        SmallVector<Value> structVals;
+        int i = 0;
+        for (auto [tapeMemrefVal, tapeStructTy] : llvm::zip(tape, tapeStructTys)) {
+            auto op = rewriter.create<UnrealizedConversionCastOp>(loc, tapeStructTy, tapeMemrefVal);
+            Value tapeStructVal = op.getResult(0);
+            tapeVal = rewriter.create<LLVM::InsertValueOp>(loc, tapeVal, tapeStructVal, i);
+            i++;
+        }
+
+        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, tapeVal);
         rewriter.replaceOp(op, returnOp);
     }
 };
