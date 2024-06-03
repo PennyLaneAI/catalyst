@@ -78,7 +78,7 @@ func.func @backprop3(%arg0: tensor<10xf64>, %arg1: tensor<2xf64>, %arg2: tensor<
 // CHECK-LABEL: @test0
 module @test0 {
 
-  func.func private @fwd(memref<f64>) -> (memref<f64>, memref<f64>)
+  func.func private @fwd(tensor<f64>) -> (tensor<f64>, tensor<f64>)
 
   // CHECK-LABEL: gradient.forward @fwd.fwd(
   // CHECK-SAME:[[inp0:%.+]]: memref<f64>, [[inpshd0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[outshd0:%.+]]: memref<f64>) -> memref<f64>
@@ -96,13 +96,17 @@ module @test0 {
 
 // CHECK-LABEL: @test1
 module @test1 {
-  func.func private @rev(memref<f64>, memref<f64>) -> memref<f64>
+  func.func private @rev(tensor<f64>, tensor<f64>) -> tensor<f64>
   // CHECK-LABEL: gradient.reverse @rev.rev(
   // CHECK-SAME:[[inp0:%.+]]: memref<f64>, [[inpshd0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[outshd0:%.+]]: memref<f64>, [[tap0:%.+]]: memref<f64>)
   // CHECK-NOT: memref<f64>
   // CHECK-SAME: attributes
   gradient.reverse @rev.rev(tensor<f64>, tensor<f64>) -> (tensor<f64>) attributes {implementation = @rev, argc = 1: i64, resc = 1 : i64, tape = 1: i64}
-  // CHECK: [[diff0:%.+]] = func.call @rev([[tap0]], [[outshd0]])
-  // CHECK: memref.copy [[diff0]], [[inpshd0]]
+  // CHECK-DAG: [[tensor0:%.+]] = bufferization.to_tensor [[tap0]]
+  // CHECK-DAG: [[tensor1:%.+]] = bufferization.to_tensor [[outshd0]]
+  // CHECK: [[tensor2:%.+]] = func.call @rev([[tensor0]], [[tensor1]])
+  // CHECK: [[memref2:%.+]] = bufferization.to_memref [[tensor2]]
+  // CHECK: memref.copy [[memref2]], [[inpshd0]]
   // CHECK: gradient.return
+
 }

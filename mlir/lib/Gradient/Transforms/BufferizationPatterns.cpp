@@ -316,17 +316,29 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         SmallVector<Value> cotangents(dupParams.end() - resc, dupParams.end());
         auto loc = op.getLoc();
         auto impl = adaptor.getImplementation();
+        auto implAttr = adaptor.getImplementationAttr();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+
+        auto implResTy = implOp.getResultTypes();
 
         SmallVector<Value> inputs(residuals.begin(), residuals.end());
         for (auto cotangent : cotangents) {
             inputs.push_back(cotangent);
         }
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, retTys, inputs);
+        SmallVector<Value> tensorInputs;
+        for (auto memrefInput : inputs) {
+            Value tensorInput = rewriter.create<bufferization::ToTensorOp>(loc, memrefInput);
+            tensorInputs.push_back(tensorInput);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
         SmallVector<Value> callResults(callOp.getResults());
 
         for (auto [resCall, diff] : llvm::zip(callResults, diffs)) {
-            rewriter.create<memref::CopyOp>(loc, resCall, diff);
+            Value memrefOut =
+                rewriter.create<bufferization::ToMemrefOp>(loc, diff.getType(), resCall);
+            rewriter.create<memref::CopyOp>(loc, memrefOut, diff);
         }
 
         rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{});

@@ -70,7 +70,7 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
 
         target.addLegalOp<catalyst::gradient::ReturnOp>();
 
-        target.addLegalDialect<func::FuncDialect,memref::MemRefDialect>();
+        target.addLegalDialect<func::FuncDialect,memref::MemRefDialect,bufferization::BufferizationDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
