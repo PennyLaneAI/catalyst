@@ -599,6 +599,7 @@ class QJIT:
         return requires_promotion
 
     # Processing Stages #
+
     @instrument
     @debug_logger
     def pre_compilation(self):
