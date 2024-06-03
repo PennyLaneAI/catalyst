@@ -247,6 +247,92 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
     }
 };
 
+struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(ReverseOp op) const override
+    {
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+
+        return success();
+    }
+
+    void rewrite(ReverseOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        SmallVector<Value> inputs;
+        SmallVector<Value> differentials;
+        SmallVector<Value> outputs;
+        SmallVector<Value> cotangents;
+        SmallVector<Value> residuals;
+
+        Block *block;
+        rewriter.updateRootInPlace(op, [&] { block = op.addEntryBlock(); });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        auto params = op.getArguments();
+
+        for (auto i = 0; i < argc * 2; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? differentials.push_back(val) : inputs.push_back(val);
+        }
+
+        auto upperLimit = (argc * 2) + (resc * 2);
+        for (auto i = argc * 2; i < upperLimit; i++) {
+            bool isDup = (i % 2) != 0;
+            Value val = params[i];
+            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+        }
+
+        auto tapeCount = op.getTape();
+        auto uppestLimit = upperLimit + tapeCount;
+        for (auto i = upperLimit; i < uppestLimit; i++) {
+            residuals.push_back(params[i]);
+        }
+
+        auto implAttr = adaptor.getImplementationAttr();
+        auto impl = adaptor.getImplementation();
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+        auto implResTy = implOp.getResultTypes();
+        Location loc = op.getLoc();
+
+        SmallVector<Value> tensorInputs;
+        for (auto residual : residuals) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, residual);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        for (auto cotangent : cotangents) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, cotangent);
+            tensorInputs.push_back(tensorIn);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
+        SmallVector<Value> tensorOutputs(callOp.getResults());
+
+        for (auto [differential, tensorOutput] : llvm::zip(differentials, tensorOutputs)) {
+            Value castVal = rewriter.create<bufferization::ToMemrefOp>(loc, differential.getType(),
+                                                                       tensorOutput);
+            rewriter.create<memref::CopyOp>(loc, castVal, differential);
+        }
+
+        auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{}, T);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -257,6 +343,7 @@ void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeForwardOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeReverseOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient
