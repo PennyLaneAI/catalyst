@@ -60,7 +60,6 @@ from catalyst.jax_extras.tracing import (
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     input_type_to_tracers,
-    jaxpr_pad_consts,
     make_jaxpr2,
     make_jaxpr_effects,
     new_dynamic_main2,
