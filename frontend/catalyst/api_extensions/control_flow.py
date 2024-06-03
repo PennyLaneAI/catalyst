@@ -679,30 +679,7 @@ class ForLoopCallable:
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx1(self, *init_state):
-        iter_arg = self.lower_bound
-        init_vals, in_tree = tree_flatten((iter_arg, *init_state))
-        init_avals = tuple(_abstractify(val) for val in init_vals)
-        body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-            self.body_fn, in_tree, init_avals, "for_loop"
-        )
-
-        out_classical_tracers = for_p.bind(
-            self.lower_bound,
-            self.upper_bound,
-            self.step,
-            *(body_consts + init_vals),
-            body_jaxpr=body_jaxpr,
-            body_nconsts=len(body_consts),
-            apply_reverse_transform=self.apply_reverse_transform,
-        )
-
-        return tree_unflatten(body_tree, out_classical_tracers)
-
     def _call_with_classical_ctx(self, ctx, *init_state):
-        # iter_arg = self.lower_bound
-        # init_vals, in_tree = tree_flatten((iter_arg, *init_state))
-        # init_avals = tuple(_abstractify(val) for val in init_vals)
 
         outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
         aux_tracers = [
