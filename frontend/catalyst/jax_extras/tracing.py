@@ -138,7 +138,6 @@ __all__ = (
     "input_type_to_tracers",
     "_extract_implicit_args",
     "output_type_to_tracers",
-    "jaxpr_remove_implicit",
     "ShapeDtypeStruct",
     "convert_constvars_jaxpr",
     "convert_element_type",
@@ -552,22 +551,6 @@ def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     implicit_args = _extract_implicit_args(in_type, explicit_args)
     args_flat = [*implicit_args, *explicit_args]
     return args_flat
-
-
-def jaxpr_remove_implicit(
-    closed_jaxpr: ClosedJaxpr, out_type: OutputType
-) -> tuple[ClosedJaxpr, OutputType]:
-    """Remove all the implicit result values of the ``closed_jaxpr``."""
-    # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the unneeded
-    # tracers.
-    jaxpr = closed_jaxpr.jaxpr
-    out_keep = list(tuple(zip(*out_type))[1]) if len(out_type) > 0 else []
-    outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
-    out_type2 = [o for o, keep in zip(out_type, out_keep) if keep]
-    jaxpr2 = Jaxpr(
-        jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
-    )
-    return ClosedJaxpr(jaxpr2, closed_jaxpr.consts), out_type2
 
 
 def make_jaxpr2(
