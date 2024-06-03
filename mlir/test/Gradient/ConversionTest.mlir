@@ -78,7 +78,7 @@ module @test1 {
   }
 
   // CHECK-LABEL: func.func private @bwd.rev
-  // CHECK-SAME: [[arg0:%.+]]: !llvm.ptr, [[ash0:%.+]]: !llvm.ptr, [[out0:%.+]]: !llvm.ptr, [[osh0:%.+]]: !llvm.ptr, [[tap0:%.+]]: !llvm.ptr)
+  // CHECK-SAME: [[arg0:%.+]]: !llvm.ptr, [[ash0:%.+]]: !llvm.ptr, [[out0:%.+]]: !llvm.ptr, [[osh0:%.+]]: !llvm.ptr, [[tap0:%.+]]: !llvm.struct<(struct<(ptr, ptr, i64)>)>)
   // CHECK-NOT: gradient-return
   gradient.reverse @bwd.rev(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>, %arg4: memref<f64>) attributes {argc = 1 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 1 : i64} {
     %0 = func.call @bwd(%arg4, %arg3) : (memref<f64>, memref<f64>) -> memref<f64>
