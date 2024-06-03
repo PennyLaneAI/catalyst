@@ -132,6 +132,44 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
     }
 }
 
+LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp, Location loc,
+                                          func::FuncOp originalFunc, func::FuncOp augmentedPrimal,
+                                          func::FuncOp gradient)
+{
+    MLIRContext *context = moduleOp.getContext();
+    OpBuilder::InsertionGuard insertGuard(builder);
+    builder.setInsertionPointToStart(moduleOp.getBody());
+
+    std::string key = (enzyme_custom_gradient_key + originalFunc.getName()).str();
+    auto customGradient = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+    if (customGradient) {
+        return customGradient;
+    }
+
+    auto ptrType = LLVM::LLVMPointerType::get(context);
+    auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
+    customGradient = builder.create<LLVM::GlobalOp>(loc, resultType,
+                                                    /*isConstant=*/false, LLVM::Linkage::External,
+                                                    key, /*address space=*/nullptr);
+    builder.createBlock(&customGradient.getInitializerRegion());
+    Value origFnPtr = builder.create<func::ConstantOp>(loc, originalFunc.getFunctionType(),
+                                                       originalFunc.getName());
+    Value augFnPtr = builder.create<func::ConstantOp>(loc, augmentedPrimal.getFunctionType(),
+                                                      augmentedPrimal.getName());
+    Value gradFnPtr =
+        builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
+    SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
+    Value result = builder.create<LLVM::UndefOp>(loc, resultType);
+    for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
+        Value casted = builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
+        result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
+    }
+
+    builder.create<LLVM::ReturnOp>(loc, result);
+
+    return customGradient;
+}
+
 /// Enzyme custom gradients appear to exhibit better stability when they are registered for
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
@@ -793,46 +831,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
         rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
         return glb;
-    }
-
-    static LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
-                                                     Location loc, func::FuncOp originalFunc,
-                                                     func::FuncOp augmentedPrimal,
-                                                     func::FuncOp gradient)
-    {
-        MLIRContext *context = moduleOp.getContext();
-        OpBuilder::InsertionGuard insertGuard(builder);
-        builder.setInsertionPointToStart(moduleOp.getBody());
-
-        std::string key = (enzyme_custom_gradient_key + originalFunc.getName()).str();
-        auto customGradient = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
-        if (customGradient) {
-            return customGradient;
-        }
-
-        auto ptrType = LLVM::LLVMPointerType::get(context);
-        auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
-        customGradient = builder.create<LLVM::GlobalOp>(
-            loc, resultType,
-            /*isConstant=*/false, LLVM::Linkage::External, key, /*address space=*/nullptr);
-        builder.createBlock(&customGradient.getInitializerRegion());
-        Value origFnPtr = builder.create<func::ConstantOp>(loc, originalFunc.getFunctionType(),
-                                                           originalFunc.getName());
-        Value augFnPtr = builder.create<func::ConstantOp>(loc, augmentedPrimal.getFunctionType(),
-                                                          augmentedPrimal.getName());
-        Value gradFnPtr =
-            builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
-        SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
-        Value result = builder.create<LLVM::UndefOp>(loc, resultType);
-        for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
-            Value casted =
-                builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
-            result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
-        }
-
-        builder.create<LLVM::ReturnOp>(loc, result);
-
-        return customGradient;
     }
 };
 
