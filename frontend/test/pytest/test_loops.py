@@ -32,17 +32,17 @@ class TestLoopToJaxpr:
 
         expected = dedent(
             """
-        { lambda ; a:f64[]. let
-            b:i64[] c:f64[] = while_loop[
-              body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
-              body_nconsts=0
-              cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
-              cond_nconsts=0
-              nimplicit=0
-              preserve_dimensions=True
-            ] 0 a
-          in (b, c) }
-        """
+            { lambda ; a:f64[]. let
+                b:i64[] c:f64[] = while_loop[
+                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let f:i64[] = add d 1 in (f, e) }
+                  body_nconsts=0
+                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let i:bool[] = lt g 10 in (i,) }
+                  cond_nconsts=0
+                  nimplicit=0
+                  preserve_dimensions=True
+                ] 0 a
+              in (b, c) }
+            """
         )
 
         @qjit
