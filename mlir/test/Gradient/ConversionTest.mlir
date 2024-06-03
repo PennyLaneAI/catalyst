@@ -45,3 +45,43 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
     return %alloc0, %alloc1 : memref<?xf64>, memref<?xf64>
 }
+
+// -----
+
+// CHECK-LABEL: @test0
+module @test0 {
+  memref.global "private" constant @__constant_xf64 : memref<f64> = dense<1.000000e+00>
+
+  func.func private @fwd(%arg0: memref<f64>) -> (memref<f64>, memref<f64>) {
+    %0 = memref.get_global @__constant_xf64 : memref<f64>
+    %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
+    catalyst.callback_call @callback_140505513630752(%arg0, %alloc) : (memref<f64>, memref<f64>) -> ()
+    return %alloc, %0 : memref<f64>, memref<f64>
+  }
+
+  // CHECK-LABEL: func.func private @fwd.fwd(
+  // CHECK: [[in0ptr:%.+]]: !llvm.ptr, [[diff0ptr:%.+]]: !llvm.ptr, [[out0ptr:%.+]]: !llvm.ptr, [[cotan0ptr:%.+]]: !llvm.ptr) -> !llvm.struct<(struct<(struct<(ptr, ptr, i64)>)>)>
+  gradient.forward @fwd.fwd(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>) -> (memref<f64>) attributes {argc = 1 : i64, implementation = @fwd, resc = 1 : i64, tape = 1 : i64} {
+    // CHECK: [[in0struct:%.+]] = llvm.load [[in0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: [[in0memref:%.+]] = builtin.unrealized_conversion_cast [[in0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
+    // CHECK: [[diff0struct:%.+]] = llvm.load [[diff0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: [[diff0memref:%.+]] = builtin.unrealized_conversion_cast [[diff0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
+    // CHECK: [[out0struct:%.+]] = llvm.load [[out0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: [[out0memref:%.+]] = builtin.unrealized_conversion_cast [[out0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
+    // CHECK: [[cotan0struct:%.+]] = llvm.load [[cotan0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: [[cotan0memref:%.+]] = builtin.unrealized_conversion_cast [[cotan0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
+    // CHECK: [[results:%.+]]:2 = call @fwd([[in0memref]])
+
+    %1:2 = func.call @fwd(%arg0) : (memref<f64>) -> (memref<f64>, memref<f64>)
+    memref.copy %1#0, %arg2 : memref<f64> to memref<f64>
+    gradient.return {empty = false} %1#1 : memref<f64>
+
+    // CHECK: [[resultOut0struct:%.+]] = builtin.unrealized_conversion_cast [[results]]#0 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: [[resultTape0struct:%.+]] = builtin.unrealized_conversion_cast [[results]]#1 : memref<f64> to !llvm.struct<(ptr, ptr, i64)>
+    // [[undef:%.+]] = llvm.mlir.undef : !llvm.struct<(struct<(struct<(ptr, ptr, i64)>)>)>
+    // [[returnTape:%.+]] = llvm.insertvalue [[resultTape0struct]], [[undef]][0, 0]
+    // llvm.return [[returnTape]]
+  }
+
+}
+
