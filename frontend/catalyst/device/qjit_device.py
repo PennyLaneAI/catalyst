@@ -35,6 +35,7 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
 )
 from catalyst.programs.verification import (
+    validate_observables,
     validate_observables_adjoint_diff,
     validate_observables_parameter_shift,
     verify_no_state_variance_returns,
@@ -395,12 +396,36 @@ class QJITDeviceNewAPI(qml.devices.Device):
         ctx,
         execution_config: qml.devices.ExecutionConfig = qml.devices.DefaultExecutionConfig,
     ):
-        """Device preprocessing function."""
-        # TODO: readd the device preprocessing program once transforms are compatible with
-        # TOML files
+        """This function defines the device transform program to be applied and an updated device 
+        configuration. The transform program will be created and applied to the tape before 
+        compilation, in order to modify the operations and measurements to meet device 
+        specifications from the TOML file. 
+        
+        The final transforms verify that the resulting tape is supported.
+
+        Args:
+            execution_config (Union[ExecutionConfig, Sequence[ExecutionConfig]]): A data structure 
+                describing parameters of the execution.
+
+        Returns:
+            TransformProgram: A transform program that when called returns QuantumTapes that can be 
+                compiled for the backend, and a postprocessing function to be called on the results
+            ExecutionConfig: configuration with unset specifications filled in if relevant.
+
+        This device supports operations and measurements based on the device ``capabilities``, 
+        which are created based on what is both compatible with Catalyst and what is supported the 
+        backend according to the backend TOML file).
+        """
+
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
 
+        # measurement transforms (these may change operations on the tape to accommodate 
+        # measurement transformations, so must occur before decomposition of measurements)
+        if self.measurement_processes == {"Counts"}:
+            program.add_transform(measurements_from_counts)
+
+        # decomposition to supported measurements
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(
             catalyst_decompose,
@@ -409,11 +434,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
             capabilities=self.qjit_capabilities,
         )
 
-        if self.measurement_processes == {"Counts"}:
-            program.add_transform(measurements_from_counts)
-
-        # TODO: Add Catalyst program verification and validation
+        # Catalyst program verification and validation
         program.add_transform(verify_operations, grad_method=config.gradient_method, qjit_device=self)
+        program.add_transform(validate_observables, self.qjit_capabilities, self.original_device.name)
         
         if config.gradient_method is not None:
             program.add_transform(verify_no_state_variance_returns)
