@@ -457,14 +457,10 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = []
-    for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        constants.append(
-            StableHLOConstantOp(
-                ir.DenseElementsAttr.get(np.asarray(const), type=const_type)
-            ).results
-        )
+    constants = [
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        for const in jaxpr.consts
+    ]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
@@ -517,14 +513,10 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = []
-    for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        constants.append(
-            StableHLOConstantOp(
-                ir.DenseElementsAttr.get(np.asarray(const), type=const_type)
-            ).results
-        )
+    constants = [
+        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
+        for const in jaxpr.consts
+    ]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
