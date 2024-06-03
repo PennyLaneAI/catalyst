@@ -23,6 +23,7 @@
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Gradient/IR/GradientDialect.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -56,6 +57,17 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<arith::ArithDialect, linalg::LinalgDialect, func::FuncDialect,
                                index::IndexDialect, memref::MemRefDialect>();
+
+        // This is a bit unfortunate.
+        // We need custom grad to have the three functions in terms of llvm pointers.
+        // but that can't be achieved until CatalystLowering.
+        // Because the original function is a callback, which is on the Catalyst dialect.
+        // And won't be changed to llvm pointers until the catalyst lowering process.
+        // A potential solution would be to have a custom grad op in catalyst
+        // and just change dialects. But this seems a bit redundant.
+        // Or yet, add another wrapper...
+        // For now this seems good enough.
+        target.addLegalOp<CustomGradOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
