@@ -63,7 +63,7 @@ module @test0 {
   gradient.forward @fwd.fwd(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>) -> (memref<f64>) attributes {argc = 1 : i64, implementation = @fwd, resc = 1 : i64, tape = 1 : i64} {
     %0:2 = func.call @fwd(%arg0) : (memref<f64>) -> (memref<f64>, memref<f64>)
     memref.copy %0#0, %arg2 : memref<f64> to memref<f64>
-    gradient.return %0#1 : memref<f64>
+    gradient.return { empty = false } %0#1 : memref<f64>
   }
 
 }
@@ -83,7 +83,7 @@ module @test1 {
   gradient.reverse @bwd.rev(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>, %arg4: memref<f64>) attributes {argc = 1 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 1 : i64} {
     %0 = func.call @bwd(%arg4, %arg3) : (memref<f64>, memref<f64>) -> memref<f64>
     memref.copy %0, %arg1 : memref<f64> to memref<f64>
-    gradient.return
+    gradient.return { empty = true }
   }
 
 }

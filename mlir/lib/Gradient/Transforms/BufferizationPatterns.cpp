@@ -244,7 +244,8 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
             tapeMemrefs.push_back(tapeMemref);
         }
 
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeMemrefs);
+        auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeMemrefs, F);
     }
 };
 
@@ -341,7 +342,8 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
             rewriter.create<memref::CopyOp>(loc, memrefOut, diff);
         }
 
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{});
+        auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{}, T);
     }
 };
 
