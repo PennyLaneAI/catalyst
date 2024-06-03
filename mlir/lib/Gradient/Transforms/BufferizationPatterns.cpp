@@ -279,8 +279,12 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         auto tapeCount = op.getTape();
         auto argTys = op.getArgumentTypes();
         auto retTys = op.getResultTypes();
-        SmallVector<Type> args(argTys.end() - tapeCount, argTys.end());
-        args.insert(args.end(), retTys.begin(), retTys.end());
+
+        // Argument starts with inputs (which here are the returns...
+        SmallVector<Type> args(retTys.begin(), retTys.end());
+
+        // Then the cotangents..
+        args.insert(args.end(), argTys.begin() + tapeCount, argTys.end());
         SmallVector<Type> tapeIns(argTys.begin(), argTys.begin() + tapeCount);
 
         SmallVector<Type> dupArgs;
@@ -291,6 +295,7 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
             dupArgs.push_back(arg);
         }
 
+        // Finally the tape.
         dupArgs.insert(dupArgs.end(), tapeIns.begin(), tapeIns.end());
 
         auto callbackTy = rewriter.getFunctionType(dupArgs, TypeRange{});

@@ -863,6 +863,10 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
         func.setPrivate();
 
+        auto noinline = rewriter.getStringAttr("noinline");
+        SmallVector<Attribute> passthrough = {noinline};
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
+
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
@@ -881,12 +885,67 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        auto func =
-            rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
+        // First create a function with the modified calling convention.
+        // The ReverseOp has many parameters that correspond to the tape, but we need only one.
+        auto tapeCount = op.getTape();
+        auto oldFuncTy = op.getFunctionType();
+        auto oldFuncTyInputs = oldFuncTy.getInputs();
+
+        SmallVector<Type> memrefTapeTys(oldFuncTyInputs.begin(),
+                                        oldFuncTyInputs.begin() + tapeCount);
+        SmallVector<Type> newFuncTyInputs(oldFuncTyInputs.begin() + tapeCount,
+                                          oldFuncTyInputs.end());
+        auto ctx = rewriter.getContext();
+        SmallVector<Type> tapeStructTys;
+        auto typeConverter = getTypeConverter();
+        for (auto tapeMemrefTy : memrefTapeTys) {
+            Type structType = typeConverter->convertType(tapeMemrefTy);
+            tapeStructTys.push_back(structType);
+        }
+
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
+        newFuncTyInputs.push_back(tapeTy);
+
+        auto newFuncTy = FunctionType::get(ctx, newFuncTyInputs, TypeRange{});
+
+        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), newFuncTy);
         func.setPrivate();
 
-        rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-        auto typeConverter = getTypeConverter();
+        auto noinline = rewriter.getStringAttr("noinline");
+        SmallVector<Attribute> passthrough = {noinline};
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
+
+        Block *entry = func.addEntryBlock();
+        rewriter.setInsertionPointToStart(entry);
+
+        auto loc = op.getLoc();
+        auto lastIdx = newFuncTyInputs.size() - 1;
+        Value structValAgg = func.getArgument(lastIdx);
+
+        SmallVector<Value> tapeStructs;
+        IRMapping map;
+        SmallVector<Value> origArgs(op.getArguments());
+        auto offset = op.getResc() * 2 + op.getArgc() * 2;
+
+        for (auto [index, memrefTy] : llvm::enumerate(memrefTapeTys)) {
+            Value structVal = rewriter.create<LLVM::ExtractValueOp>(loc, structValAgg, index);
+            tapeStructs.push_back(structVal);
+            auto castOp = rewriter.create<UnrealizedConversionCastOp>(loc, memrefTy, structVal);
+            auto memrefVal = castOp.getResult(0);
+            map.map(origArgs[offset + index], memrefVal);
+        }
+
+        int argcount = 0;
+        for (auto i = func.getArguments().begin(), e = func.getArguments().end() - 1; i != e; ++i) {
+            Value val = op.getArgument(argcount);
+            map.map(val, *i);
+            argcount++;
+        }
+
+        rewriter.cloneRegionBefore(op.getRegion(), func.getRegion(), func.getRegion().end(), map);
+        Block &firstBlock = func.getRegion().getBlocks().front();
+        Block &lastBlock = func.getRegion().getBlocks().back();
+        rewriter.mergeBlocks(&lastBlock, &firstBlock);
         catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
     }
