@@ -15,6 +15,7 @@
 #include "iostream"
 #include "llvm/Support/raw_ostream.h"
 
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -214,20 +215,36 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
         auto argc = op.getArgc();
         auto resc = op.getResc();
         SmallVector<Value> inputs(nonDupParams.begin(), nonDupParams.begin() + argc);
-        SmallVector<Value> outputs(nonDupParams.end() - resc, nonDupParams.end());
+        SmallVector<Value> tensorInputs;
         auto loc = op.getLoc();
+        for (auto input : inputs) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, input);
+            tensorInputs.push_back(tensorIn);
+        }
+        SmallVector<Value> outputs(nonDupParams.end() - resc, nonDupParams.end());
+        auto implAttr = adaptor.getImplementationAttr();
         auto impl = adaptor.getImplementation();
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, retTys, inputs);
+        auto implOp = SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(op, implAttr);
+
+        auto implResTy = implOp.getResultTypes();
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tensorInputs);
         SmallVector<Value> callResults(callOp.getResults());
 
         for (auto [resCall, resParam] : llvm::zip(callResults, outputs)) {
-            rewriter.create<memref::CopyOp>(loc, resCall, resParam);
+            Value castVal =
+                rewriter.create<bufferization::ToMemrefOp>(loc, resParam.getType(), resCall);
+            rewriter.create<memref::CopyOp>(loc, castVal, resParam);
         }
 
-        SmallVector<Value> tapeResults(callResults.end() - tapeCount, callResults.end());
+        SmallVector<Value> tapeResultsCallee(callResults.end() - tapeCount, callResults.end());
+        SmallVector<Value> tapeMemrefs;
+        for (auto [tapeOut, memrefTy] : llvm::zip(tapeResultsCallee, tapeRet)) {
+            Value tapeMemref = rewriter.create<bufferization::ToMemrefOp>(loc, memrefTy, tapeOut);
+            tapeMemrefs.push_back(tapeMemref);
+        }
 
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeResults);
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, tapeMemrefs);
     }
 };
 

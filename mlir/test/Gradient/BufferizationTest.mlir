@@ -83,9 +83,12 @@ module @test0 {
   // CHECK-LABEL: gradient.forward @fwd.fwd(
   // CHECK-SAME:[[inp0:%.+]]: memref<f64>, [[inpshd0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[outshd0:%.+]]: memref<f64>) -> memref<f64>
   gradient.forward @fwd.fwd(tensor<f64>) -> (tensor<f64>, tensor<f64>) attributes {implementation = @fwd, argc = 1: i64, resc = 1 : i64, tape = 1: i64}
-  // CHECK: [[call0:%.+]]:2 = func.call @fwd([[inp0]])
-  // CHECK: memref.copy [[call0]]#0, [[out0]]
-  // CHECK: gradient.return [[call0]]#1
+  // CHECK: [[tensor0:%.+]] = bufferization.to_tensor [[inp0]]
+  // CHECK: [[call0:%.+]]:2 = func.call @fwd([[tensor0]])
+  // CHECK: [[memref0:%.+]] = bufferization.to_memref [[call0]]#0
+  // CHECK: memref.copy [[memref0]], [[out0]]
+  // CHECK: [[memref1:%.+]] = bufferization.to_memref [[call0]]#1
+  // CHECK: gradient.return [[memref1]]
 
 }
 
