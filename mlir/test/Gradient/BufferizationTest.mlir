@@ -89,3 +89,17 @@ module @test0 {
 
 }
 
+// -----
+
+// CHECK-LABEL: @test1
+module @test1 {
+  func.func private @rev(memref<f64>, memref<f64>) -> memref<f64>
+  // CHECK-LABEL: gradient.reverse @rev.rev(
+  // CHECK-SAME:[[inp0:%.+]]: memref<f64>, [[inpshd0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[outshd0:%.+]]: memref<f64>, [[tap0:%.+]]: memref<f64>)
+  // CHECK-NOT: memref<f64>
+  // CHECK-SAME: attributes
+  gradient.reverse @rev.rev(tensor<f64>, tensor<f64>) -> (tensor<f64>) attributes {implementation = @rev, argc = 1: i64, resc = 1 : i64, tape = 1: i64}
+  // CHECK: [[diff0:%.+]] = func.call @rev([[tap0]], [[outshd0]])
+  // CHECK: memref.copy [[diff0]], [[inpshd0]]
+  // CHECK: gradient.return
+}

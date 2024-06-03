@@ -231,6 +231,91 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
     }
 };
 
+struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(ReverseOp op) const override
+    {
+        if (!op.empty()) {
+            return failure();
+        }
+
+        // Only match here if we have all memref arguments and return values.
+        if (llvm::any_of(op.getArgumentTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type argType) { return !isa<MemRefType>(argType); })) {
+            return failure();
+        }
+
+        // Only match if we have result types.
+        return op.getResultTypes().empty() ? failure() : success();
+    }
+
+    void rewrite(ReverseOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        // Remove the # tape arguments from the results
+        auto tapeCount = op.getTape();
+        auto argTys = op.getArgumentTypes();
+        auto retTys = op.getResultTypes();
+        SmallVector<Type> args(argTys.end() - tapeCount, argTys.end());
+        args.insert(args.end(), retTys.begin(), retTys.end());
+        SmallVector<Type> tapeIns(argTys.begin(), argTys.begin() + tapeCount);
+
+        SmallVector<Type> dupArgs;
+
+        // We are guaranteed bu the match above that all types are memrefs.
+        for (auto arg : args) {
+            dupArgs.push_back(arg);
+            dupArgs.push_back(arg);
+        }
+
+        dupArgs.insert(dupArgs.end(), tapeIns.begin(), tapeIns.end());
+
+        auto callbackTy = rewriter.getFunctionType(dupArgs, TypeRange{});
+        Block *block;
+        rewriter.updateRootInPlace(op, [&] {
+            op.setFunctionType(callbackTy);
+            block = op.addEntryBlock();
+        });
+
+        PatternRewriter::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(block);
+        SmallVector<Value> paramsWithTape(op.getArguments());
+        SmallVector<Value> params(paramsWithTape.begin(), paramsWithTape.end() - tapeCount);
+        SmallVector<Value> residuals(paramsWithTape.end() - tapeCount, paramsWithTape.end());
+        SmallVector<Value> dupParams;
+        for (auto [idx, param] : llvm::enumerate(params)) {
+            if ((idx % 2) != 0)
+                dupParams.push_back(param);
+        }
+
+        auto argc = op.getArgc();
+        auto resc = op.getResc();
+        SmallVector<Value> diffs(dupParams.begin(), dupParams.begin() + argc);
+        SmallVector<Value> cotangents(dupParams.end() - resc, dupParams.end());
+        auto loc = op.getLoc();
+        auto impl = adaptor.getImplementation();
+
+        SmallVector<Value> inputs(residuals.begin(), residuals.end());
+        for (auto cotangent : cotangents) {
+            inputs.push_back(cotangent);
+        }
+
+        auto callOp = rewriter.create<func::CallOp>(loc, impl, retTys, inputs);
+        SmallVector<Value> callResults(callOp.getResults());
+
+        for (auto [resCall, diff] : llvm::zip(callResults, diffs)) {
+            rewriter.create<memref::CopyOp>(loc, resCall, diff);
+        }
+
+        rewriter.create<catalyst::gradient::ReturnOp>(loc, ValueRange{});
+    }
+};
+
 } // namespace
 
 namespace catalyst {
