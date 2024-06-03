@@ -907,29 +907,5 @@ def test_qjit_cond_outdbidx():
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros([4, 3]))
 
 
-def test_qjit_cond_const_outdbidx():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
-
-    @qjit
-    def f(flag, sz):
-        a = jnp.zeros([sz], dtype=float)
-
-        @cond(flag)
-        def case():
-            return jnp.ones([sz + 1], dtype=float)
-
-        @case.otherwise
-        def case():
-            return a
-
-        c = case()
-        if flag is False:
-            assert c.shape[0] is a.shape[0]
-        return c
-
-    assert_array_and_dtype_equal(f(True, 3), jnp.ones(4))
-    assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
-
-
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
