@@ -83,6 +83,13 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
+  only integer, continuous wire labels starting at 0 are allowed.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
+* Catalyst no longer disallows quantum circuits with 0 qubits.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
   measurement. For now the feature is equivalent to returning `m` directly from a quantum
   function, but will be improved to return an array with one measurement result for each
@@ -126,6 +133,10 @@
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
+
+* The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
+  register.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
 * Correctly querying batching rules for `jax.scipy.linalg.expm`
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
