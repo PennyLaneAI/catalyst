@@ -227,18 +227,33 @@ class TestObservableValidation:
     @pytest.mark.parametrize(
         "measurements, invalid_op",
         [
-            ([qml.sample(), qml.expval(qml.X(0))], None),
+            ([qml.expval(qml.X(0))], None),  # single obs
+            ([qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qml.var(qml.X(0) @ qml.Y(2))], None),  # prod
+            ([qml.var(qml.X(0) @ qml.RY(1.23, 2))], "RY"),
+            ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
+            ([qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
+            ([qml.expval(2 * qml.Z(1))], None),  # sprod
+            ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
+            ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
+            ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
+            ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  # with sample with observable
+            ([qml.sample(qml.RX(1.2, 0)), qml.expval(qml.X(0))], "RX"),
+            ([qml.probs(wires=0), qml.var(qml.X(1) + qml.Y(2))], None),  # with probs
+            ([qml.probs(wires=0), qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
+            ([qml.counts(), qml.expval(qml.X(0))], None),  # with empty counts
+            ([qml.counts(), qml.expval(qml.RX(1.2, 0))], "RX"),
+            ([qml.counts(qml.Y(0)), qml.expval(qml.X(0))], None),  # with counts with observable
+            ([qml.counts(qml.RX(1.23, 0)), qml.expval(qml.X(0))], "RX"),
         ],
     )
-    def test_validate_observables_function(self, backend, measurements, invalid_op):
+    def test_validate_observables_transform(self, backend, measurements, invalid_op):
         """Test that the validate_observables transform raises an error (or not) as expected
-        for different configurations of observables"""
+        for different base observables."""
 
-        dev = qml.device(backend, wires=1)
-
-        from catalyst.device.qjit_device import get_device_capabilities
-
+        dev = qml.device(backend, wires=3)
         qjit_capabilities = get_device_capabilities(dev)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
@@ -247,6 +262,33 @@ class TestObservableValidation:
             with pytest.raises(CompileError, match=f"{invalid_op}.*not supported as an observable"):
                 validate_observables(tape, qjit_capabilities, dev.name)
         else:
+            validate_observables(tape, qjit_capabilities, dev.name)
+
+    @pytest.mark.parametrize(
+        "obs, obs_type",
+        [
+            (qml.X(0) @ qml.Y(1), "Prod"),
+            (2 * qml.Y(1), "SProd"),
+            (qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]), "LinearCombination"),
+        ],
+    )
+    def test_arithmetic_ops_validation(self, obs, obs_type, backend):
+        """Test that the validate_observables transform raises an error (or not) as expected
+        for different observables composed of other base observables, when the overall observable
+        type is supported/unsupported."""
+
+        dev = qml.device(backend, wires=1)
+        qjit_capabilities = get_device_capabilities(dev)
+
+        print(obs)
+
+        tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
+
+        # all good
+        validate_observables(tape, qjit_capabilities, dev.name)
+
+        del qjit_capabilities.native_obs[obs_type]
+        with pytest.raises(CompileError, match=f"not supported as an observable"):
             validate_observables(tape, qjit_capabilities, dev.name)
 
 
