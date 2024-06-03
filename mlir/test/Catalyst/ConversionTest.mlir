@@ -115,9 +115,10 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
 module @test0 {
 
   // Make sure that arguments are !llvm.ptrs.
-  // CHECK-LABEL: func.func @callback_4(
+  // CHECK-LABEL: func.func private @callback_4(
   // CHECK-SAME: [[arg0:%.+]]: !llvm.ptr,
   // CHECK-SAME: [[arg1:%.+]]: !llvm.ptr)
+  // CHECK-SAME: noinline
 
   // Make sure that we pass the constants that we need.
   // CHECK-DAG: [[id:%.+]] = llvm.mlir.constant(4
