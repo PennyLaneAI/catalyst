@@ -109,7 +109,7 @@ def mark_gradient_tracing(method: str):
 
 
 def _make_execution_config(qnode):
-    """Updates the execution_config object with information about execution. This is 
+    """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
     if qnode:
@@ -911,7 +911,7 @@ def trace_quantum_function(
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-            
+
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)

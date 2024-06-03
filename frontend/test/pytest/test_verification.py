@@ -49,7 +49,7 @@ def get_custom_device(
     non_invertible_gates=frozenset(),
     non_controllable_gates=frozenset(),
     native_gates=frozenset(),
-    **kwargs
+    **kwargs,
 ):
     """Generate a custom device where certain gates are marked as non-differensiable."""
 
@@ -211,7 +211,7 @@ class TestObservableValidation:
     """Tests the general validation of observables (independent of gradient method)"""
 
     def test_unsupported_observable_raises_error(self, backend):
-        """Test that including an unsupported observable in a measurement raises an 
+        """Test that including an unsupported observable in a measurement raises an
         error when jitting the circuit"""
 
         dev = qml.device(backend, wires=1)
@@ -224,17 +224,21 @@ class TestObservableValidation:
         with pytest.raises(CompileError, match="RX.*not supported as an observable"):
             qml.qjit(f)()
 
-    @pytest.mark.parametrize("measurements, invalid_op", [([qml.sample(), qml.expval(qml.X(0))], None), 
-                                                          ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
-                                                          ]
+    @pytest.mark.parametrize(
+        "measurements, invalid_op",
+        [
+            ([qml.sample(), qml.expval(qml.X(0))], None),
+            ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
+        ],
     )
     def test_validate_observables_function(self, backend, measurements, invalid_op):
-        """Test that the validate_observables transform raises an error (or not) as expected 
+        """Test that the validate_observables transform raises an error (or not) as expected
         for different configurations of observables"""
 
         dev = qml.device(backend, wires=1)
 
         from catalyst.device.qjit_device import get_device_capabilities
+
         qjit_capabilities = get_device_capabilities(dev)
 
         tape = qml.tape.QuantumScript([], measurements=measurements)
@@ -244,7 +248,6 @@ class TestObservableValidation:
                 validate_observables(tape, qjit_capabilities, dev.name)
         else:
             validate_observables(tape, qjit_capabilities, dev.name)
-
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
