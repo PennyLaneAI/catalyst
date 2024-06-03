@@ -836,6 +836,96 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     }
 };
 
+struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+    LogicalResult match(ForwardOp op) const override { return success(); }
+
+    void rewrite(ForwardOp op, OpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        // convert all arguments to pointers...
+        auto typeConverter = getTypeConverter();
+
+        SmallVector<Type> memrefTapeTys(op.getResultTypes());
+
+        SmallVector<Type> structTapeTys;
+        auto converter = getTypeConverter();
+        for (auto memrefTapeTy : memrefTapeTys) {
+            auto residualStructTy = converter->convertType(memrefTapeTy);
+            structTapeTys.push_back(residualStructTy);
+        }
+
+        MLIRContext *ctx = rewriter.getContext();
+        auto tapeStructs = LLVM::LLVMStructType::getLiteral(ctx, structTapeTys);
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeStructs});
+
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto ptrType = LLVM::LLVMPointerType::get(ctx);
+        Type retTy = structTapeTys.empty() ? dyn_cast<Type>(ptrType) : dyn_cast<Type>(wrappedFlatTapeStructTy);
+
+        auto oldFuncTy = op.getFunctionType();
+        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {retTy});
+
+        auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
+        func.setPrivate();
+
+        auto noinline = rewriter.getStringAttr("noinline");
+        SmallVector<Attribute> passthrough = {noinline};
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
+
+        rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        rewriter.eraseOp(op);
+    }
+};
+
+struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+    LogicalResult match(ReturnOp op) const override { return success(); }
+
+    void rewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
+    {
+        auto loc = op.getLoc();
+        if (op.getEmpty()) {
+            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, ValueRange{});
+            rewriter.replaceOp(op, returnOp);
+            return;
+        }
+
+        auto tape = adaptor.getTape();
+        auto ctx = rewriter.getContext();
+        if (tape.empty()) {
+            // Just return an empty pointer
+            auto ptrType = LLVM::LLVMPointerType::get(ctx);
+            Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
+            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, nullPtr);
+            rewriter.replaceOp(op, returnOp);
+            return;
+        }
+
+        SmallVector<Value> tapeStructVals(tape);
+
+        SmallVector<Type> tapeStructTys(tape.getTypes());
+        // This gives me { memref0, ... memrefN }
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
+        // This gives me { { memref, ..., memrefn } }
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
+
+        Value result = rewriter.create<LLVM::UndefOp>(loc, wrappedFlatTapeStructTy);
+        for (auto [idx, elem] : llvm::enumerate(tapeStructVals)) {
+            SmallVector<int64_t> pos = {0, static_cast<int64_t>(idx)};
+            result = rewriter.create<LLVM::InsertValueOp>(loc, result, elem, pos);
+        }
+
+        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, result);
+        rewriter.replaceOp(op, returnOp);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -845,6 +935,8 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
 {
     patterns.add<AdjointOpPattern>(typeConverter);
     patterns.add<BackpropOpPattern>(typeConverter);
+    patterns.add<ForwardOpPattern>(typeConverter);
+    patterns.add<ReturnOpPattern>(typeConverter);
 }
 
 } // namespace gradient
