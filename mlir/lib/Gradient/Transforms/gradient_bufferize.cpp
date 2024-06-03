@@ -45,6 +45,7 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
         RewritePatternSet patterns(context);
         populateBufferizationPatterns(typeConverter, patterns);
         populateFunctionOpInterfaceTypeConversionPattern<ForwardOp>(patterns, typeConverter);
+        populateFunctionOpInterfaceTypeConversionPattern<ReverseOp>(patterns, typeConverter);
 
         ConversionTarget target(*context);
         bufferization::populateBufferizeMaterializationLegality(target);
@@ -55,6 +56,11 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
             [&](AdjointOp op) { return typeConverter.isLegal(op); });
 
         target.addDynamicallyLegalOp<ForwardOp>([&](ForwardOp op) {
+            return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+                   typeConverter.isLegal(&op.getBody()) && !op.empty();
+        });
+
+        target.addDynamicallyLegalOp<ReverseOp>([&](ReverseOp op) {
             return typeConverter.isSignatureLegal(op.getFunctionType()) &&
                    typeConverter.isLegal(&op.getBody()) && !op.empty();
         });
