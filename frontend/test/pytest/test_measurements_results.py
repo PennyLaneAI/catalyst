@@ -23,6 +23,18 @@ from catalyst import qjit
 class TestSample:
     """Test sample."""
 
+    def test_sample_on_0qbits(self, backend):
+        """Test sample on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=0, shots=10))
+        def sample_0qbit():
+            return qml.sample()
+
+        expected = np.empty(shape=(10, 0), dtype=int)
+        observed = sample_0qbit()
+        assert np.array_equal(observed, expected)
+
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
@@ -60,6 +72,18 @@ class TestSample:
 
 class TestCounts:
     """Test counts."""
+
+    def test_counts_on_0qbits(self, backend):
+        """Test counts on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=0, shots=10))
+        def counts_0qbit():
+            return qml.counts()
+
+        expected = [np.array([0]), np.array([10])]
+        observed = counts_0qbit()
+        assert np.array_equal(observed, expected)
 
     def test_count_on_1qbit(self, backend):
         """Test counts on 1 qubits."""
@@ -625,11 +649,23 @@ class TestVar:
         )
 
 
-class TestOtherMeasurements:
-    """Test other measurement processes."""
+class TestState:
+    """Test state measurement processes."""
 
-    def test_state(self, backend):
-        """Test state."""
+    def test_state_on_0qbits(self, backend):
+        """Test state on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=0))
+        def state_0qbit():
+            return qml.state()
+
+        expected = np.array([complex(1.0, 0.0)])
+        observed = state_0qbit()
+        assert np.array_equal(observed, expected)
+
+    def test_state_on_1qubit(self, backend):
+        """Test state on 1 qubit."""
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -637,9 +673,38 @@ class TestOtherMeasurements:
             qml.RX(x, wires=0)
             return qml.state()
 
-        expected = np.array([complex(1.0, 0.0), complex(0.0, 0.0)])
-        observed = state(0.0)
+        expected = np.array([complex(1.0, 0.0), complex(0.0, -1.0)]) / np.sqrt(2)
+        observed = state(np.pi / 2)
+        assert np.allclose(observed, expected)
+
+
+class TestProbs:
+    """Test probabilities measurement processes."""
+
+    def test_probs_on_0qbits(self, backend):
+        """Test probs on 0 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=0))
+        def probs_0qbit():
+            return qml.probs()
+
+        expected = np.array([1.0])
+        observed = probs_0qbit()
         assert np.array_equal(observed, expected)
+
+    def test_probs_on_1qubit(self, backend):
+        """Test probs on 1 qubit."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def probs(x: float):
+            qml.RX(x, wires=0)
+            return qml.probs()
+
+        expected = np.array([0.5, 0.5])
+        observed = probs(np.pi / 2)
+        assert np.allclose(observed, expected)
 
 
 class TestNewArithmeticOps:
