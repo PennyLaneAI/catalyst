@@ -158,4 +158,19 @@ module @test1 {
   }
 }
 
+// -----
 
+// CHECK-LABEL: @test2
+module @test2 {
+
+  func.func private @fwd.fwd(memref<f64>, memref<f64>, memref<f64>, memref<f64>) -> memref<f64>
+  func.func private @bwd.rev(memref<f64>, memref<f64>, memref<f64>, memref<f64>)
+  func.func private @foo(memref<f64>, memref<f64>)
+
+  // CHECK-LABEL: llvm.mlir.global external @__enzyme_register_gradient_foo
+  // CHECK-DAG: [[foo:%.+]] = func.constant @foo
+  // CHECK-DAG: [[fwd:%.+]] = func.constant @fwd.fwd
+  // CHECK-DAG: [[rev:%.+]] = func.constant @bwd.rev
+
+  gradient.custom_grad @foo @fwd.fwd @bwd.rev
+}
