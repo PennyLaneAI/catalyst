@@ -118,6 +118,9 @@
   each pipeline.
   [(#772)](https://github.com/PennyLaneAI/catalyst/pull/772)
 
+* Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
+  [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
