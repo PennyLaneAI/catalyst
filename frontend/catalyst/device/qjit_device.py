@@ -206,7 +206,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
         qjit_capabilities.native_ops.update(
             {
                 "MidCircuitMeasure": OperationProperties(
-                    invertible=True, controllable=True, differentiable=False
+                    invertible=False, controllable=False, differentiable=False
                 )
             }
         )
