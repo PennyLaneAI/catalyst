@@ -193,7 +193,6 @@ namespace {
 
 Value fill(Location &loc, Value agg, SmallVector<Value> elems, RewriterBase &rewriter)
 {
-    auto type = agg.getType();
     for (auto [idx, elem] : llvm::enumerate(elems)) {
         agg = rewriter.create<LLVM::InsertValueOp>(loc, agg, elem, idx);
     }
@@ -955,21 +954,24 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
                  ConversionPatternRewriter &rewriter) const override
     {
         // convert all arguments to pointers...
+        auto typeConverter = getTypeConverter();
+
+        SmallVector<Type> memrefTapeTys(op.getResultTypes());
+
+        SmallVector<LLVM::LLVMStructType> structTapeTys =
+            fromMemrefToStruct(memrefTapeTys, typeConverter);
+
+        SmallVector<LLVM::LLVMStructType> tapeStructTys(structTapeTys);
+        SmallVector<Type> elementTypes = flatten(tapeStructTys);
+        auto ctx = rewriter.getContext();
+        auto flatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, elementTypes);
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {flatTapeStructTy});
+
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        auto tapeMemrefTys = op.getResultTypes();
-        SmallVector<Type> tapeStructTys;
-        auto ctx = rewriter.getContext();
-        auto typeConverter = getTypeConverter();
-        for (auto tapeMemrefTy : tapeMemrefTys) {
-            Type structType = typeConverter->convertType(tapeMemrefTy);
-            tapeStructTys.push_back(structType);
-        }
-
-        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
         auto oldFuncTy = op.getFunctionType();
-        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {tapeTy});
+        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {wrappedFlatTapeStructTy});
 
         auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
         func.setPrivate();
@@ -1062,7 +1064,6 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     }
 };
 
-
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
@@ -1077,7 +1078,6 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
             return;
         }
 
-        auto typeConverter = getTypeConverter();
         auto tape = adaptor.getTape();
 
         SmallVector<Value> tapeStructVals(tape);
