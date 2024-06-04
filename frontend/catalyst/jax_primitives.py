@@ -413,11 +413,10 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     constants = []
     for const in jaxpr.consts:
         const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
-        constants.append(
-            StableHLOConstantOp(
-                ir.DenseElementsAttr.get(np.asarray(const), type=const_type)
-            ).results
-        )
+        nparray = np.asarray(const)
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
     args_and_consts = constants + list(args)
 
     return GradOp(
