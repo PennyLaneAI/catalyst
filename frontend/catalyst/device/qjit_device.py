@@ -527,11 +527,6 @@ def validate_device_capabilities(
         # TODO: Eliminate string based matching against device declaration, e.g. lightning includes
         # C(gate) (for some gates), but not Adjoint(gate), or C(Adjoint(gate)) ...
         device_gates = filter_out_adjoint(set(device.operations))
-        # Lightning-kokkis might support C(GlobalPhase) in Python, but not in C++. We remove this
-        # gate before calling the validation.
-        # See https://github.com/PennyLaneAI/pennylane-lightning/pull/642#discussion_r1535478642
-        if device_name == "lightning.kokkos":
-            device_gates = device_gates - {"C(GlobalPhase)"}
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
         if device_gates != spec_gates:
             raise CompileError(
