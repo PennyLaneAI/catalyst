@@ -118,6 +118,7 @@ def null_transform(tape, *args, **kwargs):
 
     return (tape,), lambda x: x[0]
 
+
 class PauliX2(qml.PauliX):
     """Test operation without the analytic gradient"""
 
@@ -126,6 +127,7 @@ class PauliX2(qml.PauliX):
 
     def __repr__(self):
         return f"PauliX2"
+
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
@@ -247,7 +249,10 @@ class TestObservableValidation:
             ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
-            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))], None),  # legacy hamiltonian
+            (
+                [qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))],
+                None,
+            ),  # legacy hamiltonian
             ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(2.3, 1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
