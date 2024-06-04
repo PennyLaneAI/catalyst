@@ -118,6 +118,14 @@ def null_transform(tape, *args, **kwargs):
 
     return (tape,), lambda x: x[0]
 
+class PauliX2(qml.PauliX):
+    """Test operation without the analytic gradient"""
+
+    name = "PauliX2"
+    grad_method = "F"
+
+    def __repr__(self):
+        return f"PauliX2"
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
@@ -210,11 +218,11 @@ class TestHybridOpVerification:
 class TestObservableValidation:
     """Tests the general validation of observables (independent of gradient method)"""
 
-    def test_unsupported_observable_raises_error(self, backend):
+    def test_unsupported_observable_raises_error(self):
         """Test that including an unsupported observable in a measurement raises an
         error when jitting the circuit"""
 
-        dev = qml.device(backend, wires=1)
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qml.qnode(dev)
         def f():
@@ -231,12 +239,16 @@ class TestObservableValidation:
             ([qml.expval(qml.RX(1.2, 0))], "RX"),
             ([qml.var(qml.X(0) @ qml.Y(2))], None),  # prod
             ([qml.var(qml.X(0) @ qml.RY(1.23, 2))], "RY"),
+            ([qml.var(qml.operation.Tensor(qml.X(0), qml.Y(2)))], None),  # tensor
+            ([qml.var(qml.operation.Tensor(qml.X(0), PauliX2(2)))], "PauliX2"),
             ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
             ([qml.var(qml.RX(1.23, 1) + qml.Y(2))], "RX"),
             ([qml.expval(2 * qml.Z(1))], None),  # sprod
             ([qml.expval(2 * qml.RZ(1.23, 1))], "RZ"),
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]))], None),  # hamiltonian
             ([qml.expval(qml.Hamiltonian([2, 3], [qml.X(0), qml.RY(2.3, 1)]))], "RY"),
+            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))], None),  # legacy hamiltonian
+            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(2.3, 1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
             ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  # with sample with observable
@@ -279,8 +291,6 @@ class TestObservableValidation:
 
         dev = qml.device(backend, wires=1)
         qjit_capabilities = get_device_capabilities(dev)
-
-        print(obs)
 
         tape = qml.tape.QuantumScript([], measurements=[qml.expval(obs)])
 
@@ -386,13 +396,6 @@ class TestAdjointMethodVerification:
             @qml.qjit
             def cir(x: float):
                 return grad(f)(x)
-
-
-class PauliX2(qml.PauliX):
-    """Test operation without the analytic gradient"""
-
-    name = "PauliX2"
-    grad_method = "F"
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
