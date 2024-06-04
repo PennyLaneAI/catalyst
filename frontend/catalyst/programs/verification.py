@@ -222,15 +222,18 @@ def validate_observables(
         both that the overall observable is supported, and that its component
         parts are supported."""
 
-        if isinstance(obs, (Tensor, Hamiltonian, CompositeOp, SymbolicOp)):
+        if isinstance(obs, Tensor):
+            return all([_observable_is_supported(o) for o in obs.obs])
+
+        if isinstance(obs, (Hamiltonian, CompositeOp, SymbolicOp)):
 
             if not qjit_capabilities.native_obs.get(obs.name):
                 return False
 
             if hasattr(obs, "operands"):
                 return all([_observable_is_supported(o) for o in obs.operands])
-            elif hasattr(obs, "obs"):
-                return _observable_is_supported(obs.obs)
+            elif hasattr(obs, "ops"):
+                return all([_observable_is_supported(o) for o in obs.ops])
             elif hasattr(obs, "base"):
                 return _observable_is_supported(obs.base)
 
