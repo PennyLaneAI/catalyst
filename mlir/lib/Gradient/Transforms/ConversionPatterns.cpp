@@ -203,15 +203,13 @@ getStructVals(Location &loc, Value agg, SmallVector<int> shapes, RewriterBase &r
 
     SmallVector<Value> retvals;
     int i = 0;
-    for (auto structTy : structTys) {
+    for (auto [structTy, num] : llvm::zip(structTys, shapes)) {
         Value structVal = rewriter.create<LLVM::UndefOp>(loc, structTy);
-        for (auto num : shapes) {
-            for (auto j = 0; j < num; j++) {
-                Value elem = rewriter.create<LLVM::ExtractValueOp>(loc, agg, i++);
-                structVal = rewriter.create<LLVM::InsertValueOp>(loc, structVal, elem, j);
-            }
-            retvals.push_back(structVal);
+        for (auto j = 0; j < num; j++) {
+           Value elem = rewriter.create<LLVM::ExtractValueOp>(loc, agg, i++);
+           structVal = rewriter.create<LLVM::InsertValueOp>(loc, structVal, elem, j);
         }
+        retvals.push_back(structVal);
     }
     return retvals;
 }
@@ -1031,13 +1029,13 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         SmallVector<Type> elementTypes = flatten(tapeStructTys);
         auto ctx = rewriter.getContext();
         auto flatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, elementTypes);
-        //auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {flatTapeStructTy});
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {flatTapeStructTy});
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
         auto oldFuncTy = op.getFunctionType();
-        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {flatTapeStructTy});
+        auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {wrappedFlatTapeStructTy});
 
         auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
         func.setPrivate();
@@ -1074,9 +1072,10 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         SmallVector<Type> elementTypes = flatten(tapeStructTys);
         auto ctx = rewriter.getContext();
         auto flatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, elementTypes);
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {flatTapeStructTy});
 
         SmallVector<Type> newFuncInputTys(oldFuncInputTys.begin() + tapeCount, oldFuncInputTys.end());
-        newFuncInputTys.push_back(flatTapeStructTy);
+        newFuncInputTys.push_back(wrappedFlatTapeStructTy);
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
@@ -1094,8 +1093,9 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
 
         auto loc = op.getLoc();
         auto lastIdx = newFuncInputTys.size() - 1;
-        Value structValAgg = func.getArgument(lastIdx);
+        Value wrappedStructValAgg = func.getArgument(lastIdx);
 
+        Value structValAgg = rewriter.create<LLVM::ExtractValueOp>(loc, wrappedStructValAgg, 0);
         SmallVector<Value> structVals = getStructVals(loc, structValAgg, shapes, rewriter);
 
         SmallVector<Value> memrefVals;
@@ -1152,9 +1152,9 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
 
         SmallVector<Value> elementVals = flatten(loc, tapeStructVals, rewriter);
         Value tapeVal = fill(loc, flatTapeStructTy, elementVals, rewriter);
-        //Value wrappedTapeVal = fill(loc, wrappedFlatTapeStructTy, {tapeVal}, rewriter);
+        Value wrappedTapeVal = fill(loc, wrappedFlatTapeStructTy, {tapeVal}, rewriter);
 
-        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, tapeVal);
+        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, wrappedTapeVal);
         rewriter.replaceOp(op, returnOp);
     }
 };
