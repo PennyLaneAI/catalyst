@@ -951,6 +951,117 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     }
 };
 
+Value fill(Location &loc, Value agg, SmallVector<Value> elems, RewriterBase &rewriter)
+{
+    auto type = agg.getType();
+    for (auto [idx, elem] : llvm::enumerate(elems)) {
+        agg = rewriter.create<LLVM::InsertValueOp>(loc, agg, elem, idx);
+    }
+    return agg;
+}
+
+Value fill(Location &loc, Type agg, SmallVector<Value> elems, RewriterBase &rewriter)
+{
+    Value result = rewriter.create<LLVM::UndefOp>(loc, agg);
+    return fill(loc, result, elems, rewriter);
+}
+
+SmallVector<Value> flattenStruct(Location &loc, Value structVal, RewriterBase &rewriter)
+{
+    auto type = structVal.getType();
+    auto structTy = cast<LLVM::LLVMStructType>(type);
+    auto elementTys = structTy.getBody();
+    SmallVector<Value> returns;
+    for (auto [idx, elementTy] : llvm::enumerate(elementTys)) {
+        Value elementVal = rewriter.create<LLVM::ExtractValueOp>(loc, structVal, idx);
+        returns.push_back(elementVal);
+    }
+    return returns;
+}
+
+SmallVector<Value> flatten(Location &loc, Value val, RewriterBase &rewriter)
+{
+    SmallVector<Value> returns;
+
+    Type type = val.getType();
+    if (dyn_cast<LLVM::LLVMStructType>(type)) {
+        return flattenStruct(loc, val, rewriter);
+    }
+
+    return returns;
+}
+
+SmallVector<Value> flatten(Location &loc, SmallVector<Value> vals, RewriterBase &rewriter)
+{
+    SmallVector<Value> returns;
+    for (auto val : vals) {
+        auto temp = flatten(loc, val, rewriter);
+        returns.insert(returns.end(), temp.begin(), temp.end());
+    }
+    return returns;
+}
+
+SmallVector<Type> flatten(LLVM::LLVMStructType structTy)
+{
+    auto elementTys = structTy.getBody();
+    SmallVector<Type> retval;
+    for (auto elementTy : elementTys) {
+        retval.push_back(elementTy);
+    }
+    return retval;
+}
+
+SmallVector<Type> flatten(SmallVector<LLVM::LLVMStructType> structTys)
+{
+    SmallVector<Type> retvals;
+    for (auto structTy : structTys) {
+        SmallVector<Type> elementTys = flatten(structTy);
+        retvals.insert(retvals.end(), elementTys.begin(), elementTys.end());
+    }
+    return retvals;
+}
+
+SmallVector<Type> flatten(SmallVector<Type> types)
+{
+    SmallVector<Type> retvals;
+    for (auto type : types) {
+        if (auto structTy = dyn_cast<LLVM::LLVMStructType>(type)) {
+            SmallVector<Type> structTys = flatten(structTy);
+            retvals.insert(retvals.end(), structTys.begin(), structTys.end());
+        }
+    }
+    return retvals;
+}
+
+LLVM::LLVMStructType fromMemrefToStruct(MemRefType memref, const TypeConverter *converter)
+{
+    return cast<LLVM::LLVMStructType>(converter->convertType(memref));
+}
+
+SmallVector<LLVM::LLVMStructType> fromMemrefToStruct(SmallVector<MemRefType> memrefs,
+                                                     const TypeConverter *converter)
+{
+    SmallVector<LLVM::LLVMStructType> retval;
+    for (auto _memref : memrefs) {
+        LLVM::LLVMStructType _struct = fromMemrefToStruct(_memref, converter);
+        retval.push_back(_struct);
+    }
+    return retval;
+}
+
+SmallVector<LLVM::LLVMStructType> fromMemrefToStruct(SmallVector<Type> types,
+                                                     const TypeConverter *converter)
+{
+    SmallVector<LLVM::LLVMStructType> retval;
+    for (auto type : types) {
+        if (auto _memref = dyn_cast<MemRefType>(type)) {
+            LLVM::LLVMStructType _struct = fromMemrefToStruct(_memref, converter);
+            retval.push_back(_struct);
+        }
+    }
+    return retval;
+}
+
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
@@ -965,30 +1076,22 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
             return;
         }
 
-        auto tape = adaptor.getTape();
-        auto tapeMemrefTys = tape.getTypes();
-
-        SmallVector<Type> tapeStructTys;
-        auto ctx = rewriter.getContext();
         auto typeConverter = getTypeConverter();
-        for (auto tapeMemrefTy : tapeMemrefTys) {
-            Type structType = typeConverter->convertType(tapeMemrefTy);
-            tapeStructTys.push_back(structType);
-        }
+        auto tape = adaptor.getTape();
 
-        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructTys);
-        Value tapeVal = rewriter.create<LLVM::UndefOp>(loc, tapeTy);
+        SmallVector<Value> tapeStructVals(tape);
 
-        SmallVector<Value> structVals;
-        int i = 0;
-        for (auto [tapeMemrefVal, tapeStructTy] : llvm::zip(tape, tapeStructTys)) {
-            auto op = rewriter.create<UnrealizedConversionCastOp>(loc, tapeStructTy, tapeMemrefVal);
-            Value tapeStructVal = op.getResult(0);
-            tapeVal = rewriter.create<LLVM::InsertValueOp>(loc, tapeVal, tapeStructVal, i);
-            i++;
-        }
+        SmallVector<Type> tapeStructTys(tape.getTypes());
+        SmallVector<Type> elementTypes = flatten(tapeStructTys);
+        auto ctx = rewriter.getContext();
+        auto flatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, elementTypes);
+        auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {flatTapeStructTy});
 
-        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, tapeVal);
+        SmallVector<Value> elementVals = flatten(loc, tapeStructVals, rewriter);
+        Value tapeVal = fill(loc, flatTapeStructTy, elementVals, rewriter);
+        Value wrappedTapeVal = fill(loc, wrappedFlatTapeStructTy, {tapeVal}, rewriter);
+
+        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, wrappedTapeVal);
         rewriter.replaceOp(op, returnOp);
     }
 };
