@@ -612,6 +612,8 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
+                if shots is None:
+                    raise ValueError("qml.sample cannot work with shots=None")
                 if o.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(o.mv)
                 else:
@@ -629,6 +631,8 @@ def trace_quantum_measurements(
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
+                if shots is None:
+                    raise ValueError("qml.sample cannot work with shots=None")
                 shape = (2**nqubits,) if using_compbasis else (2,)
                 results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
                 if using_compbasis:
