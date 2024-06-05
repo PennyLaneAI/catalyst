@@ -73,6 +73,7 @@ from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
     ShapedArray,
     Trace,
+    Var,
     eval_jaxpr,
     find_top_trace,
     gensym,
