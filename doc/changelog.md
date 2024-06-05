@@ -124,6 +124,9 @@
 * Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
   [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
 
+* The measurement primitives now have a standardized call signature so that `shots` and `shape` can
+  both be provided as keyword arguments.
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
@@ -228,6 +231,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Christina Lee,
 Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
