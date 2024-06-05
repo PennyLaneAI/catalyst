@@ -312,6 +312,49 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     return [b.e for b in stable_toposort(boxes)]  # [4]
 
 
+def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
+    """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
+    same constants."""
+    newvar = gensym(jaxprs, suffix="_")
+
+    # List of constant variables of all jaxprs, preprended with '_'
+    all_mangled_constvars: List[List[Var]] = []
+
+    # Fill the all_mangled_constvars list
+    for jaxpr2 in jaxprs:
+        padded_constvars = []
+        cmap = {}
+        for cv in jaxpr2.constvars:
+            aval = cv.aval
+            if isinstance(aval, DShapedArray):
+                shape2 = []
+                for d in aval.shape:
+                    if hasattr(d, "aval"):
+                        shape2.append(cmap[d])
+                    else:
+                        shape2.append(d)
+                aval = aval.update(shape=tuple(shape2))
+            nv = newvar(aval)
+            cmap[cv] = nv
+            padded_constvars.append(nv)
+        all_mangled_constvars.append(padded_constvars)
+
+    # For each branch, add unused constants from all branches
+    jaxpr_acc = []
+    for jaxpr in jaxprs:
+        padded_constvars = []
+        for i, jaxpr2 in enumerate(jaxprs):
+            if jaxpr2 is jaxpr:
+                padded_constvars.extend(jaxpr2.constvars)
+            else:
+                padded_constvars.extend(all_mangled_constvars[i])
+        jaxpr_acc.append(
+            ClosedJaxpr(convert_constvars_jaxpr(jaxpr.replace(constvars=padded_constvars)), ())
+        )
+
+    return jaxpr_acc
+
+
 @transformation_with_aux
 def expanded_fun(static_args, *args_expanded):
     """Function transformation making the function to accept its arguments in the expanded format
