@@ -442,11 +442,6 @@ class TestCatalyst:
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)
 
-    def test_adjoint_outside_qjit(self):
-        """Test that the Catalyst adjoint function can be used without jitting."""
-
-        assert adjoint(qml.T(wires=0)) == qml.adjoint(qml.T(wires=0))
-
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""
 
@@ -557,6 +552,20 @@ class TestCatalyst:
         expected = circuit()
         observed = qjit(circuit)()
         assert_allclose(expected, observed)
+
+    def test_adjoint_outside_qjit(self, backend):
+        """Test that the hybrid adjoint can be used from outside qjit & qnode."""
+
+        adj_op = adjoint(qml.RY(np.pi / 2, wires=0))
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            qml.Hadamard(0)
+            qml.apply(adj_op)
+            return qml.probs()
+
+        assert_allclose(circuit(), [1.0, 0.0], atol=1e-7)
 
 
 #####################################################################################

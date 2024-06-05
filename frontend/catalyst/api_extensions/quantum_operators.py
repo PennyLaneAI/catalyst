@@ -427,20 +427,23 @@ class AdjointCallable:
         """Generate a HybridOpRegion for use by Catalyst."""
 
         # Allow the creation of HybridAdjoint instances outside of any contexts.
-        simulate_tracing_ctx = not EvaluationContext.is_tracing()
-        if simulate_tracing_ctx:
-            eval_ctx = EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION)
-            ctx = eval_ctx.__enter__()
-        else:
-            ctx = EvaluationContext.get_main_tracing_context()
+        # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
+        if not EvaluationContext.is_tracing():
+            # QuantumTapes can themselves appear in queuing records.
+            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+                self.callee(*args, **kwargs)
+
+            adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
+
+            return [], [], [adjoint_region]
 
         # Create a nested jaxpr scope for the body of the adjoint.
+        ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _, _ = deduce_avals(self.callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
-            quantum_tape = QuantumTape()
-            with QueuingManager.stop_recording(), quantum_tape:
+            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
                 # FIXME: move all full_raise calls into a separate function
                 res_classical_tracers = [
                     inner_trace.full_raise(t)
@@ -453,9 +456,6 @@ class AdjointCallable:
             adjoint_region = HybridOpRegion(
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
-
-        if simulate_tracing_ctx:
-            eval_ctx.__exit__(None, None, None)
 
         return in_classical_tracers, [], [adjoint_region]
 
@@ -484,7 +484,14 @@ class HybridAdjoint(HybridOp):
         body_trace = op.regions[0].trace
         body_tape = op.regions[0].quantum_tape
         res_classical_tracers = op.regions[0].res_classical_tracers
-        with EvaluationContext.frame_tracing_context(ctx, body_trace):
+
+        # Handle ops that were instantiated outside of a tracing context.
+        if body_trace is None:
+            frame_ctx = EvaluationContext.frame_tracing_context(ctx)
+        else:
+            frame_ctx = EvaluationContext.frame_tracing_context(ctx, body_trace)
+
+        with frame_ctx as body_trace:
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
