@@ -17,11 +17,10 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
+import logging
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
-import logging
-
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
