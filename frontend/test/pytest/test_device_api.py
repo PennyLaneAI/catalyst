@@ -150,7 +150,7 @@ def test_qjit_device_invalid_wires(wires):
     backend_info = extract_backend_info(device, capabilities)
 
     with pytest.raises(
-        AttributeError, match="Catalyst requires continuous integer wire lables starting at 0"
+        AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
     ):
         QJITDeviceNewAPI(device, capabilities, backend_info)
 

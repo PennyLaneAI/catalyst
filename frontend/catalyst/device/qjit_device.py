@@ -526,7 +526,7 @@ def check_device_wires(wires):
     assert isinstance(wires, qml.wires.Wires)
 
     if not all(isinstance(wire, int) for wire in wires.labels):
-        raise AttributeError("Catalyst requires continuous integer wire lables starting at 0.")
+        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
 
     if not wires.labels == tuple(range(len(wires))):
-        raise AttributeError("Catalyst requires continuous integer wire lables starting at 0.")
+        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
