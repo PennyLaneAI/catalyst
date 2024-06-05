@@ -23,11 +23,11 @@ from catalyst import qjit
 class TestSample:
     """Test sample."""
 
-    def test_sample_on_0qbits(self, backend):
+    def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=0, shots=10))
+        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
         def sample_0qbit():
             return qml.sample()
 
@@ -73,11 +73,11 @@ class TestSample:
 class TestCounts:
     """Test counts."""
 
-    def test_counts_on_0qbits(self, backend):
+    def test_counts_on_0qbits(self):
         """Test counts on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=0, shots=10))
+        @qml.qnode(qml.device("lightning.qubit", wires=0, shots=10))
         def counts_0qbit():
             return qml.counts()
 
@@ -652,11 +652,11 @@ class TestVar:
 class TestState:
     """Test state measurement processes."""
 
-    def test_state_on_0qbits(self, backend):
+    def test_state_on_0qbits(self):
         """Test state on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=0))
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
         def state_0qbit():
             return qml.state()
 
@@ -681,11 +681,11 @@ class TestState:
 class TestProbs:
     """Test probabilities measurement processes."""
 
-    def test_probs_on_0qbits(self, backend):
+    def test_probs_on_0qbits(self):
         """Test probs on 0 qubits."""
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=0))
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
         def probs_0qbit():
             return qml.probs()
 
