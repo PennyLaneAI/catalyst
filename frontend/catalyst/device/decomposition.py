@@ -16,7 +16,7 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
-
+import logging
 from functools import partial
 
 import jax
@@ -37,9 +37,13 @@ from pennylane.tape.tape import (
 
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
+from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import DeviceCapabilities
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 def catalyst_decomposer(op, capabilities: DeviceCapabilities):
@@ -54,6 +58,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 
 
 @transform
+@debug_logger
 def catalyst_decompose(
     tape: qml.tape.QuantumTape,
     ctx,
@@ -132,6 +137,7 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
 
 
 @transform
+@debug_logger
 def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     r"""Quantum transform that decomposes operations to unitary given a list of operations name.
 
@@ -173,6 +179,7 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
 
 
 @transform
+@debug_logger
 def measurements_from_counts(tape):
     r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
     functions for each original measurement.
