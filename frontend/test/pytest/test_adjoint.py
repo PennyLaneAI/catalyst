@@ -567,6 +567,22 @@ class TestCatalyst:
 
         assert_allclose(circuit(), [1.0, 0.0], atol=1e-7)
 
+    def test_adjoint_decomposition(self):
+        """Test that the hybrid adjoint can be decomposed."""
+
+        def qfunc(x):
+            qml.RY(x, wires=0)
+            qml.Hadamard(0)
+
+        adj_op = adjoint(qfunc)(0.7)
+        decomp = adj_op.decomposition()
+
+        assert len(decomp) == 2
+        assert all(isinstance(op, qml.ops.op_math.Adjoint) for op in decomp)
+        assert isinstance(decomp[0].base, qml.Hadamard)
+        assert isinstance(decomp[1].base, qml.RY)
+        assert decomp[1].base.data == (0.7,)
+
 
 #####################################################################################
 #### ADJOINT TEST SUITE COPIED OVER FROM PENNYLANE FOR UNIFIED BEHAVIOUR TESTING ####
