@@ -185,7 +185,6 @@ __all__ = (
     "DifferentiableCompileError",
     "CompileOptions",
     "debug",
-    "logging",
     *_api_extension_list,
     *_autograph_functions,
 )
