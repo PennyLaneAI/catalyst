@@ -6,6 +6,9 @@
   The loop over shots is executed with `catalyst.vmap`.
   [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
 
+* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
+
 * Support for disabling Autograph for a specific function or
   only for the function calls inside a specific context,
   without affecting the bare code inside such context.

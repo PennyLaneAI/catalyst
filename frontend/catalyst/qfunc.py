@@ -20,6 +20,8 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
+import logging
+
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -52,11 +54,15 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
+from catalyst.logging import debug_logger
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
     get_device_capabilities,
 )
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class QFunc:
@@ -74,13 +80,15 @@ class QFunc:
         raise NotImplementedError()  # pragma: no-cover
 
     @staticmethod
+    @debug_logger
     def extract_backend_info(
         device: qml.QubitDevice, capabilities: DeviceCapabilities
     ) -> BackendInfo:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, capabilities)
 
-    # pylint: disable=no-member
+    # pylint: disable=no-member, attribute-defined-outside-init
+    @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
