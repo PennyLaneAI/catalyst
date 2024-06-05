@@ -18,6 +18,7 @@ included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 """
 
 import copy
+import sys
 from collections.abc import Sized
 from typing import Any, Callable, List, Optional, Union
 
@@ -26,8 +27,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops.op_math.adjoint import AdjointOperation
+from pennylane.operation import Observable, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
@@ -49,6 +49,8 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
 )
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+
+pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
 
 
 ## API ##
@@ -528,14 +530,23 @@ class HybridAdjoint(HybridOp):
         return [qml.adjoint(op) for op in reversed(self.regions[0].quantum_tape.operations)]
 
 
-# TODO: Should we inherit from AdjointOperation? Maybe better to mixin the different behaviours like
-# PennyLane does (AdjointOperation, AdjointObs, AdjointOperationObs).
-class Adjoint(AdjointOperation, HybridAdjoint):
+class Adjoint:
     """This class provides near identical behaviour as PennyLane for adjoint instances with only a
     single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
 
+    def __new__(cls, base_op, tracing_artifacts):
+        if isinstance(base_op, Operation) and isinstance(base_op, Observable):
+            return object.__new__(AdjointOpObs)
+        if isinstance(base_op, Operation):
+            return object.__new__(AdjointOperation)
+        elif isinstance(base_op, Observable):
+            object.__new__(AdjointObs)
+
+        return object.__new__(AdjointBase)
+
     def __init__(self, base_op, tracing_artifacts):
-        AdjointOperation.__init__(self, base_op)
+        # Grab the constructor from the PennyLane base class.
+        super().__init__(base_op)
         HybridAdjoint.__init__(self, *tracing_artifacts)
 
     def _flatten(self):
@@ -545,6 +556,24 @@ class Adjoint(AdjointOperation, HybridAdjoint):
     @classmethod
     def _unflatten(cls, data, _):
         return cls(*data)
+
+
+# HybridAdjoint is also mixed in because the PL class needs to sit between Adjoint & HybridAdjoint.
+# Thus Adjoint cannot be made to inherit from HybridAdjoint directly.
+class AdjointOperation(Adjoint, pl_adjoint_module.AdjointOperation, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for Operations."""
+
+
+class AdjointObs(Adjoint, pl_adjoint_module.AdjointObs, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for Observables."""
+
+
+class AdjointOpObs(Adjoint, pl_adjoint_module.AdjointOpObs, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for Operations that are also Observables."""
+
+
+class AdjointBase(Adjoint, pl_adjoint_module.Adjoint, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for an unkown Operator type."""
 
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches

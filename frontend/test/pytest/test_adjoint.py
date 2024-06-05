@@ -618,7 +618,6 @@ class PlainOperator(qml.operation.Operator):
     """just an operator."""
 
 
-@pytest.mark.xfail(reason="Catalyst Adjoint class only inherits from AdjointOperation atm.")
 class TestInheritanceMixins:
     """Test inheritance structure and mixin addition through dynamic __new__ method."""
 
