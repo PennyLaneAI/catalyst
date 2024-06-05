@@ -48,7 +48,7 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_tape,
 )
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.tracing.contexts import EvaluationContext
 
 pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
 
@@ -469,6 +469,7 @@ class HybridAdjoint(HybridOp):
 
     binder = adjoint_p.bind
 
+    # pylint: disable=super-init-not-called,non-parent-init-called
     def __init__(self, in_classical_tracers, out_classical_tracers, regions):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
@@ -478,6 +479,7 @@ class HybridAdjoint(HybridOp):
         # Calling Operation.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
         # class, because both Operation and SymbolicOp init methods are used. Since PL doesn't do
         # this either they are probably not meant to be initialized together.
+        # pylint: disable=unidiomatic-typecheck
         if type(self) is HybridAdjoint:
             Operation.__init__(self, wires=Wires(self.num_wires))
 
@@ -534,7 +536,7 @@ class Adjoint:
     """This class provides near identical behaviour as PennyLane for adjoint instances with only a
     single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
 
-    def __new__(cls, base_op, tracing_artifacts):
+    def __new__(cls, base_op, _tracing_artifacts):
         if isinstance(base_op, Operation) and isinstance(base_op, Observable):
             return object.__new__(AdjointOpObs)
         if isinstance(base_op, Operation):
@@ -549,6 +551,8 @@ class Adjoint:
         super().__init__(base_op)
         HybridAdjoint.__init__(self, *tracing_artifacts)
 
+    # These attributes are provided by the mixin class.
+    # pylint: disable=no-member
     def _flatten(self):
         tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
         return (self.base, tracing_artifacts), tuple()

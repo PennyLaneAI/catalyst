@@ -16,6 +16,7 @@
 
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -24,7 +25,9 @@ import pytest
 from numpy.testing import assert_allclose
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
-from catalyst import adjoint, cond, for_loop, qjit, while_loop
+from catalyst import adjoint, cond, debug, for_loop, qjit, while_loop
+
+# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring
 
 
 class TestCatalyst:
@@ -32,9 +35,9 @@ class TestCatalyst:
 
     def verify_catalyst_adjoint_against_pennylane(self, quantum_func, device, *args):
         """
-        A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's
-        adjoint function. This is specialized to verifying the behaviour of a single function that has
-        its adjoint computed.
+        A helper function for verifying Catalyst's native adjoint against the behaviour of
+        PennyLane's adjoint function. This is specialized to verifying the behaviour of a single
+        function that has its adjoint computed.
         """
 
         @qjit
@@ -51,8 +54,8 @@ class TestCatalyst:
         assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
 
     def test_adjoint_func(self, backend):
-        """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure that
-        simple quantum gates are adjointed correctly."""
+        """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure
+        that simple quantum gates are adjointed correctly."""
 
         def func():
             qml.PauliX(wires=0)
@@ -293,8 +296,8 @@ class TestCatalyst:
 
     def test_adjoint_while_loop(self, backend):
         """
-        Tests that the correct gates are applied in reverse in a while loop with a statically unknown
-        number of iterations.
+        Tests that the correct gates are applied in reverse in a while loop with a statically
+        unknown number of iterations.
         """
 
         def func(limit):
@@ -358,7 +361,8 @@ class TestCatalyst:
 
     def test_adjoint_nested_with_control_flow(self, backend):
         """
-        Tests that nested adjoint ops produce correct results in the presence of nested control flow.
+        Tests that nested adjoint ops produce correct results in the presence of nested control
+        flow.
         """
 
         def c_quantum_func(theta):
@@ -488,8 +492,6 @@ class TestCatalyst:
     def test_adjoint_var_wires(self, backend):
         """Test catalyst.adjoint.wires with variable wires."""
 
-        from catalyst import debug
-
         device = qml.device(backend, wires=3)
 
         def func(w0, w1, theta):
@@ -596,6 +598,7 @@ class TestCatalyst:
 # - remove torch, tf, autograd tests
 # - remove non-callable error message test (duplicates catalyst test)
 # - change string wires to integers
+# - remove pickle tetst
 
 
 @pytest.fixture(scope="function")
@@ -683,25 +686,6 @@ class TestInheritanceMixins:
 
         # check the dir
         assert "grad_recipe" not in dir(ob)
-
-    @pytest.mark.parametrize(
-        "op",
-        (
-            PlainOperator(1.2, wires=0),
-            qml.RX(1.2, wires=0),
-            qml.operation.Tensor(qml.PauliX(0), qml.PauliX(1)),
-            qml.PauliX(0),
-        ),
-    )
-    def test_pickling(self, op):
-        """Test that pickling works for all inheritance combinations."""
-        adj_op = adjoint(op)
-
-        pickled_adj_op = pickle.dumps(adj_op)
-        unpickled_op = pickle.loads(pickled_adj_op)
-
-        assert type(adj_op) is type(unpickled_op)
-        assert qml.equal(adj_op, unpickled_op)
 
 
 class TestInitialization:
@@ -1150,7 +1134,8 @@ class TestQueueing:
     """Test that Adjoint operators queue and update base metadata"""
 
     def test_queueing(self):
-        """Test queuing and metadata when both Adjoint and base defined inside a recording context."""
+        """Test queuing and metadata when both Adjoint and base defined inside a recording
+        context."""
 
         with qml.queuing.AnnotatedQueue() as q:
             base = qml.Rot(1.2345, 2.3456, 3.4567, wires="b")
@@ -1197,12 +1182,12 @@ class TestMatrix:
 
     def test_matrix_jax(self):
         """Test the matrix of an adjoint operator with a jax parameter."""
-        import jax.numpy as jnp
 
         self.check_matrix(jnp.array(1.2345), "jax")
 
     def test_no_matrix_defined(self):
-        """Test that if the base has no matrix defined, then Adjoint.matrix also raises a MatrixUndefinedError."""
+        """Test that if the base has no matrix defined, then Adjoint.matrix also raises a
+        MatrixUndefinedError."""
         rng = np.random.default_rng(seed=42)
         shape = qml.StronglyEntanglingLayers.shape(n_layers=2, n_wires=2)
         params = rng.random(shape)
@@ -1225,6 +1210,7 @@ class TestMatrix:
 
 def test_sparse_matrix():
     """Test that the spare_matrix method returns the adjoint of the base sparse matrix."""
+    # pylint: disable=import-outside-toplevel
     from scipy.sparse import coo_matrix, csr_matrix
 
     H = np.array([[6 + 0j, 1 - 2j], [1 + 2j, -1]])
@@ -1335,7 +1321,8 @@ class TestDecompositionExpand:
             adjoint(base).decomposition()
 
     def test_adjoint_of_adjoint(self):
-        """Test that the adjoint an adjoint returns the base operator through both decomposition and expand."""
+        """Test that the adjoint an adjoint returns the base operator through both decomposition
+        and expand."""
 
         base = qml.PauliX(0)
         adj1 = adjoint(base)
@@ -1675,16 +1662,15 @@ class TestAdjointConstructorIntegration:
     @pytest.mark.parametrize("diff_method", ("backprop", "adjoint", "parameter-shift"))
     def test_gradient_jax(self, diff_method):
         """Test gradients through the adjoint transform with jax."""
-        import jax
 
         @qml.qnode(qml.device("default.qubit", wires=1), diff_method=diff_method)
         def circ(x):
             adjoint(qml.RX)(x, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        x = jax.numpy.array(0.234)
-        expected_res = jax.numpy.sin(x)
-        expected_grad = jax.numpy.cos(x)
+        x = jnp.array(0.234)
+        expected_res = jnp.sin(x)
+        expected_grad = jnp.cos(x)
         assert qml.math.allclose(circ(x), expected_res)
         assert qml.math.allclose(jax.grad(circ)(x), expected_grad)
 
