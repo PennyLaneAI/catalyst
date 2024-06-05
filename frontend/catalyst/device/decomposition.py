@@ -17,7 +17,6 @@ This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
 import copy
-
 from functools import partial
 
 import jax
@@ -171,11 +170,12 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
-    # `Adjoint(op)` does not pass the acceptance criteria, since it inherits the PL name attribute,
-    # we should move away from name-based matching of operations to instance-based matching.
-    # Alternatively, overwrite `.name` in `HybridAdjoint` to "Adjoint"?
+    # Adjoint of a single op does not pass the acceptance criteria, since it inherits the PL `.name`
+    # attribute (= "Adjoint(op)"). Hence we should move away from name-based matching of operations
+    # to instance-based matching.
     if isinstance(op, HybridAdjoint):
-        return True
+        return "HybridAdjoint" in operations
+
     return op.name in operations
 
 
