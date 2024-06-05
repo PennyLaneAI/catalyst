@@ -558,7 +558,7 @@ class TestControlledInit:
         assert op.name == "C(TempOperator)"
 
         assert op.num_params == 0
-        assert op.parameters == []  # pylint: disable=use-implicit-booleaness-not-comparison
+        assert not op.parameters
         assert op.data == ()
 
         assert op.num_wires == 4
