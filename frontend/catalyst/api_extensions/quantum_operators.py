@@ -334,7 +334,10 @@ def ctrl(
         (len(control) if isinstance(control, Sized) else 1)
         != (len(control_values) if isinstance(control_values, Sized) else 1)
     ):
-        raise ValueError("control_values should be the same length")
+        raise ValueError(
+            f"Length of the control_values ({len(control_values)}) must be None or equal "
+            f"to the lenght of control ({len(control)})"
+        )
 
     res = QCtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
     return res() if isinstance(op, Operator) else res
@@ -457,6 +460,7 @@ class QCtrlCallable:
         return in_classical_tracers, out_classical_tracers, [ctrl_region]
 
 
+# pylint: disable=super-init-not-called, too-many-arguments
 class HybridControlled(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
@@ -486,6 +490,7 @@ class HybridControlled(HybridOp):
         # Calling `HyperOp.__init__` instead will raise the following `ValueError`
         # in `HybridControlled.__init__` when is called indirectly from `HybridControlledOp`:
         # "HybridControlledOp: wrong number of parameters. 0 parameters passed, 1 expected"
+        # pylint: disable=unidiomatic-typecheck
         if type(self) is HybridControlled:
             Operation.__init__(self, wires=Wires(self.num_wires))
 
@@ -552,7 +557,7 @@ class HybridControlledOp(ControlledOp, HybridControlled):
     to maintain the Catalyst support for `HybridOp`.
     """
 
-    # pylint: disable=super-init-not-called,too-many-arguments,abstract-method
+    # pylint: disable=too-many-arguments,abstract-method
     def __init__(
         self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
     ):

@@ -260,7 +260,7 @@ class TestQCtrl:
             C_ctrl(qml.RX(theta, wires=[0]), control=[1], control_values=[])()
             return qml.state()
 
-        with pytest.raises(ValueError, match="control_values should be the same length"):
+        with pytest.raises(ValueError, match="Length of the control_values"):
             qjit(circuit)(0.1)
 
     def test_qctrl_no_mid_circuit_measurements(self, backend):
@@ -543,7 +543,7 @@ class TestControlledInit:
         assert op.hyperparameters["base"] is self.temp_op
 
         # In C_ctrl, wires include the list of all wires
-        assert op.wires == Wires((0, 1, "a", "aux"))
+        assert op.wires == Wires((0, 1, "a"))
 
         assert op.control_wires == Wires((0, 1))
         assert op.hyperparameters["control_wires"] == Wires((0, 1))
@@ -561,7 +561,7 @@ class TestControlledInit:
         assert not op.parameters
         assert op.data == ()
 
-        assert op.num_wires == 4
+        assert op.num_wires == 3
 
     def test_default_control_values(self):
         """Test assignment of default control_values."""
@@ -591,7 +591,7 @@ class TestControlledInit:
 
     def test_control_values_wrong_length(self):
         """Test checking control_values length error."""
-        with pytest.raises(ValueError, match="control_values should be the same length"):
+        with pytest.raises(ValueError, match="Length of the control_values"):
             C_ctrl(self.temp_op, (0, 1), [True])
 
     def test_target_control_wires_overlap(self):
@@ -765,7 +765,7 @@ class TestControlledProperties:
         base = qml.IsingXX(1.234, wires=(0, 1))
         op = C_ctrl(base, (3, 4), work_wires="aux")
 
-        assert op.wires == Wires((3, 4, 0, 1, "aux"))
+        assert op.wires == Wires((3, 4, 0, 1))
 
         op = op.map_wires(wire_map={3: "a", 4: "b", 0: "c", 1: "d", "aux": "extra"})
 
