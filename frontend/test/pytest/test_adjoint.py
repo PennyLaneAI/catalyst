@@ -585,6 +585,16 @@ class TestCatalyst:
         assert isinstance(decomp[1].base, qml.RY)
         assert decomp[1].base.data == (0.7,)
 
+    def test_qfunc_eager(self, backend):
+        """Test the error message raised for eager adjoint on qfuncs."""
+
+        def qfunc(x, w):
+            qml.RY(x, wires=w)
+            qml.CNOT(wires=[1, w])
+
+        with pytest.raises(ValueError, match="Eagerly computing the adjoint"):
+            adjoint(qfunc, lazy=False)(0.1, 0)
+
 
 #####################################################################################
 #### ADJOINT TEST SUITE COPIED OVER FROM PENNYLANE FOR UNIFIED BEHAVIOUR TESTING ####

@@ -401,6 +401,10 @@ class AdjointCallable:
             raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
         if not self.lazy and not self.single_op:
+            # Supporting this for a qfunc is technically possible by invoking the decomposition on
+            # HybridAdjoint with laza=False, however one would need to outline the classical jaxpr
+            # into the outer scope, and possibly re-mapping tracers in the quantum operators,
+            # in order to avoid escaped tracers which indicate an invalid program.
             raise ValueError(
                 "Eagerly computing the adjoint (lazy=False) is only supported on single operators."
             )
