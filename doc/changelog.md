@@ -84,14 +84,13 @@
 
   ```
 
-* Restructure `catalyst.ctrl` to inherit from the PL `ControlledOp` class.
-  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
-
-  Catalyst's ctrl method is now fully compatible with the PennyLane equivalent when applied to
-  a single Operator. This should lead to improved compatibility with PennyLane library code, as well
-  when reusing quantum functions with both Catalyst and PennyLane.
-
 <h3>Improvements</h3>
+
+* Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
+  applied to a single Operator. This should lead to improved compatibility with PennyLane library code,
+  as well when reusing quantum functions with both Catalyst and PennyLane.
+  [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
 
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
   measurement. For now the feature is equivalent to returning `m` directly from a quantum
@@ -131,6 +130,10 @@
 * Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
   [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
 
+* The measurement primitives now have a standardized call signature so that `shots` and `shape` can
+  both be provided as keyword arguments.
+  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
+
 * Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not. 
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
@@ -154,6 +157,18 @@
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 <h3>Internal changes</h3>
+
+* The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Controlled` class is generated when acting on a single PennyLane operator, which
+  inherits from both the PennyLane `Controlled` class as well the Catalyst `HybridCtrl` class.
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+
+* The `Adjoint` class in Catalyst has been renamed to `HybridAdjoint`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Adjoint` class is generated when acting on a single PennyLane operator, which inherits from
+  both the PennyLane `Adjoint` class as well the Catalyst `HybridAdjoint` class.
+  [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
 
 * Add support to use a locally cloned PennyLane Lightning repository with the runtime.
   [(#732)](https://github.com/PennyLaneAI/catalyst/pull/732)
@@ -233,19 +248,13 @@
   interface and allows for multiple `MemrefCallable` to be defined for a single
   callback, which is necessary for custom gradient of `pure_callbacks`.
 
-* The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
-  to contain a nested scope of both quantum and classical operations.
-  A new `Controlled` class is generated when acting on a single PennyLane operator, which
-  inherits from both the PennyLane `Controlled` class as well the Catalyst `HybridCtrl` class.
-  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
-
-
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Christina Lee,
 Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,

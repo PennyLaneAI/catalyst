@@ -110,11 +110,11 @@ class BackendInfo:
     kwargs: Dict[str, Any]
 
 
+# pylint: disable=too-many-branches
 @debug_logger
 def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
-    # pylint: disable=too-many-branches
 
     dname = device.name
     if isinstance(device, qml.Device):
@@ -212,7 +212,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     if all(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_config.native_ops.update(
             {
-                "Adjoint": OperationProperties(
+                "HybridAdjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
