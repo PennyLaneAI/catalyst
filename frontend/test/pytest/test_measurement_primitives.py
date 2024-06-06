@@ -17,13 +17,13 @@ This file contains a couple of tests for the capture of measurement primitives i
 import jax
 
 from catalyst.jax_primitives import (
-    sample_p,
+    compbasis_p,
     counts_p,
     expval_p,
-    var_p,
     probs_p,
+    sample_p,
     state_p,
-    compbasis_p,
+    var_p,
 )
 
 
