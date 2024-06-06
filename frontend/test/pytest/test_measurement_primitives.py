@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+This file contains a couple of tests for the capture of measurement primitives into jaxpr.
+"""
 import jax
 
 from catalyst.jax_primitives import (
