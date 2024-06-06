@@ -17,7 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 import sys
 from dataclasses import dataclass
-from itertools import chain
+from itertools import chain, repeat
 from typing import Dict, Iterable, List, Union
 
 import jax
@@ -77,10 +77,15 @@ from catalyst.jax_extras import (
     DynshapePrimitive,
     cond_expansion_strategy,
     for_loop_expansion_strategy,
+    grad_expansion_strategy,
     infer_output_type_jaxpr,
     while_loop_expansion_strategy,
 )
-from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.calculate_grad_shape import (
+    Signature,
+    calculate_grad_shape,
+    calculate_grad_shape2,
+)
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
@@ -220,7 +225,7 @@ while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
-grad_p = core.Primitive("grad")
+grad_p = DynshapePrimitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
 func_p.multiple_results = True
@@ -378,21 +383,25 @@ class GradParams:
 
 
 @grad_p.def_impl
-def _grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
+def _grad_def_impl(ctx, *args, jaxpr, fn, grad_params, body_nconsts, nimplicit):  # pragma: no cover
     raise NotImplementedError()
 
 
 @grad_p.def_abstract_eval
-def _grad_abstract(*args, jaxpr, fn, grad_params):
-    """This function is called with abstract arguments for tracing."""
-    signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
-    offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in grad_params.expanded_argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
-    return tuple(transformed_signature.get_results())
+def _grad_abstract(*in_type, jaxpr, fn, grad_params, body_nconsts, nimplicit):
+    out_type = infer_output_type_jaxpr(
+        jaxpr.jaxpr.invars[:body_nconsts],
+        jaxpr.jaxpr.invars[body_nconsts:],
+        jaxpr.jaxpr.outvars,
+        expansion_strategy=grad_expansion_strategy(),
+        num_implicit_inputs=nimplicit,
+    )
+    # new_argnum = [num + body_nconsts for num in grad_params.expanded_argnum]
+    out_type_grad = calculate_grad_shape2(in_type, out_type, grad_params.expanded_argnum)
+    return out_type_grad
 
 
-def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
+def _grad_lowering(ctx, *args, jaxpr, fn, grad_params, body_nconsts, nimplicit):
     """Lowering function to gradient.
     Args:
         ctx: the MLIR context
@@ -410,7 +419,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     if h:
         f64 = ir.F64Type.get(mlir_ctx)
         finiteDiffParam = ir.FloatAttr.get(f64, h)
-    offset = len(jaxpr.consts)
+    offset = body_nconsts
     new_argnum = [num + offset for num in argnum]
     argnum_numpy = np.array(new_argnum)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)

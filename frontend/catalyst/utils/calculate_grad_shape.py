@@ -17,7 +17,11 @@ Deduce the function signatures after taking their gradients with respect to some
 """
 
 
+from typing import Tuple
+
 from jax.core import ShapedArray
+
+from catalyst.jax_extras import DShapedArray, InputType, OutDBIdx, OutputType
 
 
 class Signature:
@@ -128,3 +132,53 @@ def calculate_grad_shape(signature, indices) -> Signature:
             )
             grad_result_types.append(grad_res_type)
     return Signature(signature.get_inputs(), grad_result_types)
+
+
+def calculate_grad_shape2(in_type: InputType, out_type: OutputType, indices) -> OutputType:
+
+    def _check_tensors(types, hint) -> None:
+        for typ, explicit in types:
+            if not explicit:
+                if not isinstance(x, (ShapedArray, DShapedArray)):
+                    raise TypeError(f"{hint} must be tensor type, got {x}.")
+
+    def _check_no_out_implicits():
+        implicit_seen = False
+        for typ, explicit in out_type:
+            if not explicit:
+                implicit_seen = True
+            else:
+                if isinstance(typ, DShapedArray):
+                    for axis in typ.shape:
+                        if isinstance(axis, OutDBIdx):
+                            raise TypeError(
+                                f"Results must not refer to output dimension variables, got {x}."
+                            )
+        assert not implicit_seen, "Unused implicit output dimension variables are not allowed"
+
+    _check_tensors(in_type, "Inputs")
+    _check_tensors(out_type, "Results")
+    _check_no_out_implicits()
+
+    grad_out_type = []
+
+    for out, explicit in out_type:
+        result_shape = []
+
+        for axis in out.shape:
+            result_shape.append(axis)
+
+        print("IAIAA", in_type)
+        in_aval = [t for t, e in in_type if e]
+        for index in indices:
+            diff_arg_type = in_aval[index]
+            dtype = diff_arg_type.dtype
+
+            grad_res_shape = result_shape.copy()
+            for axis in diff_arg_type.shape:
+                grad_res_shape.append(axis)
+
+            grad_res_type = DShapedArray(grad_res_shape, dtype) if grad_res_shape else diff_arg_type
+            grad_out_type.append((grad_res_type, True))
+
+    return grad_out_type

@@ -28,7 +28,7 @@ from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane import QNode
 
 import catalyst
-from catalyst.jax_extras import Jaxpr
+from catalyst.jax_extras import Jaxpr, grad_expansion_strategy
 from catalyst.jax_primitives import (
     GradParams,
     expval_p,
@@ -38,8 +38,8 @@ from catalyst.jax_primitives import (
     probs_p,
     vjp_p,
 )
-from catalyst.jax_tracer import Function
-from catalyst.tracing.contexts import EvaluationContext
+from catalyst.jax_tracer import Function, trace_function
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import DifferentiableCompileError
 
 Differentiable = Union[Function, QNode]
@@ -451,7 +451,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         tangents_flatten, _ = tree_flatten(tangents)
         grad_params = _check_grad_params(method, scalar_out, h, argnum, len(args_flatten), in_tree)
 
-        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, _, _, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         results = jvp_p.bind(
             *args_flatten, *tangents_flatten, jaxpr=jaxpr, fn=fn, grad_params=grad_params
@@ -535,7 +535,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
         args_argnum = tuple(params[i] for i in grad_params.argnum)
         _, in_tree = tree_flatten(args_argnum)
 
-        jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+        jaxpr, _, _, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 
         cotangents, _ = tree_flatten(cotangents)
 
@@ -605,12 +605,21 @@ class Grad:
                 in_tree,
                 self.grad_params.with_value,
             )
-            jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *args)
+            jaxpr, out_type, consts, out_tree = _make_jaxpr_check_differentiable(
+                fn, grad_params, *args
+            )
             args_argnum = tuple(args[i] for i in grad_params.argnum)
             _, in_tree = tree_flatten(args_argnum)
 
             # It always returns list as required by catalyst control-flows
-            results = grad_p.bind(*args_data, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+            results = grad_p.bind(
+                *[*consts, *args_data],
+                jaxpr=jaxpr,
+                fn=fn,
+                grad_params=grad_params,
+                body_nconsts=len(consts),
+                nimplicit=len([aval for aval, expl in out_type if not expl]),
+            )
 
             results = _unflatten_derivatives(
                 results, in_tree, out_tree, grad_params, len(jaxpr.out_avals)
@@ -716,17 +725,29 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     """Gets the jaxpr of a differentiable function. Perform the required additional checks and
     return the output tree."""
     method = grad_params.method
-    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
-    _, out_tree = tree_flatten(shape)
+    jaxpr0, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    # jaxpr = jax.make_jaxpr(f)(*args)
+
+    mode, ctx = EvaluationContext.get_evaluation_mode()
+    assert mode == EvaluationMode.CLASSICAL_COMPILATION
+
+    _, in_sig, out_sig = trace_function(ctx, f, *args, expansion_strategy=grad_expansion_strategy())
+
+    jaxpr = out_sig.out_jaxpr()
+    out_tree = out_sig.out_tree()
+    consts = out_sig.out_consts()
+    out_type = out_sig.out_type()
+
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
-    for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
-            raise DifferentiableCompileError(
-                "Catalyst.grad/jacobian only supports differentiation on floating-point "
-                f"arguments, got '{arg.dtype}' at position {pos}."
-            )
+    # FIXME: re-enable for dynamically shaped arrays
+    # for pos, arg in enumerate(jaxpr.in_avals):
+    #     if arg.dtype.kind != "f" and pos in grad_params.expanded_argnum:
+    #         raise DifferentiableCompileError(
+    #             "Catalyst.grad/jacobian only supports differentiation on floating-point "
+    #             f"arguments, got '{arg.dtype}' at position {pos}."
+    #         )
 
     if grad_params.scalar_out:
         if not (len(jaxpr.out_avals) == 1 and jaxpr.out_avals[0].shape == ()):
@@ -743,7 +764,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     _verify_differentiable_child_qnodes(jaxpr, method)
 
-    return jaxpr, out_tree
+    return jaxpr, out_type, consts, out_tree
 
 
 def _verify_differentiable_child_qnodes(jaxpr, method):

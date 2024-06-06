@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 from jax.tree_util import tree_flatten
+from numpy.testing import assert_allclose
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import (
@@ -882,7 +883,7 @@ def test_jax_consts(h_coeffs, g_method, backend):
         return h(params)
 
     inp = jnp.array([1.0, 2.0])
-    assert np.allclose(compile_grad(jnp.array(inp)), interpret_grad(inp))
+    assert_allclose(compile_grad(jnp.array(inp)), interpret_grad(inp))
 
 
 def test_non_float_arg(backend):

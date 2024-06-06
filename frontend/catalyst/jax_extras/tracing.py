@@ -677,10 +677,11 @@ class ExpansionStrategy:
         input_unshare_variables: Treat each dynamic dimension as a distinct dimension, even if some
                                  of them are described by the same dimension variables.
         output_include_indbidx_vars: Include variables corresponding to the InDBIdx references in
-                                     the result
+                                     the result. This is need for loop primitives to preserve
+                                     input/output correspondence.
         output_force_arg0_outdbidx: Force all references pointing to the first arguments to be
-                                    OutDBIdx. This is typically required to avoid input references
-                                    to the loop iteration variable.
+                                    OutDBIdx. This is required to avoid input references
+                                    to the for-loop iteration variable.
     """
 
     axes_specs: Sequence[AbstractedAxesSpec] | None
@@ -702,6 +703,11 @@ def for_loop_expansion_strategy(preserve_dimensions=False):
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
     return ExpansionStrategy(None, False, True, False)
+
+
+def grad_expansion_strategy():
+    """Arguments and results expansion strategy for conditionals."""
+    return ExpansionStrategy(None, False, False, False)
 
 
 def infer_output_type(
