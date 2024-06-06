@@ -195,7 +195,7 @@ class MemrefCallable(FlatCallable):
 
     CACHE = {}
 
-    def __new__(cls, func, results_aval):
+    def __new__(cls, func, results_aval, *_args, **_kwargs):
         # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
         flat_results_aval, _ = tree_flatten(results_aval)
         cache_key = (func, *flat_results_aval)
