@@ -527,7 +527,7 @@ class HybridAdjoint(HybridOp):
         assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
 
         # While catalyst.adjoint would be just as valid since it is PL compatible for single ops,
-        # going to PennyLane's adjoint skips unnecessarily re-queing the base operation in each
+        # going to PennyLane's adjoint skips unnecessarily re-queuing the base operation in each
         # HybridOp's nested tape when qjit is not active.
         return [qml.adjoint(op) for op in reversed(self.regions[0].quantum_tape.operations)]
 
