@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated n-shot times to simulate hardware-like results.
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
   The loop over shots is executed with `catalyst.vmap`.
   [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
 
