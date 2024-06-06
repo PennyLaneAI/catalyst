@@ -36,7 +36,7 @@ from catalyst.api_extensions.error_mitigation import mitigate_with_zne
 from catalyst.api_extensions.function_maps import vmap
 from catalyst.api_extensions.quantum_operators import (
     Adjoint,
-    HybridControlled,
+    HybridCtrl,
     MidCircuitMeasure,
     adjoint,
     ctrl,

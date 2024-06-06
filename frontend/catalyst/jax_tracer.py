@@ -482,7 +482,7 @@ def trace_quantum_tape(
     for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp) and not isinstance(
-            op, catalyst.api_extensions.quantum_operators.HybridControlled
+            op, catalyst.api_extensions.quantum_operators.HybridCtrl
         ):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
         else:

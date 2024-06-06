@@ -18,6 +18,7 @@ included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 """
 
 import copy
+import sys
 from collections.abc import Sized
 from typing import Any, Callable, List, Optional, Union
 
@@ -27,7 +28,7 @@ from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops.op_math.controlled import ControlledOp, create_controlled_op
+from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
@@ -48,6 +49,8 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
 )
 from catalyst.tracing.contexts import EvaluationContext
+
+pl_ctrl_module = sys.modules["pennylane.ops.op_math.controlled"]
 
 
 ## API ##
@@ -339,7 +342,7 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    res = QCtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
+    res = CtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
     return res() if isinstance(op, Operator) else res
 
 
@@ -397,7 +400,7 @@ class Adjoint(HybridOp):
         return total_wires
 
 
-class QCtrlCallable:
+class CtrlCallable:
     """Callable wrapper to produce a ctrl instance."""
 
     def __init__(self, op, control, control_values, work_wires):
@@ -422,7 +425,6 @@ class QCtrlCallable:
             raise ValueError(f"Expected a callable or a qml.Operator, not {op}")
 
     def __call__(self, *args, **kwargs):
-
         tracing_artifacts = self.trace_body(args, kwargs)
 
         if self.single_op:
@@ -436,7 +438,7 @@ class QCtrlCallable:
                 work_wires=self.work_wires,
             )
 
-        return HybridControlled(
+        return HybridCtrl(
             *tracing_artifacts,
             control_wires=self.control_wires,
             control_values=self.control_values,
@@ -444,7 +446,7 @@ class QCtrlCallable:
         )
 
     def trace_body(self, args, kwargs):
-        """Generate a HybridOpRegion for `catalyst.ctrl` to be used by Catalyst."""
+        """Generate a HybridOpRegion for `catalyst.ctrl` to be used by the tracer."""
 
         # Create a nested jaxpr scope for the body of the adjoint.
         in_classical_tracers, _ = tree_flatten((args, kwargs))
@@ -460,10 +462,10 @@ class QCtrlCallable:
         return in_classical_tracers, out_classical_tracers, [ctrl_region]
 
 
-# pylint: disable=super-init-not-called, too-many-arguments
-class HybridControlled(HybridOp):
+class HybridCtrl(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
+    # pylint: disable=super-init-not-called, too-many-arguments, non-parent-init-called
     def __init__(
         self,
         in_classical_tracers,
@@ -488,15 +490,15 @@ class HybridControlled(HybridOp):
             self._control_values = control_values
 
         # Calling `HyperOp.__init__` instead will raise the following `ValueError`
-        # in `HybridControlled.__init__` when is called indirectly from `Controlled`:
+        # in `HybridCtrl.__init__` when is called indirectly from `Controlled`:
         # "Controlled: wrong number of parameters. 0 parameters passed, 1 expected"
         # pylint: disable=unidiomatic-typecheck
-        if type(self) is HybridControlled:
+        if type(self) is HybridCtrl:
             Operation.__init__(self, wires=Wires(self.num_wires))
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError(
-            "HybridControlled does not support JAX quantum tracing"
+            "HybridCtrl does not support JAX quantum tracing"
         )  # pragma: no cover
 
     def decomposition(self):
@@ -550,21 +552,24 @@ class HybridControlled(HybridOp):
         return self
 
 
-class Controlled(ControlledOp, HybridControlled):
-    """
-    This class inherits `qml.ops.op_math.controlled.ControlledOp` to provide identical support as
-    PL for calculating the control of single operations. It is also derived from `HybridControlled`
-    to maintain the Catalyst support for `HybridOp`.
-    """
+class Controlled:
+    """Similar to the Adjoint class, it provides near identical behaviour as PennyLane for
+    ctrl instances with only a single base operation. Additionally, it provides the same
+    functionality as HybridCtrl."""
+
+    def __new__(cls, base, *_, **__):
+        if isinstance(base, Operation):
+            return object.__new__(ControlledOp)
+
+        return object.__new__(ControlledBase)
 
     # pylint: disable=too-many-arguments,abstract-method
     def __init__(
         self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
     ):
-        ControlledOp.__init__(
-            self,
-            base=base,
-            control_wires=control_wires,
+        super().__init__(
+            base,
+            control_wires,
             control_values=control_values,
             work_wires=work_wires,
         )
@@ -572,7 +577,7 @@ class Controlled(ControlledOp, HybridControlled):
         # Added this condition to support direct calls of this class outside the QJIT context
         # in PL integrated tests:
         if tracing_artifacts:
-            HybridControlled.__init__(
+            HybridCtrl.__init__(
                 self,
                 *tracing_artifacts,
                 control_wires=control_wires,
@@ -580,6 +585,8 @@ class Controlled(ControlledOp, HybridControlled):
                 work_wires=work_wires,
             )
 
+    # These attributes are provided by the mixin class.
+    # pylint: disable=no-member
     def _flatten(self):
         tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
         return (self.base,), (
@@ -594,6 +601,16 @@ class Controlled(ControlledOp, HybridControlled):
         return cls(
             data[0], control_wires=metadata[1], control_values=metadata[2], work_wires=metadata[3]
         )
+
+
+# HybridCtrl is also mixed in because the PL class needs to sit between Controlled & HybridCtrl.
+# Thus Controlled cannot be made to inherit from HybridCtrl directly.
+class ControlledOp(Controlled, pl_ctrl_module.ControlledOp, HybridCtrl):
+    """Replicate mixin class structure from PennyLane for Operations."""
+
+
+class ControlledBase(Controlled, pl_ctrl_module.Controlled, HybridCtrl):
+    """Replicate mixin class structure from PennyLane for a general Operator type."""
 
 
 def qctrl_distribute(
@@ -616,7 +633,7 @@ def qctrl_distribute(
     ops2 = []
     for op in tape.operations:
         if has_nested_tapes(op):
-            if isinstance(op, HybridControlled):
+            if isinstance(op, HybridCtrl):
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     tape2 = qctrl_distribute(
                         region.quantum_tape,

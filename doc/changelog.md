@@ -87,15 +87,9 @@
 * Restructure `catalyst.ctrl` to inherit from the PL `ControlledOp` class.
   [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
 
-  This provides feature parity for single operations. For quantum functions, however,
-  this support is not fully compatible with PL because PL only instantiates the `ControlledOp`
-  class of a single base operation and returns a list of `ControlledOp` instances while Catalyst
-  intends to return a single controlled instance with a list of ops nested inside of it.
-
-  Benefits:
-
-  - `catalyst.ctrl` feature parity with PL's ctrl for single ops.
-  - Allow `catalyst.ctrl` to be used outside the QJIT or QNode context similar to the PL ctrl method.
+  Catalyst's ctrl method is now fully compatible with the PennyLane equivalent when applied to
+  a single Operator. This should lead to improved compatibility with PennyLane library code, as well
+  when reusing quantum functions with both Catalyst and PennyLane.
 
 <h3>Improvements</h3>
 
@@ -238,6 +232,13 @@
   This separation allows for a better separation of concerns, provides a nicer
   interface and allows for multiple `MemrefCallable` to be defined for a single
   callback, which is necessary for custom gradient of `pure_callbacks`.
+
+* The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Controlled` class is generated when acting on a single PennyLane operator, which
+  inherits from both the PennyLane `Controlled` class as well the Catalyst `HybridCtrl` class.
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+
 
 <h3>Contributors</h3>
 
