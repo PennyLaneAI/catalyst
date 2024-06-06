@@ -34,7 +34,6 @@ from pennylane.measurements import (
 from pennylane.transforms.dynamic_one_shot import (
     init_auxiliary_tape,
     is_mcm,
-    null_postprocessing,
     parse_native_mid_circuit_measurements,
 )
 
@@ -86,7 +85,7 @@ class QFunc:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, capabilities)
 
-    # pylint: disable=no-member, attribute-defined-outside-init
+    # pylint: disable=no-member
     @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
@@ -173,7 +172,7 @@ def dynamic_one_shot(qnode):
 
         @qml.transform
         def dynamic_one_shot_partial(
-            tape: qml.tape.QuantumTape, **kwargs
+            tape: qml.tape.QuantumTape,
         ) -> (Sequence[qml.tape.QuantumTape], Callable):
 
             nonlocal cpy_tape

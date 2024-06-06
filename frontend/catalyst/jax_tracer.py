@@ -13,8 +13,6 @@
 # limitations under the License.
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
-# pylint: disable=too-many-lines
-
 import logging
 from dataclasses import dataclass
 from functools import partial, reduce
