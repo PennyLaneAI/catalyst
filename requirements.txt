@@ -24,4 +24,3 @@ nbmake
 # optional rt/test dependencies
 pennylane-lightning[kokkos]
 amazon-braket-pennylane-plugin>1.27.1
-autoray<0.6.10
