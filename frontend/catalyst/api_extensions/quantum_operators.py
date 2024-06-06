@@ -542,7 +542,7 @@ class Adjoint:
         if isinstance(base_op, Operation):
             return object.__new__(AdjointOperation)
         elif isinstance(base_op, Observable):
-            object.__new__(AdjointObs)
+            return object.__new__(AdjointObs)
 
         return object.__new__(AdjointBase)
 
