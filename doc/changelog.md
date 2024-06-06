@@ -126,6 +126,7 @@
 
 * The measurement primitives now have a standardized call signature so that `shots` and `shape` can
   both be provided as keyword arguments.
+  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
 
 <h3>Breaking changes</h3>
 
