@@ -481,7 +481,7 @@ class HybridAdjoint(HybridOp):
         # this either they are probably not meant to be initialized together.
         # pylint: disable=unidiomatic-typecheck
         if type(self) is HybridAdjoint:
-            Operation.__init__(self, wires=Wires(self.num_wires))
+            Operator.__init__(self, wires=Wires(self.num_wires))
 
     def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
         op = self
