@@ -57,12 +57,34 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
     if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
-        return op_state->emitOpError("An operation without a valid gradient was found in code "
-                                     "reachable from the gradient operation.\n"
-                                     "Example of operations not allowed:\n"
-                                     " * mid circuit measurements\n"
-                                     " * callbacks\n"
-                                     " * ZNE mitigation.");
+        // Check that the method is not finite difference, as finite difference should always be
+        // available
+        auto gradOp = dyn_cast<GradOp>(op_state->getOperation());
+        auto jvpOp = dyn_cast<JVPOp>(op_state->getOperation());
+        auto vjpOp = dyn_cast<VJPOp>(op_state->getOperation());
+
+        if (!(gradOp || jvpOp || vjpOp))
+            return op_state->emitOpError("The gradient operation should be a grad, jvp or vjp.\n");
+
+        llvm::StringRef MethodName;
+        if (gradOp)
+            MethodName = gradOp.getMethod();
+        else if (jvpOp)
+            MethodName = jvpOp.getMethod();
+        else if (vjpOp)
+            MethodName = vjpOp.getMethod();
+
+        if (MethodName != "fd") {
+            return op_state->emitOpError(
+                "An operation without a valid gradient was found in code "
+                "reachable from the gradient operation.\n"
+                "Example of operations not allowed:\n"
+                " * mid circuit measurements\n"
+                " * callbacks\n"
+                " * ZNE mitigation.\n"
+                " Try setting method=\"fd\" to directly compute the gradient with finite "
+                "difference.");
+        }
     }
 
     for (unsigned i = 0; i < fnArgs.size(); ++i)
