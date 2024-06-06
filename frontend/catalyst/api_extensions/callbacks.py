@@ -21,7 +21,7 @@ but require a Python interpreter instance.
 import ctypes
 import inspect
 from collections.abc import Sequence
-from functools import wraps
+from functools import cache, wraps
 from typing import Any, Callable
 
 import jax.numpy as jnp
@@ -185,8 +185,25 @@ class FlatCallable:
         return map(type, self.getOperands())
 
 
+def clear_callback_cache():
+    MemrefCallable.CACHE.clear()
+
+
 class MemrefCallable(FlatCallable):
     """Callable that receives void ptrs."""
+
+    CACHE = dict()
+
+    def __new__(cls, func, results_aval, *args, **kwargs):
+        # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        flat_results_aval, _ = tree_flatten(results_aval)
+        cache_key = (func, *flat_results_aval)
+        if cls.CACHE.get(cache_key):
+            return cls.CACHE.get(cache_key)
+
+        instance = super().__new__(cls)
+        cls.CACHE[cache_key] = instance
+        return instance
 
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
