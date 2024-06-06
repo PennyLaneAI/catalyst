@@ -124,6 +124,9 @@
 * Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
   [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
 
+* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not. 
+  [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
