@@ -15,6 +15,7 @@
 from functools import reduce
 from typing import Iterable, Sequence
 
+import catalyst
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -214,6 +215,59 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
+    def test_mcm_method_deferred_error(self, backend):
+        """Test that an error is raised if trying to execute with mcm_method="deferred"."""
+        dev = qml.device(backend, wires=1)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="deferred")
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m)
+
+        param = jnp.pi
+        with pytest.raises(
+            ValueError, match="mcm_method='deferred' is not supported with Catalyst"
+        ):
+            _ = circuit(param)
+
+    def test_mcm_method_one_shot_analytic_error(self, backend):
+        """Test that an error is raised if using mcm_method="one-shot" without shots."""
+        dev = qml.device(backend, wires=1, shots=None)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m)
+
+        param = jnp.pi
+        with pytest.raises(
+            ValueError, match="Cannot use the 'one-shot' method for mid-circuit measurements"
+        ):
+            _ = circuit(param)
+
+    def test_mcm_method_one_shot_uses_dynamic_one_shot(self, backend, mocker):
+        """Test that using mcm_method="one-shot" calls dynamic_one_shot"""
+        dev = qml.device(backend, wires=1, shots=10)
+        spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m)
+
+        param = jnp.pi
+        _ = circuit(param)
+        spy.assert_called()
+
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qml.sample and shots."""
@@ -240,9 +294,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize(
         "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
+    @pytest.mark.parametrize("use_kwarg", [True, False])
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
-        self, backend, shots, postselect, reset, measure_f, meas_obj
+        self, backend, shots, postselect, reset, measure_f, meas_obj, use_kwarg
     ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
@@ -282,9 +337,6 @@ class TestMidCircuitMeasurement:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
-        @qjit
-        @dynamic_one_shot
-        @qml.qnode(dev)
         def func(x, y):
             qml.RX(x, 0)
             m0 = measure(0)
@@ -303,6 +355,11 @@ class TestMidCircuitMeasurement:
             kwargs = {meas_key: meas_value}
             return measure_f(**kwargs)
 
+        if use_kwarg:
+            func = qjit(qml.QNode(func, dev, mcm_method="one-shot"))
+        else:
+            func = qjit(dynamic_one_shot(qml.QNode(func, dev)))
+
         params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
@@ -318,7 +375,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("shots", [5000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
-    def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
+    @pytest.mark.parametrize("use_kwarg", [True, False])
+    def test_dynamic_one_shot_multiple_measurements(
+        self, backend, shots, postselect, reset, use_kwarg
+    ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
         if backend == "lightning.kokkos":
@@ -352,9 +412,6 @@ class TestMidCircuitMeasurement:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
-        @qjit
-        @dynamic_one_shot
-        @qml.qnode(dev)
         def func(x, y):
             qml.RX(x, wires=0)
             m0 = measure(0, reset=reset, postselect=postselect)
@@ -375,6 +432,11 @@ class TestMidCircuitMeasurement:
                 qml.sample(op=m0),
                 qml.expval(obs),
             )
+
+        if use_kwarg:
+            func = qjit(qml.QNode(func, dev, mcm_method="one-shot"))
+        else:
+            func = qjit(dynamic_one_shot(qml.QNode(func, dev)))
 
         measures = (
             qml.expval,

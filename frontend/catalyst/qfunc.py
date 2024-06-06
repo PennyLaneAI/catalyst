@@ -91,6 +91,25 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
+        mcm_config = self.execute_kwargs["mcm_config"]
+        total_shots = (
+            self.device.shots
+            if isinstance(self.device, qml.devices.LegacyDevice)
+            else self.device.shots.total_shots
+        )
+        if total_shots is not None and mcm_config["mcm_method"] is None:
+            mcm_config["mcm_method"] = "one-shot"
+        if mcm_config["mcm_method"] == "deferred":
+            raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
+        if mcm_config["mcm_method"] == "one_shot":
+            if total_shots is None:
+                raise ValueError(
+                    "Cannot use the 'one-shot' method for mid-circuit measurements with "
+                    "analytic mode."
+                )
+            if total_shots > 1:
+                return dynamic_one_shot(self)(*args, **kwargs)
+
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
         program_features = ProgramFeatures(self.device.shots is not None)

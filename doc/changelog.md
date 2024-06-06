@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
+  [(#)]()
+
 * The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated n-shot times to simulate hardware-like results.
   The loop over shots is executed with `catalyst.vmap`.
   [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
