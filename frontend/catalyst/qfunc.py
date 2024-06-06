@@ -128,7 +128,7 @@ def dynamic_one_shot(qnode):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 
     Args:
-        qnode (QNode): a quantum circuit which will run n-shot times
+        qnode (QNode): a quantum circuit which will run ``num_shots`` times
 
     Returns:
         qnode (QNode):
