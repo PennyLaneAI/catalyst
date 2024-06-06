@@ -503,7 +503,6 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
     LogicalResult matchAndRewrite(CallbackCallOp op, CallbackCallOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-
         // Just change the calling convention from scalar replacement of aggregates
         // to pointer to struct.
         auto loc = op.getLoc();

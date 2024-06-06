@@ -240,7 +240,7 @@ def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cov
     raise NotImplementedError()
 
 
-CALLBACK_OP_CACHE = dict()
+CALLBACK_OP_CACHE = {}
 
 
 def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
@@ -253,7 +253,6 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     ctx = jax_ctx.module_context.context
     i64_type = ir.IntegerType.get_signless(64, ctx)
-    identifier = ir.IntegerAttr.get(i64_type, callback_id)
 
     params_ty = [arg.type for arg in args]
     results_ty = list(convert_shaped_arrays_to_tensors(results_aval))

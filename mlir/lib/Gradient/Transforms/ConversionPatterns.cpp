@@ -139,7 +139,6 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
 void wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter, RewriterBase &rewriter,
                     Location loc, bool volatileArgs = false)
 {
-
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
         // The memref arguments are already wrapped
