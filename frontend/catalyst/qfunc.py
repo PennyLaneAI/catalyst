@@ -218,10 +218,13 @@ def dynamic_one_shot(qnode):
 
     single_shot_qnode = transform_to_single_shot(qnode)
     shots = qnode.device.shots
+    total_shots = shots if isinstance(qnode.device, qml.Device) else shots.total_shots
 
     def one_shot_wrapper(*args, **kwargs):
-        single_shot_qnode.device._shots = qml.measurements.Shots(1)
-        arg_vmap = jnp.empty((shots.total_shots,), dtype=float)
+        single_shot_qnode.device._shots = (
+            1 if isinstance(qnode.device, qml.Device) else qml.measurements.Shots(1)
+        )
+        arg_vmap = jnp.empty((total_shots,), dtype=float)
 
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
