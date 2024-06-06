@@ -214,6 +214,26 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
+    def test_dynamic_one_shot_unsupported_measurement(self, backend):
+        """Test that circuits with unsupported measurements raise an error."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+        params = np.pi / 4 * np.ones(2)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, wires=0)
+            m0 = measure(0)
+            return qml.classical_shadow(wires=0)
+
+        with pytest.raises(
+            TypeError,
+            match=f"Native mid-circuit measurement mode does not support",
+        ):
+            func(*params)
+
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qml.sample and shots."""

@@ -176,8 +176,9 @@ def dynamic_one_shot(qnode):
             tape: qml.tape.QuantumTape, **kwargs
         ) -> (Sequence[qml.tape.QuantumTape], Callable):
 
-            if not any(is_mcm(o) for o in tape.operations):
-                return (tape,), null_postprocessing
+            nonlocal cpy_tape
+            cpy_tape = tape
+            nonlocal aux_tapes
 
             for m in tape.measurements:
                 if not isinstance(
@@ -187,12 +188,6 @@ def dynamic_one_shot(qnode):
                         f"Native mid-circuit measurement mode does not support {type(m).__name__} "
                         "measurements."
                     )
-            _ = kwargs.get("device", None)
-
-            if not tape.shots:
-                raise qml.QuantumFunctionError(
-                    "dynamic_one_shot is only supported with finite shots."
-                )
 
             samples_present = any(isinstance(mp, SampleMP) for mp in tape.measurements)
             postselect_present = any(
@@ -204,9 +199,6 @@ def dynamic_one_shot(qnode):
                     "measurements with broadcasting"
                 )
 
-            nonlocal cpy_tape
-            cpy_tape = tape
-            nonlocal aux_tapes
             aux_tapes = [init_auxiliary_tape(tape)]
 
             def processing_fn(results):

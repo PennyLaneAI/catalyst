@@ -147,14 +147,13 @@ def measure(
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
     in_classical_tracers.append(postselect)
+    in_classical_tracers.append(reset)
 
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
         regions=[],
-        reset=reset,
-        postselect=postselect,
     )
 
     # If reset was requested, reset qubit only if the measurement result was 1
@@ -395,10 +394,10 @@ class MidCircuitMeasure(HybridOp):
     binder = qmeasure_p.bind
 
     def __init__(self, *args, **kwargs):
-        self.bypass_postselect = kwargs.pop("bypass_postselect", False)
-        self.postselect = kwargs.pop("postselect", None)
-        self.reset = kwargs.pop("reset", False)
         super().__init__(*args, **kwargs)
+        self.bypass_postselect = kwargs.pop("bypass_postselect", False)
+        self.postselect = self.in_classical_tracers[-2]
+        self.reset = self.in_classical_tracers[-1]
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
