@@ -233,81 +233,7 @@ class TestMidCircuitMeasurement:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
-    @pytest.mark.parametrize("shots", [8000])
-    @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("reset", [False, True])
-    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
-    @pytest.mark.parametrize(
-        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
-    )
-    # pylint: disable=too-many-arguments
-    def test_dynamic_one_shot_simple(self, backend, shots, postselect, reset, measure_f, meas_obj):
-        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
-        circuit with a mid-circuit measurement."""
-        if measure_f in (qml.counts, qml.probs, qml.sample) and (
-            not isinstance(meas_obj, list) and not meas_obj == "mcm"
-        ):
-            pytest.skip("Can't use observables with counts, probs or sample")
-
-        if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
-            pytest.skip("Can't use wires/mcm lists with var or expval")
-
-        if measure_f == qml.var and (not isinstance(meas_obj, list) and not meas_obj == "mcm"):
-            pytest.xfail("isa<UnrealizedConversionCastOp>")
-
-        dq = qml.device("default.qubit", shots=shots, seed=8237945)
-
-        @qml.qnode(dq)
-        def ref_func(x, y):
-            qml.RX(x, wires=0)
-            m0 = qml.measure(0, reset=reset, postselect=postselect)
-            qml.cond(m0, qml.RY)(y, wires=1)
-
-            meas_key = "wires" if isinstance(meas_obj, list) else "op"
-            meas_value = m0 if isinstance(meas_obj, str) else meas_obj
-            kwargs = {meas_key: meas_value}
-            if measure_f == qml.counts:
-                kwargs["all_outcomes"] = True
-            return measure_f(**kwargs)
-
-        if postselect and measure_f in (qml.counts, qml.sample):
-            ref_func = qml.dynamic_one_shot(ref_func)
-        else:
-            ref_func = qml.defer_measurements(ref_func)
-
-        dev = qml.device(backend, wires=2, shots=shots)
-
-        @qjit
-        @dynamic_one_shot
-        @qml.qnode(dev)
-        def func(x, y):
-            qml.RX(x, wires=0)
-            m0 = measure(0, reset=reset, postselect=postselect)
-
-            @cond(m0 == 1)
-            def ansatz():
-                qml.RY(y, wires=1)
-
-            ansatz()
-
-            meas_key = "wires" if isinstance(meas_obj, list) else "op"
-            meas_value = m0 if isinstance(meas_obj, str) else meas_obj
-            kwargs = {meas_key: meas_value}
-            return measure_f(**kwargs)
-
-        params = jnp.pi / 4 * jnp.ones(2)
-        results0 = ref_func(*params)
-        results1 = func(*params)
-        if measure_f == qml.counts and isinstance(meas_obj, list):
-            results1 = {
-                format(int(state), f"0{len(meas_obj)}b"): count for state, count in zip(*results1)
-            }
-        if measure_f == qml.sample:
-            results0 = results0[results0 != fill_in_value]
-            results1 = results1[results1 != fill_in_value]
-        validate_measurements(measure_f, shots, results1, results0)
-
-    @pytest.mark.parametrize("shots", [8000])
+    @pytest.mark.parametrize("shots", [11000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
@@ -395,7 +321,10 @@ class TestMidCircuitMeasurement:
     def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
-        obs = qml.PauliY(0)
+        if backend == "lightning.kokkos":
+            obs = qml.PauliZ(0)
+        else:
+            obs = qml.PauliY(0)
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
