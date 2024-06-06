@@ -133,7 +133,7 @@ def dynamic_one_shot(qnode):
     Returns:
         qnode (QNode):
 
-        The transformed circuit to be run n-shot times such as to simulate dynamic execution.
+        The transformed circuit to be run ``num_shots`` times such as to simulate dynamic execution.
 
 
     **Example**
