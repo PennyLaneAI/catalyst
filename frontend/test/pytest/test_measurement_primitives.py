@@ -13,19 +13,29 @@
 # limitations under the License.
 import jax
 
-from catalyst.jax_primitives import sample_p, counts_p, expval_p, var_p, probs_p, state_p, compbasis_p
+from catalyst.jax_primitives import (
+    sample_p,
+    counts_p,
+    expval_p,
+    var_p,
+    probs_p,
+    state_p,
+    compbasis_p,
+)
+
 
 def test_sample():
     """Test that the sample primitive can be captured into jaxpr."""
 
     def f():
         obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots=5, shape=(5,0))
-    
+        return sample_p.bind(obs, shots=5, shape=(5, 0))
+
     jaxpr = jax.make_jaxpr(f)().jaxpr
     assert jaxpr.eqns[1].primitive == sample_p
-    assert jaxpr.eqns[1].params == {'shape': (5,0), "shots": 5}
-    assert jaxpr.eqns[1].outvars[0].aval.shape == (5,0)
+    assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
+    assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
+
 
 def test_counts():
     """Test that the counts primitive can be captured by jaxpr."""
@@ -36,51 +46,58 @@ def test_counts():
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == counts_p
-    assert jaxpr.eqns[1].params == {'shape': (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
     assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
 
+
 def test_expval():
     """Test that the expval primitive can be captured by jaxpr."""
+
     def f():
         obs = compbasis_p.bind()
         return expval_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == expval_p
-    assert jaxpr.eqns[1].params == {'shape': (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
+
 
 def test_var():
     """Test that the var primitive can be captured by jaxpr."""
+
     def f():
         obs = compbasis_p.bind()
         return var_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == var_p
-    assert jaxpr.eqns[1].params == {'shape': (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
 
 
 def test_probs():
     """Test that the var primitive can be captured by jaxpr."""
+
     def f():
         obs = compbasis_p.bind()
         return probs_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == probs_p
-    assert jaxpr.eqns[1].params == {'shape': (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
+
 
 def test_state():
     """Test that the state primitive can be captured by jaxpr."""
+
     def f():
         obs = compbasis_p.bind()
         return state_p.bind(obs, shots=5, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == state_p
-    assert jaxpr.eqns[1].params == {'shape': (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
