@@ -124,6 +124,10 @@
 * Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
   [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
 
+* The measurement primitives now have a standardized call signature so that `shots` and `shape` can
+  both be provided as keyword arguments.
+  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
+
 * Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not. 
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
@@ -231,6 +235,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Christina Lee,
 Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
