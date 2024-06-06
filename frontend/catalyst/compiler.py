@@ -16,6 +16,7 @@ MLIR/LLVM representations.
 """
 import glob
 import importlib
+import logging
 import os
 import pathlib
 import platform
@@ -31,9 +32,13 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.runtime_environment import get_lib_path
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 package_root = os.path.dirname(__file__)
 
@@ -108,6 +113,7 @@ class CompileOptions:
         return DEFAULT_PIPELINES
 
 
+@debug_logger
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
     """Run the command after optionally announcing this fact to the user.
 
@@ -258,6 +264,7 @@ class LinkerDriver:
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
     @staticmethod
+    @debug_logger
     def get_default_flags(options):
         """Re-compute the path where the libraries exist.
 
@@ -400,6 +407,7 @@ class LinkerDriver:
             return False
 
     @staticmethod
+    @debug_logger
     def get_output_filename(infile):
         """Rename object file to shared object
 
@@ -413,6 +421,7 @@ class LinkerDriver:
         return str(infile_path.with_suffix(".so"))
 
     @staticmethod
+    @debug_logger
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
@@ -446,10 +455,12 @@ class LinkerDriver:
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
+    @debug_logger_init
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
 
+    @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -510,6 +521,7 @@ class Compiler:
         self.last_compiler_output = compiler_output
         return output_filename, out_IR, [func_name, ret_type_name]
 
+    @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
@@ -534,6 +546,7 @@ class Compiler:
             **kwargs,
         )
 
+    @debug_logger
     def get_output_of(self, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:

@@ -428,7 +428,7 @@ class QCtrlCallable:
         if self.single_op:
             with QueuingManager.stop_recording():
                 base_op = self.op(*args, **kwargs)
-            return HybridControlledOp(
+            return Controlled(
                 base_op,
                 tracing_artifacts=tracing_artifacts,
                 control_wires=self.control_wires,
@@ -488,8 +488,8 @@ class HybridControlled(HybridOp):
             self._control_values = control_values
 
         # Calling `HyperOp.__init__` instead will raise the following `ValueError`
-        # in `HybridControlled.__init__` when is called indirectly from `HybridControlledOp`:
-        # "HybridControlledOp: wrong number of parameters. 0 parameters passed, 1 expected"
+        # in `HybridControlled.__init__` when is called indirectly from `Controlled`:
+        # "Controlled: wrong number of parameters. 0 parameters passed, 1 expected"
         # pylint: disable=unidiomatic-typecheck
         if type(self) is HybridControlled:
             Operation.__init__(self, wires=Wires(self.num_wires))
@@ -550,7 +550,7 @@ class HybridControlled(HybridOp):
         return self
 
 
-class HybridControlledOp(ControlledOp, HybridControlled):
+class Controlled(ControlledOp, HybridControlled):
     """
     This class inherits `qml.ops.op_math.controlled.ControlledOp` to provide identical support as
     PL for calculating the control of single operations. It is also derived from `HybridControlled`

@@ -976,7 +976,7 @@ class TestControlledMiscMethods:
 
 
 class TestControlledOperationProperties:
-    """Test HybridControlledOp specific properties."""
+    """Test Controlled specific properties."""
 
     # pylint:disable=no-member
 
@@ -1289,7 +1289,7 @@ pauli_x_based_op_decomps = [
 
 
 class TestDecomposition:
-    """Test decomposition of HybridControlledOp."""
+    """Test decomposition of Controlled."""
 
     @pytest.mark.parametrize(
         "target, decomp",

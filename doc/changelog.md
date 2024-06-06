@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
+
 * Support for disabling Autograph for a specific function or
   only for the function calls inside a specific context,
   without affecting the bare code inside such context.
@@ -131,6 +134,9 @@
   each pipeline.
   [(#772)](https://github.com/PennyLaneAI/catalyst/pull/772)
 
+* Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
+  [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
@@ -146,6 +152,9 @@
 * Correctly linking openblas routines necessary for `jax.scipy.linalg.expm`.
   In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
   [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
+
+* Correctly recording types of constant array when lowering `catalyst.grad` to mlir
+  [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 <h3>Internal changes</h3>
 
