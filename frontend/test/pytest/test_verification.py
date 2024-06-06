@@ -253,7 +253,7 @@ class TestObservableValidation:
                 [qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]))],
                 None,
             ),  # legacy hamiltonian
-            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(2.3, 1)]))], "PauliX2"),
+            ([qml.expval(qml.ops.Hamiltonian([2, 3], [qml.Y(0), PauliX2(1)]))], "PauliX2"),
             ([qml.sample(), qml.expval(qml.X(0))], None),  # with empty sample
             ([qml.sample(), qml.expval(qml.RX(1.2, 0))], "RX"),
             ([qml.sample(qml.X(0)), qml.expval(qml.X(0))], None),  # with sample with observable
