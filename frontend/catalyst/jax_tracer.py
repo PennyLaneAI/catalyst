@@ -117,9 +117,9 @@ def _make_execution_config(qnode):
     else:
         _gradient_method = None
 
-    return qml.devices.ExecutionConfig(
-        gradient_method=_gradient_method,
-    )
+    execution_config = qml.devices.DefaultExecutionConfig
+    execution_config.gradient_method = _gradient_method
+    return execution_config
 
 
 class Function:
@@ -911,7 +911,6 @@ def trace_quantum_function(
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-            
             if isinstance(device, qml.devices.Device):
                 config = _make_execution_config(qnode)
                 device_program, config = device.preprocess(ctx, config)

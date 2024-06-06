@@ -104,6 +104,7 @@ def test_qjit_device():
         transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
     assert len(transform_program) == 2
+    assert transform_program[-1]._transform.__name__ == "verify_operations"
 
     # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
