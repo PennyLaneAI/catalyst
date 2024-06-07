@@ -427,7 +427,7 @@ class HybridAdjoint(HybridOp):
 
     binder = adjoint_p.bind
 
-    # pylint: disable=super-init-not-called,non-parent-init-called
+    # pylint: disable=super-init-not-called
     def __init__(self, in_classical_tracers, out_classical_tracers, regions):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
@@ -614,7 +614,7 @@ class CtrlCallable:
 class HybridCtrl(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
-    # pylint: disable=super-init-not-called, too-many-arguments, non-parent-init-called
+    # pylint: disable=super-init-not-called, too-many-arguments
     def __init__(
         self,
         in_classical_tracers,
@@ -706,13 +706,13 @@ class Controlled:
     ctrl instances with only a single base operation. Additionally, it provides the same
     functionality as HybridCtrl."""
 
-    def __new__(cls, base, _tracing_artifacts=None, *_, **__):
+    def __new__(cls, base, *_, **__):
         if isinstance(base, Operation):
             return object.__new__(ControlledOp)
 
         return object.__new__(ControlledBase)
 
-    # pylint: disable=too-many-arguments,abstract-method
+    # pylint: disable=too-many-arguments
     def __init__(
         self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
     ):
