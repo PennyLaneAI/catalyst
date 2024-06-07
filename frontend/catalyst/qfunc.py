@@ -33,7 +33,6 @@ from pennylane.measurements import (
 )
 from pennylane.transforms.dynamic_one_shot import (
     init_auxiliary_tape,
-    is_mcm,
     parse_native_mid_circuit_measurements,
 )
 
