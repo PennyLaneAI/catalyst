@@ -481,6 +481,10 @@ def trace_quantum_tape(
 
     for op in ops:
         qrp2 = None
+        # We need to exclude HybridCtrl here because single-op control instances are kept
+        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
+        # but should be translated to JAXPR as a regular PennyLane Controlled op.
+        # Native HybridCtrl operations are not yet supported in the compiler.
         if isinstance(op, HybridOp) and not isinstance(
             op, catalyst.api_extensions.quantum_operators.HybridCtrl
         ):
