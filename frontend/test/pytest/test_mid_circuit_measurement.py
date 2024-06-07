@@ -21,7 +21,8 @@ import pennylane as qml
 import pytest
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
-from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
+import catalyst
+from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -228,7 +229,7 @@ class TestMidCircuitMeasurement:
         param = np.pi / 4
 
         @qjit
-        @dynamic_one_shot
+        @catalyst.qfunc.dynamic_one_shot
         @qml.qnode(dev)
         def func(x):
             qml.RX(x, wires=0)
@@ -248,7 +249,7 @@ class TestMidCircuitMeasurement:
         param = np.pi / 4 * jnp.ones(2)
 
         @qjit
-        @dynamic_one_shot
+        @catalyst.qfunc.dynamic_one_shot
         @qml.qnode(dev)
         def func(x, y):
             qml.RX(x, wires=0)
@@ -269,7 +270,7 @@ class TestMidCircuitMeasurement:
         dev = qml.device(backend, wires=1, shots=shots)
 
         @qjit
-        @dynamic_one_shot
+        @catalyst.qfunc.dynamic_one_shot
         @qml.qnode(dev)
         def circuit(x):
             qml.RY(x, wires=0)
@@ -326,7 +327,7 @@ class TestMidCircuitMeasurement:
         dev = qml.device(backend, wires=2, shots=shots)
 
         @qjit
-        @dynamic_one_shot
+        @catalyst.qfunc.dynamic_one_shot
         @qml.qnode(dev)
         def func(x, y):
             qml.RX(x, 0)
@@ -400,7 +401,7 @@ class TestMidCircuitMeasurement:
         dev = qml.device(backend, wires=2, shots=shots)
 
         @qjit
-        @dynamic_one_shot
+        @catalyst.qfunc.dynamic_one_shot
         @qml.qnode(dev)
         def func(x, y):
             qml.RX(x, 0)
