@@ -241,6 +241,27 @@ class TestMidCircuitMeasurement:
         ):
             func(param)
 
+    def test_dynamic_one_shot_unsupported_broadcast(self, backend):
+        """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+        param = np.pi / 4 * jnp.ones(2)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, wires=0)
+            _ = measure(0)
+            qml.RX(y, wires=0)
+            return qml.probs(wires=0)
+
+        with pytest.raises(
+            ValueError,
+            match="mcm_method='one-shot' is not compatible with broadcasting",
+        ):
+            func(param, param)
+
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qml.sample and shots."""
