@@ -131,7 +131,30 @@ def test_qjit_device_no_wires():
     backend_info = extract_backend_info(device, capabilities)
 
     with pytest.raises(
-        AttributeError, match="Catalyst does not support devices without set wires."
+        AttributeError, match="Catalyst does not support device instances without set wires."
+    ):
+        QJITDeviceNewAPI(device, capabilities, backend_info)
+
+
+@pytest.mark.parametrize(
+    "wires",
+    (
+        qml.wires.Wires(["a", "b"]),
+        qml.wires.Wires([0, 2, 4]),
+        qml.wires.Wires([1, 2, 3]),
+    ),
+)
+def test_qjit_device_invalid_wires(wires):
+    """Test the qjit device from a device using the new api without wires set."""
+    device = DummyDeviceNoWires(shots=2032)
+    device._wires = wires
+
+    # Create qjit device
+    capabilities = get_device_capabilities(device, ProgramFeatures(device.shots is not None))
+    backend_info = extract_backend_info(device, capabilities)
+
+    with pytest.raises(
+        AttributeError, match="Catalyst requires continuous integer wire labels starting at 0"
     ):
         QJITDeviceNewAPI(device, capabilities, backend_info)
 

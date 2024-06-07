@@ -86,6 +86,13 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
+  only integer, continuous wire labels starting at 0 are allowed.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
+* Catalyst no longer disallows quantum circuits with 0 qubits.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
 * Catalyst's adjoint method is now fully compatible with the PennyLane equivalent when applied to
   a single Operator. This should lead to improved compatibility with PennyLane library code, as well
   when reusing quantum functions with both Catalyst and PennyLane.
@@ -144,6 +151,10 @@
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
+
+* The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
+  register.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
 * Correctly querying batching rules for `jax.scipy.linalg.expm`
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
