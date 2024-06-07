@@ -19,7 +19,6 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
-from flaky import flaky
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
@@ -176,7 +175,8 @@ class TestMidCircuitMeasurement:
         """Test measure (reset = True)."""
 
         pytest.xfail(
-            "'postselect_mode' hardcoded to 'hw-like' and hence postselect is ignore during execution"
+            "'postselect_mode' hardcoded to 'hw-like' and hence postselect"
+            " is ignore during execution"
         )
 
         @qjit
@@ -260,8 +260,7 @@ class TestMidCircuitMeasurement:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
-    @flaky(max_runs=5)
-    @pytest.mark.parametrize("shots", [3000])
+    @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
@@ -287,7 +286,7 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq, postselect_mode="hw-like")
+        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
@@ -302,11 +301,6 @@ class TestMidCircuitMeasurement:
             if measure_f == qml.counts:
                 kwargs["all_outcomes"] = True
             return measure_f(**kwargs)
-
-        if postselect and measure_f in (qml.counts, qml.sample):
-            ref_func = qml.dynamic_one_shot(ref_func)
-        else:
-            ref_func = qml.defer_measurements(ref_func)
 
         dev = qml.device(backend, wires=2, shots=shots)
 
@@ -331,7 +325,11 @@ class TestMidCircuitMeasurement:
             kwargs = {meas_key: meas_value}
             return measure_f(**kwargs)
 
-        params = jnp.pi / 2.1 * jnp.ones(2)
+        if measure_f in (qml.expval,):
+            params = jnp.pi / 3 * jnp.ones(2)
+        else:
+            params = jnp.pi / 2.1 * jnp.ones(2)
+
         results0 = ref_func(*params)
         results1 = func(*params)
         if measure_f == qml.counts:
@@ -345,7 +343,7 @@ class TestMidCircuitMeasurement:
             results1 = results1[results1 != fill_in_value]
         validate_measurements(measure_f, shots, results1, results0)
 
-    @pytest.mark.parametrize("shots", [3000])
+    @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
     def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
@@ -358,7 +356,7 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq, postselect_mode="hw-like")
+        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
@@ -377,11 +375,6 @@ class TestMidCircuitMeasurement:
                 qml.sample(op=m0),
                 qml.expval(obs),
             )
-
-        if postselect is None:
-            ref_func = qml.defer_measurements(ref_func)
-        else:
-            ref_func = qml.dynamic_one_shot(ref_func)
 
         dev = qml.device(backend, wires=2, shots=shots)
 
@@ -422,7 +415,7 @@ class TestMidCircuitMeasurement:
             qml.sample,
             qml.expval,
         )
-        params = jnp.pi / 2.1 * jnp.ones(2)
+        params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
         for m, r1, r0 in zip(measures, results1, results0):

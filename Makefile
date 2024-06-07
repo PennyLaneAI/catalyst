@@ -258,6 +258,11 @@ ifeq ($(shell test $(BLACKVERSIONMAJOR) -eq 22 -a $(BLACKVERSIONMINOR) -lt 10; e
 endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
+	$(MAKE) format-frontend
+	pylint frontend
+
+.PHONY: format-frontend
+format-frontend:
 ifdef check
 	$(PYTHON) ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
@@ -267,7 +272,6 @@ else
 	black .
 	isort .
 endif
-	pylint frontend
 
 .PHONY: docs clean-docs
 docs:
