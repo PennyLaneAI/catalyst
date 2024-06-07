@@ -25,7 +25,7 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.operation import Operation
-from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 from catalyst.tracing.contexts import EvaluationContext
@@ -87,7 +87,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
     from catalyst.api_extensions import MidCircuitMeasure
-    from catalyst.api_extensions.quantum_operators import Adjoint, QCtrl
+    from catalyst.api_extensions.quantum_operators import Adjoint, HybridAdjoint, QCtrl
     from catalyst.jax_tracer import HybridOp
 
     def _paramshift_op_checker(op):
@@ -128,7 +128,12 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         return True if isinstance(op, QCtrl) else in_qctrl
 
     def _inv_op_checker(op, in_inverse):
-        if in_inverse:
+        if isinstance(op, Adjoint):
+            # if the operator just is Adjoint, check its base is invertible
+            if not qjit_device.qjit_capabilities.native_ops.get(op.name):
+                return _inv_op_checker(op.base, in_inverse=True)
+        elif in_inverse:
+            # if we are inside a tape on a HybridAdjoint, check that the operators is invertible
             op_name = (
                 op.base.name
                 if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}
@@ -140,12 +145,12 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 raise CompileError(
                     f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
                 )
-        return True if isinstance(op, Adjoint) else in_inverse
+        return True if isinstance(op, HybridAdjoint) else in_inverse
 
     def _op_checker(op, state):
 
         # all non-controlled ops are in the native ops of the device
-        if isinstance(op, (Controlled, QCtrl, Adjoint)):
+        if isinstance(op, (Controlled, QCtrl, Adjoint, HybridAdjoint)):
             # Controlled and QCtrl are checked in _ctrl_op_checker
             # Adjoint is checked in _inv_op_checker
             pass
