@@ -30,7 +30,7 @@ from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
 import jax
 
-from catalyst.jax_primitives import python_callback_p
+from catalyst.jax_primitives import CALLBACK_OP_CACHE, python_callback_p
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jnp_to_memref import (
@@ -274,6 +274,7 @@ class FlatCallable:
 def clear_callback_cache():
     """Clear the memref callable cache"""
     MemrefCallable.CACHE.clear()
+    CALLBACK_OP_CACHE.clear()
 
 
 class MemrefCallable(FlatCallable):
