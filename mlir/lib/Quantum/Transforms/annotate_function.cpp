@@ -17,6 +17,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/IR/SymbolTable.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
@@ -36,19 +37,23 @@ bool isAnnotated(FunctionOpInterface op, const char *attr)
 
 bool invalidGradientOperation(FunctionOpInterface op)
 {
-    auto res = op.walk([](Operation *o) {
+    ModuleOp mod = op->getParentOfType<ModuleOp>();
+    auto res = op.walk([&](Operation *o) {
         if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
-        else if (auto callback = dyn_cast<catalyst::CallbackCallOp>(o)) {
+        else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
             bool isDifferentiated = false;
-            for (Operation *user : callback->getUsers()) {
+            auto callee = callbackCall.getCalleeAttr();
+            auto callback = SymbolTable::lookupNearestSymbolFrom(callbackCall, callee);
+            auto uses = *SymbolTable::getSymbolUses(callback, mod);
+            for (SymbolTable::SymbolUse use : uses) {
+                Operation *user = use.getUser();
                 if (auto customGrad = dyn_cast<catalyst::gradient::CustomGradOp>(user)) {
-                    isDifferentiated |= customGrad.getCallee() == callback.getCallee();
+                    isDifferentiated |= customGrad.getCalleeAttr() == callee;
                 }
                 if (isDifferentiated) break;
             }
-
             if (!isDifferentiated) {
                 return WalkResult::interrupt();
             }
