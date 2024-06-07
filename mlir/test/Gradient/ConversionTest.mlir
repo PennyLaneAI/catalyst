@@ -51,6 +51,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 // CHECK-LABEL: @test0
 module @test0 {
   memref.global "private" constant @__constant_xf64 : memref<f64> = dense<1.000000e+00>
+  func.func private @callback_140505513630752(memref<f64>, memref<f64>)
   func.func private @fwd(%arg0: memref<f64>) -> (memref<f64>, memref<f64>) {
     %0 = memref.get_global @__constant_xf64 : memref<f64>
     %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
