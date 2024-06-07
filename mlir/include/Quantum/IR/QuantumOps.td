@@ -114,7 +114,7 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
 
     let arguments = (ins
         Optional<I64>:$nqubits,
-        OptionalAttr<ConfinedAttr<I64Attr, [IntMinValue<1>]>>:$nqubits_attr
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$nqubits_attr
     );
 
     let results = (outs
@@ -150,7 +150,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
     let arguments = (ins
         QuregType:$qreg,
         Optional<I64>:$idx,
-        OptionalAttr<ConfinedAttr<I64Attr, [IntMinValue<0>]>>:$idx_attr
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr
     );
 
     let results = (outs
@@ -173,7 +173,7 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
     let arguments = (ins
         QuregType:$in_qreg,
         Optional<I64>:$idx,
-        OptionalAttr<ConfinedAttr<I64Attr, [IntMinValue<0>]>>:$idx_attr,
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr,
         QubitType:$qubit
     );
 
