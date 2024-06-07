@@ -213,7 +213,7 @@ def dynamic_one_shot(qnode):
 
     def one_shot_wrapper(*args, **kwargs):
         single_shot_qnode.device._shots = (
-            1 if isinstance(qnode.device, qml.Device) else qml.measurements.Shots(1)
+            1 if isinstance(qnode.device, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
         )
         arg_vmap = jnp.empty((total_shots,), dtype=float)
 
