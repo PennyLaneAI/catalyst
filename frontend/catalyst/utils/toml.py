@@ -328,8 +328,8 @@ def get_device_toml_config(device) -> TOMLDocument:
         # The expected case: device specifies its own config.
         toml_file = device.config
     else:
-        # TODO: Remove this section when `qml.devices.LegacyDevice`s are guaranteed to have their own config file
-        # field.
+        # TODO: Remove this section when `qml.devices.LegacyDevice`s are guaranteed
+        # to have their own config file field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
         name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
