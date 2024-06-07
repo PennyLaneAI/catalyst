@@ -239,11 +239,8 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
 
     adj = AdjointCallable(f, lazy=lazy)
 
-    if isinstance(f, Operator):
-        # Return an instantiated version of the Adjoint class if we receive an operator instance.
-        adj = adj()
-
-    return adj
+    # Return an instantiated version of the Adjoint class if we receive an operator instance.
+    return adj() if isinstance(f, Operator) else adj
 
 
 def ctrl(
@@ -438,8 +435,8 @@ class HybridAdjoint(HybridOp):
         self.regions = regions
 
         # Only call the parent constructor if this class is initialized directly.
-        # Calling Operation.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
-        # class, because both Operation and SymbolicOp init methods are used. Since PL doesn't do
+        # Calling Operator.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
+        # class, because both Operator and SymbolicOp init methods are used. Since PL doesn't do
         # this either they are probably not meant to be initialized together.
         # pylint: disable=unidiomatic-typecheck
         if type(self) is HybridAdjoint:
@@ -636,7 +633,7 @@ class HybridCtrl(HybridOp):
         # "Controlled: wrong number of parameters. 0 parameters passed, 1 expected"
         # pylint: disable=unidiomatic-typecheck
         if type(self) is HybridCtrl:
-            Operation.__init__(self, wires=Wires(self.num_wires))
+            Operator.__init__(self, wires=Wires(self.num_wires))
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError(
@@ -747,10 +744,12 @@ class Controlled:
 
 # HybridCtrl is also mixed in because the PL class needs to sit between Controlled & HybridCtrl.
 # Thus Controlled cannot be made to inherit from HybridCtrl directly.
+# pylint: disable=abstract-method
 class ControlledOp(Controlled, pl_ctrl_module.ControlledOp, HybridCtrl):
     """Replicate mixin class structure from PennyLane for Operations."""
 
 
+# pylint: disable=abstract-method
 class ControlledBase(Controlled, pl_ctrl_module.Controlled, HybridCtrl):
     """Replicate mixin class structure from PennyLane for a general Operator type."""
 
