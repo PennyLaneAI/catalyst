@@ -245,6 +245,24 @@ class TestMidCircuitMeasurement:
         ):
             func(param)
 
+    def test_dynamic_one_shot_unsupported_none_shots(self, backend):
+        """Test that `dynamic_one_shot` raises when used with non-finite shots."""
+        dev = qml.device(backend, wires=1, shots=None)
+
+        with pytest.raises(
+            qml.QuantumFunctionError,
+            match="dynamic_one_shot is only supported with finite shots.",
+        ):
+
+            @qjit
+            @catalyst.qfunc.dynamic_one_shot
+            @qml.qnode(dev)
+            def _(x, y):
+                qml.RX(x, wires=0)
+                _ = measure(0)
+                qml.RX(y, wires=0)
+                return qml.probs(wires=0)
+
     def test_dynamic_one_shot_unsupported_broadcast(self, backend):
         """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
         shots = 10
@@ -300,12 +318,6 @@ class TestMidCircuitMeasurement:
         ):
             pytest.skip("Can't use observables with counts, probs or sample")
 
-        if measure_f == qml.var:
-            pytest.xfail(
-                "`qml.var` requires an auxiliary measurement `qml.sample(obs)`"
-                " which isn't possible in Catalyst"
-            )
-
         if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
@@ -354,6 +366,11 @@ class TestMidCircuitMeasurement:
             params = jnp.pi / 3 * jnp.ones(2)
         else:
             params = jnp.pi / 2.1 * jnp.ones(2)
+
+        if measure_f == qml.var and not isinstance(meas_obj, str):
+            with pytest.raises(TypeError, match=f"qml.var\\(obs\\) cannot be returned when"):
+                func(*params)
+            return
 
         results0 = ref_func(*params)
         results1 = func(*params)

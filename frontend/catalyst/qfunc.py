@@ -167,6 +167,9 @@ def dynamic_one_shot(qnode):
 
     def transform_to_single_shot(qnode):
 
+        if not qnode.device.shots:
+            raise qml.QuantumFunctionError("dynamic_one_shot is only supported with finite shots.")
+
         @qml.transform
         def dynamic_one_shot_partial(
             tape: qml.tape.QuantumTape,
@@ -183,6 +186,11 @@ def dynamic_one_shot(qnode):
                     raise TypeError(
                         f"Native mid-circuit measurement mode does not support {type(m).__name__} "
                         "measurements."
+                    )
+                if isinstance(m, VarianceMP) and m.obs:
+                    raise TypeError(
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
+                        "the Catalyst compiler does not handle qml.sample(obs)."
                     )
 
             if tape.batch_size is not None:
