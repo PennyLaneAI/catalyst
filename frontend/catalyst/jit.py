@@ -19,6 +19,7 @@ compilation of hybrid quantum-classical functions using Catalyst.
 import copy
 import functools
 import inspect
+import logging
 import os
 import warnings
 
@@ -35,6 +36,7 @@ from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -50,6 +52,9 @@ from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
 setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: id(x))
@@ -60,6 +65,7 @@ jax.config.update("jax_enable_x64", True)
 
 
 ## API ##
+@debug_logger
 def qjit(
     fn=None,
     *,
@@ -457,6 +463,7 @@ class QJIT:
 
     """
 
+    @debug_logger_init
     def __init__(self, fn, compile_options):
         self.original_function = fn
         self.compile_options = compile_options
@@ -497,6 +504,7 @@ class QJIT:
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
 
+    @debug_logger
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
@@ -516,6 +524,7 @@ class QJIT:
 
         return self.run(args, kwargs)
 
+    @debug_logger
     def aot_compile(self):
         """Compile Python function on initialization using the type hint signature."""
 
@@ -538,6 +547,7 @@ class QJIT:
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
+    @debug_logger
     def jit_compile(self, args):
         """Compile Python function on invocation using the provided arguments.
 
@@ -591,6 +601,7 @@ class QJIT:
     # Processing Stages #
 
     @instrument
+    @debug_logger
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         processed_fn = self.original_function
@@ -601,6 +612,7 @@ class QJIT:
         return processed_fn
 
     @instrument(size_from=0)
+    @debug_logger
     def capture(self, args):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
@@ -632,6 +644,7 @@ class QJIT:
         return jaxpr, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
+    @debug_logger
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
 
@@ -656,6 +669,7 @@ class QJIT:
         return mlir_module, mlir_string
 
     @instrument(size_from=1, has_finegrained=True)
+    @debug_logger
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
 
@@ -684,6 +698,7 @@ class QJIT:
         return compiled_fn, llvm_ir
 
     @instrument(has_finegrained=True)
+    @debug_logger
     def run(self, args, kwargs):
         """Invoke a previously compiled function with the supplied arguments.
 
@@ -740,6 +755,7 @@ class JAX_QJIT:
         qjit_function (QJIT): the compiled quantum function object to wrap
     """
 
+    @debug_logger_init
     def __init__(self, qjit_function):
         @jax.custom_jvp
         def jaxed_function(*args, **kwargs):
@@ -751,6 +767,7 @@ class JAX_QJIT:
         jaxed_function.defjvp(self.compute_jvp, symbolic_zeros=True)
 
     @staticmethod
+    @debug_logger
     def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
         data = jax.pure_callback(
@@ -761,6 +778,7 @@ class JAX_QJIT:
         assert qjit_function.out_treedef is not None, "PyTree shape must not be none."
         return tree_unflatten(qjit_function.out_treedef, data)
 
+    @debug_logger
     def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
 
@@ -791,6 +809,7 @@ class JAX_QJIT:
         )
         return self.derivative_functions[argnum_key]
 
+    @debug_logger
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
         # Assume we have primals of shape `[a,b]` and results of shape `[c,d]`. Derivatives [2]
@@ -829,5 +848,6 @@ class JAX_QJIT:
 
         return results, jvps
 
+    @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)

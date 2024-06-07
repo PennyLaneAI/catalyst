@@ -16,6 +16,7 @@
 This module contains device stubs for the old and new PennyLane device API, which facilitate
 the application of decomposition and other device pre-processing routines.
 """
+import logging
 import os
 import pathlib
 import platform
@@ -34,6 +35,7 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
 )
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
@@ -43,6 +45,9 @@ from catalyst.utils.toml import (
     intersect_operations,
     pennylane_operation_set,
 )
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 RUNTIME_OPERATIONS = [
     "CNOT",
@@ -105,10 +110,11 @@ class BackendInfo:
     kwargs: Dict[str, Any]
 
 
+# pylint: disable=too-many-branches
+@debug_logger
 def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
-    # pylint: disable=too-many-branches
 
     dname = device.name
     if isinstance(device, qml.Device):
@@ -167,6 +173,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
 
+@debug_logger
 def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
@@ -205,7 +212,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     if all(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_config.native_ops.update(
             {
-                "Adjoint": OperationProperties(
+                "HybridAdjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
@@ -245,6 +252,7 @@ class QJITDevice(qml.QubitDevice):
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
         return {"MultiControlledX", "BlockEncode"}
 
+    @debug_logger_init
     def __init__(
         self,
         original_device_capabilities: DeviceCapabilities,
@@ -278,6 +286,7 @@ class QJITDevice(qml.QubitDevice):
         """
         raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
 
+    @debug_logger
     def default_expand_fn(self, circuit, max_expansion=10):
         """
         Most decomposition logic will be equivalent to PennyLane's decomposition.
@@ -346,6 +355,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
+    @debug_logger_init
     def __init__(
         self,
         original_device,
@@ -382,6 +392,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """Get the device measurement processes"""
         return self.qjit_capabilities.measurement_processes
 
+    @debug_logger
     def preprocess(
         self,
         ctx,
@@ -458,6 +469,7 @@ def check_no_overlap(*args, device_name):
     raise CompileError(msg)
 
 
+@debug_logger
 def validate_device_capabilities(
     device: qml.QubitDevice, device_capabilities: DeviceCapabilities
 ) -> None:
