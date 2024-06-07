@@ -262,6 +262,8 @@ class QJITDevice(qml.QubitDevice):
     ):
         super().__init__(wires=wires, shots=shots)
 
+        check_device_wires(self.wires)
+
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
         self.backend_kwargs = backend.kwargs if backend else {}
@@ -365,8 +367,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        if original_device.wires is None:
-            raise AttributeError("Catalyst does not support devices without set wires.")
+        check_device_wires(original_device.wires)
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
@@ -527,3 +528,17 @@ def validate_device_capabilities(
                 "Observables in qml.device.observables and specification file do not match.\n"
                 f"Observables that present only in spec: {spec_observables - device_observables}\n"
             )
+
+
+def check_device_wires(wires):
+    """Validate requirements Catalyst imposes on device wires."""
+    if wires is None:
+        raise AttributeError("Catalyst does not support device instances without set wires.")
+
+    assert isinstance(wires, qml.wires.Wires)
+
+    if not all(isinstance(wire, int) for wire in wires.labels):
+        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+
+    if not wires.labels == tuple(range(len(wires))):
+        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")

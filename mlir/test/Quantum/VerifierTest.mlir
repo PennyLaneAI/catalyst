@@ -39,12 +39,12 @@ quantum.dealloc %r1 : !quantum.reg
 
 // -----
 
-// expected-error @below {{failed to satisfy constraint: 64-bit signless integer attribute whose minimum value is 1}}
-%r = quantum.alloc(0) : !quantum.reg
+// expected-error @below {{failed to satisfy constraint: 64-bit signless integer attribute whose value is non-negative}}
+%r = quantum.alloc(-1) : !quantum.reg
 
 // -----
 
-// expected-error @+2 {{failed to satisfy constraint: 64-bit signless integer attribute whose minimum value is 0}}
+// expected-error @+2 {{failed to satisfy constraint: 64-bit signless integer attribute whose value is non-negative}}
 %r = quantum.alloc(5) : !quantum.reg
 %q = quantum.extract %r[-1] : !quantum.reg -> !quantum.bit
 
