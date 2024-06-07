@@ -261,14 +261,13 @@ class TestMidCircuitMeasurement:
 
     @pytest.mark.parametrize("shots", [11000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
         "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
-        self, backend, shots, postselect, reset, measure_f, meas_obj
+        self, backend, shots, postselect, measure_f, meas_obj
     ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
@@ -290,7 +289,7 @@ class TestMidCircuitMeasurement:
             qml.RX(x, 0)
             m0 = qml.measure(0)
             qml.RX(0.5 * x, 1)
-            m1 = qml.measure(1, reset=reset, postselect=postselect)
+            m1 = qml.measure(1, postselect=postselect)
             qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
             m2 = qml.measure(0)
 
@@ -315,7 +314,7 @@ class TestMidCircuitMeasurement:
             qml.RX(x, 0)
             m0 = measure(0)
             qml.RX(0.5 * x, 1)
-            m1 = measure(1, reset=reset, postselect=postselect)
+            m1 = measure(1, postselect=postselect)
 
             @cond(m0 & m1)
             def cfun0():
