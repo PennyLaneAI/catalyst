@@ -35,7 +35,6 @@ def get_custom_qjit_device(num_wires, discards, additions):
     class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
-        # name = "Custom Device"
         name = "lightning.qubit"
         pennylane_requires = "0.35.0"
         version = "0.0.2"

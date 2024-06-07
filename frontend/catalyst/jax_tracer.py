@@ -770,7 +770,6 @@ def apply_transform(
         total_program = qnode_program + device_program + verification_program
     else:
         is_valid_for_batch = True
-        # Apply the identity transform in order to keep generalization
         total_program = device_program + verification_program
 
     tapes, post_processing = total_program([tape])
