@@ -149,6 +149,7 @@ def measure(
 
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+    # TODO: Move these values into separate attributes of the MidCircuitMeasure class
     in_classical_tracers.append(postselect)
     in_classical_tracers.append(reset)
 
