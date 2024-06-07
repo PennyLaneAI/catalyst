@@ -468,7 +468,7 @@ def trace_quantum_tape(
         return qrp
 
     qrp = QRegPromise(qreg)
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         ops = device.expand_fn(quantum_tape)
     else:
         ops = quantum_tape
@@ -614,7 +614,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         shots = device.shots
     else:
         # TODO: support shot vectors
@@ -623,7 +623,7 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
-            if isinstance(device, qml.Device):
+            if isinstance(device, qml.devices.LegacyDevice):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
                 m_wires = o.wires if o.wires else range(len(device.wires))

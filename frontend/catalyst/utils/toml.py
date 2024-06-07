@@ -328,11 +328,11 @@ def get_device_toml_config(device) -> TOMLDocument:
         # The expected case: device specifies its own config.
         toml_file = device.config
     else:
-        # TODO: Remove this section when `qml.Device`s are guaranteed to have their own config file
+        # TODO: Remove this section when `qml.devices.LegacyDevice`s are guaranteed to have their own config file
         # field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
-        name = device.short_name if isinstance(device, qml.Device) else device.name
+        name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
         toml_file_name = name.replace(".", "_") + ".toml"
@@ -361,7 +361,9 @@ def get_device_capabilities(
         program_features = (
             program_features if program_features else ProgramFeatures(device.shots is not None)
         )
-        device_name = device.short_name if isinstance(device, qml.Device) else device.name
+        device_name = (
+            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+        )
         device_config = get_device_toml_config(device)
         return load_device_capabilities(device_config, program_features, device_name)
 

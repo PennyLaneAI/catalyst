@@ -395,7 +395,6 @@ class MidCircuitMeasure(HybridOp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bypass_postselect = kwargs.pop("bypass_postselect", False)
         self.postselect = self.in_classical_tracers[-2]
         self.reset = self.in_classical_tracers[-1]
 
@@ -403,8 +402,8 @@ class MidCircuitMeasure(HybridOp):
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        postselect = op.in_classical_tracers[1]
         qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+        # postselect = op.in_classical_tracers[1]
         # qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
         qrp.insert([wire], [qubit2])
         return qrp
