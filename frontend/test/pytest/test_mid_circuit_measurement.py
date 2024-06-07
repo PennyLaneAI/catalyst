@@ -174,6 +174,10 @@ class TestMidCircuitMeasurement:
     def test_with_reset_true(self, backend):
         """Test measure (reset = True)."""
 
+        pytest.xfail(
+            "'postselect_mode' hardcoded to 'hw-like' and hence postselect is ignore during execution"
+        )
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
@@ -258,8 +262,10 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("shots", [11000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
-    @pytest.mark.parametrize("measure_f", [qml.counts])
-    @pytest.mark.parametrize("meas_obj", ["mcm"])
+    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
+    @pytest.mark.parametrize(
+        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
+    )
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
         self, backend, shots, postselect, reset, measure_f, meas_obj

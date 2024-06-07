@@ -167,8 +167,6 @@ def dynamic_one_shot(qnode):
     aux_tapes = None
 
     def transform_to_single_shot(qnode):
-        nonlocal cpy_tape
-        nonlocal aux_tapes
 
         @qml.transform
         def dynamic_one_shot_partial(
