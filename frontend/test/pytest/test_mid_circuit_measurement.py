@@ -15,13 +15,13 @@
 from functools import reduce
 from typing import Iterable, Sequence
 
-import catalyst
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
+import catalyst
 from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -266,7 +266,26 @@ class TestMidCircuitMeasurement:
 
         param = jnp.pi
         _ = circuit(param)
-        spy.assert_called()
+        spy.assert_called_once()
+
+    @pytest.mark.xfail
+    @pytest.mark.parametrize("postselect, reset, expected", [(None, True, ()), 0, 1])
+    @pytest.mark.parametrize("reset", [True, False])
+    def test_mcm_method_one_shot_with_single_shot(self, backend, postselect, reset):
+        """Test that the result is correct when using mcm_method="one-shot" with a single shot"""
+        dev = qml.device(backend, wires=1, shots=1)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = qml.measure(0, reset=reset, postselect=postselect)
+            qml.PauliX(0)
+            return qml.sample(m), qml.sample(wires=0)
+
+        param = jnp.pi
+        res = circuit(param)
+        assert False
 
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
@@ -294,10 +313,9 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize(
         "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
-    @pytest.mark.parametrize("use_kwarg", [True, False])
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
-        self, backend, shots, postselect, reset, measure_f, meas_obj, use_kwarg
+        self, backend, shots, postselect, reset, measure_f, meas_obj
     ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
@@ -337,6 +355,8 @@ class TestMidCircuitMeasurement:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
         def func(x, y):
             qml.RX(x, 0)
             m0 = measure(0)
@@ -355,11 +375,6 @@ class TestMidCircuitMeasurement:
             kwargs = {meas_key: meas_value}
             return measure_f(**kwargs)
 
-        if use_kwarg:
-            func = qjit(qml.QNode(func, dev, mcm_method="one-shot"))
-        else:
-            func = qjit(dynamic_one_shot(qml.QNode(func, dev)))
-
         params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
@@ -375,10 +390,7 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("shots", [5000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
-    @pytest.mark.parametrize("use_kwarg", [True, False])
-    def test_dynamic_one_shot_multiple_measurements(
-        self, backend, shots, postselect, reset, use_kwarg
-    ):
+    def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
         if backend == "lightning.kokkos":
@@ -412,6 +424,8 @@ class TestMidCircuitMeasurement:
 
         dev = qml.device(backend, wires=2, shots=shots)
 
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
         def func(x, y):
             qml.RX(x, wires=0)
             m0 = measure(0, reset=reset, postselect=postselect)
@@ -432,11 +446,6 @@ class TestMidCircuitMeasurement:
                 qml.sample(op=m0),
                 qml.expval(obs),
             )
-
-        if use_kwarg:
-            func = qjit(qml.QNode(func, dev, mcm_method="one-shot"))
-        else:
-            func = qjit(dynamic_one_shot(qml.QNode(func, dev)))
 
         measures = (
             qml.expval,

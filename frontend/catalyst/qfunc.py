@@ -92,13 +92,13 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         mcm_config = self.execute_kwargs["mcm_config"]
+        if mcm_config["mcm_method"] is None:
+            mcm_config["mcm_method"] = "single-branch-statistics"
         total_shots = (
             self.device.shots
             if isinstance(self.device, qml.devices.LegacyDevice)
             else self.device.shots.total_shots
         )
-        if total_shots is not None and mcm_config["mcm_method"] is None:
-            mcm_config["mcm_method"] = "one-shot"
         if mcm_config["mcm_method"] == "deferred":
             raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
         if mcm_config["mcm_method"] == "one_shot":
