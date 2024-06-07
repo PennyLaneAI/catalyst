@@ -42,22 +42,18 @@ from catalyst.utils.jnp_to_memref import (
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
-class CustomGradAbleCallback:
+class CallbackWithCustomGrad:
+    """A callback with a custom grad"""
 
-    def __init__(self, func, restype):
+    def __init__(self, func, restype, forward, reverse):
+        assert func and forward and reverse
         self.func = func
         self.restype = restype
-        self._fwd = None
+        self._fwd = forward
         self._fwd_jaxpr = None
-        self._bwd = None
+        self._bwd = reverse
         self._bwd_jaxpr = None
         self.callback = None
-
-    def fwd(self, func, restype=None):
-        self._fwd = func
-
-    def bwd(self, func, restype=None):
-        self._bwd = func
 
     def __call__(self, *args, **kwargs):
         if self.callback:
@@ -72,26 +68,6 @@ class CustomGradAbleCallback:
         # the pure_callback implementation.
         self.callback = base_callback(closure, custom_grad=self)
 
-        # No custom gradient specified:
-        # we will let either the frontend verification or the middle end
-        # verification check whether or not we are taking the derivative
-        # of this pure_callback. For now, since we don't have them, we just
-        # assume the user will never request the gradient of this pure_callback.
-        no_custom_grad = all(map(not_, [self._fwd, self._bwd]))
-        if no_custom_grad:
-            return self.callback(*args, **kwargs)
-
-        incomplete_grad = not all([self._fwd, self._bwd])
-        if incomplete_grad:
-            # If we are here, then we have either _fwd and _bwd but not both
-            msg = f"Function {self.func} differentiated but missing "
-            msg += "forward" if not self._fwd else "reverse"
-            msg += " pass"
-            raise DifferentiableCompileError(msg)
-
-        # Here, we are guaranteed that forward and reverse passes are
-        # available.
-        #
         # The arguments here are tracers.
         # And we want to just get the abstraction of the tracers (i.e., the types)
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
@@ -108,6 +84,48 @@ class CustomGradAbleCallback:
         # The input for the bwd pass is the residuals and the cotangents.
         self._bwd_jaxpr = jax.make_jaxpr(self._bwd)(residuals, cotangents)
 
+        return self.callback(*args, **kwargs)
+
+
+class CallbackWithPotentialCustomGrad:
+    """A callback which is not guaranteed to have a custom grad,
+    but the user may define one. E.g., a pure_callback is not required
+    to have a custom grad if it is never differentiated, but a user
+    may register one. A debug.callback will never have a custom grad."""
+
+    def __init__(self, func, restype):
+        self.func = func
+        self.restype = restype
+        self._fwd = None
+        self._bwd = None
+        self.callback = None
+
+    def fwd(self, func):
+        self._fwd = func
+
+    def bwd(self, func):
+        self._bwd = func
+
+    def __call__(self, *args, **kwargs):
+        incomplete_grad = bool(self._fwd) != bool(self._bwd)
+        if incomplete_grad:
+            # If we are here, then we have either _fwd and _bwd but not both
+            msg = f"Function {self.func} differentiated but missing "
+            msg += "forward" if not self._fwd else "reverse"
+            msg += " pass"
+            raise DifferentiableCompileError(msg)
+
+        if self.callback:
+            return self.callback(*args, **kwargs)
+
+        if self._fwd and self._bwd:
+            self.callback = CallbackWithCustomGrad(self.func, self.restype, self._fwd, self._bwd)
+            return self.callback(*args, **kwargs)
+
+        def closure(*args, **kwargs) -> self.restype:
+            return self.func(*args, **kwargs)
+
+        self.callback = base_callback(closure)
         return self.callback(*args, **kwargs)
 
 
@@ -282,7 +300,7 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    return CustomGradAbleCallback(callback_fn, result_type)
+    return CallbackWithPotentialCustomGrad(callback_fn, result_type)
 
 
 ## IMPL ##
