@@ -28,6 +28,7 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
+from jaxlib.hlo_helpers import shape_dtype_to_ir_type
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
@@ -408,10 +409,14 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
     # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
     # such constants to numpy array types.
-    constants = [
-        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
-        for const in jaxpr.consts
-    ]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        nparray = np.asarray(const)
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
     args_and_consts = constants + list(args)
 
     return GradOp(
@@ -1219,17 +1224,17 @@ def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 # expval measurement
 #
 @expval_p.def_abstract_eval
-def _expval_abstract_eval(obs, shots):
+def _expval_abstract_eval(obs, shots, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @expval_p.def_impl
-def _expval_def_impl(ctx, obs, shots):  # pragma: no cover
+def _expval_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
+def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1251,17 +1256,17 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 # var measurement
 #
 @var_p.def_abstract_eval
-def _var_abstract_eval(obs, shots):
+def _var_abstract_eval(obs, shots, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @var_p.def_impl
-def _var_def_impl(ctx, obs, shots):  # pragma: no cover
+def _var_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
+def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1283,7 +1288,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
 # probs measurement
 #
 @probs_p.def_abstract_eval
-def _probs_abstract_eval(obs, shape):
+def _probs_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -1295,11 +1300,11 @@ def _probs_abstract_eval(obs, shape):
 
 
 @var_p.def_impl
-def _probs_def_impl(ctx, obs, shape):  # pragma: no cover
+def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1312,7 +1317,7 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 # state measurement
 #
 @state_p.def_abstract_eval
-def _state_abstract_eval(obs, shape):
+def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -1324,11 +1329,11 @@ def _state_abstract_eval(obs, shape):
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, shape):  # pragma: no cover
+def _state_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
