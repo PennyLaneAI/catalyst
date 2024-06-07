@@ -511,9 +511,6 @@ jobs:
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
-      env:
-        OMP_PROC_BIND: false
-        OMP_NUM_THREADS: 2
       run: |
         make pytest TEST_BACKEND="lightning.kokkos"
 

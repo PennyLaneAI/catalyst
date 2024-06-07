@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from functools import reduce
 from typing import Iterable, Sequence
 
@@ -25,6 +26,8 @@ import catalyst
 from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
+os.environ["OMP_PROC_BIND"] = "false"
+os.environ["OMP_NUM_THREADS"] = "2"
 
 
 class TestMidCircuitMeasurement:
