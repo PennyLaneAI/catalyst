@@ -282,7 +282,7 @@ def _python_callback_lowering(
     if not custom_grad:
         return retval
 
-    assert custom_grad._fwd and custom_grad.bwd
+    assert custom_grad._fwd and custom_grad._bwd
     fwd = custom_grad._fwd
     rev = custom_grad._bwd
     fwd_jaxpr = custom_grad._fwd_jaxpr
