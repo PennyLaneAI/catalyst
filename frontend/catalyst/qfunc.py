@@ -209,7 +209,7 @@ def dynamic_one_shot(qnode):
 
     single_shot_qnode = transform_to_single_shot(qnode)
     shots = qnode.device.shots
-    total_shots = shots if isinstance(qnode.device, qml.Device) else shots.total_shots
+    total_shots = shots if isinstance(qnode.device, qml.devices.LegacyDevice) else shots.total_shots
 
     def one_shot_wrapper(*args, **kwargs):
         single_shot_qnode.device._shots = (
