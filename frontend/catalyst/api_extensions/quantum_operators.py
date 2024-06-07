@@ -715,14 +715,13 @@ class Controlled:
 
         # Added this condition to support direct calls of this class outside the QJIT context
         # in PL integrated tests:
-        if tracing_artifacts:
-            HybridCtrl.__init__(
-                self,
-                *tracing_artifacts,
-                control_wires=control_wires,
-                control_values=control_values,
-                work_wires=work_wires,
-            )
+        HybridCtrl.__init__(
+            self,
+            *tracing_artifacts if tracing_artifacts else ([], [], []),
+            control_wires=control_wires,
+            control_values=control_values,
+            work_wires=work_wires,
+        )
 
     # These attributes are provided by the mixin class.
     # pylint: disable=no-member

@@ -26,7 +26,6 @@ from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operator, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
-from catalyst.api_extensions import Controlled as C_Controlled
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -436,7 +435,7 @@ def trace_quantum_tape(
     def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # `Controlled(OP)` bind OP with native quantum control syntax.
-        is_catalyst_ctrl = isinstance(op, C_Controlled)
+        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
         pl_ctrl_classes = {Controlled, ControlledOp, ControlledQubitUnitary}
         is_pl_ctrl = op.__class__ in pl_ctrl_classes
         is_ctrl = is_catalyst_ctrl or is_pl_ctrl
