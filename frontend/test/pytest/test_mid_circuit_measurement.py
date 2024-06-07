@@ -15,11 +15,11 @@
 from functools import reduce
 from typing import Iterable, Sequence
 
-from flaky import flaky
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from flaky import flaky
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
