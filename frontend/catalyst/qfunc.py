@@ -43,7 +43,6 @@ from catalyst.logging import debug_logger
 from catalyst.utils.toml import (
     DeviceCapabilities,
     ProgramFeatures,
-    get_device_capabilities,
 )
 
 

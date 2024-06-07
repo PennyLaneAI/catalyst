@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operator, Wires
+from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
@@ -778,6 +778,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     is_wave_function_collapsed = any(map(is_midcircuit_measurement, tape.operations))
     are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed
     return are_batch_transforms_valid
+
 
 @debug_logger
 def apply_transform(

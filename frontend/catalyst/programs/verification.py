@@ -25,7 +25,7 @@ from pennylane.measurements import (
     VnEntropyMP,
 )
 from pennylane.operation import Operation
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 from catalyst.tracing.contexts import EvaluationContext
@@ -145,8 +145,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     def _op_checker(op, state):
 
         # all non-controlled ops are in the native ops of the device
-        if isinstance(op, (Controlled, QCtrl)):
+        if isinstance(op, (Controlled, QCtrl, Adjoint)):
             # Controlled and QCtrl are checked in _ctrl_op_checker
+            # Adjoint is checked in _inv_op_checker
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
             raise CompileError(
