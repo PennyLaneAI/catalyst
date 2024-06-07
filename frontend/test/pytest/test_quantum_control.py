@@ -14,11 +14,12 @@
 
 """Test quantum control decomposition in Catalyst."""
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-many-public-methods
 # pylint: disable=protected-access
 # pylint: disable=pointless-statement
 # pylint: disable=expression-not-assigned
 # pylint: disable=too-many-arguments
+# pylint: disable=too-many-lines
 
 import copy
 from typing import Callable
@@ -515,14 +516,20 @@ class TestCatalystControlled:
 
 
 class TempOperator(Operator):
+    """A custom operator."""
+
     num_wires = 1
 
 
 class TempOperation(Operation):
+    """A custom operation."""
+
     num_wires = 1
 
 
 class OpWithDecomposition(Operation):
+    """A custom operation with a decomposition method."""
+
     @staticmethod
     def compute_decomposition(*params, wires=None, **_):
         return [
@@ -534,6 +541,8 @@ class OpWithDecomposition(Operation):
 
 @pytest.fixture(scope="function")
 def use_legacy_opmath():
+    """Helper method for legacy opmath."""
+
     with qml.operation.disable_new_opmath_cm() as cm:
         yield cm
 
@@ -573,7 +582,7 @@ class TestControlledInit:
 
         assert op.num_params == 0
         assert not op.parameters
-        assert op.data == ()
+        assert not op.data
 
         assert op.num_wires == 3
 
@@ -651,7 +660,9 @@ class TestControlledProperties:
         "val, arr", ((4, [1, 0, 0]), (6, [1, 1, 0]), (1, [0, 0, 1]), (5, [1, 0, 1]))
     )
     def test_control_int(self, val, arr):
-        """Test private `_control_int` property converts control_values to integer representation."""
+        """Test private `_control_int` property converts control_values to integer
+        representation."""
+
         op = C_ctrl(TempOperator(5), (0, 1, 2), control_values=arr)
         assert op._control_int == val
 
@@ -660,6 +671,8 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers has_matrix to base operator."""
 
         class DummyOp(Operator):
+            """DummyOp"""
+
             num_wires = 1
             has_matrix = value
 
@@ -734,6 +747,8 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers has_adjoint to base operator."""
 
         class DummyOp(Operator):
+            """DummyOp"""
+
             num_wires = 1
             has_adjoint = value
 
@@ -745,6 +760,8 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers has_diagonalizing_gates to base operator."""
 
         class DummyOp(Operator):
+            """DummyOp"""
+
             num_wires = 1
             has_diagonalizing_gates = value
 
@@ -756,6 +773,8 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers `_queue_category` to base operator."""
 
         class DummyOp(Operator):
+            """DummyOp"""
+
             num_wires = 1
             _queue_category = value
 
@@ -767,6 +786,8 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers `is_hermitian` to base operator."""
 
         class DummyOp(Operator):
+            """DummyOp"""
+
             num_wires = 1
             is_hermitian = value
 
@@ -802,7 +823,8 @@ class TestControlledMiscMethods:
         op = C_ctrl(base, [2, 3], control_values=[True, False], work_wires=[4])
         assert (
             repr(op)
-            == "Controlled(S(wires=[0]) + T(wires=[1]), control_wires=[2, 3], work_wires=[4], control_values=[True, False])"
+            == "Controlled(S(wires=[0]) + T(wires=[1]), control_wires=[2, 3], work_wires=[4],"
+            " control_values=[True, False])"
         )
 
     def test_flatten_unflatten(self):
@@ -950,7 +972,9 @@ class TestControlledMiscMethods:
         )
 
     def test_diagonalizing_gates(self):
-        """Test that the Controlled diagonalizing gates is the same as the base diagonalizing gates."""
+        """Test that the Controlled diagonalizing gates is the same as the base
+        diagonalizing gates."""
+
         base = qml.PauliX(0)
         op = C_ctrl(base, (1, 2))
 
@@ -999,6 +1023,8 @@ class TestControlledOperationProperties:
         """Check grad_method defers to that of the base operation."""
 
         class DummyOp(Operation):
+            """DummyOp"""
+
             num_wires = 1
             grad_method = gm
 
@@ -1010,6 +1036,8 @@ class TestControlledOperationProperties:
         """Test that controlled mimics the basis attribute of the base op."""
 
         class DummyOp(Operation):
+            """DummyOp"""
+
             num_wires = 1
             basis = "Z"
 
@@ -1151,7 +1179,8 @@ def CRotx(theta):
     Args:
         theta (float): rotation angle
     Returns:
-        array: unitary 4x4 rotation matrix :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_x(\theta)`
+        array: unitary 4x4 rotation matrix
+        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_x(\theta)`
     """
     return qml.math.array(
         [
@@ -1169,7 +1198,8 @@ def CRoty(theta):
     Args:
         theta (float): rotation angle
     Returns:
-        array: unitary 4x4 rotation matrix :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_y(\theta)`
+        array: unitary 4x4 rotation matrix
+        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_y(\theta)`
     """
     return qml.math.array(
         [
@@ -1187,7 +1217,8 @@ def CRotz(theta):
     Args:
         theta (float): rotation angle
     Returns:
-        array: unitary 4x4 rotation matrix :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_z(\theta)`
+        array: unitary 4x4 rotation matrix
+        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R_z(\theta)`
     """
     return qml.math.array(
         [
@@ -1206,7 +1237,8 @@ def CRot3(a, b, c):
     Args:
         a,b,c (float): rotation angles
     Returns:
-        array: unitary 4x4 rotation matrix :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R(a,b,c)`
+        array: unitary 4x4 rotation matrix
+        :math:`|0\rangle\langle 0|\otimes \mathbb{I}+|1\rangle\langle 1|\otimes R(a,b,c)`
     """
     return qml.math.array(
         [
@@ -1241,10 +1273,11 @@ def ControlledPhaseShift(phi):
     return qml.math.diag([1, 1, 1, qml.math.exp(1j * phi)])
 
 
+# Failed with Catalyst because of different decomposition:
+# (qml.PauliX("a"), 2, qml.math.diag([1 for i in range(8)])),
+# (qml.CNOT(["a", "b"]), 1, qml.math.diag([1 for i in range(8)])),
 base_num_control_mats = [
     (qml.PauliX("a"), 1, qml.math.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])),
-    # (qml.PauliX("a"), 2, qml.math.diag([1 for i in range(8)])), # Failed with Catalyst because of different decomposition.
-    # (qml.CNOT(["a", "b"]), 1, qml.math.diag([1 for i in range(8)])), # Failed with Catalyst because of different decomposition.
     (
         qml.PauliY("a"),
         1,
@@ -1583,7 +1616,8 @@ class TestDecomposition:
         assert op.decomposition() == decomp
 
     def test_non_differentiable_one_qubit_special_unitary(self):
-        """Assert that a non-differentiable on qubit special unitary uses the bisect decomposition."""
+        """Assert that a non-differentiable on qubit special unitary uses the bisect
+        decomposition."""
 
         op = C_ctrl(qml.RZ(1.2, wires=0), (1, 2, 3, 4))
         decomp = op.decomposition()
