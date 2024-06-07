@@ -19,6 +19,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/annotate_function.h"
@@ -36,13 +37,23 @@ bool isAnnotated(FunctionOpInterface op, const char *attr)
 bool invalidGradientOperation(FunctionOpInterface op)
 {
     auto res = op.walk([](Operation *o) {
-        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::CustomCallOp>(o) ||
-            dyn_cast<catalyst::CallbackCallOp>(o)) {
+        if (dyn_cast<MeasureOp>(o) || dyn_cast<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
-        else {
-            return WalkResult::advance();
+        else if (auto callback = dyn_cast<catalyst::CallbackCallOp>(o)) {
+            bool isDifferentiated = false;
+            for (Operation *user : callback->getUsers()) {
+                if (auto customGrad = dyn_cast<catalyst::gradient::CustomGradOp>(user)) {
+                    isDifferentiated |= customGrad.getCallee() == callback.getCallee();
+                }
+                if (isDifferentiated) break;
+            }
+
+            if (!isDifferentiated) {
+                return WalkResult::interrupt();
+            }
         }
+        return WalkResult::advance();
     });
     return res.wasInterrupted();
 }
