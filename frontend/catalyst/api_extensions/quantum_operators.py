@@ -28,7 +28,6 @@ from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
 from pennylane.operation import Observable, Operation, Operator, Wires
-from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
@@ -244,7 +243,7 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
 
 
 def ctrl(
-    op: Union[Callable, Operator],
+    f: Union[Callable, Operator],
     control: List[Any],
     control_values: Optional[List[Any]] = None,
     work_wires: Optional[List[Any]] = None,
@@ -254,7 +253,7 @@ def ctrl(
     conditionals.
 
     Args:
-        op (Callable or Operator): A PennyLane operation or a Python function
+        f (Callable or Operator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
         control (Wires): The control wire(s).
         control_values (List[bool], optional): The value(s) the control wire(s) should take.
@@ -304,8 +303,8 @@ def ctrl(
             f"to the lenght of control ({len(control)})"
         )
 
-    res = CtrlCallable(op, control, control_values=control_values, work_wires=work_wires)
-    return res() if isinstance(op, Operator) else res
+    res = CtrlCallable(f, control, control_values=control_values, work_wires=work_wires)
+    return res() if isinstance(f, Operator) else res
 
 
 ## IMPL ##
@@ -542,33 +541,33 @@ class AdjointBase(Adjoint, pl_adjoint_module.Adjoint, HybridAdjoint):
 class CtrlCallable:
     """Callable wrapper to produce a ctrl instance."""
 
-    def __init__(self, op, control, control_values, work_wires):
-        self.op = op
+    def __init__(self, target, control, control_values, work_wires):
+        self.target = target
         self.control_wires = control
         self.control_values = control_values
         self.work_wires = work_wires
 
-        if isinstance(op, Operator):
-            # Case 1. Support an initialized operation as the base op
-            self.op = lambda: QueuingManager.append(op) or op
+        if isinstance(target, Operator):
+            # Case 1. Support an initialized operation as the base target
+            self.target = lambda: QueuingManager.append(target) or target
             self.single_op = True
-        elif isinstance(op, type) and issubclass(op, Operator):
+        elif isinstance(target, type) and issubclass(target, Operator):
             # Case 2: Support an operation constructor as the base op
-            self.op = op
+            self.target = target
             self.single_op = True
-        elif isinstance(op, Callable):
+        elif isinstance(target, Callable):
             # Case 3: Support a callable as the base op
-            self.op = op
+            self.target = target
             self.single_op = False
         else:
-            raise ValueError(f"Expected a callable or a qml.Operator, not {op}")
+            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
     def __call__(self, *args, **kwargs):
         tracing_artifacts = self.trace_body(args, kwargs)
 
         if self.single_op:
             with QueuingManager.stop_recording():
-                base_op = self.op(*args, **kwargs)
+                base_op = self.target(*args, **kwargs)
             return Controlled(
                 base_op,
                 tracing_artifacts=tracing_artifacts,
@@ -587,11 +586,22 @@ class CtrlCallable:
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for `catalyst.ctrl` to be used by the tracer."""
 
+        # Allow the creation of HybridCtrl instances outside of any contexts.
+        # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
+        if not EvaluationContext.is_tracing():
+            # QuantumTapes can themselves appear in queuing records.
+            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+                self.target(*args, **kwargs)
+
+            ctrl_region = HybridOpRegion(None, quantum_tape, [], [])
+
+            return [], [], [ctrl_region]
+
         # Create a nested jaxpr scope for the body of the adjoint.
         in_classical_tracers, _ = tree_flatten((args, kwargs))
         quantum_tape = QuantumTape()
         with QueuingManager.stop_recording(), quantum_tape:
-            res = self.op(*args, **kwargs)
+            res = self.target(*args, **kwargs)
         out_classical_tracers, _ = tree_flatten(res)
 
         _check_no_measurements(quantum_tape)
@@ -696,7 +706,7 @@ class Controlled:
     ctrl instances with only a single base operation. Additionally, it provides the same
     functionality as HybridCtrl."""
 
-    def __new__(cls, base, *_, **__):
+    def __new__(cls, base, _tracing_artifacts=None, *_, **__):
         if isinstance(base, Operation):
             return object.__new__(ControlledOp)
 
@@ -717,7 +727,7 @@ class Controlled:
         # in PL integrated tests:
         HybridCtrl.__init__(
             self,
-            *tracing_artifacts if tracing_artifacts else ([], [], []),
+            *tracing_artifacts,
             control_wires=control_wires,
             control_values=control_values,
             work_wires=work_wires,
@@ -737,7 +747,11 @@ class Controlled:
     @classmethod
     def _unflatten(cls, data, metadata):
         return cls(
-            data[0], control_wires=metadata[1], control_values=metadata[2], work_wires=metadata[3]
+            data[0],
+            tracing_artifacts=metadata[0],
+            control_wires=metadata[1],
+            control_values=metadata[2],
+            work_wires=metadata[3],
         )
 
 
@@ -791,7 +805,7 @@ def qctrl_distribute(
                 ops2.append(op)
         else:
             ops2.append(
-                create_controlled_op(
+                ctrl(
                     copy.copy(op),
                     control=control_wires,
                     control_values=control_values,
