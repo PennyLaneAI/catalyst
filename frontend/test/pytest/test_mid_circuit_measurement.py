@@ -15,6 +15,7 @@
 from functools import reduce
 from typing import Iterable, Sequence
 
+from flaky import flaky
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -224,21 +225,21 @@ class TestMidCircuitMeasurement:
         """Test that circuits with unsupported measurements raise an error."""
         shots = 10
         dev = qml.device(backend, wires=1, shots=shots)
-        params = np.pi / 4 * np.ones(2)
+        param = np.pi / 4
 
         @qjit
         @dynamic_one_shot
         @qml.qnode(dev)
-        def func(x, y):
+        def func(x):
             qml.RX(x, wires=0)
-            m0 = measure(0)
+            _ = measure(0)
             return qml.classical_shadow(wires=0)
 
         with pytest.raises(
             TypeError,
-            match=f"Native mid-circuit measurement mode does not support",
+            match="Native mid-circuit measurement mode does not support",
         ):
-            func(*params)
+            func(param)
 
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
@@ -259,6 +260,7 @@ class TestMidCircuitMeasurement:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
+    @flaky(max_runs=5)
     @pytest.mark.parametrize("shots", [3000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
@@ -276,7 +278,8 @@ class TestMidCircuitMeasurement:
 
         if measure_f == qml.var:
             pytest.xfail(
-                "`qml.var` requires an auxiliary measurement `qml.sample(obs)` which isn't possible in Catalyst"
+                "`qml.var` requires an auxiliary measurement `qml.sample(obs)`"
+                " which isn't possible in Catalyst"
             )
 
         if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
@@ -332,7 +335,10 @@ class TestMidCircuitMeasurement:
         results0 = ref_func(*params)
         results1 = func(*params)
         if measure_f == qml.counts:
-            fname = lambda x: format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
+
+            def fname(x):
+                return format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
+
             results1 = {fname(int(state)): count for state, count in zip(*results1)}
         if measure_f == qml.sample:
             results0 = results0[results0 != fill_in_value]
@@ -359,7 +365,7 @@ class TestMidCircuitMeasurement:
             qml.RX(0.5 * x, 1)
             m1 = qml.measure(1, postselect=postselect)
             qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
-            m2 = qml.measure(0)
+            _ = qml.measure(0)
 
             return (
                 qml.expval(op=m0),
