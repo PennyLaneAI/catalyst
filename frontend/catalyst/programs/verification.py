@@ -129,7 +129,11 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
     def _inv_op_checker(op, in_inverse):
         if in_inverse:
-            op_name = op.base.name if isinstance(op, Controlled) else op.name
+            op_name = (
+                op.base.name
+                if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}
+                else op.name
+            )
             if not qjit_device.qjit_capabilities.native_ops.get(
                 op_name, EMPTY_PROPERTIES
             ).invertible:
