@@ -27,7 +27,7 @@ extend_skip_glob = [
   "_deps/*",
 ]
 known_first_party = ["catalyst"]
-known_third_party = ["autoray", "jax", "pennylane"]
+known_third_party = ["jax", "jaxlib", "pennylane", "diastatic-malt"]
 
 [tool.bandit]
 skips = ["B607"]
