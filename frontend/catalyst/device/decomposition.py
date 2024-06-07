@@ -16,6 +16,7 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
+import copy
 import logging
 from functools import partial
 
@@ -35,6 +36,7 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
+from catalyst.api_extensions import HybridAdjoint
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
@@ -131,8 +133,8 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
                 region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers
             )
         )
-
-    new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    new_op = copy.copy(op)
+    new_op.regions = new_regions
     return new_op
 
 
@@ -175,6 +177,12 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
+    # Adjoint of a single op does not pass the acceptance criteria, since it inherits the PL `.name`
+    # attribute (= "Adjoint(op)"). Hence we should move away from name-based matching of operations
+    # to instance-based matching.
+    if isinstance(op, HybridAdjoint):
+        return "HybridAdjoint" in operations
+
     return op.name in operations
 
 

@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.operation import AnyWires, Operator, Wires
 from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
@@ -268,7 +268,7 @@ class HybridOpRegion:
     res_classical_tracers: List[DynamicJaxprTracer]
 
 
-class HybridOp(Operation):
+class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
     tracing. The methods of this class describe various aspects of quantum tracing.
@@ -334,7 +334,7 @@ class HybridOp(Operation):
         raise NotImplementedError("HybridOp should implement trace")  # pragma: no cover
 
 
-def has_nested_tapes(op: Operation) -> bool:
+def has_nested_tapes(op: Operator) -> bool:
     """Detects if the PennyLane operation holds nested quantum tapes or not."""
     return (
         isinstance(op, HybridOp)
@@ -492,12 +492,12 @@ def trace_quantum_tape(
 
 @debug_logger
 def trace_observables(
-    obs: Operation, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: int
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
-        obs (Operation): an observable operation
+        obs (Operator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
         m_wires (int): the default number of wires to use for this measurement process
 

@@ -90,6 +90,11 @@
 
 <h3>Improvements</h3>
 
+* Catalyst's adjoint method is now fully compatible with the PennyLane equivalent when applied to
+  a single Operator. This should lead to improved compatibility with PennyLane library code, as well
+  when reusing quantum functions with both Catalyst and PennyLane.
+  [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
+
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
   measurement. For now the feature is equivalent to returning `m` directly from a quantum
   function, but will be improved to return an array with one measurement result for each
@@ -128,6 +133,10 @@
 * Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
   [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
 
+* The measurement primitives now have a standardized call signature so that `shots` and `shape` can
+  both be provided as keyword arguments.
+  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
+
 * Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not. 
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
@@ -151,6 +160,12 @@
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 <h3>Internal changes</h3>
+
+* The `Adjoint` class in Catalyst has been renamed to `HybridAdjoint`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Adjoint` class is generated when acting on a single PennyLane operator, which inherits from
+  both the PennyLane `Adjoint` class as well the Catalyst `HybridAdjoint` class.
+  [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
 
 * Add support to use a locally cloned PennyLane Lightning repository with the runtime.
   [(#732)](https://github.com/PennyLaneAI/catalyst/pull/732)
@@ -235,6 +250,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Christina Lee,
 Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
