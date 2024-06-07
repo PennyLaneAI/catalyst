@@ -656,7 +656,7 @@ class HybridCtrl(HybridOp):
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
 
         _check_no_measurements(self.regions[0].quantum_tape)
-        new_tape = qctrl_distribute(
+        new_tape = ctrl_distribute(
             self.regions[0].quantum_tape,
             self._control_wires,
             self._control_values,
@@ -767,7 +767,7 @@ class ControlledBase(Controlled, pl_ctrl_module.Controlled, HybridCtrl):
     """Replicate mixin class structure from PennyLane for a general Operator type."""
 
 
-def qctrl_distribute(
+def ctrl_distribute(
     tape: QuantumTape,
     control_wires: List[Any],
     control_values: List[Any],
@@ -789,7 +789,7 @@ def qctrl_distribute(
         if has_nested_tapes(op):
             if isinstance(op, HybridCtrl):
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    tape2 = qctrl_distribute(
+                    tape2 = ctrl_distribute(
                         region.quantum_tape,
                         control_wires + op.control_wires,
                         control_values + op.control_values,
@@ -799,13 +799,13 @@ def qctrl_distribute(
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        region.quantum_tape = qctrl_distribute(
+                        region.quantum_tape = ctrl_distribute(
                             region.quantum_tape, control_wires, control_values, work_wires
                         )
                 ops2.append(op)
         else:
             ops2.append(
-                ctrl(
+                qml.ctrl(
                     copy.copy(op),
                     control=control_wires,
                     control_values=control_values,
