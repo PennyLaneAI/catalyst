@@ -208,7 +208,8 @@ def dynamic_one_shot(qnode):
     single_shot_qnode = transform_to_single_shot(qnode)
     dev = qnode.device
     single_shot = 1 if isinstance(dev, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
-    single_shot_qnode.device = qml.device(dev.name, wires=dev.wires, shots=single_shot)
+    single_name = dev.short_name if isinstance(dev, qml.devices.LegacyDevice) else dev.name
+    single_shot_qnode.device = qml.device(single_name, wires=dev.wires, shots=single_shot)
     total_shots = (
         dev.shots if isinstance(qnode.device, qml.devices.LegacyDevice) else dev.shots.total_shots
     )

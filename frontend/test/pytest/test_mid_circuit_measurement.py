@@ -146,7 +146,7 @@ class TestMidCircuitMeasurement:
             m = measure(wires=0, postselect=0)
             return m
 
-        assert not circuit(jnp.pi)  # m will be equal to False
+        assert not circuit(0.0)  # m will be equal to False
 
     def test_with_postselect_one(self, backend):
         """Test measure (postselect = 1)."""
@@ -391,7 +391,7 @@ class TestMidCircuitMeasurement:
             params = jnp.pi / 2.1 * jnp.ones(2)
 
         if measure_f == qml.var and not isinstance(meas_obj, str):
-            with pytest.raises(TypeError, match=f"qml.var\\(obs\\) cannot be returned when"):
+            with pytest.raises(TypeError, match="qml.var\\(obs\\) cannot be returned when"):
                 func(*params)
             return
 
