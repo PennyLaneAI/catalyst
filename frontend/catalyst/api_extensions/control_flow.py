@@ -925,35 +925,37 @@ class ForLoop(HybridOp):
             qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
 
-            arg_expanded_tracers = expand_args(
-                self.regions[0].arg_classical_tracers + [qreg_in],
-                expansion_strategy=expansion_strategy,
-            )[0]
+            region = self.regions[0]
+            arg_tracers = region.arg_classical_tracers + [qreg_in]
+            arg_expanded_tracers, _ = expand_args(arg_tracers, expansion_strategy=expansion_strategy)
 
-            nimplicit = len(arg_expanded_tracers) - len(self.regions[0].arg_classical_tracers) - 1
+            nimplicit = len(arg_expanded_tracers) - len(arg_tracers) - 1
 
+            res_classical_tracers = region.res_classical_tracers
+            res_tracers = res_classical_tracers + [qreg_out]
             res_expanded_tracers, _ = expand_results(
                 [],
                 arg_expanded_tracers,
-                self.regions[0].res_classical_tracers + [qreg_out],
+                res_tracers
                 expansion_strategy=expansion_strategy,
                 num_implicit_inputs=nimplicit,
             )
             jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
 
-        in_expanded_tracers = [
-            *[trace.full_raise(c) for c in consts],
-            *expand_args(op.in_classical_tracers, expansion_strategy=expansion_strategy)[0],
-            qrp.actualize(),
-        ]
+        operand_tracers = op.in_classical_tracers
+        const_tracers = [trace.full_raise(c) for c in consts]
+        const_expanded_tracers = expand_args
+        operand_expanded_tracers, _ = expand_args(operand_tracers, expansion_strategy=expansion_strategy)
+        qreg_tracer = qrp.actualize()
+        in_expanded_tracers = [*const_tracers, *operand_expanded_tracers, qreg_tracer]
 
-        out_expanded_classical_tracers = expand_results(
+        out_expanded_classical_tracers, _ = expand_results(
             [],
             in_expanded_tracers,
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
             num_implicit_inputs=nimplicit,
-        )[0]
+        )
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers2(

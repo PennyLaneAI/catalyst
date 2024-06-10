@@ -1630,15 +1630,12 @@ def _for_loop_lowering(
         body_args[0] = from_elements_op.result
 
         # Re-order arguments in accordance with jax dynamic API convensions
-        body_args = [
-            [a]
-            for a in (
-                *body_consts,  # constants
-                *body_args[1 : nimplicit + 1],  # implicit arguments
-                body_args[0],  # loop iterator
-                *body_args[nimplicit + 1 :],  # explicit arguments
-            )
-        ]
+        consts = body_consts
+        loop_iter = body_args[0]
+        implicit_args = body_args[1:nimplicit+1]
+        explicit_args = body_args[nimplit +1:]
+        loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
+        body_args = [[param] for param in loop_params]
 
         # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(

@@ -771,7 +771,7 @@ def infer_output_type_python(
     num_implicit_inputs: int,
 ) -> Tuple[List[TracerLike], Tuple[Jaxpr, OutputType, List[TracerLike]]]:
     """Infers the Jax ``OutputType`` of a traced Python program. In addition to the
-    output type, alaso return the corresponding Jaxpr program, expanded list of outputs, and the
+    output type, also return the corresponding Jaxpr program, expanded list of outputs, and the
     constants.
 
     In this function we attempt to overcome Jax incompatibilities regarding the dynamic API support
@@ -950,8 +950,8 @@ class DynshapePrimitive(JaxprPrimitive):
 
         """
         # Note: We do not return `out_type` along with the results in order to match the Jax bind
-        # API.  but it would be good to return it, because otherwise we lose the information about
-        # explicintess.
+        # API, but it would be good to return it, because otherwise we lose the information about
+        # explicitness.
 
         trace = find_top_trace(args)
         tracers = map(trace.full_raise, args)
