@@ -374,15 +374,18 @@ class TestMidCircuitMeasurement:
 
         results0 = ref_func(*params)
         results1 = func(*params)
+
         if measure_f == qml.counts:
 
             def fname(x):
                 return format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
 
             results1 = {fname(int(state)): count for state, count in zip(*results1)}
-        if measure_f == qml.sample:
-            results0 = results0[results0 != fill_in_value]
-            results1 = results1[results1 != fill_in_value]
+        elif measure_f == qml.sample:
+            results0 = sample_to_counts(results0, meas_obj)
+            results1 = sample_to_counts(results1, meas_obj)
+            measure_f = qml.counts
+
         validate_measurements(measure_f, shots, results1, results0)
 
     @pytest.mark.parametrize("shots", [10000])
@@ -467,6 +470,22 @@ class TestMidCircuitMeasurement:
             qml.math.allclose(r1, r0)
 
 
+def sample_to_counts(results, meas_obj):
+    meas_key = "wires" if isinstance(meas_obj, list) else "op"
+    meas_value = qml.measure(0) if isinstance(meas_obj, str) else meas_obj
+    kwargs = {meas_key: meas_value, "all_outcomes": True}
+    wires = (
+        meas_obj
+        if isinstance(meas_obj, list)
+        else (qml.wires.Wires([0]) if isinstance(meas_obj, str) else meas_obj.wires)
+    )
+    results = (
+        results.reshape((-1, 1)) if not isinstance(meas_obj, list) or len(meas_obj) < 2 else results
+    )
+    mask = qml.math.logical_not(qml.math.any(results == fill_in_value, axis=1))
+    return qml.counts(**kwargs).process_samples(results[mask, :], wire_order=wires)
+
+
 def validate_counts(shots, results1, results2, batch_size=None):
     """Compares two counts.
 
@@ -496,39 +515,6 @@ def validate_counts(shots, results1, results2, batch_size=None):
         val2 = results2[key1]
         if abs(val1 + val2) > 100:
             assert np.allclose(val1, val2, atol=20, rtol=0.2)
-
-
-def validate_samples(shots, results1, results2, batch_size=None):
-    """Compares two samples.
-
-    If the results are ``Sequence``s, loop over entries.
-
-    Fails if the results do not have the same shape, within ``20`` entries plus 20 percent.
-    This is to handle cases when post-selection yields variable shapes.
-    Otherwise, fails if the sums of samples differ by more than ``20`` plus 20 percent.
-    """
-    if isinstance(shots, Sequence):
-        assert isinstance(results1, tuple)
-        assert isinstance(results2, tuple)
-        assert len(results1) == len(results2) == len(shots)
-        for s, r1, r2 in zip(shots, results1, results2):
-            validate_samples(s, r1, r2, batch_size=batch_size)
-        return
-
-    if batch_size is not None:
-        assert isinstance(results1, Iterable)
-        assert isinstance(results2, Iterable)
-        assert len(results1) == len(results2) == batch_size
-        for r1, r2 in zip(results1, results2):
-            validate_samples(shots, r1, r2, batch_size=None)
-        return
-
-    sh1, sh2 = results1.shape[0], results2.shape[0]
-    assert np.allclose(sh1, sh2, atol=20, rtol=0.2)
-    assert results1.ndim == results2.ndim
-    if results2.ndim > 1:
-        assert results1.shape[1] == results2.shape[1]
-    np.allclose(qml.math.sum(results1), qml.math.sum(results2), atol=20, rtol=0.2)
 
 
 def validate_expval(shots, results1, results2, batch_size=None):
