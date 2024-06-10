@@ -139,8 +139,6 @@ class TestMidCircuitMeasurement:
     def test_with_postselect_zero(self, backend):
         """Test measure (postselect = 0)."""
 
-        pytest.xfail("'postselect_mode' hardcoded to 'hw-like'")
-
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -177,11 +175,6 @@ class TestMidCircuitMeasurement:
 
     def test_with_reset_true(self, backend):
         """Test measure (reset = True)."""
-
-        pytest.xfail(
-            "'postselect_mode' hardcoded to 'hw-like' and hence postselect"
-            " is ignore during execution"
-        )
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -353,7 +346,7 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
+        @qml.qnode(dq, postselect_mode="fill-shots", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
@@ -431,12 +424,12 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
+        @qml.qnode(dq, postselect_mode="fill-shots", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
             qml.RX(0.5 * x, 1)
-            m1 = qml.measure(1, postselect=postselect)
+            m1 = qml.measure(1, reset=reset, postselect=postselect)
             qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
             _ = qml.measure(0)
 
@@ -480,6 +473,16 @@ class TestMidCircuitMeasurement:
                 qml.expval(obs),
             )
 
+        meas_args = (
+            "mcm",
+            [1],
+            [0, 1],
+            "mcm",
+            [1],
+            [0, 1],
+            "mcm",
+            obs,
+        )
         measures = (
             qml.expval,
             qml.probs,
@@ -490,14 +493,17 @@ class TestMidCircuitMeasurement:
             qml.sample,
             qml.expval,
         )
+
         params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
-        for m, r1, r0 in zip(measures, results1, results0):
-            if postselect is not None and m == qml.sample:
-                continue
+        for meas_obj, m, r1, r0 in zip(meas_args, measures, results1, results0):
+            if m == qml.sample:
+                r0 = list(sample_to_counts(r0, meas_obj).values())
+                r1 = list(sample_to_counts(r1, meas_obj).values())
+
             r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
-            qml.math.allclose(r1, r0)
+            assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
 
 
 def sample_to_counts(results, meas_obj):
@@ -580,10 +586,6 @@ def validate_measurements(func, shots, results1, results2, batch_size=None):
     """Calls the correct validation function based on measurement type."""
     if func is qml.counts:
         validate_counts(shots, results1, results2, batch_size=batch_size)
-        return
-
-    if func is qml.sample:
-        validate_samples(shots, results1, results2, batch_size=batch_size)
         return
 
     validate_expval(shots, results1, results2, batch_size=batch_size)
