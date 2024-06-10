@@ -61,7 +61,10 @@ struct DummyDevice final : public Catalyst::Runtime::QuantumDevice {
     auto Var(ObsIdType) -> double override { return 0.0; }
     void State(DataView<std::complex<double>, 1> &) override {}
     void Probs(DataView<double, 1> &) override {}
-    void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) override {}
+    void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &,
+                      const bool use_device_shots = true) override
+    {
+    }
     void Sample(DataView<double, 2> &, size_t) override {}
     void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &, size_t) override {}
     void Counts(DataView<double, 1> &, DataView<int64_t, 1> &, size_t) override {}

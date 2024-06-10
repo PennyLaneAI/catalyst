@@ -147,7 +147,7 @@ void OQCDevice::State(DataView<std::complex<double>, 1> &)
     RT_FAIL("Unsupported functionality");
 };
 void OQCDevice::Probs(DataView<double, 1> &) { RT_FAIL("Unsupported functionality"); };
-void OQCDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &)
+void OQCDevice::PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &, const bool)
 {
     RT_FAIL("Unsupported functionality");
 };

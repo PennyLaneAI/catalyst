@@ -71,7 +71,8 @@
     auto Var(ObsIdType obsKey)->double override;                                                   \
     void State(DataView<std::complex<double>, 1> &state) override;                                 \
     void Probs(DataView<double, 1> &probs) override;                                               \
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override; \
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires,           \
+                      const bool use_device_shots) override;                                       \
     void Sample(DataView<double, 2> &samples, size_t shots) override;                              \
     void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,        \
                        size_t shots) override;                                                     \
@@ -277,7 +278,7 @@ static inline auto simulateDraw(const std::vector<double> &probs, std::optional<
     if (postselect) {
         auto postselect_value = postselect.value();
         RT_FAIL_IF(postselect_value < 0 || postselect_value > 1, "Invalid postselect value");
-
+        RT_FAIL_IF(probs[postselect_value] == 0, "Probability of postselect value is 0");
         return postselect_value == 1 ? true : false;
     }
 

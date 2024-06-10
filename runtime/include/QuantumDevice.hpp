@@ -241,8 +241,8 @@ struct QuantumDevice {
      * @param probs The pre-allocated `DataView<double, 1>`
      * @param wires Wires will restrict probabilities to a subset of the full system
      */
-    virtual void PartialProbs(DataView<double, 1> &probs,
-                              const std::vector<QubitIdType> &wires) = 0;
+    virtual void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires,
+                              const bool use_device_shots = true) = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,
