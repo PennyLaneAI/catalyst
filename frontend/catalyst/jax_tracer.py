@@ -434,7 +434,11 @@ def trace_quantum_tape(
     def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # `Controlled(OP)` bind OP with native quantum control syntax.
-        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
+        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
+        pl_ctrl_classes = {Controlled, ControlledOp, ControlledQubitUnitary}
+        is_pl_ctrl = op.__class__ in pl_ctrl_classes
+        is_ctrl = is_catalyst_ctrl or is_pl_ctrl
+        if is_ctrl:
             return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
@@ -475,7 +479,13 @@ def trace_quantum_tape(
 
     for op in ops:
         qrp2 = None
-        if isinstance(op, HybridOp):
+        # We need to exclude HybridCtrl here because single-op control instances are kept
+        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
+        # but should be translated to JAXPR as a regular PennyLane Controlled op.
+        # Native HybridCtrl operations are not yet supported in the compiler.
+        if isinstance(op, HybridOp) and not isinstance(
+            op, catalyst.api_extensions.quantum_operators.HybridCtrl
+        ):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
         else:
             if isinstance(op, MeasurementProcess):
@@ -538,7 +548,7 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else None)
+    return obs_tracers, (len(qubits) if qubits else 0)
 
 
 @debug_logger
