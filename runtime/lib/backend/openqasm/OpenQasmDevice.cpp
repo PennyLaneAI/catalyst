@@ -308,7 +308,8 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
 }
 
 void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
-                                  [[maybe_unused]] const std::vector<QubitIdType> &wires)
+                                  [[maybe_unused]] const std::vector<QubitIdType> &wires,
+                                  [[maybe_unused]] const bool use_device_shots)
 {
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
