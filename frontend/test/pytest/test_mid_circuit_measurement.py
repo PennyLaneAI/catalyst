@@ -303,6 +303,36 @@ class TestMidCircuitMeasurement:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.parametrize("debug", [False, True])
+    def test_dynamic_one_shot_nested_qnodes(self, backend, debug):
+        """Test that `dynamic_one_shot` handle nested calls correctly."""
+
+        if not debug:
+            pytest.xfail("Error in Catalyst Runtime: Cannot re-initialize an ACTIVE device")
+
+        shots = 10
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qml.qnode(dev)
+        def inner():
+            qml.PauliX(0)
+            return qml.sample(wires=0)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def outer():
+            x = inner()
+            if debug:
+                catalyst.debug.print("Value of x = {x}", x=x)
+            qml.RY(jnp.pi * qml.math.sum(x) / shots, wires=0)
+            m0 = measure(0)
+            return qml.sample(m0)
+
+        result = outer()
+        assert result.shape == (shots,)
+        assert jnp.allclose(result, 1.0)
+
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
