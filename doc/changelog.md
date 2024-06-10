@@ -274,6 +274,7 @@ Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
 Mehrdad Malekmohammadi,
+Vincent Michaud-Rioux,
 Raul Torres,
 Sergei Mironov.
 
