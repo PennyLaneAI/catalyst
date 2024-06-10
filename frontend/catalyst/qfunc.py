@@ -192,7 +192,7 @@ def dynamic_one_shot(qnode):
         @qml.transform
         def dynamic_one_shot_partial(
             tape: qml.tape.QuantumTape,
-        ) -> (Sequence[qml.tape.QuantumTape], Callable):
+        ) -> tuple[Sequence[qml.tape.QuantumTape], Callable]:
 
             nonlocal cpy_tape
             cpy_tape = tape
@@ -225,20 +225,21 @@ def dynamic_one_shot(qnode):
         return dynamic_one_shot_partial(qnode)
 
     single_shot_qnode = transform_to_single_shot(qnode)
-    shots = qnode.device.shots
-    total_shots = shots if isinstance(qnode.device, qml.devices.LegacyDevice) else shots.total_shots
+    dev = qnode.device
+    single_shot = 1 if isinstance(dev, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
+    single_name = dev.short_name if isinstance(dev, qml.devices.LegacyDevice) else dev.name
+    single_shot_qnode.device = qml.device(single_name, wires=dev.wires, shots=single_shot)
+    total_shots = (
+        dev.shots if isinstance(qnode.device, qml.devices.LegacyDevice) else dev.shots.total_shots
+    )
 
     def one_shot_wrapper(*args, **kwargs):
-        single_shot_qnode.device._shots = (
-            1 if isinstance(qnode.device, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
-        )
-        arg_vmap = jnp.empty((total_shots,), dtype=float)
 
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 
+        arg_vmap = jnp.empty((total_shots,), dtype=float)
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
-        single_shot_qnode.device._shots = shots
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
         return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)

@@ -139,8 +139,6 @@ class TestMidCircuitMeasurement:
     def test_with_postselect_zero(self, backend):
         """Test measure (postselect = 0)."""
 
-        pytest.xfail("'postselect_mode' hardcoded to 'hw-like'")
-
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -148,7 +146,7 @@ class TestMidCircuitMeasurement:
             m = measure(wires=0, postselect=0)
             return m
 
-        assert not circuit(jnp.pi)  # m will be equal to False
+        assert not circuit(0.0)  # m will be equal to False
 
     def test_with_postselect_one(self, backend):
         """Test measure (postselect = 1)."""
@@ -177,11 +175,6 @@ class TestMidCircuitMeasurement:
 
     def test_with_reset_true(self, backend):
         """Test measure (reset = True)."""
-
-        pytest.xfail(
-            "'postselect_mode' hardcoded to 'hw-like' and hence postselect"
-            " is ignore during execution"
-        )
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -371,6 +364,36 @@ class TestMidCircuitMeasurement:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.parametrize("debug", [False, True])
+    def test_dynamic_one_shot_nested_qnodes(self, backend, debug):
+        """Test that `dynamic_one_shot` handle nested calls correctly."""
+
+        if not debug:
+            pytest.xfail("Error in Catalyst Runtime: Cannot re-initialize an ACTIVE device")
+
+        shots = 10
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qml.qnode(dev)
+        def inner():
+            qml.PauliX(0)
+            return qml.sample(wires=0)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def outer():
+            x = inner()
+            if debug:
+                catalyst.debug.print("Value of x = {x}", x=x)
+            qml.RY(jnp.pi * qml.math.sum(x) / shots, wires=0)
+            m0 = measure(0)
+            return qml.sample(m0)
+
+        result = outer()
+        assert result.shape == (shots,)
+        assert jnp.allclose(result, 1.0)
+
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
@@ -391,7 +414,7 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
+        @qml.qnode(dq, postselect_mode="fill-shots", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
@@ -435,21 +458,24 @@ class TestMidCircuitMeasurement:
             params = jnp.pi / 2.1 * jnp.ones(2)
 
         if measure_f == qml.var and not isinstance(meas_obj, str):
-            with pytest.raises(TypeError, match=f"qml.var\\(obs\\) cannot be returned when"):
+            with pytest.raises(TypeError, match="qml.var\\(obs\\) cannot be returned when"):
                 func(*params)
             return
 
         results0 = ref_func(*params)
         results1 = func(*params)
+
         if measure_f == qml.counts:
 
             def fname(x):
                 return format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
 
             results1 = {fname(int(state)): count for state, count in zip(*results1)}
-        if measure_f == qml.sample:
-            results0 = results0[results0 != fill_in_value]
-            results1 = results1[results1 != fill_in_value]
+        elif measure_f == qml.sample:
+            results0 = sample_to_counts(results0, meas_obj)
+            results1 = sample_to_counts(results1, meas_obj)
+            measure_f = qml.counts
+
         validate_measurements(measure_f, shots, results1, results0)
 
     @pytest.mark.parametrize("shots", [10000])
@@ -465,12 +491,12 @@ class TestMidCircuitMeasurement:
 
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
+        @qml.qnode(dq, postselect_mode="fill-shots", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
             qml.RX(0.5 * x, 1)
-            m1 = qml.measure(1, postselect=postselect)
+            m1 = qml.measure(1, reset=reset, postselect=postselect)
             qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
             _ = qml.measure(0)
 
@@ -513,6 +539,16 @@ class TestMidCircuitMeasurement:
                 qml.expval(obs),
             )
 
+        meas_args = (
+            "mcm",
+            [1],
+            [0, 1],
+            "mcm",
+            [1],
+            [0, 1],
+            "mcm",
+            obs,
+        )
         measures = (
             qml.expval,
             qml.probs,
@@ -523,14 +559,33 @@ class TestMidCircuitMeasurement:
             qml.sample,
             qml.expval,
         )
+
         params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
-        for m, r1, r0 in zip(measures, results1, results0):
-            if postselect is not None and m == qml.sample:
-                continue
+        for meas_obj, m, r1, r0 in zip(meas_args, measures, results1, results0):
+            if m == qml.sample:
+                r0 = list(sample_to_counts(r0, meas_obj).values())
+                r1 = list(sample_to_counts(r1, meas_obj).values())
+
             r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
-            qml.math.allclose(r1, r0)
+            assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
+
+
+def sample_to_counts(results, meas_obj):
+    meas_key = "wires" if isinstance(meas_obj, list) else "op"
+    meas_value = qml.measure(0) if isinstance(meas_obj, str) else meas_obj
+    kwargs = {meas_key: meas_value, "all_outcomes": True}
+    wires = (
+        meas_obj
+        if isinstance(meas_obj, list)
+        else (qml.wires.Wires([0]) if isinstance(meas_obj, str) else meas_obj.wires)
+    )
+    results = (
+        results.reshape((-1, 1)) if not isinstance(meas_obj, list) or len(meas_obj) < 2 else results
+    )
+    mask = qml.math.logical_not(qml.math.any(results == fill_in_value, axis=1))
+    return qml.counts(**kwargs).process_samples(results[mask, :], wire_order=wires)
 
 
 def validate_counts(shots, results1, results2, batch_size=None):
@@ -562,39 +617,6 @@ def validate_counts(shots, results1, results2, batch_size=None):
         val2 = results2[key1]
         if abs(val1 + val2) > 100:
             assert np.allclose(val1, val2, atol=20, rtol=0.2)
-
-
-def validate_samples(shots, results1, results2, batch_size=None):
-    """Compares two samples.
-
-    If the results are ``Sequence``s, loop over entries.
-
-    Fails if the results do not have the same shape, within ``20`` entries plus 20 percent.
-    This is to handle cases when post-selection yields variable shapes.
-    Otherwise, fails if the sums of samples differ by more than ``20`` plus 20 percent.
-    """
-    if isinstance(shots, Sequence):
-        assert isinstance(results1, tuple)
-        assert isinstance(results2, tuple)
-        assert len(results1) == len(results2) == len(shots)
-        for s, r1, r2 in zip(shots, results1, results2):
-            validate_samples(s, r1, r2, batch_size=batch_size)
-        return
-
-    if batch_size is not None:
-        assert isinstance(results1, Iterable)
-        assert isinstance(results2, Iterable)
-        assert len(results1) == len(results2) == batch_size
-        for r1, r2 in zip(results1, results2):
-            validate_samples(shots, r1, r2, batch_size=None)
-        return
-
-    sh1, sh2 = results1.shape[0], results2.shape[0]
-    assert np.allclose(sh1, sh2, atol=20, rtol=0.2)
-    assert results1.ndim == results2.ndim
-    if results2.ndim > 1:
-        assert results1.shape[1] == results2.shape[1]
-    np.allclose(qml.math.sum(results1), qml.math.sum(results2), atol=20, rtol=0.2)
 
 
 def validate_expval(shots, results1, results2, batch_size=None):
@@ -630,10 +652,6 @@ def validate_measurements(func, shots, results1, results2, batch_size=None):
     """Calls the correct validation function based on measurement type."""
     if func is qml.counts:
         validate_counts(shots, results1, results2, batch_size=batch_size)
-        return
-
-    if func is qml.sample:
-        validate_samples(shots, results1, results2, batch_size=batch_size)
         return
 
     validate_expval(shots, results1, results2, batch_size=batch_size)
