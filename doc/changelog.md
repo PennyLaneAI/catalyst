@@ -90,6 +90,12 @@
 
 <h3>Improvements</h3>
 
+* An optional argument `use_device_shots` is introduced in `PartialProbs` to enable computing analytical probabilities mid-circuit even when the device has finite shots.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
+
+* Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
+
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
   only integer, continuous wire labels starting at 0 are allowed.
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
