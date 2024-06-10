@@ -59,20 +59,8 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
     if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
         // Check that the method is not finite difference, as finite difference should always be
         // available
-        auto gradOp = dyn_cast<GradOp>(op_state->getOperation());
-        auto jvpOp = dyn_cast<JVPOp>(op_state->getOperation());
-        auto vjpOp = dyn_cast<VJPOp>(op_state->getOperation());
-
-        if (!(gradOp || jvpOp || vjpOp))
-            return op_state->emitOpError("The gradient operation should be a grad, jvp or vjp.\n");
-
-        llvm::StringRef MethodName;
-        if (gradOp)
-            MethodName = gradOp.getMethod();
-        else if (jvpOp)
-            MethodName = jvpOp.getMethod();
-        else if (vjpOp)
-            MethodName = vjpOp.getMethod();
+        auto gradOpInterface = dyn_cast<GradientOpInterface>(op_state->getOperation());
+        llvm::StringRef MethodName = gradOpInterface.getMethod();
 
         if (MethodName != "fd") {
             return op_state->emitOpError(
