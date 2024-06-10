@@ -610,13 +610,13 @@ class QCtrl(HybridOp):
         assert len(self.regions) == 1, "Qctrl is expected to have one region"
 
         _check_no_measurements(self.regions[0].quantum_tape)
-        new_tape = qctrl_distribute(
+
+        return qctrl_distribute(
             self.regions[0].quantum_tape,
             self._control_wires,
             self._control_values,
             self._work_wires,
         )
-        return new_tape.operations
 
     @property
     def wires(self):
@@ -673,35 +673,36 @@ def qctrl_distribute(
         f"to the lenght of control_wires ({len(control_wires)})"
     )
     ctx = EvaluationContext.get_main_tracing_context()
-    ops2 = []
+    new_ops = []
     for op in tape.operations:
         if has_nested_tapes(op):
             if isinstance(op, QCtrl):
-                for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    tape2 = qctrl_distribute(
-                        region.quantum_tape,
-                        control_wires + op.control_wires,
-                        control_values + op.control_values,
-                        work_wires + op.work_wires,
-                    )
-                    ops2.extend(tape2.operations)
+                nested_ops = qctrl_distribute(
+                    op.regions[0].quantum_tape,
+                    control_wires + op.control_wires,
+                    control_values + op.control_values,
+                    work_wires + op.work_wires,
+                )
+                new_ops.extend(nested_ops)
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        region.quantum_tape = qctrl_distribute(
+                        nested_ops = qctrl_distribute(
                             region.quantum_tape, control_wires, control_values, work_wires
                         )
-                ops2.append(op)
+                        region.quantum_tape = QuantumTape(
+                            nested_ops, region.quantum_tape.measurements
+                        )
+                new_ops.append(op)
         else:
-            ops2.append(
-                create_controlled_op(
-                    copy.copy(op),
-                    control=control_wires,
-                    control_values=control_values,
-                    work_wires=work_wires,
-                )
+            ctrl_op = create_controlled_op(
+                copy.copy(op),
+                control=control_wires,
+                control_values=control_values,
+                work_wires=work_wires,
             )
-    return QuantumTape(ops2, tape.measurements)
+            new_ops.append(ctrl_op)
+    return new_ops
 
 
 ## PRIVATE ##
