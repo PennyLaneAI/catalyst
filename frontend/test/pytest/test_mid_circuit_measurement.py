@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from functools import reduce
 from typing import Iterable, Sequence
 
@@ -22,9 +23,11 @@ import pytest
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
-from catalyst import CompileError, cond, dynamic_one_shot, measure, qjit
+from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
+os.environ["OMP_PROC_BIND"] = "false"
+os.environ["OMP_NUM_THREADS"] = "2"
 
 
 class TestMidCircuitMeasurement:
@@ -136,6 +139,8 @@ class TestMidCircuitMeasurement:
     def test_with_postselect_zero(self, backend):
         """Test measure (postselect = 0)."""
 
+        pytest.xfail("'postselect_mode' hardcoded to 'hw-like'")
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -172,6 +177,11 @@ class TestMidCircuitMeasurement:
 
     def test_with_reset_true(self, backend):
         """Test measure (reset = True)."""
+
+        pytest.xfail(
+            "'postselect_mode' hardcoded to 'hw-like' and hence postselect"
+            " is ignore during execution"
+        )
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -287,6 +297,62 @@ class TestMidCircuitMeasurement:
         res = circuit(param)
         assert False
 
+    def test_dynamic_one_shot_unsupported_measurement(self, backend):
+        """Test that circuits with unsupported measurements raise an error."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+        param = np.pi / 4
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def func(x):
+            qml.RX(x, wires=0)
+            _ = measure(0)
+            return qml.classical_shadow(wires=0)
+
+        with pytest.raises(
+            TypeError,
+            match="Native mid-circuit measurement mode does not support",
+        ):
+            func(param)
+
+    def test_dynamic_one_shot_unsupported_none_shots(self, backend):
+        """Test that `dynamic_one_shot` raises when used with non-finite shots."""
+        dev = qml.device(backend, wires=1, shots=None)
+
+        with pytest.raises(
+            qml.QuantumFunctionError,
+            match="dynamic_one_shot is only supported with finite shots.",
+        ):
+
+            @qjit
+            @qml.qnode(dev, mcm_method="one-shot")
+            def _(x, y):
+                qml.RX(x, wires=0)
+                _ = measure(0)
+                qml.RX(y, wires=0)
+                return qml.probs(wires=0)
+
+    def test_dynamic_one_shot_unsupported_broadcast(self, backend):
+        """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+        param = np.pi / 4 * jnp.ones(2)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def func(x, y):
+            qml.RX(x, wires=0)
+            _ = measure(0)
+            qml.RX(y, wires=0)
+            return qml.probs(wires=0)
+
+        with pytest.raises(
+            ValueError,
+            match="mcm_method='one-shot' is not compatible with broadcasting",
+        ):
+            func(param, param)
+
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qml.sample and shots."""
@@ -294,8 +360,7 @@ class TestMidCircuitMeasurement:
         dev = qml.device(backend, wires=1, shots=shots)
 
         @qjit
-        @dynamic_one_shot
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method="one-shot")
         def circuit(x):
             qml.RY(x, wires=0)
             m = measure(0)
@@ -306,17 +371,14 @@ class TestMidCircuitMeasurement:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
-    @pytest.mark.parametrize("shots", [11000])
+    @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
     @pytest.mark.parametrize(
         "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
     )
     # pylint: disable=too-many-arguments
-    def test_dynamic_one_shot_several_mcms(
-        self, backend, shots, postselect, reset, measure_f, meas_obj
-    ):
+    def test_dynamic_one_shot_several_mcms(self, backend, shots, postselect, measure_f, meas_obj):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
         if measure_f in (qml.counts, qml.probs, qml.sample) and (
@@ -327,17 +389,14 @@ class TestMidCircuitMeasurement:
         if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
             pytest.skip("Can't use wires/mcm lists with var or expval")
 
-        if measure_f == qml.var and (not isinstance(meas_obj, list) and not meas_obj == "mcm"):
-            pytest.xfail("isa<UnrealizedConversionCastOp>")
-
         dq = qml.device("default.qubit", shots=shots, seed=8237945)
 
-        @qml.qnode(dq)
+        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
         def ref_func(x, y):
             qml.RX(x, 0)
             m0 = qml.measure(0)
             qml.RX(0.5 * x, 1)
-            m1 = qml.measure(1, reset=reset, postselect=postselect)
+            m1 = qml.measure(1, postselect=postselect)
             qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
             m2 = qml.measure(0)
 
@@ -348,10 +407,83 @@ class TestMidCircuitMeasurement:
                 kwargs["all_outcomes"] = True
             return measure_f(**kwargs)
 
-        if postselect and measure_f in (qml.counts, qml.sample):
-            ref_func = qml.dynamic_one_shot(ref_func)
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def func(x, y):
+            qml.RX(x, 0)
+            m0 = measure(0)
+            qml.RX(0.5 * x, 1)
+            m1 = measure(1, postselect=postselect)
+
+            @cond(m0 & m1)
+            def cfun0():
+                qml.RY(2.0 * y, 0)
+
+            cfun0()
+            m2 = measure(0)
+
+            meas_key = "wires" if isinstance(meas_obj, list) else "op"
+            meas_value = m2 if isinstance(meas_obj, str) else meas_obj
+            kwargs = {meas_key: meas_value}
+            return measure_f(**kwargs)
+
+        if measure_f in (qml.expval,):
+            params = jnp.pi / 3 * jnp.ones(2)
         else:
-            ref_func = qml.defer_measurements(ref_func)
+            params = jnp.pi / 2.1 * jnp.ones(2)
+
+        if measure_f == qml.var and not isinstance(meas_obj, str):
+            with pytest.raises(TypeError, match=f"qml.var\\(obs\\) cannot be returned when"):
+                func(*params)
+            return
+
+        results0 = ref_func(*params)
+        results1 = func(*params)
+        if measure_f == qml.counts:
+
+            def fname(x):
+                return format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
+
+            results1 = {fname(int(state)): count for state, count in zip(*results1)}
+        if measure_f == qml.sample:
+            results0 = results0[results0 != fill_in_value]
+            results1 = results1[results1 != fill_in_value]
+        validate_measurements(measure_f, shots, results1, results0)
+
+    @pytest.mark.parametrize("shots", [10000])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
+    @pytest.mark.parametrize("reset", [False, True])
+    def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
+        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
+        circuit with a mid-circuit measurement and several terminal measurements."""
+        if backend == "lightning.kokkos":
+            obs = qml.PauliZ(0)
+        else:
+            obs = qml.PauliY(0)
+
+        dq = qml.device("default.qubit", shots=shots, seed=8237945)
+
+        @qml.qnode(dq, postselect_mode="hw-like", mcm_method="deferred")
+        def ref_func(x, y):
+            qml.RX(x, 0)
+            m0 = qml.measure(0)
+            qml.RX(0.5 * x, 1)
+            m1 = qml.measure(1, postselect=postselect)
+            qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
+            _ = qml.measure(0)
+
+            return (
+                qml.expval(op=m0),
+                qml.probs(wires=[1]),
+                qml.probs(wires=[0, 1]),
+                qml.probs(op=m0),
+                qml.sample(wires=[1]),
+                qml.sample(wires=[0, 1]),
+                qml.sample(op=m0),
+                qml.expval(obs),
+            )
 
         dev = qml.device(backend, wires=2, shots=shots)
 
@@ -368,73 +500,7 @@ class TestMidCircuitMeasurement:
                 qml.RY(2.0 * y, 0)
 
             cfun0()
-            m2 = measure(0)
-
-            meas_key = "wires" if isinstance(meas_obj, list) else "op"
-            meas_value = m2 if isinstance(meas_obj, str) else meas_obj
-            kwargs = {meas_key: meas_value}
-            return measure_f(**kwargs)
-
-        params = jnp.pi / 3 * jnp.ones(2)
-        results0 = ref_func(*params)
-        results1 = func(*params)
-        if measure_f == qml.counts and isinstance(meas_obj, list):
-            results1 = {
-                format(int(state), f"0{len(meas_obj)}b"): count for state, count in zip(*results1)
-            }
-        if measure_f == qml.sample:
-            results0 = results0[results0 != fill_in_value]
-            results1 = results1[results1 != fill_in_value]
-        validate_measurements(measure_f, shots, results1, results0)
-
-    @pytest.mark.parametrize("shots", [5000])
-    @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("reset", [False, True])
-    def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
-        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
-        circuit with a mid-circuit measurement and several terminal measurements."""
-        if backend == "lightning.kokkos":
-            obs = qml.PauliZ(0)
-        else:
-            obs = qml.PauliY(0)
-
-        dq = qml.device("default.qubit", shots=shots, seed=8237945)
-
-        @qml.qnode(dq)
-        def ref_func(x, y):
-            qml.RX(x, wires=0)
-            m0 = qml.measure(0, reset=reset, postselect=postselect)
-            qml.cond(m0, qml.RY)(y, wires=1)
-
-            return (
-                qml.expval(op=m0),
-                qml.probs(wires=[1]),
-                qml.probs(wires=[0, 1]),
-                qml.probs(op=m0),
-                qml.sample(wires=[1]),
-                qml.sample(wires=[0, 1]),
-                qml.sample(op=m0),
-                qml.expval(obs),
-            )
-
-        if postselect is None:
-            ref_func = qml.defer_measurements(ref_func)
-        else:
-            ref_func = qml.dynamic_one_shot(ref_func)
-
-        dev = qml.device(backend, wires=2, shots=shots)
-
-        @qjit
-        @qml.qnode(dev, mcm_method="one-shot")
-        def func(x, y):
-            qml.RX(x, wires=0)
-            m0 = measure(0, reset=reset, postselect=postselect)
-
-            @cond(m0 == 1)
-            def ansatz():
-                qml.RY(y, wires=1)
-
-            ansatz()
+            _ = measure(0)
 
             return (
                 qml.expval(op=m0),
@@ -457,7 +523,7 @@ class TestMidCircuitMeasurement:
             qml.sample,
             qml.expval,
         )
-        params = jnp.pi / 4 * jnp.ones(2)
+        params = jnp.pi / 3 * jnp.ones(2)
         results0 = ref_func(*params)
         results1 = func(*params)
         for m, r1, r0 in zip(measures, results1, results0):

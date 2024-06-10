@@ -18,6 +18,7 @@ included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 """
 
 import copy
+import sys
 from collections.abc import Sized
 from typing import Any, Callable, List, Optional, Union
 
@@ -26,7 +27,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Operator
+from pennylane.operation import Observable, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
@@ -48,6 +49,8 @@ from catalyst.jax_tracer import (
     trace_quantum_tape,
 )
 from catalyst.tracing.contexts import EvaluationContext
+
+pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
 
 
 ## API ##
@@ -146,15 +149,15 @@ def measure(
 
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+    # TODO: Move these values into separate attributes of the MidCircuitMeasure class
     in_classical_tracers.append(postselect)
+    in_classical_tracers.append(reset)
 
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
         regions=[],
-        reset=reset,
-        postselect=postselect,
     )
 
     # If reset was requested, reset qubit only if the measurement result was 1
@@ -169,7 +172,7 @@ def measure(
     return m
 
 
-def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
+def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator]:
     """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
@@ -183,6 +186,11 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
+        lazy (bool): Whether to delay the computation of the Hermitian conjugate until a later time
+                     (typically during decomposition or compilation). The default is ``True``,
+                     whereas ``False`` will immediately produce a new operator implementing the
+                     adjoint. Note that ``False`` is only supported when the adjoint is applied to
+                     a single Operator, rather than a quantum function.
 
     Returns:
         If an Operator is provided, returns an Operator that is the adjoint. If
@@ -230,54 +238,13 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     [1.00000000e+00 7.39557099e-32]
     """
 
-    if not EvaluationContext.is_tracing():
-        return qml.adjoint(f)
+    adj = AdjointCallable(f, lazy=lazy)
 
-    def _call_handler(*args, _callee: Callable, **kwargs):
-        EvaluationContext.check_is_quantum_tracing(
-            "catalyst.adjoint can only be used from within a qml.qnode."
-        )
-        ctx = EvaluationContext.get_main_tracing_context()
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _, _ = deduce_avals(_callee, args, kwargs)
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
-            quantum_tape = QuantumTape()
-            with QueuingManager.stop_recording(), quantum_tape:
-                # FIXME: move all full_raise calls into a separate function
-                res_classical_tracers = [
-                    inner_trace.full_raise(t)
-                    for t in wffa.call_wrapped(*arg_classical_tracers)
-                    if isinstance(t, DynamicJaxprTracer)
-                ]
+    if isinstance(f, Operator):
+        # Return an instantiated version of the Adjoint class if we receive an operator instance.
+        adj = adj()
 
-            _check_no_measurements(quantum_tape)
-
-            adjoint_region = HybridOpRegion(
-                inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
-            )
-
-        return Adjoint(
-            in_classical_tracers=in_classical_tracers,
-            out_classical_tracers=[],
-            regions=[adjoint_region],
-        )
-
-    if isinstance(f, Callable):
-
-        def _callable(*args, **kwargs):
-            return _call_handler(*args, _callee=f, **kwargs)
-
-        return _callable
-    elif isinstance(f, Operator):
-        QueuingManager.remove(f)
-
-        def _callee():
-            QueuingManager.append(f)
-
-        return _call_handler(_callee=_callee)
-    else:
-        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
+    return adj
 
 
 def ctrl(
@@ -395,20 +362,17 @@ class MidCircuitMeasure(HybridOp):
     binder = qmeasure_p.bind
 
     def __init__(self, *args, **kwargs):
-        self.bypass_postselect = kwargs.pop("bypass_postselect", False)
-        self.postselect = kwargs.pop("postselect", None)
-        self.reset = kwargs.pop("reset", False)
         super().__init__(*args, **kwargs)
+        self.postselect = self.in_classical_tracers[-2]
+        self.reset = self.in_classical_tracers[-1]
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        if self.bypass_postselect:
-            qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
-        else:
-            postselect = op.in_classical_tracers[1]
-            qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+        # TODO: execute post-selection depending on qnode config
+        # qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=op.postselect)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -417,17 +381,136 @@ class MidCircuitMeasure(HybridOp):
         return hash(hsh + hash(self.out_classical_tracers[0]))
 
 
-class Adjoint(HybridOp):
-    """PennyLane's adjoint operation"""
+class AdjointCallable:
+    """Callable wrapper to produce an adjoint instance."""
+
+    def __init__(self, target, lazy):
+        self.target = target
+        self.lazy = lazy
+
+        if isinstance(target, Operator):
+            # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
+            # We still want to be able to trace a "body function" for the HybridOp, while ensuring
+            # the produced operation behaves exactly like Adjoint(f) from PennyLane.
+            # Allow invoking callee to get the target, similar to the constructor case.
+            self.callee = lambda: QueuingManager.append(target) or target
+            self.single_op = True
+        elif isinstance(target, type) and issubclass(target, Operator):
+            # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
+            # This case should be identical to the one above except we can use the constructor
+            # directly to trace the body function.
+            self.callee = target
+            self.single_op = True
+        elif isinstance(target, Callable):
+            # Case 3: User passed an arbitrary callable that will instantiate operations.
+            # We want to create a callable that will generate an "opaque" Adjoint object.
+            # This object differs from the Adjoint in PennyLane because that one can only be
+            # instantiated on single operations.
+            self.callee = target
+            self.single_op = False
+        else:
+            raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
+
+        if not self.lazy and not self.single_op:
+            # Supporting this for a qfunc is technically possible by invoking the decomposition on
+            # HybridAdjoint with laza=False, however one would need to outline the classical jaxpr
+            # into the outer scope, and possibly re-mapping tracers in the quantum operators,
+            # in order to avoid escaped tracers which indicate an invalid program.
+            raise ValueError(
+                "Eagerly computing the adjoint (lazy=False) is only supported on single operators."
+            )
+
+    def __call__(self, *args, **kwargs):
+        # Eager computation of the adjoint, does not create a Adjoint/HybridAdjoint instance.
+        if not self.lazy and self.target.has_adjoint:
+            with QueuingManager.stop_recording():
+                base_op = self.callee(*args, **kwargs)
+
+            adj = base_op.adjoint()
+            QueuingManager.remove(base_op)
+            QueuingManager.append(adj)
+            return adj
+
+        tracing_artifacts = self.trace_body(args, kwargs)
+
+        if self.single_op:
+            with QueuingManager.stop_recording():
+                base_op = self.callee(*args, **kwargs)
+            return Adjoint(base_op, tracing_artifacts)
+
+        return HybridAdjoint(*tracing_artifacts)
+
+    def trace_body(self, args, kwargs):
+        """Generate a HybridOpRegion for use by Catalyst."""
+
+        # Allow the creation of HybridAdjoint instances outside of any contexts.
+        # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
+        if not EvaluationContext.is_tracing():
+            # QuantumTapes can themselves appear in queuing records.
+            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+                self.callee(*args, **kwargs)
+
+            adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
+
+            return [], [], [adjoint_region]
+
+        # Create a nested jaxpr scope for the body of the adjoint.
+        ctx = EvaluationContext.get_main_tracing_context()
+        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+            in_classical_tracers, _ = tree_flatten((args, kwargs))
+            wffa, in_avals, _, _ = deduce_avals(self.callee, args, kwargs)
+            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+                # FIXME: move all full_raise calls into a separate function
+                res_classical_tracers = [
+                    inner_trace.full_raise(t)
+                    for t in wffa.call_wrapped(*arg_classical_tracers)
+                    if isinstance(t, DynamicJaxprTracer)
+                ]
+
+            _check_no_measurements(quantum_tape)
+
+            adjoint_region = HybridOpRegion(
+                inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
+            )
+
+        return in_classical_tracers, [], [adjoint_region]
+
+
+class HybridAdjoint(HybridOp):
+    """This class provides Catalyst-specific adjoint functionality, including tracing to a JAX
+    primitive and managing the nested scope/tape, while also being a PennyLane operation itself
+    than can be queued in a quantum context."""
 
     binder = adjoint_p.bind
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+    # pylint: disable=super-init-not-called,non-parent-init-called
+    def __init__(self, in_classical_tracers, out_classical_tracers, regions):
+        self.in_classical_tracers = in_classical_tracers
+        self.out_classical_tracers = out_classical_tracers
+        self.regions = regions
+
+        # Only call the parent constructor if this class is initialized directly.
+        # Calling Operation.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
+        # class, because both Operation and SymbolicOp init methods are used. Since PL doesn't do
+        # this either they are probably not meant to be initialized together.
+        # pylint: disable=unidiomatic-typecheck
+        if type(self) is HybridAdjoint:
+            Operator.__init__(self, wires=Wires(self.num_wires))
+
+    def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
         op = self
         body_trace = op.regions[0].trace
         body_tape = op.regions[0].quantum_tape
         res_classical_tracers = op.regions[0].res_classical_tracers
-        with EvaluationContext.frame_tracing_context(ctx, body_trace):
+
+        # Handle ops that were instantiated outside of a tracing context.
+        if body_trace is None:
+            frame_ctx = EvaluationContext.frame_tracing_context(ctx)
+        else:
+            frame_ctx = EvaluationContext.frame_tracing_context(ctx, body_trace)
+
+        with frame_ctx as body_trace:
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
@@ -452,6 +535,64 @@ class Adjoint(HybridOp):
         assert len(self.regions) == 1, "Adjoint is expected to have one region"
         total_wires = sum((op.wires for op in self.regions[0].quantum_tape.operations), [])
         return total_wires
+
+    def decomposition(self):
+        """Resolve the Adjoint region by propagating the adjoint modifier to nested operations
+        in reverse."""
+        assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
+
+        # While catalyst.adjoint would be just as valid since it is PL compatible for single ops,
+        # going to PennyLane's adjoint skips unnecessarily re-queuing the base operation in each
+        # HybridOp's nested tape when qjit is not active.
+        return [qml.adjoint(op) for op in reversed(self.regions[0].quantum_tape.operations)]
+
+
+class Adjoint:
+    """This class provides near identical behaviour as PennyLane for adjoint instances with only a
+    single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
+
+    def __new__(cls, base_op, _tracing_artifacts):
+        if isinstance(base_op, Operation) and isinstance(base_op, Observable):
+            return object.__new__(AdjointOpObs)
+        if isinstance(base_op, Operation):
+            return object.__new__(AdjointOperation)
+        elif isinstance(base_op, Observable):
+            return object.__new__(AdjointObs)
+
+        return object.__new__(AdjointBase)
+
+    def __init__(self, base_op, tracing_artifacts):
+        # Grab the constructor from the PennyLane base class.
+        super().__init__(base_op)
+        HybridAdjoint.__init__(self, *tracing_artifacts)
+
+    # These attributes are provided by the mixin class.
+    # pylint: disable=no-member
+    def _flatten(self):
+        tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
+        return (self.base, tracing_artifacts), tuple()
+
+    @classmethod
+    def _unflatten(cls, data, _):
+        return cls(*data)
+
+
+# HybridAdjoint is also mixed in because the PL class needs to sit between Adjoint & HybridAdjoint.
+# Thus Adjoint cannot be made to inherit from HybridAdjoint directly.
+class AdjointOperation(Adjoint, pl_adjoint_module.AdjointOperation, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for Operations."""
+
+
+class AdjointObs(Adjoint, pl_adjoint_module.AdjointObs, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for Observables."""
+
+
+class AdjointOpObs(Adjoint, pl_adjoint_module.AdjointOpObs, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for Operations that are also Observables."""
+
+
+class AdjointBase(Adjoint, pl_adjoint_module.Adjoint, HybridAdjoint):
+    """Replicate mixin class structure from PennyLane for an unkown Operator type."""
 
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches

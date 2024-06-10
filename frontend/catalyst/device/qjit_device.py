@@ -110,14 +110,14 @@ class BackendInfo:
     kwargs: Dict[str, Any]
 
 
+# pylint: disable=too-many-branches
 @debug_logger
 def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
-    # pylint: disable=too-many-branches
 
     dname = device.name
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         dname = device.short_name
 
     device_name = ""
@@ -146,7 +146,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        if isinstance(device, qml.Device):
+        if isinstance(device, qml.devices.LegacyDevice):
             device_kwargs["shots"] = device.shots if device.shots else 0
         else:
             # TODO: support shot vectors
@@ -212,7 +212,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     if all(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_config.native_ops.update(
             {
-                "Adjoint": OperationProperties(
+                "HybridAdjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
@@ -481,7 +481,7 @@ def validate_device_capabilities(
       ``device.observables``.
 
     Args:
-        device (qml.Device): An instance of a quantum device.
+        device (qml.devices.LegacyDevice): An instance of a quantum device.
         config (TOMLDocument): A TOML document representation.
 
     Raises: CompileError
@@ -493,7 +493,7 @@ def validate_device_capabilities(
             f"Config is not marked as qjit-compatible"
         )
 
-    device_name = device.short_name if isinstance(device, qml.Device) else device.name
+    device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
 
     native = pennylane_operation_set(device_capabilities.native_ops)
     decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)

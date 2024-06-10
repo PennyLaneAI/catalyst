@@ -33,8 +33,6 @@ from pennylane.measurements import (
 )
 from pennylane.transforms.dynamic_one_shot import (
     init_auxiliary_tape,
-    is_mcm,
-    null_postprocessing,
     parse_native_mid_circuit_measurements,
 )
 
@@ -86,7 +84,7 @@ class QFunc:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, capabilities)
 
-    # pylint: disable=no-member, attribute-defined-outside-init
+    # pylint: disable=no-member
     @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
@@ -147,12 +145,12 @@ def dynamic_one_shot(qnode):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 
     Args:
-        qnode (QNode): a quantum circuit which will run n-shot times
+        qnode (QNode): a quantum circuit which will run ``num_shots`` times
 
     Returns:
         qnode (QNode):
 
-        The transformed circuit to be run n-shot times such as to simulate dynamic execution.
+        The transformed circuit to be run ``num_shots`` times such as to simulate dynamic execution.
 
 
     **Example**
@@ -187,16 +185,18 @@ def dynamic_one_shot(qnode):
     aux_tapes = None
 
     def transform_to_single_shot(qnode):
-        nonlocal cpy_tape
-        nonlocal aux_tapes
+
+        if not qnode.device.shots:
+            raise qml.QuantumFunctionError("dynamic_one_shot is only supported with finite shots.")
 
         @qml.transform
         def dynamic_one_shot_partial(
-            tape: qml.tape.QuantumTape, **kwargs
+            tape: qml.tape.QuantumTape,
         ) -> (Sequence[qml.tape.QuantumTape], Callable):
 
-            if not any(is_mcm(o) for o in tape.operations):
-                return (tape,), null_postprocessing
+            nonlocal cpy_tape
+            cpy_tape = tape
+            nonlocal aux_tapes
 
             for m in tape.measurements:
                 if not isinstance(
@@ -206,26 +206,15 @@ def dynamic_one_shot(qnode):
                         f"Native mid-circuit measurement mode does not support {type(m).__name__} "
                         "measurements."
                     )
-            _ = kwargs.get("device", None)
+                if isinstance(m, VarianceMP) and m.obs:
+                    raise TypeError(
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
+                        "the Catalyst compiler does not handle qml.sample(obs)."
+                    )
 
-            if not tape.shots:
-                raise qml.QuantumFunctionError(
-                    "dynamic_one_shot is only supported with finite shots."
-                )
+            if tape.batch_size is not None:
+                raise ValueError("mcm_method='one-shot' is not compatible with broadcasting")
 
-            samples_present = any(isinstance(mp, SampleMP) for mp in tape.measurements)
-            postselect_present = any(
-                op.postselect is not None for op in tape.operations if is_mcm(op)
-            )
-            if postselect_present and samples_present and tape.batch_size is not None:
-                raise ValueError(
-                    "Returning qml.sample is not supported when postselecting mid-circuit "
-                    "measurements with broadcasting"
-                )
-
-            nonlocal cpy_tape
-            cpy_tape = tape
-            nonlocal aux_tapes
             aux_tapes = [init_auxiliary_tape(tape)]
 
             def processing_fn(results):
@@ -237,11 +226,11 @@ def dynamic_one_shot(qnode):
 
     single_shot_qnode = transform_to_single_shot(qnode)
     shots = qnode.device.shots
-    total_shots = shots if isinstance(qnode.device, qml.Device) else shots.total_shots
+    total_shots = shots if isinstance(qnode.device, qml.devices.LegacyDevice) else shots.total_shots
 
     def one_shot_wrapper(*args, **kwargs):
         single_shot_qnode.device._shots = (
-            1 if isinstance(qnode.device, qml.Device) else qml.measurements.Shots(1)
+            1 if isinstance(qnode.device, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
         )
         arg_vmap = jnp.empty((total_shots,), dtype=float)
 
