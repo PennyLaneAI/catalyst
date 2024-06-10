@@ -173,7 +173,7 @@ def dynamic_one_shot(qnode):
         @qml.transform
         def dynamic_one_shot_partial(
             tape: qml.tape.QuantumTape,
-        ) -> (Sequence[qml.tape.QuantumTape], Callable):
+        ) -> tuple[Sequence[qml.tape.QuantumTape], Callable]:
 
             nonlocal cpy_tape
             cpy_tape = tape
