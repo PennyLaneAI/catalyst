@@ -161,40 +161,57 @@ def hybrid_function(x):
 	return jnp.sin(circuit(x)) ** 2
 ```
 
+```pycon
+>>> hybrid_function(0.543)
+array(0.70807342)
+```
+
 We can also consider an example that includes a classical optimization loop, such as optimizing a
 quantum computer to find the ground state energy of a molecule:
 
 ```python
-import jaxopt
-from catalyst import grad
+import pennylane as qml
+from catalyst import qjit, grad, for_loop
+from jax import numpy as jnp
+import optax
 
-molecule = qml.data.load("qchem", molname="H3+")[0]
-n_qubits = len(molecule.hamiltonian.wires)
+mol = qml.data.load("qchem", molname="H3+")[0]
+n_qubits = len(mol.hamiltonian.wires)
 
 dev = qml.device("lightning.qubit", wires=n_qubits)
 
 @qjit
 @qml.qnode(dev)
 def cost(params):
-    qml.BasisState(molecule.hf_state, wires=range(n_qubits))
+    qml.BasisState(jnp.array(mol.hf_state), wires=range(n_qubits))
     qml.DoubleExcitation(params[0], wires=[0, 1, 2, 3])
     qml.DoubleExcitation(params[1], wires=[0, 1, 4, 5])
-    return qml.expval(molecule.hamiltonian)
+    return qml.expval(mol.hamiltonian)
 
-@qjit
-def workflow(init_params):
-    loss = lambda x: (cost(params), grad(cost)(params)[0])
-    opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
+opt = optax.adam(learning_rate=0.3)
 
-    update_step = lambda step, args: tuple(opt.update(*args))
+@qml.qjit
+def optimization(params):
+    opt_state = opt.init(params)
 
-    params = init_params
-    state = opt.init_state(params)
-    (param, _) = for_loop(0, 10, step=1)(update_step)((params, state))
-    return param
+    def update_step(i, args):
+        params, opt_state = args
+        grads = grad(cost)(params)
+        updates, opt_state = opt.update(grads, opt_state)
+        params = optax.apply_updates(params, updates)
+        return (params, opt_state)
 
-params = jnp.array([0.54, 0.3154])
-workflow(params)
+    (params, opt_state) = qml.for_loop(0, 100, 1)(update_step)((params, opt_state))
+    return params
+```
+
+```pycon
+>>> params = jnp.array([0.54, 0.3154])
+>>> final_params = optimization(params)
+>>> cost(final_params)  # optimized energy of H3+
+-1.2621747418777423
+>>> mol.vqe_energy  # expected energy of H3+
+-1.2613407428534986
 ```
 
 Here, we are using the JAXopt gradient optimization library [@blondel2022efficient] alongside the
