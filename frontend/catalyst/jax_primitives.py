@@ -1632,8 +1632,8 @@ def _for_loop_lowering(
         # Re-order arguments in accordance with jax dynamic API convensions
         consts = body_consts
         loop_iter = body_args[0]
-        implicit_args = body_args[1:nimplicit+1]
-        explicit_args = body_args[nimplit +1:]
+        implicit_args = body_args[1 : nimplicit + 1]
+        explicit_args = body_args[nimplicit + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
         body_args = [[param] for param in loop_params]
 

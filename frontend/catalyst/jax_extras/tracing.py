@@ -382,9 +382,7 @@ def deduce_signatures(
     flat_args, in_tree = tree_flatten((args, kwargs))
     trace: DynamicJaxprTrace = find_top_trace(flat_args)
     flat_tracers = [trace.full_raise(a) for a in flat_args]
-    in_expanded_args, in_type = expand_args(
-        flat_tracers, expansion_strategy=expansion_strategy
-    )
+    in_expanded_args, in_type = expand_args(flat_tracers, expansion_strategy=expansion_strategy)
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun(wf, (in_type, expansion_strategy))

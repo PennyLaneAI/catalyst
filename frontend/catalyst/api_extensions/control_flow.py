@@ -927,7 +927,9 @@ class ForLoop(HybridOp):
 
             region = self.regions[0]
             arg_tracers = region.arg_classical_tracers + [qreg_in]
-            arg_expanded_tracers, _ = expand_args(arg_tracers, expansion_strategy=expansion_strategy)
+            arg_expanded_tracers, _ = expand_args(
+                arg_tracers, expansion_strategy=expansion_strategy
+            )
 
             nimplicit = len(arg_expanded_tracers) - len(arg_tracers) - 1
 
@@ -936,7 +938,7 @@ class ForLoop(HybridOp):
             res_expanded_tracers, _ = expand_results(
                 [],
                 arg_expanded_tracers,
-                res_tracers
+                res_tracers,
                 expansion_strategy=expansion_strategy,
                 num_implicit_inputs=nimplicit,
             )
@@ -945,7 +947,9 @@ class ForLoop(HybridOp):
         operand_tracers = op.in_classical_tracers
         const_tracers = [trace.full_raise(c) for c in consts]
         const_expanded_tracers = expand_args
-        operand_expanded_tracers, _ = expand_args(operand_tracers, expansion_strategy=expansion_strategy)
+        operand_expanded_tracers, _ = expand_args(
+            operand_tracers, expansion_strategy=expansion_strategy
+        )
         qreg_tracer = qrp.actualize()
         in_expanded_tracers = [*const_tracers, *operand_expanded_tracers, qreg_tracer]
 
