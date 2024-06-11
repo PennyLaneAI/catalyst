@@ -33,6 +33,19 @@ using namespace mlir;
 
 namespace catalyst {
 namespace gradient {
+// Prototypes
+static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, mlir::Operation *gradOp,
+                                           mlir::OperandRange argOperands, func::FuncOp callee,
+                                           SmallVectorImpl<Value> &backpropArgs);
+static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
+                                        func::FuncOp qnode);
+static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
+                                        llvm::StringRef fnName, FunctionType fnType,
+                                        func::FuncOp callee, size_t numGradients,
+                                        ValueTypeRange<ResultRange> resultTypes,
+                                        const std::vector<size_t> &diffArgIndices,
+                                        mlir::DenseIntElementsAttr diffArgIndicesAttr,
+                                        TypeRange valTypes);
 
 /// Given a statically-shaped tensor type, execute `processWithIndices` for every entry of the
 /// tensor. For example, a tensor<3x2xf64> will cause `processWithIndices` to be called with
@@ -112,10 +125,14 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
     }
 }
 
-FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rewriter,
-                                                            GradOp gradOp, func::FuncOp callee,
-                                                            SmallVectorImpl<Value> &backpropArgs)
+/// Recursively process all the QNodes of the `callee` being differentiated. The resulting
+/// BackpropOps will be called with `backpropArgs`.
+static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, mlir::Operation *gradOp,
+                                           mlir::OperandRange argOperands, func::FuncOp callee,
+                                           SmallVectorImpl<Value> &backpropArgs)
 {
+    assert(gradOp && "Operation pointer is null");
+
     Location loc = callee.getLoc();
     std::string clonedCalleeName = (callee.getName() + ".cloned").str();
     func::FuncOp clonedCallee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
@@ -169,8 +186,7 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
                 rewriter.setInsertionPoint(gradOp);
 
                 Value paramCount =
-                    rewriter.create<func::CallOp>(loc, paramCountFn, gradOp.getArgOperands())
-                        .getResult(0);
+                    rewriter.create<func::CallOp>(loc, paramCountFn, argOperands).getResult(0);
                 backpropArgs.push_back(paramCount);
                 // If the callee is a QNode, we want to backprop through the split preprocessed
                 // version.
@@ -208,7 +224,8 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
     SmallVector<Value> backpropArgs(op.getArgOperands());
-    FailureOr<func::FuncOp> clonedCallee = cloneCallee(rewriter, op, callee, backpropArgs);
+    FailureOr<func::FuncOp> clonedCallee =
+        cloneCallee(rewriter, op, op.getArgOperands(), callee, backpropArgs);
     if (failed(clonedCallee)) {
         return failure();
     }
@@ -221,16 +238,30 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
         fullGradArgTypes.push_back(rewriter.getIndexType());
     }
 
+    // Define the properties of the full gradient function.
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+    std::stringstream uniquer;
+    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
+    std::string fnName = op.getCallee().str() + ".fullgrad" + uniquer.str();
+
     func::FuncOp fullGradFn =
-        genFullGradFunction(rewriter, op.getLoc(), op, *clonedCallee,
-                            rewriter.getFunctionType(fullGradArgTypes, op.getResultTypes()));
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
+
+    if (!fullGradFn) {
+        fullGradFn =
+            genFullGradFunction(rewriter, op.getLoc(), fnName,
+                                rewriter.getFunctionType(fullGradArgTypes, op.getResultTypes()),
+                                *clonedCallee, op->getNumResults(), op.getResultTypes(),
+                                diffArgIndices, op.getDiffArgIndicesAttr(), TypeRange{});
+    }
 
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, backpropArgs);
     return success();
 }
 
-func::FuncOp HybridGradientLowering::genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
-                                                         func::FuncOp qnode)
+/// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
+/// see that the gate parameters flow into the custom quantum function.
+static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc, func::FuncOp qnode)
 {
     std::string fnName = (qnode.getName() + ".quantum").str();
     SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
@@ -286,144 +317,211 @@ func::FuncOp HybridGradientLowering::genQNodeQuantumOnly(PatternRewriter &rewrit
     return modifiedCallee;
 }
 
-func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewriter, Location loc,
-                                                         GradOp gradOp, func::FuncOp callee,
-                                                         FunctionType fnType)
+/// Generate a function that computes a Jacobian row-by-row using one or more BackpropOps.
+static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
+                                        llvm::StringRef fnName, FunctionType fnType,
+                                        func::FuncOp callee, size_t numGradients,
+                                        ValueTypeRange<ResultRange> resultTypes,
+                                        const std::vector<size_t> &diffArgIndices,
+                                        mlir::DenseIntElementsAttr diffArgIndicesAttr,
+                                        TypeRange valTypes)
 {
-    // Define the properties of the full gradient function.
-    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(gradOp.getDiffArgIndices());
-    std::stringstream uniquer;
-    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
-    std::string fnName = gradOp.getCallee().str() + ".fullgrad" + uniquer.str();
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    rewriter.setInsertionPointAfter(callee);
 
-    func::FuncOp fullGradFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, rewriter.getStringAttr(fnName));
-    if (!fullGradFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointAfter(callee);
+    func::FuncOp fullGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType);
+    fullGradFn.setPrivate();
+    Block *entryBlock = fullGradFn.addEntryBlock();
+    rewriter.setInsertionPointToStart(entryBlock);
 
-        fullGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType);
-        fullGradFn.setPrivate();
-        Block *entryBlock = fullGradFn.addEntryBlock();
-        rewriter.setInsertionPointToStart(entryBlock);
-
-        SmallVector<Value> backpropResults{gradOp.getNumResults()};
-        // Iterate over the primal results
-        for (const auto &[cotangentIdx, primalResult] : llvm::enumerate(callee.getResultTypes())) {
-            // There is one Jacobian per distinct differential argument.
-            SmallVector<Value> jacobians;
-            for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
-                Type jacobianType =
-                    gradOp.getResultTypes()[argIdx + cotangentIdx * diffArgIndices.size()];
-                if (auto tensorType = dyn_cast<RankedTensorType>(jacobianType)) {
-                    jacobians.push_back(rewriter.create<tensor::EmptyOp>(
-                        loc, tensorType.getShape(), tensorType.getElementType()));
-                }
-                else {
-                    jacobians.push_back(rewriter.create<arith::ConstantFloatOp>(
-                        loc, APFloat(0.0), cast<FloatType>(jacobianType)));
-                }
-            }
-
-            if (auto primalTensorResultType = dyn_cast<RankedTensorType>(primalResult)) {
-                // Loop over every entry of this result, creating a one-hot cotangent vector and
-                // running a backward pass via the BackpropOp.
-                iterateOverEntries(
-                    primalTensorResultType, rewriter, loc,
-                    [&, cotangentIdx = cotangentIdx](ValueRange indices) {
-                        // Initialize cotangents for all of the primal outputs
-                        SmallVector<Value> cotangents;
-                        initializeCotangents(callee.getResultTypes(), cotangentIdx, indices,
-                                             rewriter, loc, cotangents);
-
-                        auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                            loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
-                            entryBlock->getArguments(),
-                            /*arg_shadows=*/ValueRange{},
-                            /*primal results=*/ValueRange{}, cotangents,
-                            gradOp.getDiffArgIndicesAttr());
-
-                        // Backprop gives a gradient of a single output entry w.r.t.
-                        // all active inputs. Catalyst gives transposed Jacobians,
-                        // such that the Jacobians have shape
-                        // [...shape_outputs, ...shape_inputs,].
-                        for (const auto &[backpropIdx, jacobianSlice] :
-                             llvm::enumerate(backpropOp.getResults())) {
-                            if (auto sliceType =
-                                    dyn_cast<RankedTensorType>(jacobianSlice.getType())) {
-                                size_t sliceRank = sliceType.getRank();
-                                auto jacobianType =
-                                    cast<RankedTensorType>(jacobians[backpropIdx].getType());
-                                size_t jacobianRank = jacobianType.getRank();
-                                if (sliceRank < jacobianRank) {
-                                    // Offsets are [0] * rank of backprop result + [...indices]
-                                    SmallVector<OpFoldResult> offsets;
-                                    offsets.append(indices.begin(), indices.end());
-                                    offsets.append(sliceRank, rewriter.getIndexAttr(0));
-
-                                    // Sizes are [1] * (jacobianRank - sliceRank) +
-                                    // [...sliceShape]
-                                    SmallVector<OpFoldResult> sizes;
-                                    sizes.append(jacobianRank - sliceRank,
-                                                 rewriter.getIndexAttr(1));
-                                    for (int64_t dim : sliceType.getShape()) {
-                                        sizes.push_back(rewriter.getIndexAttr(dim));
-                                    }
-
-                                    // Strides are [1] * jacobianRank
-                                    SmallVector<OpFoldResult> strides{jacobianRank,
-                                                                      rewriter.getIndexAttr(1)};
-
-                                    jacobians[backpropIdx] = rewriter.create<tensor::InsertSliceOp>(
-                                        loc, jacobianSlice, jacobians[backpropIdx], offsets, sizes,
-                                        strides);
-                                }
-                                else {
-                                    jacobians[backpropIdx] = jacobianSlice;
-                                }
-                            }
-                            else {
-                                assert(isa<FloatType>(jacobianSlice.getType()));
-                                jacobians[backpropIdx] = rewriter.create<tensor::InsertOp>(
-                                    loc, jacobianSlice, jacobians[backpropIdx], indices);
-                            }
-                            backpropResults[backpropIdx + cotangentIdx * diffArgIndices.size()] =
-                                jacobians[backpropIdx];
-                        }
-                    });
+    SmallVector<Value> backpropValResults;
+    SmallVector<Value> backpropGradResults{numGradients};
+    // Iterate over the primal results
+    for (const auto &[cotangentIdx, primalResult] : llvm::enumerate(callee.getResultTypes())) {
+        // There is one Jacobian per distinct differential argument.
+        SmallVector<Value> jacobians;
+        for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
+            Type jacobianType = resultTypes[argIdx + cotangentIdx * diffArgIndices.size()];
+            if (auto tensorType = dyn_cast<RankedTensorType>(jacobianType)) {
+                jacobians.push_back(rewriter.create<tensor::EmptyOp>(loc, tensorType.getShape(),
+                                                                     tensorType.getElementType()));
             }
             else {
-                // Backprop through a scalar result.
-                SmallVector<Value> cotangents;
-                initializeCotangents(callee.getResultTypes(), cotangentIdx, ValueRange(), rewriter,
-                                     loc, cotangents);
+                jacobians.push_back(rewriter.create<arith::ConstantFloatOp>(
+                    loc, APFloat(0.0), cast<FloatType>(jacobianType)));
+            }
+        }
 
-                auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                    loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
-                    entryBlock->getArguments(),
-                    /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
-                    gradOp.getDiffArgIndicesAttr());
-                for (const auto &[backpropIdx, jacobianSlice] :
-                     llvm::enumerate(backpropOp.getResults())) {
-                    size_t resultIdx = backpropIdx * callee.getNumResults() + cotangentIdx;
-                    backpropResults[resultIdx] = jacobianSlice;
-                    if (jacobianSlice.getType() != gradOp.getResultTypes()[resultIdx]) {
-                        // For ergonomics, if the backprop result is a point tensor and the
-                        // user requests a scalar, give it to them.
-                        if (isa<RankedTensorType>(jacobianSlice.getType()) &&
-                            isa<FloatType>(gradOp.getResultTypes()[resultIdx])) {
-                            backpropResults[resultIdx] = rewriter.create<tensor::ExtractOp>(
-                                loc, jacobianSlice, ValueRange{});
+
+        if (auto primalTensorResultType = dyn_cast<RankedTensorType>(primalResult)) {
+            // Loop over every entry of this result, creating a one-hot cotangent vector and
+            // running a backward pass via the BackpropOp.
+            iterateOverEntries(
+                primalTensorResultType, rewriter, loc,
+                [&, cotangentIdx = cotangentIdx](ValueRange indices) {
+                    // Initialize cotangents for all of the primal outputs
+                    SmallVector<Value> cotangents;
+                    initializeCotangents(callee.getResultTypes(), cotangentIdx, indices, rewriter,
+                                         loc, cotangents);
+
+                    auto backpropOp = rewriter.create<gradient::BackpropOp>(
+                        loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
+                        callee.getName(), entryBlock->getArguments(),
+                        /*arg_shadows=*/ValueRange{},
+                        /*primal results=*/ValueRange{}, cotangents, diffArgIndicesAttr);
+
+                    // After backpropagation, collect any possible callee results into the values of
+                    // the grad op
+                    backpropValResults.insert(backpropValResults.end(),
+                                              backpropOp.getVals().begin(),
+                                              backpropOp.getVals().end());
+
+                    // Then collect the gradients...
+
+                    // Backprop gives a gradient of a single output entry w.r.t.
+                    // all active inputs. Catalyst gives transposed Jacobians,
+                    // such that the Jacobians have shape
+                    // [...shape_outputs, ...shape_inputs,].
+                    for (const auto &[backpropIdx, jacobianSlice] :
+                         llvm::enumerate(backpropOp.getGradients())) {
+                        if (auto sliceType = dyn_cast<RankedTensorType>(jacobianSlice.getType())) {
+                            size_t sliceRank = sliceType.getRank();
+                            auto jacobianType =
+                                cast<RankedTensorType>(jacobians[backpropIdx].getType());
+                            size_t jacobianRank = jacobianType.getRank();
+                            if (sliceRank < jacobianRank) {
+                                // Offsets are [0] * rank of backprop result + [...indices]
+                                SmallVector<OpFoldResult> offsets;
+                                offsets.append(indices.begin(), indices.end());
+                                offsets.append(sliceRank, rewriter.getIndexAttr(0));
+
+                                // Sizes are [1] * (jacobianRank - sliceRank) +
+                                // [...sliceShape]
+                                SmallVector<OpFoldResult> sizes;
+                                sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
+                                for (int64_t dim : sliceType.getShape()) {
+                                    sizes.push_back(rewriter.getIndexAttr(dim));
+                                }
+
+                                // Strides are [1] * jacobianRank
+                                SmallVector<OpFoldResult> strides{jacobianRank,
+                                                                  rewriter.getIndexAttr(1)};
+
+                                jacobians[backpropIdx] = rewriter.create<tensor::InsertSliceOp>(
+                                    loc, jacobianSlice, jacobians[backpropIdx], offsets, sizes,
+                                    strides);
+                            }
+                            else {
+                                jacobians[backpropIdx] = jacobianSlice;
+                            }
                         }
+                        else {
+                            assert(isa<FloatType>(jacobianSlice.getType()));
+                            jacobians[backpropIdx] = rewriter.create<tensor::InsertOp>(
+                                loc, jacobianSlice, jacobians[backpropIdx], indices);
+                        }
+                        backpropGradResults[backpropIdx + cotangentIdx * diffArgIndices.size()] =
+                            jacobians[backpropIdx];
+                    }
+                });
+        }
+        else {
+            // Backprop through a scalar result.
+            SmallVector<Value> cotangents;
+            initializeCotangents(callee.getResultTypes(), cotangentIdx, ValueRange(), rewriter, loc,
+                                 cotangents);
+
+            auto backpropOp = rewriter.create<gradient::BackpropOp>(
+                loc, valTypes, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
+                entryBlock->getArguments(),
+                /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
+                diffArgIndicesAttr);
+
+            // After backpropagation, collect any possible callee results into the values of the
+            // grad op
+            backpropValResults.insert(backpropValResults.end(), backpropOp.getVals().begin(),
+                                      backpropOp.getVals().end());
+
+            // Then collect the gradients...
+            for (const auto &[backpropIdx, jacobianSlice] :
+                 llvm::enumerate(backpropOp.getGradients())) {
+                size_t resultIdx = backpropIdx * callee.getNumResults() + cotangentIdx;
+                backpropGradResults[resultIdx] = jacobianSlice;
+                if (jacobianSlice.getType() != resultTypes[resultIdx]) {
+                    // For ergonomics, if the backprop result is a point tensor and the
+                    // user requests a scalar, give it to them.
+                    if (isa<RankedTensorType>(jacobianSlice.getType()) &&
+                        isa<FloatType>(resultTypes[resultIdx])) {
+                        backpropGradResults[resultIdx] =
+                            rewriter.create<tensor::ExtractOp>(loc, jacobianSlice, ValueRange{});                        
                     }
                 }
             }
         }
-
-        rewriter.create<func::ReturnOp>(loc, backpropResults);
     }
 
+    // Combine both values and gradients and return them
+    SmallVector<Value> backpropResults;
+    backpropResults.insert(backpropResults.end(), backpropValResults.begin(),
+                           backpropValResults.end());
+    backpropResults.insert(backpropResults.end(), backpropGradResults.begin(),
+                           backpropGradResults.end());
+
+    rewriter.create<func::ReturnOp>(loc, backpropResults);
+
     return fullGradFn;
+}
+
+LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
+                                                              PatternRewriter &rewriter) const
+{
+    if (op.getMethod() != "auto") {
+        return failure();
+    }
+
+    func::FuncOp callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+
+    SmallVector<Value> backpropArgs(op.getArgOperands());
+    FailureOr<func::FuncOp> clonedCallee =
+        cloneCallee(rewriter, op, op.getArgOperands(), callee, backpropArgs);
+    if (failed(clonedCallee)) {
+        return failure();
+    }
+
+    // We need to special case this because QNode callees require the parameter count being passed
+    // into the BackpropOp within the full grad while non-QNode callees do not. Removing the
+    // parameter count would then make the full grad function have the same type as the GradOp.
+    SmallVector<Type> fullGradArgTypes(op.getOperandTypes());
+    if (isQNode(callee)) {
+        fullGradArgTypes.push_back(rewriter.getIndexType());
+    }
+
+    // Define the properties of the full gradient function.
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+    std::stringstream uniquer;
+    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
+    std::string fnName = op.getCallee().str() + ".fullgrad" + uniquer.str();
+
+    func::FuncOp fullGradFn =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
+
+    // Collect value types
+    SmallVector<Type> valTypes;
+    for (auto &&val : op.getVals()) {
+        valTypes.push_back(val.getType());
+    }
+
+    if (!fullGradFn) {
+        fullGradFn =
+            genFullGradFunction(rewriter, op.getLoc(), fnName,
+                                rewriter.getFunctionType(fullGradArgTypes, op.getResultTypes()),
+                                *clonedCallee, op.getGradients().size(), op.getResultTypes(),
+                                diffArgIndices, op.getDiffArgIndicesAttr(), valTypes);
+    }
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, backpropArgs);
+    return success();
 }
 
 } // namespace gradient

@@ -24,27 +24,20 @@ namespace gradient {
 
 /// A pattern responsible for common transformations required when differentiating hybrid circuits
 /// with Enzyme.
+
+// grad lowering
 struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
     using OpRewritePattern<GradOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
+};
 
-  private:
-    /// Recursively process all the QNodes of the `callee` being differentiated. The resulting
-    /// BackpropOps will be called with `backpropArgs`.
-    static mlir::FailureOr<mlir::func::FuncOp>
-    cloneCallee(mlir::PatternRewriter &rewriter, GradOp gradOp, mlir::func::FuncOp callee,
-                mlir::SmallVectorImpl<Value> &backpropArgs);
+// value_and_grad lowering
+struct HybridValueAndGradientLowering : public mlir::OpRewritePattern<ValueAndGradOp> {
+    using OpRewritePattern<ValueAndGradOp>::OpRewritePattern;
 
-    /// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
-    /// see that the gate parameters flow into the custom quantum function.
-    static mlir::func::FuncOp genQNodeQuantumOnly(mlir::PatternRewriter &rewriter,
-                                                  mlir::Location loc, mlir::func::FuncOp qnode);
-
-    /// Generate a function that computes a Jacobian row-by-row using one or more BackpropOps.
-    static mlir::func::FuncOp genFullGradFunction(mlir::PatternRewriter &rewriter,
-                                                  mlir::Location loc, GradOp gradOp,
-                                                  mlir::func::FuncOp callee, FunctionType fnType);
+    mlir::LogicalResult matchAndRewrite(ValueAndGradOp op,
+                                        mlir::PatternRewriter &rewriter) const override;
 };
 
 } // namespace gradient
