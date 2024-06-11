@@ -476,8 +476,7 @@ def trace_quantum_tape(
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
-        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
-        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary) or is_catalyst_ctrl:
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
             return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
         elif isinstance(op, Adjoint):
             return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
@@ -526,13 +525,7 @@ def trace_quantum_tape(
 
     for op in ops:
         qrp2 = None
-        # We need to exclude HybridCtrl here because single-op control instances are kept
-        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
-        # but should be translated to JAXPR as a regular PennyLane Controlled op.
-        # Native HybridCtrl operations are not yet supported in the compiler.
-        if isinstance(op, HybridOp) and not isinstance(
-            op, catalyst.api_extensions.quantum_operators.HybridCtrl
-        ):
+        if isinstance(op, HybridOp):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
