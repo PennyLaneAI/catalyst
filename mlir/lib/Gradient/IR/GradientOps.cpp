@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <assert.h>
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
@@ -60,6 +62,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         // Check that the method is not finite difference, as finite difference should always be
         // available
         auto gradOpInterface = dyn_cast<GradientOpInterface>(op_state->getOperation());
+        assert(gradOpInterface);
         llvm::StringRef MethodName = gradOpInterface.getMethod();
 
         if (MethodName != "fd") {
