@@ -341,25 +341,24 @@ class AdjointCallable:
     """Callable wrapper to produce an adjoint instance."""
 
     def __init__(self, target, lazy):
-        self.base_op = None
-        self.callee = None
+        self.target = target
         self.lazy = lazy
 
         if isinstance(target, Operator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
-            self.base_op = target
             self.single_op = True
+            self.instantiated = True
         elif isinstance(target, type) and issubclass(target, Operator):
             # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
-            self.callee = target
             self.single_op = True
+            self.instantiated = False
         elif isinstance(target, Callable):
             # Case 3: User passed an arbitrary callable that will instantiate operations.
             # We want to create a callable that will generate an "opaque" Adjoint object.
             # This object differs from the Adjoint in PennyLane because that one can only be
             # instantiated on single operations.
-            self.callee = target
             self.single_op = False
+            self.instantiated = False
         else:
             raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
@@ -373,10 +372,9 @@ class AdjointCallable:
             )
 
     def __call__(self, *args, **kwargs):
-        if self.base_op:
-            return create_adjoint_op(self.base_op, self.lazy)
-        elif self.single_op:
-            return create_adjoint_op(self.callee(*args, **kwargs), self.lazy)
+        if self.single_op:
+            base_op = self.target if self.instantiated else self.target(*args, **kwargs)
+            return create_adjoint_op(base_op, self.lazy)
 
         tracing_artifacts = self.trace_body(args, kwargs)
 
@@ -390,7 +388,7 @@ class AdjointCallable:
         if not EvaluationContext.is_tracing():
             # QuantumTapes can themselves appear in queuing records.
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
-                self.callee(*args, **kwargs)
+                self.target(*args, **kwargs)
 
             adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
 
@@ -400,7 +398,7 @@ class AdjointCallable:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _, _ = deduce_avals(self.callee, args, kwargs)
+            wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
                 # FIXME: move all full_raise calls into a separate function
@@ -425,20 +423,6 @@ class HybridAdjoint(HybridOp):
     than can be queued in a quantum context."""
 
     binder = adjoint_p.bind
-
-    # pylint: disable=super-init-not-called,non-parent-init-called
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions):
-        self.in_classical_tracers = in_classical_tracers
-        self.out_classical_tracers = out_classical_tracers
-        self.regions = regions
-
-        # Only call the parent constructor if this class is initialized directly.
-        # Calling Operator.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
-        # class, because both Operator and SymbolicOp init methods are used. Since PL doesn't do
-        # this either they are probably not meant to be initialized together.
-        # pylint: disable=unidiomatic-typecheck
-        if type(self) is HybridAdjoint:
-            Operator.__init__(self, wires=Wires(self.num_wires))
 
     def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
         op = self
