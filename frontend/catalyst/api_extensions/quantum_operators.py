@@ -27,7 +27,8 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Observable, Operation, Operator, Wires
+from pennylane.operation import Operator, Wires
+from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
@@ -374,20 +375,16 @@ class AdjointCallable:
     """Callable wrapper to produce an adjoint instance."""
 
     def __init__(self, target, lazy):
-        self.target = target
+        self.base_op = None
+        self.callee = None
         self.lazy = lazy
 
         if isinstance(target, Operator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
-            # We still want to be able to trace a "body function" for the HybridOp, while ensuring
-            # the produced operation behaves exactly like Adjoint(f) from PennyLane.
-            # Allow invoking callee to get the target, similar to the constructor case.
-            self.callee = lambda: QueuingManager.append(target) or target
+            self.base_op = target
             self.single_op = True
         elif isinstance(target, type) and issubclass(target, Operator):
             # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
-            # This case should be identical to the one above except we can use the constructor
-            # directly to trace the body function.
             self.callee = target
             self.single_op = True
         elif isinstance(target, Callable):
@@ -410,22 +407,12 @@ class AdjointCallable:
             )
 
     def __call__(self, *args, **kwargs):
-        # Eager computation of the adjoint, does not create a Adjoint/HybridAdjoint instance.
-        if not self.lazy and self.target.has_adjoint:
-            with QueuingManager.stop_recording():
-                base_op = self.callee(*args, **kwargs)
-
-            adj = base_op.adjoint()
-            QueuingManager.remove(base_op)
-            QueuingManager.append(adj)
-            return adj
+        if self.base_op:
+            return create_adjoint_op(self.base_op, self.lazy)
+        elif self.single_op:
+            return create_adjoint_op(self.callee(*args, **kwargs), self.lazy)
 
         tracing_artifacts = self.trace_body(args, kwargs)
-
-        if self.single_op:
-            with QueuingManager.stop_recording():
-                base_op = self.callee(*args, **kwargs)
-            return Adjoint(base_op, tracing_artifacts)
 
         return HybridAdjoint(*tracing_artifacts)
 
@@ -527,61 +514,14 @@ class HybridAdjoint(HybridOp):
 
     def decomposition(self):
         """Resolve the Adjoint region by propagating the adjoint modifier to nested operations
-        in reverse."""
+        in reverse. Note that decomposition of control flow ops like for loops are only supported
+        in the compiler."""
         assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
 
-        # While catalyst.adjoint would be just as valid since it is PL compatible for single ops,
-        # going to PennyLane's adjoint skips unnecessarily re-queuing the base operation in each
-        # HybridOp's nested tape when qjit is not active.
-        return [qml.adjoint(op) for op in reversed(self.regions[0].quantum_tape.operations)]
-
-
-class Adjoint:
-    """This class provides near identical behaviour as PennyLane for adjoint instances with only a
-    single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
-
-    def __new__(cls, base_op, _tracing_artifacts):
-        if isinstance(base_op, Operation) and isinstance(base_op, Observable):
-            return object.__new__(AdjointOpObs)
-        if isinstance(base_op, Operation):
-            return object.__new__(AdjointOperation)
-        elif isinstance(base_op, Observable):
-            return object.__new__(AdjointObs)
-
-        return object.__new__(AdjointBase)
-
-    def __init__(self, base_op, tracing_artifacts):
-        # Grab the constructor from the PennyLane base class.
-        super().__init__(base_op)
-        HybridAdjoint.__init__(self, *tracing_artifacts)
-
-    # These attributes are provided by the mixin class.
-    # pylint: disable=no-member
-    def _flatten(self):
-        tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
-        return (self.base, tracing_artifacts), tuple()
-
-    @classmethod
-    def _unflatten(cls, data, _):
-        return cls(*data)
-
-
-# HybridAdjoint is also mixed in because the PL class needs to sit between Adjoint & HybridAdjoint.
-# Thus Adjoint cannot be made to inherit from HybridAdjoint directly.
-class AdjointOperation(Adjoint, pl_adjoint_module.AdjointOperation, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for Operations."""
-
-
-class AdjointObs(Adjoint, pl_adjoint_module.AdjointObs, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for Observables."""
-
-
-class AdjointOpObs(Adjoint, pl_adjoint_module.AdjointOpObs, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for Operations that are also Observables."""
-
-
-class AdjointBase(Adjoint, pl_adjoint_module.Adjoint, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for an unkown Operator type."""
+        return [
+            create_adjoint_op(op, lazy=True)
+            for op in reversed(self.regions[0].quantum_tape.operations)
+        ]
 
 
 # TODO: This class needs to be made interoperable with qml.Controlled since qml.ctrl dispatches
@@ -694,6 +634,15 @@ def qctrl_distribute(
                             nested_ops, region.quantum_tape.measurements
                         )
                 new_ops.append(op)
+        elif isinstance(op, qml.ops.Adjoint):
+            # ctrl resolves faster for nested hybrid controls than create_controlled_op
+            ctrl_op = ctrl(
+                copy.copy(op.base),
+                control=control_wires,
+                control_values=control_values,
+                work_wires=work_wires,
+            )
+            new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
         else:
             ctrl_op = create_controlled_op(
                 copy.copy(op),

@@ -36,7 +36,6 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-from catalyst.api_extensions import HybridAdjoint
 from catalyst.api_extensions.quantum_operators import QCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
@@ -54,6 +53,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     Raises a CompileError for MidMeasureMP"""
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+    # TODO: remove hardcoded controlled to matrix decomp
     if capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled):
         return _decompose_to_matrix(op)
     return op.decomposition()
@@ -177,12 +177,6 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
     """Specify whether or not an Operator is supported."""
-    # Adjoint of a single op does not pass the acceptance criteria, since it inherits the PL `.name`
-    # attribute (= "Adjoint(op)"). Hence we should move away from name-based matching of operations
-    # to instance-based matching.
-    if isinstance(op, HybridAdjoint):
-        return "HybridAdjoint" in operations
-
     return op.name in operations
 
 

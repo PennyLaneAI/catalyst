@@ -103,6 +103,11 @@ def pennylane_operation_set(config_ops: Dict[str, OperationProperties]) -> Set[s
         ops.update({g})
         if props.controllable:
             ops.update({f"C({g})"})
+        if props.invertible:
+            ops.update({f"Adjoint({g})"})
+        if props.controllable and props.invertible:
+            ops.update({f"Adjoint(C({g}))"})
+            ops.update({f"C(Adjoint({g}))"})
     return ops
 
 

@@ -443,9 +443,11 @@ def filter_out_adjoint(operations):
         removed.
     """
     adjoint = re.compile(r"^Adjoint\(.*\)$")
+    c_adjoint = re.compile(r"^C\(Adjoint\(.*\)\)$")
+    adjoint_c = re.compile(r"^Adjoint\(C\(.*\)\)$")
 
     def is_not_adj(op):
-        return not re.match(adjoint, op)
+        return not (re.match(adjoint, op) or re.match(c_adjoint, op) or re.match(adjoint_c, op))
 
     operations_no_adj = filter(is_not_adj, operations)
     return set(operations_no_adj)
@@ -511,6 +513,8 @@ def validate_device_capabilities(
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
         # For gates, we require strict match
+        # TODO: Eliminate string based matching against device declaration, e.g. lightning includes
+        # C(gate) (for some gates), but not Adjoint(gate), or C(Adjoint(gate)) ...
         device_gates = filter_out_adjoint(set(device.operations))
         # Lightning-kokkis might support C(GlobalPhase) in Python, but not in C++. We remove this
         # gate before calling the validation.
@@ -580,7 +584,7 @@ def get_device_capabilities(
         device_config = get_device_toml_config(device)
         return load_device_capabilities(device_config, program_features, device_name)
 
-      
+
 def check_device_wires(wires):
     """Validate requirements Catalyst imposes on device wires."""
     if wires is None:
