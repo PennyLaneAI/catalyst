@@ -119,18 +119,31 @@ The essential steps are:
         cd catalyst
         pip install -r requirements.txt 
 
-        # (Only for conda users) Install the latest C++ library
-        conda install -c conda-forge libstdcxx-ng
-
         # Build Catalyst
         make all
 
         # Test that everything is built properly
         make test
 
-
-
 These steps should give you the full functionality of Catalyst. 
+
+.. tabs::
+
+  .. group-tab:: Linux Debian/Ubuntu
+    .. warning::
+
+      If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
+
+      .. code-block:: console
+
+          conda install -c conda-forge libstdcxx-ng
+
+      If not, you will receive the following error when running ``make test`` because the conda
+      environment is using old versions of ``libstdcxx-ng``.
+
+      .. code-block:: console
+
+          'GLIBCXX_3.4.30' not found
 
 
 Detailed Building From Source Guide
@@ -213,9 +226,6 @@ All additional build and developer dependencies are managed via the repository's
 
   pip install -r requirements.txt
 
-
-For conda users, conda environment may contain old versions of C++ library and trigger 
-"'GLIBCXX_3.4.30' not found" error. To fix the error, the latest C++ library should be installed.
 
 .. code-block:: console
 
