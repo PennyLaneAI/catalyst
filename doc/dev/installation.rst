@@ -89,12 +89,12 @@ The essential steps are:
 
           conda install -c conda-forge libstdcxx-ng
 
-        If not, you will receive the following error when running ``make test`` because the conda
+        If not, you may receive the following error when running ``make test`` because the conda
         environment is using old versions of ``libstdcxx-ng``.
 
         .. code-block:: console
 
-          'GLIBCXX_3.4.30' not found
+          'GLIBCXX_3.4.x' not found
 
       .. code-block:: console
 
@@ -196,12 +196,12 @@ They can be installed via:
 
           conda install -c conda-forge libstdcxx-ng
 
-        If not, you will receive the following error when running ``make test`` because the conda
+        If not, you may receive the following error when running ``make test`` because the conda
         environment is using old versions of ``libstdcxx-ng``.
 
         .. code-block:: console
 
-          'GLIBCXX_3.4.30' not found
+          'GLIBCXX_3.4.x' not found
 
    .. group-tab:: macOS
 
