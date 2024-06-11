@@ -15,6 +15,7 @@ pylint
 isort
 
 # testing
+flaky
 lit
 pytest
 pytest-xdist

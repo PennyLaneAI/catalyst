@@ -16,6 +16,9 @@ Pytest configuration file for Catalyst test suite.
 """
 # pylint: disable=unused-import
 import platform
+
+import numpy as np
+import pennylane as qml
 import pytest
 
 

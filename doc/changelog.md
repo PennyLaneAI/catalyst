@@ -2,6 +2,10 @@
 
 <h3>New features</h3>
 
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
+  The loop over shots is executed with `catalyst.vmap`.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
 
@@ -270,6 +274,7 @@ Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
 Mehrdad Malekmohammadi,
+Vincent Michaud-Rioux,
 Raul Torres,
 Sergei Mironov.
 
