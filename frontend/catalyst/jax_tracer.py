@@ -14,8 +14,8 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-from contextlib import contextmanager
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -26,7 +26,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -471,11 +471,13 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
-        # `Controlled(OP)` bind OP with native quantum control syntax.
-        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
-            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+        elif isinstance(op, Adjoint):
+            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -483,6 +485,7 @@ def trace_quantum_tape(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -491,6 +494,7 @@ def trace_quantum_tape(
             qubits2 = gphase_p.bind(
                 *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
         else:
@@ -502,6 +506,7 @@ def trace_quantum_tape(
                 qubits_len=len(qubits),
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -520,11 +525,10 @@ def trace_quantum_tape(
         qrp2 = None
         if isinstance(op, HybridOp):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+        elif isinstance(op, MeasurementProcess):
+            qrp2 = qrp
         else:
-            if isinstance(op, MeasurementProcess):
-                qrp2 = qrp
-            else:
-                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
