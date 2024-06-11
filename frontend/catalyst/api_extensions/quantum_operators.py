@@ -28,7 +28,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Operation, Operator, Wires
+from pennylane.operation import Operator
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape

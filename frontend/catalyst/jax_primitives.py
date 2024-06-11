@@ -823,6 +823,7 @@ def _qinst_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
+# pylint: disable=too-many-arguments
 def _qinst_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *qubits_or_params,
