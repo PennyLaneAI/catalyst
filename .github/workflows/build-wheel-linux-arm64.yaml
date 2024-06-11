@@ -35,9 +35,8 @@ jobs:
       fail-fast: false
       matrix:
         python_version: [3.9]
-        python_sub_version: [19]
+        python_subversion: [19]
         python_container_path: ["/usr/bin/python3"]
-        numpy_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/numpy/core/include"]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
@@ -140,26 +139,13 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         set -x
+        # With GCC 13, LLVM fails some tests, then we use GCC 12 instead
+        export GCC_VERSION=12
         docker run --platform linux/aarch64 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash -c "   set -x && \
-                        cd /catalyst && \
-                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
-                        dnf update -y && \
-                        dnf install -y libzstd-devel gcc-toolset-12 && \
-                        dnf clean all -y && \
-                        source /opt/rh/gcc-toolset-12/enable -y && \
-                        export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
-                        export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
-                        rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
-                        export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
-                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
-                        cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_TARGETS_TO_BUILD=\"host\" -DLLVM_ENABLE_PROJECTS=\"mlir\" -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INSTALL_UTILS=ON -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=FORCE_ON -DLLVM_ENABLE_LLD=OFF -DMLIR_ENABLE_BINDINGS_PYTHON=ON -DPython3_EXECUTABLE=${{ matrix.python_container_path }} -DPython3_NumPy_INCLUDE_DIRS=${{ matrix.numpy_include_path }} -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
-                        LIT_FILTER_OUT=\"Bytecode\" cmake --build /catalyst/llvm-build --target check-mlir;"
+            bash /catalyst/.github/workflows/scripts/linux_arm64/build_llvm.sh $GCC_VERSION ${{ matrix.python_version }} ${{ matrix.python_subversion }}
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -179,9 +165,9 @@ jobs:
                         export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
                         export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
                         rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
                         export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
                         ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
                         sed -i -e 's/LINK_LIBS PUBLIC/LINK_LIBS PUBLIC MLIRDeallocationUtils/g' mlir/mlir-hlo/deallocation/transforms/CMakeLists.txt && \
                         cmake -S /catalyst/mlir/mlir-hlo -B /catalyst/mhlo-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir -DPython3_EXECUTABLE=${{ matrix.python_container_path }} -DLLVM_ENABLE_LLD=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=FORCE_ON -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
@@ -205,9 +191,9 @@ jobs:
                         export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
                         export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
                         rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
                         export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
                         ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
                         cmake -S /catalyst/mlir/Enzyme/enzyme -B /catalyst/enzyme-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm -DENZYME_STATIC_LIB=ON -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
                         cmake --build /catalyst/enzyme-build --target EnzymeStatic-18;"
@@ -218,7 +204,7 @@ jobs:
       fail-fast: false
       matrix:
         python_version: [3.9]
-        python_sub_version: [19]
+        python_subversion: [19]
         python_container_path: ["/usr/bin/python3"]
         numpy_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/numpy/core/include"]
         pybind_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/pybind11/share/cmake/pybind11"]
@@ -318,9 +304,9 @@ jobs:
                         export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
                         export CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++ && \
                         rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
                         export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
                         ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1' && \
                         cmake -S runtime -B runtime-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib -DCMAKE_CXX_STANDARD_LIBRARIES=\"-lpython3.9\" -DPYTHON_EXECUTABLE=${{ matrix.python_container_path }} -DPYTHON_INCLUDE_DIR=${{ matrix.python_include_path }} -DPYTHON_LIBRARY=${{ matrix.python_library_path }} -Dpybind11_DIR=${{ matrix.pybind_include_path }} -DENABLE_LIGHTNING_KOKKOS=ON -DLIGHTNING_GIT_TAG=latest_release -DENABLE_LAPACK=OFF -DKokkos_ENABLE_SERIAL=ON -DKokkos_ENABLE_OPENMP=ON -DKokkos_ENABLE_COMPLEX_ALIGN=OFF -DENABLE_WARNINGS=OFF -DENABLE_OPENQASM=ON -DENABLE_OPENMP=OFF -DLQ_ENABLE_KERNEL_OMP=OFF && \
                         cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy && \
@@ -356,7 +342,7 @@ jobs:
       fail-fast: false
       matrix:
         python_version: [3.9]
-        python_sub_version: [19]
+        python_subversion: [19]
         python_container_path: ["/usr/bin/python3"]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
 
@@ -406,9 +392,9 @@ jobs:
                         export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
                         export CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++ && \
                         rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin/python3 ${{ matrix.python_container_path }} && \
+                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
                         export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_sub_version }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
+                        export PATH=/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
                         ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja pytest pytest-xdist 'autoray<0.6.10' oqc-qcaas-client PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1' && \
                         ${{ matrix.python_container_path }} -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple && \
                         ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest -n auto && \
