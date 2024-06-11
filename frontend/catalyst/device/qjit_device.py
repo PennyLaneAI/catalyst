@@ -221,6 +221,17 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
             }
         )
 
+    # TODO: Optionally enable runtime-powered quantum gate controlling once they
+    #       are supported natively in MLIR.
+    # if any(ng.controllable for ng in target_capabilities.native_ops.values()):
+    #     qjit_capabilities.native_ops.update(
+    #         {
+    #             "HybridCtrl": OperationProperties(
+    #                 invertible=True, controllable=True, differentiable=True
+    #             )
+    #
+    #     )
+
     return qjit_capabilities
 
 
