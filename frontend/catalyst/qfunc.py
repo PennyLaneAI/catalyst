@@ -89,24 +89,33 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
+        # Mid-circuit measurement configuration/execution
         mcm_config = self.execute_kwargs["mcm_config"]
-        if mcm_config["mcm_method"] is None:
-            mcm_config["mcm_method"] = "single-branch-statistics"
         total_shots = (
             self.device.shots
             if isinstance(self.device, qml.devices.LegacyDevice)
             else self.device.shots.total_shots
         )
-        if mcm_config["mcm_method"] == "deferred":
+        mcm_config.postselect_mode = mcm_config.postselect_mode if total_shots else None
+        if mcm_config.mcm_method is None:
+            mcm_config.mcm_method = (
+                "one-shot"
+                if mcm_config.postselect_mode == "hw-like"
+                else "single-branch-statistics"
+            )
+        if (
+            mcm_config.mcm_method == "single-branch-statistics"
+            and mcm_config.postselect_mode == "hw-like"
+        ):
+            raise ValueError(
+                "Cannot use postselect_mode='hw-like' with mcm_method='single-branch-statistics'."
+            )
+        if mcm_config.mcm_method == "deferred":
             raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
-        if mcm_config["mcm_method"] == "one_shot":
-            if total_shots is None:
-                raise ValueError(
-                    "Cannot use the 'one-shot' method for mid-circuit measurements with "
-                    "analytic mode."
-                )
-            if total_shots > 1:
-                return dynamic_one_shot(self)(*args, **kwargs)
+
+        if mcm_config.mcm_method == "one-shot" and total_shots > 1:
+            postselect_mode = mcm_config.postselect_mode or "hw-like"
+            return dynamic_one_shot(self)(*args, **kwargs)
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.

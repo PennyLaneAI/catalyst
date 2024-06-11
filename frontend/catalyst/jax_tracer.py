@@ -401,15 +401,17 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
 
 
 @debug_logger
-def trace_quantum_tape(
+def trace_quantum_operations(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
+    qnode: qml.QNode = None,
 ) -> QRegPromise:
-    """Recursively trace ``quantum_tape`` containing both PennyLane original and Catalyst extension
-    operations. Produce ``QRegPromise`` object holding the resulting quantum register tracer.
+    """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
+    Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
+    register tracer.
 
     Args:
         quantum_tape: PennyLane quantum tape to trace.
@@ -473,9 +475,9 @@ def trace_quantum_tape(
 
     qrp = QRegPromise(qreg)
     if isinstance(device, qml.devices.LegacyDevice):
-        ops = device.expand_fn(quantum_tape)
+        ops = device.expand_fn(quantum_tape).operations
     else:
-        ops = quantum_tape
+        ops = quantum_tape.operations
 
     for op in ops:
         qrp2 = None
@@ -486,12 +488,18 @@ def trace_quantum_tape(
         if isinstance(op, HybridOp) and not isinstance(
             op, catalyst.api_extensions.quantum_operators.HybridCtrl
         ):
-            qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+            kwargs = (
+                {
+                    "postselect_mode": getattr(qnode, "execute_kwargs", {})
+                    .get("mcm_config", qml.devices.MCMConfig())
+                    .postselect_mode
+                }
+                if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
+                else {}
+            )
+            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         else:
-            if isinstance(op, MeasurementProcess):
-                qrp2 = qrp
-            else:
-                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
+            qrp2 = _bind_native_controlled_op(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
@@ -611,7 +619,7 @@ def trace_quantum_measurements(
     out_tree: PyTreeDef,
     tape: QuantumTape,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
-    """Trace quantum measurement. Accept a list of QNode ouptputs and its Pytree-shape. Process
+    """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
 
     Args:
@@ -619,6 +627,7 @@ def trace_quantum_measurements(
         qrp (QRegPromise): Quantum register tracer with cached qubits
         outputs (List of quantum function results): List of qnode output JAX tracers to process.
         out_tree (PyTreeDef): PyTree-shape of the outputs.
+        quantum_tape: PennyLane quantum tape.
 
     Returns:
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
@@ -948,7 +957,7 @@ def trace_quantum_function(
                     output = return_values_flat
                     trees = return_values_tree
 
-                qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
+                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, qnode=qnode)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
                 qreg_out = qrp_out.actualize()
 

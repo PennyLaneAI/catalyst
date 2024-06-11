@@ -27,6 +27,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Observable, Operation, Operator, Wires
 from pennylane.tape import QuantumTape
 
@@ -45,7 +46,7 @@ from catalyst.jax_tracer import (
     HybridOpRegion,
     QRegPromise,
     has_nested_tapes,
-    trace_quantum_tape,
+    trace_quantum_operations,
 )
 from catalyst.tracing.contexts import EvaluationContext
 
@@ -149,15 +150,14 @@ def measure(
 
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
-    # TODO: Move these values into separate attributes of the MidCircuitMeasure class
-    in_classical_tracers.append(postselect)
-    in_classical_tracers.append(reset)
 
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
         regions=[],
+        reset=reset,
+        postselect=postselect,
     )
 
     # If reset was requested, reset qubit only if the measurement result was 1
@@ -315,18 +315,28 @@ class MidCircuitMeasure(HybridOp):
 
     binder = qmeasure_p.bind
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.postselect = self.in_classical_tracers[-2]
-        self.reset = self.in_classical_tracers[-1]
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        reset: bool = None,
+        postselect: int = None,
+    ):
+        HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
+        self.reset = reset
+        self.postselect = postselect
+        # self.mv = self.out_classical_tracers[0]
 
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        op = self
-        wire = op.in_classical_tracers[0]
+    def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
+        wire = self.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        # qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
-        # TODO: execute post-selection depending on qnode config
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=op.postselect)
+        if postselect_mode == "fill-shots":
+            qubit2 = self.bind_overwrite_classical_tracers(
+                ctx, trace, qubit, postselect=self.postselect
+            )
+        else:
+            qubit2 = self.bind_overwrite_classical_tracers(ctx, trace, qubit)
         qrp.insert([wire], [qubit2])
         return qrp
 
@@ -466,7 +476,7 @@ class HybridAdjoint(HybridOp):
 
         with frame_ctx as body_trace:
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
