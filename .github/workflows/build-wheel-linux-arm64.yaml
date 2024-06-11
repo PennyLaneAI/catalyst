@@ -310,27 +310,9 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         set -x
+        export GCC_VERSION=13
         docker run --platform linux/aarch64 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash -c "   set -x && \
-                        cd /catalyst && \
-                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
-                        dnf update -y && \
-                        dnf install -y libzstd-devel gcc-toolset-13 python39 python39-devel && \
-                        dnf clean all -y && \
-                        source /opt/rh/gcc-toolset-13/enable -y && \
-                        export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
-                        export CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++ && \
-                        rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
-                        export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
-                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja pytest pytest-xdist 'autoray<0.6.10' oqc-qcaas-client PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1' && \
-                        ${{ matrix.python_container_path }} -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple && \
-                        ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest -n auto && \
-                        ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest --backend="lightning.kokkos" -n auto && \
-                        ${{ matrix.python_container_path }} -m pytest /catalyst/frontend/test/async_tests && \
-                        ${{ matrix.python_container_path }} -m pytest -v /catalyst/frontend/test/pytest --runbraket=LOCAL -n auto && \
-                        ${{ matrix.python_container_path }} -m pytest /catalyst/frontend/test/test_oqc/oqc -n auto;"
+            bash /catalyst/.github/workflows/scripts/linux_arm64/test_wheels.sh $GCC_VERSION ${{ matrix.python_version }} ${{ matrix.python_subversion }}
