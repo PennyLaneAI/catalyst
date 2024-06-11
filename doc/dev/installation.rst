@@ -81,6 +81,21 @@ The essential steps are:
 
    .. group-tab:: Linux Debian/Ubuntu
 
+      .. warning::
+
+        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
+
+        .. code-block:: console
+
+          conda install -c conda-forge libstdcxx-ng
+
+        If not, you will receive the following error when running ``make test`` because the conda
+        environment is using old versions of ``libstdcxx-ng``.
+
+        .. code-block:: console
+
+          'GLIBCXX_3.4.30' not found
+
       .. code-block:: console
 
         # Install common requirements
@@ -126,24 +141,6 @@ The essential steps are:
         make test
 
 These steps should give you the full functionality of Catalyst. 
-
-.. tabs::
-
-  .. group-tab:: Linux Debian/Ubuntu
-    .. warning::
-
-      If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
-
-      .. code-block:: console
-
-          conda install -c conda-forge libstdcxx-ng
-
-      If not, you will receive the following error when running ``make test`` because the conda
-      environment is using old versions of ``libstdcxx-ng``.
-
-      .. code-block:: console
-
-          'GLIBCXX_3.4.30' not found
 
 
 Detailed Building From Source Guide
@@ -192,6 +189,22 @@ They can be installed via:
         If the CMake version available in your system is too old, you can also install up-to-date
         versions of it via ``pip install cmake``.
 
+      .. tabs::
+
+      .. warning::
+
+        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
+
+        .. code-block:: console
+
+          conda install -c conda-forge libstdcxx-ng
+
+        If not, you will receive the following error when running ``make test`` because the conda
+        environment is using old versions of ``libstdcxx-ng``.
+
+        .. code-block:: console
+
+          'GLIBCXX_3.4.30' not found
 
    .. group-tab:: macOS
 
