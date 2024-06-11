@@ -175,11 +175,6 @@ jobs:
       matrix:
         python_version: [3.9]
         python_subversion: [19]
-        python_container_path: ["/usr/bin/python3"]
-        numpy_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/numpy/core/include"]
-        pybind_include_path: ["/opt/_internal/cpython-3.9.19/lib/python3.9/site-packages/pybind11/share/cmake/pybind11"]
-        python_include_path: ["/opt/_internal/cpython-3.9.19/include/python3.9"]
-        python_library_path: ["/opt/_internal/cpython-3.9.19/lib"]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
@@ -259,45 +254,12 @@ jobs:
     - name: Build Catalyst Wheel
       run: |
         set -x
+        export GCC_VERSION=13
         docker run --platform linux/aarch64 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash -c "   set -x && \
-                        cd /catalyst && \
-                        git config --global --add safe.directory '*' && \
-                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
-                        dnf update -y && \
-                        dnf install -y libzstd-devel gcc-toolset-13 python39-devel.aarch64 && \
-                        dnf clean all -y && \
-                        source /opt/rh/gcc-toolset-13/enable -y && \
-                        export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
-                        export CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++ && \
-                        rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
-                        export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-13/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
-                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja delocate 'amazon-braket-pennylane-plugin>1.27.1' && \
-                        cmake -S runtime -B runtime-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib -DCMAKE_CXX_STANDARD_LIBRARIES=\"-lpython3.9\" -DPYTHON_EXECUTABLE=${{ matrix.python_container_path }} -DPYTHON_INCLUDE_DIR=${{ matrix.python_include_path }} -DPYTHON_LIBRARY=${{ matrix.python_library_path }} -Dpybind11_DIR=${{ matrix.pybind_include_path }} -DENABLE_LIGHTNING_KOKKOS=ON -DLIGHTNING_GIT_TAG=latest_release -DENABLE_LAPACK=OFF -DKokkos_ENABLE_SERIAL=ON -DKokkos_ENABLE_OPENMP=ON -DKokkos_ENABLE_COMPLEX_ALIGN=OFF -DENABLE_WARNINGS=OFF -DENABLE_OPENQASM=ON -DENABLE_OPENMP=OFF -DLQ_ENABLE_KERNEL_OMP=OFF && \
-                        cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy && \
-                        cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm && \
-                        echo \"target_link_directories(rtd_oqc PRIVATE /catalyst/runtime-build/utils/runtime-build/lib)\" >> frontend/catalyst/third_party/oqc/src/CMakeLists.txt && \
-                        export OQC_BUILD_DIR=\"/catalyst/oqc-build\" && \
-                        export RT_BUILD_DIR=\"/catalyst/runtime-build\" && \
-                        make oqc && \
-                        cmake -S mlir -B quantum-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON -DPython3_EXECUTABLE=${{ matrix.python_container_path }} -DPython3_NumPy_INCLUDE_DIRS=${{ matrix.numpy_include_path }} -DMLIR_DIR=/catalyst/llvm-build/lib/cmake/mlir -DMHLO_DIR=/catalyst/mhlo-build/lib/cmake/mlir-hlo -DMHLO_BINARY_DIR=/catalyst/mhlo-build/bin -DEnzyme_DIR=/catalyst/enzyme-build -DENZYME_SRC_DIR=/catalyst/mlir/Enzyme -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=FORCE_ON -DLLVM_ENABLE_LLD=OFF -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm && \
-                        cmake --build quantum-build --target check-dialects compiler_driver && \
-                        cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib && \
-                        cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-39-aarch64-linux-gnu.so /catalyst/runtime-build/lib && \
-                        cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/ && \
-                        export LLVM_BUILD_DIR=/catalyst/llvm-build && \
-                        export MHLO_BUILD_DIR=/catalyst/mhlo-build && \
-                        export DIALECTS_BUILD_DIR=/catalyst/quantum-build && \
-                        export RT_BUILD_DIR=/catalyst/runtime-build && \
-                        export OQC_BUILD_DIR=/catalyst/oqc-build && \
-                        export ENZYME_BUILD_DIR=/catalyst/enzyme-build && \
-                        make wheel && \
-                        auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so;"
+            bash /catalyst/.github/workflows/scripts/linux_arm64/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version }} ${{ matrix.python_subversion }}
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
@@ -356,7 +318,7 @@ jobs:
                         cd /catalyst && \
                         cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
                         dnf update -y && \
-                        dnf install -y libzstd-devel gcc-toolset-13 && \
+                        dnf install -y libzstd-devel gcc-toolset-13 python39 python39-devel && \
                         dnf clean all -y && \
                         source /opt/rh/gcc-toolset-13/enable -y && \
                         export C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc && \
