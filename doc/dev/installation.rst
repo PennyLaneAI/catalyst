@@ -108,9 +108,6 @@ The essential steps are:
         cd catalyst
         pip install -r requirements.txt
 
-        # (Only for conda users) Install the latest C++ library
-        conda install -c conda-forge libstdcxx-ng
-
         # Build Catalyst
         make all
 
@@ -238,11 +235,6 @@ All additional build and developer dependencies are managed via the repository's
 .. code-block:: console
 
   pip install -r requirements.txt
-
-
-.. code-block:: console
-
-  conda install -c conda-forge libstdcxx-ng
 
 
 .. note::
