@@ -93,6 +93,9 @@ The essential steps are:
         cd catalyst
         pip install -r requirements.txt
 
+        # (Only for conda users) Install the latest C++ library
+        conda install -c conda-forge libstdcxx-ng
+
         # Build Catalyst
         make all
 
@@ -115,6 +118,9 @@ The essential steps are:
         # Install specific requirements for Catalyst
         cd catalyst
         pip install -r requirements.txt 
+
+        # (Only for conda users) Install the latest C++ library
+        conda install -c conda-forge libstdcxx-ng
 
         # Build Catalyst
         make all
@@ -199,12 +205,22 @@ For an existing copy of the repository without its submodules, they can also be 
 
   git submodule update --init --depth=1
 
+
 All additional build and developer dependencies are managed via the repository's
 ``requirements.txt`` and can be installed as follows once the repository is cloned:
 
 .. code-block:: console
 
   pip install -r requirements.txt
+
+
+For conda users, conda environment may contain old versions of C++ library and trigger 
+"'GLIBCXX_3.4.30' not found" error. To fix the error, the latest C++ library should be installed.
+
+.. code-block:: console
+
+  conda install -c conda-forge libstdcxx-ng
+
 
 .. note::
 
