@@ -251,8 +251,7 @@ void LightningSimulator::Probs(DataView<double, 1> &probs)
 }
 
 void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
-                                      const std::vector<QubitIdType> &wires,
-                                      const bool use_device_shots)
+                                      const std::vector<QubitIdType> &wires)
 {
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
@@ -262,8 +261,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs =
-        (device_shots && use_device_shots) ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
+    auto &&dv_probs = device_shots ? m.probs(dev_wires, device_shots) : m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
                "Invalid size for the pre-allocated partial-probabilities");
@@ -429,7 +427,10 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
 
     std::vector<double> probs(1U << wires.size());
     DataView<double, 1> buffer_view(probs);
-    this->PartialProbs(buffer_view, wires, false);
+    auto device_shots = GetDeviceShots();
+    SetDeviceShots(0);
+    this->PartialProbs(buffer_view, wires);
+    SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
     bool mres = Lightning::simulateDraw(probs, postselect);
