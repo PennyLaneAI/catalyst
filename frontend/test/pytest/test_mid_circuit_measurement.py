@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Tests for mid-circuit measurements in Catalyst"""
 
 import os
 from functools import reduce
@@ -31,6 +32,8 @@ os.environ["OMP_NUM_THREADS"] = "2"
 
 
 class TestMidCircuitMeasurement:
+    """Tests for mid-circuit behaviour."""
+
     def test_pl_measure(self, backend):
         """Test PL measure."""
 
@@ -254,6 +257,10 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(param)
 
+
+class TestDynamicOneShotIntegration:
+    """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
+
     def test_mcm_method_one_shot_uses_dynamic_one_shot(self, backend, mocker):
         """Test that using mcm_method="one-shot" calls dynamic_one_shot"""
         dev = qml.device(backend, wires=1, shots=10)
@@ -380,8 +387,7 @@ class TestMidCircuitMeasurement:
             return qml.sample(wires=0)
 
         @qjit
-        @catalyst.qfunc.dynamic_one_shot
-        @qml.qnode(dev)
+        @qml.qnode(dev, mcm_method="one-shot")
         def outer():
             x = inner()
             if debug:
@@ -573,6 +579,7 @@ class TestMidCircuitMeasurement:
 
 
 def sample_to_counts(results, meas_obj):
+    """Helper function to convert samples array to counts dictionary"""
     meas_key = "wires" if isinstance(meas_obj, list) else "op"
     meas_value = qml.measure(0) if isinstance(meas_obj, str) else meas_obj
     kwargs = {meas_key: meas_value, "all_outcomes": True}
