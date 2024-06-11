@@ -36,7 +36,6 @@ jobs:
       matrix:
         python_version: [3.9]
         python_subversion: [19]
-        python_container_path: ["/usr/bin/python3"]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
@@ -162,26 +161,12 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         set -x
+        export GCC_VERSION=13
         docker run --platform linux/aarch64 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash -c "   set -x && \
-                        cd /catalyst && \
-                        cat /etc/dnf.conf | sed 's/\[main\]/\[main\]\ntimeout=5/g' > /etc/dnf.conf && \
-                        dnf update -y && \
-                        dnf install -y libzstd-devel gcc-toolset-12 && \
-                        dnf clean all -y && \
-                        source /opt/rh/gcc-toolset-12/enable -y && \
-                        export C_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/gcc && \
-                        export CXX_COMPILER=/opt/rh/gcc-toolset-12/root/usr/bin/g++ && \
-                        rm -rf ${{ matrix.python_container_path }} && \
-                        ln -s /opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin/python3 ${{ matrix.python_container_path }} && \
-                        export PYTHON=${{ matrix.python_container_path }} && \
-                        export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${{ matrix.python_version }}.${{ matrix.python_subversion }}/bin:/opt/rh/gcc-toolset-12/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && \
-                        ${{ matrix.python_container_path }} -m pip install numpy pybind11 PyYAML cmake ninja && \
-                        cmake -S /catalyst/mlir/Enzyme/enzyme -B /catalyst/enzyme-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR=/catalyst/llvm-build/lib/cmake/llvm -DENZYME_STATIC_LIB=ON -DCMAKE_CXX_VISIBILITY_PRESET=hidden && \
-                        cmake --build /catalyst/enzyme-build --target EnzymeStatic-18;"
+            bash /catalyst/.github/workflows/scripts/linux_arm64/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version }} ${{ matrix.python_subversion }}
 
   catalyst-linux-wheels-arm64:
     needs: [constants, build-dependencies]
