@@ -300,3 +300,4 @@ func.func @measure(%arg0: tensor<2xf64>) -> tensor<2xf64> {
 %cst0 = arith.constant dense<[1.0, 0.0]> : tensor<2xf64>
 %cst1 = arith.constant dense<[1.0, 0.0]> : tensor<2xf64>
 gradient.vjp "fd" @measure(%cst0) cotangents(%cst1) {resultSegmentSizes = array<i32: 1, 1>} : (tensor<2xf64>, tensor<2xf64>) -> (tensor<2xf64>, tensor<2xf64>)
+

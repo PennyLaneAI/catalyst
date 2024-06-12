@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <assert.h>
+#include <cassert>
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
