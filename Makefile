@@ -259,7 +259,6 @@ endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
 	$(MAKE) format-frontend
-	pylint frontend
 
 .PHONY: format-frontend
 format-frontend:
