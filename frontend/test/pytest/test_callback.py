@@ -431,5 +431,60 @@ def test_accelerate_no_device(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_no_device_inside(arg):
+    """Test with no device parameter accelerate is inside qjit"""
+
+    @qml.qjit
+    def qjitted_fn(x):
+        @accelerate
+        def identity(x):
+            return x
+
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_no_device_autograph(arg):
+    """Test with no device parameter"""
+
+    @accelerate
+    def identity(x):
+        return x
+
+    @qml.qjit(autograph=True)
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_manual_jax_jit(arg):
+    """Test with no device parameter"""
+
+    @accelerate
+    @jax.jit
+    def identity(x):
+        return x
+
+    @qml.qjit(autograph=True)
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
