@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import ExitStack, contextmanager
 from copy import copy
 from dataclasses import dataclass
@@ -97,6 +98,7 @@ from jax.tree_util import (
 from jaxlib.xla_extension import PyTreeRegistry
 
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access,too-many-lines
@@ -161,6 +163,9 @@ __all__ = (
     "wrap_init",
 )
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
 
 
@@ -168,6 +173,7 @@ class DynshapedClosedJaxpr(ClosedJaxpr):
     """A wrapper class to handle implicit/explicit result information used by JAX for dynamically
     shaped arrays. Can be used inplace of any other ClosedJaxpr instance."""
 
+    @debug_logger_init
     def __init__(self, jaxpr: Jaxpr, consts: Sequence, output_type: OutputType):
         super().__init__(jaxpr, consts)
         self.output_type = output_type
@@ -216,6 +222,7 @@ def transient_jax_config() -> Generator[None, None, None]:
 
 
 @contextmanager
+@debug_logger
 def new_dynamic_main2(
     trace_type: Type[Trace],
     main: Optional[MainTrace] = None,
@@ -532,6 +539,7 @@ def get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs):
     return args_flat
 
 
+@debug_logger
 def make_jaxpr2(
     fun: Callable,
     static_argnums: Any | None = None,

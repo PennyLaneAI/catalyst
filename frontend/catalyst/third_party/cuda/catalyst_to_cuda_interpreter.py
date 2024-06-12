@@ -824,7 +824,9 @@ class QJIT_CUDAQ:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
-            device_name = device.short_name if isinstance(device, qml.Device) else device.name
+            device_name = (
+                device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+            )
             return BackendInfo(device_name, device.name, "", {})
 
         with Patcher(

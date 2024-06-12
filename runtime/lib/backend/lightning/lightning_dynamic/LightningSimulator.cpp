@@ -427,44 +427,15 @@ auto LightningSimulator::Measure(QubitIdType wire, std::optional<int32_t> postse
 
     std::vector<double> probs(1U << wires.size());
     DataView<double, 1> buffer_view(probs);
-    this->PartialProbs(buffer_view, wires);
+    auto device_shots = GetDeviceShots();
+    SetDeviceShots(0);
+    PartialProbs(buffer_view, wires);
+    SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
     bool mres = Lightning::simulateDraw(probs, postselect);
-
-    const size_t numQubits = this->GetNumQubits();
-
-    auto &&state = this->device_sv->getDataVector();
-
-    auto &&dev_wires = this->getDeviceWires(wires);
-    const auto stride = pow(2, numQubits - (1 + dev_wires[0]));
-    const auto vec_size = pow(2, numQubits);
-    const auto section_size = vec_size / stride;
-    const auto half_section_size = section_size / 2;
-
-    // zero half the entries
-    // the "half" entries depend on the stride
-    // *_*_*_*_ for stride 1
-    // **__**__ for stride 2
-    // ****____ for stride 4
-    const size_t k = mres ? 0 : 1;
-    for (size_t idx = 0; idx < half_section_size; idx++) {
-        for (size_t ids = 0; ids < stride; ids++) {
-            auto v = stride * (k + 2 * idx) + ids;
-            state[v] = {0., 0.};
-        }
-    }
-
-    // get the total of the new vector (since we need to normalize)
-    double total =
-        std::accumulate(state.begin(), state.end(), 0.0, [](double sum, std::complex<double> c) {
-            return sum + std::real(c * std::conj(c));
-        });
-
-    // normalize the vector
-    double norm = std::sqrt(total);
-    std::for_each(state.begin(), state.end(), [norm](auto &elem) { elem /= norm; });
-
+    auto dev_wires = getDeviceWires(wires);
+    this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
     return mres ? this->One() : this->Zero();
 }
 

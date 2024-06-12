@@ -2,6 +2,13 @@
 
 <h3>New features</h3>
 
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
+  The loop over shots is executed with `catalyst.vmap`.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+
+* The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
+  [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
+
 * Support for disabling Autograph for a specific function or
   only for the function calls inside a specific context,
   without affecting the bare code inside such context.
@@ -83,6 +90,19 @@
 
 <h3>Improvements</h3>
 
+* Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
+  only integer, continuous wire labels starting at 0 are allowed.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
+* Catalyst no longer disallows quantum circuits with 0 qubits.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
+* Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
+  applied to a single Operator. This should lead to improved compatibility with PennyLane library code,
+  as well when reusing quantum functions with both Catalyst and PennyLane.
+  [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
   measurement. For now the feature is equivalent to returning `m` directly from a quantum
   function, but will be improved to return an array with one measurement result for each
@@ -118,6 +138,16 @@
   each pipeline.
   [(#772)](https://github.com/PennyLaneAI/catalyst/pull/772)
 
+* Raise a better error message when no shots are specified and `qml.sample` or `qml.counts` is used.
+  [(#786)](https://github.com/PennyLaneAI/catalyst/pull/786)
+
+* The measurement primitives now have a standardized call signature so that `shots` and `shape` can
+  both be provided as keyword arguments.
+  [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
+
+* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not.
+  [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
@@ -127,6 +157,13 @@
 
 <h3>Bug fixes</h3>
 
+* `device_shots` is modified to `0` on the fly in `Measure` (and set back to its original value after the call to `PartialProbs`) to compute mid-circuit probabilities analytically, even when the device has finite shots.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
+
+* The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
+  register.
+  [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
+
 * Correctly querying batching rules for `jax.scipy.linalg.expm`
   [(#733)](https://github.com/PennyLaneAI/catalyst/pull/733)
 
@@ -134,7 +171,25 @@
   In this bug fix, four openblas routines were newly linked and are now discoverable by `stablehlo.custom_call@<blas_routine>`. They are `blas_dtrsm`, `blas_ztrsm`, `lapack_dgetrf`, `lapack_zgetrf`.
   [(#752)](https://github.com/PennyLaneAI/catalyst/pull/752)
 
+* Correctly recording types of constant array when lowering `catalyst.grad` to mlir
+  [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
+
 <h3>Internal changes</h3>
+
+* Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
+
+* The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Controlled` class is generated when acting on a single PennyLane operator, which
+  inherits from both the PennyLane `Controlled` class as well the Catalyst `HybridCtrl` class.
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
+
+* The `Adjoint` class in Catalyst has been renamed to `HybridAdjoint`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Adjoint` class is generated when acting on a single PennyLane operator, which inherits from
+  both the PennyLane `Adjoint` class as well the Catalyst `HybridAdjoint` class.
+  [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
 
 * Add support to use a locally cloned PennyLane Lightning repository with the runtime.
   [(#732)](https://github.com/PennyLaneAI/catalyst/pull/732)
@@ -218,11 +273,14 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 David Ittah,
+Christina Lee,
 Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
 Mehrdad Malekmohammadi,
+Vincent Michaud-Rioux,
 Raul Torres,
 Sergei Mironov.
 

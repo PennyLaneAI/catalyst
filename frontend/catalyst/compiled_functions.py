@@ -15,6 +15,7 @@
 """This module contains classes to manage compiled functions and their underlying resources."""
 
 import ctypes
+import logging
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -28,6 +29,7 @@ from mlir_quantum.runtime import (
 )
 
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
+from catalyst.logging import debug_logger_init
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
     filter_static_args,
@@ -38,6 +40,9 @@ from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
 from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class SharedObjectManager:
@@ -50,6 +55,7 @@ class SharedObjectManager:
         func_name (str): name of compiled function
     """
 
+    @debug_logger_init
     def __init__(self, shared_object_file, func_name):
         self.shared_object_file = shared_object_file
         self.shared_object = None
@@ -128,6 +134,7 @@ class CompiledFunction:
         compile_options (CompileOptions): compilation options used
     """
 
+    @debug_logger_init
     def __init__(
         self, shared_object_file, func_name, restype, out_type, compile_options
     ):  # pylint: disable=too-many-arguments
@@ -394,6 +401,7 @@ class CompilationCache:
     combination of PyTreeDefs and static arguments.
     """
 
+    @debug_logger_init
     def __init__(self, static_argnums, abstracted_axes):
         self.static_argnums = static_argnums
         self.abstracted_axes = abstracted_axes
