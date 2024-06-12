@@ -946,7 +946,6 @@ class ForLoop(HybridOp):
 
         operand_tracers = op.in_classical_tracers
         const_tracers = [trace.full_raise(c) for c in consts]
-        const_expanded_tracers = expand_args
         operand_expanded_tracers, _ = expand_args(
             operand_tracers, expansion_strategy=expansion_strategy
         )

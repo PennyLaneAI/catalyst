@@ -13,6 +13,8 @@
 # limitations under the License.
 """ Jax extras module containing functions related to the Python program tracing  """
 
+# pylint: disable=line-too-long
+
 from __future__ import annotations
 
 import logging
