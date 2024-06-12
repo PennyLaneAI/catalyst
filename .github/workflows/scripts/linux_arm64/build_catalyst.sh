@@ -10,12 +10,12 @@ git config --global --add safe.directory '*'
 export GCC_VERSION=$1
 export PYTHON_VERSION=$2
 export PYTHON_SUBVERSION=$3
+export PYTHON_ALTERNATIVE_VERSION=$4
 
 # Install system dependencies
 dnf update -y 
-dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} python39 python39-devel
-dnf clean all -y
-
+dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} python${PYTHON_ALTERNATIVE_VERSION} python${PYTHON_ALTERNATIVE_VERSION}-devel
+dnf clean all -y 
 # Make GCC the default compiler
 source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
 export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc 
@@ -81,7 +81,7 @@ cmake --build quantum-build --target check-dialects compiler_driver
 
 # Copy files needed for the wheel where they are expected
 cp /catalyst/runtime-build/lib/*/*/*/*/librtd* /catalyst/runtime-build/lib
-cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-39-aarch64-linux-gnu.so /catalyst/runtime-build/lib
+cp /catalyst/runtime-build/lib/registry/runtime-build/lib/catalyst_callback_registry.cpython-${PYTHON_ALTERNATIVE_VERSION}-aarch64-linux-gnu.so /catalyst/runtime-build/lib
 cp /catalyst/runtime-build/lib/capi/runtime-build/lib/librt_capi.so /catalyst/runtime-build/lib/
 
 # Build wheels

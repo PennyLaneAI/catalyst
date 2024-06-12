@@ -7,12 +7,12 @@ cd /catalyst
 export GCC_VERSION=$1
 export PYTHON_VERSION=$2
 export PYTHON_SUBVERSION=$3
+export PYTHON_ALTERNATIVE_VERSION=$4
 
 # Install system dependencies
 dnf update -y 
-dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} python39 python39-devel
-dnf clean all -y
-
+dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} python${PYTHON_ALTERNATIVE_VERSION} python${PYTHON_ALTERNATIVE_VERSION}-devel
+dnf clean all -y 
 # Make GCC the default compiler
 source /opt/rh/gcc-toolset-${GCC_VERSION}/enable -y 
 export C_COMPILER=/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin/gcc 
