@@ -41,6 +41,44 @@ from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
 def accelerate(func=None, dev=None):
+    """Seamless integration with jax.jit
+
+    The accelerate function can be used to automatically apply `jax.jit` to
+    the input function `func` and be used to specify the device with the `dev`
+    keyword argument. If `dev` is None, then the default device as determined
+    by JAX is used.
+
+    Can be used in the following modes:
+
+
+    ```py
+    @accelerate
+    def identity(x):
+      return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+      return x
+    ```
+
+    ```
+    @accelerate(dev=jax.devices()[0])
+    def identity(x):
+      return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+      return x
+    ```
+
+    or
+
+    ```
+    @qml.qjit
+    def qjitted_fn(x):
+      return accelerate(lambda x: x)
+    ```
+    """
 
     if isinstance(func, Callable):
 
