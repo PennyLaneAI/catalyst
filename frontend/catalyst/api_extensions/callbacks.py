@@ -40,6 +40,7 @@ from catalyst.utils.jnp_to_memref import (
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
+## API ##
 def accelerate(func=None, dev=None):
     """Seamless integration with jax.jit
 
@@ -89,7 +90,7 @@ def accelerate(func=None, dev=None):
             # Find the shape of the return value
             _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
             jitted_fn = jax.jit(func)
-            return pure_callback(jitted_fn, result_type=returnshape, device=dev)(*args, **kwargs)
+            return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
 
         return defer
 
@@ -97,9 +98,7 @@ def accelerate(func=None, dev=None):
     kwargs.pop("func")
     return functools.partial(accelerate, **kwargs)
 
-
-## API ##
-def pure_callback(callback_fn, result_type=None, device=None):
+def pure_callback(callback_fn, result_type=None):
     """Execute and return the results of a functionally pure Python
     function from within a qjit-compiled function.
 
@@ -193,10 +192,23 @@ def pure_callback(callback_fn, result_type=None, device=None):
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
 
-    return base_callback(closure, device=device)
+    return base_callback(closure)
 
 
 ## IMPL ##
+def jax_jit_callback(callback_fn, result_type, device=None):
+
+    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+    if result_type is None:
+        msg = "A function using pure_callback requires return types "
+        msg += "to be passed in as a parameter or type annotation."
+        raise TypeError(msg)
+
+    def closure(*args, **kwargs) -> result_type:
+        return callback_fn(*args, **kwargs)
+
+    return base_callback(closure, device=device)
+
 def base_callback(func, device=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
