@@ -20,7 +20,7 @@ reliability of noisy quantum computers without relying on error correction.
 
 import copy
 import functools
-from typing import Callable
+from typing import Callable, Optional, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -30,8 +30,15 @@ from jax._src.tree_util import tree_flatten
 from catalyst.jax_primitives import zne_p
 
 
+def polynomial_extrapolation(degree):
+    """utility to generate polynomial fitting functions of arbitrary degree"""
+    return lambda scale_factors, results: qml.transforms.poly_extrapolate(
+        scale_factors, results, degree
+    )
+
+
 ## API ##
-def mitigate_with_zne(fn=None, *, scale_factors=None, deg=None):
+def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None):
     """A :func:`~.qjit` compatible error mitigation of an input circuit using zero-noise
     extrapolation.
 
@@ -46,7 +53,7 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, deg=None):
     Args:
         fn (qml.QNode): the circuit to be mitigated.
         scale_factors (array[int]): the range of noise scale factors used.
-        deg (int): the degree of the polymonial used for fitting.
+        extrapoloate (Callable): A function to perform fitting.
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
@@ -88,9 +95,10 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, deg=None):
     if fn is None:
         return functools.partial(mitigate_with_zne, **kwargs)
 
-    if deg is None:
-        deg = len(scale_factors) - 1
-    return ZNE(fn, scale_factors, deg)
+    if extrapolate is None:
+        extrapolate = polynomial_extrapolation(len(scale_factors) - 1)
+
+    return ZNE(fn, scale_factors, extrapolate)
 
 
 ## IMPL ##
@@ -106,13 +114,18 @@ class ZNE:
         TypeError: Non-QNode object was passed as `fn`.
     """
 
-    def __init__(self, fn: Callable, scale_factors: jnp.ndarray, deg: int):
+    def __init__(
+        self,
+        fn: Callable,
+        scale_factors: jnp.ndarray,
+        extrapolate: Callable[[Sequence[float], Sequence[float]], float],
+    ):
         if not isinstance(fn, qml.QNode):
             raise TypeError(f"A QNode is expected, got the classical function {fn}")
         self.fn = fn
         self.__name__ = f"zne.{getattr(fn, '__name__', 'unknown')}"
         self.scale_factors = scale_factors
-        self.deg = deg
+        self.extrapolate = extrapolate
 
     def __call__(self, *args, **kwargs):
         """Specifies the an actual call to the folded circuit."""
@@ -127,7 +140,7 @@ class ZNE:
         args_data, _ = tree_flatten(args)
         results = zne_p.bind(*args_data, self.scale_factors, jaxpr=jaxpr, fn=self.fn)
         float_scale_factors = jnp.array(self.scale_factors, dtype=float)
-        results = jnp.polyfit(float_scale_factors, results[0], self.deg)[-1]
+        results = self.extrapolate(float_scale_factors, results[0])
         # Single measurement
         if results.shape == ():
             return results
