@@ -315,7 +315,14 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
 @transformation_with_aux
 def expanded_fun(static_args, *args_expanded):
     """Function transformation making the function to accept its arguments in the expanded format
-    (with the dimension variables added)"""
+    (with the dimension variables added). The function is a Python generator matching the
+    requirements of the Jax WrappedFun library [1]. Specifically, it yields the pre-processed
+    arguments and then yields the post-processed results. See ``deduce_signatures`` for the usage
+    example.
+
+    [1] - https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/linear_util.py#L16
+
+    """
     (in_type, expansion_strategy) = static_args
     args_collapsed = [a for a, (_, k) in zip(args_expanded, in_type) if k]
     res_flat = yield args_collapsed, {}
@@ -350,10 +357,10 @@ class InputSignature:
 @dataclass
 class OutputSignature:
     """Meta-parameters of a function which become available after the tracing to the function is
-    complete. Each field is a collable to match the style of the Jax transform library. See the
+    complete. Each field is a collable to match the style of the Jax WrappedFun library. See the
     comment [1] describing its principles.
 
-    [1] - https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/linear_util.py#L49
+    [1] - https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/linear_util.py#L16
 
     Args:
         out_jaxpr: Output Jaxpr program of the function.
