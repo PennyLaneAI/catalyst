@@ -91,6 +91,7 @@ class QFunc:
 
         # Mid-circuit measurement configuration/execution
         mcm_config = self.execute_kwargs["mcm_config"]
+        _dynamic_one_shot_called = kwargs.pop("_dynamic_one_shot_called", False)
         total_shots = (
             self.device.shots
             if isinstance(self.device, qml.devices.LegacyDevice)
@@ -120,9 +121,9 @@ class QFunc:
                     "Cannot use the 'one-shot' method for mid-circuit measurements with "
                     "analytic mode."
                 )
-            if total_shots > 1:
+            if not _dynamic_one_shot_called:
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
-                return dynamic_one_shot(self)(*args, **kwargs)
+                return dynamic_one_shot(self)(*args, _dynamic_one_shot_called=True, **kwargs)
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
@@ -258,7 +259,6 @@ def dynamic_one_shot(qnode):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        interface = qml.math.get_deep_interface(cpy_tape.data)
-        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
+        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results, interface="jax")
 
     return one_shot_wrapper

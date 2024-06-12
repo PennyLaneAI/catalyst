@@ -285,14 +285,27 @@ class TestMidCircuitMeasurement:
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
 
-    @pytest.mark.xfail
-    @pytest.mark.parametrize("postselect", [None, 0, 1])
-    @pytest.mark.parametrize("reset", [True, False])
+    @pytest.mark.parametrize(
+        "postselect, reset, expected",
+        [
+            (None, False, (1, 1)),
+            (0, False, (0, 0)),
+            (1, False, (1, 1)),
+            (None, True, (1, 0)),
+            (0, True, (0, 0)),
+            (1, True, (1, 0)),
+        ],
+    )
     @pytest.mark.parametrize("postselect_mode", ["hw-like", "fill-shots"])
     def test_mcm_method_one_shot_with_single_shot(
-        self, backend, postselect, reset, postselect_mode
+        self, backend, postselect, reset, expected, postselect_mode
     ):
         """Test that the result is correct when using mcm_method="one-shot" with a single shot"""
+        if postselect == 0 and postselect_mode == "fill-shots":
+            pytest.xfail(
+                reason="fill-shots not currently working when postselecting a zero probability state"
+            )
+
         dev = qml.device(backend, wires=1, shots=1)
 
         @qjit
@@ -303,9 +316,30 @@ class TestDynamicOneShotIntegration:
             m1 = measure(0)
             return qml.sample(m0), qml.sample(m1)
 
+        param = jnp.pi
+        res = circuit(param)
+        if postselect_mode == "hw-like" and postselect == 0:
+            assert qml.math.allclose(res, fill_in_value)
+        else:
+            assert qml.math.allclose(res, expected)
+
+    @pytest.mark.parametrize("shots", [1, 10])
+    def test_dynamic_one_shot_only_called_once(self, backend, shots, mocker):
+        """Test that when using mcm_method="one-shot", dynamic_one_shot does not get called multiple times"""
+        dev = qml.device(backend, wires=1, shots=shots)
+        spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
+
+        @qjit
+        @qml.qnode(dev, mcm_method="one-shot")
+        def circuit(x):
+            qml.RY(x, wires=0)
+            measure(0)
+            return qml.sample(wires=0)
+
         param = jnp.array(0.1)
         _ = circuit(param)
-        assert False
+
+        assert spy.call_count == 1
 
     def test_dynamic_one_shot_unsupported_measurement(self, backend):
         """Test that circuits with unsupported measurements raise an error."""
