@@ -96,12 +96,16 @@ endif()
 # On macOS libomp is typically installed via brew, which doesn't make the package discoverable by
 # default to avoid conflicting with GCC's OpenMP library.
 if(APPLE)
-    execute_process (
-        COMMAND brew --prefix libomp
-        OUTPUT_VARIABLE BREW_OMP
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(OpenMP_ROOT ${BREW_OMP})
+    if(NOT DEFINED ENV{OpenMP_ROOT})
+        execute_process (
+            COMMAND brew --prefix libomp
+            OUTPUT_VARIABLE BREW_OMP
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        set(OpenMP_ROOT ${BREW_OMP})
+    else()
+        set(OpenMP_ROOT "$ENV{OpenMP_ROOT}")
+    endif()
 endif()
 
 add_library(catalyst_qir_runtime INTERFACE)

@@ -11,9 +11,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  MACOSX_DEPLOYMENT_TARGET: 14.0
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -41,6 +38,9 @@ jobs:
       group: 'Office 24th floor M2 Mac'
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 12.0
 
     steps:
     - name: Checkout Catalyst repo
@@ -103,6 +103,11 @@ jobs:
 
       # This step is needed because actions/checkout cannot clone to outside GITHUB_WORKSPACE
       # https://github.com/actions/checkout/issues/197
+      # ----------
+      # We need the deps to build outside of the GITHUB_WORKSPACE as the paths where the file resides get embedded
+      # within the compiled file. And since the runner GITHUB_WORKSPACE value can change, this causes build errors where runnerA
+      # can build the cache but runnerB attempts to use the cache.
+      # Building outside of the GITHUB_WORKSPACE ensures all file paths are consistent across runners.
     - name: Copy Submodule to tmp cache directory
       run: |
         if [ ! -d "${{ steps.setup_env.outputs.dependency_build_dir }}/mlir" ]; then
@@ -136,21 +141,21 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-generic-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
       uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-generic-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
       uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-generic-build
 
     - name: Install Dependencies (Python)
       run: python${{ matrix.python_version }} -m pip install numpy pybind11 PyYAML cmake ninja
@@ -167,6 +172,7 @@ jobs:
               -DLLVM_INSTALL_UTILS=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
               -DLLVM_ENABLE_ZSTD=FORCE_ON \
+              -DLLVM_USE_STATIC_ZSTD=ON \
               -DLLVM_ENABLE_LLD=OFF \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
@@ -216,6 +222,9 @@ jobs:
     runs-on:
       group: 'Office 24th floor M2 Mac'
 
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 12.0
+
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -244,7 +253,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  ${{ steps.setup_env.outputs.dependency_build_dir }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -261,7 +270,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -277,7 +286,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ steps.setup_env.outputs.dependency_build_dir }}/enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}-generic-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
@@ -286,6 +295,8 @@ jobs:
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GITHUB_WORKSPACE/runtime-build/lib \
+              -DCMAKE_INSTALL_RPATH="$HOME/.local/lib" \
+              -DCMAKE_BUILD_RPATH="$HOME/.local/lib" \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
@@ -308,6 +319,19 @@ jobs:
         export PYTHONPATH="$VENV_SITE_PACKAGES:$PYTHONPATH"
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
         cmake --build runtime-build --target runner_tests_lightning runner_tests_openqasm
+        
+        echo ''
+        echo '-------------------'
+        otool -L ./runtime-build/tests/runner_tests_lightning
+        echo '----------------------'
+        otool -l ./runtime-build/tests/runner_tests_lightning
+        
+        echo ''
+        echo '---------------------------'
+        otool -L ./runtime-build/tests/runner_tests_openqasm
+        echo '-----------------------------'
+        otool -l ./runtime-build/tests/runner_tests_openqasm
+        
         ./runtime-build/tests/runner_tests_lightning
         ./runtime-build/tests/runner_tests_openqasm
 
@@ -324,6 +348,7 @@ jobs:
       run: |
         cmake -S mlir -B quantum-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_RPATH_USE_LINK_PATH="ON" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
