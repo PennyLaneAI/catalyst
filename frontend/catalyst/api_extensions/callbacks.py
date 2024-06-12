@@ -20,9 +20,9 @@ but require a Python interpreter instance.
 
 import copy
 import ctypes
+import functools
 import inspect
 from collections.abc import Sequence
-import functools
 from typing import Any, Callable
 
 import jax
