@@ -80,8 +80,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
-    from catalyst.api_extensions import MidCircuitMeasure
-    from catalyst.api_extensions.quantum_operators import HybridAdjoint, QCtrl
+    from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
     from catalyst.jax_tracer import HybridOp
 
     def _paramshift_op_checker(op):
@@ -114,7 +113,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             return in_control
         # Early exit when not in inverse, only determine the control status for recursing later.
         elif not in_control:
-            return isinstance(op, QCtrl)
+            return isinstance(op, HybridCtrl)
 
         # For PL adjoint instances look at control support of the base gate, since Adjoint(Op)
         # is implemented as Op(..., inverse=True).

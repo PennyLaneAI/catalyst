@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains functions tracing and lowering JAX code to MLIR.
+
+"""
+This module contains functions tracing and lowering JAX code to MLIR.
 """
 
 import logging
@@ -474,7 +476,8 @@ def trace_quantum_tape(
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
-        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary) or is_catalyst_ctrl:
             return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
         elif isinstance(op, Adjoint):
             return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
@@ -514,7 +517,7 @@ def trace_quantum_tape(
 
     qrp = QRegPromise(qreg)
 
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         # Old device API expands tapes here. Note: this way some ops might bypass the verification.
         # We decided to ignore this since we are aiming new device API.
         ops = device.expand_fn(quantum_tape)
@@ -523,7 +526,13 @@ def trace_quantum_tape(
 
     for op in ops:
         qrp2 = None
-        if isinstance(op, HybridOp):
+        # We need to exclude HybridCtrl here because single-op control instances are kept
+        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
+        # but should be translated to JAXPR as a regular PennyLane Controlled op.
+        # Native HybridCtrl operations are not yet supported in the compiler.
+        if isinstance(op, HybridOp) and not isinstance(
+            op, catalyst.api_extensions.quantum_operators.HybridCtrl
+        ):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
@@ -661,7 +670,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         shots = device.shots
     else:
         # TODO: support shot vectors
@@ -670,7 +679,7 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
-            if isinstance(device, qml.Device):
+            if isinstance(device, qml.devices.LegacyDevice):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
                 m_wires = o.wires if o.wires else range(len(device.wires))

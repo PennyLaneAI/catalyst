@@ -2,6 +2,10 @@
 
 <h3>New features</h3>
 
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
+  The loop over shots is executed with `catalyst.vmap`.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
 
@@ -93,10 +97,11 @@
 * Catalyst no longer disallows quantum circuits with 0 qubits.
   [(#784)](https://github.com/PennyLaneAI/catalyst/pull/784)
 
-* Catalyst's adjoint method is now fully compatible with the PennyLane equivalent when applied to
-  a single Operator. This should lead to improved compatibility with PennyLane library code, as well
-  when reusing quantum functions with both Catalyst and PennyLane.
+* Catalyst's adjoint and ctrl methods are now fully compatible with the PennyLane equivalent when
+  applied to a single Operator. This should lead to improved compatibility with PennyLane library code,
+  as well when reusing quantum functions with both Catalyst and PennyLane.
   [(#768)](https://github.com/PennyLaneAI/catalyst/pull/768)
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
 
 * Catalyst now has support for `qml.sample(m)` where `m` is the result of a mid-circuit
   measurement. For now the feature is equivalent to returning `m` directly from a quantum
@@ -167,6 +172,12 @@
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 <h3>Internal changes</h3>
+
+* The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
+  to contain a nested scope of both quantum and classical operations.
+  A new `Controlled` class is generated when acting on a single PennyLane operator, which
+  inherits from both the PennyLane `Controlled` class as well the Catalyst `HybridCtrl` class.
+  [(#771)](https://github.com/PennyLaneAI/catalyst/pull/771)
 
 * The `Adjoint` class in Catalyst has been renamed to `HybridAdjoint`, indicating its capability
   to contain a nested scope of both quantum and classical operations.
@@ -256,12 +267,14 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 David Ittah,
 Christina Lee,
 Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
 Mehrdad Malekmohammadi,
+Vincent Michaud-Rioux,
 Raul Torres,
 Sergei Mironov.
 
