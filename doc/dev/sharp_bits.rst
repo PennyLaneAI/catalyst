@@ -382,6 +382,7 @@ circuit, are measuring an expectation value, and are optimizing the result:
 .. code-block:: python
 
     import numpy as np
+    import jax
 
     dev = qml.device("default.qubit", wires=4)
 
@@ -412,8 +413,8 @@ circuit, are measuring an expectation value, and are optimizing the result:
     state = opt.init(params)
 
     for i in range(200):
-        value = cost(params, data)
-        (updates, state) = opt.update(value, state)
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
         params = optax.apply_updates(params, updates)
 
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
@@ -468,8 +469,8 @@ it using Catalyst:
     state = opt.init(params)
 
     for i in range(200):
-        value = cost(params, data)
-        (updates, state) = opt.update(value, state)
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
         params = optax.apply_updates(params, updates)
 
 With the quantum function qjit-compiled, the optimization loop
