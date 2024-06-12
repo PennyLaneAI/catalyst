@@ -90,6 +90,8 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=too-many-lines
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
