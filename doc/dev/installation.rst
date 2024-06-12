@@ -386,3 +386,10 @@ They can be installed via
 
         brew install doxygen pandoc
 
+To generate html files for the documentation for Catalyst:
+
+.. code-block:: console
+
+  pip install -r doc/requirements.txt
+
+The generated files are located in ``doc/_build/html``
