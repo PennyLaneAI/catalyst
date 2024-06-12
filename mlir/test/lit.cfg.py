@@ -17,7 +17,8 @@ config.test_source_root = os.path.dirname(__file__)
 config.test_exec_root = getattr(config, "quantum_test_dir", ".lit")
 
 # Define substitutions used at the top of lit test files, e.g. %PYTHON.
-python_executable = getattr(config, "python_executable", "python3.10")
+#python_executable = getattr(config, "python_executable", "python3.10")
+python_executable = "python"
 
 if "Address" in getattr(config, "llvm_use_sanitizer", ""):
     # With sanitized builds, Python tests require some preloading magic to run.

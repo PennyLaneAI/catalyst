@@ -449,6 +449,10 @@ Sergei Mironov.
 
   Measurements currently include wall time, CPU time, and (intermediate) program size.
 
+* Catalyst now supports `qml.expval` and `qml.var` of `qml.Hermitian` observables
+  when finite shots are specified.
+  [(#451)](https://github.com/PennyLaneAI/catalyst/pull/451)
+
 <h3>Improvements</h3>
 
 * AutoGraph now supports return statements inside conditionals in qjit-compiled
@@ -1170,7 +1174,8 @@ Haochen Paul Wang.
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
-David Ittah.
+David Ittah,
+Shuli Shu.
 
 # Release 0.4.0
 
