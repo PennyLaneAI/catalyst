@@ -52,7 +52,7 @@ jobs:
 
     - name: Setup Runner Environment
       id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
         python_version: ${{ matrix.python_version }}
 
@@ -188,7 +188,7 @@ jobs:
 
     - name: Setup Runner Environment
       id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
         python_version: ${{ matrix.python_version }}
 
@@ -288,7 +288,7 @@ jobs:
 
     - name: Setup Runner Environment
       id: setup_env
-      uses: ./.github/workflows/utils/setup_self_hosted_macos_env
+      uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
         python_version: ${{ matrix.python_version }}
     
