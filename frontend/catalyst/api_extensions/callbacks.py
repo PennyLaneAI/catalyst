@@ -18,10 +18,11 @@ a compiled program. Host callbacks are able to run non-jittable code at runtime
 but require a Python interpreter instance.
 """
 
+import copy
 import ctypes
 import inspect
 from collections.abc import Sequence
-from functools import wraps
+import functools
 from typing import Any, Callable
 
 import jax
@@ -39,30 +40,24 @@ from catalyst.utils.jnp_to_memref import (
 from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
-def accelerate(func, device=None):
-    def defer(*args, **kwargs):
-        # Make abstract variables from input tracers.
-        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-        # Find the shape of the return value
-        _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
-        jitted_fn = jax.jit(func, device=device)
-        return pure_callback(jitted_fn, result_type=returnshape)(*args, **kwargs)
+def accelerate(func=None, dev=None):
 
-    # When used as a decorator with device=None
     if isinstance(func, Callable):
+
+        @functools.wraps(func)
+        def defer(*args, **kwargs):
+            # Make abstract variables from input tracers.
+            absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+            # Find the shape of the return value
+            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+            jitted_fn = jax.jit(func, device=dev)
+            return pure_callback(jitted_fn, result_type=returnshape)(*args, **kwargs)
+
         return defer
 
-    # When used as a decorator with device non-None
-    #
-    #   @accelerate(dev)
-    #   def identity(x):
-    #     return x
-    device = func
-
-    def wrap(func):
-        return accerate(func, device)
-
-    return wrap
+    kwargs = copy.copy(locals())
+    kwargs.pop("func")
+    return functools.partial(accelerate, **kwargs)
 
 
 ## API ##
@@ -174,7 +169,7 @@ def base_callback(func):
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
-    @wraps(func)
+    @functools.wraps(func)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.

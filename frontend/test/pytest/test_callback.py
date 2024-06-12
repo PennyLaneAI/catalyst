@@ -22,7 +22,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import debug, pure_callback
+from catalyst import accelerate, debug, pure_callback
 from catalyst.api_extensions.callbacks import base_callback
 
 
@@ -393,6 +393,47 @@ def test_numpy_ufuncs():
         return y
 
     assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_device(arg):
+    """Test with device parameter"""
+
+    @accelerate(dev=jax.devices()[0])
+    def identity(x):
+        return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_no_device(arg):
+    """Test with no device parameter"""
+
+    # Notice that this identity is named identity2.
+    # It looks like JAX does not like pytest running tests in parallel with
+    # function names being similar.
+    # If changed to identity JAX will fail.
+
+    @accelerate
+    def identity2(x):
+        return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+        return identity2(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
 
 
 if __name__ == "__main__":

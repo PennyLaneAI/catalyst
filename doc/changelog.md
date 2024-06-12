@@ -88,6 +88,43 @@
 
   ```
 
+* Add support for accelerating classical processing via JAX with `catalyst.accelerate`.
+  [(#805)](https://github.com/PennyLaneAI/catalyst/pull/805)
+
+  Classical code that can be just in time compiled with JAX can now be seamlessly just
+  in time compiled with `catalyst.accelerate`. `catalyst.accelerate` can be used as a
+  decorator without specifying a device
+
+  ```py
+  @accelerate
+  def identity(x):
+      return x
+
+  @qml.qjit
+  def qjitted_fn(x):
+      return x
+  ```
+
+  or specifying a device with the `dev` keyword
+
+  ```py
+  @accelerate(dev=jax.devices()[0])
+  def identity(x):
+      return x
+
+  @qml.qjit
+  def qjitted_fn(x):
+      return x
+  ```
+
+  or alternatively in functional form
+
+  ```py
+  @qml.qjit
+  def qjitted_fn(x):
+      return accelerate(lambda x: x)
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
