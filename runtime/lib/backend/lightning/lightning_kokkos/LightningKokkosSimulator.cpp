@@ -451,7 +451,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire, std::optional<int32_t> 
     DataView<double, 1> buffer_view(probs);
     auto device_shots = GetDeviceShots();
     SetDeviceShots(0);
-    this->PartialProbs(buffer_view, wires);
+    PartialProbs(buffer_view, wires);
     SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
