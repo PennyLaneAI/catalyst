@@ -332,7 +332,7 @@ class MidCircuitMeasure(HybridOp):
     def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
         wire = self.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        if postselect_mode == "fill-shots":
+        if postselect_mode != "hw-like":
             qubit2 = self.bind_overwrite_classical_tracers(
                 ctx, trace, qubit, postselect=self.postselect
             )

@@ -17,6 +17,7 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
+from copy import copy
 import logging
 from typing import Callable, Sequence
 
@@ -89,8 +90,6 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
-        # Mid-circuit measurement configuration/execution
-        mcm_config = self.execute_kwargs["mcm_config"]
         total_shots = (
             self.device.shots
             if isinstance(self.device, qml.devices.LegacyDevice)
@@ -103,6 +102,7 @@ class QFunc:
                 if mcm_config.postselect_mode == "hw-like"
                 else "single-branch-statistics"
             )
+            mcm_config.mcm_method = "one-shot"
         if (
             mcm_config.mcm_method == "single-branch-statistics"
             and mcm_config.postselect_mode == "hw-like"
@@ -113,8 +113,14 @@ class QFunc:
         if mcm_config.mcm_method == "deferred":
             raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
 
-        if mcm_config.mcm_method == "one-shot" and total_shots > 1:
-            return dynamic_one_shot(self)(*args, **kwargs)
+        if mcm_config.mcm_method == "one-shot":
+            if total_shots is None:
+                raise ValueError(
+                    "Cannot use the 'one-shot' method for mid-circuit measurements with "
+                    "analytic mode."
+                )
+            if total_shots > 1:
+                return dynamic_one_shot(self)(*args, **kwargs)
 
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.

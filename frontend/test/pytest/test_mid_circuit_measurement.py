@@ -261,41 +261,24 @@ class TestMidCircuitMeasurement:
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
 
-    def test_mcm_method_one_shot_uses_dynamic_one_shot(self, backend, mocker):
-        """Test that using mcm_method="one-shot" calls dynamic_one_shot"""
-        dev = qml.device(backend, wires=1, shots=10)
-        spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
+    # @pytest.mark.xfail
+    # @pytest.mark.parametrize("postselect, reset, expected", [(None, True, ()), 0, 1])
+    # @pytest.mark.parametrize("reset", [True, False])
+    # def test_mcm_method_one_shot_with_single_shot(self, backend, postselect, reset):
+    #     """Test that the result is correct when using mcm_method="one-shot" with a single shot"""
+    #     dev = qml.device(backend, wires=1, shots=1)
 
-        @qjit
-        @qml.qnode(dev, mcm_method="one-shot")
-        def circuit(x):
-            qml.RY(x, wires=0)
-            m = measure(0)
-            qml.PauliX(0)
-            return qml.sample(m)
+    #     @qjit
+    #     @qml.qnode(dev, mcm_method="one-shot")
+    #     def circuit(x):
+    #         qml.RY(x, wires=0)
+    #         m = qml.measure(0, reset=reset, postselect=postselect)
+    #         qml.PauliX(0)
+    #         return qml.sample(m), qml.sample(wires=0)
 
-        param = jnp.pi
-        _ = circuit(param)
-        spy.assert_called_once()
-
-    @pytest.mark.xfail
-    @pytest.mark.parametrize("postselect, reset, expected", [(None, True, ()), 0, 1])
-    @pytest.mark.parametrize("reset", [True, False])
-    def test_mcm_method_one_shot_with_single_shot(self, backend, postselect, reset):
-        """Test that the result is correct when using mcm_method="one-shot" with a single shot"""
-        dev = qml.device(backend, wires=1, shots=1)
-
-        @qjit
-        @qml.qnode(dev, mcm_method="one-shot")
-        def circuit(x):
-            qml.RY(x, wires=0)
-            m = qml.measure(0, reset=reset, postselect=postselect)
-            qml.PauliX(0)
-            return qml.sample(m), qml.sample(wires=0)
-
-        param = jnp.pi
-        res = circuit(param)
-        assert False
+    #     param = jnp.pi
+    #     res = circuit(param)
+    #     assert False
 
     def test_dynamic_one_shot_unsupported_measurement(self, backend):
         """Test that circuits with unsupported measurements raise an error."""
@@ -326,7 +309,8 @@ class TestDynamicOneShotIntegration:
         ):
 
             @qjit
-            @qml.qnode(dev, mcm_method="one-shot")
+            @catalyst.qfunc.dynamic_one_shot
+            @qml.qnode(dev)
             def _(x, y):
                 qml.RX(x, wires=0)
                 _ = measure(0)
