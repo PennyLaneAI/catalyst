@@ -17,7 +17,6 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
-from copy import copy
 import logging
 from typing import Callable, Sequence
 
@@ -90,6 +89,8 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
+        # Mid-circuit measurement configuration/execution
+        mcm_config = self.execute_kwargs["mcm_config"]
         total_shots = (
             self.device.shots
             if isinstance(self.device, qml.devices.LegacyDevice)
