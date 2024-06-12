@@ -290,10 +290,10 @@
   ```
   to identify which op it actually is and protect against segfaults (calling `nullptr.getMethod()`), in the new interface we just do 
   ```C++
-        auto gradOpInterface = dyn_cast<GradientOpInterface>(op);
+        auto gradOpInterface = cast<GradientOpInterface>(op);
         llvm::StringRef MethodName = gradOpInterface.getMethod();
   ```
-  
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):

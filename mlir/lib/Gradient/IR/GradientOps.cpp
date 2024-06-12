@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
-
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
@@ -61,8 +59,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
     if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
         // Check that the method is not finite difference, as finite difference should always be
         // available
-        auto gradOpInterface = dyn_cast<GradientOpInterface>(op_state->getOperation());
-        assert(gradOpInterface);
+        auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
         llvm::StringRef MethodName = gradOpInterface.getMethod();
 
         if (MethodName != "fd") {

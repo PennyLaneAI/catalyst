@@ -28,7 +28,7 @@ def GradientOpInterface : OpInterface<"GradientOpInterface">{
 
     let methods = [
         InterfaceMethod<
-        "Return the gradient method, which can be one of [\"auto\", \"fd\"].",
+        "Return the gradient method, which can be one of [\"auto\", \"fd\", \"ps\", \"adj\"].",
         "llvm::StringRef", "getMethod"
         >
     ];
