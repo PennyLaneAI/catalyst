@@ -145,7 +145,7 @@
   both be provided as keyword arguments.
   [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
 
-* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not. 
+* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not.
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
 <h3>Breaking changes</h3>
@@ -156,6 +156,9 @@
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
+
+* `device_shots` is modified to `0` on the fly in `Measure` (and set back to its original value after the call to `PartialProbs`) to compute mid-circuit probabilities analytically, even when the device has finite shots.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
 * The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
   register.
@@ -172,6 +175,9 @@
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 <h3>Internal changes</h3>
+
+* Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
 * The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
   to contain a nested scope of both quantum and classical operations.
