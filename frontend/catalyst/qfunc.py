@@ -17,13 +17,26 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
-
 import logging
+from typing import Callable, Sequence
 
+import jax.numpy as jnp
 import pennylane as qml
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane.measurements import (
+    CountsMP,
+    ExpectationMP,
+    ProbabilityMP,
+    SampleMP,
+    VarianceMP,
+)
+from pennylane.transforms.dynamic_one_shot import (
+    init_auxiliary_tape,
+    parse_native_mid_circuit_measurements,
+)
 
+import catalyst
 from catalyst.device import (
     BackendInfo,
     QJITDevice,
@@ -105,3 +118,110 @@ class QFunc:
         args_flat = tree_flatten(args)[0]
         res_flat = func_p.bind(flattened_fun, *args_flat, fn=self)
         return tree_unflatten(out_tree_promise(), res_flat)[0]
+
+
+# pylint: disable=protected-access,no-member,not-callable
+def dynamic_one_shot(qnode):
+    """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
+
+    Args:
+        qnode (QNode): a quantum circuit which will run ``num_shots`` times
+
+    Returns:
+        qnode (QNode):
+
+        The transformed circuit to be run ``num_shots`` times such as to simulate dynamic execution.
+
+
+    **Example**
+
+    Consider the following circuit:
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", shots=100)
+        params = np.pi / 4 * np.ones(2)
+
+        @qjit
+        @dynamic_one_shot
+        @qml.qnode(dev, diff_method=None)
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            m0 = measure(0, reset=reset, postselect=postselect)
+
+            @cond(m0 == 1)
+            def ansatz():
+                qml.RY(y, wires=1)
+
+            ansatz()
+            return measure_f(wires=[0, 1])
+
+    The ``dynamic_one_shot`` decorator prompts the QNode to perform a hundred one-shot
+    calculations, where in each calculation the ``measure`` operations dynamically
+    measures the 0-wire and collapse the state vector stochastically.
+    """
+
+    cpy_tape = None
+    aux_tapes = None
+
+    def transform_to_single_shot(qnode):
+
+        if not qnode.device.shots:
+            raise qml.QuantumFunctionError("dynamic_one_shot is only supported with finite shots.")
+
+        @qml.transform
+        def dynamic_one_shot_partial(
+            tape: qml.tape.QuantumTape,
+        ) -> tuple[Sequence[qml.tape.QuantumTape], Callable]:
+
+            nonlocal cpy_tape
+            cpy_tape = tape
+            nonlocal aux_tapes
+
+            for m in tape.measurements:
+                if not isinstance(
+                    m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)
+                ):
+                    raise TypeError(
+                        f"Native mid-circuit measurement mode does not support {type(m).__name__} "
+                        "measurements."
+                    )
+                if isinstance(m, VarianceMP) and m.obs:
+                    raise TypeError(
+                        "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
+                        "the Catalyst compiler does not handle qml.sample(obs)."
+                    )
+
+            if tape.batch_size is not None:
+                raise ValueError("mcm_method='one-shot' is not compatible with broadcasting")
+
+            aux_tapes = [init_auxiliary_tape(tape)]
+
+            def processing_fn(results):
+                return results
+
+            return aux_tapes, processing_fn
+
+        return dynamic_one_shot_partial(qnode)
+
+    single_shot_qnode = transform_to_single_shot(qnode)
+    dev = qnode.device
+    single_shot = 1 if isinstance(dev, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
+    single_name = dev.short_name if isinstance(dev, qml.devices.LegacyDevice) else dev.name
+    single_shot_qnode.device = qml.device(single_name, wires=dev.wires, shots=single_shot)
+    total_shots = (
+        dev.shots if isinstance(qnode.device, qml.devices.LegacyDevice) else dev.shots.total_shots
+    )
+
+    def one_shot_wrapper(*args, **kwargs):
+
+        def wrap_single_shot_qnode(*_):
+            return single_shot_qnode(*args, **kwargs)
+
+        arg_vmap = jnp.empty((total_shots,), dtype=float)
+        results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
+        if isinstance(results[0], tuple) and len(results) == 1:
+            results = results[0]
+        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
+
+    return one_shot_wrapper

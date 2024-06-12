@@ -40,6 +40,7 @@ try:
     from pennylane import qcut
 except:  # pylint: disable=bare-except
     from pennylane.transforms import qcut
+
 from pennylane.transforms import hamiltonian_expand, merge_rotations, sum_expand
 
 from catalyst import measure, qjit
@@ -426,7 +427,7 @@ class TestQFuncTransforms:
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
 
-    @pytest.mark.xfail(reason="qml.ctrl to QCtrl dispatch breaks the method of this transform")
+    @pytest.mark.xfail(reason="qml.ctrl to HybridCtrl dispatch breaks the method of this transform")
     def test_unroll_ccrz(self, backend):
         """Test unroll_ccrz transform."""
         # TODO: Test by inspecting the circuit actually produced, testing the

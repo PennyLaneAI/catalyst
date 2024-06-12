@@ -37,7 +37,7 @@ from pennylane.tape.tape import (
 )
 
 from catalyst.api_extensions import HybridAdjoint
-from catalyst.api_extensions.quantum_operators import QCtrl
+from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
@@ -154,7 +154,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, HybridCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:

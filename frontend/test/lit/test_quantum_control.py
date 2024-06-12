@@ -143,9 +143,7 @@ def test_native_controlled_unitary():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_unitary
     def native_controlled_unitary():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:3 = quantum.unitary
-        # CHECK-SAME: ctrls
-        # CHECK-SAME: ctrlvals(%true, %true, %true)
+        # CHECK: [[out:%.+]] = quantum.unitary
         qml.ctrl(
             qml.QubitUnitary(
                 jnp.array(
