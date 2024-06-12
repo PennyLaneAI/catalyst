@@ -88,8 +88,8 @@ def accelerate(func=None, dev=None):
             absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
             # Find the shape of the return value
             _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
-            jitted_fn = jax.jit(func, device=dev)
-            return pure_callback(jitted_fn, result_type=returnshape)(*args, **kwargs)
+            jitted_fn = jax.jit(func)
+            return pure_callback(jitted_fn, result_type=returnshape, device=dev)(*args, **kwargs)
 
         return defer
 
@@ -99,7 +99,7 @@ def accelerate(func=None, dev=None):
 
 
 ## API ##
-def pure_callback(callback_fn, result_type=None):
+def pure_callback(callback_fn, result_type=None, device=None):
     """Execute and return the results of a functionally pure Python
     function from within a qjit-compiled function.
 
@@ -190,15 +190,14 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    @base_callback
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
 
-    return closure
+    return base_callback(closure, device=device)
 
 
 ## IMPL ##
-def base_callback(func):
+def base_callback(func, device=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -213,7 +212,7 @@ def base_callback(func):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        return callback_implementation(func, retty, *args, **kwargs)
+        return callback_implementation(func, retty, *args, **kwargs, device=device)
 
     return bind_callback
 
@@ -316,8 +315,24 @@ class MemrefCallable(FlatCallable):
         return list(map(ctypes.POINTER, operandTys))
 
 
+class JaxJitCallable(MemrefCallable):
+    """Callable that places the arguments in device before execution"""
+
+    def __init__(self, func, device, results_aval, *args, **kwargs):
+        assert device is not None, "Cannot have none device"
+        self.device = device
+        super().__init__(func, results_aval, *args, **kwargs)
+
+    def asarrays(self, void_ptrs):
+        """cast void_ptrs to jax arrays and move them to a device"""
+        expected_types = self.getOperandTypes()
+        jnparrays = MemrefCallable._asarrays(void_ptrs, expected_types)
+        movedarrays = [jax.device_put(array, self.device) for array in jnparrays]
+        return movedarrays
+
+
 def callback_implementation(
-    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, device=None, **kwargs: Any
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -331,7 +346,10 @@ def callback_implementation(
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
-    memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+    if device is None:
+        memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+    else:
+        memref_callable = JaxJitCallable(cb, device, results_aval, *args, **kwargs)
 
     out_flat = python_callback_p.bind(
         *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)

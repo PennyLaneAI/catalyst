@@ -420,18 +420,13 @@ def test_accelerate_device(arg):
 def test_accelerate_no_device(arg):
     """Test with no device parameter"""
 
-    # Notice that this identity is named identity2.
-    # It looks like JAX does not like pytest running tests in parallel with
-    # function names being similar.
-    # If changed to identity JAX will fail.
-
     @accelerate
-    def identity2(x):
+    def identity(x):
         return x
 
     @qml.qjit
     def qjitted_fn(x):
-        return identity2(x)
+        return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
 
