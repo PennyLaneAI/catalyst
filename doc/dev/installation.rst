@@ -81,21 +81,6 @@ The essential steps are:
 
    .. group-tab:: Linux Debian/Ubuntu
 
-      .. warning::
-
-        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
-
-        .. code-block:: console
-
-          conda install -c conda-forge libstdcxx-ng
-
-        If not, you may receive the following error when running ``make test`` because the conda
-        environment is using old versions of ``libstdcxx-ng``.
-
-        .. code-block:: console
-
-          'GLIBCXX_3.4.x' not found
-
       .. code-block:: console
 
         # Install common requirements
@@ -113,6 +98,21 @@ The essential steps are:
 
         # Test that everything is built properly
         make test
+
+      .. warning::
+
+        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
+
+        .. code-block:: console
+
+          conda install -c conda-forge libstdcxx-ng
+
+        If not, you may receive the following error when running ``make test`` because the conda
+        environment is using old versions of ``libstdcxx-ng``.
+
+        .. code-block:: console
+
+          'GLIBCXX_3.4.x' not found
 
 
    .. group-tab:: macOS
