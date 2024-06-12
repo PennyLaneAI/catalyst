@@ -97,23 +97,23 @@ class QFunc:
             else self.device.shots.total_shots
         )
         mcm_config.postselect_mode = mcm_config.postselect_mode if total_shots else None
-        if mcm_config.mcm_method is None:
-            mcm_config.mcm_method = (
-                "one-shot"
-                if mcm_config.postselect_mode == "hw-like"
-                else "single-branch-statistics"
-            )
-            mcm_config.mcm_method = "one-shot"
+        # if mcm_config.mcm_method is None:
+        #     mcm_config.mcm_method = (
+        #         "one-shot"
+        #         if mcm_config.postselect_mode == "hw-like"
+        #         else "single-branch-statistics"
+        #     )
+        #     mcm_config.mcm_method = "one-shot"
+        if mcm_config.mcm_method == "deferred":
+            raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
         if (
-            mcm_config.mcm_method == "single-branch-statistics"
+            mcm_config.mcm_method in ("single-branch-statistics", None)
             and mcm_config.postselect_mode == "hw-like"
         ):
             raise ValueError(
-                "Cannot use postselect_mode='hw-like' with mcm_method='single-branch-statistics'."
+                "Cannot use postselect_mode='hw-like' with Catalyst when "
+                "mcm_method != 'one-shot'."
             )
-        if mcm_config.mcm_method == "deferred":
-            raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
-
         if mcm_config.mcm_method == "one-shot":
             if total_shots is None:
                 raise ValueError(
@@ -121,6 +121,7 @@ class QFunc:
                     "analytic mode."
                 )
             if total_shots > 1:
+                mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
                 return dynamic_one_shot(self)(*args, **kwargs)
 
         # TODO: Move the capability loading and validation to the device constructor when the
@@ -257,6 +258,7 @@ def dynamic_one_shot(qnode):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
+        interface = qml.math.get_deep_interface(cpy_tape.data)
         return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
 
     return one_shot_wrapper
