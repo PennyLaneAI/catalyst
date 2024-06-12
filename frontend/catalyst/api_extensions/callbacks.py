@@ -24,6 +24,7 @@ from collections.abc import Sequence
 from functools import wraps
 from typing import Any, Callable
 
+import jax
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
@@ -36,6 +37,32 @@ from catalyst.utils.jnp_to_memref import (
     ranked_memref_to_numpy,
 )
 from catalyst.utils.types import convert_pytype_to_shaped_array
+
+
+def accelerate(func, device=None):
+    def defer(*args, **kwargs):
+        # Make abstract variables from input tracers.
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        # Find the shape of the return value
+        _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+        jitted_fn = jax.jit(func, device=device)
+        return pure_callback(jitted_fn, result_type=returnshape)(*args, **kwargs)
+
+    # When used as a decorator with device=None
+    if isinstance(func, Callable):
+        return defer
+
+    # When used as a decorator with device non-None
+    #
+    #   @accelerate(dev)
+    #   def identity(x):
+    #     return x
+    device = func
+
+    def wrap(func):
+        return accerate(func, device)
+
+    return wrap
 
 
 ## API ##

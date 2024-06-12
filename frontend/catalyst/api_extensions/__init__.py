@@ -16,7 +16,7 @@
 This module is a collection of public API extensions for pragramming with Catalyst frontends.
 """
 
-from catalyst.api_extensions.callbacks import pure_callback
+from catalyst.api_extensions.callbacks import accelerate, pure_callback
 from catalyst.api_extensions.control_flow import (
     Cond,
     ForLoop,
@@ -45,6 +45,7 @@ from catalyst.api_extensions.quantum_operators import (
 )
 
 __all__ = (
+    "accelerate",
     "pure_callback",
     "cond",
     "for_loop",
