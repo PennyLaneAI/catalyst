@@ -329,7 +329,14 @@ def expanded_fun(static_args, *args_expanded):
 @dataclass
 class InputSignature:
     """Meta-parameters of a function which are available before the tracing to the function
-    starts."""
+    starts. Typically this structure is the result of scanning example input arguments of the
+    function to be traced.
+
+    Args:
+         in_type: InputType (a list of tuples) of the function to be traced.
+         in_tree: PyTree of the function arguments.
+         in_expanded_args: Flattened list of arguments with the implicit arguments prepended.
+    """
 
     in_type: InputType
     in_tree: PyTreeDef
@@ -343,7 +350,19 @@ class InputSignature:
 @dataclass
 class OutputSignature:
     """Meta-parameters of a function which become available after the tracing to the function is
-    complete."""
+    complete. Each field is a collable to match the style of the Jax transform library. See the
+    comment [1] describing its principles.
+
+    [1] - https://github.com/google/jax/blob/88a60b808c1f91260cc9e75b9aa2508aae5bc9f9/jax/_src/linear_util.py#L49
+
+    Args:
+        out_jaxpr: Output Jaxpr program of the function.
+        out_type: OutputType (a list of abstract values tupled with the explicitness flag) of a
+                  Jaxpr program.
+        out_conts: Constants (automatically-deduced arguments) of the Jaxpr program.
+        out_tree: Resulting PyTree of the Python source of the Jaxpr program.
+        out_initial_jaxpr: Initial-style form of the Jaxpr program.
+    """
 
     out_jaxpr: Callable[[], ClosedJaxpr]
     out_type: Callable[[], OutputType]
@@ -391,11 +410,11 @@ def deduce_signatures(
         wf,
         InputSignature(in_type, in_tree, in_expanded_args),
         OutputSignature(
-            lambda: ClosedJaxpr(convert_constvars_jaxpr(out_sig_promise()[0]), ()),
-            lambda: out_sig_promise()[1],
-            lambda: out_sig_promise()[2],
-            out_tree_promise,
-            lambda: out_sig_promise()[0],
+            out_jaxpr=lambda: ClosedJaxpr(convert_constvars_jaxpr(out_sig_promise()[0]), ()),
+            out_type=lambda: out_sig_promise()[1],
+            out_consts=lambda: out_sig_promise()[2],
+            out_tree=out_tree_promise,
+            out_initial_jaxpr=lambda: out_sig_promise()[0],
         ),
     )
 
