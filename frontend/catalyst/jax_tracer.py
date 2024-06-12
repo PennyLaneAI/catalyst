@@ -400,6 +400,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     return mlir_module, ctx
 
 
+# pylint: disable=too-many-arguments
 @debug_logger
 def trace_quantum_operations(
     quantum_tape: QuantumTape,

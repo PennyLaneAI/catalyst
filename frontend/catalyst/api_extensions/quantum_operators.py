@@ -27,7 +27,6 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Observable, Operation, Operator, Wires
 from pennylane.tape import QuantumTape
 
@@ -315,6 +314,7 @@ class MidCircuitMeasure(HybridOp):
 
     binder = qmeasure_p.bind
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         in_classical_tracers,
@@ -328,6 +328,7 @@ class MidCircuitMeasure(HybridOp):
         self.postselect = postselect
         # self.mv = self.out_classical_tracers[0]
 
+    # pylint: disable=too-many-arguments
     def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
         wire = self.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
