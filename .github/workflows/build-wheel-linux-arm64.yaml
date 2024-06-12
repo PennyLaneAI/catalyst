@@ -46,8 +46,6 @@ jobs:
 
     if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
 
-    continue-on-error: true
-
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -183,8 +181,6 @@ jobs:
     name: Build Wheels (Python ${{ matrix.python_version }})
     runs-on:
       group: 'Office 24th floor M2 Mac'
-    
-    continue-on-error: true
 
     steps:
     - name: Checkout Catalyst repo
@@ -285,8 +281,6 @@ jobs:
     name: Test Wheels (Python ${{ matrix.python_version }}) on Xanadu M2 Mac
     runs-on:
       group: 'Office 24th floor M2 Mac'
-    
-    continue-on-error: true
     
     steps:
     - name: Checkout Catalyst repo
