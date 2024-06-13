@@ -232,7 +232,7 @@ class TestMidCircuitMeasurement:
             # QNode has unused argument because if there are no arguments then compilation happens
             # during QJIT.__init__ rather than __call__
             m = measure(0)
-            return qml.sample(m)
+            return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError, match="mcm_method='deferred' is not supported with Catalyst"
@@ -249,7 +249,7 @@ class TestMidCircuitMeasurement:
             # QNode has unused argument because if there are no arguments then compilation happens
             # during QJIT.__init__ rather than __call__
             m = measure(0)
-            return qml.sample(m)
+            return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError, match="Cannot use the 'one-shot' method for mid-circuit measurements"
@@ -267,7 +267,7 @@ class TestMidCircuitMeasurement:
             # QNode has unused argument because if there are no arguments then compilation happens
             # during QJIT.__init__ rather than __call__
             m = measure(0)
-            return qml.sample(m)
+            return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError,
@@ -298,6 +298,23 @@ class TestMidCircuitMeasurement:
 
         _ = circuit(1.8)
         assert circuit.execute_kwargs["mcm_config"] == original_config
+
+    @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
+    def test_default_mcm_method(self, backend, postselect_mode, mocker):
+        """Test that the correct default mcm_method is chosen based on postselect_mode"""
+        dev = qml.device(backend, wires=1, shots=10)
+
+        @qjit
+        @qml.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
+        def circuit(x):
+            qml.RX(x, 0)
+            measure(0)
+            return qml.expval(qml.Z(0))
+
+        spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
+        _ = circuit(1.8)
+        expected_call_count = 1 if postselect_mode == "hw-like" else 0
+        assert spy.call_count == expected_call_count
 
 
 class TestDynamicOneShotIntegration:
