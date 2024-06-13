@@ -217,7 +217,7 @@ project = "Catalyst"
 copyright = "2023, Xanadu Quantum Technologies"
 author = "Xanadu Inc."
 
-add_module_names = True
+add_module_names = False
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
