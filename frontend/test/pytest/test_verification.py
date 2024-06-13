@@ -273,7 +273,7 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_non_controllable_gate_hybridctrl(self, mocker):
+    def test_non_controllable_gate_hybridctrl(self):
         """Test that a non-controllable gate applied inside a HybridCtrl raises an error."""
 
         # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the
