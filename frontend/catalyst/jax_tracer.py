@@ -408,7 +408,7 @@ def trace_quantum_operations(
     qreg: DynamicJaxprTracer,
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
-    qnode: qml.QNode = None,
+    mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
 ) -> QRegPromise:
     """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
     Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
@@ -490,11 +490,7 @@ def trace_quantum_operations(
             op, catalyst.api_extensions.quantum_operators.HybridCtrl
         ):
             kwargs = (
-                {
-                    "postselect_mode": getattr(qnode, "execute_kwargs", {})
-                    .get("mcm_config", qml.devices.MCMConfig())
-                    .postselect_mode
-                }
+                {"postselect_mode": mcm_config.postselect_mode}
                 if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
                 else {}
             )
@@ -864,7 +860,7 @@ def reset_qubit(qreg_in, w):
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode=None
+    f: Callable, device: QubitDevice, args, kwargs, qnode
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -958,7 +954,10 @@ def trace_quantum_function(
                     output = return_values_flat
                     trees = return_values_tree
 
-                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, qnode=qnode)
+                mcm_config = (
+                    getattr(qnode, "_tmp_mcm_config", None) or qnode.execute_kwargs["mcm_config"]
+                )
+                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
                 meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
                 qreg_out = qrp_out.actualize()
 

@@ -14,6 +14,7 @@
 """Tests for mid-circuit measurements in Catalyst"""
 
 import os
+from dataclasses import asdict
 from functools import reduce
 from typing import Iterable, Sequence
 
@@ -227,17 +228,16 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method="deferred")
-        def circuit(x):
-            qml.RY(x, wires=0)
+        def circuit(_x):  # pylint: disable=unused-argument
+            # QNode has unused argument because if there are no arguments then compilation happens
+            # during QJIT.__init__ rather than __call__
             m = measure(0)
-            qml.PauliX(0)
             return qml.sample(m)
 
-        param = jnp.pi
         with pytest.raises(
             ValueError, match="mcm_method='deferred' is not supported with Catalyst"
         ):
-            _ = circuit(param)
+            _ = circuit(None)
 
     def test_mcm_method_one_shot_analytic_error(self, backend):
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
@@ -245,46 +245,65 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method="one-shot")
-        def circuit(x):
-            qml.RY(x, wires=0)
+        def circuit(_x):  # pylint: disable=unused-argument
+            # QNode has unused argument because if there are no arguments then compilation happens
+            # during QJIT.__init__ rather than __call__
             m = measure(0)
-            qml.PauliX(0)
             return qml.sample(m)
 
-        param = jnp.pi
         with pytest.raises(
             ValueError, match="Cannot use the 'one-shot' method for mid-circuit measurements"
         ):
-            _ = circuit(param)
+            _ = circuit(None)
 
-    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", None])
-    def test_single_branch_statistics_hw_like_error(self, backend, mcm_method):
+    def test_single_branch_statistics_hw_like_error(self, backend):
         """Test that an error is raised if using `mcm_method="single-branch-statistics"` and
         `postselect_mode="hw-like"`"""
         dev = qml.device(backend, wires=1, shots=10)
 
         @qjit
-        @qml.qnode(dev, mcm_method=mcm_method, postselect_mode="hw-like")
-        def circuit(x):
-            qml.RY(x, wires=0)
+        @qml.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
+        def circuit(_x):  # pylint: disable=unused-argument
+            # QNode has unused argument because if there are no arguments then compilation happens
+            # during QJIT.__init__ rather than __call__
             m = measure(0)
-            qml.PauliX(0)
             return qml.sample(m)
 
-        param = jnp.pi
         with pytest.raises(
             ValueError,
-            match=(
-                "Cannot use postselect_mode='hw-like' with Catalyst when "
-                "mcm_method != 'one-shot'"
-            ),
+            match=("Cannot use postselect_mode='hw-like' with Catalyst when"),
         ):
-            _ = circuit(param)
+            _ = circuit(None)
+
+    @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
+    @pytest.mark.parametrize("mcm_method", [None, "one-shot", "single-branch-statistics"])
+    def test_mcm_config_not_mutated(self, backend, postselect_mode, mcm_method):
+        """Test that executing a QJIT-ed QNode does not mutate its mid-circuit measurements
+        config."""
+        if postselect_mode == "hw-like" and mcm_method == "single-branch-statistics":
+            pytest.skip("Invalid MCM configuration")
+
+        dev = qml.device(backend, wires=2, shots=10)
+
+        original_config = qml.devices.MCMConfig(
+            postselect_mode=postselect_mode, mcm_method=mcm_method
+        )
+
+        @qjit
+        @qml.qnode(dev, **asdict(original_config))
+        def circuit(x):
+            qml.RX(x, 0)
+            measure(0, postselect=1)
+            return qml.expval(qml.PauliZ(0))
+
+        _ = circuit(1.8)
+        assert circuit.execute_kwargs["mcm_config"] == original_config
 
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
 
+    # pylint: disable=too-many-arguments
     @pytest.mark.parametrize(
         "postselect, reset, expected",
         [
@@ -325,7 +344,8 @@ class TestDynamicOneShotIntegration:
 
     @pytest.mark.parametrize("shots", [1, 10])
     def test_dynamic_one_shot_only_called_once(self, backend, shots, mocker):
-        """Test that when using mcm_method="one-shot", dynamic_one_shot does not get called multiple times"""
+        """Test that when using mcm_method="one-shot", dynamic_one_shot does not get
+        called multiple times"""
         dev = qml.device(backend, wires=1, shots=shots)
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
 
