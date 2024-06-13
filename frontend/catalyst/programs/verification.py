@@ -111,6 +111,11 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 )
             _ctrl_op_checker(op.base, True)
             return in_control
+        # if its a PL Adjoint we also want to check its base to catch Adj(Ctrl(base))
+        # PL simplification should generally mean pure PL operators will not be more nested than this
+        if isinstance(op, Adjoint):
+            _ctrl_op_checker(op.base, in_control)
+            return in_control
         # Early exit when not in inverse, only determine the control status for recursing later.
         elif not in_control:
             return isinstance(op, HybridCtrl)
@@ -138,6 +143,11 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 )
             _inv_op_checker(op.base, in_inverse=True)
             return in_inverse
+        # if its a PL Controlled we also want to check its base to catch Ctrl(Adj(base))
+        # PL simplification should generally mean pure PL operators will not be more nested than this
+        if type(op) in (Controlled, ControlledOp):
+            _inv_op_checker(op.base, in_inverse)
+            return in_inverse
         # Early exit when not in inverse, only determine the inverse status for recursing later.
         elif not in_inverse:
             return isinstance(op, HybridAdjoint)
@@ -149,7 +159,6 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             op_name = op.base.name
         else:
             op_name = op.name
-
         if not qjit_device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
             raise CompileError(
                 f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
