@@ -11,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains functions tracing and lowering JAX code to MLIR.
+
+"""
+This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-from contextlib import contextmanager
-
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -27,7 +28,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -97,6 +98,8 @@ from catalyst.utils.exceptions import CompileError
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+# TODO: refactor the tracer module
+# pylint: disable=too-many-lines
 
 # Global flag tracing wether the function that we trace might be used for gradients
 TRACING_GRADIENTS: List[str] = []
@@ -472,15 +475,13 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
-        # `Controlled(OP)` bind OP with native quantum control syntax.
-        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
-        pl_ctrl_classes = {Controlled, ControlledOp, ControlledQubitUnitary}
-        is_pl_ctrl = op.__class__ in pl_ctrl_classes
-        is_ctrl = is_catalyst_ctrl or is_pl_ctrl
-        if is_ctrl:
-            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+        elif isinstance(op, Adjoint):
+            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -488,6 +489,7 @@ def trace_quantum_tape(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -496,6 +498,7 @@ def trace_quantum_tape(
             qubits2 = gphase_p.bind(
                 *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
         else:
@@ -507,6 +510,7 @@ def trace_quantum_tape(
                 qubits_len=len(qubits),
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -523,19 +527,12 @@ def trace_quantum_tape(
 
     for op in ops:
         qrp2 = None
-        # We need to exclude HybridCtrl here because single-op control instances are kept
-        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
-        # but should be translated to JAXPR as a regular PennyLane Controlled op.
-        # Native HybridCtrl operations are not yet supported in the compiler.
-        if isinstance(op, HybridOp) and not isinstance(
-            op, catalyst.api_extensions.quantum_operators.HybridCtrl
-        ):
+        if isinstance(op, HybridOp):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+        elif isinstance(op, MeasurementProcess):
+            qrp2 = qrp
         else:
-            if isinstance(op, MeasurementProcess):
-                qrp2 = qrp
-            else:
-                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2

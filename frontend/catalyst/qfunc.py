@@ -17,6 +17,7 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
+
 import logging
 from typing import Callable, Sequence
 
@@ -53,11 +54,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    ProgramFeatures,
-)
-
+from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

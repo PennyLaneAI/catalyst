@@ -440,7 +440,7 @@ class TestPreprocessHybridOp:
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
-            adjoint(OtherRX(x, 0))
+            adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
         mlir = qml.qjit(circuit, target="mlir").mlir

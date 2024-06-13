@@ -214,11 +214,11 @@ class TestHybridOpVerification:
                 return grad(f)(x)
 
     def test_non_controllable_gate_simple_qctrl(self):
-        """Emulate a device with a non-controllable gate applied inside a QCtrl."""
+        """Emulate a device with a non-controllable gate applied inside a HybridCtrl."""
 
         @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
         def f(x: float):
-            ctrl(qml.PauliZ(wires=0), control=[1, 2])
+            ctrl(qml.PauliZ(wires=0), control=[1, 2, 3])
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):

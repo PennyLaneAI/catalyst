@@ -17,15 +17,9 @@
 from typing import Any, Callable
 
 from pennylane import transform
-from pennylane.measurements import (
-    MeasurementProcess,
-    MutualInfoMP,
-    StateMP,
-    VarianceMP,
-    VnEntropyMP,
-)
+from pennylane.measurements import MutualInfoMP, StateMP, VarianceMP, VnEntropyMP
 from pennylane.operation import Operation
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
 from catalyst.tracing.contexts import EvaluationContext
@@ -86,8 +80,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """
 
     # FIXME: How should we re-organize the code to avoid this kind of circular dependency?
-    from catalyst.api_extensions import MidCircuitMeasure
-    from catalyst.api_extensions.quantum_operators import Adjoint, HybridAdjoint, QCtrl
+    from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
     from catalyst.jax_tracer import HybridOp
 
     def _paramshift_op_checker(op):
@@ -109,50 +102,69 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
             )
 
-    def _ctrl_op_checker(op, in_qctrl, in_controllable):
-        if not (in_qctrl or in_controllable):
-            # PennyLane has many flavors of controlled operations. Here we check if the operation is
-            # supported as a self-contained native operation for a device.
-            if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
-                if not qjit_device.qjit_capabilities.native_ops.get(op.name):
-                    return _ctrl_op_checker(op.base, in_qctrl, in_controllable=True)
-        else:
-            # Otherwise we check that the operation is supported and is marked as
-            # 'controllable'.
-            if not qjit_device.qjit_capabilities.native_ops.get(
-                op.name, EMPTY_PROPERTIES
-            ).controllable:
+    def _ctrl_op_checker(op, in_control):
+        # For PL controlled instances we don't recurse via nested tapes, so check the base op here.
+        if type(op) in (Controlled, ControlledOp):
+            if isinstance(op.base, HybridOp):
                 raise CompileError(
-                    f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
+                    f"Cannot compile PennyLane control of the hybrid op {type(op.base)}."
                 )
-        return True if isinstance(op, QCtrl) else in_qctrl
+            _ctrl_op_checker(op.base, True)
+            return in_control
+        # Early exit when not in inverse, only determine the control status for recursing later.
+        elif not in_control:
+            return isinstance(op, HybridCtrl)
+
+        # For PL adjoint instances look at control support of the base gate, since Adjoint(Op)
+        # is implemented as Op(..., inverse=True).
+        if isinstance(op, Adjoint):
+            op_name = op.base.name
+        else:
+            op_name = op.name
+
+        if not qjit_device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).controllable:
+            raise CompileError(
+                f"{op_name} is not controllable on '{qjit_device.original_device.name}' device"
+            )
+
+        return True
 
     def _inv_op_checker(op, in_inverse):
+        # For PL adjoint instances we don't recurse via nested tapes, so check the base op here.
         if isinstance(op, Adjoint):
-            # if the operator just is Adjoint, check its base is invertible
-            if not qjit_device.qjit_capabilities.native_ops.get(op.name):
-                return _inv_op_checker(op.base, in_inverse=True)
-        elif in_inverse:
-            # if we are inside a tape on a HybridAdjoint, check that the operators is invertible
-            op_name = (
-                op.base.name
-                if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}
-                else op.name
-            )
-            if not qjit_device.qjit_capabilities.native_ops.get(
-                op_name, EMPTY_PROPERTIES
-            ).invertible:
+            if isinstance(op.base, HybridOp):
                 raise CompileError(
-                    f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
+                    f"Cannot compile PennyLane inverse of the hybrid op {type(op.base)}."
                 )
-        return True if isinstance(op, HybridAdjoint) else in_inverse
+            _inv_op_checker(op.base, in_inverse=True)
+            return in_inverse
+        # Early exit when not in inverse, only determine the inverse status for recursing later.
+        elif not in_inverse:
+            return isinstance(op, HybridAdjoint)
+
+        # For PL controlled instances look at adjoint support of the base gate, since Controlled(Op)
+        # is implemented as Op(..., control_wires=...).
+        # TODO: remove ControlledQubitUnitary to treat it as independant gate everywhere
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+            op_name = op.base.name
+        else:
+            op_name = op.name
+
+        if not qjit_device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
+            raise CompileError(
+                f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
+            )
+
+        return True
 
     def _op_checker(op, state):
 
-        # all non-controlled ops are in the native ops of the device
-        if isinstance(op, (Controlled, QCtrl, Adjoint, HybridAdjoint)):
-            # Controlled and QCtrl are checked in _ctrl_op_checker
-            # Adjoint is checked in _inv_op_checker
+        # Don't check PennyLane Adjoint / Controlled instances directly since the compound name
+        # (e.g. "Adjoint(Hadamard)") will not show up in the device capabilities. Instead the check
+        # is handled in _inv_op_checker and _ctrl_op_checker.
+        # Specialed control op classes (e.g. CRZ) should be checked directly though, which is why we
+        # can't use isinstance(op, Controlled).
+        if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
             pass
         elif not qjit_device.qjit_capabilities.native_ops.get(op.name):
             raise CompileError(
@@ -162,7 +174,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # check validity of ops nested inside control or adjoint
         in_inverse, in_control = state
         in_inverse = _inv_op_checker(op, in_inverse)
-        in_control = _ctrl_op_checker(op, in_control, False)
+        in_control = _ctrl_op_checker(op, in_control)
 
         # check validity based on grad method if using
         if grad_method is not None:
