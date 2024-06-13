@@ -201,7 +201,6 @@ exhale_args = {
 }
 
 # Add any paths that contain templates here, relative to this directory.
-from pennylane_sphinx_theme import templates_dir
 
 templates_path = ["_templates"]
 
