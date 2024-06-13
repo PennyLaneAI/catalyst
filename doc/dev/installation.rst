@@ -82,13 +82,9 @@ The essential steps are:
    .. group-tab:: Linux Debian/Ubuntu
 
       .. warning::
-
-        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``. 
-        If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
-
-        .. code-block:: console
-
-          conda install -c conda-forge libstdcxx-ng
+        | If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng`` via:
+        | ``conda install -c conda-forge libstdcxx-ng``
+        | If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
 
 
       .. code-block:: console
