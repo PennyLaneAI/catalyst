@@ -94,6 +94,9 @@ def accelerate(func=None, *, dev=None):
     ```
     """
 
+    if dev is None:
+       dev = jax.devices()[0]
+
     if not isinstance(func, Callable):
 
         kwargs = copy.copy(locals())
