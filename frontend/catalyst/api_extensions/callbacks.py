@@ -44,13 +44,13 @@ from catalyst.utils.types import convert_pytype_to_shaped_array
 def accelerate(func=None, *, dev=None):
     """Execute a ``jax.jit`` accelerated function on classical
     accelerators such as GPUs from within a qjit-compiled function.
-    
+
     .. note::
-    
+
         ``catalyst.accelerate`` doses not currently support
         differentiation, and cannot be used inside functions that
         :func:`catalyst.grad` is applied to.
-        
+
     Args:
         func (Callable or PjitFunction): The function to be classically
             accelerated from within the qjit-compiled workflow. This
@@ -64,14 +64,14 @@ def accelerate(func=None, *, dev=None):
             ``jax.devices()[0]`` as determined by JAX will be used.
 
     .. see-also:: :func:`~.pure_callback`, :func:`.debug.callback`.
-    
+
     **Example**
-    
+
     ```py
     @accelerate(dev=jax.devices("gpu")[0])
     def classical_fn(x):
         return jnp.sin(x) ** 2
-    
+
     @qjit
     def hybrid_fn(x):
         y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
@@ -80,13 +80,13 @@ def accelerate(func=None, *, dev=None):
 
     In addition, you can accelerate function that have already been
     ``jax.jit`` decorated:
-    
+
     ```py
     @jax.jit
     def classical_fn(x):
         x = jax.device_put(x, jax.local_devices("gpu")[0])
         return jnp.sin(x) ** 2
-    
+
     @qjit
     def hybrid_fn(x):
         y = accelerate(classical_fn)(x) # will be executed on a GPU
@@ -94,22 +94,23 @@ def accelerate(func=None, *, dev=None):
     ```
     """
 
-    if isinstance(func, Callable):
+    if not isinstance(func, Callable):
 
-        @functools.wraps(func)
-        def defer(*args, **kwargs):
-            # Make abstract variables from input tracers.
-            absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-            # Find the shape of the return value
-            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
-            jitted_fn = jax.jit(func)
-            return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
+        kwargs = copy.copy(locals())
+        kwargs.pop("func")
+        return functools.partial(accelerate, **kwargs)
 
-        return defer
+    @functools.wraps(func)
+    def defer(*args, **kwargs):
+        # Make abstract variables from input tracers.
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        # Find the shape of the return value
+        _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+        jitted_fn = jax.jit(func)
+        return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
 
-    kwargs = copy.copy(locals())
-    kwargs.pop("func")
-    return functools.partial(accelerate, **kwargs)
+    return defer
+
 
 def pure_callback(callback_fn, result_type=None):
     """Execute and return the results of a functionally pure Python
@@ -221,6 +222,7 @@ def jax_jit_callback(callback_fn, result_type, device=None):
         return callback_fn(*args, **kwargs)
 
     return base_callback(closure, device=device)
+
 
 def base_callback(func, device=None):
     """Decorator that will correctly pass the signature as arguments to the callback
