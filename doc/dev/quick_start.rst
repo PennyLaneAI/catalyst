@@ -744,3 +744,31 @@ as well as vectorized using ``jax.vmap``:
 
 >>> jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
 Array([1.32269195, 1.53905377], dtype=float64)
+
+
+In particular, this allows for a reduction in boilerplate when using
+JAX-compatible optimizers such as ``optax``.
+
+We first define `update_step` function to compute the gradient and update the parameters of the optimizer.
+After that, `opt_run` introduces an optimization loop with `update_step`.
+
+.. code-block:: python
+
+    opt = optax.sgd(learning_rate=0.4)
+
+    def update_step(i, args):
+        param, state = args
+        gradient = jax.grad(cost_fn)(param)
+        (updates, state) = opt.update(gradient, state)
+        param = optax.apply_updates(param, updates)
+        return (param, state)
+
+    def opt_run(param):
+        state = opt.init(param)
+        (param, state) = fori_loop(0, 100, update_step, (param, state))
+        return (param, state)
+
+>>> params = jnp.array([0.1, 0.2, 0.3])
+>>> (final_params, _) = jax.jit(opt_run)(params)
+>>> final_params
+Array([-0.00320799,  0.03475223,  0.29362844], dtype=float64)
