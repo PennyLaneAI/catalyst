@@ -35,7 +35,6 @@ def get_custom_qjit_device(num_wires, discards, additions):
     class CustomDevice(qml.devices.Device):
         """Custom Gate Set Device"""
 
-        # name = "Custom Device"
         name = "lightning.qubit"
         pennylane_requires = "0.35.0"
         version = "0.0.2"
@@ -58,20 +57,6 @@ def get_custom_qjit_device(num_wires, discards, additions):
                 custom_capabilities.native_ops.pop(gate)
             custom_capabilities.native_ops.update(additions)
             self.qjit_capabilities = custom_capabilities
-
-        @property
-        def operations(self):
-            """Get PennyLane operations."""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Get PennyLane observables."""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
         @property
         def operations(self):
@@ -144,9 +129,7 @@ def test_native_controlled_unitary():
     @qml.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_unitary
     def native_controlled_unitary():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:3 = quantum.unitary
-        # CHECK-SAME: ctrls
-        # CHECK-SAME: ctrlvals(%true, %true, %true)
+        # CHECK: [[out:%.+]] = quantum.unitary
         qml.ctrl(
             qml.QubitUnitary(
                 jnp.array(

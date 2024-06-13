@@ -16,6 +16,7 @@
 This module contains device stubs for the old and new PennyLane device API, which facilitate
 the application of decomposition and other device pre-processing routines.
 """
+import logging
 import os
 import pathlib
 import platform
@@ -34,6 +35,7 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
 )
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.programs.verification import (
     validate_observables,
     validate_observables_adjoint_diff,
@@ -54,6 +56,9 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
     read_toml_file,
 )
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 RUNTIME_OPERATIONS = [
     "CNOT",
@@ -116,13 +121,14 @@ class BackendInfo:
     kwargs: Dict[str, Any]
 
 
+# pylint: disable=too-many-branches
+@debug_logger
 def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabilities) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
-    # pylint: disable=too-many-branches
 
     dname = device.name
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         dname = device.short_name
 
     device_name = ""
@@ -151,7 +157,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        if isinstance(device, qml.Device):
+        if isinstance(device, qml.devices.LegacyDevice):
             device_kwargs["shots"] = device.shots if device.shots else 0
         else:
             # TODO: support shot vectors
@@ -178,6 +184,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
 
+@debug_logger
 def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set[str]:
     """Calculate the set of supported quantum gates for the QJIT device from the gates
     allowed on the target quantum device."""
@@ -215,11 +222,22 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
     if any(ng.invertible for ng in target_capabilities.native_ops.values()):
         qjit_capabilities.native_ops.update(
             {
-                "Adjoint": OperationProperties(
+                "HybridAdjoint": OperationProperties(
                     invertible=True, controllable=True, differentiable=True
                 )
             }
         )
+
+    # TODO: Optionally enable runtime-powered quantum gate controlling once they
+    #       are supported natively in MLIR.
+    # if any(ng.controllable for ng in target_capabilities.native_ops.values()):
+    #     qjit_capabilities.native_ops.update(
+    #         {
+    #             "HybridCtrl": OperationProperties(
+    #                 invertible=True, controllable=True, differentiable=True
+    #             )
+    #
+    #     )
 
     return qjit_capabilities
 
@@ -255,6 +273,7 @@ class QJITDevice(qml.QubitDevice):
         # TODO: https://github.com/PennyLaneAI/catalyst/issues/398
         return {"MultiControlledX", "BlockEncode"}
 
+    @debug_logger_init
     def __init__(
         self,
         original_device,
@@ -263,6 +282,8 @@ class QJITDevice(qml.QubitDevice):
     ):
         self.original_device = original_device
         super().__init__(wires=original_device.wires, shots=original_device.shots)
+
+        check_device_wires(self.wires)
 
         self.backend_name = backend.c_interface_name if backend else "default"
         self.backend_lib = backend.lpath if backend else ""
@@ -286,6 +307,7 @@ class QJITDevice(qml.QubitDevice):
         """
         raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
 
+    @debug_logger
     def default_expand_fn(self, circuit, max_expansion=10):
         """
         Most decomposition logic will be equivalent to PennyLane's decomposition.
@@ -354,6 +376,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
+    @debug_logger_init
     def __init__(
         self,
         original_device,
@@ -365,8 +388,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         for key, value in original_device.__dict__.items():
             self.__setattr__(key, value)
 
-        if original_device.wires is None:
-            raise AttributeError("Catalyst does not support devices without set wires.")
+        check_device_wires(original_device.wires)
 
         super().__init__(wires=original_device.wires, shots=original_device.shots)
 
@@ -391,6 +413,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         """Get the device measurement processes"""
         return self.qjit_capabilities.measurement_processes
 
+    @debug_logger
     def preprocess(
         self,
         ctx,
@@ -444,7 +467,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         if config.gradient_method is not None:
             program.add_transform(verify_no_state_variance_returns)
-
+            
         if config.gradient_method == "adjoint":
             program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
         elif config.gradient_method == "parameter-shift":
@@ -474,9 +497,11 @@ def filter_out_adjoint(operations):
         removed.
     """
     adjoint = re.compile(r"^Adjoint\(.*\)$")
+    c_adjoint = re.compile(r"^C\(Adjoint\(.*\)\)$")
+    adjoint_c = re.compile(r"^Adjoint\(C\(.*\)\)$")
 
     def is_not_adj(op):
-        return not re.match(adjoint, op)
+        return not (re.match(adjoint, op) or re.match(c_adjoint, op) or re.match(adjoint_c, op))
 
     operations_no_adj = filter(is_not_adj, operations)
     return set(operations_no_adj)
@@ -507,6 +532,7 @@ def check_no_overlap(*args, device_name):
     raise CompileError(msg)
 
 
+@debug_logger
 def validate_device_capabilities(
     device: qml.QubitDevice, device_capabilities: DeviceCapabilities
 ) -> None:
@@ -519,7 +545,7 @@ def validate_device_capabilities(
       ``device.observables``.
 
     Args:
-        device (qml.Device): An instance of a quantum device.
+        device (qml.devices.LegacyDevice): An instance of a quantum device.
         config (TOMLDocument): A TOML document representation.
 
     Raises: CompileError
@@ -531,7 +557,7 @@ def validate_device_capabilities(
             f"Config is not marked as qjit-compatible"
         )
 
-    device_name = device.short_name if isinstance(device, qml.Device) else device.name
+    device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
 
     native = pennylane_operation_set(device_capabilities.native_ops)
     decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)
@@ -541,11 +567,19 @@ def validate_device_capabilities(
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
         # For gates, we require strict match
+        # TODO: Eliminate string based matching against device declaration, e.g. lightning includes
+        # C(gate) (for some gates), but not Adjoint(gate), or C(Adjoint(gate)) ...
         device_gates = filter_out_adjoint(set(device.operations))
+        # Lightning-kokkis might support C(GlobalPhase) in Python, but not in C++. We remove this
+        # gate before calling the validation.
+        # See https://github.com/PennyLaneAI/pennylane-lightning/pull/642#discussion_r1535478642
+        if device_name == "lightning.kokkos":
+            device_gates = device_gates - {"C(GlobalPhase)"}
         spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
         if device_gates != spec_gates:
             raise CompileError(
-                "Gates in qml.device.operations and specification file do not match.\n"
+                "Gates in qml.device.operations and specification file do not match for "
+                f'"{device_name}".\n'
                 f"Gates that present only in the device: {device_gates - spec_gates}\n"
                 f"Gates that present only in spec: {spec_gates - device_gates}\n"
             )
@@ -571,7 +605,7 @@ def get_device_toml_config(device) -> TOMLDocument:
         # field.
         device_lpath = pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
 
-        name = device.short_name if isinstance(device, qml.Device) else device.name
+        name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
         # The toml files name convention we follow is to replace
         # the dots with underscores in the device short name.
         toml_file_name = name.replace(".", "_") + ".toml"
@@ -593,13 +627,28 @@ def get_device_capabilities(
     device, program_features: Optional[ProgramFeatures] = None
 ) -> DeviceCapabilities:
     """Get or load DeviceCapabilities structure from device"""
-
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
     else:
         program_features = (
             program_features if program_features else ProgramFeatures(device.shots is not None)
         )
-        device_name = device.short_name if isinstance(device, qml.Device) else device.name
+        device_name = (
+            device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+        )
         device_config = get_device_toml_config(device)
         return load_device_capabilities(device_config, program_features, device_name)
+
+
+def check_device_wires(wires):
+    """Validate requirements Catalyst imposes on device wires."""
+    if wires is None:
+        raise AttributeError("Catalyst does not support device instances without set wires.")
+
+    assert isinstance(wires, qml.wires.Wires)
+
+    if not all(isinstance(wire, int) for wire in wires.labels):
+        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")
+
+    if not wires.labels == tuple(range(len(wires))):
+        raise AttributeError("Catalyst requires continuous integer wire labels starting at 0.")

@@ -15,7 +15,7 @@
 """
 This module contains debug functions to interact with the compiler and compiled functions.
 """
-
+import logging
 import os
 
 from jax.interpreters import mlir
@@ -23,11 +23,16 @@ from jax.interpreters import mlir
 import catalyst
 from catalyst.compiled_functions import CompiledFunction
 from catalyst.compiler import Compiler
+from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 from catalyst.utils.filesystem import WorkspaceManager
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
+
+@debug_logger
 def print_compilation_stage(fn, stage):
     """Print one of the recorded compilation stages for a JIT-compiled function.
 
@@ -58,6 +63,7 @@ def print_compilation_stage(fn, stage):
     print(fn.compiler.get_output_of(stage))
 
 
+@debug_logger
 def get_cmain(fn, *args):
     """Return a C program that calls a jitted function with the provided arguments.
 
@@ -83,6 +89,7 @@ def get_cmain(fn, *args):
 
 
 # pylint: disable=line-too-long
+@debug_logger
 def compile_from_mlir(ir, compiler=None, compile_options=None):
     """Compile a Catalyst function to binary code from the provided MLIR.
 
@@ -136,4 +143,4 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
     with mlir.ir.Context():
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
-    return CompiledFunction(shared_object, qfunc_name, result_types, compiler.options)
+    return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)
