@@ -41,43 +41,56 @@ from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
 ## API ##
-def accelerate(func=None, dev=None):
-    """Seamless integration with jax.jit
+def accelerate(func=None, *, dev=None):
+    """Execute a ``jax.jit`` accelerated function on classical
+    accelerators such as GPUs from within a qjit-compiled function.
+    
+    .. note::
+    
+        ``catalyst.accelerate`` doses not currently support
+        differentiation, and cannot be used inside functions that
+        :func:`catalyst.grad` is applied to.
+        
+    Args:
+        func (Callable or PjitFunction): The function to be classically
+            accelerated from within the qjit-compiled workflow. This
+            function can be already just-in-time compiled with JAX via
+            the ``jax.jit`` decorator and a specified device. If not,
+            it will be implicitly JIT-compiled, and so must be JIT
+            compatible.
+        dev (jax.Device): the classical accelerator device the JIT-compiled
+            function will run on. Available devices can be retrieved via
+            ``jax.devices()``. If not provided, the default value of
+            ``jax.devices()[0]`` as determined by JAX will be used.
 
-    The accelerate function can be used to automatically apply `jax.jit` to
-    the input function `func` and be used to specify the device with the `dev`
-    keyword argument. If `dev` is None, then the default device as determined
-    by JAX is used.
-
-    Can be used in the following modes:
-
-
+    .. see-also:: :func:`~.pure_callback`, :func:`.debug.callback`.
+    
+    **Example**
+    
     ```py
-    @accelerate
-    def identity(x):
-      return x
-
-    @qml.qjit
-    def qjitted_fn(x):
-      return x
+    @accelerate(dev=jax.devices("gpu")[0])
+    def classical_fn(x):
+        return jnp.sin(x) ** 2
+    
+    @qjit
+    def hybrid_fn(x):
+        y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
+        return jnp.cos(y)
     ```
 
-    ```
-    @accelerate(dev=jax.devices()[0])
-    def identity(x):
-      return x
-
-    @qml.qjit
-    def qjitted_fn(x):
-      return x
-    ```
-
-    or
-
-    ```
-    @qml.qjit
-    def qjitted_fn(x):
-      return accelerate(lambda x: x)
+    In addition, you can accelerate function that have already been
+    ``jax.jit`` decorated:
+    
+    ```py
+    @jax.jit
+    def classical_fn(x):
+        x = jax.device_put(x, jax.local_devices("gpu")[0])
+        return jnp.sin(x) ** 2
+    
+    @qjit
+    def hybrid_fn(x):
+        y = accelerate(classical_fn)(x) # will be executed on a GPU
+        return jnp.cos(y)
     ```
     """
 
