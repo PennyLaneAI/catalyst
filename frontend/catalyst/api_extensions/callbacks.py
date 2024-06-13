@@ -199,7 +199,8 @@ class MemrefCallable(FlatCallable):
         results_aval_sequence = (
             self.results_aval if isinstance(self.results_aval, Sequence) else [self.results_aval]
         )
-        for retval, exp_aval in zip(retvals, results_aval_sequence):
+        flat_res_avals, _ = tree_flatten(results_aval_sequence)
+        for retval, exp_aval in zip(retvals, flat_res_avals):
             self._check_types(retval, exp_aval)
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)
@@ -215,6 +216,7 @@ class MemrefCallable(FlatCallable):
     def _check_types(self, obs, exp_aval):
         """Raise error if observed value is different than expected abstract value"""
         obs_aval = shaped_abstractify(obs)
+        obs_aval = obs_aval.strip_weak_type()
         if obs_aval != exp_aval:
             # pylint: disable-next=line-too-long
             msg = f"Callback {self.func.__name__} expected type {exp_aval} but observed {obs_aval} in its return value"
