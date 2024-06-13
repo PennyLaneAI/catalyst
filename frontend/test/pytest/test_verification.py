@@ -41,7 +41,7 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
 )
 
-# pylint: disable = unused-argument
+# pylint: disable = unused-argument, unnecessary-lambda-assignment
 
 
 def get_custom_device(
@@ -50,7 +50,7 @@ def get_custom_device(
     non_invertible_gates=frozenset(),
     non_controllable_gates=frozenset(),
     native_gates=frozenset(),
-    **kwargs
+    **kwargs,
 ):
     """Generate a custom device where certain gates are marked as non-differensiable."""
 
@@ -144,26 +144,34 @@ def test_unsupported_ops_raise_an_error():
     with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
         qml.qjit(f)(1.2)
 
-def queue_multiple_ops(x, wires):
+
+def queue_ops(x, wires):
+    """Queue two operators. To be used to create HybridAdjoint
+    and HybridCtrl instances for testing"""
     qml.RX(x, wires=wires)
     qml.Z(wires)
 
+
 # callables to return adjoint ops via different contruction methods
-adj_operator = lambda x, wires: adjoint(qml.RX(x, wires))  # instantiated op (qml.ops.Adjoint)
-adj_op_callable = lambda x, wires: adjoint(qml.RX)(x, wires)  # op callable (qml.ops.Adjoint)
-adj_op_multiple = lambda x, wires: adjoint(queue_multiple_ops)(x, wires)  # op queue (HybridAdjoint)
+adj_operator = lambda x, wires: adjoint(qml.RX(x, wires))  # instantiated op (Adjoint)
+adj_op_callable = lambda x, wires: adjoint(qml.RX)(x, wires)  # op callable (Adjoint)
+adj_op_multiple = lambda x, wires: adjoint(queue_ops)(x, wires)  # op queue (HybridAdjoint)
 
 # callables to return controlled ops via different construction methods
-ctrl_operator = lambda x, wires: ctrl(qml.Z(wires), control=[1, 2, 3])  # instantiated op (Controlled)
-ctrl_op_callable = lambda x, wires: ctrl(qml.Z, control=[1, 2, 3])(wires)  # op callable (Controlled)
-ctrl_op_multiple = lambda x, wires: ctrl(queue_multiple_ops, control=[1, 2, 3])(x, wires)  # op queue (HybridCtrl)
-    
+ctrl_operator = lambda x, wires: ctrl(qml.Z(wires), control=[1, 2, 3])  # (Controlled)
+ctrl_op_callable = lambda x, wires: ctrl(qml.Z, control=[1, 2, 3])(wires)  # (Controlled)
+ctrl_op_multiple = lambda x, wires: ctrl(queue_ops, control=[1, 2, 3])(x, wires)  # (HybridCtrl)
+
+
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
     """Test that the verification catches situations where a HybridOp subtape contains
     an operation the given device can't support inside that HybridOp"""
 
-    @pytest.mark.parametrize("op_fn, op_type", [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)])
+    @pytest.mark.parametrize(
+        "op_fn, op_type",
+        [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)],
+    )
     def test_non_invertible_gate_simple(self, op_fn, op_type):
         """Emulate a device with a non-invertible gate applied inside an Adjoint HybridOp."""
 
@@ -184,7 +192,10 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    @pytest.mark.parametrize("op_fn, op_type", [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)])
+    @pytest.mark.parametrize(
+        "op_fn, op_type",
+        [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)],
+    )
     def test_non_invertible_gate_nested_cond(self, op_fn, op_type):
         """Emulate a device with a non-invertible gate inside an Adjoint that
         is further nested in a Cond operation."""
@@ -214,7 +225,10 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    @pytest.mark.parametrize("op_fn, op_type", [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)])
+    @pytest.mark.parametrize(
+        "op_fn, op_type",
+        [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)],
+    )
     def test_non_invertible_gate_nested_for(self, op_fn, op_type):
         """Emulate a device with a non-invertible gate inside an Adjoint that
         is further nested in a For operation."""
@@ -245,7 +259,9 @@ class TestHybridOpVerification:
         @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
         def f(x: float):
             op = op_fn(x, wires=0)
-            assert isinstance(op, Controlled), f"op expected to be qml.ops.Controlled but got {type(op)}"
+            assert isinstance(
+                op, Controlled
+            ), f"op expected to be qml.ops.Controlled but got {type(op)}"
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
@@ -260,19 +276,25 @@ class TestHybridOpVerification:
     def test_non_controllable_gate_hybridctrl(self, mocker):
         """Test that a non-controllable gate applied inside a HybridCtrl raises an error."""
 
-        # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the 
-        # verification structure is in place, so we test the verification of its nested operators by 
-        # adding HybridCtrl to the list of native gates for the custom base device and by patching 
+        # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the
+        # verification structure is in place, so we test the verification of its nested operators by
+        # adding HybridCtrl to the list of native gates for the custom base device and by patching
         # the list of RUNTIME_OPERATIONS for the QJIT device to include HybridCtrl for this test.
 
-        @qml.qnode(get_custom_device(native_gates={"HybridCtrl"}, non_controllable_gates={"PauliZ"}, wires=4))
+        @qml.qnode(
+            get_custom_device(
+                native_gates={"HybridCtrl"}, non_controllable_gates={"PauliZ"}, wires=4
+            )
+        )
         def f(x: float):
             op = ctrl_op_multiple(x, wires=0)
             assert isinstance(op, HybridCtrl), f"op expected to be HybridCtrl but got {type(op)}"
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(invertible=True, controllable=True, differentiable=True)
+        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+            invertible=True, controllable=True, differentiable=True
+        )
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
@@ -287,7 +309,7 @@ class TestHybridOpVerification:
     def test_hybridctrl_raises_error(self):
         """Test that a HybridCtrl operator is rejected by the verification."""
 
-        # TODO: If you are deleting this test because HybridCtrl support has been added, consider 
+        # TODO: If you are deleting this test because HybridCtrl support has been added, consider
         # updating the tests that patch RUNTIME_OPERATIONS to inclue HybridCtrl accordingly
 
         @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
@@ -295,7 +317,7 @@ class TestHybridOpVerification:
             op = ctrl_op_multiple(x, wires=0)
             assert isinstance(op, HybridCtrl), f"op expected to be HybridCtrl but got {type(op)}"
             return qml.expval(qml.PauliX(0))
-        
+
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             qml.qjit(f)(1.2)
 
@@ -312,9 +334,11 @@ class TestHybridOpVerification:
         def f(x: float):
             op = Controlled(adj_op_multiple(x, wires=0), control_wires=[1, 2, 3])
             assert isinstance(op, Controlled), f"op expected to be Controlled but got {type(op)}"
-            assert isinstance(op.base, HybridAdjoint), f"base op expected to be HybridAdjoint but got {type(op)}"
+            assert isinstance(
+                op.base, HybridAdjoint
+            ), f"base op expected to be HybridAdjoint but got {type(op)}"
             return qml.expval(qml.PauliX(0))
-        
+
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             qml.qjit(f)(1.2)
 
@@ -331,9 +355,11 @@ class TestHybridOpVerification:
         def f(x: float):
             op = Adjoint(adj_op_multiple(x, wires=0))
             assert isinstance(op, Adjoint), f"op expected to be Adjoint but got {type(op)}"
-            assert isinstance(op.base, HybridAdjoint), f"base op expected to be HybridAdjoint but got {type(op)}"
+            assert isinstance(
+                op.base, HybridAdjoint
+            ), f"base op expected to be HybridAdjoint but got {type(op)}"
             return qml.expval(qml.PauliX(0))
-        
+
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             qml.qjit(f)(1.2)
 
@@ -345,12 +371,12 @@ class TestHybridOpVerification:
 
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_hybrid_ctrl_containing_hybrid_adjoint(self, unsupported_gate_attribute):
-        """Test that verification catches a non-invertible or non-controllable base that 
+        """Test that verification catches a non-invertible or non-controllable base that
         is in a HybridAdjoint inside a HybridCtrl"""
 
-        # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the 
-        # verification structure is in place, so we test the verification of its nested operators by 
-        # adding HybridCtrl to the list of native gates for the custom base device and by patching 
+        # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the
+        # verification structure is in place, so we test the verification of its nested operators by
+        # adding HybridCtrl to the list of native gates for the custom base device and by patching
         # the list of RUNTIME_OPERATIONS for the QJIT device to include HybridCtrl for this test.
 
         def _ops(x, wires):
@@ -363,11 +389,15 @@ class TestHybridOpVerification:
         def f(x: float):
             op = ctrl(_ops, control=[2, 3, 4])(x, wires=0)
             assert isinstance(op, HybridCtrl), f"op expected to be HybridCtrl but got {type(op)}"
-            assert isinstance(op.regions[0].quantum_tape.operations[0], HybridAdjoint), f"op expected to be HybridAdjoint but got {type(op)}"
+            assert isinstance(
+                op.regions[0].quantum_tape.operations[0], HybridAdjoint
+            ), f"op expected to be HybridAdjoint but got {type(op)}"
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(invertible=True, controllable=True, differentiable=True)
+        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+            invertible=True, controllable=True, differentiable=True
+        )
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
@@ -381,12 +411,12 @@ class TestHybridOpVerification:
 
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_hybrid_adjoint_containing_hybrid_ctrl(self, unsupported_gate_attribute):
-        """Test that verification catches a non-invertible or non-controllable base that 
+        """Test that verification catches a non-invertible or non-controllable base that
         is in a HybridCtrl inside a HybridAdjoint"""
-    
-        # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the 
-        # verification structure is in place, so we test the verification of its nested operators by 
-        # adding HybridCtrl to the list of native gates for the custom base device and by patching 
+
+        # Note: The HybridCtrl operator is not currently supported with the QJIT device, but the
+        # verification structure is in place, so we test the verification of its nested operators by
+        # adding HybridCtrl to the list of native gates for the custom base device and by patching
         # the list of RUNTIME_OPERATIONS for the QJIT device to include HybridCtrl for this test.
 
         def _ops(x, wires):
@@ -398,12 +428,18 @@ class TestHybridOpVerification:
         @qml.qnode(get_custom_device(native_gates={"HybridCtrl"}, wires=4, **device_kwargs))
         def f(x: float):
             op = adjoint(_ops)(x, wires=0)
-            assert isinstance(op, HybridAdjoint), f"op expected to be HybridAdjoint but got {type(op)}"
-            assert isinstance(op.regions[0].quantum_tape.operations[0], HybridCtrl), f"op expected to be HybridCtrl but got {type(op)}"
+            assert isinstance(
+                op, HybridAdjoint
+            ), f"op expected to be HybridAdjoint but got {type(op)}"
+            assert isinstance(
+                op.regions[0].quantum_tape.operations[0], HybridCtrl
+            ), f"op expected to be HybridCtrl but got {type(op)}"
             return qml.expval(qml.PauliX(0))
 
         runtime_ops_with_qctrl = deepcopy(RUNTIME_OPERATIONS)
-        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(invertible=True, controllable=True, differentiable=True)
+        runtime_ops_with_qctrl["HybridCtrl"] = OperationProperties(
+            invertible=True, controllable=True, differentiable=True
+        )
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
