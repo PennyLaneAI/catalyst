@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains functions tracing and lowering JAX code to MLIR.
+
+"""
+This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
@@ -24,8 +27,8 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operation, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.operation import AnyWires, Operation, Operator, Wires
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -35,6 +38,9 @@ from catalyst.jax_extras import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     DynshapedClosedJaxpr,
+    ExpansionStrategy,
+    InputSignature,
+    OutputSignature,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
@@ -42,7 +48,9 @@ from catalyst.jax_extras import (
     _input_type_to_tracers,
     convert_element_type,
     deduce_avals,
+    deduce_signatures,
     eval_jaxpr,
+    input_type_to_tracers,
     jaxpr_to_mlir,
     make_jaxpr2,
     sort_eqns,
@@ -78,12 +86,21 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
     JaxTracingContext,
 )
 from catalyst.utils.exceptions import CompileError
+
+# pylint: disable=too-many-lines
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+# TODO: refactor the tracer module
+# pylint: disable=too-many-lines
 
 # Global flag tracing wether the function that we trace might be used for gradients
 TRACING_GRADIENTS: List[str] = []
@@ -135,12 +152,14 @@ class Function:
         AssertionError: Invalid function type.
     """
 
+    @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
         self.__name__ = fn.__name__
 
+    @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -165,6 +184,7 @@ PAULI_NAMED_MAP = {
 }
 
 
+@debug_logger
 def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray]) -> ClosedJaxpr:
     """Return a JAXPR that is identical to the given one but with added type conversion operations
     to produce the provided type signature in its output."""
@@ -189,6 +209,7 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     return ClosedJaxpr(jaxpr2, consts)
 
 
+@debug_logger
 def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
     """Unify result signatures across a set of JAXPRs by promoting to common types.
 
@@ -224,10 +245,12 @@ class QRegPromise:
     """QReg adaptor tracing the qubit extractions and insertions. The adaptor works by postponing
     the insertions in order to re-use qubits later thus skipping the extractions."""
 
+    @debug_logger_init
     def __init__(self, qreg: DynamicJaxprTracer):
         self.base: DynamicJaxprTracer = qreg
         self.cache: Dict[Any, DynamicJaxprTracer] = {}
 
+    @debug_logger
     def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
         """Extract qubits from the wrapped quantum register or get the already extracted qubits
         from cache"""
@@ -251,6 +274,7 @@ class QRegPromise:
                 qubits.append(qextract_p.bind(qrp.base, w))
         return qubits
 
+    @debug_logger
     def insert(self, wires, qubits) -> None:
         """Insert qubits to the cache."""
         qrp = self
@@ -261,6 +285,7 @@ class QRegPromise:
             ), f"Attempting to insert an already-inserted wire {w} into {qrp.base}"
             qrp.cache[w] = qubit
 
+    @debug_logger
     def actualize(self) -> DynamicJaxprTracer:
         """Prune the qubit cache by performing the postponed insertions."""
         qrp = self
@@ -293,7 +318,7 @@ class HybridOpRegion:
     res_classical_tracers: List[DynamicJaxprTracer]
 
 
-class HybridOp(Operation):
+class HybridOp(Operator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
     tracing. The methods of this class describe various aspects of quantum tracing.
@@ -316,10 +341,20 @@ class HybridOp(Operation):
     num_wires = AnyWires
     binder: Callable = _no_binder
 
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
+    @debug_logger_init
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+    ):  # pylint: disable=too-many-arguments
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
+        self.expansion_strategy = expansion_strategy
+        self.apply_reverse_transform = apply_reverse_transform
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):
@@ -327,24 +362,38 @@ class HybridOp(Operation):
         nested_ops = [r.quantum_tape.operations for r in self.regions if r.quantum_tape]
         return f"{self.name}(tapes={nested_ops})"
 
-    def bind_overwrite_classical_tracers(
-        self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+    @debug_logger
+    def bind_overwrite_classical_tracers2(
+        # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+        self,
+        ctx: JaxTracingContext,
+        trace: DynamicJaxprTrace,
+        in_expanded_tracers,
+        out_expanded_tracers,
+        **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations."""
-        # Notes:
-        # [1] - We are interested in a new quantum tracer only, so we ignore all other (classical)
-        #       tracers returned by JAX.
-        # [2] - We add the already existing classical tracers into the last JAX equation created by
-        #       JAX bind handler of the ``trace`` object.
         assert self.binder is not None, "HybridOp should set a binder"
-        out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
+        out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
+        assert len(eqn.outvars[:-1]) == len(
+            out_expanded_tracers
+        ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
+        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
+            if trace.getvar(t) in set(
+                [
+                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
+                    *ctx.frames[trace].invars,
+                    *ctx.frames[trace].constvar_to_val.keys(),
+                ]
+            ):
+                # Do not re-assign vars from other equations
+                continue
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 
+    @debug_logger
     def trace_quantum(
         self,
         ctx: JaxTracingContext,
@@ -356,7 +405,7 @@ class HybridOp(Operation):
         raise NotImplementedError("HybridOp should implement trace")  # pragma: no cover
 
 
-def has_nested_tapes(op: Operation) -> bool:
+def has_nested_tapes(op: Operator) -> bool:
     """Detects if the PennyLane operation holds nested quantum tapes or not."""
     return (
         isinstance(op, HybridOp)
@@ -374,6 +423,7 @@ def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
     )
 
 
+@debug_logger
 def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """Trace a Python function to JAXPR.
 
@@ -396,11 +446,12 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
                 "static_argnums": static_argnums,
                 "abstracted_axes": abstracted_axes,
             }
-            jaxpr, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    return jaxpr, out_treedef
+    return jaxpr, out_type, out_treedef
 
 
+@debug_logger
 def lower_jaxpr_to_mlir(jaxpr, func_name):
     """Lower a JAXPR to MLIR.
 
@@ -429,6 +480,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     return mlir_module, ctx
 
 
+@debug_logger
 def trace_quantum_tape(
     quantum_tape: QuantumTape,
     device: QubitDevice,
@@ -459,11 +511,13 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
-        # `Controlled(OP)` bind OP with native quantum control syntax.
-        if op.__class__ in {Controlled, ControlledOp, ControlledQubitUnitary}:
-            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+        elif isinstance(op, Adjoint):
+            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -471,6 +525,7 @@ def trace_quantum_tape(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -479,6 +534,7 @@ def trace_quantum_tape(
             qubits2 = gphase_p.bind(
                 *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
         else:
@@ -490,6 +546,7 @@ def trace_quantum_tape(
                 qubits_len=len(qubits),
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -497,7 +554,7 @@ def trace_quantum_tape(
 
     qrp = QRegPromise(qreg)
 
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         # Old device API expands tapes here. Note: this way some ops might bypass the verification.
         # We decided to ignore this since we are aiming new device API.
         ops = device.expand_fn(quantum_tape)
@@ -508,11 +565,10 @@ def trace_quantum_tape(
         qrp2 = None
         if isinstance(op, HybridOp):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+        elif isinstance(op, MeasurementProcess):
+            qrp2 = qrp
         else:
-            if isinstance(op, MeasurementProcess):
-                qrp2 = qrp
-            else:
-                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
@@ -521,13 +577,14 @@ def trace_quantum_tape(
     return qrp
 
 
+@debug_logger
 def trace_observables(
-    obs: Operation, qrp: QRegPromise, m_wires: int
+    obs: Operator, qrp: QRegPromise, m_wires: int
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
-        obs (Operation): an observable operation
+        obs (Operator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
         m_wires (int): the default number of wires to use for this measurement process
 
@@ -568,9 +625,10 @@ def trace_observables(
         raise NotImplementedError(
             f"Observable {obs} (of type {type(obs)}) is not impemented"
         )  # pragma: no cover
-    return obs_tracers, (len(qubits) if qubits else None)
+    return obs_tracers, (len(qubits) if qubits else 0)
 
 
+@debug_logger
 def pauli_sentence_to_hamiltonian_obs(paulis, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     """Convert a :class:`pennylane.pauli.PauliSentence` into a Hamiltonian.
 
@@ -592,6 +650,7 @@ def pauli_sentence_to_hamiltonian_obs(paulis, qrp: QRegPromise) -> List[DynamicJ
     return hamiltonian_p.bind(coeffs, *nested_obs)
 
 
+@debug_logger
 def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     """Convert a :class:`pennylane.pauli.PauliWord` into a Named or Tensor observable.
 
@@ -621,6 +680,7 @@ def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Calla
 
 
 # pylint: disable=too-many-statements,too-many-branches
+@debug_logger
 def trace_quantum_measurements(
     device: QubitDevice,
     qrp: QRegPromise,
@@ -641,7 +701,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         shots = device.shots
     else:
         # TODO: support shot vectors
@@ -650,7 +710,7 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
-            if isinstance(device, qml.Device):
+            if isinstance(device, qml.devices.LegacyDevice):
                 m_wires = o.wires if o.wires else range(device.num_wires)
             else:
                 m_wires = o.wires if o.wires else range(len(device.wires))
@@ -660,6 +720,11 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
 
             if o.return_type.value == "sample":
+                if shots is None:
+                    raise ValueError(
+                        "qml.sample cannot work with shots=None. "
+                        "Please specify a finite number of shots."
+                    )
                 if o.mv is not None:  # qml.sample(m)
                     out_classical_tracers.append(o.mv)
                 else:
@@ -677,6 +742,11 @@ def trace_quantum_measurements(
                 shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
+                if shots is None:
+                    raise ValueError(
+                        "qml.sample cannot work with shots=None. "
+                        "Please specify a finite number of shots."
+                    )
                 shape = (2**nqubits,) if using_compbasis else (2,)
                 results = counts_p.bind(obs_tracers, shots=shots, shape=shape)
                 if using_compbasis:
@@ -710,6 +780,7 @@ def trace_quantum_measurements(
     return out_classical_tracers, out_tree
 
 
+@debug_logger
 def is_transform_valid_for_batch_transforms(tape, flat_results):
     """Not all transforms are valid for batch transforms.
     Batch transforms will increase the number of tapes from 1 to N.
@@ -753,6 +824,7 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
     return are_batch_transforms_valid
 
 
+@debug_logger
 def apply_transform(
     qnode_program,
     device_program,
@@ -787,6 +859,7 @@ def apply_transform(
     return tapes, post_processing
 
 
+@debug_logger
 def split_tracers_and_measurements(flat_values):
     """Return classical tracers and measurements"""
     classical = []
@@ -804,6 +877,7 @@ def split_tracers_and_measurements(flat_values):
     return classical, measurements
 
 
+@debug_logger
 def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
     """Trace post processing function.
 
@@ -837,6 +911,7 @@ def trace_post_processing(ctx, trace, post_processing: Callable, pp_args):
         return closed_jaxpr, out_type, out_tree_promise()
 
 
+@debug_logger
 def reset_qubit(qreg_in, w):
     """Perform a qubit reset on a single wire. Suitable for use during late-stage tracing,
     as JAX primitives are used directly. These operations will not appear on tape."""
@@ -862,6 +937,39 @@ def reset_qubit(qreg_in, w):
     return qreg_out
 
 
+@debug_logger
+def trace_function(
+    ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Trace classical Python function containing no quantum computations. Arguments and results of
+    the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
+    resulting Jaxpr program might or might not preserve sharing among the dynamic dimension
+    variables. The support for expansion options makes this function different from
+    `jax_extras.make_jaxpr2`.
+
+    Args:
+        ctx: Jax tracing context helper.
+        fun: Callable python function.
+        expansion_strategy: dynamic dimension expansion options.
+        *args: Sample positional arguments of the function.
+        **kwargs: Sample keyword arguments of the function.
+
+    Result:
+        List of output Jax tracers
+        InputSignature of the resulting Jaxpr program
+        OutputSignature of the resulting Jaxpr program
+    """
+    wfun, in_sig, out_sig = deduce_signatures(
+        fun, args, kwargs, expansion_strategy=expansion_strategy
+    )
+    with EvaluationContext.frame_tracing_context(ctx) as trace:
+        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
+
+        return res_expanded_tracers, in_sig, out_sig
+
+
+@debug_logger
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:

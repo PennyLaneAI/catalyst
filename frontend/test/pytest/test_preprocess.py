@@ -43,7 +43,7 @@ from catalyst.api_extensions.control_flow import (
     for_loop,
     while_loop,
 )
-from catalyst.api_extensions.quantum_operators import Adjoint, adjoint
+from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import (
@@ -339,7 +339,7 @@ region2 = HybridOpRegion([], tape2, [], [])
 
 # catalyst.pennylane_extensions.Adjoint:
 #   Adjoint([], [], regions=[HybridOpRegion([], quantum_tape, [], [])])
-adj_op = Adjoint([], [], [region1])
+adj_op = HybridAdjoint([], [], [region1])
 
 # catalyst.pennylane_extensions.ForLoop:
 #     ForLoop([], [], regions=[HybridOpRegion([], quantum_tape, [], [])])
@@ -358,7 +358,7 @@ cond_op = Cond([], [], regions=[region1, region2])
 
 # each entry contains (initialized_op, op_class, num_regions)
 HYBRID_OPS = [
-    (adj_op, Adjoint, 1),
+    (adj_op, HybridAdjoint, 1),
     (forloop_op, ForLoop, 1),
     (whileloop_op, WhileLoop, 2),
     (cond_op, Cond, 2),
@@ -376,7 +376,7 @@ capabilities = get_test_device_capabilities(
         RY = { }
         RZ = { }
         CNOT = { }
-        Adjoint = { }
+        HybridAdjoint = { }
         ForLoop = { }
         WhileLoop = { }
         Cond = { }
@@ -440,7 +440,7 @@ class TestPreprocessHybridOp:
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
-            adjoint(OtherRX(x, 0))
+            adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
         mlir = qml.qjit(circuit, target="mlir").mlir
@@ -571,7 +571,7 @@ class TestPreprocessHybridOp:
         stopping_condition = partial(catalyst_acceptance, operations=expected_ops)
 
         # make a weird nested op
-        adjoint_op = Adjoint([], [], [region1])
+        adjoint_op = HybridAdjoint([], [], [region1])
         ops = [qml.RY(1.23, 1), adjoint_op, qml.Hadamard(2)]  # Hadamard will decompose
         adj_region = HybridOpRegion([], QuantumScript(ops), [], [])
 
@@ -617,7 +617,7 @@ class TestPreprocessHybridOp:
             assert "RZ" in [op.name for op in subtape.operations]
 
         # the seconds element on the first subtape of the cond op is an adjoint
-        assert isinstance(cond_subtapes[0][1], Adjoint)
+        assert isinstance(cond_subtapes[0][1], HybridAdjoint)
         # unsupported op on it has been decomposed (no more Hadamard)
         adj_subtape = cond_subtapes[0][1].regions[0].quantum_tape
         assert "Hadamard" not in [op.name for op in adj_subtape.operations]
@@ -687,7 +687,7 @@ class TestPreprocessHybridOp:
 
         region = HybridOpRegion([], subtape, [], [])
         region.trace = None
-        adjoint_op = Adjoint([], [], [region])
+        adjoint_op = HybridAdjoint([], [], [region])
 
         tape = qml.tape.QuantumScript([adjoint_op, qml.Y(1)], [])
 

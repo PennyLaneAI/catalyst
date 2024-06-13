@@ -16,7 +16,8 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
-
+import copy
+import logging
 from functools import partial
 
 import jax
@@ -35,11 +36,15 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-from catalyst.api_extensions.quantum_operators import QCtrl
+from catalyst.api_extensions import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
+from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import DeviceCapabilities
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 def catalyst_decomposer(op, capabilities: DeviceCapabilities):
@@ -48,12 +53,14 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     Raises a CompileError for MidMeasureMP"""
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+    # TODO: remove hardcoded controlled to matrix decomp
     if capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled):
         return _decompose_to_matrix(op)
     return op.decomposition()
 
 
 @transform
+@debug_logger
 def catalyst_decompose(
     tape: qml.tape.QuantumTape,
     ctx,
@@ -127,11 +134,15 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
             )
         )
 
-    new_op = op.__class__(op.in_classical_tracers, op.out_classical_tracers, new_regions)
+    new_op = copy.copy(op)
+    new_op.regions = new_regions
+    # new_op.apply_reverse_transform=op.apply_reverse_transform,
+    # new_op.expansion_strategy=op.expansion_strategy,
     return new_op
 
 
 @transform
+@debug_logger
 def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     r"""Quantum transform that decomposes operations to unitary given a list of operations name.
 
@@ -146,7 +157,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     new_operations = []
 
     for op in tape.operations:
-        if op.name in convert_to_matrix_ops or isinstance(op, QCtrl):
+        if op.name in convert_to_matrix_ops or isinstance(op, HybridCtrl):
             try:
                 mat = op.matrix()
             except Exception as e:
@@ -173,6 +184,7 @@ def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
 
 
 @transform
+@debug_logger
 def measurements_from_counts(tape):
     r"""Replace all measurements from a tape with a single count measurement, it adds postprocessing
     functions for each original measurement.

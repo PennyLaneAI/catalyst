@@ -19,6 +19,7 @@ compilation of hybrid quantum-classical functions using Catalyst.
 import copy
 import functools
 import inspect
+import logging
 import os
 import warnings
 
@@ -35,6 +36,7 @@ from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.debug.instruments import instrument
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -50,6 +52,9 @@ from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
 setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: id(x))
@@ -60,6 +65,7 @@ jax.config.update("jax_enable_x64", True)
 
 
 ## API ##
+@debug_logger
 def qjit(
     fn=None,
     *,
@@ -448,8 +454,16 @@ class QJIT:
     Args:
         fn (Callable): the quantum or classical function to compile
         compile_options (CompileOptions): compilation options to use
+
+    :ivar original_function: This attribute stores `fn`, the quantum or classical function
+                             object to compile, as is, without any modifications
+    :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
+    :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
+    :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
+
     """
 
+    @debug_logger_init
     def __init__(self, fn, compile_options):
         self.original_function = fn
         self.compile_options = compile_options
@@ -469,6 +483,7 @@ class QJIT:
         self.mlir = None  # string form (historic presence)
         self.mlir_module = None
         self.qir = None
+        self.out_type = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
@@ -490,6 +505,7 @@ class QJIT:
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
 
+    @debug_logger
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
@@ -509,6 +525,7 @@ class QJIT:
 
         return self.run(args, kwargs)
 
+    @debug_logger
     def aot_compile(self):
         """Compile Python function on initialization using the type hint signature."""
 
@@ -520,7 +537,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_treedef, self.c_sig = self.capture(self.user_sig or ())
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    self.user_sig or ()
+                )
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()
@@ -531,6 +550,7 @@ class QJIT:
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
+    @debug_logger
     def jit_compile(self, args):
         """Compile Python function on invocation using the provided arguments.
 
@@ -562,7 +582,7 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_treedef, self.c_sig = self.capture(args)
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args)
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -584,6 +604,7 @@ class QJIT:
     # Processing Stages #
 
     @instrument
+    @debug_logger
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         processed_fn = self.original_function
@@ -594,6 +615,7 @@ class QJIT:
         return processed_fn
 
     @instrument(size_from=0)
+    @debug_logger
     def capture(self, args):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
@@ -618,13 +640,14 @@ class QJIT:
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             # TODO: improve PyTree handling
-            jaxpr, treedef = trace_to_jaxpr(
+            jaxpr, out_type, treedef = trace_to_jaxpr(
                 self.user_function, static_argnums, abstracted_axes, full_sig, {}
             )
 
-        return jaxpr, treedef, dynamic_sig
+        return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
+    @debug_logger
     def generate_ir(self):
         """Generate Catalyst's intermediate representation (IR) as an MLIR module.
 
@@ -649,6 +672,7 @@ class QJIT:
         return mlir_module, mlir_string
 
     @instrument(size_from=1, has_finegrained=True)
+    @debug_logger
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.
 
@@ -672,11 +696,14 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
-        compiled_fn = CompiledFunction(shared_object, func_name, restype, self.compile_options)
+        compiled_fn = CompiledFunction(
+            shared_object, func_name, restype, self.out_type, self.compile_options
+        )
 
         return compiled_fn, llvm_ir
 
     @instrument(has_finegrained=True)
+    @debug_logger
     def run(self, args, kwargs):
         """Invoke a previously compiled function with the supplied arguments.
 
@@ -733,6 +760,7 @@ class JAX_QJIT:
         qjit_function (QJIT): the compiled quantum function object to wrap
     """
 
+    @debug_logger_init
     def __init__(self, qjit_function):
         @jax.custom_jvp
         def jaxed_function(*args, **kwargs):
@@ -744,6 +772,7 @@ class JAX_QJIT:
         jaxed_function.defjvp(self.compute_jvp, symbolic_zeros=True)
 
     @staticmethod
+    @debug_logger
     def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
         data = jax.pure_callback(
@@ -754,6 +783,7 @@ class JAX_QJIT:
         assert qjit_function.out_treedef is not None, "PyTree shape must not be none."
         return tree_unflatten(qjit_function.out_treedef, data)
 
+    @debug_logger
     def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
 
@@ -784,6 +814,7 @@ class JAX_QJIT:
         )
         return self.derivative_functions[argnum_key]
 
+    @debug_logger
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
         # Assume we have primals of shape `[a,b]` and results of shape `[c,d]`. Derivatives [2]
@@ -822,5 +853,6 @@ class JAX_QJIT:
 
         return results, jvps
 
+    @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)

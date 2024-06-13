@@ -28,6 +28,7 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
+from jaxlib.hlo_helpers import shape_dtype_to_ir_type
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
@@ -72,11 +73,17 @@ from mlir_quantum.dialects.quantum import (
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 
 from catalyst.compiler import get_lib_path
+from catalyst.jax_extras import (
+    ClosedJaxpr,
+    DynshapePrimitive,
+    for_loop_expansion_strategy,
+    infer_output_type_jaxpr,
+)
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,abstract-method,too-many-lines
+# pylint: disable=unused-argument,abstract-method,too-many-lines,too-many-statements
 
 #########
 # Types #
@@ -210,7 +217,7 @@ cond_p = core.AxisPrimitive("cond")
 cond_p.multiple_results = True
 while_p = core.AxisPrimitive("while_loop")
 while_p.multiple_results = True
-for_p = core.AxisPrimitive("for_loop")
+for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
@@ -226,6 +233,13 @@ print_p = jax.core.Primitive("debug_print")
 print_p.multiple_results = True
 python_callback_p = core.Primitive("python_callback")
 python_callback_p.multiple_results = True
+
+
+def _assert_jaxpr_without_constants(jaxpr: ClosedJaxpr):
+    assert len(jaxpr.consts) == 0, (
+        "Abstract evaluation is not defined for Jaxprs with non-empty constants because these are "
+        "not available at the time of the creation of output tracers."
+    )
 
 
 @python_callback_p.def_abstract_eval
@@ -408,10 +422,14 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
     # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
     # such constants to numpy array types.
-    constants = [
-        StableHLOConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results
-        for const in jaxpr.consts
-    ]
+
+    constants = []
+    for const in jaxpr.consts:
+        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        nparray = np.asarray(const)
+        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
+        constantVals = StableHLOConstantOp(attr).results
+        constants.append(constantVals)
     args_and_consts = constants + list(args)
 
     return GradOp(
@@ -737,7 +755,7 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
+def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
@@ -750,17 +768,14 @@ def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
     return (AbstractQbit(),) * (ctrl_len)
 
 
-@qinst_p.def_impl
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
+@gphase_p.def_impl
+def _gphase_def_impl(*args, **kwargs):
     """Not implemented"""
     raise NotImplementedError()
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params,
-    op=None,
-    ctrl_len: int = 0,
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, op=None, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -793,6 +808,7 @@ def _gphase_lowering(
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     )
     return ctrl_qubits
 
@@ -802,7 +818,7 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -816,19 +832,19 @@ def _qinst_abstract_eval(
 
 
 @qinst_p.def_impl
-def _qinst_def_impl(
-    ctx, *qubits_or_params, op, qubits_len, params_len, ctrl_len
-):  # pragma: no cover
+def _qinst_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
+# pylint: disable=too-many-arguments
 def _qinst_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params: tuple,
+    *qubits_or_params,
     op=None,
-    qubits_len: int = 0,
-    params_len: int = 0,
-    ctrl_len: int = 0,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -880,6 +896,7 @@ def _qinst_lowering(
             in_qubits=qubits,
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
         ).results
 
     return CustomOp(
@@ -890,6 +907,7 @@ def _qinst_lowering(
         gate_name=name_attr,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     ).results
 
 
@@ -897,7 +915,7 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int = 0):
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -905,9 +923,7 @@ def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int 
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(
-    ctx, matrix, qubits, qubits_len: int = None, ctrl_len: int = 0
-):  # pragma: no cover
+def _qunitary_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -915,8 +931,9 @@ def _qunitary_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     matrix: ir.Value,
     *qubits_or_controlled: tuple,
-    qubits_len: int = 0,
-    ctrl_len: int = 0,
+    qubits_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     qubits = qubits_or_controlled[:qubits_len]
     ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
@@ -965,6 +982,7 @@ def _qunitary_lowering(
         in_qubits=qubits,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     ).results
 
 
@@ -1219,17 +1237,17 @@ def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 # expval measurement
 #
 @expval_p.def_abstract_eval
-def _expval_abstract_eval(obs, shots):
+def _expval_abstract_eval(obs, shots, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @expval_p.def_impl
-def _expval_def_impl(ctx, obs, shots):  # pragma: no cover
+def _expval_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
+def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1251,17 +1269,17 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 # var measurement
 #
 @var_p.def_abstract_eval
-def _var_abstract_eval(obs, shots):
+def _var_abstract_eval(obs, shots, shape=None):
     assert isinstance(obs, AbstractObs)
     return core.ShapedArray((), jax.numpy.float64)
 
 
 @var_p.def_impl
-def _var_def_impl(ctx, obs, shots):  # pragma: no cover
+def _var_def_impl(ctx, obs, shots, shape=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
+def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1283,7 +1301,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
 # probs measurement
 #
 @probs_p.def_abstract_eval
-def _probs_abstract_eval(obs, shape):
+def _probs_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -1295,11 +1313,11 @@ def _probs_abstract_eval(obs, shape):
 
 
 @var_p.def_impl
-def _probs_def_impl(ctx, obs, shape):  # pragma: no cover
+def _probs_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1312,7 +1330,7 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 # state measurement
 #
 @state_p.def_abstract_eval
-def _state_abstract_eval(obs, shape):
+def _state_abstract_eval(obs, shape, shots=None):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -1324,11 +1342,11 @@ def _state_abstract_eval(obs, shape):
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, shape):  # pragma: no cover
+def _state_def_impl(ctx, obs, shape, shots=None):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple, shots=None):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1506,14 +1524,32 @@ def _while_loop_lowering(
 # for loop
 #
 @for_p.def_abstract_eval
-def _for_loop_abstract_eval(*args, body_jaxpr, **kwargs):
-    return body_jaxpr.out_avals
+def _for_loop_abstract_eval(
+    *args, body_jaxpr, nimplicit, preserve_dimensions, body_nconsts, **kwargs
+):
+    _assert_jaxpr_without_constants(body_jaxpr)
+
+    return infer_output_type_jaxpr(
+        body_jaxpr.jaxpr.invars[:body_nconsts],
+        body_jaxpr.jaxpr.invars[body_nconsts:],
+        body_jaxpr.jaxpr.outvars[nimplicit:],
+        expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
+        num_implicit_inputs=nimplicit,
+    )
 
 
 # pylint: disable=too-many-arguments
 @for_p.def_impl
 def _for_loop_def_impl(
-    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_nconsts
+    ctx,
+    lower_bound,
+    upper_bound,
+    step,
+    *iter_args_plus_consts,
+    body_jaxpr,
+    nimplicit=0,
+    body_nconsts,
+    preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1521,67 +1557,65 @@ def _for_loop_def_impl(
 # pylint: disable=too-many-arguments
 def _for_loop_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    lower_bound: ir.Value,
-    upper_bound: ir.Value,
-    step: ir.Value,
     *iter_args_plus_consts: tuple,
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
+    nimplicit: int,
+    preserve_dimensions,
 ):
-    # Separate constants from iteration arguments.
-    # The MLIR value provided by JAX for the iteration index is not needed
-    # (as it's identical to the lower bound value).
     body_consts = iter_args_plus_consts[:body_nconsts]
-    loop_index = iter_args_plus_consts[body_nconsts]
-    loop_args = iter_args_plus_consts[body_nconsts + 1 :]
+    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + nimplicit]
+    lower_bound = iter_args_plus_consts[body_nconsts + nimplicit + 0]
+    upper_bound = iter_args_plus_consts[body_nconsts + nimplicit + 1]
+    step = iter_args_plus_consts[body_nconsts + nimplicit + 2]
+    loop_index = iter_args_plus_consts[body_nconsts + nimplicit + 3]
+    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + nimplicit + 4 :]]
+
+    loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
     all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
+    assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[
+        body_nconsts + nimplicit : body_nconsts + nimplicit + 3
+    ]
+    assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
 
-    # Remove header values: lower_bound, upper_bound, step
-    assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[:3]
-    loop_carry_types_plus_consts = all_param_types_plus_consts[3:]
-
-    # Remove loop body constants.
-    assert [val.type for val in body_consts] == loop_carry_types_plus_consts[:body_nconsts]
-    loop_carry_types = loop_carry_types_plus_consts[body_nconsts:]
-
-    # Overwrite the type of the iteration index determined by JAX (= type of lower bound)
-    # in favor of the 'index' type expected by MLIR.
-    loop_index_type = ir.RankedTensorType(loop_index.type).element_type
-    loop_carry_types[0] = ir.IndexType.get()
-
-    # Don't include the iteration index in the result types.
-    result_types = loop_carry_types[1:]
-    assert [val.type for val in loop_args] == result_types
+    result_types = [v.type for v in loop_args]
     assert result_types == [
         mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
-    ], f"{result_types=} doesn't match {jax_ctx.avals_out=}"
+    ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
 
-    loop_operands = []
-    for p in (lower_bound, upper_bound, step):
+    def _cast_to_index(p):
         p = TensorExtractOp(
             ir.RankedTensorType(p.type).element_type, p, []
         ).result  # tensor<i64> -> i64
         p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
-        loop_operands.append(p)
+        return p
+
+    lower_bound, upper_bound, step = map(_cast_to_index, (lower_bound, upper_bound, step))
 
     if apply_reverse_transform:
-        zero = ConstantOp(ir.IndexType.get(), 0).result
-        one = ConstantOp(ir.IndexType.get(), 1).result
+        zero_np = np.array(0)
+        one_np = np.array(1)
+        zero_attr = ir.DenseIntElementsAttr.get(zero_np)
+        one_attr = ir.DenseIntElementsAttr.get(one_np)
+        zero_tensor = StableHLOConstantOp(zero_attr)
+        one_tensor = StableHLOConstantOp(one_attr)
+        ctx = jax_ctx.module_context.context
+        i64_type = ir.IntegerType.get_signless(64, ctx)
+        zero_i64 = TensorExtractOp(i64_type, zero_tensor, []).result
+        one_i64 = TensorExtractOp(i64_type, one_tensor, []).result
+        zero = IndexCastOp(ir.IndexType.get(), zero_i64).result
+        one = IndexCastOp(ir.IndexType.get(), one_i64).result
 
-        start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
+        start_val, stop_val, step_val = lower_bound, upper_bound, step
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
         num_iterations = CeilDivSIOp(distance, step_val)
-        loop_operands[0] = zero
-        loop_operands[1] = num_iterations
-        loop_operands[2] = one
+        lower_bound, upper_bound, step = zero, num_iterations, one
 
-    loop_operands.extend(loop_args)
-
-    for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
+    for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
 
     name_stack = jax_ctx.module_context.name_stack.extend("for")
     body_block = for_op_scf.body
@@ -1594,19 +1628,27 @@ def _for_loop_lowering(
         if apply_reverse_transform:
             # iv = start + normalized_iv * step
             body_args[0] = AddIOp(start_val, MulIOp(body_args[0], step_val))
+
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
         result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
         from_elements_op = FromElementsOp(result_from_elements_op, body_args[0])
         body_args[0] = from_elements_op.result
 
-        # recursively generate the mlir for the loop body
+        # Re-order arguments in accordance with jax dynamic API convensions
+        consts = body_consts
+        loop_iter = body_args[0]
+        implicit_args = body_args[1 : nimplicit + 1]
+        explicit_args = body_args[nimplicit + 1 :]
+        loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
+        body_args = [[param] for param in loop_params]
+
+        # Recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
             body_ctx,
             body_jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
-            # [],
-            *([a] for a in (*body_consts, *body_args)),
+            *body_args,
             dim_var_values=jax_ctx.dim_var_values,
         )
 

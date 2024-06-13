@@ -960,6 +960,12 @@ int64_t __catalyst__rt__array_get_size_1d(QirArray *ptr)
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *ptr, int64_t idx)
 {
     std::vector<QubitIdType> *qubit_vector_ptr = reinterpret_cast<std::vector<QubitIdType> *>(ptr);
+
+    RT_ASSERT(idx >= 0);
+    std::string error_msg = "The qubit register does not contain the requested wire: ";
+    error_msg += std::to_string(idx);
+    RT_FAIL_IF(static_cast<size_t>(idx) >= qubit_vector_ptr->size(), error_msg.c_str());
+
     QubitIdType *data = qubit_vector_ptr->data();
     return (int8_t *)&data[idx];
 }

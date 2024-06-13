@@ -824,7 +824,9 @@ class QJIT_CUDAQ:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
-            device_name = device.short_name if isinstance(device, qml.Device) else device.name
+            device_name = (
+                device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
+            )
             return BackendInfo(device_name, device.name, "", {})
 
         with Patcher(
@@ -837,7 +839,7 @@ class QJIT_CUDAQ:
             # We could also pass abstract arguments here in *args
             # the same way we do so in Catalyst.
             # But I think that is redundant now given make_jaxpr2
-            jaxpr, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
 
         # TODO(@erick-xanadu):
         # What about static_args?
