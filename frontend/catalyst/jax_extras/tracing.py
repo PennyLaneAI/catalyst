@@ -111,8 +111,6 @@ __all__ = (
     "DynamicJaxprTracer",
     "ExpansionStrategy",
     "for_loop_expansion_strategy",
-    "cond_expansion_strategy",
-    "while_loop_expansion_strategy",
     "DynshapedClosedJaxpr",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",

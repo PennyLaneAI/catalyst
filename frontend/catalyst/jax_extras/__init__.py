@@ -43,7 +43,6 @@ from catalyst.jax_extras.tracing import (
     _initial_style_jaxpr,
     _input_type_to_tracers,
     collapse,
-    cond_expansion_strategy,
     convert_constvars_jaxpr,
     convert_element_type,
     deduce_avals,
@@ -72,6 +71,5 @@ from catalyst.jax_extras.tracing import (
     tree_unflatten,
     treedef_is_leaf,
     unzip2,
-    while_loop_expansion_strategy,
     wrap_init,
 )
