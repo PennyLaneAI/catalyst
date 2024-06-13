@@ -20,7 +20,7 @@ from unittest.mock import patch
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.ops import Controlled, Adjoint
+from pennylane.ops import Adjoint, Controlled
 
 from catalyst import (
     CompileError,
@@ -32,7 +32,7 @@ from catalyst import (
     grad,
     while_loop,
 )
-from catalyst.api_extensions import HybridCtrl, HybridAdjoint
+from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS
 from catalyst.utils.toml import (
