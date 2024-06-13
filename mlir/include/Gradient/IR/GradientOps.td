@@ -139,7 +139,8 @@ def BackpropOp : Gradient_Op<"backprop", [
             RankedTensorOf<[AnyFloat]>,
             MemRefOf<[AnyFloat]>
         ]>>:$cotangents,
-        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_StringAttr>:$requester
     );
 
     let results = (outs

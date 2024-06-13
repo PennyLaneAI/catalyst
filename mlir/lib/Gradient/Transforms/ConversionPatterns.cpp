@@ -360,7 +360,14 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // for being ignored by Enzime. But if we have vals, we are coming from a ValueAndGradOp,
         // then we tell Enzime to keep them.
         //bool dupNoNeed = op.getVals().empty();
-        bool dupNoNeed = false; // todo: add an attribute to see whether backprop is called by value_and_grad
+        //bool dupNoNeed = true;   // should be false for value_and_grad
+        //bool dupNoNeed = false; // todo: add an attribute to see whether backprop is called by value_and_grad
+        //llvm::errs() << "requester: " << op.getRequesterAttr() << "\n";
+        //llvm::errs() << "requester: " << (op.getRequesterAttr().getValue()=="GradOp") << "\n";
+
+        // If we are coming from a GradOp, then we mark the results for being ignored by Enzime. 
+        // But if we are coming from a ValueAndGradOp, we don't ignore the results. 
+        bool dupNoNeed = (op.getRequesterAttr().getValue()=="GradOp");
 
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
