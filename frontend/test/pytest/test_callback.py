@@ -485,17 +485,37 @@ def test_accelerate_manual_jax_jit(arg):
 
     assert np.allclose(qjitted_fn(arg), arg)
 
+
 def test_jax_jit_returns_nothing():
+    """This is more a question for reviewer"""
 
     @accelerate
     def noop(): ...
 
     msg = "Function noop requires a return value when using accelerate"
     with pytest.raises(TypeError, match=msg):
+
         @qml.qjit
         def func(x: float):
             noop()
             return x
+
+
+def test_non_jax_jittable():
+    """Test that error is raised when jax-jit fails"""
+
+    @accelerate
+    def impossible(x):
+        if x:
+            return 0
+        return 1
+
+    msg = "Function impossible must be jax.jit-able"
+    with pytest.raises(ValueError, match=msg):
+
+        @qml.qjit
+        def func(x: bool):
+            return impossible(x)
 
 
 if __name__ == "__main__":

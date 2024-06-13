@@ -104,9 +104,14 @@ def accelerate(func=None, *, dev=None):
     def defer(*args, **kwargs):
         # Make abstract variables from input tracers.
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
-        # Find the shape of the return value
-        _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
-        jitted_fn = jax.jit(func)
+        try:
+            # Find the shape of the return value
+            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+            jitted_fn = jax.jit(func)
+        except Exception as e:
+            name = func.__name__
+            msg = f"Function {name} must be jax.jit-able."
+            raise ValueError(msg) from e
         return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
 
     return defer
