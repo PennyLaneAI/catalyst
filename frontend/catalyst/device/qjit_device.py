@@ -412,7 +412,6 @@ class QJITDeviceNewAPI(qml.devices.Device):
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
 
-        # TODO: Add Catalyst program verification and validation
         program.add_transform(verify_operations, grad_method=config.gradient_method, qjit_device=self)
         if config.gradient_method is not None:
             program.add_transform(verify_no_state_variance_returns)
