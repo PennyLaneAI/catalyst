@@ -41,7 +41,7 @@ from catalyst.utils.toml import (
     pennylane_operation_set,
 )
 
-# pylint: disable = unused-argument, unnecessary-lambda-assignment
+# pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
 
 def get_custom_device(
@@ -328,7 +328,8 @@ class TestHybridOpVerification:
                 return grad(f)(x)
 
     def test_pennylane_ctrl_of_hybridop_raises_error(self):
-        """Test that a PennyLane Controlled op with a HybridOp as its base is caught in verification"""
+        """Test that a PennyLane Controlled op with a HybridOp as its base is
+        caught in verification"""
 
         @qml.qnode(get_custom_device(wires=4))
         def f(x: float):

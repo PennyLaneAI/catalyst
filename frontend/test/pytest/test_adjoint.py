@@ -27,7 +27,7 @@ from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 from catalyst import adjoint, cond, debug, for_loop, qjit, while_loop
 
-# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring
+# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
 
 class TestCatalyst:

@@ -33,6 +33,8 @@ from catalyst.device import (
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.toml import ProgramFeatures
 
+# pylint:disable = protected-access,attribute-defined-outside-init
+
 
 class DummyDevice(Device):
     """A dummy device from the device API."""

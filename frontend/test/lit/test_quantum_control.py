@@ -72,20 +72,6 @@ def get_custom_qjit_device(num_wires, discards, additions):
             """Get PennyLane observables."""
             return pennylane_operation_set(self.qjit_capabilities.native_obs)
 
-        @property
-        def operations(self):
-            """Get PennyLane operations."""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
-            )
-
-        @property
-        def observables(self):
-            """Get PennyLane observables."""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
-
         def execute(self, circuits, execution_config):
             """Exececute the device (no)."""
             raise RuntimeError("No execution for the custom device")

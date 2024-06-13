@@ -584,7 +584,6 @@ def get_device_capabilities(
     device, program_features: Optional[ProgramFeatures] = None
 ) -> DeviceCapabilities:
     """Get or load DeviceCapabilities structure from device"""
-
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
     else:
@@ -593,7 +592,7 @@ def get_device_capabilities(
         )
         device_name = (
             device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
-        )        
+        )
         device_config = get_device_toml_config(device)
         return load_device_capabilities(device_config, program_features, device_name)
 
