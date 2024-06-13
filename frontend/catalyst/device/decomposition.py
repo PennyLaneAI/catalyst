@@ -133,8 +133,11 @@ def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expan
                 region.trace, new_tape, region.arg_classical_tracers, region.res_classical_tracers
             )
         )
+
     new_op = copy.copy(op)
     new_op.regions = new_regions
+    # new_op.apply_reverse_transform=op.apply_reverse_transform,
+    # new_op.expansion_strategy=op.expansion_strategy,
     return new_op
 
 
