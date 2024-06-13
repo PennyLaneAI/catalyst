@@ -25,9 +25,15 @@ from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDeviceNewAPI, extract_backend_info
+from catalyst.device import (
+    QJITDeviceNewAPI,
+    extract_backend_info,
+    get_device_capabilities,
+)
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
-from catalyst.utils.toml import ProgramFeatures, get_device_capabilities
+from catalyst.utils.toml import ProgramFeatures
+
+# pylint:disable = protected-access,attribute-defined-outside-init
 
 
 class DummyDevice(Device):

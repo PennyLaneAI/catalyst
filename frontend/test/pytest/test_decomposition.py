@@ -19,11 +19,8 @@ import pytest
 from jax import numpy as jnp
 
 from catalyst import CompileError, ctrl, measure, qjit
-from catalyst.utils.toml import (
-    ProgramFeatures,
-    get_device_capabilities,
-    pennylane_operation_set,
-)
+from catalyst.device import get_device_capabilities
+from catalyst.utils.toml import ProgramFeatures, pennylane_operation_set
 
 
 class CustomDevice(qml.QubitDevice):
