@@ -20,7 +20,7 @@ from unittest.mock import patch
 import numpy as np
 import pennylane as qml
 import pytest
-from pennylane.ops import Controlled
+from pennylane.ops import Controlled, Adjoint
 
 from catalyst import (
     CompileError,
@@ -32,6 +32,7 @@ from catalyst import (
     grad,
     while_loop,
 )
+from catalyst.api_extensions import HybridCtrl, HybridAdjoint
 from catalyst.device import get_device_capabilities
 from catalyst.utils.toml import (
     OperationProperties,
@@ -139,20 +140,35 @@ def test_unsupported_ops_raise_an_error():
     with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
         qml.qjit(f)(1.2)
 
+def queue_multiple_ops(x, wires):
+    qml.RX(x, wires=wires)
+    qml.Z(wires)
 
+# callables to return adjoint ops via different contruction methods
+adj_operator = lambda x, wires: adjoint(qml.RX(x, wires))  # instantiated op (qml.ops.Adjoint)
+adj_op_callable = lambda x, wires: adjoint(qml.RX)(x, wires)  # op callable (qml.ops.Adjoint)
+adj_op_multiple = lambda x, wires: adjoint(queue_multiple_ops)(x, wires)  # op queue (HybridAdjoint)
+
+# callables to return controlled ops via different construction methods
+ctrl_operator = lambda x, wires: ctrl(qml.Z(wires), control=[1, 2, 3])  # instantiated op (Controlled)
+ctrl_op_callable = lambda x, wires: ctrl(qml.Z, control=[1, 2, 3])(wires)  # op callable (Controlled)
+ctrl_op_multiple = lambda x, wires: ctrl(queue_multiple_ops, control=[1, 2, 3])(x, wires)  # op queue (HybridCtrl)
+    
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
     """Test that the verification catches situations where a HybridOp subtape contains
     an operation the given device can't support inside that HybridOp"""
 
-    def test_non_invertible_gate_simple(self):
+    @pytest.mark.parametrize("op_fn, op_type", [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)])
+    def test_non_invertible_gate_simple(self, op_fn, op_type):
         """Emulate a device with a non-invertible gate applied inside an Adjoint HybridOp."""
 
         dev = get_custom_device(non_invertible_gates={"RX"}, wires=1)
 
         @qml.qnode(dev)
         def f(x):
-            adjoint(qml.RX(x, wires=0))
+            op = op_fn(x, wires=0)
+            assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
@@ -164,7 +180,8 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_non_invertible_gate_nested_cond(self):
+    @pytest.mark.parametrize("op_fn, op_type", [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)])
+    def test_non_invertible_gate_nested_cond(self, op_fn, op_type):
         """Emulate a device with a non-invertible gate inside an Adjoint that
         is further nested in a Cond operation."""
 
@@ -172,11 +189,13 @@ class TestHybridOpVerification:
         def f(x):
             @cond(True)
             def true_path():
-                adjoint(qml.RX(x, wires=0))
+                op = op_fn(x, wires=0)
+                assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
 
             @true_path.otherwise
             def false_path():
-                adjoint(qml.RX(x, wires=0))
+                op = op_fn(x, wires=0)
+                assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
 
             true_path()
 
@@ -191,7 +210,8 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_non_invertible_gate_nested_for(self):
+    @pytest.mark.parametrize("op_fn, op_type", [(adj_operator, Adjoint), (adj_op_callable, Adjoint), (adj_op_multiple, HybridAdjoint)])
+    def test_non_invertible_gate_nested_for(self, op_fn, op_type):
         """Emulate a device with a non-invertible gate inside an Adjoint that
         is further nested in a For operation."""
 
@@ -199,7 +219,8 @@ class TestHybridOpVerification:
         def f(x):
             @for_loop(0, 10, 1)
             def loop(_i):
-                adjoint(qml.RX(x, wires=0))
+                op = op_fn(x, wires=0)
+                assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
 
             loop()
             return qml.expval(qml.PauliX(0))
@@ -213,30 +234,15 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_non_controllable_gate_simple_qctrl(self):
-        """Emulate a device with a non-controllable gate applied inside a HybridCtrl."""
 
-        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
+    @pytest.mark.parametrize("op_fn, op_type", [(ctrl_operator, Controlled), (ctrl_op_callable, Controlled), (ctrl_op_multiple, HybridCtrl)])
+    def test_non_controllable_gate_simple(self, op_fn, op_type, mocker):
+        """Emulate a device with a non-controllable gate applied inside a control."""
+
+        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=4))
         def f(x: float):
-            ctrl(qml.PauliZ(wires=0), control=[1, 2, 3])
-            return qml.expval(qml.PauliX(0))
-
-        with pytest.raises(CompileError, match="PauliZ is not controllable"):
-            qml.qjit(f)(1.2)
-
-        with pytest.raises(CompileError, match="PauliZ is not controllable"):
-
-            @qml.qjit
-            def cir(x: float):
-                return grad(f)(x)
-
-    def test_non_controllable_gate_simple_pennylane_ctrl(self):
-        """Test that a Controlled PennyLane op that is not natively supported by the device
-        and has a non-controllable base raises an error"""
-
-        @qml.qnode(get_custom_device(non_controllable_gates={"PauliZ"}, wires=3))
-        def f(x: float):
-            Controlled(qml.PauliZ(wires=0), control_wires=[1, 2])
+            op = op_fn(x, wires=0)
+            assert isinstance(op, op_type), f"op expected to be {op_type} but got {type(op)}"
             return qml.expval(qml.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
