@@ -357,9 +357,13 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         // If we are coming from a ValueAndGradOp, aka want to keep the results,
-        // then we mark the results for not being ignored by Enzime.
+        // then we mark the results for not being ignored by Enzime, i.e. need to duplicate
         // But if we are coming from other ops, we ignore the results.
-        bool dupNoNeed = (op.getRequesterAttr().getValue() != "ValueAndGradOp");
+        // Note that when this attribute is not set, we are then not coming from ValueAndGrad
+        // so there's no need to duplicate
+        bool dupNoNeed = (op.getRequesterAttr() == nullptr)
+                             ? true
+                             : (op.getRequesterAttr().getValue() != "ValueAndGradOp");
 
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
