@@ -117,7 +117,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
     to a valid TOML config file."""
 
     dname = device.name
-    if isinstance(device, qml.Device):
+    if isinstance(device, qml.devices.LegacyDevice):
         dname = device.short_name
 
     device_name = ""
@@ -146,7 +146,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        if isinstance(device, qml.Device):
+        if isinstance(device, qml.devices.LegacyDevice):
             device_kwargs["shots"] = device.shots if device.shots else 0
         else:
             # TODO: support shot vectors
@@ -482,7 +482,7 @@ def validate_device_capabilities(
       ``device.observables``.
 
     Args:
-        device (qml.Device): An instance of a quantum device.
+        device (qml.devices.LegacyDevice): An instance of a quantum device.
         config (TOMLDocument): A TOML document representation.
 
     Raises: CompileError
@@ -494,7 +494,7 @@ def validate_device_capabilities(
             f"Config is not marked as qjit-compatible"
         )
 
-    device_name = device.short_name if isinstance(device, qml.Device) else device.name
+    device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
 
     native = pennylane_operation_set(device_capabilities.native_ops)
     decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)

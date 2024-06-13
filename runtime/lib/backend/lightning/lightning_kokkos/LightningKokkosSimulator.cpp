@@ -444,58 +444,20 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
 auto LightningKokkosSimulator::Measure(QubitIdType wire, std::optional<int32_t> postselect)
     -> Result
 {
-    using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
-                                                  Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
-
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
 
     std::vector<double> probs(1U << wires.size());
     DataView<double, 1> buffer_view(probs);
-    this->PartialProbs(buffer_view, wires);
+    auto device_shots = GetDeviceShots();
+    SetDeviceShots(0);
+    PartialProbs(buffer_view, wires);
+    SetDeviceShots(device_shots);
 
     // It represents the measured result, true for 1, false for 0
     bool mres = Lightning::simulateDraw(probs, postselect);
-
-    const size_t num_qubits = this->GetNumQubits();
-
-    auto &&dev_wires = this->getDeviceWires(wires);
-    const auto stride = pow(2, num_qubits - (1 + dev_wires[0]));
-    const auto vec_size = pow(2, num_qubits);
-    const auto section_size = vec_size / stride;
-    const auto half_section_size = section_size / 2;
-
-    std::vector<Kokkos::complex<double>> state(vec_size);
-
-    // copy data from device to host
-    auto device_data = this->device_sv->getView();
-    Kokkos::deep_copy(UnmanagedComplexHostView(state.data(), vec_size), device_data);
-
-    // zero half the entries
-    // the "half" entries depend on the stride
-    // *_*_*_*_ for stride 1
-    // **__**__ for stride 2
-    // ****____ for stride 4
-    const size_t k = mres ? 0 : 1;
-    for (size_t idx = 0; idx < half_section_size; idx++) {
-        for (size_t ids = 0; ids < stride; ids++) {
-            auto v = stride * (k + 2 * idx) + ids;
-            state[v] = Kokkos::complex<double>(0.0, 0.0);
-        }
-    }
-
-    // get the total of the new vector (since we need to normalize)
-    double total =
-        std::accumulate(state.begin(), state.end(), 0.0, [](double sum, Kokkos::complex<double> c) {
-            return sum + real(c * conj(c));
-        });
-
-    // normalize the vector
-    double norm = std::sqrt(total);
-    std::for_each(state.begin(), state.end(), [norm](auto &elem) { elem /= norm; });
-
-    this->device_sv = std::make_unique<StateVectorT>(state.data(), vec_size);
-
+    auto dev_wires = getDeviceWires(wires);
+    this->device_sv->collapse(dev_wires[0], mres ? 1 : 0);
     return mres ? this->One() : this->Zero();
 }
 

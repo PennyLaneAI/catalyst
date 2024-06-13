@@ -149,7 +149,9 @@ def measure(
 
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
+    # TODO: Move these values into separate attributes of the MidCircuitMeasure class
     in_classical_tracers.append(postselect)
+    in_classical_tracers.append(reset)
 
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
@@ -313,15 +315,24 @@ class MidCircuitMeasure(HybridOp):
 
     binder = qmeasure_p.bind
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.postselect = self.in_classical_tracers[-2]
+        self.reset = self.in_classical_tracers[-1]
+
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
         wire = op.in_classical_tracers[0]
         qubit = qrp.extract([wire])[0]
-        postselect = op.in_classical_tracers[1]
-
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=postselect)
+        # qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
+        # TODO: execute post-selection depending on qnode config
+        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit, postselect=op.postselect)
         qrp.insert([wire], [qubit2])
         return qrp
+
+    def __hash__(self):
+        hsh = super().__hash__()
+        return hash(hsh + hash(self.out_classical_tracers[0]))
 
 
 class AdjointCallable:

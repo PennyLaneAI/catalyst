@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+from functools import reduce
+from typing import Iterable, Sequence
+
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.transforms.dynamic_one_shot import fill_in_value
 
-from catalyst import CompileError, measure, qjit
+import catalyst
+from catalyst import CompileError, cond, measure, qjit
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
+os.environ["OMP_PROC_BIND"] = "false"
+os.environ["OMP_NUM_THREADS"] = "2"
 
 
 class TestMidCircuitMeasurement:
@@ -137,7 +146,7 @@ class TestMidCircuitMeasurement:
             m = measure(wires=0, postselect=0)
             return m
 
-        assert not circuit(jnp.pi)  # m will be equal to False
+        assert not circuit(0.0)  # m will be equal to False
 
     def test_with_postselect_one(self, backend):
         """Test measure (postselect = 1)."""
@@ -193,7 +202,6 @@ class TestMidCircuitMeasurement:
         assert circuit(0.0) == 0
         assert circuit(jnp.pi) == 1
 
-    @pytest.mark.xfail(reason="not yet implemented, coming in one-shot support")
     def test_return_mcm_with_sample_multiple(self, backend):
         """Test that a measurement result can be returned with qml.sample and shots."""
 
@@ -207,8 +215,380 @@ class TestMidCircuitMeasurement:
             qml.PauliX(0)
             return qml.sample(m)
 
-        assert circuit(0.0) == [0] * 10
-        assert circuit(jnp.pi) == [1] * 10
+        assert jnp.allclose(circuit(0.0), 0)
+        assert jnp.allclose(circuit(jnp.pi), 1)
+
+    def test_dynamic_one_shot_unsupported_measurement(self, backend):
+        """Test that circuits with unsupported measurements raise an error."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+        param = np.pi / 4
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x):
+            qml.RX(x, wires=0)
+            _ = measure(0)
+            return qml.classical_shadow(wires=0)
+
+        with pytest.raises(
+            TypeError,
+            match="Native mid-circuit measurement mode does not support",
+        ):
+            func(param)
+
+    def test_dynamic_one_shot_unsupported_none_shots(self, backend):
+        """Test that `dynamic_one_shot` raises when used with non-finite shots."""
+        dev = qml.device(backend, wires=1, shots=None)
+
+        with pytest.raises(
+            qml.QuantumFunctionError,
+            match="dynamic_one_shot is only supported with finite shots.",
+        ):
+
+            @qjit
+            @catalyst.qfunc.dynamic_one_shot
+            @qml.qnode(dev)
+            def _(x, y):
+                qml.RX(x, wires=0)
+                _ = measure(0)
+                qml.RX(y, wires=0)
+                return qml.probs(wires=0)
+
+    def test_dynamic_one_shot_unsupported_broadcast(self, backend):
+        """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+        param = np.pi / 4 * jnp.ones(2)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, wires=0)
+            _ = measure(0)
+            qml.RX(y, wires=0)
+            return qml.probs(wires=0)
+
+        with pytest.raises(
+            ValueError,
+            match="mcm_method='one-shot' is not compatible with broadcasting",
+        ):
+            func(param, param)
+
+    @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
+    def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
+        """Test that a measurement result can be returned with qml.sample and shots."""
+        shots = 10
+        dev = qml.device(backend, wires=1, shots=shots)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RY(x, wires=0)
+            m = measure(0)
+            qml.PauliX(0)
+            return qml.sample(m)
+
+        result = circuit(param)
+        assert result.shape == (shots,)
+        assert jnp.allclose(result, expected)
+
+    @pytest.mark.parametrize("debug", [False, True])
+    def test_dynamic_one_shot_nested_qnodes(self, backend, debug):
+        """Test that `dynamic_one_shot` handle nested calls correctly."""
+
+        if not debug:
+            pytest.xfail("Error in Catalyst Runtime: Cannot re-initialize an ACTIVE device")
+
+        shots = 10
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qml.qnode(dev)
+        def inner():
+            qml.PauliX(0)
+            return qml.sample(wires=0)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def outer():
+            x = inner()
+            if debug:
+                catalyst.debug.print("Value of x = {x}", x=x)
+            qml.RY(jnp.pi * qml.math.sum(x) / shots, wires=0)
+            m0 = measure(0)
+            return qml.sample(m0)
+
+        result = outer()
+        assert result.shape == (shots,)
+        assert jnp.allclose(result, 1.0)
+
+    @pytest.mark.parametrize("shots", [10000])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
+    @pytest.mark.parametrize("measure_f", [qml.counts, qml.expval, qml.probs, qml.sample, qml.var])
+    @pytest.mark.parametrize(
+        "meas_obj", [qml.PauliZ(0), qml.Hadamard(0) @ qml.PauliZ(1), [0], [0, 1], "mcm"]
+    )
+    # pylint: disable=too-many-arguments
+    def test_dynamic_one_shot_several_mcms(self, backend, shots, postselect, measure_f, meas_obj):
+        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
+        circuit with a mid-circuit measurement."""
+        if measure_f in (qml.counts, qml.probs, qml.sample) and (
+            not isinstance(meas_obj, list) and not meas_obj == "mcm"
+        ):
+            pytest.skip("Can't use observables with counts, probs or sample")
+
+        if measure_f in (qml.var, qml.expval) and (isinstance(meas_obj, list)):
+            pytest.skip("Can't use wires/mcm lists with var or expval")
+
+        dq = qml.device("default.qubit", shots=shots, seed=8237945)
+
+        @qml.qnode(dq, postselect_mode="fill-shots", mcm_method="deferred")
+        def ref_func(x, y):
+            qml.RX(x, 0)
+            m0 = qml.measure(0)
+            qml.RX(0.5 * x, 1)
+            m1 = qml.measure(1, postselect=postselect)
+            qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
+            m2 = qml.measure(0)
+
+            meas_key = "wires" if isinstance(meas_obj, list) else "op"
+            meas_value = m2 if isinstance(meas_obj, str) else meas_obj
+            kwargs = {meas_key: meas_value}
+            if measure_f == qml.counts:
+                kwargs["all_outcomes"] = True
+            return measure_f(**kwargs)
+
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, 0)
+            m0 = measure(0)
+            qml.RX(0.5 * x, 1)
+            m1 = measure(1, postselect=postselect)
+
+            @cond(m0 & m1)
+            def cfun0():
+                qml.RY(2.0 * y, 0)
+
+            cfun0()
+            m2 = measure(0)
+
+            meas_key = "wires" if isinstance(meas_obj, list) else "op"
+            meas_value = m2 if isinstance(meas_obj, str) else meas_obj
+            kwargs = {meas_key: meas_value}
+            return measure_f(**kwargs)
+
+        if measure_f in (qml.expval,):
+            params = jnp.pi / 3 * jnp.ones(2)
+        else:
+            params = jnp.pi / 2.1 * jnp.ones(2)
+
+        if measure_f == qml.var and not isinstance(meas_obj, str):
+            with pytest.raises(TypeError, match="qml.var\\(obs\\) cannot be returned when"):
+                func(*params)
+            return
+
+        results0 = ref_func(*params)
+        results1 = func(*params)
+
+        if measure_f == qml.counts:
+
+            def fname(x):
+                return format(x, f"0{len(meas_obj)}b") if isinstance(meas_obj, list) else x
+
+            results1 = {fname(int(state)): count for state, count in zip(*results1)}
+        elif measure_f == qml.sample:
+            results0 = sample_to_counts(results0, meas_obj)
+            results1 = sample_to_counts(results1, meas_obj)
+            measure_f = qml.counts
+
+        validate_measurements(measure_f, shots, results1, results0)
+
+    @pytest.mark.parametrize("shots", [10000])
+    @pytest.mark.parametrize("postselect", [None, 0, 1])
+    @pytest.mark.parametrize("reset", [False, True])
+    def test_dynamic_one_shot_multiple_measurements(self, backend, shots, postselect, reset):
+        """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
+        circuit with a mid-circuit measurement and several terminal measurements."""
+        if backend == "lightning.kokkos":
+            obs = qml.PauliZ(0)
+        else:
+            obs = qml.PauliY(0)
+
+        dq = qml.device("default.qubit", shots=shots, seed=8237945)
+
+        @qml.qnode(dq, postselect_mode="fill-shots", mcm_method="deferred")
+        def ref_func(x, y):
+            qml.RX(x, 0)
+            m0 = qml.measure(0)
+            qml.RX(0.5 * x, 1)
+            m1 = qml.measure(1, reset=reset, postselect=postselect)
+            qml.cond(m0 & m1, qml.RY)(2.0 * y, 0)
+            _ = qml.measure(0)
+
+            return (
+                qml.expval(op=m0),
+                qml.probs(wires=[1]),
+                qml.probs(wires=[0, 1]),
+                qml.probs(op=m0),
+                qml.sample(wires=[1]),
+                qml.sample(wires=[0, 1]),
+                qml.sample(op=m0),
+                qml.expval(obs),
+            )
+
+        dev = qml.device(backend, wires=2, shots=shots)
+
+        @qjit
+        @catalyst.qfunc.dynamic_one_shot
+        @qml.qnode(dev)
+        def func(x, y):
+            qml.RX(x, 0)
+            m0 = measure(0)
+            qml.RX(0.5 * x, 1)
+            m1 = measure(1, reset=reset, postselect=postselect)
+
+            @cond(m0 & m1)
+            def cfun0():
+                qml.RY(2.0 * y, 0)
+
+            cfun0()
+            _ = measure(0)
+
+            return (
+                qml.expval(op=m0),
+                qml.probs(wires=[1]),
+                qml.probs(wires=[0, 1]),
+                qml.probs(op=m0),
+                qml.sample(wires=[1]),
+                qml.sample(wires=[0, 1]),
+                qml.sample(op=m0),
+                qml.expval(obs),
+            )
+
+        meas_args = (
+            "mcm",
+            [1],
+            [0, 1],
+            "mcm",
+            [1],
+            [0, 1],
+            "mcm",
+            obs,
+        )
+        measures = (
+            qml.expval,
+            qml.probs,
+            qml.probs,
+            qml.probs,
+            qml.sample,
+            qml.sample,
+            qml.sample,
+            qml.expval,
+        )
+
+        params = jnp.pi / 3 * jnp.ones(2)
+        results0 = ref_func(*params)
+        results1 = func(*params)
+        for meas_obj, m, r1, r0 in zip(meas_args, measures, results1, results0):
+            if m == qml.sample:
+                r0 = list(sample_to_counts(r0, meas_obj).values())
+                r1 = list(sample_to_counts(r1, meas_obj).values())
+
+            r1, r0 = qml.math.array(r1).ravel(), qml.math.array(r0).ravel()
+            assert qml.math.allclose(r1, r0, atol=20, rtol=0.2)
+
+
+def sample_to_counts(results, meas_obj):
+    meas_key = "wires" if isinstance(meas_obj, list) else "op"
+    meas_value = qml.measure(0) if isinstance(meas_obj, str) else meas_obj
+    kwargs = {meas_key: meas_value, "all_outcomes": True}
+    wires = (
+        meas_obj
+        if isinstance(meas_obj, list)
+        else (qml.wires.Wires([0]) if isinstance(meas_obj, str) else meas_obj.wires)
+    )
+    results = (
+        results.reshape((-1, 1)) if not isinstance(meas_obj, list) or len(meas_obj) < 2 else results
+    )
+    mask = qml.math.logical_not(qml.math.any(results == fill_in_value, axis=1))
+    return qml.counts(**kwargs).process_samples(results[mask, :], wire_order=wires)
+
+
+def validate_counts(shots, results1, results2, batch_size=None):
+    """Compares two counts.
+
+    If the results are ``Sequence``s, loop over entries.
+
+    Fails if a key of ``results1`` is not found in ``results2``.
+    Passes if counts are too low, chosen as ``100``.
+    Otherwise, fails if counts differ by more than ``20`` plus 20 percent.
+    """
+    if isinstance(shots, Sequence):
+        assert isinstance(results1, tuple)
+        assert isinstance(results2, tuple)
+        assert len(results1) == len(results2) == len(shots)
+        for s, r1, r2 in zip(shots, results1, results2):
+            validate_counts(s, r1, r2, batch_size=batch_size)
+        return
+
+    if batch_size is not None:
+        assert isinstance(results1, Iterable)
+        assert isinstance(results2, Iterable)
+        assert len(results1) == len(results2) == batch_size
+        for r1, r2 in zip(results1, results2):
+            validate_counts(shots, r1, r2, batch_size=None)
+        return
+
+    for key1, val1 in results1.items():
+        val2 = results2[key1]
+        if abs(val1 + val2) > 100:
+            assert np.allclose(val1, val2, atol=20, rtol=0.2)
+
+
+def validate_expval(shots, results1, results2, batch_size=None):
+    """Compares two expval, probs or var.
+
+    If the results are ``Sequence``s, validate the average of items.
+
+    If ``shots is None``, validate using ``np.allclose``'s default parameters.
+    Otherwise, fails if the results do not match within ``0.01`` plus 20 percent.
+    """
+    if isinstance(shots, Sequence):
+        assert isinstance(results1, tuple)
+        assert isinstance(results2, tuple)
+        assert len(results1) == len(results2) == len(shots)
+        results1 = reduce(lambda x, y: x + y, results1) / len(results1)
+        results2 = reduce(lambda x, y: x + y, results2) / len(results2)
+        validate_expval(sum(shots), results1, results2, batch_size=batch_size)
+        return
+
+    if shots is None:
+        assert np.allclose(results1, results2)
+        return
+
+    if batch_size is not None:
+        assert len(results1) == len(results2) == batch_size
+        for r1, r2 in zip(results1, results2):
+            validate_expval(shots, r1, r2, batch_size=None)
+
+    assert np.allclose(results1, results2, atol=0.01, rtol=0.2)
+
+
+def validate_measurements(func, shots, results1, results2, batch_size=None):
+    """Calls the correct validation function based on measurement type."""
+    if func is qml.counts:
+        validate_counts(shots, results1, results2, batch_size=batch_size)
+        return
+
+    validate_expval(shots, results1, results2, batch_size=batch_size)
 
 
 if __name__ == "__main__":

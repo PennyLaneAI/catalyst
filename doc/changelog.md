@@ -2,6 +2,10 @@
 
 <h3>New features</h3>
 
+* The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
+  The loop over shots is executed with `catalyst.vmap`.
+  [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
+
 * The Catalyst frontend now supports Python logging through PennyLane's `qml.logging` module.
   [(#660)](https://github.com/PennyLaneAI/catalyst/pull/660)
 
@@ -141,7 +145,7 @@
   both be provided as keyword arguments.
   [(#790)](https://github.com/PennyLaneAI/catalyst/pull/790)
 
-* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not. 
+* Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not.
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
 <h3>Breaking changes</h3>
@@ -152,6 +156,9 @@
   [(#663)](https://github.com/PennyLaneAI/catalyst/pull/663)
 
 <h3>Bug fixes</h3>
+
+* `device_shots` is modified to `0` on the fly in `Measure` (and set back to its original value after the call to `PartialProbs`) to compute mid-circuit probabilities analytically, even when the device has finite shots.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
 * The Catalyst runtime now raises an error if an qubit is accessed out of bounds from the allocated
   register.
@@ -168,6 +175,9 @@
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
 <h3>Internal changes</h3>
+
+* Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
+  [(#801)](https://github.com/PennyLaneAI/catalyst/pull/801)
 
 * The `QCtrl` class in Catalyst has been renamed to `HybridCtrl`, indicating its capability
   to contain a nested scope of both quantum and classical operations.
@@ -259,6 +269,31 @@
   interface and allows for multiple `MemrefCallable` to be defined for a single
   callback, which is necessary for custom gradient of `pure_callbacks`.
 
+* A new `catalyst::gradient::GradientOpInterface` is available when querying the gradient method in the mlir c++ api.
+  [(#800)](https://github.com/PennyLaneAI/catalyst/pull/800)
+
+  `catalyst::gradient::GradOp`, `JVPOp`, and `VJPOp` now inherits traits in this new `GradientOpInterface` (right now there is only a `getMethod()` method, returning "auto"/"fd")
+
+  There are operations that could potentially be used as `GradOp`, `JVPOp` or `VJPOp`. When trying to get the gradient method, instead of doing 
+  ```C++
+        auto gradOp = dyn_cast<GradOp>(op);
+        auto jvpOp = dyn_cast<JVPOp>(op);
+        auto vjpOp = dyn_cast<VJPOp>(op);
+
+        llvm::StringRef MethodName;
+        if (gradOp)
+            MethodName = gradOp.getMethod();
+        else if (jvpOp)
+            MethodName = jvpOp.getMethod();
+        else if (vjpOp)
+            MethodName = vjpOp.getMethod();
+  ```
+  to identify which op it actually is and protect against segfaults (calling `nullptr.getMethod()`), in the new interface we just do 
+  ```C++
+        auto gradOpInterface = cast<GradientOpInterface>(op);
+        llvm::StringRef MethodName = gradOpInterface.getMethod();
+  ```
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -270,6 +305,7 @@ Erick Ochoa,
 Haochen Paul Wang,
 Lee James O'Riordan,
 Mehrdad Malekmohammadi,
+Vincent Michaud-Rioux,
 Raul Torres,
 Sergei Mironov.
 

@@ -21,9 +21,13 @@ include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
 
 include "Gradient/IR/GradientDialect.td"
+include "Gradient/IR/GradientInterfaces.td"
 
-def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def GradOp : Gradient_Op<"grad", [
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>, 
+        GradientOpInterface
+        ]> {
     let summary = "Compute the gradient of a function.";
     let description = [{
         The `gradient.grad` operation computes the gradient of a function
@@ -127,7 +131,8 @@ def JVPOp : Gradient_Op<"jvp", [
         AttrSizedOperandSegments,
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+        GradientOpInterface
         ]> {
     let summary = "Compute the jvp of a function.";
 
@@ -159,7 +164,9 @@ def VJPOp : Gradient_Op<"vjp", [
         AttrSizedOperandSegments,
         AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+        GradientOpInterface
+        ]> {
     let summary = "Compute the vjp of a function.";
 
     let arguments = (ins
@@ -185,3 +192,4 @@ def VJPOp : Gradient_Op<"vjp", [
 }
 
 #endif // GRADIENT_OPS
+
