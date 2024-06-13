@@ -111,8 +111,8 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 )
             _ctrl_op_checker(op.base, True)
             return in_control
-        # if its a PL Adjoint we also want to check its base to catch Adj(Ctrl(base))
-        # PL simplification should generally mean pure PL operators will not be more nested than this
+        # If it's a PL Adjoint we also want to check its base to catch Adjoint(C(base)).
+        # PL simplification should mean pure PL operators will not be more nested than this.
         if isinstance(op, Adjoint):
             _ctrl_op_checker(op.base, in_control)
             return in_control
@@ -143,8 +143,8 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 )
             _inv_op_checker(op.base, in_inverse=True)
             return in_inverse
-        # if its a PL Controlled we also want to check its base to catch Ctrl(Adj(base))
-        # PL simplification should generally mean pure PL operators will not be more nested than this
+        # If its a PL Controlled we also want to check its base to catch C(Adjoint(base)).
+        # PL simplification should mean pure PL operators will not be more nested than this.
         if type(op) in (Controlled, ControlledOp):
             _inv_op_checker(op.base, in_inverse)
             return in_inverse
