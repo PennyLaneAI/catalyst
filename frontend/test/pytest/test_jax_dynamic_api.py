@@ -442,12 +442,12 @@ def test_qjit_forloop_indbidx_outdbidx():
 
     @qjit()
     def f(sz):
-        a = jnp.ones([sz], dtype=float)
-        b = jnp.ones([sz], dtype=float)
+        a = jnp.ones([sz, 3], dtype=float)
+        b = jnp.ones([sz, 3], dtype=float)
 
         @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
         def loop(_i, a, _b):
-            b = jnp.ones([sz + 1], dtype=float)
+            b = jnp.ones([sz + 1, 3], dtype=float)
             return (a, b)
 
         a2, b2 = loop(a, b)
@@ -455,8 +455,8 @@ def test_qjit_forloop_indbidx_outdbidx():
         return a2, b2
 
     res_a, res_b = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones(3))
-    assert_array_and_dtype_equal(res_b, jnp.ones(4))
+    assert_array_and_dtype_equal(res_a, jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(res_b, jnp.ones([4, 3]))
 
 
 def test_qjit_forloop_index_indbidx():
@@ -588,18 +588,18 @@ def test_qnode_forloop_index_indbidx():
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
-        a = jnp.ones([sz], dtype=float)
+        a = jnp.ones([sz, 3], dtype=float)
 
         @for_loop(0, 10, 1)
         def loop(i, _):
-            b = jnp.ones([i], dtype=float)
+            b = jnp.ones([i, 3], dtype=float)
             return b
 
         a2 = loop(a)
         return a2
 
     res_a = f(3)
-    assert_array_and_dtype_equal(res_a, jnp.ones(9))
+    assert_array_and_dtype_equal(res_a, jnp.ones([9, 3]))
 
 
 if __name__ == "__main__":
