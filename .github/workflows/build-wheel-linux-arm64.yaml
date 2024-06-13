@@ -35,9 +35,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        python_version: [{official: 3.9,  subversion: 19, alternative: 39},
-                         {official: 3.11, subversion: 9,  alternative: 3.11}, 
-                         {official: 3.12, subversion: 3,  alternative: 3.12}]
+        python_version: [{official: 3.9,  subversion: 19, alternative: 39}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
         container_name: ["manylinux_2_28_aarch64"]
 
@@ -118,21 +116,21 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version.official }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
       uses: actions/cache@v4
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-${{ matrix.python_version.official }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
 
     - name: Cache Enzyme Build
       id: cache-enzyme-build
       uses: actions/cache@v4
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ matrix.python_version.official }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -214,7 +212,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version.official}}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -231,7 +229,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-${{ matrix.python_version.official }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Source
@@ -247,7 +245,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ matrix.python_version.official }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
     # Build Catalyst Wheel
@@ -313,7 +311,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version.official }}-generic-build
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.container_name }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build
         fail-on-cache-miss: True
     
     - name: Run Python Pytest Tests
