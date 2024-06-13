@@ -316,6 +316,21 @@ class TestMidCircuitMeasurement:
         expected_call_count = 1 if postselect_mode == "hw-like" else 0
         assert spy.call_count == expected_call_count
 
+    @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
+    def test_invalid_postselect_error(self, backend, mcm_method):
+        """Test that an error is raised if postselecting on an invalid value"""
+        dev = qml.device(backend, wires=1, shots=10)
+
+        @qjit
+        @qml.qnode(dev, mcm_method=mcm_method)
+        def circuit(x):
+            qml.RX(x, 0)
+            measure(0, postselect=-1)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
+            _ = circuit(1.8)
+
 
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
