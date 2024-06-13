@@ -20,7 +20,6 @@ but require a Python interpreter instance.
 
 import ctypes
 import inspect
-from collections.abc import Sequence
 from functools import wraps
 from typing import Any, Callable
 
