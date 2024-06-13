@@ -931,7 +931,7 @@ class ForLoop(HybridOp):
                 arg_tracers, expansion_strategy=expansion_strategy
             )
 
-            nimplicit = len(arg_expanded_tracers) - len(arg_tracers) - 1
+            nimplicit = len(arg_expanded_tracers) - len(region.arg_classical_tracers) - 1
 
             res_classical_tracers = region.res_classical_tracers
             res_tracers = res_classical_tracers + [qreg_out]
