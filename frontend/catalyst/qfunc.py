@@ -161,7 +161,7 @@ class QFunc:
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
-# pylint: disable=protected-access,not-callable
+# pylint: disable=protected-access,no-member,not-callable
 def dynamic_one_shot(qnode, **kwargs):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 
@@ -249,7 +249,6 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode = transform_to_single_shot(qnode)
     if mcm_config is not None:
         single_shot_qnode.execute_kwargs["mcm_config"] = mcm_config
-    # pylint: disable=attribute-defined-outside-init
     single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
     total_shots = _get_device_shots(dev)
