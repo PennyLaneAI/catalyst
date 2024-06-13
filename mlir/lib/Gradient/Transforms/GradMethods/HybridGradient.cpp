@@ -353,7 +353,6 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
             }
         }
 
-
         if (auto primalTensorResultType = dyn_cast<RankedTensorType>(primalResult)) {
             // Loop over every entry of this result, creating a one-hot cotangent vector and
             // running a backward pass via the BackpropOp.
@@ -454,7 +453,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                     if (isa<RankedTensorType>(jacobianSlice.getType()) &&
                         isa<FloatType>(resultTypes[resultIdx])) {
                         backpropGradResults[resultIdx] =
-                            rewriter.create<tensor::ExtractOp>(loc, jacobianSlice, ValueRange{});                        
+                            rewriter.create<tensor::ExtractOp>(loc, jacobianSlice, ValueRange{});
                     }
                 }
             }

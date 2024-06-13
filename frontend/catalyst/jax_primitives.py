@@ -457,6 +457,7 @@ def _value_and_grad_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=
     Note: argument names must match these of `_value_and_grad_lowering`."""
     return jaxpr.out_avals + jaxpr.out_avals
 
+
 def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     """
     Returns:
