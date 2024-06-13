@@ -750,16 +750,17 @@ def infer_output_type(
     kept_outs = [False] * len(impl_outs) + [True] * len(expl_outs)
     out_type = tuple(zip(out_avals, kept_outs))
 
-    if s.output_force_arg0_outdbidx:
-        assert s.output_include_indbidx_vars
-        assert num_implicit_inputs is not None
-        out_type = out_type_force_outdbidx(
-            out_type,
-            len(constants) + num_implicit_inputs,  # for-loop index argument
-            constants,
-            expanded_inputs,
-            all_outs,
-        )
+    # TODO: Convert back to if- when dynamic API support for other primitives is added
+    assert s.output_force_arg0_outdbidx
+    assert s.output_include_indbidx_vars
+    assert num_implicit_inputs is not None
+    out_type = out_type_force_outdbidx(
+        out_type,
+        len(constants) + num_implicit_inputs,  # for-loop index argument
+        constants,
+        expanded_inputs,
+        all_outs,
+    )
     return all_outs, out_type
 
 
