@@ -302,15 +302,30 @@ def _python_callback_lowering(
     mlir_fwd = _func_def_lowering(ctx, call_jaxpr=fwd_jaxpr, fn=fwd)
     mlir_rev = _func_def_lowering(ctx, call_jaxpr=rev_jaxpr, fn=rev)
     sym_fwd = mlir_fwd.sym_name.value + ".fwd"
-    fwd_fn_ty_attr = ir.TypeAttr.get(mlir_fwd.type)
-    fwd_callee_attr = ir.FlatSymbolRefAttr.get(mlir_fwd.sym_name.value)
-    sym_rev = mlir_rev.sym_name.value + ".rev"
-    rev_fn_ty_attr = ir.TypeAttr.get(mlir_rev.type)
-    rev_callee_attr = ir.FlatSymbolRefAttr.get(mlir_rev.sym_name.value)
 
     argc = len(args)
     resc = len(results_ty)
-    len_tape = len(mlir_fwd.type.results) - argc
+    len_tape = len(mlir_fwd.type.results) - resc
+
+    # args_ty = inputs and cotangents since they are shadows
+    args_ty = [arg.type for arg in args]
+    # results_ty = output and cotangent
+    output_ty = results_ty
+    # the tape is found in the mlir_fwd.type
+    tape_ty = mlir_fwd.type.results[-len_tape:] if len_tape > 0 else []
+
+    
+    s = list(*zip(args_ty, args_ty)) + list(*zip(output_ty, output_ty))
+    fn_fwd_ty = FunctionType.get(inputs=s, results=tape_ty)
+    fn_rev_ty = FunctionType.get(inputs=s + tape_ty, results=[])
+
+
+    fwd_fn_ty_attr = ir.TypeAttr.get(fn_fwd_ty)
+    fwd_callee_attr = ir.FlatSymbolRefAttr.get(mlir_fwd.sym_name.value)
+    sym_rev = mlir_rev.sym_name.value + ".rev"
+    rev_fn_ty_attr = ir.TypeAttr.get(fn_rev_ty)
+    rev_callee_attr = ir.FlatSymbolRefAttr.get(mlir_rev.sym_name.value)
+
     with ir.InsertionPoint(ip):
         forward = ForwardOp(sym_fwd, fwd_fn_ty_attr, fwd_callee_attr, argc, resc, len_tape)
         reverse = ReverseOp(sym_rev, rev_fn_ty_attr, rev_callee_attr, argc, resc, len_tape)
