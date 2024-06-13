@@ -2,8 +2,8 @@
 .. include:: {{ referencefile }}
 {% endif %}
 
-{{ mod }}.{{ objname }}
-={% for i in range(mod|length) %}={% endfor %}{{ underline }}
+{{ module }}.{{ objname }}
+={% for i in range(module|length) %}={% endfor %}{{ underline }}
 
 .. currentmodule:: {{ module }}
 
