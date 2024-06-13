@@ -373,7 +373,7 @@ def test_no_return_list(arg):
     [0.1, jnp.array(0.1)],
 )
 def test_dictionary(arg):
-    """Test pytrees. Specifying the tape is easier for accelerate sice it is
+    """Test pytrees. Specifying the type is easier for accelerate since it is
     not needed. But here, we just use the same trick as above where
     we can use any value with the same type as the return to specify
     the return type in a callback.
