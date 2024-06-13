@@ -326,7 +326,6 @@ class MidCircuitMeasure(HybridOp):
         HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
         self.reset = reset
         self.postselect = postselect
-        # self.mv = self.out_classical_tracers[0]
 
     # pylint: disable=too-many-arguments
     def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
