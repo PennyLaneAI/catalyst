@@ -479,11 +479,23 @@ def test_accelerate_manual_jax_jit(arg):
     def identity(x):
         return x
 
-    @qml.qjit(autograph=True)
+    @qml.qjit
     def qjitted_fn(x):
         return identity(x)
 
     assert np.allclose(qjitted_fn(arg), arg)
+
+def test_jax_jit_returns_nothing():
+
+    @accelerate
+    def noop(): ...
+
+    msg = "Function noop requires a return value when using accelerate"
+    with pytest.raises(TypeError, match=msg):
+        @qml.qjit
+        def func(x: float):
+            noop()
+            return x
 
 
 if __name__ == "__main__":

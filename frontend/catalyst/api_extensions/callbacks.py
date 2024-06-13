@@ -211,11 +211,26 @@ def pure_callback(callback_fn, result_type=None):
 
 ## IMPL ##
 def jax_jit_callback(callback_fn, result_type, device=None):
+    """Wrapper around base callback that can accept a device as a parameter"""
 
     result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+    # This is maybe unnecessary. A function that returns nothing can still be
+    # jax.jit-ed. Why would this be advantageous? Imagine if we have some logs
+    # that we need to generate, but at the same time the contents of these logs
+    # require a lot of computation. One can imagine passing inputs to a
+    # a jax.jit-ed function and then just using io_callbacks to write down
+    # the answer and returning nothing.
+    #
+    # So, do we need this check? Likely not, but I am asking you, reviewer
+    # to chime in.
+    #
+    # The interesting point here is how we would treat this in the gradient
+    # integration? I think if it returns something, then we treat is as an
+    # active function, but if it returns nothing, then we just treat it as
+    # an inactive function.
     if result_type is None:
-        msg = "A function using pure_callback requires return types "
-        msg += "to be passed in as a parameter or type annotation."
+        name = callback_fn.__name__
+        msg = f"Function {name} requires a return value when using accelerate"
         raise TypeError(msg)
 
     def closure(*args, **kwargs) -> result_type:
