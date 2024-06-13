@@ -135,20 +135,24 @@ class CompiledFunction:
     """
 
     @debug_logger_init
-    def __init__(self, shared_object_file, func_name, restype, compile_options):
+    def __init__(
+        self, shared_object_file, func_name, restype, out_type, compile_options
+    ):  # pylint: disable=too-many-arguments
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.compile_options = compile_options
         self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
+        self.out_type = out_type
 
     @staticmethod
-    def _exec(shared_object, has_return, numpy_dict, *args):
+    def _exec(shared_object, has_return, out_type, numpy_dict, *args):
         """Execute the compiled function with arguments ``*args``.
 
         Args:
             lib: Shared object
             has_return: whether the function returns a value or not
+            out_type: Jaxpr output type holding information about implicit outputs
             numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
 
@@ -160,6 +164,9 @@ class CompiledFunction:
             result_desc = type(args[0].contents) if has_return else None
             retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
 
+        if out_type is not None:
+            keep_outputs = [k for _, k in out_type]
+            retval = [r for (k, r) in zip(keep_outputs, retval) if k]
         return retval
 
     @staticmethod
@@ -335,6 +342,7 @@ class CompiledFunction:
         result = CompiledFunction._exec(
             self.shared_object,
             self.restype,
+            self.out_type,
             numpy_dict,
             *abi_args,
         )
