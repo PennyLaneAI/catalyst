@@ -20,7 +20,6 @@ but require a Python interpreter instance.
 
 import ctypes
 import inspect
-from collections.abc import Sequence
 from functools import wraps
 from typing import Any, Callable
 
@@ -196,10 +195,8 @@ class MemrefCallable(FlatCallable):
         jnpargs = self.asarrays(args)
         retvals = super().__call__(jnpargs)
         return_values = []
-        results_aval_sequence = (
-            self.results_aval if isinstance(self.results_aval, Sequence) else [self.results_aval]
-        )
-        for retval, exp_aval in zip(retvals, results_aval_sequence):
+        flat_results_aval, _ = tree_flatten(self.results_aval)
+        for retval, exp_aval in zip(retvals, flat_results_aval):
             self._check_types(retval, exp_aval)
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)

@@ -17,6 +17,8 @@ This module contains public API functions that enabling quantum programming
 with control flow, including conditionals, for loops, and while loops.
 """
 
+# pylint: disable=too-many-lines
+
 from typing import Any, Callable, List
 
 import jax.numpy as jnp
@@ -33,17 +35,26 @@ from catalyst.jax_extras import (
     ShapedArray,
     _initial_style_jaxpr,
     _input_type_to_tracers,
+    collapse,
     convert_constvars_jaxpr,
     deduce_avals,
+    deduce_signatures,
+    expand_args,
+    expand_results,
+    find_top_trace,
+    for_loop_expansion_strategy,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
+    input_type_to_tracers,
     new_inner_tracer,
+    output_type_to_tracers,
 )
 from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
+    trace_function,
     trace_quantum_operations,
     unify_jaxpr_result_types,
 )
@@ -232,7 +243,7 @@ def cond(pred: DynamicJaxprTracer):
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step):
+def for_loop(lower_bound, upper_bound, step, experimental_preserve_dimensions=True):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -309,7 +320,9 @@ def for_loop(lower_bound, upper_bound, step):
     """
 
     def _decorator(body_fn):
-        return ForLoopCallable(lower_bound, upper_bound, step, body_fn)
+        return ForLoopCallable(
+            lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
+        )
 
     return _decorator
 
@@ -590,12 +603,17 @@ class ForLoopCallable:
     (array([0.5, 0. , 0.5, 0. ]),)
     """
 
-    def __init__(self, lower_bound, upper_bound, step, body_fn):
+    def __init__(
+        self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
+    ):  # pylint:disable=too-many-arguments
+
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.step = step
         self.body_fn = body_fn
         self._operation = None
+        self.expansion_strategy = for_loop_expansion_strategy(experimental_preserve_dimensions)
+        self.apply_reverse_transform = isinstance(self.step, int) and self.step < 0
 
     @property
     def operation(self):
@@ -614,55 +632,87 @@ class ForLoopCallable:
     def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
         quantum_tape = QuantumTape()
         outer_trace = ctx.trace
+        aux_classical_tracers = [
+            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+        ]
+        wfun, in_sig, out_sig = deduce_signatures(
+            self.body_fn,
+            (aux_classical_tracers[0], *init_state),
+            {},
+            self.expansion_strategy,
+        )
+        in_type = in_sig.in_type
+
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            in_classical_tracers = [
-                self.lower_bound,
-                self.upper_bound,
-                self.step,
-                self.lower_bound,
-            ] + tree_flatten(init_state)[0]
-            wffa, in_avals, _, body_tree = deduce_avals(
-                self.body_fn, [self.lower_bound] + list(init_state), {}
-            )
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            arg_classical_tracers = input_type_to_tracers(in_type, inner_trace.new_arg)
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = [
-                    inner_trace.full_raise(t) for t in wffa.call_wrapped(*arg_classical_tracers)
+                    inner_trace.full_raise(t) for t in wfun.call_wrapped(*arg_classical_tracers)
                 ]
+                out_type = out_sig.out_type()
+                out_tree = out_sig.out_tree()
+                out_consts = out_sig.out_consts()
 
-        res_avals = list(map(shaped_abstractify, res_classical_tracers))
-        out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+        in_expanded_classical_tracers, in_type2 = expand_args(
+            aux_classical_tracers + collapse(in_type, in_sig.in_expanded_args),
+            self.expansion_strategy,
+        )
+        out_expanded_classical_tracers = output_type_to_tracers(
+            out_type,
+            out_consts,
+            in_expanded_classical_tracers,
+            maker=lambda aval: new_inner_tracer(outer_trace, aval),
+        )
         self._operation = ForLoop(
-            in_classical_tracers,
-            out_classical_tracers,
+            collapse(in_type2, in_expanded_classical_tracers),
+            collapse(out_type, out_expanded_classical_tracers),
             [
                 HybridOpRegion(
-                    inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
+                    inner_trace,
+                    quantum_tape,
+                    collapse(in_type, arg_classical_tracers),
+                    collapse(out_type, res_classical_tracers),
                 )
             ],
+            apply_reverse_transform=self.apply_reverse_transform,
+            expansion_strategy=self.expansion_strategy,
         )
-        return tree_unflatten(body_tree(), out_classical_tracers)
+        return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx(self, *init_state):
-        iter_arg = self.lower_bound
-        init_vals, in_tree = tree_flatten((iter_arg, *init_state))
-        init_avals = tuple(_abstractify(val) for val in init_vals)
-        body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-            self.body_fn, in_tree, init_avals, "for_loop"
-        )
+    def _call_with_classical_ctx(self, ctx, *init_state):
 
-        apply_reverse_transform = isinstance(self.step, int) and self.step < 0
-        out_classical_tracers = for_p.bind(
-            self.lower_bound,
-            self.upper_bound,
-            self.step,
-            *(body_consts + init_vals),
-            body_jaxpr=body_jaxpr,
-            body_nconsts=len(body_consts),
-            apply_reverse_transform=apply_reverse_transform,
+        outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
+        aux_tracers = [
+            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+        ]
+
+        _, in_sig, out_sig = trace_function(
+            ctx,
+            self.body_fn,
+            *(aux_tracers[0], *init_state),
+            expansion_strategy=self.expansion_strategy,
         )
 
-        return tree_unflatten(body_tree, out_classical_tracers)
+        in_expanded_tracers = [
+            *out_sig.out_consts(),
+            *expand_args(
+                aux_tracers + collapse(in_sig.in_type, in_sig.in_expanded_args),
+                expansion_strategy=self.expansion_strategy,
+            )[0],
+        ]
+
+        out_expanded_tracers = for_p.bind(
+            *in_expanded_tracers,
+            body_jaxpr=out_sig.out_jaxpr(),
+            body_nconsts=len(out_sig.out_consts()),
+            apply_reverse_transform=self.apply_reverse_transform,
+            nimplicit=in_sig.num_implicit_inputs(),
+            preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
+        )
+
+        return tree_unflatten(
+            out_sig.out_tree(), collapse(out_sig.out_type(), out_expanded_tracers)
+        )
 
     def _call_during_interpretation(self, *init_state):
         args = init_state
@@ -677,7 +727,7 @@ class ForLoopCallable:
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(ctx, *init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(*init_state)
+            return self._call_with_classical_ctx(ctx, *init_state)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation(*init_state)
@@ -846,10 +896,13 @@ class Cond(HybridOp):
 
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
+            op.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                *(op.in_classical_tracers + combined_consts + [qreg]),
+                in_expanded_tracers=[
+                    *(op.in_classical_tracers + combined_consts + [qreg]),
+                ],
+                out_expanded_tracers=op.out_classical_tracers,
                 branch_jaxprs=unify_jaxpr_result_types(jaxprs2),
             )
         )
@@ -865,28 +918,59 @@ class ForLoop(HybridOp):
         op = self
         inner_trace = op.regions[0].trace
         inner_tape = op.regions[0].quantum_tape
-        res_classical_tracers = op.regions[0].res_classical_tracers
+        expansion_strategy = self.expansion_strategy
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
-            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_classical_tracers + [qreg_out])
 
-        step = op.in_classical_tracers[2]
-        apply_reverse_transform = isinstance(step, int) and step < 0
-        qreg = qrp.actualize()
+            region = self.regions[0]
+            arg_tracers = region.arg_classical_tracers + [qreg_in]
+            arg_expanded_tracers, _ = expand_args(
+                arg_tracers, expansion_strategy=expansion_strategy
+            )
+
+            nimplicit = len(arg_expanded_tracers) - len(region.arg_classical_tracers) - 1
+
+            res_classical_tracers = region.res_classical_tracers
+            res_tracers = res_classical_tracers + [qreg_out]
+            res_expanded_tracers, _ = expand_results(
+                [],
+                arg_expanded_tracers,
+                res_tracers,
+                expansion_strategy=expansion_strategy,
+                num_implicit_inputs=nimplicit,
+            )
+            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
+
+        operand_tracers = op.in_classical_tracers
+        const_tracers = [trace.full_raise(c) for c in consts]
+        operand_expanded_tracers, _ = expand_args(
+            operand_tracers, expansion_strategy=expansion_strategy
+        )
+        qreg_tracer = qrp.actualize()
+        in_expanded_tracers = [*const_tracers, *operand_expanded_tracers, qreg_tracer]
+
+        out_expanded_classical_tracers, _ = expand_results(
+            [],
+            in_expanded_tracers,
+            self.out_classical_tracers,
+            expansion_strategy=expansion_strategy,
+            num_implicit_inputs=nimplicit,
+        )
+
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
+            op.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                op.in_classical_tracers[0],
-                op.in_classical_tracers[1],
-                step,
-                *(consts + op.in_classical_tracers[3:] + [qreg]),
+                in_expanded_tracers=in_expanded_tracers,
+                out_expanded_tracers=out_expanded_classical_tracers,
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                 body_nconsts=len(consts),
-                apply_reverse_transform=apply_reverse_transform,
+                apply_reverse_transform=self.apply_reverse_transform,
+                nimplicit=nimplicit,
+                preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
         return qrp2
@@ -917,10 +1001,13 @@ class WhileLoop(HybridOp):
 
         qreg = qrp.actualize()
         qrp2 = QRegPromise(
-            self.bind_overwrite_classical_tracers(
+            self.bind_overwrite_classical_tracers2(
                 ctx,
                 trace,
-                *(cond_consts + body_consts + self.in_classical_tracers + [qreg]),
+                in_expanded_tracers=[
+                    *(cond_consts + body_consts + self.in_classical_tracers + [qreg]),
+                ],
+                out_expanded_tracers=self.out_classical_tracers,
                 cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                 cond_nconsts=len(cond_consts),

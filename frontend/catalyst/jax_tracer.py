@@ -34,6 +34,9 @@ from catalyst.jax_extras import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     DynshapedClosedJaxpr,
+    ExpansionStrategy,
+    InputSignature,
+    OutputSignature,
     PyTreeDef,
     PyTreeRegistry,
     ShapedArray,
@@ -41,7 +44,9 @@ from catalyst.jax_extras import (
     _input_type_to_tracers,
     convert_element_type,
     deduce_avals,
+    deduce_signatures,
     eval_jaxpr,
+    input_type_to_tracers,
     jaxpr_to_mlir,
     make_jaxpr2,
     sort_eqns,
@@ -85,6 +90,8 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
+# pylint: disable=too-many-lines
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
@@ -109,7 +116,7 @@ class Function:
 
     @debug_logger
     def __call__(self, *args, **kwargs):
-        jaxpr, out_tree = make_jaxpr2(self.fn)(*args)
+        jaxpr, _, out_tree = make_jaxpr2(self.fn)(*args)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -292,10 +299,19 @@ class HybridOp(Operator):
     binder: Callable = _no_binder
 
     @debug_logger_init
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+    ):  # pylint: disable=too-many-arguments
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.regions: List[HybridOpRegion] = regions
+        self.expansion_strategy = expansion_strategy
+        self.apply_reverse_transform = apply_reverse_transform
         super().__init__(wires=Wires(HybridOp.num_wires))
 
     def __repr__(self):
@@ -304,21 +320,33 @@ class HybridOp(Operator):
         return f"{self.name}(tapes={nested_ops})"
 
     @debug_logger
-    def bind_overwrite_classical_tracers(
-        self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+    def bind_overwrite_classical_tracers2(
+        # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+        self,
+        ctx: JaxTracingContext,
+        trace: DynamicJaxprTrace,
+        in_expanded_tracers,
+        out_expanded_tracers,
+        **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations."""
-        # Notes:
-        # [1] - We are interested in a new quantum tracer only, so we ignore all other (classical)
-        #       tracers returned by JAX.
-        # [2] - We add the already existing classical tracers into the last JAX equation created by
-        #       JAX bind handler of the ``trace`` object.
         assert self.binder is not None, "HybridOp should set a binder"
-        out_quantum_tracer = self.binder(*args, **kwargs)[-1]  # [1]
+        out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
+        assert len(eqn.outvars[:-1]) == len(
+            out_expanded_tracers
+        ), f"{eqn.outvars=}\n{out_expanded_tracers=}"
+        for i, t in zip(range(len(eqn.outvars[:-1])), out_expanded_tracers):
+            if trace.getvar(t) in set(
+                [
+                    *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
+                    *ctx.frames[trace].invars,
+                    *ctx.frames[trace].constvar_to_val.keys(),
+                ]
+            ):
+                # Do not re-assign vars from other equations
+                continue
             eqn.outvars[i] = trace.getvar(t)
         return out_quantum_tracer
 
@@ -366,9 +394,9 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
                 "static_argnums": static_argnums,
                 "abstracted_axes": abstracted_axes,
             }
-            jaxpr, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
 
-    return jaxpr, out_treedef
+    return jaxpr, out_type, out_treedef
 
 
 @debug_logger
@@ -856,6 +884,38 @@ def reset_qubit(qreg_in, w):
     qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
 
     return qreg_out
+
+
+@debug_logger
+def trace_function(
+    ctx: JaxTracingContext, fun: Callable, *args, expansion_strategy: ExpansionStrategy, **kwargs
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Trace classical Python function containing no quantum computations. Arguments and results of
+    the function are allowed to contain dynamic dimensions. Depending on the expansion strategy, the
+    resulting Jaxpr program might or might not preserve sharing among the dynamic dimension
+    variables. The support for expansion options makes this function different from
+    `jax_extras.make_jaxpr2`.
+
+    Args:
+        ctx: Jax tracing context helper.
+        fun: Callable python function.
+        expansion_strategy: dynamic dimension expansion options.
+        *args: Sample positional arguments of the function.
+        **kwargs: Sample keyword arguments of the function.
+
+    Result:
+        List of output Jax tracers
+        InputSignature of the resulting Jaxpr program
+        OutputSignature of the resulting Jaxpr program
+    """
+    wfun, in_sig, out_sig = deduce_signatures(
+        fun, args, kwargs, expansion_strategy=expansion_strategy
+    )
+    with EvaluationContext.frame_tracing_context(ctx) as trace:
+        arg_expanded_tracers = input_type_to_tracers(in_sig.in_type, trace.new_arg)
+        res_expanded_tracers = wfun.call_wrapped(*arg_expanded_tracers)
+
+        return res_expanded_tracers, in_sig, out_sig
 
 
 @debug_logger
