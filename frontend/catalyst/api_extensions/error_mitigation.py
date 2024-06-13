@@ -32,9 +32,7 @@ from catalyst.jax_primitives import zne_p
 
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
-    return lambda scale_factors, results: qml.transforms.poly_extrapolate(
-        scale_factors, results, degree
-    )
+    return functools.partial(qml.transforms.poly_extrapolate, order=degree)
 
 
 ## API ##
@@ -53,7 +51,8 @@ def mitigate_with_zne(fn=None, *, scale_factors=None, extrapolate=None):
     Args:
         fn (qml.QNode): the circuit to be mitigated.
         scale_factors (array[int]): the range of noise scale factors used.
-        extrapoloate (Callable): A function to perform fitting.
+        extrapolate (Callable): A function taking two sequences as arguments (scale factors, and
+            results), and returning a float by performing a fitting procedure.
 
     Returns:
         Callable: A callable object that computes the mitigated of the wrapped :class:`qml.QNode`
