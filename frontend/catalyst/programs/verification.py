@@ -22,7 +22,7 @@ from pennylane.operation import Operation
 from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
-from catalyst.api_extensions import MidCircuitMeasure
+from catalyst.api_extensions import HybridAdjoint, HybridCtrl, MidCircuitMeasure
 from catalyst.jax_tracer import HybridOp, has_nested_tapes, nested_quantum_regions
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
