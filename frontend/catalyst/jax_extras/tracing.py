@@ -386,10 +386,6 @@ class OutputSignature:
     out_tree: Callable[[], PyTreeDef]
     out_initial_jaxpr: Callable[[], Jaxpr]
 
-    def num_implicit_outputs(self) -> int:
-        """Return the number of implicit resuts of the function"""
-        return len([() for _, k in self.out_type() if not k])
-
 
 def deduce_signatures(
     f: Callable, args, kwargs, expansion_strategy
@@ -678,19 +674,9 @@ class ExpansionStrategy:
     output_force_arg0_outdbidx: bool
 
 
-def while_loop_expansion_strategy(preserve_dimensions=False):
-    """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, False)
-
-
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
     return ExpansionStrategy(None, not preserve_dimensions, True, True)
-
-
-def cond_expansion_strategy():
-    """Arguments and results expansion strategy for conditionals."""
-    return ExpansionStrategy(None, False, True, False)
 
 
 def infer_output_type(
