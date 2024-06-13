@@ -368,6 +368,28 @@ def test_no_return_list(arg):
     f(arg)
 
 
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1)],
+)
+def test_dictionary(arg):
+    """Test pytrees. Specifying the type is easier for accelerate since it is
+    not needed. But here, we just use the same trick as above where
+    we can use any value with the same type as the return to specify
+    the return type in a callback.
+    """
+
+    @pure_callback
+    def callback_fn(x) -> {"helloworld": arg}:
+        return {"helloworld": x}
+
+    @qml.qjit
+    def f(x):
+        return callback_fn(x)["helloworld"]
+
+    assert np.allclose(f(arg), arg)
+
+
 def test_tuple_out():
     """Test with multiple tuples."""
 

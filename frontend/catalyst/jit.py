@@ -483,6 +483,7 @@ class QJIT:
         self.mlir = None  # string form (historic presence)
         self.mlir_module = None
         self.qir = None
+        self.out_type = None
 
         functools.update_wrapper(self, fn)
         self.user_sig = get_type_annotations(fn)
@@ -536,7 +537,9 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_treedef, self.c_sig = self.capture(self.user_sig or ())
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
+                    self.user_sig or ()
+                )
 
         if self.compile_options.target in ("mlir", "binary"):
             self.mlir_module, self.mlir = self.generate_ir()
@@ -579,7 +582,7 @@ class QJIT:
             with Patcher(
                 (ag_primitives, "module_allowlist", self.patched_module_allowlist),
             ):
-                self.jaxpr, self.out_treedef, self.c_sig = self.capture(args)
+                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args)
 
             self.mlir_module, self.mlir = self.generate_ir()
             self.compiled_function, self.qir = self.compile()
@@ -637,11 +640,11 @@ class QJIT:
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             # TODO: improve PyTree handling
-            jaxpr, treedef = trace_to_jaxpr(
+            jaxpr, out_type, treedef = trace_to_jaxpr(
                 self.user_function, static_argnums, abstracted_axes, full_sig, {}
             )
 
-        return jaxpr, treedef, dynamic_sig
+        return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
     @debug_logger
@@ -693,7 +696,9 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         shared_object, llvm_ir, _ = self.compiler.run(self.mlir_module, self.workspace)
-        compiled_fn = CompiledFunction(shared_object, func_name, restype, self.compile_options)
+        compiled_fn = CompiledFunction(
+            shared_object, func_name, restype, self.out_type, self.compile_options
+        )
 
         return compiled_fn, llvm_ir
 

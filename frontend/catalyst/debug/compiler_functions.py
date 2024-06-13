@@ -143,4 +143,4 @@ def compile_from_mlir(ir, compiler=None, compile_options=None):
     with mlir.ir.Context():
         result_types = [mlir.ir.RankedTensorType.parse(rt) for rt in func_data[1].split(",")]
 
-    return CompiledFunction(shared_object, qfunc_name, result_types, compiler.options)
+    return CompiledFunction(shared_object, qfunc_name, result_types, None, compiler.options)

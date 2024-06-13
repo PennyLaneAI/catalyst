@@ -510,6 +510,7 @@ that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
 - ``jax.numpy.fft``
+- ``jax.numpy.argsort``
 - ``jax.debug``
 - ``jax.scipy.linalg.expm``
 - ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array

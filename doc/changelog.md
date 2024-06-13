@@ -211,6 +211,9 @@
 * Correctly recording types of constant array when lowering `catalyst.grad` to mlir
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
+* Callbacks can now return types which can be flattened and unflattened.
+  [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
+
 <h3>Internal changes</h3>
 
 * Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
@@ -305,6 +308,31 @@
   This separation allows for a better separation of concerns, provides a nicer
   interface and allows for multiple `MemrefCallable` to be defined for a single
   callback, which is necessary for custom gradient of `pure_callbacks`.
+
+* A new `catalyst::gradient::GradientOpInterface` is available when querying the gradient method in the mlir c++ api.
+  [(#800)](https://github.com/PennyLaneAI/catalyst/pull/800)
+
+  `catalyst::gradient::GradOp`, `JVPOp`, and `VJPOp` now inherits traits in this new `GradientOpInterface` (right now there is only a `getMethod()` method, returning "auto"/"fd")
+
+  There are operations that could potentially be used as `GradOp`, `JVPOp` or `VJPOp`. When trying to get the gradient method, instead of doing 
+  ```C++
+        auto gradOp = dyn_cast<GradOp>(op);
+        auto jvpOp = dyn_cast<JVPOp>(op);
+        auto vjpOp = dyn_cast<VJPOp>(op);
+
+        llvm::StringRef MethodName;
+        if (gradOp)
+            MethodName = gradOp.getMethod();
+        else if (jvpOp)
+            MethodName = jvpOp.getMethod();
+        else if (vjpOp)
+            MethodName = vjpOp.getMethod();
+  ```
+  to identify which op it actually is and protect against segfaults (calling `nullptr.getMethod()`), in the new interface we just do 
+  ```C++
+        auto gradOpInterface = cast<GradientOpInterface>(op);
+        llvm::StringRef MethodName = gradOpInterface.getMethod();
+  ```
 
 <h3>Contributors</h3>
 
