@@ -522,14 +522,9 @@ class CondCallable:
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wfun.call_wrapped()]
 
-            regions.append(
-                HybridOpRegion(
-                    inner_trace,
-                    quantum_tape,
-                    [],
-                    collapse(out_sig.out_type(), res_classical_tracers),
-                )
-            )
+            explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
+            hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [],  explicit_return_tys)
+            regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
 
