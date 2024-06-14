@@ -81,6 +81,12 @@ The essential steps are:
 
    .. group-tab:: Linux Debian/Ubuntu
 
+      .. warning::
+        | If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng`` via:
+        | ``conda install -c conda-forge libstdcxx-ng``
+        | If not, you may receive ``'GLIBCXX_3.4.x' not found`` error when running ``make test``.
+
+
       .. code-block:: console
 
         # Install common requirements
@@ -98,7 +104,6 @@ The essential steps are:
 
         # Test that everything is built properly
         make test
-
 
    .. group-tab:: macOS
 
@@ -121,8 +126,6 @@ The essential steps are:
 
         # Test that everything is built properly
         make test
-
-
 
 These steps should give you the full functionality of Catalyst. 
 
@@ -173,6 +176,22 @@ They can be installed via:
         If the CMake version available in your system is too old, you can also install up-to-date
         versions of it via ``pip install cmake``.
 
+      .. tabs::
+
+      .. warning::
+
+        If using Anaconda or Miniconda, please make sure to upgrade ``libstdcxx-ng``:
+
+        .. code-block:: console
+
+          conda install -c conda-forge libstdcxx-ng
+
+        If not, you may receive the following error when running ``make test`` because the conda
+        environment is using old versions of ``libstdcxx-ng``.
+
+        .. code-block:: console
+
+          'GLIBCXX_3.4.x' not found
 
    .. group-tab:: macOS
 
@@ -199,12 +218,14 @@ For an existing copy of the repository without its submodules, they can also be 
 
   git submodule update --init --depth=1
 
+
 All additional build and developer dependencies are managed via the repository's
 ``requirements.txt`` and can be installed as follows once the repository is cloned:
 
 .. code-block:: console
 
   pip install -r requirements.txt
+
 
 .. note::
 
@@ -386,3 +407,10 @@ They can be installed via
 
         brew install doxygen pandoc
 
+To generate html files for the documentation for Catalyst:
+
+.. code-block:: console
+
+  pip install -r doc/requirements.txt
+
+The generated files are located in ``doc/_build/html``

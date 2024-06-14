@@ -174,6 +174,9 @@
 * Correctly recording types of constant array when lowering `catalyst.grad` to mlir
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
+* Callbacks can now return types which can be flattened and unflattened.
+  [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
+
 <h3>Internal changes</h3>
 
 * Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.

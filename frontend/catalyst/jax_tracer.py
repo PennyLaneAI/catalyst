@@ -87,6 +87,12 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.programs.verification import (
+    validate_observables_adjoint_diff,
+    validate_observables_parameter_shift,
+    verify_no_state_variance_returns,
+    verify_operations,
+)
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -124,7 +130,7 @@ def mark_gradient_tracing(method: str):
     finally:
         TRACING_GRADIENTS.pop()
 
-
+        
 def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is 
     used in preprocess to determine what decomposition and validation is needed."""
@@ -1024,6 +1030,7 @@ def trace_quantum_function(
                 device_program, config = device.preprocess(ctx, config)
             else:
                 device_program = TransformProgram()
+                verification_program = TransformProgram()
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
@@ -1034,6 +1041,7 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 qnode_program,
                 device_program,
+                verification_program,
                 device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
