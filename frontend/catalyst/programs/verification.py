@@ -65,6 +65,7 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     return (tape,), lambda x: x[0]
 
 
+# pylint: disable=too-many-statements
 @transform
 def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """verify the quantum program against Catalyst requirements. This transform makes no
@@ -209,7 +210,7 @@ def validate_observables_parameter_shift(tape: QuantumTape):
     for m in tape.measurements:
         if m.obs:
             if isinstance(m.obs, Tensor):
-                [_obs_checker(o) for o in m.obs.obs]
+                _ = [_obs_checker(o) for o in m.obs.obs]
             else:
                 _obs_checker(m.obs)
 
@@ -232,7 +233,7 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     for m in tape.measurements:
         if m.obs:
             if isinstance(m.obs, Tensor):
-                [_obs_checker(o) for o in m.obs.obs]
+                _ = [_obs_checker(o) for o in m.obs.obs]
             else:
                 _obs_checker(m.obs)
 
