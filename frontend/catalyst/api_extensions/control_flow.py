@@ -573,15 +573,14 @@ class CondCallable:
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
-        num_implicit_outputs = out_sigs[-1].num_implicit_outputs()
+        all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
         all_jaxprs, _, all_consts = unify_convert_result_types(
-            ctx, all_jaxprs, all_consts, num_implicit_outputs
+            ctx, all_jaxprs, all_consts, all_noimplouts
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
-            nimplicit_inputs=in_sigs[0].num_implicit_inputs(),
             nimplicit_outputs=out_sigs[0].num_implicit_outputs(),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -981,16 +980,10 @@ class Cond(HybridOp):
 
                 jaxprs.append(jaxpr)
                 consts.append(const)
-
                 nouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
-        nouts_s = list(set(nouts))
-        assert len(nouts_s) == 1
-        num_implicit_outputs = nouts_s[0]
-        all_jaxprs, _, all_consts = unify_convert_result_types(
-            ctx, jaxprs, consts, num_implicit_outputs
-        )
+        all_jaxprs, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nouts)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
         in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
@@ -1000,7 +993,6 @@ class Cond(HybridOp):
             in_expanded_classical_tracers,
             self.out_classical_tracers,
             expansion_strategy=self.expansion_strategy,
-            num_implicit_inputs=0,
         )[0]
 
         qrp2 = QRegPromise(
@@ -1010,8 +1002,7 @@ class Cond(HybridOp):
                 in_expanded_tracers=in_expanded_classical_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
                 branch_jaxprs=branch_jaxprs,
-                nimplicit_inputs=0,
-                nimplicit_outputs=num_implicit_outputs,
+                nimplicit_outputs=nouts[0],
             )
         )
         return qrp2

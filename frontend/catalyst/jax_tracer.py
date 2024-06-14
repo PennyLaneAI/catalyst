@@ -236,7 +236,7 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
 
 
 @debug_logger
-def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
+def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
     """Unify result types of the jaxpr programs given.
     Args:
         jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
@@ -252,7 +252,7 @@ def unify_convert_result_types(ctx, jaxprs, consts, num_implicit_outputs):
     """
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
     jaxpr_acc, consts2 = [], []
-    for j, a in zip(jaxprs, consts):
+    for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
         _, out_sig = _apply_result_type_conversion(ctx, j, a, promoted_types, num_implicit_outputs)
         jaxpr_acc.append(out_sig.out_initial_jaxpr())
         consts2.append(out_sig.out_consts())
