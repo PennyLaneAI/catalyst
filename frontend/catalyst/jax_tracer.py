@@ -214,9 +214,10 @@ def _apply_result_type_conversion(
 
 
 def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
-    # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid abstact
-    # value. One need to investigate how to use it correctly and remove the condition [1]. Should we
-    # add AbstractQreg into the `_weak_types` list of JAX?
+    # TODO: Our custom AbstractQreg happened to be incompatible with jnp.promote_types, we suspect
+    # we failed to match some expectation of Jax. We suggest to make our abstract values compatible
+    # and hopefully remove the logic behind the condition [1]. Should we add AbstractQreg into the
+    # `_weak_types` list of JAX?
     assert len(types) > 0, "Expected one or more set of types"
     assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
 
@@ -229,7 +230,7 @@ def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
     assert (
         all_ends_with_qreg or all_not_ends_with_qreg
     ), "We require either all-qregs or all-non-qregs as last items of the type lists"
-    if all_ends_with_qreg:
+    if all_ends_with_qreg:  # [1]
         types = [t[:-1] for t in types]
     results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
     return results + ([AbstractQreg()] if all_ends_with_qreg else [])
