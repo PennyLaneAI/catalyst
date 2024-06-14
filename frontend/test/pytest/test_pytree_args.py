@@ -406,9 +406,6 @@ class TestPyTreesFuncArgs:
     def test_args_grad(self, backend):
         """Test arguments with the grad operation."""
 
-        import pennylane as qml
-        assert qml.operation.active_new_opmath()
-
         @qml.qnode(qml.device(backend, wires=2))
         def circuit1(params):
             qml.RX(params["a"][0], wires=0)
@@ -454,7 +451,6 @@ class TestPyTreesFuncArgs:
         result_flatten_expected, tree_expected = tree_flatten(expected)
         assert np.allclose(result_flatten, result_flatten_expected)
         assert tree == tree_expected
-
 
     @pytest.mark.parametrize("inp", [(np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
     def test_args_control_flow(self, backend, inp):
