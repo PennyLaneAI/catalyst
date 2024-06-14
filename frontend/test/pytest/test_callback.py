@@ -547,6 +547,7 @@ def test_non_jax_jittable():
 
 
 def test_that_jax_jit_is_called():
+    """Test that jax.jit is called"""
 
     called_jax_jit = False
 
