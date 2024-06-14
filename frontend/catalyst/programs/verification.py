@@ -86,9 +86,13 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         if isinstance(op, MidCircuitMeasure):
             raise DifferentiableCompileError(f"{op.name} is not allowed in gradinets")
 
-    def _adj_op_checker(op):
+    def _adj_diff_op_checker(op):
+        if type(op) in (Controlled, ControlledOp) or isinstance(op, Adjoint):
+            op_name = op.base.name
+        else:
+            op_name = op.name
         if not qjit_device.qjit_capabilities.native_ops.get(
-            op.name, EMPTY_PROPERTIES
+            op_name, EMPTY_PROPERTIES
         ).differentiable:
             raise DifferentiableCompileError(
                 f"{op.name} is non-differentiable on '{qjit_device.original_device.name}' device"
@@ -151,7 +155,6 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             op_name = op.base.name
         else:
             op_name = op.name
-
         if not qjit_device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
             raise CompileError(
                 f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
@@ -182,7 +185,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         if grad_method is not None:
             _mcm_op_checker(op)
             if grad_method == "adjoint":
-                _adj_op_checker(op)
+                _adj_diff_op_checker(op)
             elif grad_method == "parameter-shift":
                 _paramshift_op_checker(op)
 
