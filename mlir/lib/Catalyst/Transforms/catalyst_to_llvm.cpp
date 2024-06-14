@@ -460,11 +460,10 @@ struct CallbackOpPatternOne : public OpConversionPattern<CallbackOp> {
             mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
                                          /*ret_type=*/voidType, isVarArg);
 
-        for (auto arg : llvm::enumerate(op.getArguments())) {
-            auto val = arg.value();
-            Type structTy = typeConverter->convertType(val.getType());
+        for (auto arg : op.getArguments()) {
+            Type structTy = typeConverter->convertType(arg.getType());
             auto structVal =
-                rewriter.create<UnrealizedConversionCastOp>(loc, structTy, val).getResult(0);
+                rewriter.create<UnrealizedConversionCastOp>(loc, structTy, arg).getResult(0);
             Value ptr = rewriter.create<LLVM::AllocaOp>(loc, ptrTy, structTy, c1);
             rewriter.create<LLVM::StoreOp>(loc, structVal, ptr);
             callArgs.push_back(ptr);
