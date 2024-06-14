@@ -29,6 +29,7 @@ class TestCondToJaxpr:
 
     def test_basic_cond_to_jaxpr(self):
         """Check the JAXPR of simple conditional function."""
+        # pylint: disable=line-too-long
 
         expected = dedent(
             """
@@ -41,7 +42,7 @@ class TestCondToJaxpr:
                   nimplicit_outputs=0
                 ] b a a
               in (c,) }
-        """
+            """
         )
 
         @qjit

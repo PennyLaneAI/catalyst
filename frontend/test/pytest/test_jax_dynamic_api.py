@@ -825,7 +825,7 @@ def test_qjit_whileloop_outer():
         a0 = jnp.ones([sz], dtype=float)
 
         @while_loop(lambda _a, i: i < 3)
-        def loop(a, i):
+        def loop(_a, i):
             i += 1
             return (a0, i)
 
