@@ -350,7 +350,7 @@ class MidCircuitMeasure(MidMeasureMP):
 
     def __hash__(self):
         hsh = super().__hash__()
-        return hash(hsh + hash(self.mv))
+        return hash(hsh + hash(self.mcm_tracer))
 
 
 class AdjointCallable:
