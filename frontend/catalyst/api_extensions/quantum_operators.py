@@ -16,7 +16,7 @@
 This module contains public API functions for quantum operators which are not
 included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 """
-
+import logging
 import copy
 import sys
 from collections.abc import Sized
@@ -28,6 +28,7 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op
@@ -50,7 +51,12 @@ from catalyst.jax_tracer import (
     has_nested_tapes,
     trace_quantum_operations,
 )
+from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 
 pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
 pl_ctrl_module = sys.modules["pennylane.ops.op_math.controlled"]
@@ -147,17 +153,14 @@ def measure(
             f"Measure is only supported on 1 qubit, got array of shape {wires[0].shape}."
         )
 
-    # Copy, so wires remain unmodified
-    in_classical_tracers = wires.copy()
-
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
 
     m = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
-        in_classical_tracers=in_classical_tracers,
-        out_classical_tracers=[m],
-        regions=[],
+        # Copy, so wires remain unmodified
+        wires=wires.copy(),
+        mcm_tracer=m,
         reset=reset,
         postselect=postselect,
     )
@@ -312,49 +315,42 @@ def ctrl(
 
 
 ## IMPL ##
-class MidCircuitMeasure(HybridOp):
+class MidCircuitMeasure(MidMeasureMP):
     """Operation representing a mid-circuit measurement."""
 
     binder = qmeasure_p.bind
 
     # pylint: disable=too-many-arguments
-    def __init__(
-        self,
-        in_classical_tracers,
-        out_classical_tracers,
-        regions: List[HybridOpRegion],
-        reset: bool = None,
-        postselect: int = None,
-    ):
-        HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
-        self.reset = reset
-        self.postselect = postselect
+    @debug_logger_init
+    def __init__(self, wires, mcm_tracer, reset: bool = None, postselect: int = None):
+        super().__init__(wires=wires, reset=reset, postselect=postselect)
+        # self.wires = wires
+        self.mcm_tracer = mcm_tracer
 
-    # pylint: disable=too-many-arguments
-    def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
-        wire = self.in_classical_tracers[0]
-        qubit = qrp.extract([wire])[0]
-        if postselect_mode == "hw-like":
-            qubit2 = self.bind_overwrite_classical_tracers2(
-                ctx,
-                trace,
-                in_expanded_tracers=[qubit],
-                out_expanded_tracers=self.out_classical_tracers,
-            )
-        else:
-            qubit2 = self.bind_overwrite_classical_tracers2(
-                ctx,
-                trace,
-                in_expanded_tracers=[qubit],
-                out_expanded_tracers=self.out_classical_tracers,
-                postselect=self.postselect,
-            )
-        qrp.insert([wire], [qubit2])
+    @debug_logger
+    def trace_quantum(self, ctx, trace, qrp, postselect_mode=None) -> QRegPromise:
+        qubit = qrp.extract(self.wires)[0]
+        kwargs = {} if postselect_mode == "hw-like" else {"postselect": self.postselect}
+        qubit2 = self.binder(qubit, **kwargs)[-1]
+
+        eqn = ctx.frames[trace].eqns[-1]
+        assert len(eqn.outvars[:-1]) == 1, f"{eqn.outvars=}\n{self.mcm_tracer=}"
+
+        if trace.getvar(self.mcm_tracer) not in set(
+            [
+                *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
+                *ctx.frames[trace].invars,
+                *ctx.frames[trace].constvar_to_val.keys(),
+            ]
+        ):
+            eqn.outvars[0] = trace.getvar(self.mcm_tracer)
+
+        qrp.insert(self.wires, [qubit2])
         return qrp
 
     def __hash__(self):
         hsh = super().__hash__()
-        return hash(hsh + hash(self.out_classical_tracers[0]))
+        return hash(hsh + hash(self.mv))
 
 
 class AdjointCallable:

@@ -36,7 +36,7 @@ from pennylane.tape.tape import (
     rotations_and_diagonal_measurements,
 )
 
-from catalyst.api_extensions import HybridCtrl
+from catalyst.api_extensions import HybridCtrl, MidCircuitMeasure
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
@@ -51,6 +51,8 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
     returns the default decomposition, unless the operator should decompose to a QubitUnitary.
     Raises a CompileError for MidMeasureMP"""
+    if isinstance(op, MidCircuitMeasure):
+        return []
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
     # TODO: remove hardcoded controlled to matrix decomp
