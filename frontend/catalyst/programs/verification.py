@@ -18,7 +18,7 @@ from typing import Any, Callable
 
 from pennylane import transform
 from pennylane.measurements import MutualInfoMP, StateMP, VarianceMP, VnEntropyMP
-from pennylane.operation import Operation
+from pennylane.operation import Operation, Tensor
 from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 
@@ -208,7 +208,10 @@ def validate_observables_parameter_shift(tape: QuantumTape):
 
     for m in tape.measurements:
         if m.obs:
-            _obs_checker(m.obs)
+            if isinstance(m.obs, Tensor):
+                [_obs_checker(o) for o in m.obs.obs]
+            else:
+                _obs_checker(m.obs)
 
     return (tape,), lambda x: x[0]
 
@@ -227,12 +230,10 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
             )
 
     for m in tape.measurements:
-        import pennylane as qml
-        print(m)
-        print(m.obs)
-        print(type(m.obs))
-        print(f"active op_math: {qml.operation.active_new_opmath()}")
         if m.obs:
-            _obs_checker(m.obs)
+            if isinstance(m.obs, Tensor):
+                [_obs_checker(o) for o in m.obs.obs]
+            else:
+                _obs_checker(m.obs)
 
     return (tape,), lambda x: x[0]
