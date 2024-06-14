@@ -619,16 +619,26 @@ class TestAdjointMethodVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-    def test_non_differentiable_observable(self):
+    @pytest.mark.parametrize(
+        "observable",
+        [
+            qml.PauliX(0),
+            # qml.PauliX(0) @ qml.PauliZ(1),
+            qml.operation.Tensor(qml.X(0), qml.Z(1)),
+            # qml.PauliX(0)+qml.PauliY(1)
+        ],
+    )
+    def test_non_differentiable_observable(self, observable):
         """Test that taking the adjoint diff of a circuit with an observable that doesn't support
         adjoint differentiation raises an error."""
 
         @qml.qnode(
-            get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0]), diff_method="adjoint"
+            get_custom_device(non_differentiable_obs={"PauliX"}, wires=[0, 1]),
+            diff_method="adjoint",
         )
         def f(x):
             qml.RX(x, wires=0)
-            return qml.expval(qml.PauliX(0))
+            return qml.expval(observable)
 
         with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
 
@@ -699,23 +709,33 @@ class TestParameterShiftMethodVerification:
     """Test the verification of operators and observables when the parameter shift method
     is used for differentiation"""
 
-    def test_paramshift_obs_simple(self):
+    @pytest.mark.parametrize(
+        "observable",
+        [
+            qml.PauliX(0),
+            # qml.PauliX(0) @ qml.PauliZ(1),
+            qml.operation.Tensor(qml.X(0), qml.Z(1)),
+            # qml.PauliX(0)+qml.PauliY(1)
+        ],
+    )
+    @patch.object(qml.PauliX, "grad_method", "F")
+    def test_paramshift_obs_simple(self, observable):
         """Test that taking a parameter-shift gradient of an observable that doesn't support
         analytic differentiation raises an error."""
 
-        assert qml.Hermitian.grad_method != "A"
+        assert qml.PauliX.grad_method != "A"
 
         @qml.qnode(get_custom_device(wires=2), diff_method="parameter-shift")
         def f(x):
-            qml.PauliX(wires=1)
+            qml.PauliY(wires=1)
             qml.RX(x, wires=0)
             A = np.array(
                 [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
             )
-            return qml.expval(qml.Hermitian(A, wires=0))
+            return qml.expval(observable)
 
         with pytest.raises(
-            DifferentiableCompileError, match="Hermitian does not support analytic differentiation"
+            DifferentiableCompileError, match="PauliX does not support analytic differentiation"
         ):
 
             @qml.qjit

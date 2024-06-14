@@ -117,7 +117,7 @@ class QFunc:
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
-# pylint: disable=protected-access,no-member,not-callable
+# pylint: disable=not-callable
 def dynamic_one_shot(qnode):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 

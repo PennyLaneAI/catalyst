@@ -87,12 +87,6 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.programs.verification import (
-    validate_observables_adjoint_diff,
-    validate_observables_parameter_shift,
-    verify_no_state_variance_returns,
-    verify_operations,
-)
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -106,7 +100,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 # TODO: refactor the tracer module
-# pylint: disable=too-many-lines
 
 # Global flag tracing wether the function that we trace might be used for gradients
 TRACING_GRADIENTS: List[str] = []
@@ -837,7 +830,7 @@ def apply_transform(
     device_modify_measurements,
     tape,
     flat_results,
-):  # pylint: disable=too-many-arguments
+):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -1030,7 +1023,6 @@ def trace_quantum_function(
                 device_program, config = device.preprocess(ctx, config)
             else:
                 device_program = TransformProgram()
-                verification_program = TransformProgram()
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
@@ -1041,7 +1033,6 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 qnode_program,
                 device_program,
-                verification_program,
                 device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
