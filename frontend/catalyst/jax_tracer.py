@@ -33,6 +33,7 @@ from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
 import catalyst
+from catalyst.api_extensions.callbacks import MemrefCallable
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -464,6 +465,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     # python function is seen in the cache. This happens during testing or if we wanted to compile a
     # single python function multiple times with different options.
     mlir_fn_cache.clear()
+    MemrefCallable.clearcache()
 
     with transient_jax_config():
         # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
