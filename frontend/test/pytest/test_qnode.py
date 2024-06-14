@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Test cases relating to quantum functions represented via :class:`qml.QNode.`"""
-from unittest.mock import patch
 
 import jax.numpy as jnp
 import pennylane as qml
@@ -149,6 +148,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     assert config.gradient_method == grad_method
 
 
+# pylint: disable=protected_access
 def test_execution_config_grad_method_with_no_qnode():
     """Test that if qnode is None (default value on ``trace_quantum_function``) when
     ``_make_execution_config`` is called, an appropriate ExecutionConfig is returned"""
