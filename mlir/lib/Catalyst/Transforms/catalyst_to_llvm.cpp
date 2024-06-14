@@ -460,6 +460,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
             mlir::LLVM::lookupOrCreateFn(mod, "inactive_callback", {/*args=*/i64, i64, i64},
                                          /*ret_type=*/voidType, isVarArg);
 
+        // TODO: remove redundant alloca+store since ultimately we'll receive struct*
         for (auto arg : op.getArguments()) {
             Type structTy = typeConverter->convertType(arg.getType());
             auto structVal =
