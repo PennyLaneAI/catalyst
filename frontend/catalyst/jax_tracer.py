@@ -973,7 +973,6 @@ def reset_qubit(qreg_in, w):
         m,
         qreg_mid,
         branch_jaxprs=[jaxpr_true, jaxpr_false],
-        nimplicit_inputs=0,
         nimplicit_outputs=0,
     )[0]
 
