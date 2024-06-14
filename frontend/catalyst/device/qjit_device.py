@@ -35,7 +35,7 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
 )
-from catalyst.jax_tracer import _get_device_shots
+from catalyst.jax_tracer import get_device_shots
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
@@ -151,7 +151,7 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        shots = _get_device_shots(device) or 0
+        shots = get_device_shots(device) or 0
         device_kwargs["shots"] = shots
 
     if dname == "braket.local.qubit":  # pragma: no cover

@@ -131,7 +131,7 @@ def mark_gradient_tracing(method: str):
         TRACING_GRADIENTS.pop()
 
 
-def _get_device_shots(dev):
+def get_device_shots(dev):
     """Helper function to get device shots."""
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
@@ -707,7 +707,7 @@ def trace_quantum_measurements(
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    shots = _get_device_shots(device)
+    shots = get_device_shots(device)
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
