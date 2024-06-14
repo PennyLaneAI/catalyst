@@ -415,7 +415,7 @@ class HybridOp(Operator):
         return f"{self.name}(tapes={nested_ops})"
 
     @debug_logger
-    def bind_overwrite_classical_tracers2(
+    def bind_overwrite_classical_tracers(
         # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
         self,
         ctx: JaxTracingContext,

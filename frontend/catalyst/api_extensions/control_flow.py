@@ -995,7 +995,7 @@ class Cond(HybridOp):
         )[0]
 
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers2(
+            op.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 in_expanded_tracers=in_expanded_classical_tracers,
@@ -1059,7 +1059,7 @@ class ForLoop(HybridOp):
         )
 
         qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers2(
+            op.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
@@ -1133,7 +1133,7 @@ class WhileLoop(HybridOp):
         )[0]
 
         qrp2 = QRegPromise(
-            self.bind_overwrite_classical_tracers2(
+            self.bind_overwrite_classical_tracers(
                 ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
