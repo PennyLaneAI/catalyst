@@ -279,7 +279,7 @@ jobs:
         container_name: ["manylinux_2_28_aarch64"]
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on Xanadu M2 Mac
+    name: Test Wheels (Python ${{ matrix.python_version.official }}) on Xanadu M2 Mac
     runs-on:
       group: 'Office 24th floor M2 Mac'
     
