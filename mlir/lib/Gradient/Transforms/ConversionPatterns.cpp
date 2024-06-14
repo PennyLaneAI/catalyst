@@ -357,7 +357,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         // Check to see if we need to keep the value results alongside the gradients.
-        // There is no need to duplicate if there's no need to keep the results. 
+        // There is no need to duplicate if there's no need to keep the results.
         // Note that when this attribute is not set, we are then not coming from ValueAndGrad
         // so there's no need to duplicate
         bool dupNoNeed = (op.getKeepValueResultsAttr() == nullptr)
