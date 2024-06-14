@@ -75,7 +75,7 @@ def _validate_mcm_config(mcm_config, shots):
         and mcm_config.postselect_mode == "hw-like"
     ):
         raise ValueError(
-            "Cannot use postselect_mode='hw-like' with Catalyst when " "mcm_method != 'one-shot'."
+            "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
         )
     if mcm_config.mcm_method == "one-shot" and shots is None:
         raise ValueError(
