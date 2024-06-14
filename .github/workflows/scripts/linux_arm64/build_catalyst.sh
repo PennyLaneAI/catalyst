@@ -41,7 +41,6 @@ export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${
 cmake -S runtime -B runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=runtime-build/lib \
-    -DCMAKE_CXX_STANDARD_LIBRARIES="-lpython${PYTHON_VERSION}" \
     -DPYTHON_EXECUTABLE=/usr/bin/python3 \
     -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/include/python${PYTHON_VERSION} \
     -DPYTHON_LIBRARY=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/lib \
