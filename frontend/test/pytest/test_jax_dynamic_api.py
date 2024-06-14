@@ -583,7 +583,8 @@ def test_qnode_forloop_indbidx_outdbidx():
 
 
 def test_qnode_forloop_abstracted_axes():
-    """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
+    """Test for-loops with mixed input and output dimension variables during the quantum tracing.
+    Use abstracted_axes as the source of dynamism."""
 
     @qjit(abstracted_axes={0: "n"})
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -668,7 +669,8 @@ def test_qnode_whileloop_2():
 
 
 def test_qnode_whileloop_abstracted_axes():
-    """Test that catalyst tensor primitive is compatible with quantum while"""
+    """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
+    the source of dynamism."""
 
     @qjit(abstracted_axes={0: "n"})
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -908,7 +910,8 @@ def test_qnode_cond_identity():
 
 
 def test_qnode_cond_abstracted_axes():
-    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+    """Test that catalyst tensor primitive is compatible with quantum conditional. Use
+    abstracted_axes as the source of dynamism."""
 
     def f(flag, a, b):
         @qjit(abstracted_axes={0: "n"})
