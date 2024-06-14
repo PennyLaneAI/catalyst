@@ -11,7 +11,9 @@ export PYTHON_PACKAGE=$4
 
 # Install system dependencies
 dnf update -y 
-dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
+dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION}
+if [ "$PYTHON_VERSION" != "3.10" ]; then
+    dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
 dnf clean all -y
 
 # Make GCC the default compiler
