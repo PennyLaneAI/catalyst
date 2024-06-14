@@ -51,7 +51,7 @@ from catalyst.jax_extras import (
     unzip2,
 )
 from catalyst.jax_primitives import func_p
-from catalyst.jax_tracer import trace_quantum_function
+from catalyst.jax_tracer import _get_device_shots, trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.utils.toml import (
     DeviceCapabilities,
@@ -61,11 +61,6 @@ from catalyst.utils.toml import (
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-
-
-def _get_device_shots(dev):
-    """Helper function to get device shots."""
-    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
 
 class QFunc:

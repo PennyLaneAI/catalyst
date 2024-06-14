@@ -228,16 +228,15 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method="deferred")
-        def circuit(_x):  # pylint: disable=unused-argument
-            # QNode has unused argument because if there are no arguments then compilation happens
-            # during QJIT.__init__ rather than __call__
-            m = measure(0)
+        def circuit(x):
+            qml.RX(x, 0)
+            measure(0)
             return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError, match="mcm_method='deferred' is not supported with Catalyst"
         ):
-            _ = circuit(None)
+            _ = circuit(1.8)
 
     def test_mcm_method_one_shot_analytic_error(self, backend):
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
@@ -245,16 +244,15 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method="one-shot")
-        def circuit(_x):  # pylint: disable=unused-argument
-            # QNode has unused argument because if there are no arguments then compilation happens
-            # during QJIT.__init__ rather than __call__
-            m = measure(0)
+        def circuit(x):
+            qml.RX(x, 0)
+            measure(0)
             return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError, match="Cannot use the 'one-shot' method for mid-circuit measurements"
         ):
-            _ = circuit(None)
+            _ = circuit(1.8)
 
     def test_single_branch_statistics_hw_like_error(self, backend):
         """Test that an error is raised if using `mcm_method="single-branch-statistics"` and
@@ -263,17 +261,16 @@ class TestMidCircuitMeasurement:
 
         @qjit
         @qml.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
-        def circuit(_x):  # pylint: disable=unused-argument
-            # QNode has unused argument because if there are no arguments then compilation happens
-            # during QJIT.__init__ rather than __call__
-            m = measure(0)
+        def circuit(x):
+            qml.RX(x, 0)
+            measure(0)
             return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError,
             match=("Cannot use postselect_mode='hw-like' with Catalyst when"),
         ):
-            _ = circuit(None)
+            _ = circuit(1.8)
 
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot", "single-branch-statistics"])
