@@ -327,13 +327,13 @@ class MidCircuitMeasure(HybridOp):
         postselect: int = None,
     ):
         HybridOp.__init__(self, in_classical_tracers, out_classical_tracers, regions)
+        self._wires = qml.wires.Wires(in_classical_tracers)
         self.reset = reset
         self.postselect = postselect
 
     # pylint: disable=too-many-arguments
     def trace_quantum(self, ctx, device, trace, qrp, postselect_mode=None) -> QRegPromise:
-        wire = self.in_classical_tracers[0]
-        qubit = qrp.extract([wire])[0]
+        qubit = qrp.extract(self.wires)[0]
         if postselect_mode == "hw-like":
             qubit2 = self.bind_overwrite_classical_tracers2(
                 ctx,
@@ -349,7 +349,7 @@ class MidCircuitMeasure(HybridOp):
                 out_expanded_tracers=self.out_classical_tracers,
                 postselect=self.postselect,
             )
-        qrp.insert([wire], [qubit2])
+        qrp.insert(self.wires, [qubit2])
         return qrp
 
     def __hash__(self):

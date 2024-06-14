@@ -105,6 +105,11 @@ SUPPORTED_RT_DEVICES = {
 }
 
 
+def get_device_shots(dev):
+    """Helper function to get device shots."""
+    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+
+
 @dataclass
 class BackendInfo:
     """Backend information"""

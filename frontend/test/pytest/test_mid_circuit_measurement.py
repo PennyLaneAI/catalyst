@@ -31,6 +31,8 @@ from catalyst import CompileError, cond, measure, qjit
 os.environ["OMP_PROC_BIND"] = "false"
 os.environ["OMP_NUM_THREADS"] = "2"
 
+# pylint: disable=too-many-public-methods
+
 
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
