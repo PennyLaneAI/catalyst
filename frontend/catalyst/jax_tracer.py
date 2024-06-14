@@ -425,8 +425,9 @@ class HybridOp(Operator):
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
         existing output tracers, stored in the operations since the classical tracing stage.
-        User-defined transformations are allowed to change them. The quantum tracer, namely the
-        quantum register is not supposed to be changed so it is kept as-is.
+        User-defined transformations might have changed them by the time this function is called.
+        The quantum tracer, namely the quantum register is not supposed to be changed so it is kept
+        as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
