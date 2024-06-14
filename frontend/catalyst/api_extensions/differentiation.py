@@ -38,7 +38,7 @@ from catalyst.jax_primitives import (
     probs_p,
     vjp_p,
 )
-from catalyst.jax_tracer import Function
+from catalyst.jax_tracer import Function, mark_gradient_tracing
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import DifferentiableCompileError
 
@@ -716,7 +716,8 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     """Gets the jaxpr of a differentiable function. Perform the required additional checks and
     return the output tree."""
     method = grad_params.method
-    jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
+    with mark_gradient_tracing(method):
+        jaxpr, shape = jax.make_jaxpr(f, return_shape=True)(*args)
     _, out_tree = tree_flatten(shape)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
@@ -742,7 +743,6 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
             )
 
     _verify_differentiable_child_qnodes(jaxpr, method)
-
     return jaxpr, out_tree
 
 

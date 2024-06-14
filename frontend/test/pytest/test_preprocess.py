@@ -45,6 +45,7 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
+from catalyst.device import get_device_capabilities
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
@@ -58,7 +59,6 @@ from catalyst.utils.toml import (
     OperationProperties,
     ProgramFeatures,
     TOMLDocument,
-    get_device_capabilities,
     load_device_capabilities,
     pennylane_operation_set,
     read_toml_file,
@@ -440,7 +440,7 @@ class TestPreprocessHybridOp:
         @qml.qnode(dev)
         def circuit(x: float, y: float):
             qml.RY(y, 0)
-            adjoint(OtherRX(x, 0))
+            adjoint(lambda: OtherRX(x, 0))()
             return qml.expval(qml.PauliZ(0))
 
         mlir = qml.qjit(circuit, target="mlir").mlir

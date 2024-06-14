@@ -20,9 +20,8 @@ import pytest
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import extract_backend_info
+from catalyst.device import extract_backend_info, get_device_capabilities
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import get_device_capabilities
 
 # These have to match the ones in the configuration file.
 OPERATIONS = [

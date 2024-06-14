@@ -21,7 +21,7 @@ from textwrap import dedent
 import pennylane as qml
 import pytest
 
-from catalyst.device import QJITDevice, validate_device_capabilities
+from catalyst.device import QJITDeviceNewAPI
 from catalyst.device.qjit_device import check_no_overlap, validate_device_capabilities
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.toml import (
@@ -390,7 +390,8 @@ def test_config_qjit_device_operations():
             """
         ),
     )
-    qjit_device = QJITDevice(capabilities, shots=1000, wires=2)
+    device = qml.device("lightning.qubit", wires=2, shots=1000)
+    qjit_device = QJITDeviceNewAPI(device, capabilities)
     assert "PauliX" in qjit_device.operations
     assert "PauliY" in qjit_device.observables
 

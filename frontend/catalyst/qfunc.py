@@ -17,6 +17,7 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
+
 import logging
 from copy import copy
 from typing import Callable, Sequence
@@ -43,6 +44,7 @@ from catalyst.device import (
     QJITDevice,
     QJITDeviceNewAPI,
     extract_backend_info,
+    get_device_capabilities,
     validate_device_capabilities,
 )
 from catalyst.jax_extras import (
@@ -53,11 +55,7 @@ from catalyst.jax_extras import (
 from catalyst.jax_primitives import func_p
 from catalyst.jax_tracer import _get_device_shots, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.utils.toml import (
-    DeviceCapabilities,
-    ProgramFeatures,
-    get_device_capabilities,
-)
+from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -136,9 +134,7 @@ class QFunc:
         if isinstance(self.device, qml.devices.Device):
             qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
         else:
-            qjit_device = QJITDevice(
-                device_capabilities, self.device.shots, self.device.wires, backend_info
-            )
+            qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
