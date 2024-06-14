@@ -242,6 +242,8 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
         jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
                                       matching sizes and numpy array shapes but dtypes might be
                                       different.
+        consts (list of Jaxpr constants): Constants of the sourece Jaxpr programs.
+        nimplout (list of integers): Numbers of implicit outputs of Jaxpr programs.
 
     Returns (list of ClosedJaxpr):
         Same number of jaxprs with equal result dtypes.
