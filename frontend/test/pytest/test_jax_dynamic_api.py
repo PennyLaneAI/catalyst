@@ -582,6 +582,28 @@ def test_qnode_forloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
+def test_qnode_forloop_abstracted_axes():
+    """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
+
+    @qjit(abstracted_axes={0: "n"})
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(a, b):
+
+        @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
+        def loop(_i, a, _b):
+            b = jnp.ones([a.shape[0] + 1], dtype=float)
+            return (a, b)
+
+        a2, b2 = loop(a, b)
+        return a2, b2
+
+    a = jnp.ones([3], dtype=float)
+    b = jnp.ones([3], dtype=float)
+    res_a, res_b = f(a, b)
+    assert_array_and_dtype_equal(res_a, jnp.ones(3))
+    assert_array_and_dtype_equal(res_b, jnp.ones(4))
+
+
 def test_qnode_forloop_index_indbidx():
     """Test for-loops referring loop index as a dimension during the quantum tracing."""
 
@@ -642,6 +664,28 @@ def test_qnode_whileloop_2():
 
     result = f(3)
     expected = jnp.ones(4)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qnode_whileloop_abstracted_axes():
+    """Test that catalyst tensor primitive is compatible with quantum while"""
+
+    @qjit(abstracted_axes={0: "n"})
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(a, b):
+
+        @while_loop(lambda _a, _b, i: i < 3)
+        def loop(a, b, i):
+            i += 1
+            return (a, b, i)
+
+        a2, b2, _ = loop(a, b, 0)
+        return a2 + b2
+
+    a = jnp.ones([3], dtype=float)
+    b = jnp.ones([3], dtype=float)
+    result = f(a, b)
+    expected = 2 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 
@@ -861,6 +905,35 @@ def test_qnode_cond_identity():
 
     assert_array_and_dtype_equal(f(True, 3), jnp.ones(3))
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
+
+
+def test_qnode_cond_abstracted_axes():
+    """Test that catalyst tensor primitive is compatible with quantum conditional"""
+
+    def f(flag, a, b):
+        @qjit(abstracted_axes={0: "n"})
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def _f(a, b):
+
+            @cond(flag)
+            def case():
+                return a
+
+            @case.otherwise
+            def case():
+                return b
+
+            c = case()
+            assert c.shape[0] is a.shape[0]
+            assert c.shape[0] is b.shape[0]
+            return c
+
+        return _f(a, b)
+
+    a = jnp.ones([3], dtype=float)
+    b = jnp.zeros([3], dtype=float)
+    assert_array_and_dtype_equal(f(True, a, b), jnp.ones(3))
+    assert_array_and_dtype_equal(f(False, a, b), jnp.zeros(3))
 
 
 def test_qjit_cond_identity():
