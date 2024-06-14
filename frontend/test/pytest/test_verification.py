@@ -532,6 +532,9 @@ class TestObservableValidation:
             ([qml.expval(qml.RX(1.2, 0))], "RX"),
             ([qml.var(qml.X(0) @ qml.Y(2))], None),  # prod
             ([qml.var(qml.X(0) @ qml.RY(1.23, 2))], "RY"),
+            ([qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2*qml.X(3)) @ qml.Y(1))], None),  # nested prod+sprod
+            ([qml.var((2 * qml.X(0) @ qml.Y(2)) @ (2*qml.RY(1.2, 3)) @ qml.Y(1))], "RY"),
+            ([qml.var((2 * qml.X(0) @ qml.RY(1.2, 2)) @ (2*qml.X(3)) @ qml.Y(1))], "RY"), 
             ([qml.var(qml.operation.Tensor(qml.X(0), qml.Y(2)))], None),  # tensor
             ([qml.var(qml.operation.Tensor(qml.X(0), PauliX2(2)))], "PauliX2"),
             ([qml.var(qml.X(1) + qml.Y(2))], None),  # sum
@@ -578,6 +581,7 @@ class TestObservableValidation:
             (qml.X(0) @ qml.Y(1), "Prod"),
             (2 * qml.Y(1), "SProd"),
             (qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]), "LinearCombination"),
+            (qml.X(0) + 2 * qml.Y(1), "Sum"),
         ],
     )
     def test_arithmetic_ops_validation(self, obs, obs_type, backend):
