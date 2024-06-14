@@ -70,7 +70,8 @@ def GradOp : Gradient_Op<"grad", [
 def ValueAndGradOp : Gradient_Op<"value_and_grad", [
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+        GradientOpInterface
         ]> {
     let summary = "Compute the value and gradient of a function.";
 

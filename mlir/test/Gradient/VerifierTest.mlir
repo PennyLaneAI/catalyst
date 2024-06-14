@@ -301,3 +301,36 @@ func.func @measure(%arg0: tensor<2xf64>) -> tensor<2xf64> {
 %cst1 = arith.constant dense<[1.0, 0.0]> : tensor<2xf64>
 gradient.vjp "fd" @measure(%cst0) cotangents(%cst1) {resultSegmentSizes = array<i32: 1, 1>} : (tensor<2xf64>, tensor<2xf64>) -> (tensor<2xf64>, tensor<2xf64>)
 
+// -----
+
+func.func @measure(%arg0: f64) -> f64 {
+
+    %c0 = arith.constant 0 : i64
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[%c0] : !quantum.reg -> !quantum.bit
+    %res, %new_q = quantum.measure %1 : i1, !quantum.bit
+    %c1 = arith.constant 1.0 : f64
+
+    return %c1 : f64
+}
+
+%f0 = arith.constant 0.0 : f64
+// expected-error@+1 {{An operation without a valid gradient was found}}
+gradient.value_and_grad "auto" @measure(%f0) : (f64) -> (f64, f64)
+
+// -----
+
+func.func @measure(%arg0: f64) -> f64 {
+
+    %c0 = arith.constant 0 : i64
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[%c0] : !quantum.reg -> !quantum.bit
+    %res, %new_q = quantum.measure %1 : i1, !quantum.bit
+    %c1 = arith.constant 1.0 : f64
+
+    return %c1 : f64
+}
+
+%f0 = arith.constant 0.0 : f64
+gradient.value_and_grad "fd" @measure(%f0) : (f64) -> (f64, f64)
+
