@@ -117,16 +117,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         elif not in_control:
             return isinstance(op, HybridCtrl)
 
-        # For PL adjoint instances look at control support of the base gate, since Adjoint(Op)
-        # is implemented as Op(..., inverse=True).
-        if isinstance(op, Adjoint):
-            op_name = op.base.name
-        else:
-            op_name = op.name
-
-        if not qjit_device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).controllable:
+        if not qjit_device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).controllable:
             raise CompileError(
-                f"{op_name} is not controllable on '{qjit_device.original_device.name}' device"
+                f"{op.name} is not controllable on '{qjit_device.original_device.name}' device"
             )
 
         return True
@@ -142,23 +135,17 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
             return in_inverse
         # If its a PL Controlled we also want to check its base to catch C(Adjoint(base)).
         # PL simplification should mean pure PL operators will not be more nested than this.
-        if type(op) in (Controlled, ControlledOp):
+        # TODO: remove ControlledQubitUnitary to treat it as independant gate everywhere
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
             _inv_op_checker(op.base, in_inverse)
             return in_inverse
         # Early exit when not in inverse, only determine the inverse status for recursing later.
         elif not in_inverse:
             return isinstance(op, HybridAdjoint)
 
-        # For PL controlled instances look at adjoint support of the base gate, since Controlled(Op)
-        # is implemented as Op(..., control_wires=...).
-        # TODO: remove ControlledQubitUnitary to treat it as independant gate everywhere
-        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
-            op_name = op.base.name
-        else:
-            op_name = op.name
-        if not qjit_device.qjit_capabilities.native_ops.get(op_name, EMPTY_PROPERTIES).invertible:
+        if not qjit_device.qjit_capabilities.native_ops.get(op.name, EMPTY_PROPERTIES).invertible:
             raise CompileError(
-                f"{op_name} is not invertible on '{qjit_device.original_device.name}' device"
+                f"{op.name} is not invertible on '{qjit_device.original_device.name}' device"
             )
 
         return True
