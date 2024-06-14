@@ -88,6 +88,25 @@
 
   ```
 
+* Support for using `catalyst.value_and_grad` with a `qjit`-ted function. 
+  [(#804)](https://github.com/PennyLaneAI/catalyst/pull/804)
+
+  ```py
+  @qjit
+  def workflow(x: float):
+      @qml.qnode(qml.device("lightning.qubit", wires=3))
+      def circuit():
+          qml.CNOT(wires=[0, 1])
+          qml.RX(0, wires=[2])
+          return qml.probs()  # This is [1, 0, 0, ...]
+
+      return x * (circuit()[0])
+
+  result = qjit(value_and_grad(workflow))(3.0)
+
+  >>> (3.0, 1.0)
+  ```
+
 <h3>Improvements</h3>
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
