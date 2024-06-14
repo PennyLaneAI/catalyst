@@ -538,18 +538,22 @@ class CondCallable:
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # TODO: Creating output tracers like this is not quite cocrect. We need to calculate the
-        # unified result type first and only then use it as the output type of this primitive.
-        out_type2 = out_types[-1]
+        # TODO: Creating output tracers like this is not quite cocrect. We want to calculate the
+        # unified result type first (see the call to `unify_convert_result_types`) and only then use
+        # it as the output type of this primitive. But this unification will only happen during the
+        # quantum tracing, when all the user-difined transformations are applied. Since we need to
+        # create output classical tracers here and now, we blindly use out_type of the last cond
+        # branch.
+        out_type_guess = out_types[-1]
 
         out_expanded_classical_tracers = output_type_to_tracers(
-            out_type2,
+            out_type_guess,
             sum(all_consts, []),
             (),
             maker=lambda aval: new_inner_tracer(outer_trace, aval),
         )
 
-        out_classical_tracers = collapse(out_type2, out_expanded_classical_tracers)
+        out_classical_tracers = collapse(out_type_guess, out_expanded_classical_tracers)
 
         self._operation = Cond(
             in_classical_tracers,
