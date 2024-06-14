@@ -245,7 +245,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDevice):
-        new_dev.shots = 1
+        new_dev.shots = 1  # pragma: no cover
     else:
         new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev
