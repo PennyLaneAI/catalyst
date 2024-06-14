@@ -185,11 +185,6 @@ class FlatCallable:
         return map(type, self.getOperands())
 
 
-def clear_callback_cache():
-    """Clear the memref callable cache"""
-    MemrefCallable.CACHE.clear()
-
-
 class MemrefCallable(FlatCallable):
     """Callable that receives void ptrs."""
 
@@ -205,6 +200,11 @@ class MemrefCallable(FlatCallable):
         instance = super().__new__(cls)
         cls.CACHE[cache_key] = instance
         return instance
+
+    @classmethod
+    def clearcache(cls):
+        """Clear the memref callable cache"""
+        cls.CACHE.clear()
 
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
