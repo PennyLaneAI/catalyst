@@ -22,9 +22,7 @@ with control flow, including conditionals, for loops, and while loops.
 from typing import Any, Callable, List
 
 import jax.numpy as jnp
-from jax._src.api_util import shaped_abstractify
-from jax._src.lax.lax import _abstractify
-from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.core import AbstractValue
 from pennylane import QueuingManager
 from pennylane.tape import QuantumTape
@@ -33,19 +31,15 @@ from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
     ShapedArray,
-    _initial_style_jaxpr,
     _input_type_to_tracers,
     collapse,
     cond_expansion_strategy,
     convert_constvars_jaxpr,
-    deduce_avals,
     deduce_signatures,
     expand_args,
     expand_results,
     find_top_trace,
     for_loop_expansion_strategy,
-    initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
     input_type_to_tracers,
     jaxpr_pad_consts,
     new_inner_tracer,
@@ -61,7 +55,6 @@ from catalyst.jax_tracer import (
     trace_function,
     trace_quantum_tape,
     unify_convert_result_types,
-    unify_jaxpr_result_types,
 )
 from catalyst.tracing.contexts import (
     EvaluationContext,
