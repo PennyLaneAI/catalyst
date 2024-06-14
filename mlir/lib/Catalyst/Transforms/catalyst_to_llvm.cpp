@@ -420,7 +420,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     }
 };
 
-struct CallbackOpPatternOne : public OpConversionPattern<CallbackOp> {
+struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult match(CallbackOp op) const override
@@ -473,7 +473,7 @@ struct CallbackOpPatternOne : public OpConversionPattern<CallbackOp> {
     }
 };
 
-struct CallbackOpPatternTwo : public OpConversionPattern<CallbackOp> {
+struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult match(CallbackOp op) const override
@@ -541,8 +541,8 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         RewritePatternSet patterns(context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
-        patterns.add<CallbackOpPatternOne>(typeConverter, context);
-        patterns.add<CallbackOpPatternTwo>(typeConverter, context);
+        patterns.add<DefineCallbackOpPattern>(typeConverter, context);
+        patterns.add<ReplaceCallbackOpWithFuncOp>(typeConverter, context);
         patterns.add<CallbackCallOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
