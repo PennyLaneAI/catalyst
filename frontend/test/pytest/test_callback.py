@@ -24,6 +24,7 @@ import pytest
 
 from catalyst import accelerate, debug, pure_callback
 from catalyst.api_extensions.callbacks import base_callback
+from catalyst.utils.patching import Patcher
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -543,6 +544,32 @@ def test_non_jax_jittable():
         @qml.qjit
         def func(x: bool):
             return impossible(x)
+
+
+def test_that_jax_jit_is_called():
+
+    called_jax_jit = False
+
+    builtin_jax_jit = jax.jit
+
+    def mock_jax_jit(func):
+        nonlocal called_jax_jit
+        called_jax_jit = True
+        return builtin_jax_jit(func)
+
+    with Patcher((jax, "jit", mock_jax_jit)):
+
+        @accelerate
+        def identity(x):
+            return x
+
+        @qml.qjit
+        def wrapper(x):
+            return identity(x)
+
+        wrapper(1.0)
+
+    assert called_jax_jit
 
 
 def test_callback_cache():
