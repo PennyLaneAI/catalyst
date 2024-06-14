@@ -101,6 +101,8 @@ def accelerate(func=None, *, dev=None):
         kwargs.pop("func")
         return functools.partial(accelerate, **kwargs)
 
+    jitted_fn = jax.jit(func)
+
     @functools.wraps(func)
     def defer(*args, **kwargs):
         # Make abstract variables from input tracers.
@@ -108,7 +110,6 @@ def accelerate(func=None, *, dev=None):
         try:
             # Find the shape of the return value
             _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
-            jitted_fn = jax.jit(func)
         except Exception as e:
             name = func.__name__
             msg = f"Function {name} must be jax.jit-able."
