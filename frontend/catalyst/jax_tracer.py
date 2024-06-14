@@ -11,9 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains functions tracing and lowering JAX code to MLIR.
+
 """
+This module contains functions tracing and lowering JAX code to MLIR.
+"""
+
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -23,12 +27,13 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operator, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.operation import AnyWires, Operation, Operator, Wires
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
 import catalyst
+from catalyst.api_extensions.callbacks import MemrefCallable
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -83,6 +88,12 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.programs.verification import (
+    validate_observables_adjoint_diff,
+    validate_observables_parameter_shift,
+    verify_no_state_variance_returns,
+    verify_operations,
+)
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -94,6 +105,31 @@ from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+# TODO: refactor the tracer module
+# pylint: disable=too-many-lines
+
+# Global flag tracing wether the function that we trace might be used for gradients
+TRACING_GRADIENTS: List[str] = []
+
+
+def _in_gradient_tracing(qnode) -> Optional[str]:
+    """If we are tracing gradient - return the current grad method."""
+    if len(TRACING_GRADIENTS) == 0:
+        return None
+
+    method = TRACING_GRADIENTS[-1]
+    return qnode.diff_method if method == "auto" else method
+
+
+@contextmanager
+def mark_gradient_tracing(method: str):
+    """Wraps the inner flow with the gradient-tracing flag"""
+    try:
+        TRACING_GRADIENTS.append(method)
+        yield
+    finally:
+        TRACING_GRADIENTS.pop()
 
 
 class Function:
@@ -371,6 +407,15 @@ def has_nested_tapes(op: Operator) -> bool:
     )
 
 
+def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
+    """Returns the list of nested quantum regions."""
+    return (
+        [region for region in op.regions if region.quantum_tape is not None]
+        if isinstance(op, HybridOp)
+        else []
+    )
+
+
 @debug_logger
 def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs):
     """Trace a Python function to JAXPR.
@@ -417,6 +462,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     # python function is seen in the cache. This happens during testing or if we wanted to compile a
     # single python function multiple times with different options.
     mlir_fn_cache.clear()
+    MemrefCallable.clearcache()
 
     with transient_jax_config():
         # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
@@ -459,15 +505,13 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
-        # `Controlled(OP)` bind OP with native quantum control syntax.
-        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
-        pl_ctrl_classes = {Controlled, ControlledOp, ControlledQubitUnitary}
-        is_pl_ctrl = op.__class__ in pl_ctrl_classes
-        is_ctrl = is_catalyst_ctrl or is_pl_ctrl
-        if is_ctrl:
-            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+        elif isinstance(op, Adjoint):
+            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -475,6 +519,7 @@ def trace_quantum_tape(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -483,6 +528,7 @@ def trace_quantum_tape(
             qubits2 = gphase_p.bind(
                 *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
         else:
@@ -494,32 +540,29 @@ def trace_quantum_tape(
                 qubits_len=len(qubits),
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         return qrp
 
     qrp = QRegPromise(qreg)
+
     if isinstance(device, qml.devices.LegacyDevice):
+        # Old device API expands tapes here. Note: this way some ops might bypass the verification.
+        # We decided to ignore this since we are aiming new device API.
         ops = device.expand_fn(quantum_tape)
     else:
         ops = quantum_tape
 
     for op in ops:
         qrp2 = None
-        # We need to exclude HybridCtrl here because single-op control instances are kept
-        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
-        # but should be translated to JAXPR as a regular PennyLane Controlled op.
-        # Native HybridCtrl operations are not yet supported in the compiler.
-        if isinstance(op, HybridOp) and not isinstance(
-            op, catalyst.api_extensions.quantum_operators.HybridCtrl
-        ):
+        if isinstance(op, HybridOp):
             qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+        elif isinstance(op, MeasurementProcess):
+            qrp2 = qrp
         else:
-            if isinstance(op, MeasurementProcess):
-                qrp2 = qrp
-            else:
-                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
@@ -776,7 +819,14 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 
 @debug_logger
-def apply_transform(qnode_program, device_program, device_modify_measurements, tape, flat_results):
+def apply_transform(
+    qnode_program,
+    device_program,
+    verification_program,
+    device_modify_measurements,
+    tape,
+    flat_results,
+):  # pylint: disable=too-many-arguments
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -791,14 +841,15 @@ def apply_transform(qnode_program, device_program, device_modify_measurements, t
 
     if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        total_program = qnode_program + device_program
-        tapes, post_processing = total_program([tape])
-        if not is_valid_for_batch and len(tapes) > 1:
-            msg = "Multiple tapes are generated, but each run might produce different results."
-            raise CompileError(msg)
+        total_program = qnode_program + device_program + verification_program
     else:
-        # Apply the identity transform in order to keep generalization
-        tapes, post_processing = device_program([tape])
+        is_valid_for_batch = True
+        total_program = device_program + verification_program
+
+    tapes, post_processing = total_program([tape])
+    if not is_valid_for_batch and len(tapes) > 1:
+        msg = "Multiple tapes are generated, but each run might produce different results."
+        raise CompileError(msg)
     return tapes, post_processing
 
 
@@ -965,8 +1016,23 @@ def trace_quantum_function(
 
             if isinstance(device, qml.devices.Device):
                 device_program, _ = device.preprocess(ctx)
+                verification_program = TransformProgram()
+                grad_method = _in_gradient_tracing(qnode)
+                verification_program.add_transform(
+                    verify_operations, grad_method=grad_method, qjit_device=device
+                )
+                if grad_method is not None:
+                    verification_program.add_transform(verify_no_state_variance_returns)
+                if grad_method == "adjoint":
+                    verification_program.add_transform(
+                        validate_observables_adjoint_diff, qjit_device=device
+                    )
+                elif grad_method == "parameter-shift":
+                    verification_program.add_transform(validate_observables_parameter_shift)
+
             else:
                 device_program = TransformProgram()
+                verification_program = TransformProgram()
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
@@ -977,6 +1043,7 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 qnode_program,
                 device_program,
+                verification_program,
                 device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
