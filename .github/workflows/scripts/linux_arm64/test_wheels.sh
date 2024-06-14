@@ -32,7 +32,11 @@ export LLVM_SYMBOLIZER_PATH=/catalyst/llvm-build/bin/llvm-symbolizer
 export PATH=/catalyst/llvm-build/bin:/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
 
 # Install python dependencies
-/usr/bin/python3 -m pip install numpy pybind11 PyYAML cmake ninja pytest pytest-xdist autoray oqc-qcaas-client PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1'
+/usr/bin/python3 -m pip install numpy pybind11 PyYAML cmake ninja pytest pytest-xdist autoray PennyLane-Lightning-Kokkos 'amazon-braket-pennylane-plugin>1.27.1'
+
+if [ "$PYTHON_VERSION" == "3.9" ] || [ "$PYTHON_VERSION" == "3.10" ]; then
+    /usr/bin/python3 -m pip install oqc-qcaas-client
+fi
 
 # Install Catalyst wheel
 /usr/bin/python3 -m pip install /catalyst/dist/*.whl --extra-index-url https://test.pypi.org/simple
