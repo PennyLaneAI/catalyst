@@ -416,7 +416,6 @@ class HybridOp(Operator):
 
     @debug_logger
     def bind_overwrite_classical_tracers(
-        # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
         self,
         ctx: JaxTracingContext,
         trace: DynamicJaxprTrace,
@@ -425,7 +424,10 @@ class HybridOp(Operator):
         **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
-        existing output tracers, stored in the operations."""
+        existing output tracers, stored in the operations since the classical tracing stage.
+        User-defined transformations are allowed to change them. The quantum tracer, namely the
+        quantum register is not supposed to be changed so it is kept as-is.
+        """
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
