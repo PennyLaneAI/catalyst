@@ -20,6 +20,7 @@ included in PennyLane, or whose behaviour needs to be adapted for Catalyst.
 import copy
 import sys
 from collections.abc import Sized
+from contextlib import nullcontext
 from typing import Any, Callable, List, Optional, Union
 
 import jax
@@ -27,7 +28,9 @@ import pennylane as qml
 from jax._src.tree_util import tree_flatten
 from jax.core import get_aval
 from pennylane import QueuingManager
-from pennylane.operation import Observable, Operation, Operator, Wires
+from pennylane.operation import Operator
+from pennylane.ops.op_math.adjoint import create_adjoint_op
+from pennylane.ops.op_math.controlled import create_controlled_op
 from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
@@ -351,24 +354,19 @@ class AdjointCallable:
 
         if isinstance(target, Operator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qml.Hadamard(0))
-            # We still want to be able to trace a "body function" for the HybridOp, while ensuring
-            # the produced operation behaves exactly like Adjoint(f) from PennyLane.
-            # Allow invoking callee to get the target, similar to the constructor case.
-            self.callee = lambda: QueuingManager.append(target) or target
             self.single_op = True
+            self.instantiated = True
         elif isinstance(target, type) and issubclass(target, Operator):
             # Case 2: User passed the constructor of an operation, e.g. adjoint(qml.Hadamard)(0)
-            # This case should be identical to the one above except we can use the constructor
-            # directly to trace the body function.
-            self.callee = target
             self.single_op = True
+            self.instantiated = False
         elif isinstance(target, Callable):
             # Case 3: User passed an arbitrary callable that will instantiate operations.
             # We want to create a callable that will generate an "opaque" Adjoint object.
             # This object differs from the Adjoint in PennyLane because that one can only be
             # instantiated on single operations.
-            self.callee = target
             self.single_op = False
+            self.instantiated = False
         else:
             raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
@@ -382,22 +380,11 @@ class AdjointCallable:
             )
 
     def __call__(self, *args, **kwargs):
-        # Eager computation of the adjoint, does not create a Adjoint/HybridAdjoint instance.
-        if not self.lazy and self.target.has_adjoint:
-            with QueuingManager.stop_recording():
-                base_op = self.callee(*args, **kwargs)
-
-            adj = base_op.adjoint()
-            QueuingManager.remove(base_op)
-            QueuingManager.append(adj)
-            return adj
+        if self.single_op:
+            base_op = self.target if self.instantiated else self.target(*args, **kwargs)
+            return create_adjoint_op(base_op, self.lazy)
 
         tracing_artifacts = self.trace_body(args, kwargs)
-
-        if self.single_op:
-            with QueuingManager.stop_recording():
-                base_op = self.callee(*args, **kwargs)
-            return Adjoint(base_op, tracing_artifacts)
 
         return HybridAdjoint(*tracing_artifacts)
 
@@ -409,7 +396,7 @@ class AdjointCallable:
         if not EvaluationContext.is_tracing():
             # QuantumTapes can themselves appear in queuing records.
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
-                self.callee(*args, **kwargs)
+                self.target(*args, **kwargs)
 
             adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
 
@@ -419,7 +406,7 @@ class AdjointCallable:
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _, _ = deduce_avals(self.callee, args, kwargs)
+            wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
                 # FIXME: move all full_raise calls into a separate function
@@ -444,20 +431,6 @@ class HybridAdjoint(HybridOp):
     than can be queued in a quantum context."""
 
     binder = adjoint_p.bind
-
-    # pylint: disable=super-init-not-called
-    def __init__(self, in_classical_tracers, out_classical_tracers, regions):
-        self.in_classical_tracers = in_classical_tracers
-        self.out_classical_tracers = out_classical_tracers
-        self.regions = regions
-
-        # Only call the parent constructor if this class is initialized directly.
-        # Calling Operator.__init__ (from HybridOp.__init__) causes problems for the Adjoint child
-        # class, because both Operator and SymbolicOp init methods are used. Since PL doesn't do
-        # this either they are probably not meant to be initialized together.
-        # pylint: disable=unidiomatic-typecheck
-        if type(self) is HybridAdjoint:
-            Operator.__init__(self, wires=Wires(self.num_wires))
 
     def trace_quantum(self, ctx, device, _trace, qrp) -> QRegPromise:
         op = self
@@ -499,61 +472,14 @@ class HybridAdjoint(HybridOp):
 
     def decomposition(self):
         """Resolve the Adjoint region by propagating the adjoint modifier to nested operations
-        in reverse."""
+        in reverse. Note that decomposition of control flow ops like for loops are only supported
+        in the compiler."""
         assert len(self.regions) == 1, "Expected a single nested region for HybridAdjoint"
 
-        # While catalyst.adjoint would be just as valid since it is PL compatible for single ops,
-        # going to PennyLane's adjoint skips unnecessarily re-queuing the base operation in each
-        # HybridOp's nested tape when qjit is not active.
-        return [qml.adjoint(op) for op in reversed(self.regions[0].quantum_tape.operations)]
-
-
-class Adjoint:
-    """This class provides near identical behaviour as PennyLane for adjoint instances with only a
-    single base operation. Additionally, it provides the same functionality as HybridAdjoint."""
-
-    def __new__(cls, base_op, _tracing_artifacts):
-        if isinstance(base_op, Operation) and isinstance(base_op, Observable):
-            return object.__new__(AdjointOpObs)
-        if isinstance(base_op, Operation):
-            return object.__new__(AdjointOperation)
-        elif isinstance(base_op, Observable):
-            return object.__new__(AdjointObs)
-
-        return object.__new__(AdjointBase)
-
-    def __init__(self, base_op, tracing_artifacts):
-        # Grab the constructor from the PennyLane base class.
-        super().__init__(base_op)
-        HybridAdjoint.__init__(self, *tracing_artifacts)
-
-    # These attributes are provided by the mixin class.
-    # pylint: disable=no-member
-    def _flatten(self):
-        tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
-        return (self.base, tracing_artifacts), tuple()
-
-    @classmethod
-    def _unflatten(cls, data, _):
-        return cls(*data)
-
-
-# HybridAdjoint is also mixed in because the PL class needs to sit between Adjoint & HybridAdjoint.
-# Thus Adjoint cannot be made to inherit from HybridAdjoint directly.
-class AdjointOperation(Adjoint, pl_adjoint_module.AdjointOperation, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for Operations."""
-
-
-class AdjointObs(Adjoint, pl_adjoint_module.AdjointObs, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for Observables."""
-
-
-class AdjointOpObs(Adjoint, pl_adjoint_module.AdjointOpObs, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for Operations that are also Observables."""
-
-
-class AdjointBase(Adjoint, pl_adjoint_module.Adjoint, HybridAdjoint):
-    """Replicate mixin class structure from PennyLane for an unkown Operator type."""
+        return [
+            create_adjoint_op(op, lazy=True)
+            for op in reversed(self.regions[0].quantum_tape.operations)
+        ]
 
 
 class CtrlCallable:
@@ -567,32 +493,27 @@ class CtrlCallable:
 
         if isinstance(target, Operator):
             # Case 1. Support an initialized operation as the base target
-            self.target = lambda: QueuingManager.append(target) or target
             self.single_op = True
+            self.instantiated = True
         elif isinstance(target, type) and issubclass(target, Operator):
             # Case 2: Support an operation constructor as the base op
-            self.target = target
             self.single_op = True
+            self.instantiated = False
         elif isinstance(target, Callable):
             # Case 3: Support a callable as the base op
-            self.target = target
             self.single_op = False
+            self.instantiated = False
         else:
             raise ValueError(f"Expected a callable or a qml.Operator, not {target}")
 
     def __call__(self, *args, **kwargs):
-        tracing_artifacts = self.trace_body(args, kwargs)
-
         if self.single_op:
-            with QueuingManager.stop_recording():
-                base_op = self.target(*args, **kwargs)
-            return Controlled(
-                base_op,
-                tracing_artifacts=tracing_artifacts,
-                control_wires=self.control_wires,
-                control_values=self.control_values,
-                work_wires=self.work_wires,
+            base_op = self.target if self.instantiated else self.target(*args, **kwargs)
+            return create_controlled_op(
+                base_op, self.control_wires, self.control_values, self.work_wires
             )
+
+        tracing_artifacts = self.trace_body(args, kwargs)
 
         return HybridCtrl(
             *tracing_artifacts,
@@ -617,13 +538,11 @@ class CtrlCallable:
 
         # Create a nested jaxpr scope for the body of the adjoint.
         in_classical_tracers, _ = tree_flatten((args, kwargs))
-        quantum_tape = QuantumTape()
-        with QueuingManager.stop_recording(), quantum_tape:
+        with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
             res = self.target(*args, **kwargs)
         out_classical_tracers, _ = tree_flatten(res)
 
         _check_no_measurements(quantum_tape)
-
         ctrl_region = HybridOpRegion(None, quantum_tape, [], [])
 
         return in_classical_tracers, out_classical_tracers, [ctrl_region]
@@ -632,36 +551,16 @@ class CtrlCallable:
 class HybridCtrl(HybridOp):
     """Catalyst quantum ctrl operation support for both operations and callables"""
 
-    # pylint: disable=super-init-not-called, too-many-arguments
-    def __init__(
-        self,
-        in_classical_tracers,
-        out_classical_tracers,
-        regions,
-        control_wires=None,
-        control_values=None,
-        work_wires=None,
-    ):
-        self.in_classical_tracers = in_classical_tracers
-        self.out_classical_tracers = out_classical_tracers
-        self.regions = regions
-
-        self._control_wires = Wires(control_wires)
-        self._work_wires = Wires([] if work_wires is None else work_wires)
+    def __init__(self, *tracing_artifacts, control_wires, control_values=None, work_wires=None):
+        self._control_wires = qml.wires.Wires(control_wires)
+        self._work_wires = qml.wires.Wires([] if work_wires is None else work_wires)
         if control_values is None:
             self._control_values = [True] * len(self._control_wires)
-
         elif isinstance(control_values, (int, bool)):
             self._control_values = [control_values]
         else:
             self._control_values = control_values
-
-        # Calling `HyperOp.__init__` instead will raise the following `ValueError`
-        # in `HybridCtrl.__init__` when is called indirectly from `Controlled`:
-        # "Controlled: wrong number of parameters. 0 parameters passed, 1 expected"
-        # pylint: disable=unidiomatic-typecheck
-        if type(self) is HybridCtrl:
-            Operator.__init__(self, wires=Wires(self.num_wires))
+        super().__init__(*tracing_artifacts)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError(
@@ -671,21 +570,21 @@ class HybridCtrl(HybridOp):
     def decomposition(self):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
         distributing the quantum control operaiton over the tape operations."""
-        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+        assert len(self.regions) == 1, "HybridCtrl is expected to have one region"
 
         _check_no_measurements(self.regions[0].quantum_tape)
-        new_tape = ctrl_distribute(
+
+        return ctrl_distribute(
             self.regions[0].quantum_tape,
             self._control_wires,
             self._control_values,
             self._work_wires,
         )
-        return new_tape.operations
 
     @property
     def wires(self):
         """The list of all control-wires and active-wires."""
-        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+        assert len(self.regions) == 1, "HybridCtrl is expected to have one region"
 
         total_wires = sum(
             (op.wires for op in self.regions[0].quantum_tape.operations),
@@ -719,72 +618,6 @@ class HybridCtrl(HybridOp):
         return self
 
 
-class Controlled:
-    """Similar to the Adjoint class, it provides near identical behaviour as PennyLane for
-    ctrl instances with only a single base operation. Additionally, it provides the same
-    functionality as HybridCtrl."""
-
-    def __new__(cls, base, *_, **__):
-        if isinstance(base, Operation):
-            return object.__new__(ControlledOp)
-
-        return object.__new__(ControlledBase)
-
-    # pylint: disable=too-many-arguments
-    def __init__(
-        self, base, tracing_artifacts=None, control_wires=None, control_values=None, work_wires=None
-    ):
-        super().__init__(
-            base,
-            control_wires,
-            control_values=control_values,
-            work_wires=work_wires,
-        )
-
-        # Added this condition to support direct calls of this class outside the QJIT context
-        # in PL integrated tests:
-        HybridCtrl.__init__(
-            self,
-            *tracing_artifacts,
-            control_wires=control_wires,
-            control_values=control_values,
-            work_wires=work_wires,
-        )
-
-    # These attributes are provided by the mixin class.
-    # pylint: disable=no-member
-    def _flatten(self):
-        tracing_artifacts = (self.in_classical_tracers, self.out_classical_tracers, self.regions)
-        return (self.base,), (
-            tracing_artifacts,
-            self.control_wires,
-            tuple(self.control_values),
-            self.work_wires,
-        )
-
-    @classmethod
-    def _unflatten(cls, data, metadata):
-        return cls(
-            data[0],
-            tracing_artifacts=metadata[0],
-            control_wires=metadata[1],
-            control_values=metadata[2],
-            work_wires=metadata[3],
-        )
-
-
-# HybridCtrl is also mixed in because the PL class needs to sit between Controlled & HybridCtrl.
-# Thus Controlled cannot be made to inherit from HybridCtrl directly.
-# pylint: disable=abstract-method
-class ControlledOp(Controlled, pl_ctrl_module.ControlledOp, HybridCtrl):
-    """Replicate mixin class structure from PennyLane for Operations."""
-
-
-# pylint: disable=abstract-method
-class ControlledBase(Controlled, pl_ctrl_module.Controlled, HybridCtrl):
-    """Replicate mixin class structure from PennyLane for a general Operator type."""
-
-
 def ctrl_distribute(
     tape: QuantumTape,
     control_wires: List[Any],
@@ -801,36 +634,58 @@ def ctrl_distribute(
         f"Length of the control_values ({len(control_values)}) must be equal "
         f"to the lenght of control_wires ({len(control_wires)})"
     )
-    ctx = EvaluationContext.get_main_tracing_context()
-    ops2 = []
+
+    # Allow decompositions outside of a Catalyst context.
+    if EvaluationContext.is_tracing():
+        ctx = EvaluationContext.get_main_tracing_context()
+    else:
+        ctx = None
+
+    new_ops = []
     for op in tape.operations:
         if has_nested_tapes(op):
             if isinstance(op, HybridCtrl):
-                for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    tape2 = ctrl_distribute(
-                        region.quantum_tape,
-                        control_wires + op.control_wires,
-                        control_values + op.control_values,
-                        work_wires + op.work_wires,
-                    )
-                    ops2.extend(tape2.operations)
+                nested_ops = ctrl_distribute(
+                    op.regions[0].quantum_tape,
+                    control_wires + op.control_wires,
+                    control_values + op.control_values,
+                    work_wires + op.work_wires,
+                )
+                new_ops.extend(nested_ops)
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        region.quantum_tape = ctrl_distribute(
+                    # Re-enter a JAXPR frame but do not create a new one is none exists.
+                    if ctx and region.trace:
+                        trace_manager = EvaluationContext.frame_tracing_context(ctx, region.trace)
+                    else:
+                        trace_manager = nullcontext
+
+                    with trace_manager:
+                        nested_ops = ctrl_distribute(
                             region.quantum_tape, control_wires, control_values, work_wires
                         )
-                ops2.append(op)
-        else:
-            ops2.append(
-                qml.ctrl(
-                    copy.copy(op),
-                    control=control_wires,
-                    control_values=control_values,
-                    work_wires=work_wires,
-                )
+                        region.quantum_tape = QuantumTape(
+                            nested_ops, region.quantum_tape.measurements
+                        )
+                new_ops.append(op)
+        elif isinstance(op, qml.ops.Adjoint):
+            # ctrl resolves faster for nested hybrid controls than create_controlled_op
+            ctrl_op = ctrl(
+                copy.copy(op.base),
+                control=control_wires,
+                control_values=control_values,
+                work_wires=work_wires,
             )
-    return QuantumTape(ops2, tape.measurements)
+            new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
+        else:
+            ctrl_op = create_controlled_op(
+                copy.copy(op),
+                control=control_wires,
+                control_values=control_values,
+                work_wires=work_wires,
+            )
+            new_ops.append(ctrl_op)
+    return new_ops
 
 
 ## PRIVATE ##

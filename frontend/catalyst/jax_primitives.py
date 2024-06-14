@@ -814,7 +814,7 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
+def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
@@ -827,17 +827,14 @@ def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
     return (AbstractQbit(),) * (ctrl_len)
 
 
-@qinst_p.def_impl
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
+@gphase_p.def_impl
+def _gphase_def_impl(*args, **kwargs):
     """Not implemented"""
     raise NotImplementedError()
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params,
-    op=None,
-    ctrl_len: int = 0,
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, op=None, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -870,6 +867,7 @@ def _gphase_lowering(
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     )
     return ctrl_qubits
 
@@ -879,7 +877,7 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -893,19 +891,19 @@ def _qinst_abstract_eval(
 
 
 @qinst_p.def_impl
-def _qinst_def_impl(
-    ctx, *qubits_or_params, op, qubits_len, params_len, ctrl_len
-):  # pragma: no cover
+def _qinst_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
+# pylint: disable=too-many-arguments
 def _qinst_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params: tuple,
+    *qubits_or_params,
     op=None,
-    qubits_len: int = 0,
-    params_len: int = 0,
-    ctrl_len: int = 0,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -957,6 +955,7 @@ def _qinst_lowering(
             in_qubits=qubits,
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
         ).results
 
     return CustomOp(
@@ -967,6 +966,7 @@ def _qinst_lowering(
         gate_name=name_attr,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     ).results
 
 
@@ -974,7 +974,7 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int = 0):
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -982,9 +982,7 @@ def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int 
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(
-    ctx, matrix, qubits, qubits_len: int = None, ctrl_len: int = 0
-):  # pragma: no cover
+def _qunitary_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -992,8 +990,9 @@ def _qunitary_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     matrix: ir.Value,
     *qubits_or_controlled: tuple,
-    qubits_len: int = 0,
-    ctrl_len: int = 0,
+    qubits_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     qubits = qubits_or_controlled[:qubits_len]
     ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
@@ -1042,6 +1041,7 @@ def _qunitary_lowering(
         in_qubits=qubits,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     ).results
 
 
