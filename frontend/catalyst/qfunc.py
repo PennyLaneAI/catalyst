@@ -82,7 +82,6 @@ class QFunc:
         """Wrapper around extract_backend_info in the runtime module."""
         return extract_backend_info(device, capabilities)
 
-    # pylint: disable=no-member
     @debug_logger
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
@@ -117,7 +116,7 @@ class QFunc:
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
-# pylint: disable=protected-access,no-member,not-callable
+# pylint: disable=not-callable
 def dynamic_one_shot(qnode):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 

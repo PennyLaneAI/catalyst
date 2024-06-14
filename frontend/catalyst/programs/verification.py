@@ -227,6 +227,11 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
             )
 
     for m in tape.measurements:
+        import pennylane as qml
+        print(m)
+        print(m.obs)
+        print(type(m.obs))
+        print(f"active op_math: {qml.operation.active_new_opmath()}")
         if m.obs:
             _obs_checker(m.obs)
 

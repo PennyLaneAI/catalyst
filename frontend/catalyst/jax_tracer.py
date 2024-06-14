@@ -100,7 +100,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 # TODO: refactor the tracer module
-# pylint: disable=too-many-lines
 
 # Global flag tracing wether the function that we trace might be used for gradients
 TRACING_GRADIENTS: List[str] = []
@@ -831,7 +830,7 @@ def apply_transform(
     device_modify_measurements,
     tape,
     flat_results,
-):  # pylint: disable=too-many-arguments
+):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
