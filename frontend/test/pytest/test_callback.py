@@ -544,6 +544,7 @@ def test_non_jax_jittable():
         def func(x: bool):
             return impossible(x)
 
+
 def test_callback_cache():
     """Test callback cache. This test is for coverage."""
 
