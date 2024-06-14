@@ -63,6 +63,35 @@ def _verify_nested(
     return state
 
 
+def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
+    """Specifies whether or not an observable is accepted by QJITDevice.
+
+    Args: 
+        obs(Operator): the observable to be validated
+        _obs_checker(Callable): a callable that takes an observable
+            and returns True if its supported, and 
+
+    If the observable is built on one or multiple other observables, check
+    both that the overall observable is supported, and that its component
+    parts are supported."""
+
+    if isinstance(obs, Tensor):
+        return all([_verify_observable(o, _obs_checker) for o in obs.obs])
+
+    if isinstance(obs, (Hamiltonian, CompositeOp, SymbolicOp)):
+
+        _obs_checker(obs)
+
+        if hasattr(obs, "operands"): # CompositeOp
+            return all([_verify_observable(o, _obs_checker) for o in obs.operands])
+        elif hasattr(obs, "ops"): # Hamiltonian
+            return all([_verify_observable(o, _obs_checker) for o in obs.ops])
+        elif hasattr(obs, "base"): # SymbolicOp
+            return _verify_observable(obs.base, _obs_checker)
+
+    _obs_checker(obs)
+
+
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
 
 
@@ -246,42 +275,12 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
     for m in tape.measurements:
         if m.obs:
-            if isinstance(m.obs, Tensor):
-                _ = [_obs_checker(o) for o in m.obs.obs]
-            else:
-                _obs_checker(m.obs)
+            _verify_observable(m.obs, _obs_checker)
 
     return (tape,), lambda x: x[0]
 
 
-def _observable_is_supported(obs: Operation, _obs_checker: Callable) -> bool:
-    """Specifies whether or not an observable is accepted by QJITDevice.
 
-    Args: 
-        obs(Operator): the observable to be validated
-        _obs_checker(Callable): a callable that takes an observable
-            and returns True if its supported, and 
-
-    If the observable is built on one or multiple other observables, check
-    both that the overall observable is supported, and that its component
-    parts are supported."""
-
-    if isinstance(obs, Tensor):
-        return all([_observable_is_supported(o, _obs_checker) for o in obs.obs])
-
-    if isinstance(obs, (Hamiltonian, CompositeOp, SymbolicOp)):
-
-        if not _obs_checker(obs):
-            return False
-
-        if hasattr(obs, "operands"):
-            return all([_observable_is_supported(o, _obs_checker) for o in obs.operands])
-        elif hasattr(obs, "ops"):
-            return all([_observable_is_supported(o, _obs_checker) for o in obs.ops])
-        elif hasattr(obs, "base"):
-            return _observable_is_supported(obs.base, _obs_checker)
-
-    return _obs_checker(obs)
 
 
 @transform
@@ -306,12 +305,13 @@ def validate_observables(
     """
 
     def _obs_checker(obs):
-         return qjit_capabilities.native_obs.get(obs.name)
-
-    for m in tape.measurements:
-        if m.obs and not _observable_is_supported(m.obs, _obs_checker):
+        if not qjit_capabilities.native_obs.get(obs.name):
             raise CompileError(
                 f"{m.obs} is not supported as an observable on the '{name}' device with Catalyst"
             )
 
+    for m in tape.measurements:
+        if m.obs:
+            _verify_observable(m.obs, _obs_checker)
+            
     return (tape,), lambda x: x[0]

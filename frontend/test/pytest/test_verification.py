@@ -626,10 +626,15 @@ class TestAdjointMethodVerification:
     @pytest.mark.parametrize(
         "observable",
         [
-            qml.PauliX(0),
-            # qml.PauliX(0) @ qml.PauliZ(1),
-            qml.operation.Tensor(qml.X(0), qml.Z(1)),
-            # qml.PauliX(0)+qml.PauliY(1)
+            qml.PauliX(0), # single observable
+            qml.PauliX(0) @ qml.PauliZ(1), # prod
+            qml.operation.Tensor(qml.X(0), qml.Z(1)), # tensor
+            qml.PauliX(0)+qml.PauliY(1), # sum
+            qml.Hamiltonian([2, 3], [qml.X(0), qml.Y(1)]), # hamiltonian
+            qml.ops.Hamiltonian([2, 3], [qml.Y(0), qml.X(1)]), # legacy hamiltonian
+            2 * qml.PauliX(0), # sprod
+            (2 * qml.X(0) @ qml.Y(2)) @ (2*qml.X(3)) @ qml.Y(1), # nested prod+sprod
+
         ],
     )
     def test_non_differentiable_observable(self, observable):
