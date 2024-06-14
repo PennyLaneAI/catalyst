@@ -118,7 +118,7 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<
     // CHECK-DAG: [[outputStride:%.+]] = llvm.extractvalue [[outputCasted]][4, 0]
     // CHECK: llvm.call @__enzyme_autodiff0([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], [[enzymeConst]], [[outputAllocated]], [[enzymeDupNoNeed]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]])
 
-    gradient.backprop @argmap(%arg0) grad_out(%arg1 : memref<f64>) callee_out(%arg2 : memref<?xf64>) cotangents(%arg3 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>, requester = "GradOp"} : (memref<f64>) -> ()
+    gradient.backprop @argmap(%arg0) grad_out(%arg1 : memref<f64>) callee_out(%arg2 : memref<?xf64>) cotangents(%arg3 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>, keepValueResults = false} : (memref<f64>) -> ()
 
     return %arg1 : memref<f64>
 }
@@ -187,7 +187,7 @@ func.func @backpropArgmap2(%arg0: memref<f64>, %arg1: f64, %arg2: memref<f64>, %
     // CHECK-DAG: [[outputStride1:%.+]] = llvm.extractvalue [[outputCasted1]][4, 0]
 
     // CHECK: [[res:%.+]] = llvm.call @__enzyme_autodiff1([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], %arg1, [[enzymeConst]], [[outputAllocated]], [[enzymeDupNoNeed]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]], [[enzymeConst]], [[outputAllocated1]], [[enzymeDupNoNeed]], [[outputAligned1]], [[qJacobianAligned1]], [[outputOffset1]], [[outputSize1]], [[outputStride1]])
-    %res = gradient.backprop @argmap2(%arg0, %arg1) grad_out(%arg2: memref<f64>) callee_out(%arg3, %arg4 : memref<?xf64>, memref<?xf64>) cotangents(%arg5, %arg6 : memref<?xf64>, memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, requester = "helloworld", resultSegmentSizes = array<i32: 0, 1>} : (memref<f64>, f64) -> f64
+    %res = gradient.backprop @argmap2(%arg0, %arg1) grad_out(%arg2: memref<f64>) callee_out(%arg3, %arg4 : memref<?xf64>, memref<?xf64>) cotangents(%arg5, %arg6 : memref<?xf64>, memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, keepValueResults = false, resultSegmentSizes = array<i32: 0, 1>} : (memref<f64>, f64) -> f64
     // CHECK: return %arg2, [[res]]
     return %arg2, %res: memref<f64>, f64
 }
@@ -254,7 +254,7 @@ func.func @backpropArgmap3(%arg0: memref<f64>, %arg1: f64, %arg2: memref<f64>, %
     // CHECK-DAG: [[outputStride1:%.+]] = llvm.extractvalue [[outputCasted1]][4, 0]
 
     // CHECK: [[res:%.+]] = llvm.call @__enzyme_autodiff1([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], %arg1, [[enzymeConst]], [[outputAllocated]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]], [[enzymeConst]], [[outputAllocated1]], [[outputAligned1]], [[qJacobianAligned1]], [[outputOffset1]], [[outputSize1]], [[outputStride1]])
-    %res = gradient.backprop @argmap3(%arg0, %arg1) grad_out(%arg2: memref<f64>) callee_out(%arg3, %arg4 : memref<?xf64>, memref<?xf64>) cotangents(%arg5, %arg6 : memref<?xf64>, memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, requester="ValueAndGradOp", resultSegmentSizes = array<i32: 0, 1>} : (memref<f64>, f64) -> f64
+    %res = gradient.backprop @argmap3(%arg0, %arg1) grad_out(%arg2: memref<f64>) callee_out(%arg3, %arg4 : memref<?xf64>, memref<?xf64>) cotangents(%arg5, %arg6 : memref<?xf64>, memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>, keepValueResults = true, resultSegmentSizes = array<i32: 0, 1>} : (memref<f64>, f64) -> f64
     // CHECK: return %arg2, [[res]]
     return %arg2, %res: memref<f64>, f64
 }

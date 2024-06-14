@@ -141,7 +141,7 @@ def BackpropOp : Gradient_Op<"backprop", [
             MemRefOf<[AnyFloat]>
         ]>>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_StringAttr>:$requester
+        OptionalAttr<BoolAttr>:$keepValueResults
     );
 
     let results = (outs

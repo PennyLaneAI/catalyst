@@ -45,7 +45,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                         ValueTypeRange<ResultRange> resultTypes,
                                         const std::vector<size_t> &diffArgIndices,
                                         mlir::DenseIntElementsAttr diffArgIndicesAttr,
-                                        TypeRange valTypes, mlir::StringAttr requester);
+                                        TypeRange valTypes, mlir::BoolAttr keepValueResults);
 
 /// Given a statically-shaped tensor type, execute `processWithIndices` for every entry of the
 /// tensor. For example, a tensor<3x2xf64> will cause `processWithIndices` to be called with
@@ -247,13 +247,14 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
     func::FuncOp fullGradFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
 
-    mlir::StringAttr requester = rewriter.getStringAttr("GradOp");
+    // GradOp do not need to keep the results
+    mlir::BoolAttr keepValueResults = rewriter.getBoolAttr(false);
     if (!fullGradFn) {
         fullGradFn =
             genFullGradFunction(rewriter, op.getLoc(), fnName,
                                 rewriter.getFunctionType(fullGradArgTypes, op.getResultTypes()),
                                 *clonedCallee, op->getNumResults(), op.getResultTypes(),
-                                diffArgIndices, op.getDiffArgIndicesAttr(), TypeRange{}, requester);
+                                diffArgIndices, op.getDiffArgIndicesAttr(), TypeRange{}, keepValueResults);
     }
 
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, backpropArgs);
@@ -325,7 +326,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                         ValueTypeRange<ResultRange> resultTypes,
                                         const std::vector<size_t> &diffArgIndices,
                                         mlir::DenseIntElementsAttr diffArgIndicesAttr,
-                                        TypeRange valTypes, mlir::StringAttr requester)
+                                        TypeRange valTypes, mlir::BoolAttr keepValueResults)
 {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointAfter(callee);
@@ -368,7 +369,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                         loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
                         callee.getName(), entryBlock->getArguments(),
                         /*arg_shadows=*/ValueRange{},
-                        /*primal results=*/ValueRange{}, cotangents, diffArgIndicesAttr, requester);
+                        /*primal results=*/ValueRange{}, cotangents, diffArgIndicesAttr, keepValueResults);
 
                     // After backpropagation, collect any possible callee results into the values of
                     // the grad op
@@ -435,7 +436,7 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                 loc, valTypes, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
                 entryBlock->getArguments(),
                 /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
-                diffArgIndicesAttr, requester);
+                diffArgIndicesAttr, keepValueResults);
 
             // After backpropagation, collect any possible callee results into the values of the
             // grad op
@@ -512,13 +513,14 @@ LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
         valTypes.push_back(val.getType());
     }
 
-    mlir::StringAttr requester = rewriter.getStringAttr("ValueAndGradOp");
+    // ValueAndGradOp need to keep the results
+    mlir::BoolAttr keepValueResults = rewriter.getBoolAttr(true);
     if (!fullGradFn) {
         fullGradFn =
             genFullGradFunction(rewriter, op.getLoc(), fnName,
                                 rewriter.getFunctionType(fullGradArgTypes, op.getResultTypes()),
                                 *clonedCallee, op.getGradients().size(), op.getResultTypes(),
-                                diffArgIndices, op.getDiffArgIndicesAttr(), valTypes, requester);
+                                diffArgIndices, op.getDiffArgIndicesAttr(), valTypes, keepValueResults);
     }
 
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, backpropArgs);
