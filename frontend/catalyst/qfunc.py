@@ -133,9 +133,7 @@ class QFunc:
         if isinstance(self.device, qml.devices.Device):
             qjit_device = QJITDeviceNewAPI(self.device, device_capabilities, backend_info)
         else:
-            qjit_device = QJITDevice(
-                device_capabilities, self.device.shots, self.device.wires, backend_info
-            )
+            qjit_device = QJITDevice(self.device, device_capabilities, backend_info)
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(

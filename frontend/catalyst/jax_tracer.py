@@ -100,7 +100,6 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=too-many-lines
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -691,7 +690,6 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
-    tape: QuantumTape,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -1087,7 +1085,7 @@ def trace_quantum_function(
                     getattr(qnode, "_tmp_mcm_config", None) or qnode.execute_kwargs["mcm_config"]
                 )
                 qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]
