@@ -14,6 +14,7 @@ dnf update -y
 dnf install -y libzstd-devel gcc-toolset-${GCC_VERSION} gcc
 if [ "$PYTHON_VERSION" != "3.10" ]; then
     dnf install -y ${PYTHON_PACKAGE} ${PYTHON_PACKAGE}-devel
+fi
 dnf clean all -y
 
 # Make GCC the default compiler
