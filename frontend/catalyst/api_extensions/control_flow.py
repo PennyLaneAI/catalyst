@@ -567,7 +567,7 @@ class CondCallable:
             )
             return in_sig, out_sig
 
-        in_sigs, out_sigs = unzip2(_trace(fun) for fun in (*self.branch_fns, self.otherwise_fn))
+        _, out_sigs = unzip2(_trace(fun) for fun in (*self.branch_fns, self.otherwise_fn))
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
