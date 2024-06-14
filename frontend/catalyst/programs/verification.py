@@ -117,6 +117,11 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                 )
             _ctrl_op_checker(op.base, True)
             return in_control
+        # If it's a PL Adjoint we also want to check its base to catch Adjoint(C(base)).
+        # PL simplification should mean pure PL operators will not be more nested than this.
+        if isinstance(op, Adjoint):
+            _ctrl_op_checker(op.base, in_control)
+            return in_control
         # Early exit when not in inverse, only determine the control status for recursing later.
         elif not in_control:
             return isinstance(op, HybridCtrl)
@@ -143,6 +148,11 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
                     f"Cannot compile PennyLane inverse of the hybrid op {type(op.base)}."
                 )
             _inv_op_checker(op.base, in_inverse=True)
+            return in_inverse
+        # If its a PL Controlled we also want to check its base to catch C(Adjoint(base)).
+        # PL simplification should mean pure PL operators will not be more nested than this.
+        if type(op) in (Controlled, ControlledOp):
+            _inv_op_checker(op.base, in_inverse)
             return in_inverse
         # Early exit when not in inverse, only determine the inverse status for recursing later.
         elif not in_inverse:

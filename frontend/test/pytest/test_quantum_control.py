@@ -499,6 +499,19 @@ class TestCatalystControlled:
         assert result.control_values == expected.control_values
         assert result.work_wires == expected.work_wires
 
+    def test_distribute_controlled_with_adj(self):
+        """Test that the distribute_controlled function with a PennyLane Adjoint,
+        creates the equivalent Adjoint(Ctrl(base)) instead of Ctrl(Adj(base))"""
+
+        from catalyst.api_extensions.quantum_operators import ctrl_distribute
+
+        tape = qml.tape.QuantumScript([qml.ops.Adjoint(qml.RX(1.2, 0)), qml.Hadamard(1)])
+
+        new_ops = ctrl_distribute(tape, control_wires=[2, 3], control_values=[True, True])
+
+        assert new_ops[0] == qml.ops.Adjoint(Controlled(qml.RX(1.2, 0), control_wires=[2, 3]))
+        assert new_ops[1] == Controlled(qml.Hadamard(1), control_wires=[2, 3])
+
 
 ########################################################################################
 #### Controlled TEST SUITE COPIED OVER FROM PENNYLANE FOR UNIFIED BEHAVIOUR TESTING ####
