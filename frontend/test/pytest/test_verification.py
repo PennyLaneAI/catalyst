@@ -370,7 +370,6 @@ class TestHybridOpVerification:
             def cir(x: float):
                 return grad(f)(x)
 
-              
     @pytest.mark.parametrize("adjoint_type", [Adjoint, HybridAdjoint])
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_hybrid_ctrl_containing_adjoint(self, adjoint_type, unsupported_gate_attribute):
@@ -414,7 +413,6 @@ class TestHybridOpVerification:
                 def cir(x: float):
                     return grad(f)(x)
 
-
     @pytest.mark.parametrize("ctrl_type", [Controlled, HybridCtrl])
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_hybrid_adjoint_containing_hybrid_ctrl(self, ctrl_type, unsupported_gate_attribute):
@@ -457,7 +455,6 @@ class TestHybridOpVerification:
                 @qml.qjit
                 def cir(x: float):
                     return grad(f)(x)
-
 
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_pennylane_ctrl_containing_adjoint(self, unsupported_gate_attribute):

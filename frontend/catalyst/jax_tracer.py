@@ -130,9 +130,9 @@ def mark_gradient_tracing(method: str):
     finally:
         TRACING_GRADIENTS.pop()
 
-        
+
 def _make_execution_config(qnode):
-    """Updates the execution_config object with information about execution. This is 
+    """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
 
     if qnode:
