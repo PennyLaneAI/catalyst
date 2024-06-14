@@ -508,19 +508,24 @@ def test_accelerate_manual_jax_jit(arg):
     assert np.allclose(qjitted_fn(arg), arg)
 
 
-def test_jax_jit_returns_nothing():
+def test_jax_jit_returns_nothing(capsys):
     """This is more a question for reviewer"""
 
     @accelerate
-    def noop(): ...
+    def noop(x):
+        jax.debug.print("x={x}", x=x)
 
-    msg = "Function noop requires a return value when using accelerate"
-    with pytest.raises(TypeError, match=msg):
+    @qml.qjit
+    def func(x: float):
+        noop(x)
+        return x
 
-        @qml.qjit
-        def func(x: float):
-            noop()
-            return x
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    func(1.0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "x=1.0"
 
 
 def test_non_jax_jittable():
