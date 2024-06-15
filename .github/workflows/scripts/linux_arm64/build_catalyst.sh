@@ -57,12 +57,10 @@ cmake -S runtime -B runtime-build -G Ninja \
     -DLQ_ENABLE_KERNEL_OMP=OFF
 cmake --build runtime-build --target rt_capi rtd_lightning rtd_openqasm rtd_dummy
 
-# Patch OQC for correct linking
-echo "target_link_directories(rtd_oqc PRIVATE /catalyst/runtime-build/utils/runtime-build/lib)" >> frontend/catalyst/third_party/oqc/src/CMakeLists.txt
-
 # Build OQC
 export OQC_BUILD_DIR="/catalyst/oqc-build"
 export RT_BUILD_DIR="/catalyst/runtime-build"
+export USE_ALTERNATIVE_CATALYST_PYTHON_INTERPRETER=ON
 make oqc
 
 # Build Catalyst dialects
