@@ -31,7 +31,7 @@ export PYTHON=/usr/bin/python3
 export PATH=/opt/_internal/cpython-${PYTHON_VERSION}.${PYTHON_SUBVERSION}/bin:/opt/rh/gcc-toolset-${GCC_VERSION}/root/usr/bin:$PATH
 
 # Install python dependencies
-/usr/bin/python3 -m pip install numpy pybind11 PyYAML cmake ninja
+/usr/bin/python3 -m pip install pennylane pybind11 PyYAML cmake ninja
 
 # Build LLVM
 cmake -S /catalyst/mlir/llvm-project/llvm -B /catalyst/llvm-build -G Ninja \
