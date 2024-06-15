@@ -66,31 +66,31 @@ def accelerate(func=None, *, dev=None):
 
     **Example**
 
-    ```py
-    @accelerate(dev=jax.devices("gpu")[0])
-    def classical_fn(x):
-        return jnp.sin(x) ** 2
+    .. code-block:: python
 
-    @qjit
-    def hybrid_fn(x):
-        y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
-        return jnp.cos(y)
-    ```
+        @accelerate(dev=jax.devices("gpu")[0])
+        def classical_fn(x):
+            return jnp.sin(x) ** 2
+
+        @qjit
+        def hybrid_fn(x):
+            y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
+            return jnp.cos(y)
 
     In addition, you can accelerate function that have already been
     ``jax.jit`` decorated:
 
-    ```py
-    @jax.jit
-    def classical_fn(x):
-        x = jax.device_put(x, jax.local_devices("gpu")[0])
-        return jnp.sin(x) ** 2
+    .. code-block:: python
 
-    @qjit
-    def hybrid_fn(x):
-        y = accelerate(classical_fn)(x) # will be executed on a GPU
-        return jnp.cos(y)
-    ```
+        @jax.jit
+        def classical_fn(x):
+            x = jax.device_put(x, jax.local_devices("gpu")[0])
+            return jnp.sin(x) ** 2
+
+        @qjit
+        def hybrid_fn(x):
+            y = accelerate(classical_fn)(x) # will be executed on a GPU
+            return jnp.cos(y)
     """
 
     if dev is None:
