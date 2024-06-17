@@ -142,7 +142,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_llvm.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -153,7 +153,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_mhlo.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -164,7 +164,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_enzyme.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
 
   catalyst-linux-wheels-arm64:
     needs: [constants, build-dependencies]
@@ -258,7 +258,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/build_catalyst.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }} ${{ matrix.python_version.alternative }}
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
@@ -324,4 +324,4 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v `pwd`:/catalyst \
             -i ${{ matrix.container_img }} \
-            bash /catalyst/.github/workflows/scripts/linux_arm64/test_wheels.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
+            bash /catalyst/.github/workflows/scripts/linux_arm64/rh8/test_wheels.sh $GCC_VERSION ${{ matrix.python_version.official }} ${{ matrix.python_version.subversion }} ${{ matrix.python_version.package }}
