@@ -242,7 +242,7 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
 LogicalResult ValueAndGradOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
+    if (method != "fd" && method != "auto")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
