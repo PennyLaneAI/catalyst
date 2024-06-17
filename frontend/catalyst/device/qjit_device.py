@@ -28,6 +28,7 @@ from typing import Any, Dict, Optional, Set, Union
 
 import pennylane as qml
 from pennylane.measurements import MidMeasureMP
+from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
@@ -419,6 +420,9 @@ class QJITDeviceNewAPI(qml.devices.Device):
         # TOML files
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
+
+        if self.qjit_capabilities.non_commuting_observables_flag == False:
+            program.add_transform(split_non_commuting)
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
         program.add_transform(
