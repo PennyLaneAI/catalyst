@@ -55,7 +55,6 @@ from catalyst.jax_tracer import (
     trace_function,
     trace_quantum_operations,
     unify_convert_result_types,
-    unify_jaxpr_result_types,
 )
 from catalyst.tracing.contexts import (
     EvaluationContext,
@@ -534,11 +533,11 @@ class CondCallable:
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
-        all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
         # FIXME: We want to perform the result unificaiton here:
+        # all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
+        # all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
         # _, out_type, _, all_consts = unify_convert_result_types(
         #     ctx, all_jaxprs, all_consts, all_noimplouts
         # )

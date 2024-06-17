@@ -309,37 +309,6 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
     return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
-def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
-    """Unify result signatures across a set of JAXPRs by promoting to common types.
-
-    Args:
-        jaxprs (List[ClosedJaxpr]): List of JAXPRs to unify. The result signatures must already have
-                                    matching result numbers, abstract value kinds, and array shapes,
-                                    but may differ in array dtypes.
-
-    Returns
-        List[ClosedJaxpr]: List of JAXPRs with unified result types.
-
-    Raises:
-        TypePromotionError: Type unification via promotion was not possible.
-    """
-    out_signatures = [jaxpr.out_avals for jaxpr in jaxprs]
-    assert all(len(out_sig) == len(out_signatures[0]) for out_sig in out_signatures)
-
-    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
-        # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid
-        # abstact value. One need to investigate how to use it correctly and remove this condition.
-        # Should we add AbstractQreg into the `_weak_types` list of JAX?
-        out_signatures = [avals[:-1] for avals in out_signatures]
-
-    promoted_types = list(map(partial(reduce, jnp.promote_types), zip(*out_signatures)))
-
-    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
-        promoted_types.append(AbstractQreg())
-
-    return [retrace_with_result_types(jaxpr, promoted_types) for jaxpr in jaxprs]
-
-
 class QRegPromise:
     """QReg adaptor tracing the qubit extractions and insertions. The adaptor works by postponing
     the insertions in order to re-use qubits later thus skipping the extractions."""
