@@ -48,3 +48,8 @@ mid_circuit_measurement = true
 # This field is currently unchecked but it is reserved for the purpose of
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
+
+# whether the device can suppoprt non-commuting measurements together 
+# in a single execution
+non_commuting_observables = true
+
