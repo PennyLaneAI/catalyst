@@ -25,6 +25,7 @@ from functools import partial
 from os.path import join
 from tempfile import TemporaryDirectory
 from textwrap import dedent
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pennylane as qml
@@ -47,7 +48,12 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDeviceNewAPI, extract_backend_info, get_device_capabilities
+from catalyst.device import (
+    QJITDeviceNewAPI,
+    extract_backend_info,
+    get_device_capabilities,
+    get_device_toml_config,
+)
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
@@ -355,6 +361,43 @@ class TestPreprocess:
 
         assert split_non_commuting not in transform_program1
         assert split_non_commuting in transform_program2
+
+    def test_split_non_commuting_execution(self, mocker):
+        """Test that the results of the execution for a tape with non-commuting observables is
+        consistent (on a backend that does, in fact, support non-commuting observables) regardless
+        of whether split_non_commuting is applied or not as expected"""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit
+        @qml.qnode(dev)
+        def circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RY(0.89, 1)
+            return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
+
+        @qml.qnode(dev)
+        def unjitted_circuit(theta: float):
+            qml.RX(theta, 0)
+            qml.RY(0.89, 1)
+            return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
+
+        config = get_device_toml_config(dev)
+        spy = mocker.spy(transforms, "split_non_commuting")
+
+        # mock TOML file output to indicate non-commuting observables are supported
+        config["compilation"]["non_commuting_observables"] = True
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            assert np.allclose(circuit(1.2), unjitted_circuit(1.2))
+
+        spy.assert_not_called
+
+        # mock TOML file output to indicate non-commuting observables are NOT supported
+        config["compilation"]["non_commuting_observables"] = False
+        with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
+            assert np.allclose(circuit(1.2), unjitted_circuit(1.2))
+
+        spy.assert_called_once
 
 
 # tapes and regions for generating HybridOps
