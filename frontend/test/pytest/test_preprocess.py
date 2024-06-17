@@ -20,6 +20,7 @@ import pathlib
 # pylint: disable=unused-argument
 import platform
 import tempfile
+from dataclasses import replace
 from functools import partial
 from os.path import join
 from tempfile import TemporaryDirectory
@@ -31,6 +32,7 @@ import pytest
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.tape import QuantumScript
+from pennylane import transforms
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
@@ -45,7 +47,7 @@ from catalyst.api_extensions.control_flow import (
 )
 from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
+from catalyst.device import QJITDeviceNewAPI, extract_backend_info, get_device_capabilities
 from catalyst.device.decomposition import (
     catalyst_acceptance,
     catalyst_decompose,
@@ -329,6 +331,30 @@ class TestPreprocess:
         mlir = qml.qjit(circuit, target="mlir").mlir
         assert "expval" not in mlir
         assert "counts" in mlir
+
+    def test_non_commuting_measurements_are_split(self, mocker):
+        """Test that non-commuting measurements are split (or not) as expected"""
+        
+        dev = DummyDevice(wires=4, shots=1000)
+
+        # Create a qjit device that supports non-commuting observables
+        capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
+        backend_info = extract_backend_info(dev, capabilities)
+        qjit_dev1 = QJITDeviceNewAPI(dev, capabilities, backend_info)
+
+        # Create a qjit device that does NOT support non-commuting observables
+        new_capabilites = replace(capabilities, non_commuting_observables_flag=False)
+        backend_info = extract_backend_info(dev, new_capabilites)
+        qjit_dev2 = QJITDeviceNewAPI(dev, new_capabilites, backend_info)
+       
+        # Check the preprocess
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            transform_program1, _ = qjit_dev1.preprocess(ctx)
+            transform_program2, _ = qjit_dev2.preprocess(ctx)
+
+        assert split_non_commuting not in transform_program1
+        assert split_non_commuting in transform_program2
+
 
 
 # tapes and regions for generating HybridOps
