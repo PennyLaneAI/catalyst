@@ -495,7 +495,7 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
         func.setPrivate();
         auto noinline = rewriter.getStringAttr("noinline");
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-        SmallVector<Attribute> passthrough = { noinline };
+        SmallVector<Attribute> passthrough = {noinline};
         auto ctx = rewriter.getContext();
         func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
         auto typeConverter = getTypeConverter();

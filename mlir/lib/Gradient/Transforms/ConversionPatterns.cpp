@@ -862,7 +862,8 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         rewriter.setInsertionPointToStart(mod.getBody());
 
         auto ptrType = LLVM::LLVMPointerType::get(ctx);
-        Type retTy = structTapeTys.empty() ? dyn_cast<Type>(ptrType) : dyn_cast<Type>(wrappedFlatTapeStructTy);
+        Type retTy = structTapeTys.empty() ? dyn_cast<Type>(ptrType)
+                                           : dyn_cast<Type>(wrappedFlatTapeStructTy);
 
         auto oldFuncTy = op.getFunctionType();
         auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {retTy});
@@ -888,7 +889,6 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     void rewrite(ReverseOp op, OpAdaptor adaptor,
                  ConversionPatternRewriter &rewriter) const override
     {
-
         auto argc = op.getArgc();
         auto resc = op.getResc();
         SmallVector<Value> inputs;
@@ -944,7 +944,8 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         // This gives me { { memref, ..., memrefn } }
         auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
         auto ptrTy = LLVM::LLVMPointerType::get(ctx);
-        Type retty = tapeCount > 0 ? dyn_cast<Type>(wrappedFlatTapeStructTy) : dyn_cast<Type>(ptrTy);
+        Type retty =
+            tapeCount > 0 ? dyn_cast<Type>(wrappedFlatTapeStructTy) : dyn_cast<Type>(ptrTy);
         newFuncInputTys.push_back(retty);
 
         auto newFuncTy = FunctionType::get(ctx, newFuncInputTys, TypeRange{});
@@ -962,28 +963,28 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         IRMapping map;
 
         if (tapeCount > 0) {
-        auto loc = op.getLoc();
-        auto lastIdx = newFuncInputTys.size() - 1;
-        Value wrappedStructValAgg = func.getArgument(lastIdx);
+            auto loc = op.getLoc();
+            auto lastIdx = newFuncInputTys.size() - 1;
+            Value wrappedStructValAgg = func.getArgument(lastIdx);
 
-        SmallVector<Value> tapestructs;
-        for (auto i = 0; i < tapeCount; i++) {
-            SmallVector<int64_t> pos = {0, static_cast<int64_t>(i)};
-            Value tapeStructIth =
-                rewriter.create<LLVM::ExtractValueOp>(loc, wrappedStructValAgg, pos);
-            tapestructs.push_back(tapeStructIth);
-        }
+            SmallVector<Value> tapestructs;
+            for (auto i = 0; i < tapeCount; i++) {
+                SmallVector<int64_t> pos = {0, static_cast<int64_t>(i)};
+                Value tapeStructIth =
+                    rewriter.create<LLVM::ExtractValueOp>(loc, wrappedStructValAgg, pos);
+                tapestructs.push_back(tapeStructIth);
+            }
 
-        SmallVector<Value> tapememrefs;
-        for (auto [_struct, memref] : llvm::zip(tapestructs, residuals)) {
-            auto memrefTy = memref.getType();
-            auto castOp = rewriter.create<UnrealizedConversionCastOp>(loc, memrefTy, _struct);
-            tapememrefs.push_back(castOp.getResult(0));
-        }
+            SmallVector<Value> tapememrefs;
+            for (auto [_struct, memref] : llvm::zip(tapestructs, residuals)) {
+                auto memrefTy = memref.getType();
+                auto castOp = rewriter.create<UnrealizedConversionCastOp>(loc, memrefTy, _struct);
+                tapememrefs.push_back(castOp.getResult(0));
+            }
 
-        for (auto [newmemref, oldmemref] : llvm::zip(tapememrefs, residuals)) {
-            map.map(oldmemref, newmemref);
-        }
+            for (auto [newmemref, oldmemref] : llvm::zip(tapememrefs, residuals)) {
+                map.map(oldmemref, newmemref);
+            }
         }
 
         for (auto i = 0; i < upperLimit; i++) {
