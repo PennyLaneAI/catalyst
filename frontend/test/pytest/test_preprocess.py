@@ -333,8 +333,9 @@ class TestPreprocess:
         assert "counts" in mlir
 
     def test_non_commuting_measurements_are_split(self, mocker):
-        """Test that non-commuting measurements are split (or not) as expected"""
-        
+        """Test that the split_non_commuting transform is added to the transform
+        program from preprocess when non_commuting_observables_flag is False"""
+
         dev = DummyDevice(wires=4, shots=1000)
 
         # Create a qjit device that supports non-commuting observables
@@ -346,7 +347,7 @@ class TestPreprocess:
         new_capabilites = replace(capabilities, non_commuting_observables_flag=False)
         backend_info = extract_backend_info(dev, new_capabilites)
         qjit_dev2 = QJITDeviceNewAPI(dev, new_capabilites, backend_info)
-       
+
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
             transform_program1, _ = qjit_dev1.preprocess(ctx)
@@ -354,7 +355,6 @@ class TestPreprocess:
 
         assert split_non_commuting not in transform_program1
         assert split_non_commuting in transform_program2
-
 
 
 # tapes and regions for generating HybridOps
