@@ -64,6 +64,6 @@ mid_circuit_measurement = false
 # determining if the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
 
-# whether the device can suppoprt non-commuting measurements together 
+# whether the device can support non-commuting measurements together 
 # in a single execution
 non_commuting_observables = false
