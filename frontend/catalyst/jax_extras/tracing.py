@@ -807,7 +807,6 @@ def expand_args(
 
 
 def expand_results(
-    constants: List[TracerLike],
     expanded_inputs: List[TracerLike],
     results: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
@@ -828,9 +827,7 @@ def expand_results(
         OutputType describing the expanded result
 
     """
-    return infer_output_type(
-        constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs
-    )
+    return infer_output_type([], expanded_inputs, results, expansion_strategy, num_implicit_inputs)
 
 
 def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:
