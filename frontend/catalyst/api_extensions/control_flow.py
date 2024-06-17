@@ -512,8 +512,10 @@ class CondCallable:
         regions: List[HybridOpRegion] = []
 
         in_sigs, out_sigs = [], []
+        # Do the classical tracing of every branch
         for branch_fn in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
+            # Cond branches take no arguments
             wfun, in_sig, out_sig = deduce_signatures(
                 branch_fn, [], {}, expansion_strategy=self.expansion_strategy
             )
@@ -531,25 +533,32 @@ class CondCallable:
         _assert_cond_result_structure([s.out_tree() for s in out_sigs])
         _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
+        all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # TODO: Creating output tracers like this is not quite cocrect. We want to calculate the
-        # unified result type first (see the call to `unify_convert_result_types`) and only then use
-        # it as the output type of this primitive. But this unification will only happen during the
-        # quantum tracing, when all the user-difined transformations are applied. Since we need to
-        # create output classical tracers here and now, we blindly use out_type of the last cond
-        # branch.
-        out_type_guess = out_types[-1]
+        all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
+        # FIXME: We want to perform the result unificaiton here:
+        # _, out_type, _, all_consts = unify_convert_result_types(
+        #     ctx, all_jaxprs, all_consts, all_noimplouts
+        # )
+        # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
+        # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
+        # unification until the quantum tracing is done. The consequence of that: we have to guess
+        # the correct output type now and if our guess is not correct, we might have MLIR type error
+        # down the pipeline.
+        out_type = out_types[-1]
 
+        # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
-            out_type_guess,
+            out_type,
             sum(all_consts, []),
             (),
             maker=lambda aval: new_inner_tracer(outer_trace, aval),
         )
 
-        out_classical_tracers = collapse(out_type_guess, out_expanded_classical_tracers)
+        out_classical_tracers = collapse(out_type, out_expanded_classical_tracers)
 
+        # Save tracers for futher quantum tracing
         self._operation = Cond(
             in_classical_tracers,
             out_classical_tracers,
@@ -573,7 +582,7 @@ class CondCallable:
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
         all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
-        all_jaxprs, _, all_consts = unify_convert_result_types(
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(
             ctx, all_jaxprs, all_consts, all_noimplouts
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
@@ -984,7 +993,7 @@ class Cond(HybridOp):
                 nouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
         qreg = qrp.actualize()
-        all_jaxprs, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nouts)
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nouts)
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
         in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]

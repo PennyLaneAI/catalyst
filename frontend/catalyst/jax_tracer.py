@@ -173,20 +173,21 @@ def _apply_result_type_conversion(
     consts: List[Any],
     target_types: List[ShapedArray],
     num_implicit_outputs: int,
-) -> Tuple[InputSignature, OutputSignature]:
-    """Apply type conversion to the results of a Jaxpr program. Return full information about the
-    modified Jaxpr program.
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Re-trace the ``jaxpr`` program and apply type conversion to its results. Return full
+    information about the modified Jaxpr program. The jaxpr program is only allowed to take zero or
+    one quantum register as an argument.
 
     Args:
         ctx: Jax tracing context object.
-        jaxpr: The Jaxpr program to apply the conversion to. As any Jaxpr program, it might contain
-               both implicit and explicit arguments and results.
+        jaxpr: The Jaxpr program to apply the conversion to.
         consts: List of constant values we need to know to trace this program.
         target_types: List of types we want to convert the outputs of the program to. The list must
                       match the number of outputs, except maybe the very last output if it is Qreg.
         num_implicit_outputs: Number of implicit outputs found in the Jaxpr program.
 
     Returns:
+        List[TracerLike]: output tracers of the program
         InputSignature: new input signature of the function
         OutputSignature: new output signature of the function
     """
@@ -206,11 +207,11 @@ def _apply_result_type_conversion(
             [out_tracers[-1]] if with_qreg else []
         )
 
-    _, in_sig, out_sig = trace_function(
+    expanded_tracers, in_sig, out_sig = trace_function(
         ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
     )
 
-    return in_sig, out_sig
+    return expanded_tracers, in_sig, out_sig
 
 
 def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
@@ -246,20 +247,27 @@ def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
         consts (list of Jaxpr constants): Constants of the sourece Jaxpr programs.
         nimplout (list of integers): Numbers of implicit outputs of Jaxpr programs.
 
-    Returns (list of ClosedJaxpr):
-        Same number of jaxprs with equal result dtypes.
+    Returns (list of output signatures):
+        Output jaxprs of the new programs
+        Output type of the new programs
+        Output tracers of the new programs
+        Constants of the new programs
 
     Raises:
         TypePromotionError: Unification is not possible.
 
     """
     promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
-    jaxpr_acc, consts2 = [], []
+    jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
     for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
-        _, out_sig = _apply_result_type_conversion(ctx, j, a, promoted_types, num_implicit_outputs)
+        tracers, _, out_sig = _apply_result_type_conversion(
+            ctx, j, a, promoted_types, num_implicit_outputs
+        )
         jaxpr_acc.append(out_sig.out_initial_jaxpr())
-        consts2.append(out_sig.out_consts())
-    return jaxpr_acc, out_sig.out_type(), consts2
+        type_acc.append(out_sig.out_type())
+        tracers_acc.append(tracers)
+        consts_acc.append(out_sig.out_consts())
+    return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
 def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
@@ -1001,7 +1009,7 @@ def trace_function(
         **kwargs: Sample keyword arguments of the function.
 
     Result:
-        List of output Jax tracers
+        Expanded list of output Jax tracers
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """

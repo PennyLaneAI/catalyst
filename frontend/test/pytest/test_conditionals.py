@@ -268,7 +268,7 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_type_unification(self, backend):
+    def test_branch_multi_return_type_unification_qnode(self, backend):
         """Test that an exception is not raised when the return types of all branches do not match
         but could be unified."""
 
@@ -288,6 +288,50 @@ class TestCond:
                 return measure(wires=0)
 
             return cond_fn()
+
+        assert 0 == circuit()
+
+    def test_branch_multi_return_type_unification_qjit(self, backend):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
+                return True
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype("int")
+            return r
+
+        assert 0 == circuit()
+
+    @pytest.mark.xfail(
+        reason="Inability to apply Jax transformations before the quantum traing is complete"
+    )
+    def test_branch_multi_return_type_unification_qnode(self, backend):
+        """Test that unification happens before the results of the cond primitve is available.
+        See the FIXME in the ``CondCallable._call_with_quantum_ctx`` function.
+        """
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
+                return True
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype("int")
+            return r
 
         assert 0 == circuit()
 
