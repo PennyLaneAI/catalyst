@@ -289,7 +289,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG=6ca460a587ce6ffd977a4d9e9db8421339cd5e05 \
+              -DLIGHTNING_GIT_TAG=f8097d5da4f070a031d41fa47644b6d6129bb5d8 \
               -DENABLE_LAPACK=OFF \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \

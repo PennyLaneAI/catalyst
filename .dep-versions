@@ -6,4 +6,6 @@ enzyme=1beb98b51442d50652eaa3ffb9574f4720d611f1
 
 # Always remove custom PL/LQ versions before release.
 pennylane=f0bc6120747749497b8ef08238485526ec376a26
-lightning=0.37.0-dev24
+lightning=0.37.0-dev37
+# Lightning-Kokkos wheels are currently not published to TestPyPI, manual install required.
+lightning-kokkos=f8097d5da4f070a031d41fa47644b6d6129bb5d8
