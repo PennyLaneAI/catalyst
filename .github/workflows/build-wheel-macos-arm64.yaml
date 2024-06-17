@@ -393,7 +393,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
 
     - name: Install PennyLane Plugins
       run: |
