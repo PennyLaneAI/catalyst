@@ -544,8 +544,8 @@ class CondCallable:
         # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
         # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
         # unification until the quantum tracing is done. The consequence of that: we have to guess
-        # the correct output type now and if our guess is not correct, we might have MLIR type error
-        # down the pipeline.
+        # the output type now and if we fail to do so, we might face MLIR type error down the
+        # pipeline.
         out_type = out_types[-1]
 
         # Create output tracers in the outer tracing context
