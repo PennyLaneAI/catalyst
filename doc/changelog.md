@@ -203,6 +203,9 @@
 * Callbacks can now return types which can be flattened and unflattened.
   [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
 
+* `catalyst.qjit` and `catalyst.grad` can now get `__name__` from `functools.partial`.
+  [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
+
 <h3>Internal changes</h3>
 
 * Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
@@ -337,7 +340,8 @@ Mehrdad Malekmohammadi,
 Vincent Michaud-Rioux,
 Mudit Pandey,
 Raul Torres,
-Sergei Mironov.
+Sergei Mironov,
+Tzung-Han Juang.
 
 # Release 0.6.0
 

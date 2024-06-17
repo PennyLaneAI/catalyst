@@ -37,6 +37,12 @@ from catalyst.device.decomposition import (
     measurements_from_counts,
 )
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.programs.verification import (
+    validate_observables_adjoint_diff,
+    validate_observables_parameter_shift,
+    verify_no_state_variance_returns,
+    verify_operations,
+)
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.runtime_environment import get_lib_path
@@ -435,7 +441,16 @@ class QJITDeviceNewAPI(qml.devices.Device):
         if self.measurement_processes == {"Counts"}:
             program.add_transform(measurements_from_counts)
 
-        # TODO: Add Catalyst program verification and validation
+        program.add_transform(
+            verify_operations, grad_method=config.gradient_method, qjit_device=self
+        )
+        if config.gradient_method is not None:
+            program.add_transform(verify_no_state_variance_returns)
+        if config.gradient_method == "adjoint":
+            program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
+        elif config.gradient_method == "parameter-shift":
+            program.add_transform(validate_observables_parameter_shift)
+
         return program, config
 
     def execute(self, circuits, execution_config):

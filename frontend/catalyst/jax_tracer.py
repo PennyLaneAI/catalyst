@@ -88,12 +88,6 @@ from catalyst.jax_primitives import (
     var_p,
 )
 from catalyst.logging import debug_logger, debug_logger_init
-from catalyst.programs.verification import (
-    validate_observables_adjoint_diff,
-    validate_observables_parameter_shift,
-    verify_no_state_variance_returns,
-    verify_operations,
-)
 from catalyst.tracing.contexts import (
     EvaluationContext,
     EvaluationMode,
@@ -130,6 +124,20 @@ def mark_gradient_tracing(method: str):
         TRACING_GRADIENTS.pop()
 
 
+def _make_execution_config(qnode):
+    """Updates the execution_config object with information about execution. This is
+    used in preprocess to determine what decomposition and validation is needed."""
+
+    if qnode:
+        _gradient_method = _in_gradient_tracing(qnode)
+    else:
+        _gradient_method = None
+
+    execution_config = qml.devices.DefaultExecutionConfig
+    execution_config.gradient_method = _gradient_method
+    return execution_config
+
+
 def get_device_shots(dev):
     """Helper function to get device shots."""
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
@@ -151,7 +159,10 @@ class Function:
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
-        self.__name__ = fn.__name__
+        if isinstance(fn, partial):
+            self.__name__ = fn.func.__name__
+        else:
+            self.__name__ = fn.__name__
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -829,11 +840,10 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 def apply_transform(
     qnode_program,
     device_program,
-    verification_program,
     device_modify_measurements,
     tape,
     flat_results,
-):  # pylint: disable=too-many-arguments
+):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -848,10 +858,11 @@ def apply_transform(
 
     if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
-        total_program = qnode_program + device_program + verification_program
+        total_program = qnode_program + device_program
     else:
         is_valid_for_batch = True
-        total_program = device_program + verification_program
+        # Apply the identity transform in order to keep generalization
+        total_program = device_program
 
     tapes, post_processing = total_program([tape])
     if not is_valid_for_batch and len(tapes) > 1:
@@ -1020,26 +1031,11 @@ def trace_quantum_function(
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-
             if isinstance(device, qml.devices.Device):
-                device_program, _ = device.preprocess(ctx)
-                verification_program = TransformProgram()
-                grad_method = _in_gradient_tracing(qnode)
-                verification_program.add_transform(
-                    verify_operations, grad_method=grad_method, qjit_device=device
-                )
-                if grad_method is not None:
-                    verification_program.add_transform(verify_no_state_variance_returns)
-                if grad_method == "adjoint":
-                    verification_program.add_transform(
-                        validate_observables_adjoint_diff, qjit_device=device
-                    )
-                elif grad_method == "parameter-shift":
-                    verification_program.add_transform(validate_observables_parameter_shift)
-
+                config = _make_execution_config(qnode)
+                device_program, config = device.preprocess(ctx, config)
             else:
                 device_program = TransformProgram()
-                verification_program = TransformProgram()
 
             qnode_program = qnode.transform_program if qnode else TransformProgram()
 
@@ -1050,7 +1046,6 @@ def trace_quantum_function(
             tapes, post_processing = apply_transform(
                 qnode_program,
                 device_program,
-                verification_program,
                 device_modify_measurements,
                 quantum_tape,
                 return_values_flat,
