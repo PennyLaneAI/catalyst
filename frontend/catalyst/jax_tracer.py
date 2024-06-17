@@ -151,7 +151,10 @@ class Function:
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
-        self.__name__ = fn.__name__
+        if isinstance(fn, partial):
+            self.__name__ = fn.func.__name__
+        else:
+            self.__name__ = fn.__name__
 
     @debug_logger
     def __call__(self, *args, **kwargs):
