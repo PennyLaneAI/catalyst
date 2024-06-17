@@ -114,7 +114,6 @@ __all__ = (
     "for_loop_expansion_strategy",
     "cond_expansion_strategy",
     "while_loop_expansion_strategy",
-    "DynshapedClosedJaxpr",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
     "Jaxpr",
@@ -146,8 +145,6 @@ __all__ = (
     "convert_constvars_jaxpr",
     "convert_element_type",
     "eval_jaxpr",
-    "initial_style_jaxprs_with_common_consts1",
-    "initial_style_jaxprs_with_common_consts2",
     "_abstractify",
     "_initial_style_jaxpr",
     "_input_type_to_tracers",
@@ -170,36 +167,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
-
-
-class DynshapedClosedJaxpr(ClosedJaxpr):
-    """A wrapper class to handle implicit/explicit result information used by JAX for dynamically
-    shaped arrays. Can be used inplace of any other ClosedJaxpr instance."""
-
-    @debug_logger_init
-    def __init__(self, jaxpr: Jaxpr, consts: Sequence, output_type: OutputType):
-        super().__init__(jaxpr, consts)
-        self.output_type = output_type
-
-    def remove_implicit_results(self):
-        """Remove all implicit result values from this JAXPR.
-
-        Returns:
-            ClosedJaxpr
-        """
-        # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the
-        # unneeded tracers.
-        if not self.output_type:
-            return self
-
-        jaxpr = self.jaxpr
-        out_keep = tuple(zip(*self.output_type))[1]
-        outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
-        filtered_jaxpr = Jaxpr(
-            jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
-        )
-
-        return ClosedJaxpr(filtered_jaxpr, self.consts)
 
 
 @contextmanager
@@ -477,77 +444,6 @@ def deduce_signatures(
             out_initial_jaxpr=lambda: out_sig_promise()[0],
         ),
     )
-
-
-def initial_style_jaxprs_with_common_consts1(
-    funs: Sequence[Callable], in_tree, in_avals, primitive_name: str
-):
-    """This function is the head (shorter) part of the original
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The algorithm is the
-    same at the time of this writing, we use this function only to avoid conflicts with future
-    versions of JAX.
-    """
-    jaxprs, all_consts, all_out_trees = unzip3(
-        _initial_style_open_jaxpr(fun, in_tree, in_avals, primitive_name) for fun in funs
-    )
-    closed_jaxprs, consts = initial_style_jaxprs_with_common_consts2(jaxprs, all_consts)
-    return closed_jaxprs, consts, all_out_trees
-
-
-def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
-    """This function is the tail (largest) part of the
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The JAX version
-    traces argument Python functions in order to determine signatures to be unified. Here we rely on
-    the fact that the tracing was already done elsewhere - and this is the only difference.
-    """
-
-    all_const_avals = [map(_abstractify, consts) for consts in all_consts]
-    for consts_avals in all_const_avals:
-        for aval in consts_avals:
-            assert not isinstance(
-                aval, state.AbstractRef
-            ), "AbstractRefs are not supported in this Catalyst version of this function"
-    canonical_ref_indices = []
-    canonical_refs: List[Any] = []
-    all_nonref_consts = []
-    canonical_ref_avals = []
-    all_nonref_const_avals = []
-    for consts, consts_avals in zip(all_consts, all_const_avals):
-        ref_indices = []
-        nonref_consts = []
-        nonref_const_avals = []
-        for c, aval in zip(consts, consts_avals):
-            assert not isinstance(
-                aval, state.AbstractRef
-            ), "AbstractRefs are not supported in this Catalyst version of this function"
-            nonref_consts.append(c)
-            nonref_const_avals.append(aval)
-        all_nonref_consts.append(nonref_consts)
-        all_nonref_const_avals.append(nonref_const_avals)
-        canonical_ref_indices.append(ref_indices)
-
-    newvar = gensym(jaxprs, suffix="_")
-    unused_ref_const_vars = map(newvar, canonical_ref_avals)
-    unused_const_vars = [map(newvar, const_avals) for const_avals in all_nonref_const_avals]
-
-    def pad_jaxpr_constvars(i, jaxpr):
-        is_ref = [isinstance(v.aval, state.AbstractRef) for v in jaxpr.constvars]
-        nonref_constvars, ref_constvars = partition_list(is_ref, jaxpr.constvars)
-        padded_ref_constvars = unused_ref_const_vars[:]
-        for canonical_id, ref_var in zip(canonical_ref_indices[i], ref_constvars):
-            padded_ref_constvars[canonical_id] = ref_var  # pragma: no cover
-        const_prefix = util.concatenate(unused_const_vars[:i])
-        const_suffix = util.concatenate(unused_const_vars[i + 1 :])
-        constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
-        jaxpr = jaxpr.replace(constvars=constvars)
-        effects = make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
-        jaxpr = jaxpr.replace(effects=effects)
-        return jaxpr
-
-    consts = [*canonical_refs, *util.concatenate(all_nonref_consts)]
-    jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
-    closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
-    return closed_jaxprs, consts
 
 
 def deduce_avals(f: Callable, args, kwargs):
