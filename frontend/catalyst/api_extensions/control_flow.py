@@ -577,6 +577,8 @@ class CondCallable:
             ctx, all_jaxprs, all_consts, all_noimplouts
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+        # Output types from all the branches are unified by now, we use the first branch for
+        # the resulting tracers.
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
