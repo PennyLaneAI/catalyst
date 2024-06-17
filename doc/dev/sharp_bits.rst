@@ -381,6 +381,9 @@ circuit, are measuring an expectation value, and are optimizing the result:
 
 .. code-block:: python
 
+    import numpy as np
+    import jax
+
     dev = qml.device("default.qubit", wires=4)
 
     @qml.qnode(dev)
@@ -404,13 +407,15 @@ circuit, are measuring an expectation value, and are optimizing the result:
     weights = jnp.array(2 * np.random.random([5, 4]) - 1)
     data = jnp.array(np.random.random([4]))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4, jit=False)
+    opt = optax.sgd(learning_rate=0.4)
 
     params = weights
-    state = opt.init_state(params)
+    state = opt.init(params)
 
     for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
+        params = optax.apply_updates(params, updates)
 
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
@@ -458,13 +463,15 @@ it using Catalyst:
         for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
         return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
 
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+    opt = optax.sgd(learning_rate=0.4)
 
     params = weights
-    state = opt.init_state(params)
+    state = opt.init(params)
 
     for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
+        gradient = jax.grad(cost)(params, data)
+        (updates, state) = opt.update(gradient, state)
+        params = optax.apply_updates(params, updates)
 
 With the quantum function qjit-compiled, the optimization loop
 now takes 16.4s ± 1.51s.
@@ -485,11 +492,16 @@ optimization to take place within Catalyst:
             dy = grad(cost, argnum=0)(x, data)
             return (cost(x, data), dy)
 
-        opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
-        update_step = lambda i, *args: tuple(opt.update(*args))
+        opt = optax.sgd(learning_rate=0.4)
+    
+        def update_step(i, params, state):
+            (_, gradient) = loss(params)
+            (updates, state) = opt.update(gradient, state)
+            params = optax.apply_updates(params, updates)
+            return (params, state)
 
         params = init_weights
-        state = opt.init_state(params)
+        state = opt.init(params)
 
         return for_loop(0, steps, 1)(update_step)(params, state)
 

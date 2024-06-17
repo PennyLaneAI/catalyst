@@ -87,8 +87,8 @@ def grad(fn=None, *, method=None, h=None, argnum=None):
 
     .. note::
 
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        Any JAX-compatible optimization library, such as `Optax
+        <https://optax.readthedocs.io/en/stable/index.html>`_, can be used
         alongside ``grad`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
@@ -225,8 +225,8 @@ def value_and_grad(fn=None, *, method=None, h=None, argnum=None):
 
     .. note::
 
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        Any JAX-compatible optimization library, such as `Optax
+        <https://optax.readthedocs.io/en/stable/index.html>`_, can be used
         alongside ``value_and_grad`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
@@ -330,8 +330,8 @@ def jacobian(fn=None, *, method=None, h=None, argnum=None):
 
     .. note::
 
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        Any JAX-compatible optimization library, such as `Optax
+        <https://optax.readthedocs.io/en/stable/index.html>`_, can be used
         alongside ``jacobian`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 

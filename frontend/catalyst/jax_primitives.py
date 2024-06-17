@@ -38,11 +38,11 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
-from jaxlib.mlir.dialects.func import CallOp
+from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import PrintOp, PythonCallOp
+from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, ValueAndGradOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -256,6 +256,9 @@ def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cov
     raise NotImplementedError()
 
 
+CALLBACK_OP_CACHE = {}
+
+
 def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
     """Callback lowering"""
 
@@ -264,12 +267,24 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     callback_id = registry.register(callback)
 
-    ctx = jax_ctx.module_context.context
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    identifier = ir.IntegerAttr.get(i64_type, callback_id)
+    params_ty = [arg.type for arg in args]
+    results_ty = list(convert_shaped_arrays_to_tensors(results_aval))
+    fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
+    fn_ty_attr = ir.TypeAttr.get(fn_ty)
+    cache_key = (callback_id, *params_ty, *results_ty)
+    if cache_key not in CALLBACK_OP_CACHE:
+        module = jax_ctx.module_context.module
+        ip = module.body
+        attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
+        with ir.InsertionPoint(ip):
+            callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
+        CALLBACK_OP_CACHE[cache_key] = callbackOp
 
-    mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
-    return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+    callbackOp = CALLBACK_OP_CACHE[cache_key]
+    symbol = callbackOp.sym_name.value
+    symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
+
+    return CallbackCallOp(results_ty, symbol_attr, args).results
 
 
 #
