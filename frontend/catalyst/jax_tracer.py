@@ -63,6 +63,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.jax_primitives import (
     AbstractQreg,
+    CALLBACK_OP_CACHE,
     compbasis_p,
     cond_p,
     counts_p,
@@ -551,6 +552,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     # single python function multiple times with different options.
     mlir_fn_cache.clear()
     MemrefCallable.clearcache()
+    CALLBACK_OP_CACHE.clear()
 
     with transient_jax_config():
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
