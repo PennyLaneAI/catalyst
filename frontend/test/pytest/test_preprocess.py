@@ -342,17 +342,18 @@ class TestPreprocess:
         """Test that the split_non_commuting transform is added to the transform
         program from preprocess when non_commuting_observables_flag is False"""
 
+        # dummy device supports non_commuting observables by default
         dev = DummyDevice(wires=4, shots=1000)
 
         # Create a qjit device that supports non-commuting observables
-        capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
-        backend_info = extract_backend_info(dev, capabilities)
-        qjit_dev1 = QJITDeviceNewAPI(dev, capabilities, backend_info)
+        dev_capabilities = get_device_capabilities(dev, ProgramFeatures(dev.shots is not None))
+        backend_info = extract_backend_info(dev, dev_capabilities)
+        qjit_dev1 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
         # Create a qjit device that does NOT support non-commuting observables
-        new_capabilites = replace(capabilities, non_commuting_observables_flag=False)
-        backend_info = extract_backend_info(dev, new_capabilites)
-        qjit_dev2 = QJITDeviceNewAPI(dev, new_capabilites, backend_info)
+        dev_capabilities = replace(dev_capabilities, non_commuting_observables_flag=False)
+        backend_info = extract_backend_info(dev, dev_capabilities)
+        qjit_dev2 = QJITDeviceNewAPI(dev, dev_capabilities, backend_info)
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
@@ -369,13 +370,6 @@ class TestPreprocess:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit
-        @qml.qnode(dev)
-        def circuit(theta: float):
-            qml.RX(theta, 0)
-            qml.RY(0.89, 1)
-            return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
-
         @qml.qnode(dev)
         def unjitted_circuit(theta: float):
             qml.RX(theta, 0)
@@ -383,21 +377,25 @@ class TestPreprocess:
             return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
 
         config = get_device_toml_config(dev)
-        spy = mocker.spy(transforms, "split_non_commuting")
+        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
 
         # mock TOML file output to indicate non-commuting observables are supported
         config["compilation"]["non_commuting_observables"] = True
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
-            assert np.allclose(circuit(1.2), unjitted_circuit(1.2))
+            jitted_circuit = qml.qjit(unjitted_circuit)
+            assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
-        spy.assert_not_called
+        transform_program, _ = spy.spy_return
+        assert split_non_commuting not in transform_program
 
         # mock TOML file output to indicate non-commuting observables are NOT supported
         config["compilation"]["non_commuting_observables"] = False
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
-            assert np.allclose(circuit(1.2), unjitted_circuit(1.2))
+            jitted_circuit = qml.qjit(unjitted_circuit)
+            assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
-        spy.assert_called_once
+        transform_program, _ = spy.spy_return
+        assert split_non_commuting in transform_program
 
 
 # tapes and regions for generating HybridOps
