@@ -30,10 +30,10 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane import transforms
 from pennylane.devices import Device
 from pennylane.devices.execution_config import DefaultExecutionConfig, ExecutionConfig
 from pennylane.tape import QuantumScript
-from pennylane import transforms
 from pennylane.transforms import split_non_commuting
 from pennylane.transforms.core import TransformProgram
 
