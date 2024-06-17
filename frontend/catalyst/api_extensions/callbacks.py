@@ -62,7 +62,7 @@ def accelerate(func=None, *, dev=None):
             ``jax.devices()``. If not provided, the default value of
             ``jax.devices()[0]`` as determined by JAX will be used.
 
-    .. see-also:: :func:`~.pure_callback`, :func:`.debug.callback`.
+    .. seealso:: :func:`~.pure_callback`, :func:`.debug.callback`.
 
     **Example**
 
