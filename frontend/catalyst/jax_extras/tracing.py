@@ -37,7 +37,6 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src import state, util
 from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
@@ -46,7 +45,7 @@ from jax._src.interpreters.partial_eval import (
     infer_lambda_input_type,
     trace_to_jaxpr_dynamic2,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
+from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import (
     _argnum_weak_type,
@@ -57,7 +56,7 @@ from jax._src.lax.slicing import (
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as jax_current
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wraps
+from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
@@ -101,7 +100,7 @@ from jax.tree_util import (
 from jaxlib.xla_extension import PyTreeRegistry
 
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
 
 # pylint: disable=protected-access,too-many-lines
@@ -146,7 +145,6 @@ __all__ = (
     "convert_element_type",
     "eval_jaxpr",
     "_abstractify",
-    "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "_module_name_regex",
     "make_jaxpr_effects",
