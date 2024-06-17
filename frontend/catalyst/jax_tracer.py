@@ -99,6 +99,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 # TODO: refactor the tracer module
+#pylint: disable=too-many-lines
 
 # Global flag tracing wether the function that we trace might be used for gradients
 TRACING_GRADIENTS: List[str] = []

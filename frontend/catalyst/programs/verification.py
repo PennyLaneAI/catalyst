@@ -65,7 +65,6 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
     return (tape,), lambda x: x[0]
 
 
-# pylint: disable=too-many-statements
 @transform
 def verify_operations(tape: QuantumTape, grad_method, qjit_device):
     """verify the quantum program against Catalyst requirements. This transform makes no
