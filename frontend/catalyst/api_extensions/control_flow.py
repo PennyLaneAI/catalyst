@@ -1097,10 +1097,12 @@ class WhileLoop(HybridOp):
             arg_expanded_classical_tracers = expand_args(
                 self.regions[0].arg_classical_tracers, expansion_strategy=expansion_strategy
             )[0]
+            res_classical_tracers = region.res_classical_tracers
+            constants = []
             res_expanded_classical_tracers, out_type = expand_results(
-                [],
+                constants,
                 arg_expanded_classical_tracers,
-                self.regions[0].res_classical_tracers,
+                res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
