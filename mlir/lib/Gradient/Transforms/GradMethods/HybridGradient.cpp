@@ -34,8 +34,8 @@ using namespace mlir;
 namespace catalyst {
 namespace gradient {
 // Prototypes
-static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, mlir::Operation *gradOp,
-                                           mlir::OperandRange argOperands, func::FuncOp callee,
+static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation *callSite,
+                                           OperandRange argOperands, func::FuncOp callee,
                                            SmallVectorImpl<Value> &backpropArgs);
 static func::FuncOp genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
                                         func::FuncOp qnode);
@@ -127,11 +127,11 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
 
 /// Recursively process all the QNodes of the `callee` being differentiated. The resulting
 /// BackpropOps will be called with `backpropArgs`.
-static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, mlir::Operation *gradOp,
-                                           mlir::OperandRange argOperands, func::FuncOp callee,
+static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation *callSite,
+                                           OperandRange argOperands, func::FuncOp callee,
                                            SmallVectorImpl<Value> &backpropArgs)
 {
-    assert(gradOp && "Operation pointer is null");
+    assert(callSite && "Operation pointer is null");
 
     Location loc = callee.getLoc();
     std::string clonedCalleeName = (callee.getName() + ".cloned").str();
@@ -183,7 +183,7 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, mlir::Oper
                 // argument, we need to insert a call to the parameter count function at the
                 // location of the grad op.
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPoint(gradOp);
+                rewriter.setInsertionPoint(callSite);
 
                 Value paramCount =
                     rewriter.create<func::CallOp>(loc, paramCountFn, argOperands).getResult(0);
