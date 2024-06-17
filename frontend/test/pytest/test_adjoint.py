@@ -27,7 +27,7 @@ from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 from catalyst import adjoint, cond, debug, for_loop, qjit, while_loop
 
-# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring
+# pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
 
 class TestCatalyst:
@@ -1039,7 +1039,7 @@ class TestMiscMethods:
         op = CustomOp(1.2, 2.3, wires=0)
         adj_op = adjoint(op)
         data, metadata = adj_op._flatten()
-        assert len(data) == 2
+        assert len(data) == 1
         assert data[0] is op
 
         assert metadata == tuple()

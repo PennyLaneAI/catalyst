@@ -20,7 +20,6 @@ but require a Python interpreter instance.
 
 import ctypes
 import inspect
-from collections.abc import Sequence
 from functools import wraps
 from typing import Any, Callable
 
@@ -188,6 +187,24 @@ class FlatCallable:
 class MemrefCallable(FlatCallable):
     """Callable that receives void ptrs."""
 
+    CACHE = {}
+
+    def __new__(cls, func, results_aval, *_args, **_kwargs):
+        # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        flat_results_aval, _ = tree_flatten(results_aval)
+        cache_key = (func, *flat_results_aval)
+        if cls.CACHE.get(cache_key):
+            return cls.CACHE.get(cache_key)
+
+        instance = super().__new__(cls)
+        cls.CACHE[cache_key] = instance
+        return instance
+
+    @classmethod
+    def clearcache(cls):
+        """Clear the memref callable cache"""
+        cls.CACHE.clear()
+
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
         self.results_aval = results_aval
@@ -196,10 +213,8 @@ class MemrefCallable(FlatCallable):
         jnpargs = self.asarrays(args)
         retvals = super().__call__(jnpargs)
         return_values = []
-        results_aval_sequence = (
-            self.results_aval if isinstance(self.results_aval, Sequence) else [self.results_aval]
-        )
-        for retval, exp_aval in zip(retvals, results_aval_sequence):
+        flat_results_aval, _ = tree_flatten(self.results_aval)
+        for retval, exp_aval in zip(retvals, flat_results_aval):
             self._check_types(retval, exp_aval)
             ranked_memref = get_ranked_memref_descriptor(retval)
             element_size = ctypes.sizeof(ranked_memref.aligned.contents)

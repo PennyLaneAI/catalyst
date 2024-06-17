@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* `qjit` adheres to user-specified `mcm_method` given to the `QNode`.
+  [(#798)](https://github.com/PennyLaneAI/catalyst/pull/798)
+
 * The `dynamic_one_shot` transform uses a single auxiliary tape which is repeatedly simulated `n_shots` times to simulate hardware-like results.
   The loop over shots is executed with `catalyst.vmap`.
   [(#5617)](https://github.com/PennyLaneAI/pennylane/pull/5617)
@@ -174,6 +177,9 @@
 * Correctly recording types of constant array when lowering `catalyst.grad` to mlir
   [(#778)](https://github.com/PennyLaneAI/catalyst/pull/778)
 
+* Callbacks can now return types which can be flattened and unflattened.
+  [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
+
 <h3>Internal changes</h3>
 
 * Catalyst uses the `collapse` method of Lightning simulators in `Measure` to select a state vector branch and normalize.
@@ -306,6 +312,7 @@ Haochen Paul Wang,
 Lee James O'Riordan,
 Mehrdad Malekmohammadi,
 Vincent Michaud-Rioux,
+Mudit Pandey,
 Raul Torres,
 Sergei Mironov.
 

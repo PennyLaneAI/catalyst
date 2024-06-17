@@ -53,8 +53,9 @@ from catalyst.jax_tracer import (
     HybridOpRegion,
     QRegPromise,
     trace_function,
-    trace_quantum_tape,
+    trace_quantum_operations,
     unify_convert_result_types,
+    unify_jaxpr_result_types,
 )
 from catalyst.tracing.contexts import (
     EvaluationContext,
@@ -974,7 +975,7 @@ class Cond(HybridOp):
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
-                qreg_out = trace_quantum_tape(
+                qreg_out = trace_quantum_operations(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 ).actualize()
 
@@ -1031,7 +1032,7 @@ class ForLoop(HybridOp):
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+            qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
 
             region = self.regions[0]
@@ -1118,7 +1119,7 @@ class WhileLoop(HybridOp):
         body_tape = self.regions[1].quantum_tape
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
                 self.regions[1].arg_classical_tracers + [qreg_in],

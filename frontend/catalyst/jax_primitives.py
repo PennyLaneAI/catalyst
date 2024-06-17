@@ -38,11 +38,11 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
-from jaxlib.mlir.dialects.func import CallOp
+from jaxlib.mlir.dialects.func import CallOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import PrintOp, PythonCallOp
+from mlir_quantum.dialects.catalyst import CallbackCallOp, CallbackOp, PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.mitigation import ZneOp
 from mlir_quantum.dialects.quantum import (
@@ -257,6 +257,9 @@ def _python_callback_def_impl(*avals, callback, results_aval):  # pragma: no cov
     raise NotImplementedError()
 
 
+CALLBACK_OP_CACHE = {}
+
+
 def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback, results_aval):
     """Callback lowering"""
 
@@ -265,12 +268,24 @@ def _python_callback_lowering(jax_ctx: mlir.LoweringRuleContext, *args, callback
 
     callback_id = registry.register(callback)
 
-    ctx = jax_ctx.module_context.context
-    i64_type = ir.IntegerType.get_signless(64, ctx)
-    identifier = ir.IntegerAttr.get(i64_type, callback_id)
+    params_ty = [arg.type for arg in args]
+    results_ty = list(convert_shaped_arrays_to_tensors(results_aval))
+    fn_ty = FunctionType.get(inputs=params_ty, results=results_ty)
+    fn_ty_attr = ir.TypeAttr.get(fn_ty)
+    cache_key = (callback_id, *params_ty, *results_ty)
+    if cache_key not in CALLBACK_OP_CACHE:
+        module = jax_ctx.module_context.module
+        ip = module.body
+        attrs = [fn_ty_attr, callback_id, len(args), len(results_ty)]
+        with ir.InsertionPoint(ip):
+            callbackOp = CallbackOp(f"callback_{callback_id}", *attrs)
+        CALLBACK_OP_CACHE[cache_key] = callbackOp
 
-    mlir_ty = list(convert_shaped_arrays_to_tensors(results_aval))
-    return PythonCallOp(mlir_ty, args, identifier, number_original_arg=len(args)).results
+    callbackOp = CALLBACK_OP_CACHE[cache_key]
+    symbol = callbackOp.sym_name.value
+    symbol_attr = ir.FlatSymbolRefAttr.get(symbol)
+
+    return CallbackCallOp(results_ty, symbol_attr, args).results
 
 
 #
@@ -758,7 +773,7 @@ def _qinsert_lowering(
 # gphase
 #
 @gphase_p.def_abstract_eval
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
+def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len=0, adjoint=False):
     # The signature here is: (using * to denote zero or more)
     # param, ctrl_qubits*, ctrl_values*
     # since gphase has no target qubits.
@@ -771,17 +786,14 @@ def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
     return (AbstractQbit(),) * (ctrl_len)
 
 
-@qinst_p.def_impl
-def _gphase_abstract_eval(*qubits_or_params, op=None, ctrl_len: int = 0):
+@gphase_p.def_impl
+def _gphase_def_impl(*args, **kwargs):
     """Not implemented"""
     raise NotImplementedError()
 
 
 def _gphase_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params,
-    op=None,
-    ctrl_len: int = 0,
+    jax_ctx: mlir.LoweringRuleContext, *qubits_or_params, op=None, ctrl_len=0, adjoint=False
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -814,6 +826,7 @@ def _gphase_lowering(
         out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     )
     return ctrl_qubits
 
@@ -823,7 +836,7 @@ def _gphase_lowering(
 #
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len: int = 0, params_len: int = 0, ctrl_len: int = 0
+    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -837,19 +850,19 @@ def _qinst_abstract_eval(
 
 
 @qinst_p.def_impl
-def _qinst_def_impl(
-    ctx, *qubits_or_params, op, qubits_len, params_len, ctrl_len
-):  # pragma: no cover
+def _qinst_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
+# pylint: disable=too-many-arguments
 def _qinst_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params: tuple,
+    *qubits_or_params,
     op=None,
-    qubits_len: int = 0,
-    params_len: int = 0,
-    ctrl_len: int = 0,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -901,6 +914,7 @@ def _qinst_lowering(
             in_qubits=qubits,
             in_ctrl_qubits=ctrl_qubits,
             in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
         ).results
 
     return CustomOp(
@@ -911,6 +925,7 @@ def _qinst_lowering(
         gate_name=name_attr,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     ).results
 
 
@@ -918,7 +933,7 @@ def _qinst_lowering(
 # qubit unitary operation
 #
 @qunitary_p.def_abstract_eval
-def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int = 0):
+def _qunitary_abstract_eval(matrix, *qubits, qubits_len=0, ctrl_len=0, adjoint=False):
     for idx in range(qubits_len + ctrl_len):
         qubit = qubits[idx]
         assert isinstance(qubit, AbstractQbit)
@@ -926,9 +941,7 @@ def _qunitary_abstract_eval(matrix, *qubits, qubits_len: int = 0, ctrl_len: int 
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(
-    ctx, matrix, qubits, qubits_len: int = None, ctrl_len: int = 0
-):  # pragma: no cover
+def _qunitary_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -936,8 +949,9 @@ def _qunitary_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     matrix: ir.Value,
     *qubits_or_controlled: tuple,
-    qubits_len: int = 0,
-    ctrl_len: int = 0,
+    qubits_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     qubits = qubits_or_controlled[:qubits_len]
     ctrl_qubits = qubits_or_controlled[qubits_len : qubits_len + ctrl_len]
@@ -986,6 +1000,7 @@ def _qunitary_lowering(
         in_qubits=qubits,
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
+        adjoint=adjoint,
     ).results
 
 

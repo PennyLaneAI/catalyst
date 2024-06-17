@@ -32,6 +32,7 @@ from catalyst.jax_extras.tracing import (
     InDBIdx,
     InputSignature,
     Jaxpr,
+    JaxprEqn,
     OutDBIdx,
     OutputSignature,
     PyTreeDef,
