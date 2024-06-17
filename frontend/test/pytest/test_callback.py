@@ -22,8 +22,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import debug, pure_callback
+from catalyst import accelerate, debug, pure_callback
 from catalyst.api_extensions.callbacks import base_callback
+from catalyst.utils.patching import Patcher
 
 
 @pytest.mark.parametrize("arg", [1, 2, 3])
@@ -415,6 +416,174 @@ def test_numpy_ufuncs():
         return y
 
     assert np.allclose(np.sin(1.0 / 2.0), f(1.0 / 2.0))
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_device(arg):
+    """Test with device parameter"""
+
+    @accelerate(dev=jax.devices()[0])
+    def identity(x):
+        return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_no_device(arg):
+    """Test with no device parameter"""
+
+    @accelerate
+    def identity(x):
+        return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_no_device_inside(arg):
+    """Test with no device parameter accelerate is inside qjit"""
+
+    @qml.qjit
+    def qjitted_fn(x):
+        @accelerate
+        def identity(x):
+            return x
+
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_no_device_autograph(arg):
+    """Test with no device parameter"""
+
+    @accelerate
+    def identity(x):
+        return x
+
+    @qml.qjit(autograph=True)
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [0.1, jnp.array(0.1), jnp.array([0.1]), jnp.array([0.1, 0.2]), jnp.array([[1, 2], [3, 4]])],
+)
+def test_accelerate_manual_jax_jit(arg):
+    """Test with no device parameter"""
+
+    @accelerate
+    @jax.jit
+    def identity(x):
+        return x
+
+    @qml.qjit
+    def qjitted_fn(x):
+        return identity(x)
+
+    assert np.allclose(qjitted_fn(arg), arg)
+
+
+def test_jax_jit_returns_nothing(capsys):
+    """This is more a question for reviewer"""
+
+    @accelerate
+    def noop(x):
+        jax.debug.print("x={x}", x=x)
+
+    @qml.qjit
+    def func(x: float):
+        noop(x)
+        return x
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    func(1.0)
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "x=1.0"
+
+
+def test_non_jax_jittable():
+    """Test that error is raised when jax-jit fails"""
+
+    @accelerate
+    def impossible(x):
+        if x:
+            return 0
+        return 1
+
+    msg = "Function impossible must be jax.jit-able"
+    with pytest.raises(ValueError, match=msg):
+
+        @qml.qjit
+        def func(x: bool):
+            return impossible(x)
+
+
+def test_that_jax_jit_is_called():
+    """Test that jax.jit is called"""
+
+    called_jax_jit = False
+
+    builtin_jax_jit = jax.jit
+
+    def mock_jax_jit(func):
+        nonlocal called_jax_jit
+        called_jax_jit = True
+        return builtin_jax_jit(func)
+
+    with Patcher((jax, "jit", mock_jax_jit)):
+
+        @accelerate
+        def identity(x):
+            return x
+
+        @qml.qjit
+        def wrapper(x):
+            return identity(x)
+
+        wrapper(1.0)
+
+    assert called_jax_jit
+
+
+def test_callback_cache():
+    """Test callback cache. This test is for coverage."""
+
+    @debug.callback
+    def hello_world():
+        print("hello world")
+
+    @qml.qjit
+    def wrapper():
+        hello_world()
+        hello_world()
 
 
 if __name__ == "__main__":

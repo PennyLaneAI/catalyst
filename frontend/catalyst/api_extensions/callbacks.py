@@ -18,11 +18,13 @@ a compiled program. Host callbacks are able to run non-jittable code at runtime
 but require a Python interpreter instance.
 """
 
+import copy
 import ctypes
+import functools
 import inspect
-from functools import wraps
 from typing import Any, Callable
 
+import jax
 import jax.numpy as jnp
 from jax._src.api_util import shaped_abstractify
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_map, tree_unflatten
@@ -38,6 +40,85 @@ from catalyst.utils.types import convert_pytype_to_shaped_array
 
 
 ## API ##
+def accelerate(func=None, *, dev=None):
+    """Execute a ``jax.jit`` accelerated function on classical
+    accelerators such as GPUs from within a qjit-compiled function.
+
+    .. note::
+
+        ``catalyst.accelerate`` doses not currently support
+        differentiation, and cannot be used inside functions that
+        :func:`catalyst.grad` is applied to.
+
+    Args:
+        func (Callable or PjitFunction): The function to be classically
+            accelerated from within the qjit-compiled workflow. This
+            function can be already just-in-time compiled with JAX via
+            the ``jax.jit`` decorator and a specified device. If not,
+            it will be implicitly JIT-compiled, and so must be JIT
+            compatible.
+        dev (jax.Device): the classical accelerator device the JIT-compiled
+            function will run on. Available devices can be retrieved via
+            ``jax.devices()``. If not provided, the default value of
+            ``jax.devices()[0]`` as determined by JAX will be used.
+
+    .. seealso:: :func:`~.pure_callback`, :func:`.debug.callback`.
+
+    **Example**
+
+    .. code-block:: python
+
+        @accelerate(dev=jax.devices("gpu")[0])
+        def classical_fn(x):
+            return jnp.sin(x) ** 2
+
+        @qjit
+        def hybrid_fn(x):
+            y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
+            return jnp.cos(y)
+
+    In addition, you can accelerate function that have already been
+    ``jax.jit`` decorated:
+
+    .. code-block:: python
+
+        @jax.jit
+        def classical_fn(x):
+            x = jax.device_put(x, jax.local_devices("gpu")[0])
+            return jnp.sin(x) ** 2
+
+        @qjit
+        def hybrid_fn(x):
+            y = accelerate(classical_fn)(x) # will be executed on a GPU
+            return jnp.cos(y)
+    """
+
+    if dev is None:
+        dev = jax.devices()[0]
+
+    if not isinstance(func, Callable):
+        kwargs = copy.copy(locals())
+        kwargs.pop("func")
+        return functools.partial(accelerate, **kwargs)
+
+    jitted_fn = jax.jit(func)
+
+    @functools.wraps(func)
+    def defer(*args, **kwargs):
+        # Make abstract variables from input tracers.
+        absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
+        try:
+            # Find the shape of the return value
+            _, returnshape = jax.make_jaxpr(func, return_shape=True)(*absargs, **abskwargs)
+        except Exception as e:
+            name = func.__name__
+            msg = f"Function {name} must be jax.jit-able."
+            raise ValueError(msg) from e
+        return jax_jit_callback(jitted_fn, returnshape, device=dev)(*args, **kwargs)
+
+    return defer
+
+
 def pure_callback(callback_fn, result_type=None):
     """Execute and return the results of a functionally pure Python
     function from within a qjit-compiled function.
@@ -129,15 +210,25 @@ def pure_callback(callback_fn, result_type=None):
         msg += "to be passed in as a parameter or type annotation."
         raise TypeError(msg)
 
-    @base_callback
     def closure(*args, **kwargs) -> result_type:
         return callback_fn(*args, **kwargs)
 
-    return closure
+    return base_callback(closure)
 
 
 ## IMPL ##
-def base_callback(func):
+def jax_jit_callback(callback_fn, result_type, device=None):
+    """Wrapper around base callback that can accept a device as a parameter"""
+
+    result_type = tree_map(convert_pytype_to_shaped_array, result_type)
+
+    def closure(*args, **kwargs) -> result_type:
+        return callback_fn(*args, **kwargs)
+
+    return base_callback(closure, device=device)
+
+
+def base_callback(func, device=None):
     """Decorator that will correctly pass the signature as arguments to the callback
     implementation.
     """
@@ -146,13 +237,13 @@ def base_callback(func):
 
     # We just disable inconsistent return statements
     # Since we are building this feature step by step.
-    @wraps(func)
+    @functools.wraps(func)
     def bind_callback(*args, **kwargs):
         if not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
-        return callback_implementation(func, retty, *args, **kwargs)
+        return callback_implementation(func, retty, *args, **kwargs, device=device)
 
     return bind_callback
 
@@ -186,6 +277,24 @@ class FlatCallable:
 
 class MemrefCallable(FlatCallable):
     """Callable that receives void ptrs."""
+
+    CACHE = {}
+
+    def __new__(cls, func, results_aval, *_args, **_kwargs):
+        # Hash-cons: https://en.wikipedia.org/wiki/Hash_consing
+        flat_results_aval, _ = tree_flatten(results_aval)
+        cache_key = (func, *flat_results_aval)
+        if cls.CACHE.get(cache_key):
+            return cls.CACHE.get(cache_key)
+
+        instance = super().__new__(cls)
+        cls.CACHE[cache_key] = instance
+        return instance
+
+    @classmethod
+    def clearcache(cls):
+        """Clear the memref callable cache"""
+        cls.CACHE.clear()
 
     def __init__(self, func, results_aval, *args, **kwargs):
         super().__init__(func, *args, **kwargs)
@@ -253,8 +362,24 @@ class MemrefCallable(FlatCallable):
         return list(map(ctypes.POINTER, operandTys))
 
 
+class JaxJitCallable(MemrefCallable):
+    """Callable that places the arguments in device before execution"""
+
+    def __init__(self, func, device, results_aval, *args, **kwargs):
+        assert device is not None, "Cannot have none device"
+        self.device = device
+        super().__init__(func, results_aval, *args, **kwargs)
+
+    def asarrays(self, void_ptrs):
+        """cast void_ptrs to jax arrays and move them to a device"""
+        expected_types = self.getOperandTypes()
+        jnparrays = MemrefCallable._asarrays(void_ptrs, expected_types)
+        movedarrays = [jax.device_put(array, self.device) for array in jnparrays]
+        return movedarrays
+
+
 def callback_implementation(
-    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, **kwargs: Any
+    cb: Callable[..., Any], result_shape_dtypes: Any, *args: Any, device=None, **kwargs: Any
 ):
     """
     This function has been modified from its original form in the JAX project at
@@ -268,7 +393,10 @@ def callback_implementation(
 
     results_aval = tree_map(convert_pytype_to_shaped_array, result_shape_dtypes)
     flat_results_aval, out_tree = tree_flatten(results_aval)
-    memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+    if device is None:
+        memref_callable = MemrefCallable(cb, results_aval, *args, **kwargs)
+    else:
+        memref_callable = JaxJitCallable(cb, device, results_aval, *args, **kwargs)
 
     out_flat = python_callback_p.bind(
         *flat_args, callback=memref_callable, results_aval=tuple(flat_results_aval)
