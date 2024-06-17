@@ -122,7 +122,7 @@ def mark_gradient_tracing(method: str):
     finally:
         TRACING_GRADIENTS.pop()
 
-        
+
 def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
@@ -136,7 +136,7 @@ def _make_execution_config(qnode):
     execution_config.gradient_method = _gradient_method
     return execution_config
 
-  
+
 def get_device_shots(dev):
     """Helper function to get device shots."""
     return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
