@@ -1094,9 +1094,9 @@ class WhileLoop(HybridOp):
         cond_trace = self.regions[0].trace
         expansion_strategy = self.expansion_strategy
         with EvaluationContext.frame_tracing_context(ctx, cond_trace):
-            arg_expanded_classical_tracers = expand_args(
-                self.regions[0].arg_classical_tracers, expansion_strategy=expansion_strategy
-            )[0]
+            region = self.regions[0]
+            arg_classical_tracers = region.arg_classical_tracers
+            arg_expanded_classical_tracers, _ = expand_args(arg_classical_tracers, expansion_strategy=expansion_strategy)
             res_classical_tracers = region.res_classical_tracers
             constants = []
             res_expanded_classical_tracers, out_type = expand_results(
