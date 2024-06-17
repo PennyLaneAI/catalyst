@@ -95,8 +95,6 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=too-many-lines
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
@@ -124,7 +122,7 @@ def mark_gradient_tracing(method: str):
     finally:
         TRACING_GRADIENTS.pop()
 
-
+        
 def _make_execution_config(qnode):
     """Updates the execution_config object with information about execution. This is
     used in preprocess to determine what decomposition and validation is needed."""
@@ -137,6 +135,11 @@ def _make_execution_config(qnode):
     execution_config = qml.devices.DefaultExecutionConfig
     execution_config.gradient_method = _gradient_method
     return execution_config
+
+  
+def get_device_shots(dev):
+    """Helper function to get device shots."""
+    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
 
 class Function:
@@ -481,16 +484,19 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     return mlir_module, ctx
 
 
+# pylint: disable=too-many-arguments
 @debug_logger
-def trace_quantum_tape(
+def trace_quantum_operations(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
+    mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
 ) -> QRegPromise:
-    """Recursively trace ``quantum_tape`` containing both PennyLane original and Catalyst extension
-    operations. Produce ``QRegPromise`` object holding the resulting quantum register tracer.
+    """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
+    Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
+    register tracer.
 
     Args:
         quantum_tape: PennyLane quantum tape to trace.
@@ -558,14 +564,19 @@ def trace_quantum_tape(
     if isinstance(device, qml.devices.LegacyDevice):
         # Old device API expands tapes here. Note: this way some ops might bypass the verification.
         # We decided to ignore this since we are aiming new device API.
-        ops = device.expand_fn(quantum_tape)
+        ops = device.expand_fn(quantum_tape).operations
     else:
-        ops = quantum_tape
+        ops = quantum_tape.operations
 
     for op in ops:
         qrp2 = None
         if isinstance(op, HybridOp):
-            qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+            kwargs = (
+                {"postselect_mode": mcm_config.postselect_mode}
+                if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
+                else {}
+            )
+            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
         elif isinstance(op, MeasurementProcess):
             qrp2 = qrp
         else:
@@ -687,9 +698,8 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
-    tape: QuantumTape,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
-    """Trace quantum measurement. Accept a list of QNode ouptputs and its Pytree-shape. Process
+    """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
 
     Args:
@@ -697,16 +707,13 @@ def trace_quantum_measurements(
         qrp (QRegPromise): Quantum register tracer with cached qubits
         outputs (List of quantum function results): List of qnode output JAX tracers to process.
         out_tree (PyTreeDef): PyTree-shape of the outputs.
+        quantum_tape: PennyLane quantum tape.
 
     Returns:
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    if isinstance(device, qml.devices.LegacyDevice):
-        shots = device.shots
-    else:
-        # TODO: support shot vectors
-        shots = tape.shots.total_shots
+    shots = get_device_shots(device)
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
@@ -972,7 +979,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode=None
+    f: Callable, device: QubitDevice, args, kwargs, qnode
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -1066,8 +1073,9 @@ def trace_quantum_function(
                     output = return_values_flat
                     trees = return_values_tree
 
-                qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
+                mcm_config = qnode.execute_kwargs["mcm_config"]
+                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]

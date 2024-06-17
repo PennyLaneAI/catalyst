@@ -17,8 +17,8 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
-
 import logging
+from copy import copy
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
@@ -44,6 +44,7 @@ from catalyst.device import (
     QJITDeviceNewAPI,
     extract_backend_info,
     get_device_capabilities,
+    get_device_shots,
     validate_device_capabilities,
 )
 from catalyst.jax_extras import (
@@ -58,6 +59,28 @@ from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+def _validate_mcm_config(mcm_config, shots):
+    """Helper function for validating that the mcm_config is valid for executing."""
+    mcm_config.postselect_mode = mcm_config.postselect_mode if shots else None
+    if mcm_config.mcm_method is None:
+        mcm_config.mcm_method = (
+            "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
+        )
+    if mcm_config.mcm_method == "deferred":
+        raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
+    if (
+        mcm_config.mcm_method == "single-branch-statistics"
+        and mcm_config.postselect_mode == "hw-like"
+    ):
+        raise ValueError(
+            "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
+        )
+    if mcm_config.mcm_method == "one-shot" and shots is None:
+        raise ValueError(
+            "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
+        )
 
 
 class QFunc:
@@ -87,6 +110,17 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         assert isinstance(self, qml.QNode)
 
+        # Mid-circuit measurement configuration/execution
+        dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
+        if not dynamic_one_shot_called:
+            mcm_config = copy(self.execute_kwargs["mcm_config"])
+            total_shots = get_device_shots(self.device)
+            _validate_mcm_config(mcm_config, total_shots)
+
+            if mcm_config.mcm_method == "one-shot":
+                mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
+                return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
+
         # TODO: Move the capability loading and validation to the device constructor when the
         # support for old device api is dropped.
         program_features = ProgramFeatures(self.device.shots is not None)
@@ -103,7 +137,7 @@ class QFunc:
 
         def _eval_quantum(*args):
             closed_jaxpr, out_type, out_tree = trace_quantum_function(
-                self.func, qjit_device, args, kwargs, qnode=self
+                self.func, qjit_device, args, kwargs, self
             )
             args_expanded = get_implicit_and_explicit_flat_args(None, *args)
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
@@ -117,8 +151,8 @@ class QFunc:
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 
-# pylint: disable=not-callable
-def dynamic_one_shot(qnode):
+# pylint: disable=protected-access,no-member,not-callable
+def dynamic_one_shot(qnode, **kwargs):
     """Transform a QNode to into several one-shot tapes to support dynamic circuit execution.
 
     Args:
@@ -160,6 +194,7 @@ def dynamic_one_shot(qnode):
 
     cpy_tape = None
     aux_tapes = None
+    mcm_config = kwargs.pop("mcm_config", None)
 
     def transform_to_single_shot(qnode):
 
@@ -202,13 +237,18 @@ def dynamic_one_shot(qnode):
         return dynamic_one_shot_partial(qnode)
 
     single_shot_qnode = transform_to_single_shot(qnode)
+    if mcm_config is not None:
+        single_shot_qnode.execute_kwargs["mcm_config"] = mcm_config
+    single_shot_qnode._dynamic_one_shot_called = True
     dev = qnode.device
-    single_shot = 1 if isinstance(dev, qml.devices.LegacyDevice) else qml.measurements.Shots(1)
-    single_name = dev.short_name if isinstance(dev, qml.devices.LegacyDevice) else dev.name
-    single_shot_qnode.device = qml.device(single_name, wires=dev.wires, shots=single_shot)
-    total_shots = (
-        dev.shots if isinstance(qnode.device, qml.devices.LegacyDevice) else dev.shots.total_shots
-    )
+    total_shots = get_device_shots(dev)
+
+    new_dev = copy(dev)
+    if isinstance(new_dev, qml.devices.LegacyDevice):
+        new_dev.shots = 1  # pragma: no cover
+    else:
+        new_dev._shots = qml.measurements.Shots(1)
+    single_shot_qnode.device = new_dev
 
     def one_shot_wrapper(*args, **kwargs):
 
@@ -219,6 +259,6 @@ def dynamic_one_shot(qnode):
         results = catalyst.vmap(wrap_single_shot_qnode)(arg_vmap)
         if isinstance(results[0], tuple) and len(results) == 1:
             results = results[0]
-        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results)
+        return parse_native_mid_circuit_measurements(cpy_tape, aux_tapes, results, interface="jax")
 
     return one_shot_wrapper
