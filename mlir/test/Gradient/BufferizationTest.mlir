@@ -126,3 +126,18 @@ module @test1 {
   // CHECK: memref.copy [[memrefDiff0]], [[diff0]]
   // CHECK: gradient.return {empty = true}
 }
+
+// -----
+
+module @rev_test_no_tape {
+
+  func.func private @bwd(%arg0: tensor<f64>) -> tensor<f64>
+
+  // CHECK-LABEL: gradient.reverse @bwd.rev
+  // CHECK-SAME:[[in0:%.+]]: memref<f64>, [[diff0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[cotan0:%.+]]: memref<f64>)
+  gradient.reverse @bwd.rev(tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>) attributes {argc = 1 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 0 : i64}
+  // CHECK: [[tensorCotangent0:%.+]] = bufferization.to_tensor [[cotan0]]
+  // CHECK: [[tensorDiff0:%.+]] = func.call @bwd([[tensorCotangent0]])
+  // CHECK: [[memrefDiff0:%.+]] = bufferization.to_memref [[tensorDiff0]]
+  // CHECK: gradient.return {empty = true}
+}
