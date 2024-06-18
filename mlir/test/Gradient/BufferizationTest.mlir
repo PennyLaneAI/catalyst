@@ -94,6 +94,24 @@ module @test0 {
 
 // -----
 
+// CHECK-LABEL: @fwd_test_no_tape
+module @fwd_test_no_tape {
+
+  func.func private @fwd(%arg0: tensor<f64>) -> tensor<f64>
+
+  // CHECK-LABEL: gradient.forward @fwd.fwd
+  // CHECK-SAME:[[in0:%.+]]: memref<f64>, [[diff0:%.+]]: memref<f64>, [[out0:%.+]]: memref<f64>, [[cotang0:%.+]]: memref<f64>) attributes
+  gradient.forward @fwd.fwd(tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>) attributes {argc = 1 : i64, implementation = @fwd, resc = 1 : i64, tape = 0 : i64}
+  // CHECK: [[tensor0:%.+]] = bufferization.to_tensor [[in0]]
+  // CHECK: [[outTensor0:%.+]] = func.call @fwd([[tensor0]])
+  // CHECK: [[outMemref0:%.+]] = bufferization.to_memref [[outTensor0]]
+  // CHECK: memref.copy [[outMemref0]], [[out0]]
+  // CHECK: gradient.return {empty = false}
+
+}
+
+// -----
+
 // CHECK-LABEL: @test1
 module @test1 {
   func.func private @rev(tensor<f64>, tensor<f64>) -> tensor<f64>
