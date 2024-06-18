@@ -154,3 +154,17 @@ module @test1 {
   }
 
 }
+
+// -----
+
+module @test_rev_no_tape {
+  func.func private @bwd(%arg0: memref<f64>) -> memref<f64> attributes {llvm.linkage = #llvm.linkage<internal>} {
+    return %arg0 : memref<f64>
+  }
+  // CHECK-LABEL: func.func private @bwd.rev(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: !llvm.ptr, %arg4: !llvm.ptr)
+  gradient.reverse @bwd.rev(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>) attributes {argc = 1 : i64, implementation = @bwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 0 : i64} {
+    %0 = func.call @bwd(%arg3) : (memref<f64>) -> memref<f64>
+    memref.copy %0, %arg1 : memref<f64> to memref<f64>
+    gradient.return {empty = true}
+  }
+}
