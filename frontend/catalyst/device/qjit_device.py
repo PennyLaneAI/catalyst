@@ -467,7 +467,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
 
         if config.gradient_method is not None:
             program.add_transform(verify_no_state_variance_returns)
-            
+
         if config.gradient_method == "adjoint":
             program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
         elif config.gradient_method == "parameter-shift":

@@ -64,12 +64,16 @@ def _verify_nested(
 
 
 def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
-    """Specifies whether or not an observable is accepted by QJITDevice.
+    """Validates whether or not an observable is accepted by QJITDevice.
 
-    Args: 
+    Args:
         obs(Operator): the observable to be validated
         _obs_checker(Callable): a callable that takes an observable
-            and returns True if its supported, and 
+            and raises an error if the observable is unsupported.
+
+    Raises:
+        DifferentiableCompileError: gradient-related error
+        CompileError: compilation error
 
     If the observable is built on one or multiple other observables, check
     both that the overall observable is supported, and that its component
@@ -82,11 +86,11 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
 
         _obs_checker(obs)
 
-        if hasattr(obs, "operands"): # CompositeOp
+        if hasattr(obs, "operands"):  # CompositeOp
             return all([_verify_observable(o, _obs_checker) for o in obs.operands])
-        elif hasattr(obs, "ops"): # Hamiltonian
+        elif hasattr(obs, "ops"):  # Hamiltonian
             return all([_verify_observable(o, _obs_checker) for o in obs.ops])
-        elif hasattr(obs, "base"): # SymbolicOp
+        elif hasattr(obs, "base"):  # SymbolicOp
             return _verify_observable(obs.base, _obs_checker)
 
     _obs_checker(obs)
@@ -267,9 +271,6 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
     return (tape,), lambda x: x[0]
 
 
-
-
-
 @transform
 def validate_observables(
     tape: QuantumTape, qjit_capabilities: dict, name: str
@@ -300,5 +301,5 @@ def validate_observables(
     for m in tape.measurements:
         if m.obs:
             _verify_observable(m.obs, _obs_checker)
-            
+
     return (tape,), lambda x: x[0]
