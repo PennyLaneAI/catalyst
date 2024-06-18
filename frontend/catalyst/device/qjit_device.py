@@ -427,7 +427,7 @@ class QJITDeviceNewAPI(qml.devices.Device):
         _, config = self.original_device.preprocess(execution_config)
         program = TransformProgram()
 
-        if self.qjit_capabilities.non_commuting_observables_flag == False:
+        if self.qjit_capabilities.non_commuting_observables_flag is False:
             program.add_transform(split_non_commuting)
 
         ops_acceptance = partial(catalyst_acceptance, operations=self.operations)
