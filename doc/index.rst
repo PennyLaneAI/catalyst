@@ -90,7 +90,6 @@ Catalyst
    demos/adaptive_circuits_demo
    demos/qml/tutorial_qubit_rotation
    QML Optimization with Optax <demos/qml_optimization>
-   Shallow Quantum Circuits <demos/qml/tutorial_learningshallow>
 
 .. toctree::
    :maxdepth: 1
