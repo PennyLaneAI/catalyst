@@ -33,7 +33,6 @@ jobs:
 
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39"}]
         container_img: ["quay.io/pypa/manylinux_2_28_aarch64"]
@@ -54,12 +53,6 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
         python_version: ${{ matrix.python_version.official }}
-
-    - name: Setup Colima VM
-      run: |
-        set -x
-        colima stop
-        colima start --cpu 4 --memory 16
 
     # Cache external project sources
     - name: Cache LLVM Source
@@ -170,7 +163,6 @@ jobs:
     needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39",   alternative: "39"},
                          {official: "3.10", subversion: "14", package: "python3.10", alternative: "310"},
@@ -192,12 +184,6 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
         python_version: ${{ matrix.python_version.official }}
-
-    - name: Setup Colima VM
-      run: |
-        set -x
-        colima stop
-        colima start --cpu 4 --memory 16
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -271,7 +257,6 @@ jobs:
     needs: [constants, catalyst-linux-wheels-arm64]
     strategy:
       fail-fast: false
-      max-parallel: 1 
       matrix:
         python_version: [{official: "3.9",  subversion: "19", package: "python39"},
                          {official: "3.10", subversion: "14", package: "python3.10"},
@@ -294,12 +279,6 @@ jobs:
       uses: ./.github/workflows/utils/setup_self_hosted_macos_env_linux_arm64
       with:
         python_version: ${{ matrix.python_version.official }}
-    
-    - name: Setup Colima VM
-      run: |
-        set -x
-        colima stop
-        colima start --cpu 4 --memory 16
 
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v4
