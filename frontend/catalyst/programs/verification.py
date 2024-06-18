@@ -79,19 +79,20 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     parts are supported."""
 
     if isinstance(obs, Tensor):
-        (_verify_observable(o, _obs_checker) for o in obs.obs)
+        for o in obs.obs:
+            _verify_observable(o, _obs_checker)
 
     else:
         _obs_checker(obs)
 
         if isinstance(obs, (Hamiltonian, CompositeOp, SymbolicOp)):
 
-            _obs_checker(obs)
-
             if hasattr(obs, "operands"):  # CompositeOp
-                (_verify_observable(o, _obs_checker) for o in obs.operands)
+                for o in obs.operands:
+                    _verify_observable(o, _obs_checker)
             elif hasattr(obs, "ops"):  # Hamiltonian
-                (_verify_observable(o, _obs_checker) for o in obs.ops)
+                for o in obs.ops:
+                    _verify_observable(o, _obs_checker)
             elif hasattr(obs, "base"):  # SymbolicOp
                 _verify_observable(obs.base, _obs_checker)
 
@@ -234,6 +235,9 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 @transform
 def validate_observables_parameter_shift(tape: QuantumTape):
     """Validate that the observables on the tape support parameter shift"""
+
+    # ToDo: add verification support for Composite and Symbolic op
+    # observables with parameter shift
 
     def _obs_checker(obs):
         if obs and obs.grad_method not in {"A", None}:

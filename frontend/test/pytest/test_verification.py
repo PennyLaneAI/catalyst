@@ -361,7 +361,8 @@ class TestHybridOpVerification:
                 return grad(f)(x)
 
     def test_pennylane_adj_of_hybridop_raises_error(self):
-        """Test that a PennyLane Controlled op with a HybridOp as its base is caught in verification"""
+        """Test that a PennyLane Controlled op with a HybridOp as its base is caught
+        in verification"""
 
         @qml.qnode(get_custom_device(wires=4))
         def f(x: float):
@@ -601,7 +602,7 @@ class TestObservableValidation:
         validate_observables(tape, qjit_capabilities, dev.name)
 
         del qjit_capabilities.native_obs[obs_type]
-        with pytest.raises(CompileError, match=f"not supported as an observable"):
+        with pytest.raises(CompileError, match="not supported as an observable"):
             validate_observables(tape, qjit_capabilities, dev.name)
 
 
@@ -740,9 +741,6 @@ class TestParameterShiftMethodVerification:
         def f(x):
             qml.PauliY(wires=1)
             qml.RX(x, wires=0)
-            A = np.array(
-                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
-            )
             return qml.expval(observable)
 
         with pytest.raises(
