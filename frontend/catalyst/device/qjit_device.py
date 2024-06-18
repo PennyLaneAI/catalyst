@@ -454,18 +454,10 @@ def filter_out_modifiers(operations):
     Returns:
         Set: filtered set of operation names
     """
-    control = re.compile(r"^C\(.*\)$")
-    adjoint = re.compile(r"^Adjoint\(.*\)$")
-    c_adjoint = re.compile(r"^C\(Adjoint\(.*\)\)$")
-    adjoint_c = re.compile(r"^Adjoint\(C\(.*\)\)$")
+    pattern = re.compile(r"^(C|Adjoint)\(.*\)$")
 
     def is_not_modifier(op):
-        return not (
-            re.match(control, op)
-            or re.match(adjoint, op)
-            or re.match(c_adjoint, op)
-            or re.match(adjoint_c, op)
-        )
+        return not re.match(pattern, op)
 
     return set(filter(is_not_modifier, operations))
 
