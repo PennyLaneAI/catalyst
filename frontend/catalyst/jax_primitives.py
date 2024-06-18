@@ -87,7 +87,6 @@ from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-arguments
 
-
 #########
 # Types #
 #########

@@ -128,7 +128,7 @@ class PauliX2(qml.PauliX):
     grad_method = "F"
 
     def __repr__(self):
-        return f"PauliX2"
+        return "PauliX2"
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
