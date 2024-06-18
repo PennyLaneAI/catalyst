@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from textwrap import dedent
+
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
@@ -27,14 +29,20 @@ class TestCondToJaxpr:
 
     def test_basic_cond_to_jaxpr(self):
         """Check the JAXPR of simple conditional function."""
+        # pylint: disable=line-too-long
 
-        expected = """{ lambda ; a:i64[]. let
-    b:bool[] = eq a 5
-    c:i64[] = cond[
-      branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                     { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-    ] b a a
-  in (c,) }"""
+        expected = dedent(
+            """
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5
+                c:i64[] = cond[
+                  branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
+                                 { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                  nimplicit_outputs=0
+                ] b a a
+              in (c,) }
+            """
+        )
 
         @qjit
         def circuit(n: int):
@@ -50,7 +58,7 @@ class TestCondToJaxpr:
             return out
 
         def asline(text):
-            return " ".join(map(lambda x: x.strip(), str(text).split("\n")))
+            return " ".join(map(lambda x: x.strip(), str(text).split("\n"))).strip()
 
         assert asline(expected) == asline(circuit.jaxpr)
 
@@ -260,7 +268,7 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_type_unification(self, backend):
+    def test_branch_multi_return_type_unification_qnode_1(self, backend):
         """Test that an exception is not raised when the return types of all branches do not match
         but could be unified."""
 
@@ -280,6 +288,50 @@ class TestCond:
                 return measure(wires=0)
 
             return cond_fn()
+
+        assert 0 == circuit()
+
+    def test_branch_multi_return_type_unification_qjit(self):
+        """Test that unification happens before the results of the cond primitve is available."""
+
+        @qjit
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
+                return True
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype("int")
+            return r
+
+        assert 0 == circuit()
+
+    @pytest.mark.xfail(
+        reason="Inability to apply Jax transformations before the quantum traing is complete"
+    )
+    def test_branch_multi_return_type_unification_qnode_2(self, backend):
+        """Test that unification happens before the results of the cond primitve is available.
+        See the FIXME in the ``CondCallable._call_with_quantum_ctx`` function.
+        """
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
+                return True
+
+            r = cond_fn()
+            assert r.dtype is jnp.dtype("int")
+            return r
 
         assert 0 == circuit()
 
