@@ -38,7 +38,6 @@ from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    DynshapedClosedJaxpr,
     ExpansionStrategy,
     InputSignature,
     OutputSignature,
@@ -47,6 +46,7 @@ from catalyst.jax_extras import (
     ShapedArray,
     _abstractify,
     _input_type_to_tracers,
+    cond_expansion_strategy,
     convert_element_type,
     deduce_avals,
     deduce_signatures,
@@ -216,36 +216,107 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     return ClosedJaxpr(jaxpr2, consts)
 
 
-@debug_logger
-def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
-    """Unify result signatures across a set of JAXPRs by promoting to common types.
+def _apply_result_type_conversion(
+    ctx: JaxTracingContext,
+    jaxpr: ClosedJaxpr,
+    consts: List[Any],
+    target_types: List[ShapedArray],
+    num_implicit_outputs: int,
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Re-trace the ``jaxpr`` program and apply type conversion to its results. Return full
+    information about the modified Jaxpr program. The jaxpr program is only allowed to take zero or
+    one quantum register as an argument.
 
     Args:
-        jaxprs (List[ClosedJaxpr]): List of JAXPRs to unify. The result signatures must already have
-                                    matching result numbers, abstract value kinds, and array shapes,
-                                    but may differ in array dtypes.
+        ctx: Jax tracing context object.
+        jaxpr: The Jaxpr program to apply the conversion to.
+        consts: List of constant values we need to know to trace this program.
+        target_types: List of types we want to convert the outputs of the program to. The list must
+                      match the number of outputs, except maybe the very last output if it is Qreg.
+        num_implicit_outputs: Number of implicit outputs found in the Jaxpr program.
 
-    Returns
-        List[ClosedJaxpr]: List of JAXPRs with unified result types.
+    Returns:
+        List[TracerLike]: output tracers of the program
+        InputSignature: new input signature of the function
+        OutputSignature: new output signature of the function
+    """
+    with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
+    args = [AbstractQreg()] if with_qreg else []
+
+    def _fun(*in_tracers):
+        out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
+        out_tracers_, target_types_ = (
+            (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
+        )
+        out_promoted_tracers = [
+            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            for tr, ty in zip(out_tracers_, target_types_)
+        ]
+        return out_promoted_tracers[num_implicit_outputs:] + (
+            [out_tracers[-1]] if with_qreg else []
+        )
+
+    expanded_tracers, in_sig, out_sig = trace_function(
+        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+    )
+
+    return expanded_tracers, in_sig, out_sig
+
+
+def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
+    # TODO: Our custom AbstractQreg happened to be incompatible with jnp.promote_types, we suspect
+    # we failed to match some expectation of Jax. We suggest to make our abstract values compatible
+    # and hopefully remove the logic behind the condition [1]. Should we add AbstractQreg into the
+    # `_weak_types` list of JAX?
+    assert len(types) > 0, "Expected one or more set of types"
+    assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
+
+    def _shapes(ts):
+        return [t.shape for t in ts if isinstance(t, ShapedArray)]
+
+    assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
+    all_ends_with_qreg = all(len(t) > 0 and isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(len(t) == 0 or not isinstance(t[-1], AbstractQreg) for t in types)
+    assert (
+        all_ends_with_qreg or all_not_ends_with_qreg
+    ), "We require either all-qregs or all-non-qregs as last items of the type lists"
+    if all_ends_with_qreg:  # [1]
+        types = [t[:-1] for t in types]
+    results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
+
+
+@debug_logger
+def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
+    """Unify result types of the jaxpr programs given.
+    Args:
+        jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
+                                      matching sizes and numpy array shapes but dtypes might be
+                                      different.
+        consts (list of Jaxpr constants): Constants of the sourece Jaxpr programs.
+        nimplout (list of integers): Numbers of implicit outputs of Jaxpr programs.
+
+    Returns (list of output signatures):
+        Output jaxprs of the new programs
+        Output type of the new programs
+        Output tracers of the new programs
+        Constants of the new programs
 
     Raises:
-        TypePromotionError: Type unification via promotion was not possible.
+        TypePromotionError: Unification is not possible.
+
     """
-    out_signatures = [jaxpr.out_avals for jaxpr in jaxprs]
-    assert all(len(out_sig) == len(out_signatures[0]) for out_sig in out_signatures)
-
-    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
-        # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid
-        # abstact value. One need to investigate how to use it correctly and remove this condition.
-        # Should we add AbstractQreg into the `_weak_types` list of JAX?
-        out_signatures = [avals[:-1] for avals in out_signatures]
-
-    promoted_types = list(map(partial(reduce, jnp.promote_types), zip(*out_signatures)))
-
-    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
-        promoted_types.append(AbstractQreg())
-
-    return [retrace_with_result_types(jaxpr, promoted_types) for jaxpr in jaxprs]
+    promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
+    jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
+    for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
+        tracers, _, out_sig = _apply_result_type_conversion(
+            ctx, j, a, promoted_types, num_implicit_outputs
+        )
+        jaxpr_acc.append(out_sig.out_initial_jaxpr())
+        type_acc.append(out_sig.out_type())
+        tracers_acc.append(tracers)
+        consts_acc.append(out_sig.out_consts())
+    return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
 class QRegPromise:
@@ -370,8 +441,7 @@ class HybridOp(Operator):
         return f"{self.name}(tapes={nested_ops})"
 
     @debug_logger
-    def bind_overwrite_classical_tracers2(
-        # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+    def bind_overwrite_classical_tracers(
         self,
         ctx: JaxTracingContext,
         trace: DynamicJaxprTrace,
@@ -380,7 +450,11 @@ class HybridOp(Operator):
         **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
-        existing output tracers, stored in the operations."""
+        existing output tracers, stored in the operations since the classical tracing stage.
+        User-defined transformations might have changed them by the time this function is called.
+        The quantum tracer, namely the quantum register is not supposed to be changed so it is kept
+        as-is.
+        """
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
@@ -479,10 +553,6 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     MemrefCallable.clearcache()
 
     with transient_jax_config():
-        # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-        if isinstance(jaxpr, DynshapedClosedJaxpr):
-            jaxpr = jaxpr.remove_implicit_results()
-
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
 
     return mlir_module, ctx
@@ -944,7 +1014,12 @@ def reset_qubit(qreg_in, w):
 
     jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
     jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
+    qreg_out = cond_p.bind(
+        m,
+        qreg_mid,
+        branch_jaxprs=[jaxpr_true, jaxpr_false],
+        nimplicit_outputs=0,
+    )[0]
 
     return qreg_out
 
@@ -967,7 +1042,7 @@ def trace_function(
         **kwargs: Sample keyword arguments of the function.
 
     Result:
-        List of output Jax tracers
+        Expanded list of output Jax tracers
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """
