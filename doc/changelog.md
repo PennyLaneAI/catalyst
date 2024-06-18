@@ -346,9 +346,9 @@
 * A new `catalyst::gradient::GradientOpInterface` is available when querying the gradient method in the mlir c++ api.
   [(#800)](https://github.com/PennyLaneAI/catalyst/pull/800)
 
-  `catalyst::gradient::GradOp`, `JVPOp`, and `VJPOp` now inherits traits in this new `GradientOpInterface` (right now there is only a `getMethod()` method, returning "auto"/"fd")
+  `catalyst::gradient::GradOp`, `ValueAndGradOp`, `JVPOp`, and `VJPOp` now inherits traits in this new `GradientOpInterface`. The supported attributes are now `getMethod()`, `getCallee()`, `getDiffArgIndices()`, `getDiffArgIndicesAttr()`, `getFiniteDiffParam()`, and `getFiniteDiffParamAttr()`. 
 
-  There are operations that could potentially be used as `GradOp`, `JVPOp` or `VJPOp`. When trying to get the gradient method, instead of doing 
+  - There are operations that could potentially be used as `GradOp`, `ValueAndGradOp`, `JVPOp` or `VJPOp`. When trying to get the gradient method, instead of doing 
   ```C++
         auto gradOp = dyn_cast<GradOp>(op);
         auto jvpOp = dyn_cast<JVPOp>(op);
@@ -366,6 +366,24 @@
   ```C++
         auto gradOpInterface = cast<GradientOpInterface>(op);
         llvm::StringRef MethodName = gradOpInterface.getMethod();
+  ```
+
+  - Another advantage is that any concrete gradient operation object can behave like a `GradientOpInterface` :
+  ```C++
+  GradOp op; // or ValueAndGradOp op, ...
+  auto foo = [](GradientOpInterface op){
+    llvm::errs() << op.getCallee();
+  };
+  foo(op);  // this works!
+  ```
+
+  - Finally, concrete op specific methods can still be called by "reinterpret"-casting the interface back to a concrete op (provided the concrete op type is correct):
+  ```C++
+  auto foo = [](GradientOpInterface op){
+    size_t numGradients = cast<ValueAndGradOp>(&op)->getGradients().size();
+  };
+  ValueAndGradOp op;
+  foo(op);  // this works!  
   ```
 
 <h3>Contributors</h3>
