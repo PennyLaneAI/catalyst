@@ -17,12 +17,7 @@
 from typing import Any, Callable, Sequence
 
 from pennylane import transform
-from pennylane.measurements import (
-    MutualInfoMP,
-    StateMP,
-    VarianceMP,
-    VnEntropyMP,
-)
+from pennylane.measurements import MutualInfoMP, StateMP, VarianceMP, VnEntropyMP
 from pennylane.operation import Operation, Tensor
 from pennylane.ops import (
     Adjoint,
@@ -85,16 +80,14 @@ def _verify_observable(obs: Operation, _obs_checker: Callable) -> bool:
     else:
         _obs_checker(obs)
 
-        if isinstance(obs, (Hamiltonian, CompositeOp, SymbolicOp)):
-
-            if hasattr(obs, "operands"):  # CompositeOp
-                for o in obs.operands:
-                    _verify_observable(o, _obs_checker)
-            elif hasattr(obs, "ops"):  # Hamiltonian
-                for o in obs.ops:
-                    _verify_observable(o, _obs_checker)
-            elif hasattr(obs, "base"):  # SymbolicOp
-                _verify_observable(obs.base, _obs_checker)
+        if isinstance(obs, CompositeOp):
+            for o in obs.operands:
+                _verify_observable(o, _obs_checker)
+        elif isinstance(obs, Hamiltonian):
+            for o in obs.ops:
+                _verify_observable(o, _obs_checker)
+        elif isinstance(obs, SymbolicOp):
+            _verify_observable(obs.base, _obs_checker)
 
 
 EMPTY_PROPERTIES = OperationProperties(False, False, False)
