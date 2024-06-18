@@ -114,6 +114,29 @@
   `jax.devices()`. If not provided, the default value of
   `jax.devices()[0]` as determined by JAX will be used.
 
+* Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
+  shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
+  ``` python
+  @qjit()
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def f(sz):
+      a = jnp.ones([sz], dtype=float)
+
+      @for_loop(0, 10, 2)
+      def loop(i, a):
+          return a + i
+
+      return loop(a)
+  ```
+  ``` pycon
+  >>> f(3)
+  array([21., 21., 21.])
+  ```
+  There are some limitations regarding the usage of such arrays, notably, the ones captured from the
+  outer scopes of a Python program. These limitations are yet to be addressed.
+  [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
+  [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+
 <h3>Improvements</h3>
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
