@@ -944,9 +944,9 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         // This gives me { { memref, ..., memrefn } }
         auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
         auto ptrTy = LLVM::LLVMPointerType::get(ctx);
-        Type retty =
+        Type inputTapeTy =
             tapeCount > 0 ? dyn_cast<Type>(wrappedFlatTapeStructTy) : dyn_cast<Type>(ptrTy);
-        newFuncInputTys.push_back(retty);
+        newFuncInputTys.push_back(inputTapeTy);
 
         auto newFuncTy = FunctionType::get(ctx, newFuncInputTys, TypeRange{});
 
