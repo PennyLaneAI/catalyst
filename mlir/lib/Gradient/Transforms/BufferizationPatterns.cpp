@@ -252,6 +252,11 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
 
     LogicalResult match(ReverseOp op) const override
     {
+        // Only match with functions that are empty (i.e., just declarations, not definitions)
+        if (!op.empty()) {
+            return failure();
+        }
+
         // Only match here if we have all memref arguments and return values.
         if (llvm::any_of(op.getArgumentTypes(),
                          [](Type argType) { return !isa<MemRefType>(argType); })) {
