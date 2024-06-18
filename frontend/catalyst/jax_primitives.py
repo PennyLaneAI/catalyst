@@ -76,14 +76,16 @@ from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynshapePrimitive,
+    cond_expansion_strategy,
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
+    while_loop_expansion_strategy,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
-# pylint: disable=unused-argument,abstract-method,too-many-lines,too-many-statements
+# pylint: disable=unused-argument,too-many-lines,too-many-statements,too-many-arguments
 
 #########
 # Types #
@@ -213,9 +215,9 @@ expval_p = core.Primitive("expval")
 var_p = core.Primitive("var")
 probs_p = core.Primitive("probs")
 state_p = core.Primitive("state")
-cond_p = core.AxisPrimitive("cond")
+cond_p = DynshapePrimitive("cond")
 cond_p.multiple_results = True
-while_p = core.AxisPrimitive("while_loop")
+while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
 for_p.multiple_results = True
@@ -1434,8 +1436,15 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 # cond
 #
 @cond_p.def_abstract_eval
-def _cond_abstract_eval(*args, branch_jaxprs, **kwargs):
-    return branch_jaxprs[0].out_avals
+def _cond_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
+    out_type = infer_output_type_jaxpr(
+        [()] + branch_jaxprs[0].jaxpr.invars,
+        [],
+        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        expansion_strategy=cond_expansion_strategy(),
+        num_implicit_inputs=None,
+    )
+    return out_type
 
 
 @cond_p.def_impl
@@ -1447,6 +1456,7 @@ def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
+    nimplicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -1516,13 +1526,26 @@ def _cond_lowering(
 # while loop
 #
 @while_p.def_abstract_eval
-def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
-    return body_jaxpr.out_avals
+def _while_loop_abstract_eval(*in_type, body_jaxpr, nimplicit, preserve_dimensions, **kwargs):
+    _assert_jaxpr_without_constants(body_jaxpr)
+    return infer_output_type_jaxpr(
+        [],
+        body_jaxpr.jaxpr.invars,
+        body_jaxpr.jaxpr.outvars[nimplicit:],
+        expansion_strategy=while_loop_expansion_strategy(preserve_dimensions),
+    )
 
 
 @while_p.def_impl
 def _while_loop_def_impl(
-    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts
+    ctx,
+    *iter_args_plus_consts,
+    cond_jaxpr,
+    body_jaxpr,
+    cond_nconsts,
+    body_nconsts,
+    nimplicit,
+    preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
 
@@ -1534,6 +1557,8 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
+    nimplicit: int,
+    preserve_dimensions: bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)

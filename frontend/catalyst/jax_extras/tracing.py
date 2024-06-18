@@ -37,7 +37,6 @@ from typing import (
 
 import jax
 from jax import ShapeDtypeStruct
-from jax._src import state, util
 from jax._src.core import DBIdx, _update_thread_local_jit_state
 from jax._src.interpreters.mlir import _module_name_regex, register_lowering
 from jax._src.interpreters.partial_eval import (
@@ -46,7 +45,7 @@ from jax._src.interpreters.partial_eval import (
     infer_lambda_input_type,
     trace_to_jaxpr_dynamic2,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
+from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.lax import _abstractify
 from jax._src.lax.slicing import (
     _argnum_weak_type,
@@ -57,7 +56,7 @@ from jax._src.lax.slicing import (
 from jax._src.linear_util import annotate
 from jax._src.pjit import _extract_implicit_args, _flat_axes_specs
 from jax._src.source_info_util import current as jax_current
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wraps
+from jax._src.util import safe_map, unzip2, wraps
 from jax.api_util import flatten_fun
 from jax.core import (
     AbstractValue,
@@ -76,6 +75,7 @@ from jax.core import Primitive as JaxprPrimitive
 from jax.core import (
     ShapedArray,
     Trace,
+    Var,
     eval_jaxpr,
     find_top_trace,
     gensym,
@@ -100,10 +100,10 @@ from jax.tree_util import (
 from jaxlib.xla_extension import PyTreeRegistry
 
 from catalyst.jax_extras.patches import _gather_shape_rule_dynamic, get_aval2
-from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.logging import debug_logger
 from catalyst.utils.patching import Patcher
 
-# pylint: disable=protected-access,too-many-lines
+# pylint: disable=protected-access
 
 __all__ = (
     "ClosedJaxpr",
@@ -111,7 +111,8 @@ __all__ = (
     "DynamicJaxprTracer",
     "ExpansionStrategy",
     "for_loop_expansion_strategy",
-    "DynshapedClosedJaxpr",
+    "cond_expansion_strategy",
+    "while_loop_expansion_strategy",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
     "Jaxpr",
@@ -143,10 +144,7 @@ __all__ = (
     "convert_constvars_jaxpr",
     "convert_element_type",
     "eval_jaxpr",
-    "initial_style_jaxprs_with_common_consts1",
-    "initial_style_jaxprs_with_common_consts2",
     "_abstractify",
-    "_initial_style_jaxpr",
     "_input_type_to_tracers",
     "_module_name_regex",
     "make_jaxpr_effects",
@@ -167,36 +165,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
-
-
-class DynshapedClosedJaxpr(ClosedJaxpr):
-    """A wrapper class to handle implicit/explicit result information used by JAX for dynamically
-    shaped arrays. Can be used inplace of any other ClosedJaxpr instance."""
-
-    @debug_logger_init
-    def __init__(self, jaxpr: Jaxpr, consts: Sequence, output_type: OutputType):
-        super().__init__(jaxpr, consts)
-        self.output_type = output_type
-
-    def remove_implicit_results(self):
-        """Remove all implicit result values from this JAXPR.
-
-        Returns:
-            ClosedJaxpr
-        """
-        # Note: a more idiomatic way of doing this would be to re-trace the jaxpr and drop the
-        # unneeded tracers.
-        if not self.output_type:
-            return self
-
-        jaxpr = self.jaxpr
-        out_keep = tuple(zip(*self.output_type))[1]
-        outvars = [o for o, keep in zip(jaxpr._outvars, out_keep) if keep]
-        filtered_jaxpr = Jaxpr(
-            jaxpr.constvars, jaxpr.invars, outvars, jaxpr.eqns, jaxpr.effects, jaxpr.debug_info
-        )
-
-        return ClosedJaxpr(filtered_jaxpr, self.consts)
 
 
 @contextmanager
@@ -319,6 +287,49 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     return [b.e for b in stable_toposort(boxes)]  # [4]
 
 
+def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
+    """Align the constants of Jaxpr programs. Return the list of corresponding programs accepting
+    the same constants."""
+    newvar = gensym(jaxprs, suffix="_")
+
+    # List of constant variables of all jaxprs, preprended with '_'
+    all_mangled_constvars: List[List[Var]] = []
+
+    # Fill the all_mangled_constvars list
+    for jaxpr2 in jaxprs:
+        padded_constvars = []
+        cmap = {}
+        for cv in jaxpr2.constvars:
+            aval = cv.aval
+            if isinstance(aval, DShapedArray):
+                shape2 = []
+                for d in aval.shape:
+                    if hasattr(d, "aval"):
+                        shape2.append(cmap[d])
+                    else:
+                        shape2.append(d)
+                aval = aval.update(shape=tuple(shape2))
+            nv = newvar(aval)
+            cmap[cv] = nv
+            padded_constvars.append(nv)
+        all_mangled_constvars.append(padded_constvars)
+
+    # For each branch, add unused constants from all branches
+    jaxpr_acc = []
+    for jaxpr in jaxprs:
+        padded_constvars = []
+        for i, jaxpr2 in enumerate(jaxprs):
+            if jaxpr2 is jaxpr:
+                padded_constvars.extend(jaxpr2.constvars)
+            else:
+                padded_constvars.extend(all_mangled_constvars[i])
+        jaxpr_acc.append(
+            ClosedJaxpr(convert_constvars_jaxpr(jaxpr.replace(constvars=padded_constvars)), ())
+        )
+
+    return jaxpr_acc
+
+
 @transformation_with_aux
 def expanded_fun(static_args, *args_expanded):
     """Function transformation making the function to accept its arguments in the expanded format
@@ -384,6 +395,10 @@ class OutputSignature:
     out_tree: Callable[[], PyTreeDef]
     out_initial_jaxpr: Callable[[], Jaxpr]
 
+    def num_implicit_outputs(self) -> int:
+        """Return the number of implicit resuts of the function"""
+        return len([() for _, k in self.out_type() if not k])
+
 
 def deduce_signatures(
     f: Callable, args, kwargs, expansion_strategy
@@ -427,77 +442,6 @@ def deduce_signatures(
             out_initial_jaxpr=lambda: out_sig_promise()[0],
         ),
     )
-
-
-def initial_style_jaxprs_with_common_consts1(
-    funs: Sequence[Callable], in_tree, in_avals, primitive_name: str
-):
-    """This function is the head (shorter) part of the original
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The algorithm is the
-    same at the time of this writing, we use this function only to avoid conflicts with future
-    versions of JAX.
-    """
-    jaxprs, all_consts, all_out_trees = unzip3(
-        _initial_style_open_jaxpr(fun, in_tree, in_avals, primitive_name) for fun in funs
-    )
-    closed_jaxprs, consts = initial_style_jaxprs_with_common_consts2(jaxprs, all_consts)
-    return closed_jaxprs, consts, all_out_trees
-
-
-def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
-    """This function is the tail (largest) part of the
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The JAX version
-    traces argument Python functions in order to determine signatures to be unified. Here we rely on
-    the fact that the tracing was already done elsewhere - and this is the only difference.
-    """
-
-    all_const_avals = [map(_abstractify, consts) for consts in all_consts]
-    for consts_avals in all_const_avals:
-        for aval in consts_avals:
-            assert not isinstance(
-                aval, state.AbstractRef
-            ), "AbstractRefs are not supported in this Catalyst version of this function"
-    canonical_ref_indices = []
-    canonical_refs: List[Any] = []
-    all_nonref_consts = []
-    canonical_ref_avals = []
-    all_nonref_const_avals = []
-    for consts, consts_avals in zip(all_consts, all_const_avals):
-        ref_indices = []
-        nonref_consts = []
-        nonref_const_avals = []
-        for c, aval in zip(consts, consts_avals):
-            assert not isinstance(
-                aval, state.AbstractRef
-            ), "AbstractRefs are not supported in this Catalyst version of this function"
-            nonref_consts.append(c)
-            nonref_const_avals.append(aval)
-        all_nonref_consts.append(nonref_consts)
-        all_nonref_const_avals.append(nonref_const_avals)
-        canonical_ref_indices.append(ref_indices)
-
-    newvar = gensym(jaxprs, suffix="_")
-    unused_ref_const_vars = map(newvar, canonical_ref_avals)
-    unused_const_vars = [map(newvar, const_avals) for const_avals in all_nonref_const_avals]
-
-    def pad_jaxpr_constvars(i, jaxpr):
-        is_ref = [isinstance(v.aval, state.AbstractRef) for v in jaxpr.constvars]
-        nonref_constvars, ref_constvars = partition_list(is_ref, jaxpr.constvars)
-        padded_ref_constvars = unused_ref_const_vars[:]
-        for canonical_id, ref_var in zip(canonical_ref_indices[i], ref_constvars):
-            padded_ref_constvars[canonical_id] = ref_var  # pragma: no cover
-        const_prefix = util.concatenate(unused_const_vars[:i])
-        const_suffix = util.concatenate(unused_const_vars[i + 1 :])
-        constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
-        jaxpr = jaxpr.replace(constvars=constvars)
-        effects = make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
-        jaxpr = jaxpr.replace(effects=effects)
-        return jaxpr
-
-    consts = [*canonical_refs, *util.concatenate(all_nonref_consts)]
-    jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
-    closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
-    return closed_jaxprs, consts
 
 
 def deduce_avals(f: Callable, args, kwargs):
@@ -672,9 +616,19 @@ class ExpansionStrategy:
     output_force_arg0_outdbidx: bool
 
 
+def while_loop_expansion_strategy(preserve_dimensions=False):
+    """Arguments and results expansion strategy for while-loops."""
+    return ExpansionStrategy(None, not preserve_dimensions, True, False)
+
+
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
     return ExpansionStrategy(None, not preserve_dimensions, True, True)
+
+
+def cond_expansion_strategy():
+    """Arguments and results expansion strategy for conditionals."""
+    return ExpansionStrategy(None, False, True, False)
 
 
 def infer_output_type(
@@ -750,17 +704,16 @@ def infer_output_type(
     kept_outs = [False] * len(impl_outs) + [True] * len(expl_outs)
     out_type = tuple(zip(out_avals, kept_outs))
 
-    # TODO: Convert back to if- when dynamic API support for other primitives is added
-    assert s.output_force_arg0_outdbidx
-    assert s.output_include_indbidx_vars
-    assert num_implicit_inputs is not None
-    out_type = out_type_force_outdbidx(
-        out_type,
-        len(constants) + num_implicit_inputs,  # for-loop index argument
-        constants,
-        expanded_inputs,
-        all_outs,
-    )
+    if s.output_force_arg0_outdbidx:
+        assert s.output_include_indbidx_vars
+        assert num_implicit_inputs is not None
+        out_type = out_type_force_outdbidx(
+            out_type,
+            len(constants) + num_implicit_inputs,  # for-loop index argument
+            constants,
+            expanded_inputs,
+            all_outs,
+        )
     return all_outs, out_type
 
 
@@ -854,7 +807,6 @@ def expand_args(
 
 
 def expand_results(
-    constants: List[TracerLike],
     expanded_inputs: List[TracerLike],
     results: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
@@ -875,9 +827,7 @@ def expand_results(
         OutputType describing the expanded result
 
     """
-    return infer_output_type(
-        constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs
-    )
+    return infer_output_type([], expanded_inputs, results, expansion_strategy, num_implicit_inputs)
 
 
 def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:
