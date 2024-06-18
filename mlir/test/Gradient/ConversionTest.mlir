@@ -87,6 +87,27 @@ module @test0 {
 
 // -----
 
+// CHECK-LABEL: @test_fwd_lowering_no_tape
+module @test_fwd_lowering_no_tape {
+  func.func private @fwd(%arg0: memref<f64>) -> memref<f64> attributes {llvm.linkage = #llvm.linkage<internal>} {
+    %alloc = memref.alloc() {alignment = 64 : i64} : memref<f64>
+    catalyst.callback_call @callback_139840982544656(%arg0, %alloc) : (memref<f64>, memref<f64>) -> ()
+    return %alloc : memref<f64>
+  }
+  // CHECK-LABEL: @fwd.fwd
+  gradient.forward @fwd.fwd(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>) attributes {argc = 1 : i64, implementation = @fwd, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64, tape = 0 : i64} {
+    %0 = func.call @fwd(%arg0) : (memref<f64>) -> memref<f64>
+    memref.copy %0, %arg2 : memref<f64> to memref<f64>
+    gradient.return {empty = false}
+    // CHECK: "llvm.intr.memcpy"
+    // CHECK: [[null:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK-NEXT: llvm.return [[null]] : !llvm.ptr
+  }
+  catalyst.callback @callback_139840982544656(memref<f64>, memref<f64>) attributes {argc = 1 : i64, id = 139840982544656 : i64, llvm.linkage = #llvm.linkage<internal>, resc = 1 : i64}
+}
+
+// -----
+
 // CHECK-LABEL: @test1
 module @test1 {
 
