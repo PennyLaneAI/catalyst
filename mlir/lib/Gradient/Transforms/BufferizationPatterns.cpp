@@ -279,7 +279,7 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         SmallVector<Value> differentials;
         SmallVector<Value> outputs;
         SmallVector<Value> cotangents;
-        SmallVector<Value> residuals;
+        SmallVector<Value> tapeElements;
 
         Block *block;
         rewriter.updateRootInPlace(op, [&] { block = op.addEntryBlock(); });
@@ -304,7 +304,7 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         auto tapeCount = op.getTape();
         auto uppestLimit = upperLimit + tapeCount;
         for (auto i = upperLimit; i < uppestLimit; i++) {
-            residuals.push_back(params[i]);
+            tapeElements.push_back(params[i]);
         }
 
         auto implAttr = adaptor.getImplementationAttr();
@@ -314,8 +314,8 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         Location loc = op.getLoc();
 
         SmallVector<Value> tensorInputs;
-        for (auto residual : residuals) {
-            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, residual);
+        for (auto tapeElement : tapeElements) {
+            Value tensorIn = rewriter.create<bufferization::ToTensorOp>(loc, tapeElement);
             tensorInputs.push_back(tensorIn);
         }
 

@@ -850,8 +850,8 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         SmallVector<Type> structTapeTys;
         auto converter = getTypeConverter();
         for (auto memrefTapeTy : memrefTapeTys) {
-            auto residualStructTy = converter->convertType(memrefTapeTy);
-            structTapeTys.push_back(residualStructTy);
+            auto structTapeTy = converter->convertType(memrefTapeTy);
+            structTapeTys.push_back(structTapeTy);
         }
 
         MLIRContext *ctx = rewriter.getContext();
@@ -895,7 +895,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         SmallVector<Value> differentials;
         SmallVector<Value> outputs;
         SmallVector<Value> cotangents;
-        SmallVector<Value> residuals;
+        SmallVector<Value> tapeElements;
         auto params = op.getArguments();
 
         for (auto i = 0; i < argc * 2; i++) {
@@ -914,7 +914,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         auto tapeCount = op.getTape();
         auto uppestLimit = upperLimit + tapeCount;
         for (auto i = upperLimit; i < uppestLimit; i++) {
-            residuals.push_back(params[i]);
+            tapeElements.push_back(params[i]);
         }
 
         SmallVector<Type> newFuncInputTys;
@@ -929,18 +929,18 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
             newFuncInputTys.push_back(cotan.getType());
         }
 
-        SmallVector<Type> residualStructs;
+        SmallVector<Type> tapeStructs;
         auto converter = getTypeConverter();
-        for (auto residualMemref : residuals) {
-            auto residualMemrefTy = residualMemref.getType();
-            auto residualStructTy = converter->convertType(residualMemrefTy);
-            residualStructs.push_back(residualStructTy);
+        for (auto tapeMemref : tapeElements) {
+            auto tapeMemrefTy = tapeMemref.getType();
+            auto tapeStructTy = converter->convertType(tapeMemrefTy);
+            tapeStructs.push_back(tapeStructTy);
         }
 
         auto ctx = rewriter.getContext();
         // This gives me a struct of the following type
         // { memref0, memref1, memref2, ... memrefN }
-        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, residualStructs);
+        auto tapeTy = LLVM::LLVMStructType::getLiteral(ctx, tapeStructs);
         // This gives me { { memref, ..., memrefn } }
         auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
         auto ptrTy = LLVM::LLVMPointerType::get(ctx);
@@ -976,13 +976,13 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
             }
 
             SmallVector<Value> tapememrefs;
-            for (auto [_struct, memref] : llvm::zip(tapestructs, residuals)) {
+            for (auto [_struct, memref] : llvm::zip(tapestructs, tapeElements)) {
                 auto memrefTy = memref.getType();
                 auto castOp = rewriter.create<UnrealizedConversionCastOp>(loc, memrefTy, _struct);
                 tapememrefs.push_back(castOp.getResult(0));
             }
 
-            for (auto [newmemref, oldmemref] : llvm::zip(tapememrefs, residuals)) {
+            for (auto [newmemref, oldmemref] : llvm::zip(tapememrefs, tapeElements)) {
                 map.map(oldmemref, newmemref);
             }
         }
