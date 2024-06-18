@@ -111,6 +111,11 @@ SUPPORTED_RT_DEVICES = {
 }
 
 
+def get_device_shots(dev):
+    """Helper function to get device shots."""
+    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
+
+
 @dataclass
 class BackendInfo:
     """Backend information"""
@@ -157,11 +162,8 @@ def extract_backend_info(device: qml.QubitDevice, capabilities: DeviceCapabiliti
         raise CompileError(f"Device at {device_lpath} cannot be found!")
 
     if hasattr(device, "shots"):
-        if isinstance(device, qml.devices.LegacyDevice):
-            device_kwargs["shots"] = device.shots if device.shots else 0
-        else:
-            # TODO: support shot vectors
-            device_kwargs["shots"] = device.shots.total_shots if device.shots else 0
+        shots = get_device_shots(device) or 0
+        device_kwargs["shots"] = shots
 
     if dname == "braket.local.qubit":  # pragma: no cover
         device_kwargs["device_type"] = dname
@@ -468,6 +470,16 @@ class QJITDeviceNewAPI(qml.devices.Device):
         if config.gradient_method is not None:
             program.add_transform(verify_no_state_variance_returns)
 
+        if config.gradient_method == "adjoint":
+            program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
+        elif config.gradient_method == "parameter-shift":
+            program.add_transform(validate_observables_parameter_shift)
+
+        program.add_transform(
+            verify_operations, grad_method=config.gradient_method, qjit_device=self
+        )
+        if config.gradient_method is not None:
+            program.add_transform(verify_no_state_variance_returns)
         if config.gradient_method == "adjoint":
             program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
         elif config.gradient_method == "parameter-shift":
