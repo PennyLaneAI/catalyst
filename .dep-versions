@@ -6,3 +6,4 @@ enzyme=1beb98b51442d50652eaa3ffb9574f4720d611f1
 
 # Always remove custom PL/LQ versions before release.
 pennylane=d90137dd8f6af46699653deda5f839c27701769f
+pennylane-lightning=9598b093172b713f8b883458c65c6e9d9d30d146
