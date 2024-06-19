@@ -773,5 +773,41 @@ def test_example_from_story(arg0, arg1):
     assert np.allclose(jax_jit_cost(arg0, arg1), cost(arg0, arg1))
 
 
+@pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
+def test_active_grad_inside_qjit(backend, scale):
+    """Test that pure callback can be differentiated no tape"""
+
+    @pure_callback
+    def identity(x) -> float:
+        return x
+
+    @identity.fwd
+    def fwd(x):
+        # Still needs to return a tuple.
+        return identity(x), None
+
+    @identity.bwd
+    def bwd(_res, cot):
+        return cot
+
+    @qml.qjit
+    @grad
+    @qml.qnode(qml.device(backend, wires=1))
+    def wrapper(x):
+        param = scale * identity(x)
+        qml.RX(param, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @jax.jit
+    @qml.grad
+    @qml.qnode(qml.device(backend, wires=1))
+    def wrapper_jit(x):
+        param = scale * identity(x)
+        qml.RX(param, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    assert np.allclose(wrapper_jit(42.0), wrapper(42.0))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
