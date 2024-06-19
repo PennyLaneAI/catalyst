@@ -46,7 +46,8 @@ void CallbackCallOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Read::get());
 }
 
-LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
     auto callee = this->getCalleeAttr();
     auto sym = symbolTable.lookupNearestSymbolFrom(this->getOperation(), callee);
     if (!sym) {
