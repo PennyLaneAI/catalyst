@@ -375,6 +375,8 @@ class TestPreprocess:
             qml.RY(0.89, 1)
             return qml.expval(qml.X(0) @ qml.X(1)), qml.expval(qml.Y(0))
 
+        expected_result = unjitted_circuit(1.2)
+
         config = get_device_toml_config(dev)
         spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
 
@@ -382,7 +384,8 @@ class TestPreprocess:
         config["compilation"]["non_commuting_observables"] = True
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
             jitted_circuit = qml.qjit(unjitted_circuit)
-            assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 2
+            assert np.allclose(jitted_circuit(1.2), expected_result)
 
         transform_program, _ = spy.spy_return
         assert split_non_commuting not in transform_program
@@ -391,6 +394,9 @@ class TestPreprocess:
         config["compilation"]["non_commuting_observables"] = False
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
             jitted_circuit = qml.qjit(unjitted_circuit)
+            print(jitted_circuit(1.2), expected_result)
+            raise RuntimeError
+            assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
         transform_program, _ = spy.spy_return
