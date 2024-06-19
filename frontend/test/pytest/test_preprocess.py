@@ -394,8 +394,6 @@ class TestPreprocess:
         config["compilation"]["non_commuting_observables"] = False
         with patch("catalyst.device.qjit_device.get_device_toml_config", Mock(return_value=config)):
             jitted_circuit = qml.qjit(unjitted_circuit)
-            print(jitted_circuit(1.2), expected_result)
-            raise RuntimeError
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
