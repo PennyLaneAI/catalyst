@@ -271,8 +271,9 @@ def for_stmt(
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
 
-    # pylint: disable=multiple-statements,missing-class-docstring
-    class EmptyResult: ...
+    # pylint: disable=missing-class-docstring
+    class EmptyResult:
+        ...
 
     results = EmptyResult()
     fallback = False

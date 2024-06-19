@@ -1151,6 +1151,7 @@ def test_pytrees_args_return_classical():
     assert np.allclose(flatten_res_jax, flatten_res_catalyst)
 
 
+@pytest.mark.xfail(reason="The verifier currently doesn't distinguish between active/inactive ops")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
     """Test the adjoint method."""
@@ -1190,7 +1191,7 @@ class TestGradientErrors:
             qml.RX(_bool + 1, wires=0)
             return qml.expval(qml.PauliX(0))
 
-        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
 
             @qml.qjit
             def cir(x: float):

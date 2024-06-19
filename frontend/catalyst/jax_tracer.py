@@ -11,9 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains functions tracing and lowering JAX code to MLIR.
+
 """
+This module contains functions tracing and lowering JAX code to MLIR.
+"""
+
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -23,17 +27,17 @@ import jax.numpy as jnp
 import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import AnyWires, Operator, Wires
-from pennylane.ops import Controlled, ControlledOp, ControlledQubitUnitary
+from pennylane.operation import AnyWires, Operation, Operator, Wires
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledQubitUnitary
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
 import catalyst
+from catalyst.api_extensions.callbacks import MemrefCallable
 from catalyst.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    DynshapedClosedJaxpr,
     ExpansionStrategy,
     InputSignature,
     OutputSignature,
@@ -42,6 +46,7 @@ from catalyst.jax_extras import (
     ShapedArray,
     _abstractify,
     _input_type_to_tracers,
+    cond_expansion_strategy,
     convert_element_type,
     deduce_avals,
     deduce_signatures,
@@ -90,10 +95,52 @@ from catalyst.tracing.contexts import (
 )
 from catalyst.utils.exceptions import CompileError
 
-# pylint: disable=too-many-lines
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+# TODO: refactor the tracer module
+# pylint: disable=too-many-lines
+
+# Global flag tracing wether the function that we trace might be used for gradients
+TRACING_GRADIENTS: List[str] = []
+
+
+def _in_gradient_tracing(qnode) -> Optional[str]:
+    """If we are tracing gradient - return the current grad method."""
+    if len(TRACING_GRADIENTS) == 0:
+        return None
+
+    method = TRACING_GRADIENTS[-1]
+    return qnode.diff_method if method == "auto" else method
+
+
+@contextmanager
+def mark_gradient_tracing(method: str):
+    """Wraps the inner flow with the gradient-tracing flag"""
+    try:
+        TRACING_GRADIENTS.append(method)
+        yield
+    finally:
+        TRACING_GRADIENTS.pop()
+
+
+def _make_execution_config(qnode):
+    """Updates the execution_config object with information about execution. This is
+    used in preprocess to determine what decomposition and validation is needed."""
+
+    if qnode:
+        _gradient_method = _in_gradient_tracing(qnode)
+    else:
+        _gradient_method = None
+
+    execution_config = qml.devices.DefaultExecutionConfig
+    execution_config.gradient_method = _gradient_method
+    return execution_config
+
+
+def get_device_shots(dev):
+    """Helper function to get device shots."""
+    return dev.shots if isinstance(dev, qml.devices.LegacyDevice) else dev.shots.total_shots
 
 
 class Function:
@@ -112,7 +159,10 @@ class Function:
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
-        self.__name__ = fn.__name__
+        if isinstance(fn, partial):
+            self.__name__ = fn.func.__name__
+        else:
+            self.__name__ = fn.__name__
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -166,36 +216,107 @@ def retrace_with_result_types(jaxpr: ClosedJaxpr, target_types: List[ShapedArray
     return ClosedJaxpr(jaxpr2, consts)
 
 
-@debug_logger
-def unify_jaxpr_result_types(jaxprs: List[ClosedJaxpr]) -> List[ClosedJaxpr]:
-    """Unify result signatures across a set of JAXPRs by promoting to common types.
+def _apply_result_type_conversion(
+    ctx: JaxTracingContext,
+    jaxpr: ClosedJaxpr,
+    consts: List[Any],
+    target_types: List[ShapedArray],
+    num_implicit_outputs: int,
+) -> Tuple[List[Any], InputSignature, OutputSignature]:
+    """Re-trace the ``jaxpr`` program and apply type conversion to its results. Return full
+    information about the modified Jaxpr program. The jaxpr program is only allowed to take zero or
+    one quantum register as an argument.
 
     Args:
-        jaxprs (List[ClosedJaxpr]): List of JAXPRs to unify. The result signatures must already have
-                                    matching result numbers, abstract value kinds, and array shapes,
-                                    but may differ in array dtypes.
+        ctx: Jax tracing context object.
+        jaxpr: The Jaxpr program to apply the conversion to.
+        consts: List of constant values we need to know to trace this program.
+        target_types: List of types we want to convert the outputs of the program to. The list must
+                      match the number of outputs, except maybe the very last output if it is Qreg.
+        num_implicit_outputs: Number of implicit outputs found in the Jaxpr program.
 
-    Returns
-        List[ClosedJaxpr]: List of JAXPRs with unified result types.
+    Returns:
+        List[TracerLike]: output tracers of the program
+        InputSignature: new input signature of the function
+        OutputSignature: new output signature of the function
+    """
+    with_qreg = len(target_types) > 0 and isinstance(target_types[-1], AbstractQreg)
+    args = [AbstractQreg()] if with_qreg else []
+
+    def _fun(*in_tracers):
+        out_tracers = eval_jaxpr(jaxpr, consts, *in_tracers)
+        out_tracers_, target_types_ = (
+            (out_tracers[:-1], target_types[:-1]) if with_qreg else (out_tracers, target_types)
+        )
+        out_promoted_tracers = [
+            (convert_element_type(tr, ty) if _abstractify(tr).dtype != ty else tr)
+            for tr, ty in zip(out_tracers_, target_types_)
+        ]
+        return out_promoted_tracers[num_implicit_outputs:] + (
+            [out_tracers[-1]] if with_qreg else []
+        )
+
+    expanded_tracers, in_sig, out_sig = trace_function(
+        ctx, _fun, *args, expansion_strategy=cond_expansion_strategy()
+    )
+
+    return expanded_tracers, in_sig, out_sig
+
+
+def _promote_jaxpr_types(types: List[List[Any]]) -> List[Any]:
+    # TODO: Our custom AbstractQreg happened to be incompatible with jnp.promote_types, we suspect
+    # we failed to match some expectation of Jax. We suggest to make our abstract values compatible
+    # and hopefully remove the logic behind the condition [1]. Should we add AbstractQreg into the
+    # `_weak_types` list of JAX?
+    assert len(types) > 0, "Expected one or more set of types"
+    assert all(len(t) == len(types[0]) for t in types), "Expected matching number of arguments"
+
+    def _shapes(ts):
+        return [t.shape for t in ts if isinstance(t, ShapedArray)]
+
+    assert all(_shapes(t) == _shapes(types[0]) for t in types), "Expected matching shapes"
+    all_ends_with_qreg = all(len(t) > 0 and isinstance(t[-1], AbstractQreg) for t in types)
+    all_not_ends_with_qreg = all(len(t) == 0 or not isinstance(t[-1], AbstractQreg) for t in types)
+    assert (
+        all_ends_with_qreg or all_not_ends_with_qreg
+    ), "We require either all-qregs or all-non-qregs as last items of the type lists"
+    if all_ends_with_qreg:  # [1]
+        types = [t[:-1] for t in types]
+    results = list(map(partial(reduce, jnp.promote_types), zip(*types)))
+    return results + ([AbstractQreg()] if all_ends_with_qreg else [])
+
+
+@debug_logger
+def unify_convert_result_types(ctx, jaxprs, consts, nimplouts):
+    """Unify result types of the jaxpr programs given.
+    Args:
+        jaxprs (list of ClosedJaxpr): Source Jaxpr programs. The program results must have
+                                      matching sizes and numpy array shapes but dtypes might be
+                                      different.
+        consts (list of Jaxpr constants): Constants of the sourece Jaxpr programs.
+        nimplout (list of integers): Numbers of implicit outputs of Jaxpr programs.
+
+    Returns (list of output signatures):
+        Output jaxprs of the new programs
+        Output type of the new programs
+        Output tracers of the new programs
+        Constants of the new programs
 
     Raises:
-        TypePromotionError: Type unification via promotion was not possible.
+        TypePromotionError: Unification is not possible.
+
     """
-    out_signatures = [jaxpr.out_avals for jaxpr in jaxprs]
-    assert all(len(out_sig) == len(out_signatures[0]) for out_sig in out_signatures)
-
-    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
-        # TODO: We seem to use AbstractQreg incorrectly, so JAX doesn't recognize it as a valid
-        # abstact value. One need to investigate how to use it correctly and remove this condition.
-        # Should we add AbstractQreg into the `_weak_types` list of JAX?
-        out_signatures = [avals[:-1] for avals in out_signatures]
-
-    promoted_types = list(map(partial(reduce, jnp.promote_types), zip(*out_signatures)))
-
-    if isinstance(jaxprs[0].out_avals[-1], AbstractQreg):
-        promoted_types.append(AbstractQreg())
-
-    return [retrace_with_result_types(jaxpr, promoted_types) for jaxpr in jaxprs]
+    promoted_types = _promote_jaxpr_types([[v.aval for v in j.outvars] for j in jaxprs])
+    jaxpr_acc, type_acc, tracers_acc, consts_acc = [], [], [], []
+    for j, a, num_implicit_outputs in zip(jaxprs, consts, nimplouts):
+        tracers, _, out_sig = _apply_result_type_conversion(
+            ctx, j, a, promoted_types, num_implicit_outputs
+        )
+        jaxpr_acc.append(out_sig.out_initial_jaxpr())
+        type_acc.append(out_sig.out_type())
+        tracers_acc.append(tracers)
+        consts_acc.append(out_sig.out_consts())
+    return jaxpr_acc, type_acc[0], tracers_acc, consts_acc
 
 
 class QRegPromise:
@@ -320,8 +441,7 @@ class HybridOp(Operator):
         return f"{self.name}(tapes={nested_ops})"
 
     @debug_logger
-    def bind_overwrite_classical_tracers2(
-        # self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
+    def bind_overwrite_classical_tracers(
         self,
         ctx: JaxTracingContext,
         trace: DynamicJaxprTrace,
@@ -330,7 +450,11 @@ class HybridOp(Operator):
         **kwargs,
     ) -> DynamicJaxprTracer:
         """Binds the JAX primitive but override the returned classical tracers with the already
-        existing output tracers, stored in the operations."""
+        existing output tracers, stored in the operations since the classical tracing stage.
+        User-defined transformations might have changed them by the time this function is called.
+        The quantum tracer, namely the quantum register is not supposed to be changed so it is kept
+        as-is.
+        """
         assert self.binder is not None, "HybridOp should set a binder"
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
@@ -368,6 +492,15 @@ def has_nested_tapes(op: Operator) -> bool:
         isinstance(op, HybridOp)
         and len(op.regions) > 0
         and any(r.quantum_tape is not None for r in op.regions)
+    )
+
+
+def nested_quantum_regions(op: Operation) -> List[HybridOpRegion]:
+    """Returns the list of nested quantum regions."""
+    return (
+        [region for region in op.regions if region.quantum_tape is not None]
+        if isinstance(op, HybridOp)
+        else []
     )
 
 
@@ -417,27 +550,27 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     # python function is seen in the cache. This happens during testing or if we wanted to compile a
     # single python function multiple times with different options.
     mlir_fn_cache.clear()
+    MemrefCallable.clearcache()
 
     with transient_jax_config():
-        # We remove implicit Jaxpr result values since we are compiling a top-level jaxpr program.
-        if isinstance(jaxpr, DynshapedClosedJaxpr):
-            jaxpr = jaxpr.remove_implicit_results()
-
         mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
 
     return mlir_module, ctx
 
 
+# pylint: disable=too-many-arguments
 @debug_logger
-def trace_quantum_tape(
+def trace_quantum_operations(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
+    mcm_config: qml.devices.MCMConfig = qml.devices.MCMConfig(),
 ) -> QRegPromise:
-    """Recursively trace ``quantum_tape`` containing both PennyLane original and Catalyst extension
-    operations. Produce ``QRegPromise`` object holding the resulting quantum register tracer.
+    """Recursively trace ``quantum_tape``'s operations containing both PennyLane original and
+    Catalyst extension operations. Produce ``QRegPromise`` object holding the resulting quantum
+    register tracer.
 
     Args:
         quantum_tape: PennyLane quantum tape to trace.
@@ -459,15 +592,13 @@ def trace_quantum_tape(
     #       equations in a wrong order. The set of variables are always complete though, so we sort
     #       the equations to restore their correct order.
 
-    def _bind_native_controlled_op(qrp, op, controlled_wires, controlled_values):
+    def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
-        # `Controlled(OP)` bind OP with native quantum control syntax.
-        is_catalyst_ctrl = isinstance(op, catalyst.api_extensions.Controlled)
-        pl_ctrl_classes = {Controlled, ControlledOp, ControlledQubitUnitary}
-        is_pl_ctrl = op.__class__ in pl_ctrl_classes
-        is_ctrl = is_catalyst_ctrl or is_pl_ctrl
-        if is_ctrl:
-            return _bind_native_controlled_op(qrp, op.base, op.control_wires, op.control_values)
+        # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
+        if type(op) in (Controlled, ControlledOp, ControlledQubitUnitary):
+            return bind_native_operation(qrp, op.base, op.control_wires, op.control_values, adjoint)
+        elif isinstance(op, Adjoint):
+            return bind_native_operation(qrp, op.base, controlled_wires, controlled_values, True)
         elif isinstance(op, QubitUnitary):
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
@@ -475,6 +606,7 @@ def trace_quantum_tape(
                 *[*op.parameters, *qubits, *controlled_qubits, *controlled_values],
                 qubits_len=len(qubits),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
@@ -483,6 +615,7 @@ def trace_quantum_tape(
             qubits2 = gphase_p.bind(
                 *[*op.parameters, *controlled_qubits, *controlled_values],
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(controlled_wires, qubits2)
         else:
@@ -494,32 +627,34 @@ def trace_quantum_tape(
                 qubits_len=len(qubits),
                 params_len=len(op.parameters),
                 ctrl_len=len(controlled_qubits),
+                adjoint=adjoint,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
         return qrp
 
     qrp = QRegPromise(qreg)
+
     if isinstance(device, qml.devices.LegacyDevice):
-        ops = device.expand_fn(quantum_tape)
+        # Old device API expands tapes here. Note: this way some ops might bypass the verification.
+        # We decided to ignore this since we are aiming new device API.
+        ops = device.expand_fn(quantum_tape).operations
     else:
-        ops = quantum_tape
+        ops = quantum_tape.operations
 
     for op in ops:
         qrp2 = None
-        # We need to exclude HybridCtrl here because single-op control instances are kept
-        # as instances of the Catalyst Controlled class, which also inherits from HybridCtrl,
-        # but should be translated to JAXPR as a regular PennyLane Controlled op.
-        # Native HybridCtrl operations are not yet supported in the compiler.
-        if isinstance(op, HybridOp) and not isinstance(
-            op, catalyst.api_extensions.quantum_operators.HybridCtrl
-        ):
-            qrp2 = op.trace_quantum(ctx, device, trace, qrp)
+        if isinstance(op, HybridOp):
+            kwargs = (
+                {"postselect_mode": mcm_config.postselect_mode}
+                if isinstance(op, catalyst.api_extensions.quantum_operators.MidCircuitMeasure)
+                else {}
+            )
+            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
+        elif isinstance(op, MeasurementProcess):
+            qrp2 = qrp
         else:
-            if isinstance(op, MeasurementProcess):
-                qrp2 = qrp
-            else:
-                qrp2 = _bind_native_controlled_op(qrp, op, [], [])
+            qrp2 = bind_native_operation(qrp, op, [], [])
 
         assert qrp2 is not None
         qrp = qrp2
@@ -637,9 +772,8 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
-    tape: QuantumTape,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
-    """Trace quantum measurement. Accept a list of QNode ouptputs and its Pytree-shape. Process
+    """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
 
     Args:
@@ -647,16 +781,13 @@ def trace_quantum_measurements(
         qrp (QRegPromise): Quantum register tracer with cached qubits
         outputs (List of quantum function results): List of qnode output JAX tracers to process.
         out_tree (PyTreeDef): PyTree-shape of the outputs.
+        quantum_tape: PennyLane quantum tape.
 
     Returns:
         out_classical_tracers: modified list of JAX classical qnode ouput tracers.
         out_tree: modified PyTree-shape of the qnode output.
     """
-    if isinstance(device, qml.devices.LegacyDevice):
-        shots = device.shots
-    else:
-        # TODO: support shot vectors
-        shots = tape.shots.total_shots
+    shots = get_device_shots(device)
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
@@ -776,7 +907,13 @@ def is_transform_valid_for_batch_transforms(tape, flat_results):
 
 
 @debug_logger
-def apply_transform(qnode_program, device_program, device_modify_measurements, tape, flat_results):
+def apply_transform(
+    qnode_program,
+    device_program,
+    device_modify_measurements,
+    tape,
+    flat_results,
+):
     """Apply transform."""
     # Some transforms use trainability as a basis for transforming.
     # See batch_params
@@ -792,13 +929,15 @@ def apply_transform(qnode_program, device_program, device_modify_measurements, t
     if is_program_transformed or device_modify_measurements:
         is_valid_for_batch = is_transform_valid_for_batch_transforms(tape, flat_results)
         total_program = qnode_program + device_program
-        tapes, post_processing = total_program([tape])
-        if not is_valid_for_batch and len(tapes) > 1:
-            msg = "Multiple tapes are generated, but each run might produce different results."
-            raise CompileError(msg)
     else:
+        is_valid_for_batch = True
         # Apply the identity transform in order to keep generalization
-        tapes, post_processing = device_program([tape])
+        total_program = device_program
+
+    tapes, post_processing = total_program([tape])
+    if not is_valid_for_batch and len(tapes) > 1:
+        msg = "Multiple tapes are generated, but each run might produce different results."
+        raise CompileError(msg)
     return tapes, post_processing
 
 
@@ -875,7 +1014,12 @@ def reset_qubit(qreg_in, w):
 
     jaxpr_true = jax.make_jaxpr(flip)(qreg_mid)
     jaxpr_false = jax.make_jaxpr(dont_flip)(qreg_mid)
-    qreg_out = cond_p.bind(m, qreg_mid, branch_jaxprs=[jaxpr_true, jaxpr_false])[0]
+    qreg_out = cond_p.bind(
+        m,
+        qreg_mid,
+        branch_jaxprs=[jaxpr_true, jaxpr_false],
+        nimplicit_outputs=0,
+    )[0]
 
     return qreg_out
 
@@ -898,7 +1042,7 @@ def trace_function(
         **kwargs: Sample keyword arguments of the function.
 
     Result:
-        List of output Jax tracers
+        Expanded list of output Jax tracers
         InputSignature of the resulting Jaxpr program
         OutputSignature of the resulting Jaxpr program
     """
@@ -914,7 +1058,7 @@ def trace_function(
 
 @debug_logger
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs, qnode=None
+    f: Callable, device: QubitDevice, args, kwargs, qnode
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -962,9 +1106,9 @@ def trace_quantum_function(
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
                 return_values, is_leaf=is_leaf
             )
-
             if isinstance(device, qml.devices.Device):
-                device_program, _ = device.preprocess(ctx)
+                config = _make_execution_config(qnode)
+                device_program, config = device.preprocess(ctx, config)
             else:
                 device_program = TransformProgram()
 
@@ -1008,8 +1152,9 @@ def trace_quantum_function(
                     output = return_values_flat
                     trees = return_values_tree
 
-                qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
-                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees, tape)
+                mcm_config = qnode.execute_kwargs["mcm_config"]
+                qrp_out = trace_quantum_operations(tape, device, qreg_in, ctx, trace, mcm_config)
+                meas, meas_trees = trace_quantum_measurements(device, qrp_out, output, trees)
                 qreg_out = qrp_out.actualize()
 
                 meas_tracers = [trace.full_raise(m) for m in meas]

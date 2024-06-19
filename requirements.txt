@@ -20,8 +20,9 @@ lit
 pytest
 pytest-xdist
 pytest-cov
+pytest-mock
 nbmake
 
 # optional rt/test dependencies
-pennylane-lightning[kokkos]
+pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
