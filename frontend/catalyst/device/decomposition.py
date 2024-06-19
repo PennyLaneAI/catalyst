@@ -54,7 +54,9 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     Raises a CompileError for MidMeasureMP"""
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
-    if capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled):
+    if op.has_matrix and (
+        capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled)
+    ):
         return _decompose_to_matrix(op)
     return op.decomposition()
 

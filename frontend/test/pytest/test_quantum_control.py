@@ -501,6 +501,22 @@ class TestCatalystControlled:
         assert result.control_values == expected.control_values
         assert result.work_wires == expected.work_wires
 
+    def test_control_decomp_trotter(self):
+        """Test that the Catalyst control can safelt decompose TrotterProduct."""
+
+        coeffs = [0.25, 0.75]
+        ops = [qml.X(0), qml.Z(0)]
+        H = qml.dot(coeffs, ops)
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(0)
+            qml.ControlledSequence(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
+            return qml.expval(qml.PauliZ(0))
+
+        assert qml.math.allclose(qml.qjit(circuit)(), circuit())
 
 ########################################################################################
 #### Controlled TEST SUITE COPIED OVER FROM PENNYLANE FOR UNIFIED BEHAVIOUR TESTING ####
