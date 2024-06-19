@@ -759,7 +759,7 @@ def infer_output_type_python(
     _, _, consts = trace.frame.to_jaxpr2(outputs)
 
     # Calculate output type containing the correct De Brjuin indices
-    expanded_outputs2, out_type2 = infer_output_type(
+    expanded_outputs, out_type = infer_output_type(
         [trace.full_raise(t) for t in consts],
         expanded_inputs,
         outputs,
@@ -768,10 +768,10 @@ def infer_output_type_python(
     )
 
     # Calculate the jaxpr representing the full outputs
-    jaxpr, _, _ = trace.frame.to_jaxpr2(expanded_outputs2)
+    jaxpr, _, _ = trace.frame.to_jaxpr2(expanded_outputs)
 
     # Return the final results
-    return expanded_outputs2, (jaxpr, out_type2, consts)
+    return expanded_outputs, (jaxpr, out_type, consts)
 
 
 def expand_args(
