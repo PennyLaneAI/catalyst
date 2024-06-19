@@ -55,8 +55,8 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
     # TODO: remove hardcoded controlled to matrix decomp.
     # Check op.has_matrix to support controlled ops without matrices:
-    if op.has_matrix and (
-        capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled)
+    if capabilities.to_matrix_ops.get(op.name) or (
+        op.has_matrix and isinstance(op, qml.ops.Controlled)
     ):
         return _decompose_to_matrix(op)
     return op.decomposition()
