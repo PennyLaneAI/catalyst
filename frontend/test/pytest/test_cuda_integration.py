@@ -21,6 +21,7 @@ from numpy.testing import assert_allclose
 
 import catalyst
 from catalyst import measure, qjit
+from catalyst.device import QJITDeviceNewAPI
 from catalyst.utils.exceptions import CompileError
 
 # This import is here on purpose. We shouldn't ever import CUDA
@@ -475,6 +476,34 @@ class TestCudaQ:
 
         observed = circuit2(3.14)
         assert_allclose(expected, observed)
+
+    def test_non_commuting_observable(self, mocker):
+        """Test that returning multiple observables that do not commute returns
+        as expected, and that split_non_commuting is not called in the preprocess"""
+
+        from catalyst.third_party.cuda import cudaqjit as cjit
+
+        spy = mocker.spy(QJITDeviceNewAPI, "preprocess")
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2, shots=10))
+        def circuit1(a):
+            qml.RX(a, wires=0)
+            return qml.expval(qml.X(0)), qml.var(qml.Y(0) @ qml.X(1))
+
+        expected = circuit1(3.14)
+
+        @cjit
+        @qml.qnode(qml.device("softwareq.qpp", wires=2, shots=10))
+        def circuit2(a):
+            qml.RX(a, wires=0)
+            return qml.expval(qml.X(0)), qml.var(qml.Y(0) @ qml.X(1))
+
+        observed = circuit2(3.14)
+        assert_allclose(expected, observed)
+
+        transform_program, _ = spy.spy_return
+        assert split_non_commuting not in transform_program
 
 
 if __name__ == "__main__":
