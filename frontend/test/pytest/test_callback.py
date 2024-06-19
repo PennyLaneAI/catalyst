@@ -656,5 +656,29 @@ def test_active_grad_no_tape(scale):
     assert np.allclose(wrapper(42.0), scale)
 
 
+@pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
+def test_active_grad_tape(scale):
+    """Test that pure callback can be differentiated with a tape"""
+
+    @pure_callback
+    def identity(x) -> float:
+        return x
+
+    @identity.fwd
+    def fwd(x):
+        return identity(x), 1.0
+
+    @identity.bwd
+    def bwd(res, cot):
+        return cot * res
+
+    @qml.qjit
+    @grad
+    def wrapper(x):
+        return scale * identity(x)
+
+    assert np.allclose(wrapper(42.0), scale)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
