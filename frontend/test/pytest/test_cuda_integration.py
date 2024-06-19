@@ -19,11 +19,8 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
-from pennylane.transforms import split_non_commuting
-
 import catalyst
 from catalyst import measure, qjit
-from catalyst.device import QJITDeviceNewAPI
 from catalyst.utils.exceptions import CompileError
 
 # This import is here on purpose. We shouldn't ever import CUDA
