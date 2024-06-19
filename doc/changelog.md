@@ -117,7 +117,7 @@
 * Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
   shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
   ``` python
-  @qjit()
+  @qjit
   @qml.qnode(qml.device("lightning.qubit", wires=4))
   def f(sz):
       a = jnp.ones([sz], dtype=float)
@@ -136,6 +136,18 @@
   outer scopes of a Python program. These limitations are yet to be addressed.
   [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
   [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+
+* Support controlled operations without matrices via applying PennyLane's decomposition.
+  [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit():
+      qml.Hadamard(0)
+      qml.ctrl(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
+      return qml.state()
+  ```
 
 <h3>Improvements</h3>
 
