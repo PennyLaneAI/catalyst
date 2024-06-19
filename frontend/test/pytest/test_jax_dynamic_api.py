@@ -466,7 +466,7 @@ def test_qjit_forloop_index_indbidx():
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 1)
+        @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
         def loop(i, _):
             return jnp.ones([i], dtype=float)
 
@@ -505,7 +505,7 @@ def test_qjit_forloop_shared_dimensions():
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @for_loop(0, 10, 1, experimental_preserve_dimensions=True)
+        @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
         def loop(_i, _a, _b):
             return (input_a, input_a)
 

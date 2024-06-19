@@ -145,7 +145,6 @@ __all__ = (
     "convert_element_type",
     "eval_jaxpr",
     "_abstractify",
-    "_input_type_to_tracers",
     "_module_name_regex",
     "make_jaxpr_effects",
     "make_jaxpr2",
@@ -536,11 +535,29 @@ def make_jaxpr2(
 
 
 def input_type_to_tracers(
-    in_type: InputType, maker: Callable[[AbstractValue], DynamicJaxprTracer]
+    in_type: InputType,
+    arg_maker: Callable[[AbstractValue], DynamicJaxprTracer],
+    const_maker: Callable[[DynamicJaxprTracer], DynamicJaxprTracer]
 ) -> List[DynamicJaxprTracer]:
     """Creates an expanded list of tracers representing an input values of a Jaxpr program"""
-    in_aval, _ = unzip2(in_type)
-    return _input_type_to_tracers(maker, in_aval)
+    in_tracers: list[Tracer] = []
+
+    def _substitute_tracers_in_aval(a: AbstractValue) -> AbstractValue:
+        if isinstance(a, DShapedArray):
+            shape2 = []
+            for d in a.shape:
+                if isinstance(d, DBIdx):
+                    shape2.append(in_tracers[d.val])
+                elif _is_tracer_like(d):
+                    shape2.append(const_maker(d))
+                else:
+                    shape2.append(d)
+            return a.update(shape=tuple(shape2))
+        return a
+
+    for a,_ in in_type:
+        in_tracers.append(arg_maker(_substitute_tracers_in_aval(a)))
+    return in_tracers
 
 
 def output_type_to_tracers(
@@ -570,12 +587,18 @@ def output_type_to_tracers(
 
 TracerLike = TypeVar("TracerLike")
 
+def _is_tracer_like(x):
+    return hasattr(x, "aval")
+
+
+def infer_input_type_constshapes(inputs: List[TracerLike]) -> InputType:
+    """Infer the input type of a function having `inputs` Jax tracers."""
+
+    return tuple([(i.aval if _is_tracer_like(i) else i, True) for i in inputs])
+
 
 def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:
     """Infer the input type of a function having `inputs` Jax tracers."""
-
-    def _is_tracer_like(x):
-        return hasattr(x, "aval")
 
     expl_ins = inputs
     impl_avals = []
@@ -614,21 +637,23 @@ class ExpansionStrategy:
     input_unshare_variables: bool
     output_include_indbidx_vars: bool
     output_force_arg0_outdbidx: bool
+    input_dimensions_as_consts: bool
 
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, False)
+    return ExpansionStrategy(None, not preserve_dimensions, True, False, False)
 
 
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, True)
+    # return ExpansionStrategy(None, not preserve_dimensions, False, False, True)
+    return ExpansionStrategy(None, not preserve_dimensions, True, True, preserve_dimensions)
 
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
-    return ExpansionStrategy(None, False, True, False)
+    return ExpansionStrategy(None, False, True, False, False)
 
 
 def infer_output_type(
@@ -663,12 +688,15 @@ def infer_output_type(
     """
     s = expansion_strategy
 
-    def _is_tracer_like(x):
-        return hasattr(x, "aval")
-
     expl_outs = outputs
     impl_outs = []
-    seen = set() if s.output_include_indbidx_vars else set(map(id, [*constants, *expanded_inputs]))
+    if s.output_include_indbidx_vars:
+        if s.input_dimensions_as_consts:
+            seen = set(map(id, [*constants]))
+        else:
+            seen = set()
+    else:
+        seen = set(map(id, [*constants, *expanded_inputs]))
 
     for o in expl_outs:
         assert _is_tracer_like(o)
@@ -705,7 +733,6 @@ def infer_output_type(
     out_type = tuple(zip(out_avals, kept_outs))
 
     if s.output_force_arg0_outdbidx:
-        assert s.output_include_indbidx_vars
         assert num_implicit_inputs is not None
         out_type = out_type_force_outdbidx(
             out_type,
@@ -793,8 +820,11 @@ def expand_args(
     if s.input_unshare_variables is True:
         assert s.axes_specs is None
         in_type = infer_input_type_unshared(args)
+    elif s.input_dimensions_as_consts is True:
+        in_type = infer_input_type_constshapes(args)
     else:
         in_type = infer_lambda_input_type(s.axes_specs, args)
+
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
 
