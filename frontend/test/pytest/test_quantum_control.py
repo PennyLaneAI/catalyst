@@ -520,6 +520,7 @@ class TestCatalystControlled:
         """Test that the distribute_controlled function with a PennyLane Adjoint,
         creates the equivalent Adjoint(Ctrl(base)) instead of Ctrl(Adj(base))"""
 
+        # pylint: disable=import-outside-toplevel
         from catalyst.api_extensions.quantum_operators import ctrl_distribute
 
         tape = qml.tape.QuantumScript([qml.ops.Adjoint(qml.RX(1.2, 0)), qml.Hadamard(1)])
