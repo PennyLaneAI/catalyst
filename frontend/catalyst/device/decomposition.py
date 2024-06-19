@@ -53,6 +53,8 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     Raises a CompileError for MidMeasureMP"""
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+    # TODO: remove hardcoded controlled to matrix decomp.
+    # Check op.has_matrix to support controlled ops without matrices:
     if op.has_matrix and (
         capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled)
     ):
