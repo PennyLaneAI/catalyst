@@ -773,13 +773,14 @@ def infer_output_type_python(
     )
 
     # Combine the explicitness information with the correct De Brjuin indices
-    assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
-    _, out_keep1 = unzip2(out_type1)
-    out_aval2, _ = unzip2(out_type2)
-    out_type3 = tuple(zip(out_aval2, out_keep1))
+    # assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
+    # _, out_keep1 = unzip2(out_type1)
+    # out_aval2, out_keep2 = unzip2(out_type2)
+    # assert out_keep1 == out_keep2, out_type2
+    # out_type3 = tuple(zip(out_aval2, out_keep1))
 
     # Return the final results
-    return expanded_outputs2, (jaxpr, out_type3, consts)
+    return expanded_outputs2, (jaxpr, out_type2, consts)
 
 
 def expand_args(
