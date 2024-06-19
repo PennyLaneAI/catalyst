@@ -740,5 +740,38 @@ def test_active_jacobian_many_residuals(scale, space):
     assert np.allclose(wrapper(arg), wrapper_jax(arg))
 
 
+@pytest.mark.parametrize("arg0", [(0.1), (0.2), (0.3)])
+@pytest.mark.parametrize("arg1", [(2.0), (3.0), (4.0)])
+def test_example_from_story(arg0, arg1):
+    """Just exactly the same function on the spec
+    modulo errors in the example
+    """
+
+    @pure_callback
+    def some_func(x, y) -> float:
+        return jnp.sin(x) * y
+
+    @some_func.fwd
+    def some_func_fwd(x, y):
+        return some_func(x, y), (jnp.cos(x), jnp.sin(x), y)
+
+    @some_func.bwd
+    def some_func_bws(res, dy):
+        cos_x, sin_x, y = res  # Gets residuals computed in f_fwd
+        return (cos_x * dy * y, sin_x * dy)
+
+    @qml.qjit
+    @grad
+    def cost(x, y):
+        return jnp.sin(some_func(jnp.cos(x), y))
+
+    @jax.jit
+    @jax.grad
+    def jax_jit_cost(x, y):
+        return jnp.sin(jnp.sin(jnp.cos(x)) * y)
+
+    assert np.allclose(jax_jit_cost(arg0, arg1), cost(arg0, arg1))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
