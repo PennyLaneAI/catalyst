@@ -755,13 +755,8 @@ def infer_output_type_python(
     trace: DynamicJaxprTrace = find_top_trace(expanded_inputs)
     outputs = [trace.full_raise(t) for t in outputs]
 
-    # Infer output type assuming the empty list of constants
-    expanded_outputs, out_type1 = infer_output_type(
-        [], expanded_inputs, outputs, expansion_strategy, num_implicit_inputs
-    )
-
-    # Calculate constants using the expanded outputs
-    jaxpr, _, consts = trace.frame.to_jaxpr2(expanded_outputs)
+    # Calculate the constants. We need it to set InDBIdx correctly
+    _, _, consts = trace.frame.to_jaxpr2(outputs)
 
     # Calculate output type containing the correct De Brjuin indices
     expanded_outputs2, out_type2 = infer_output_type(
@@ -772,12 +767,8 @@ def infer_output_type_python(
         num_implicit_inputs,
     )
 
-    # Combine the explicitness information with the correct De Brjuin indices
-    # assert len(out_type1) == len(out_type2), f"\n{out_type1=}\n{out_type2=}"
-    # _, out_keep1 = unzip2(out_type1)
-    # out_aval2, out_keep2 = unzip2(out_type2)
-    # assert out_keep1 == out_keep2, out_type2
-    # out_type3 = tuple(zip(out_aval2, out_keep1))
+    # Calculate the jaxpr representing the full outputs
+    jaxpr, _, _ = trace.frame.to_jaxpr2(expanded_outputs2)
 
     # Return the final results
     return expanded_outputs2, (jaxpr, out_type2, consts)
