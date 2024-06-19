@@ -214,7 +214,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Set
         qjit_capabilities.native_ops.update(
             {
                 "MidCircuitMeasure": OperationProperties(
-                    invertible=True, controllable=True, differentiable=False
+                    invertible=False, controllable=False, differentiable=False
                 )
             }
         )
@@ -460,50 +460,21 @@ class QJITDeviceNewAPI(qml.devices.Device):
 AnyQJITDevice = Union[QJITDevice, QJITDeviceNewAPI]
 
 
-def filter_out_adjoint(operations):
-    """Remove Adjoint from operations.
+def filter_out_modifiers(operations):
+    """Remove Adjoint/Control from operations.
 
     Args:
-        operations (List[Str]): List of strings with names of supported operations
+        operations (Iterable[str]): list of operation names
 
     Returns:
-        List: A list of strings with names of supported operations with Adjoint and C gates
-        removed.
+        Set: filtered set of operation names
     """
-    adjoint = re.compile(r"^Adjoint\(.*\)$")
-    c_adjoint = re.compile(r"^C\(Adjoint\(.*\)\)$")
-    adjoint_c = re.compile(r"^Adjoint\(C\(.*\)\)$")
+    pattern = re.compile(r"^(C|Adjoint)\(.*\)$")
 
-    def is_not_adj(op):
-        return not (re.match(adjoint, op) or re.match(c_adjoint, op) or re.match(adjoint_c, op))
+    def is_not_modifier(op):
+        return not re.match(pattern, op)
 
-    operations_no_adj = filter(is_not_adj, operations)
-    return set(operations_no_adj)
-
-
-def check_no_overlap(*args, device_name):
-    """Check items in *args are mutually exclusive.
-
-    Args:
-        *args (List[Str]): List of strings.
-        device_name (str): Device name for error reporting.
-
-    Raises:
-        CompileError
-    """
-    set_of_sets = [set(arg) for arg in args]
-    union = set.union(*set_of_sets)
-    len_of_sets = [len(arg) for arg in args]
-    if sum(len_of_sets) == len(union):
-        return
-
-    overlaps = set()
-    for s in set_of_sets:
-        overlaps.update(s - union)
-        union = union - s
-
-    msg = f"Device '{device_name}' has overlapping gates: {overlaps}"
-    raise CompileError(msg)
+    return set(filter(is_not_modifier, operations))
 
 
 @debug_logger
@@ -533,23 +504,19 @@ def validate_device_capabilities(
 
     device_name = device.short_name if isinstance(device, qml.devices.LegacyDevice) else device.name
 
-    native = pennylane_operation_set(device_capabilities.native_ops)
-    decomposable = pennylane_operation_set(device_capabilities.to_decomp_ops)
-    matrix = pennylane_operation_set(device_capabilities.to_matrix_ops)
+    native = set(device_capabilities.native_ops.keys())
+    decomposable = set(device_capabilities.to_decomp_ops.keys())
+    matrix = set(device_capabilities.to_matrix_ops.keys())
 
-    check_no_overlap(native, decomposable, matrix, device_name=device_name)
+    overlap = (native & decomposable) | (native & matrix) | (decomposable & matrix)
+    if overlap:
+        raise CompileError(f"Device '{device_name}' has overlapping gates: {overlap}")
 
     if hasattr(device, "operations") and hasattr(device, "observables"):
-        # For gates, we require strict match
-        # TODO: Eliminate string based matching against device declaration, e.g. lightning includes
-        # C(gate) (for some gates), but not Adjoint(gate), or C(Adjoint(gate)) ...
-        device_gates = filter_out_adjoint(set(device.operations))
-        # Lightning-kokkis might support C(GlobalPhase) in Python, but not in C++. We remove this
-        # gate before calling the validation.
-        # See https://github.com/PennyLaneAI/pennylane-lightning/pull/642#discussion_r1535478642
-        if device_name == "lightning.kokkos":
-            device_gates = device_gates - {"C(GlobalPhase)"}
-        spec_gates = filter_out_adjoint(set.union(native, matrix, decomposable))
+        # For validation against PL device properties we only check base gates as Adjoint/Control
+        # declarations can be very sporadic.
+        device_gates = filter_out_modifiers(device.operations)
+        spec_gates = native | decomposable | matrix
         if device_gates != spec_gates:
             raise CompileError(
                 "Gates in qml.device.operations and specification file do not match for "
