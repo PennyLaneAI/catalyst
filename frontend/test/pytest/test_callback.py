@@ -706,5 +706,39 @@ def test_active_grad_many_residuals(scale, space):
     assert np.allclose(wrapper(42.0), scale)
 
 
+@pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
+@pytest.mark.parametrize("space", [(2), (3), (4)])
+def test_active_jacobian_many_residuals(scale, space):
+    """Test that pure callback can be differentiated with many residuals"""
+
+    # This is a hack, just for the type
+    arg = jax.numpy.identity(2, dtype=float)
+
+    @pure_callback
+    def identity(x) -> arg:
+        return x
+
+    @identity.fwd
+    def fwd(x):
+        tape = [1 / space] * space
+        return identity(x), tuple(tape)
+
+    @identity.bwd
+    def bwd(res, cot):
+        return cot * sum(res)
+
+    @qml.qjit
+    @jacobian
+    def wrapper(x):
+        return scale * identity(x)
+
+    @jax.jit
+    @jax.jacobian
+    def wrapper_jax(x):
+        return scale * x
+
+    assert np.allclose(wrapper(arg), wrapper_jax(arg))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
