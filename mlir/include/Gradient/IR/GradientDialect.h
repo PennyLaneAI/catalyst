@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2024 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,5 +16,10 @@
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+
+//===----------------------------------------------------------------------===//
+// Gradient dialect declarations.
+//===----------------------------------------------------------------------===//
 
 #include "Gradient/IR/GradientOpsDialect.h.inc"
