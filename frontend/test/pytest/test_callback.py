@@ -22,7 +22,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import accelerate, debug, pure_callback
+from catalyst import accelerate, debug, grad, pure_callback
 from catalyst.api_extensions.callbacks import base_callback
 from catalyst.utils.patching import Patcher
 
@@ -584,6 +584,26 @@ def test_callback_cache():
     def wrapper():
         hello_world()
         hello_world()
+
+
+@pytest.mark.parametrize("arg", [(0.1), (0.2), (0.3)])
+def test_inactive_debug(capsys, arg):
+    """Test that debug callback can be differentiated
+    and not affects the output"""
+
+    @qml.qjit
+    @grad
+    def identity(x: float):
+        debug.print(x)
+        return x
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+
+    assert np.allclose(identity(arg), 1.0)
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == str(arg)
 
 
 if __name__ == "__main__":
