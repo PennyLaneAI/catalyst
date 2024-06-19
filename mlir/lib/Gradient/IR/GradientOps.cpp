@@ -160,7 +160,8 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     return success(succeeded(r1) && succeeded(r2));
 }
 
-LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
     return success();
 }
 
