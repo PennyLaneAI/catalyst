@@ -14,6 +14,7 @@
 
 import random
 import warnings
+from functools import partial
 from timeit import default_timer as timer
 
 import jax
@@ -956,6 +957,26 @@ class TestQJITUsagePatterns:
         expected = 30
         assert res_pattern_fn_as_argument == expected
         assert res_pattern_partial == expected
+
+
+class TestGradPartial:
+    """Test functools.partial with catalyst.qjit and catalyst.qjit."""
+
+    def test_partial_func_grad(self):
+        """Test if partial triggers function name error with gjit and grad."""
+
+        def fn(x, y):
+            return x * y
+
+        partial_fn = partial(fn, y=1)
+
+        @qjit
+        def grad_partial_fn(x):
+            return grad(partial_fn)(x)
+
+        expected = jax.grad(partial_fn)(0.3)
+
+        assert np.allclose(grad_partial_fn(0.3), expected)
 
 
 if __name__ == "__main__":

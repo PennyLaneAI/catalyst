@@ -44,6 +44,7 @@ from catalyst.device import (
     QJITDeviceNewAPI,
     extract_backend_info,
     get_device_capabilities,
+    get_device_shots,
     validate_device_capabilities,
 )
 from catalyst.jax_extras import (
@@ -58,6 +59,28 @@ from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+def _validate_mcm_config(mcm_config, shots):
+    """Helper function for validating that the mcm_config is valid for executing."""
+    mcm_config.postselect_mode = mcm_config.postselect_mode if shots else None
+    if mcm_config.mcm_method is None:
+        mcm_config.mcm_method = (
+            "one-shot" if mcm_config.postselect_mode == "hw-like" else "single-branch-statistics"
+        )
+    if mcm_config.mcm_method == "deferred":
+        raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
+    if (
+        mcm_config.mcm_method == "single-branch-statistics"
+        and mcm_config.postselect_mode == "hw-like"
+    ):
+        raise ValueError(
+            "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
+        )
+    if mcm_config.mcm_method == "one-shot" and shots is None:
+        raise ValueError(
+            "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
+        )
 
 
 class QFunc:
@@ -89,35 +112,12 @@ class QFunc:
 
         # Mid-circuit measurement configuration/execution
         dynamic_one_shot_called = getattr(self, "_dynamic_one_shot_called", False)
-
         if not dynamic_one_shot_called:
             mcm_config = copy(self.execute_kwargs["mcm_config"])
             total_shots = get_device_shots(self.device)
-
-            mcm_config.postselect_mode = mcm_config.postselect_mode if total_shots else None
-            if mcm_config.mcm_method is None:
-                mcm_config.mcm_method = (
-                    "one-shot"
-                    if mcm_config.postselect_mode == "hw-like"
-                    else "single-branch-statistics"
-                )
-            if mcm_config.mcm_method == "deferred":
-                raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
-            if (
-                mcm_config.mcm_method == "single-branch-statistics"
-                and mcm_config.postselect_mode == "hw-like"
-            ):
-                raise ValueError(
-                    "Cannot use postselect_mode='hw-like' with Catalyst when "
-                    "mcm_method != 'one-shot'."
-                )
+            _validate_mcm_config(mcm_config, total_shots)
 
             if mcm_config.mcm_method == "one-shot":
-                if total_shots is None:
-                    raise ValueError(
-                        "Cannot use the 'one-shot' method for mid-circuit measurements with "
-                        "analytic mode."
-                    )
                 mcm_config.postselect_mode = mcm_config.postselect_mode or "hw-like"
                 return dynamic_one_shot(self, mcm_config=mcm_config)(*args, **kwargs)
 
@@ -245,7 +245,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
     new_dev = copy(dev)
     if isinstance(new_dev, qml.devices.LegacyDevice):
-        new_dev.shots = 1
+        new_dev.shots = 1  # pragma: no cover
     else:
         new_dev._shots = qml.measurements.Shots(1)
     single_shot_qnode.device = new_dev

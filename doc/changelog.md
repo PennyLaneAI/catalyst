@@ -91,6 +91,52 @@
 
   ```
 
+* Add support for accelerating classical processing via JAX with `catalyst.accelerate`.
+  [(#805)](https://github.com/PennyLaneAI/catalyst/pull/805)
+
+  Classical code that can be just-in-time compiled with JAX can now be seamlessly just
+  in time compiled with `catalyst.accelerate` and included within QJIT-compiled functions.
+  `catalyst.accelerate` can be used as a
+  decorator without specifying a device:
+
+  ```python
+  @accelerate(dev=jax.devices("gpu")[0])
+  def classical_fn(x):
+      return jnp.sin(x) ** 2
+
+  @qjit
+  def hybrid_fn(x):
+      y = classical_fn(jnp.sqrt(x)) # will be executed on a GPU
+      return jnp.cos(y)
+  ```
+
+  Available devices can be retrieved via
+  `jax.devices()`. If not provided, the default value of
+  `jax.devices()[0]` as determined by JAX will be used.
+
+* Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
+  shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
+  ``` python
+  @qjit()
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def f(sz):
+      a = jnp.ones([sz], dtype=float)
+
+      @for_loop(0, 10, 2)
+      def loop(i, a):
+          return a + i
+
+      return loop(a)
+  ```
+  ``` pycon
+  >>> f(3)
+  array([21., 21., 21.])
+  ```
+  There are some limitations regarding the usage of such arrays, notably, the ones captured from the
+  outer scopes of a Python program. These limitations are yet to be addressed.
+  [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
+  [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+
 <h3>Improvements</h3>
 
 * Catalyst now performs a stricter validation of the wire requirements for devices. In particular,
@@ -151,6 +197,9 @@
 * Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not.
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
 
+* A new GitHub workflow makes available a binary distribution for Linux Arm64.
+  [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
@@ -179,6 +228,9 @@
 
 * Callbacks can now return types which can be flattened and unflattened.
   [(#812)](https://github.com/PennyLaneAI/catalyst/pull/812)
+
+* `catalyst.qjit` and `catalyst.grad` can now get `__name__` from `functools.partial`.
+  [(#820)](https://github.com/PennyLaneAI/catalyst/pull/820)
 
 <h3>Internal changes</h3>
 
@@ -314,7 +366,8 @@ Mehrdad Malekmohammadi,
 Vincent Michaud-Rioux,
 Mudit Pandey,
 Raul Torres,
-Sergei Mironov.
+Sergei Mironov,
+Tzung-Han Juang.
 
 # Release 0.6.0
 
