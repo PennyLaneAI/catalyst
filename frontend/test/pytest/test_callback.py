@@ -631,5 +631,30 @@ def test_inactive_debug_jacobian(capsys, arg):
     assert str(arg) in captured.out.strip()
 
 
+@pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
+def test_active_grad_no_tape(scale):
+    """Test that pure callback can be differentiated no tape"""
+
+    @pure_callback
+    def identity(x) -> float:
+        return x
+
+    @identity.fwd
+    def fwd(x):
+        # Still needs to return a tuple.
+        return identity(x), None
+
+    @identity.bwd
+    def bwd(_res, cot):
+        return cot
+
+    @qml.qjit
+    @grad
+    def wrapper(x):
+        return scale * identity(x)
+
+    assert np.allclose(wrapper(42.0), scale)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
