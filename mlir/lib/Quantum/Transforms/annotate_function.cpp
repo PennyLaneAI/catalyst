@@ -16,8 +16,8 @@
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
@@ -45,14 +45,20 @@ bool invalidGradientOperation(FunctionOpInterface op)
         else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
             bool isDifferentiated = false;
             auto callee = callbackCall.getCalleeAttr();
-            auto callback = SymbolTable::lookupNearestSymbolFrom(callbackCall, callee);
+            auto callback =
+                SymbolTable::lookupNearestSymbolFrom<FunctionOpInterface>(callbackCall, callee);
+            bool inactive = callback.getResultTypes().empty();
+            if (inactive) {
+                return WalkResult::advance();
+            }
             auto uses = *SymbolTable::getSymbolUses(callback, mod);
             for (SymbolTable::SymbolUse use : uses) {
                 Operation *user = use.getUser();
                 if (auto customGrad = dyn_cast<catalyst::gradient::CustomGradOp>(user)) {
                     isDifferentiated |= customGrad.getCalleeAttr() == callee;
                 }
-                if (isDifferentiated) break;
+                if (isDifferentiated)
+                    break;
             }
             if (!isDifferentiated) {
                 return WalkResult::interrupt();
