@@ -1888,7 +1888,7 @@ class TestJaxIndexAssignment:
         @qjit(autograph=True)
         def expand_by_two(x):
             first_dim = x.shape[0]
-            result = jnp.empty((first_dim*2, *x.shape[1:]), dtype=x.dtype)
+            result = jnp.empty((first_dim * 2, *x.shape[1:]), dtype=x.dtype)
 
             for i in range(2):
                 start = i * first_dim

@@ -594,7 +594,7 @@ def set_item(target, i, x):
     # Otherwise, fallback to Python's default syntax.
     if isinstance(target, DynamicJaxprTracer):
         if isinstance(i, slice):
-            target = jax.lax.dynamic_update_slice(target, x, (i.start, ))
+            target = jax.lax.dynamic_update_slice(target, x, (i.start,))
         else:
             target = target.at[i].set(x)
     else:
