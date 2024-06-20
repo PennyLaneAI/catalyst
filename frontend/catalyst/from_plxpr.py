@@ -20,29 +20,31 @@ from typing import Callable
 
 import jax
 from jax.extend.linear_util import wrap_init
-
 from pennylane.capture.capture_qnode import _get_qnode_prim, _get_shapes_for
-from pennylane.capture.primitives import _get_abstract_measurement, _get_abstract_operator
+from pennylane.capture.primitives import (
+    _get_abstract_measurement,
+    _get_abstract_operator,
+)
 
+from .device import extract_backend_info, get_device_capabilities
 from .jax_primitives import (
-    sample_p,
-    expval_p,
-    var_p,
-    probs_p,
-    state_p,
-    func_p,
-    qextract_p,
-    namedobs_p,
-    compbasis_p,
-    qdevice_p,
-    qalloc_p,
-    qinst_p,
-    qdealloc_p,
-    qinsert_p,
     AbstractQreg,
+    compbasis_p,
+    expval_p,
+    func_p,
+    namedobs_p,
+    probs_p,
+    qalloc_p,
+    qdealloc_p,
+    qdevice_p,
+    qextract_p,
+    qinsert_p,
+    qinst_p,
+    sample_p,
+    state_p,
+    var_p,
 )
 from .utils.toml import ProgramFeatures
-from .device import get_device_capabilities, extract_backend_info
 
 qnode_prim = _get_qnode_prim()
 AbstractOperator = _get_abstract_operator()
