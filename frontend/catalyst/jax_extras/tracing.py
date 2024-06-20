@@ -606,7 +606,7 @@ def _is_tracer_like(x):
 def infer_input_type_constshapes(inputs: List[TracerLike]) -> InputType:
     """Infer the input type of a function having `inputs` Jax tracers."""
 
-    return tuple([(i.aval if _is_tracer_like(i) else i, True) for i in inputs])
+    return tuple((i.aval if _is_tracer_like(i) else i, True) for i in inputs)
 
 
 def infer_input_type_unshared(inputs: List[TracerLike]) -> InputType:

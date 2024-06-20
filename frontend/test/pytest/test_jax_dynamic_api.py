@@ -14,6 +14,8 @@
 
 """This test fixes our expectations regarding the JAX dynamic API."""
 
+# pytest: disable=too-many-lines
+
 import numpy as np
 import pennylane as qml
 import pytest

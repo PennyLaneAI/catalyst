@@ -1110,14 +1110,14 @@ class WhileLoop(HybridOp):
             _, _, consts = ctx.frames[cond_trace].to_jaxpr2(
                 (*res_classical_tracers, *arg_expanded_classical_tracers)
             )
-            res_expanded_classical_tracers, out_type = expand_results(
+            res_expanded_classical_tracers, _ = expand_results(
                 [cond_trace.full_raise(t) for t in consts],
                 arg_expanded_classical_tracers,
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
-            cond_jaxpr, out_type2, cond_consts = trace_to_jaxpr(
+            cond_jaxpr, _, cond_consts = trace_to_jaxpr(
                 cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
 
@@ -1137,13 +1137,13 @@ class WhileLoop(HybridOp):
             _, _, consts = ctx.frames[body_trace].to_jaxpr2(
                 (*res_classical_tracers, qreg_out, *arg_expanded_tracers)
             )
-            res_expanded_tracers, out_type = expand_results(
+            res_expanded_tracers, _ = expand_results(
                 [body_trace.full_raise(t) for t in consts],
                 arg_expanded_tracers,
                 res_classical_tracers + [qreg_out],
                 expansion_strategy=expansion_strategy,
             )
-            body_jaxpr, out_type2, body_consts = trace_to_jaxpr(
+            body_jaxpr, _, body_consts = trace_to_jaxpr(
                 body_trace, arg_expanded_tracers, res_expanded_tracers
             )
 
