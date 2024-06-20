@@ -625,7 +625,6 @@ def test_qnode_forloop_abstracted_axes():
     @qjit(abstracted_axes={0: "n"})
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(a, b):
-
         @for_loop(0, 10, 2, experimental_preserve_dimensions=False)
         def loop(_i, a, _b):
             b = jnp.ones([a.shape[0] + 1], dtype=float)
@@ -731,7 +730,6 @@ def test_qnode_whileloop_abstracted_axes():
     @qjit(abstracted_axes={0: "n"})
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(a, b):
-
         @while_loop(lambda _a, _b, i: i < 3)
         def loop(a, b, i):
             i += 1
@@ -992,7 +990,6 @@ def test_qnode_cond_abstracted_axes():
         @qjit(abstracted_axes={0: "n"})
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def _f(a, b):
-
             @cond(flag)
             def case():
                 return a

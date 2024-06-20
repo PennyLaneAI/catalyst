@@ -85,6 +85,7 @@ class DeviceCapabilities:  # pylint: disable=too-many-instance-attributes
     mid_circuit_measurement_flag: bool
     runtime_code_generation_flag: bool
     dynamic_qubit_management_flag: bool
+    non_commuting_observables_flag: bool
     options: Dict[str, bool]
 
 
@@ -377,5 +378,6 @@ def load_device_capabilities(
         mid_circuit_measurement_flag=get_compilation_flag(config, "mid_circuit_measurement"),
         runtime_code_generation_flag=get_compilation_flag(config, "runtime_code_generation"),
         dynamic_qubit_management_flag=get_compilation_flag(config, "dynamic_qubit_management"),
+        non_commuting_observables_flag=get_compilation_flag(config, "non_commuting_observables"),
         options=get_options(config),
     )

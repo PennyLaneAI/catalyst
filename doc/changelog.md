@@ -117,7 +117,7 @@
 * Add support for the dynamically-shaped arrays in control-flow primitives. Arrays with dynamic
   shapes can now be used in `for_loop`, `while_loop` and `cond` primitives.
   ``` python
-  @qjit()
+  @qjit
   @qml.qnode(qml.device("lightning.qubit", wires=4))
   def f(sz):
       a = jnp.ones([sz], dtype=float)
@@ -136,6 +136,32 @@
   outer scopes of a Python program. These limitations are yet to be addressed.
   [(#775)](https://github.com/PennyLaneAI/catalyst/pull/775)
   [(#777)](https://github.com/PennyLaneAI/catalyst/pull/777)
+
+* Differentiation support for callbacks. (Not yet enabled on the frontend)
+  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
+  [(#782)](https://github.com/PennyLaneAI/catalyst/pull/782)
+  [(#822)](https://github.com/PennyLaneAI/catalyst/pull/822)
+
+  Parameters to `debug.callback`s are marked as inactive. This means that the
+  This means that the partial derivative of `debug.callback`s does not need to
+  be computed.
+
+  Parameters to `pure_callback`s are active variables. This means the
+  partial derivative of `pure_callback`s needs to be computed.
+  Since callbacks are opaque to the compiler, the user needs to register
+  custom gradients with Enzyme.
+
+* Support controlled operations without matrices via applying PennyLane's decomposition.
+  [(#831)](https://github.com/PennyLaneAI/catalyst/pull/831)
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit():
+      qml.Hadamard(0)
+      qml.ctrl(qml.TrotterProduct(H, time=2.4, order=2), control=[1])
+      return qml.state()
+  ```
 
 <h3>Improvements</h3>
 
@@ -157,10 +183,6 @@
   function, but will be improved to return an array with one measurement result for each
   shot in a shots-based execution mode.
   [(#731)](https://github.com/PennyLaneAI/catalyst/pull/731)
-
-* `debug.callbacks` are marked as inactive. This means `debug.callbacks` will not be considered
-  as active for the computation of gradients.
-  [(#706)](https://github.com/PennyLaneAI/catalyst/pull/706)
 
 * Added support for IsingZZ gate in Catalyst frontend. Previously, the IsingZZ gate would be
   decomposed into a CNOT and RZ gates. However, this is not needed as the PennyLane-Lightning
@@ -196,6 +218,9 @@
 
 * Finite difference is now always possible regardless of whether the differentiated function has a valid gradient for autodiff or not.
   [(#789)](https://github.com/PennyLaneAI/catalyst/pull/789)
+
+* A new GitHub workflow makes available a binary distribution for Linux Arm64.
+  [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
 <h3>Breaking changes</h3>
 

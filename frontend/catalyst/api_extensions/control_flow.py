@@ -658,7 +658,6 @@ class ForLoopCallable:
     def __init__(
         self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
     ):  # pylint:disable=too-many-arguments
-
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.step = step
