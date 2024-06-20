@@ -63,7 +63,6 @@ def get_program_length(reference_tracers):
         quantum_queue = EvaluationContext.find_quantum_queue()
         # Using the the class methods directly allows this to work for both
         # QuantumTape & AnnotatedQueue instances.
-        # pylint: disable=unnecessary-dunder-call
         num_tape_ops = AnnotatedQueue.__len__(quantum_queue)
 
     return num_jaxpr_eqns, num_tape_ops
@@ -81,7 +80,6 @@ def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
         quantum_queue = EvaluationContext.find_quantum_queue()
         # Using the the class methods directly allows this to work for both
         # QuantumTape & AnnotatedQueue instances.
-        # pylint: disable=unnecessary-dunder-call
         while AnnotatedQueue.__len__(quantum_queue) > num_tape_ops:
             AnnotatedQueue.popitem(quantum_queue)
 

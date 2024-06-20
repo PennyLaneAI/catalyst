@@ -96,7 +96,6 @@ def cudaqjit(fn=None, **kwargs):
 
 
 # Do we need to reimplement apply for every child?
-# pylint: disable=abstract-method
 class BaseCudaInstructionSet(qml.QubitDevice):
     """Base instruction set for CUDA-Quantum devices"""
 

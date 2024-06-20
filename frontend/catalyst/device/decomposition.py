@@ -134,6 +134,8 @@ def check_alternative_support(op, capabilities):
     if isinstance(op, qml.ops.Controlled):
         return check_alternative_control_support(op, capabilities)
 
+    return None
+
 
 def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
