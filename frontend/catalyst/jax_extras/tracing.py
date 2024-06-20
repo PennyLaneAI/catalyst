@@ -649,23 +649,21 @@ class ExpansionStrategy:
     input_unshare_variables: bool
     output_include_indbidx_vars: bool
     output_force_arg0_outdbidx: bool
-    input_dimensions_as_consts: bool
 
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, False, preserve_dimensions)
+    return ExpansionStrategy(None, not preserve_dimensions, True, False)
 
 
 def for_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for for-loops."""
-    # return ExpansionStrategy(None, not preserve_dimensions, False, False, True)
-    return ExpansionStrategy(None, not preserve_dimensions, True, True, preserve_dimensions)
+    return ExpansionStrategy(None, not preserve_dimensions, True, True)
 
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
-    return ExpansionStrategy(None, False, True, False, False)
+    return ExpansionStrategy(None, True, True, False)
 
 
 def infer_output_type(
@@ -703,7 +701,7 @@ def infer_output_type(
     expl_outs = outputs
     impl_outs = []
     if s.output_include_indbidx_vars:
-        if s.input_dimensions_as_consts:
+        if not s.input_unshare_variables:
             seen = set(map(id, [*constants]))
         else:
             seen = set()
@@ -833,10 +831,11 @@ def expand_args(
     if s.input_unshare_variables is True:
         assert s.axes_specs is None
         in_type = infer_input_type_unshared(args)
-    elif s.input_dimensions_as_consts is True:
-        in_type = infer_input_type_constshapes(args)
     else:
-        in_type = infer_lambda_input_type(s.axes_specs, args)
+        if s.axes_specs is not None:
+            in_type = infer_lambda_input_type(s.axes_specs, args)
+        else:
+            in_type = infer_input_type_constshapes(args)
 
     return list(_extract_implicit_args(in_type, args)) + list(args), in_type
 
