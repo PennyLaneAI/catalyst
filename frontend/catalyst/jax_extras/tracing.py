@@ -460,7 +460,7 @@ def deduce_avals(f: Callable, args, kwargs):
 
 
 def trace_to_jaxpr(
-    trace: DynamicJaxprTrace, inputs: List[Tracer], outputs: List[Tracer]
+    trace: DynamicJaxprTrace, inputs: List[DynamicJaxprTracer], outputs: List[DynamicJaxprTracer]
 ) -> Tuple[Jaxpr, List[DynamicJaxprTracer], List[Any]]:
     """Get Jaxpr from a Jax trace applying a workaround.  The workaround makes it possible to trace
     the following program `lambda i, a: i<3`. Where `a` is an unused dynamically-shaped array.
@@ -844,11 +844,11 @@ def expand_args(
 
 
 def expand_results(
+    constants: List[Any],
     expanded_inputs: List[TracerLike],
     results: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
-    consts=[],
 ) -> Tuple[List[TracerLike], OutputType]:
     """Calculate the expanded list of results of a Python function, based on its input and output
     tracers/variables.
@@ -866,7 +866,7 @@ def expand_results(
 
     """
     return infer_output_type(
-        consts, expanded_inputs, results, expansion_strategy, num_implicit_inputs
+        constants, expanded_inputs, results, expansion_strategy, num_implicit_inputs
     )
 
 
