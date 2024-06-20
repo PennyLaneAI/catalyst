@@ -297,7 +297,7 @@ def test_quantum_tracing_2():
         i = 0
         a = jnp.ones((x, y + 1), dtype=float)
 
-        @while_loop(lambda _, i: i < 3)
+        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
         def loop(_, i):
             qml.PauliX(wires=0)
             b = jnp.ones((x, y + 1), dtype=float)
@@ -1033,10 +1033,11 @@ def test_qnode_cond_capture():
             b = jnp.ones([sz, 3], dtype=float)
             return a + b
 
-        return case()
+        c = case()
+        return c + a
 
-    assert_array_and_dtype_equal(f(True, 3), 2 * jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(False, 3), 3 * jnp.ones([3, 3]))
 
 
 def test_qjit_cond_identity():
@@ -1100,10 +1101,11 @@ def test_qjit_cond_capture():
             b = jnp.ones([sz, 3], dtype=float)
             return a + b
 
-        return case()
+        c = case()
+        return c + a
 
-    assert_array_and_dtype_equal(f(True, 3), 2 * jnp.ones([3, 3]))
-    assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(True, 3), 3 * jnp.ones([3, 3]))
+    assert_array_and_dtype_equal(f(False, 3), 3 * jnp.ones([3, 3]))
 
 
 if __name__ == "__main__":
