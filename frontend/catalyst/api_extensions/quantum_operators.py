@@ -327,6 +327,11 @@ class MidCircuitMeasure(MidMeasureMP):
         # self.wires = wires
         self.mcm_tracer = mcm_tracer
 
+    @property
+    def name(self):
+        """Operator name"""
+        return "MidCircuitMeasure"
+
     @debug_logger
     def trace_quantum(self, ctx, trace, qrp, postselect_mode=None) -> QRegPromise:
         qubit = qrp.extract(self.wires)[0]

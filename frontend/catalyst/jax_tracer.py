@@ -1097,7 +1097,9 @@ def trace_quantum_function(
                 return_values = tree_unflatten(out_tree_promise(), return_values_flat)
 
             def is_leaf(obj):
-                return isinstance(obj, qml.measurements.MeasurementProcess)
+                return isinstance(obj, qml.measurements.MeasurementProcess) and not isinstance(
+                    obj, qml.measurements.MidMeasureMP
+                )
 
             # 2. Create a new tree that has measurements as leaves
             return_values_flat, return_values_tree = jax.tree_util.tree_flatten(
