@@ -794,7 +794,8 @@ def infer_output_type_python(
         num_implicit_inputs,
     )
 
-    # Calculate the jaxpr representing the full outputs.
+    # Calculate the jaxpr representing the full outputs. The `del` hack makes it possible to trace
+    # the following program `lambda i, a: i<3`. Where `a` is an unused dynamically-shaped array.
     jaxpr, _, _ = trace.frame.to_jaxpr2((*expanded_outputs, *expanded_inputs))
     del jaxpr._outvars[len(expanded_outputs) :]
 

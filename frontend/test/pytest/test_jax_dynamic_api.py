@@ -691,7 +691,7 @@ def test_qnode_whileloop_2():
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3)
+        @while_loop(lambda _, i: i < 3, experimental_preserve_dimensions=False)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -702,6 +702,26 @@ def test_qnode_whileloop_2():
 
     result = f(3)
     expected = jnp.ones(4)
+    assert_array_and_dtype_equal(result, expected)
+
+
+def test_qnode_whileloop_capture():
+    """Tests that while-loop primitive can capture variables from the outer scope"""
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def f(sz):
+        x = jnp.ones([sz], dtype=float)
+
+        @while_loop(lambda i, _: i < 3)
+        def loop(i, a):
+            return i + 1, a + x
+
+        _, a2 = loop(1, x)
+        return a2
+
+    result = f(3)
+    expected = 3 * jnp.ones(3)
     assert_array_and_dtype_equal(result, expected)
 
 
@@ -927,7 +947,6 @@ def test_qjit_whileloop_capture():
     def f(sz):
         x = jnp.ones([sz], dtype=float)
 
-        # FIXME: `a` must be mentioned in the while-condition due to a Jax bug
         @while_loop(lambda i, _: i < 3)
         def loop(i, a):
             return i + 1, a + x

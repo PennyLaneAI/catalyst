@@ -1105,36 +1105,47 @@ class WhileLoop(HybridOp):
                 arg_classical_tracers, expansion_strategy=expansion_strategy
             )
             res_classical_tracers = region.res_classical_tracers
+            _, _, consts = ctx.frames[cond_trace].to_jaxpr2(
+                (*res_classical_tracers, *arg_expanded_classical_tracers)
+            )
             res_expanded_classical_tracers, out_type = expand_results(
                 arg_expanded_classical_tracers,
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
+                consts=[cond_trace.full_raise(t) for t in consts],
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
             cond_jaxpr, out_type2, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
-                res_expanded_classical_tracers
+                (*res_expanded_classical_tracers, *arg_expanded_classical_tracers)
             )
-            assert unzip2(out_type)[0] == unzip2(out_type2)[0], f"\n{out_type=}\n{out_type2=}"
+            del cond_jaxpr._outvars[len(res_expanded_classical_tracers) :]
 
         nimplicit = len(arg_expanded_classical_tracers) - len(self.regions[0].arg_classical_tracers)
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
+            region = self.regions[1]
+            res_classical_tracers = region.res_classical_tracers
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
-                self.regions[1].arg_classical_tracers + [qreg_in],
+                region.arg_classical_tracers + [qreg_in],
                 expansion_strategy=expansion_strategy,
             )[0]
+            _, _, consts = ctx.frames[body_trace].to_jaxpr2(
+                (*res_classical_tracers, qreg_out, *arg_expanded_tracers)
+            )
             res_expanded_tracers, out_type = expand_results(
                 arg_expanded_tracers,
-                self.regions[1].res_classical_tracers + [qreg_out],
+                res_classical_tracers + [qreg_out],
                 expansion_strategy=expansion_strategy,
+                consts=[body_trace.full_raise(t) for t in consts],
             )
             body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_expanded_tracers
+                (*res_expanded_tracers, *arg_expanded_tracers)
             )
+            del body_jaxpr._outvars[len(res_expanded_tracers) :]
 
         in_expanded_tracers = [
             *[trace.full_raise(c) for c in (cond_consts + body_consts)],
@@ -1146,6 +1157,7 @@ class WhileLoop(HybridOp):
             in_expanded_tracers,
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
+            consts=[trace.full_raise(c) for c in (cond_consts + body_consts)],
         )[0]
 
         qrp2 = QRegPromise(
