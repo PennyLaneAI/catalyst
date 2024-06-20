@@ -410,9 +410,18 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
+        // Check to see if we need to keep the value results alongside the gradients.
+        // There is no need to duplicate if there's no need to keep the results.
+        // Note that when this attribute is not set, we are then not coming from ValueAndGrad
+        // so there's no need to duplicate
+        bool dupNoNeed = (op.getKeepValueResultsAttr() == nullptr)
+                             ? true
+                             : (!op.getKeepValueResultsAttr().getValue());
+
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc,
+                                  {.dupNoNeed = dupNoNeed});
         }
 
         // The results of backprop are in argShadows, except scalar derivatives which are in the

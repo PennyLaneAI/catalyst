@@ -30,7 +30,27 @@ def GradientOpInterface : OpInterface<"GradientOpInterface">{
         InterfaceMethod<
         "Return the gradient method, which can be one of [\"auto\", \"fd\"].",
         "llvm::StringRef", "getMethod"
-        >
+        >,
+        InterfaceMethod<
+        "Return the name of the callee, aka the function being differentiated by the gradient operation.",
+        "llvm::StringRef", "getCallee"
+        >,
+        InterfaceMethod<
+        "Return the indices of the arguments being differentiated.",
+        "std::optional<mlir::DenseIntElementsAttr>", "getDiffArgIndices"
+        >,
+        InterfaceMethod<
+        "Return the indices of the arguments being differentiated, as an MLIR attribute.",
+        "mlir::DenseIntElementsAttr", "getDiffArgIndicesAttr"
+        >,
+        InterfaceMethod<
+        "Return the finite difference parameter.",
+        "std::optional<mlir::FloatAttr>", "getFiniteDiffParam"
+        >,
+        InterfaceMethod<
+        "Return the finite difference parameter, as an MLIR attribute.",
+        "mlir::FloatAttr", "getFiniteDiffParamAttr"
+        >,
     ];
 }
 
