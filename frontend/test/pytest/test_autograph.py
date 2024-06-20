@@ -39,6 +39,7 @@ from catalyst import (
     jvp,
     measure,
     qjit,
+    run_autograph,
     vjp,
     vmap,
 )
@@ -156,6 +157,20 @@ class TestSourceCodeInfo:
 
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
+
+    def test_unsupported_object(self):
+        """Check the error produced when attempting to convert an unsupported object (neither of
+        QNode, function, method or callable)."""
+
+        class FN:
+            """Test object."""
+
+            __name__ = "unknown"
+
+        fn = FN()
+
+        with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
+            run_autograph(fn)
 
     def test_callable_object(self):
         """Test qjit applied to a callable object."""
