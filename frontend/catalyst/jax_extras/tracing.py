@@ -642,7 +642,7 @@ class ExpansionStrategy:
 
 def while_loop_expansion_strategy(preserve_dimensions=False):
     """Arguments and results expansion strategy for while-loops."""
-    return ExpansionStrategy(None, not preserve_dimensions, True, False, False)
+    return ExpansionStrategy(None, not preserve_dimensions, True, False, preserve_dimensions)
 
 
 def for_loop_expansion_strategy(preserve_dimensions=False):

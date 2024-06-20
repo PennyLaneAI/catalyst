@@ -920,6 +920,26 @@ def test_qjit_whileloop_outer():
     assert_array_and_dtype_equal(res_a, jnp.ones(3))
 
 
+def test_qjit_whileloop_capture():
+    """Tests that while-loop primitive can capture variables from the outer scope"""
+
+    @qjit()
+    def f(sz):
+        x = jnp.ones([sz], dtype=float)
+
+        # FIXME: `a` must be mentioned in the while-condition due to a Jax bug
+        @while_loop(lambda i, a: jnp.logical_and(i < 3, a[0] < 3))
+        def loop(i, a):
+            return i + 1, a + x
+
+        _, a2 = loop(0, x)
+        return a2
+
+    result = f(3)
+    expected = 3 * jnp.ones(3)
+    assert_array_and_dtype_equal(result, expected)
+
+
 def test_qnode_cond_identity():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
