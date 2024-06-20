@@ -208,14 +208,14 @@ struct BufferizeForwardOp : public OpConversionPattern<ForwardOp> {
         rewriter.setInsertionPointToStart(block);
         auto params = op.getArguments();
 
-        for (auto i = 0; i < argc * 2; i++) {
+        for (size_t i = 0; i < argc * 2; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? differentials.push_back(val) : inputs.push_back(val);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
-        for (auto i = argc * 2; i < upperLimit; i++) {
+        for (size_t i = argc * 2; i < upperLimit; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? cotangents.push_back(val) : outputs.push_back(val);
@@ -301,14 +301,14 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
         rewriter.setInsertionPointToStart(block);
         auto params = op.getArguments();
 
-        for (auto i = 0; i < argc * 2; i++) {
+        for (size_t i = 0; i < argc * 2; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? differentials.push_back(val) : inputs.push_back(val);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
-        for (auto i = argc * 2; i < upperLimit; i++) {
+        for (size_t i = argc * 2; i < upperLimit; i++) {
             bool isDup = (i % 2) != 0;
             Value val = params[i];
             isDup ? cotangents.push_back(val) : outputs.push_back(val);
@@ -316,7 +316,7 @@ struct BufferizeReverseOp : public OpConversionPattern<ReverseOp> {
 
         auto tapeCount = op.getTape();
         auto uppestLimit = upperLimit + tapeCount;
-        for (auto i = upperLimit; i < uppestLimit; i++) {
+        for (size_t i = upperLimit; i < uppestLimit; i++) {
             tapeElements.push_back(params[i]);
         }
 
