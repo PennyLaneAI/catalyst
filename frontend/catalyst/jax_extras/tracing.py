@@ -551,7 +551,7 @@ def input_type_to_tracers(
     const_maker: Callable[[DynamicJaxprTracer], DynamicJaxprTracer],
 ) -> List[DynamicJaxprTracer]:
     """Creates an expanded list of tracers representing an input values of a Jaxpr program"""
-    in_tracers: list[Tracer] = []
+    in_tracers: list[DynamicJaxprTracer] = []
 
     def _substitute_tracers_in_aval(a: AbstractValue) -> AbstractValue:
         if isinstance(a, DShapedArray):
