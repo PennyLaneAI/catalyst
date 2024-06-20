@@ -20,11 +20,8 @@ from typing import Callable
 
 import jax
 from jax.extend.linear_util import wrap_init
-from pennylane.capture.capture_qnode import _get_qnode_prim, _get_shapes_for
-from pennylane.capture.primitives import (
-    _get_abstract_measurement,
-    _get_abstract_operator,
-)
+from pennylane.capture import AbstractOperator, AbstractMeasurement, qnode_prim
+
 
 from .device import extract_backend_info, get_device_capabilities
 from .jax_primitives import (
@@ -46,10 +43,6 @@ from .jax_primitives import (
 )
 from .utils.toml import ProgramFeatures
 
-qnode_prim = _get_qnode_prim()
-AbstractOperator = _get_abstract_operator()
-AbstractMeasurement = _get_abstract_measurement()
-
 measurement_map = {
     "sample_wires": sample_p,
     "expval_obs": expval_p,
@@ -58,6 +51,29 @@ measurement_map = {
     "state_wires": state_p,
 }
 
+def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
+    if jax.config.jax_enable_x64:
+        dtype_map = {
+            float: jax.numpy.float64,
+            int: jax.numpy.int64,
+            complex: jax.numpy.complex128,
+        }
+    else:
+        dtype_map = {
+            float: jax.numpy.float32,
+            int: jax.numpy.int32,
+            complex: jax.numpy.complex64,
+        }
+
+    shapes = []
+    if not shots:
+        shots = [None]
+
+    for s in shots:
+        for m in measurements:
+            shape, dtype = m.abstract_eval(shots=s, num_device_wires=num_device_wires)
+            shapes.append(jax.core.ShapedArray(shape, dtype_map.get(dtype, dtype)))
+    return shapes
 
 # pylint: disable=unidiomatic-typecheck
 def _read(var, env: dict):
@@ -69,7 +85,8 @@ def _get_device_kwargs(device: "pennylane.devices.Device") -> dict:
     features = ProgramFeatures(device.shots is not None)
     capabilities = get_device_capabilities(device, features)
     info = extract_backend_info(device, capabilities)
-    # Note that the value of rtd_kwargs is a string version of the info kwargs, not the info kwargs itself!
+    # Note that the value of rtd_kwargs is a string version of
+    # the info kwargs, not the info kwargs itself
     return {
         "rtd_kwargs": str(info.kwargs),
         "rtd_lib": info.lpath,
@@ -77,6 +94,8 @@ def _get_device_kwargs(device: "pennylane.devices.Device") -> dict:
     }
 
 
+# code example has long lines
+# pylint: disable=line-too-long
 def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
     """Convert pennylane variant jaxpr to catalyst variant jaxpr.
 
@@ -141,6 +160,8 @@ def from_plxpr(plxpr: jax.core.Jaxpr) -> Callable[..., jax.core.Jaxpr]:
     return jax.make_jaxpr(partial(to_catalyst_interpreter, plxpr.jaxpr, plxpr.consts))
 
 
+# docstring link too long
+# pylint: disable=line-too-long
 def to_catalyst_interpreter(jaxpr: jax.core.Jaxpr, consts, *args) -> list:
     """Convert pennylane variant jaxpr to catalyst variant jaxpr.
 

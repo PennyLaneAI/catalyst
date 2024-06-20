@@ -16,9 +16,8 @@ This module tests the from_plxpr conversion function.
 """
 
 import numpy as np
-import pytest
-
 import pennylane as qml
+import pytest
 
 catalyst = pytest.importorskip("catalyst")
 jax = pytest.importorskip("jax")
@@ -29,9 +28,12 @@ from catalyst.from_plxpr import from_plxpr
 
 
 def catalyst_execute_jaxpr(jaxpr):
-
+    """Create a function capable of executing the provided catalyst-variant jaxpr."""
     # pylint: disable=too-few-public-methods
     class JAXPRRunner(catalyst.QJIT):
+        """A variant of catalyst.QJIT with a pre-constructed jaxpr."""
+
+        # pylint: disable=missing-function-docstring
         def capture(self, args):
 
             result_treedef = jax.tree_util.tree_structure((0,) * len(jaxpr.out_avals))
@@ -56,6 +58,7 @@ def compare_call_jaxprs(jaxpr1, jaxpr2, skip_eqns=(), skip_counts=False):
 
 
 def compare_eqns(eqn1, eqn2, skip_counts=False):
+    """Compare two jaxpr equations."""
     assert eqn1.primitive == eqn2.primitive
     if "shots" not in eqn1.params and "shape" not in eqn1.params:
         assert eqn1.params == eqn2.params
@@ -133,7 +136,8 @@ class TestErorrs:
             from_plxpr(jaxpr)()
 
     def test_measuring_eigvals_not_supported(self):
-        """Test that a NotImplementedError is raised for converting a measurement specified via eigvals and wires."""
+        """Test that a NotImplementedError is raised for converting a measurement
+        specified via eigvals and wires."""
 
         dev = qml.device("lightning.qubit", wires=2, shots=50)
 
@@ -169,7 +173,8 @@ class TestErorrs:
             from_plxpr(jaxpr)()
 
     def test_unsupported_measurement(self):
-        """Test that a NotImplementedError is raised if a measurement is not yet supported for conversion."""
+        """Test that a NotImplementedError is raised if a measurement
+        is not yet supported for conversion."""
 
         dev = qml.device("lightning.qubit", wires=2)
 
@@ -203,7 +208,7 @@ class TestCatalystCompareJaxpr:
         converted = from_plxpr(plxpr)(0.5)
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
-        assert converted.eqns[0].params["fn"] == circuit
+        assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
         assert len(catalyst_res) == 1
@@ -234,7 +239,7 @@ class TestCatalystCompareJaxpr:
         converted = from_plxpr(plxpr)(0.5)
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
-        assert converted.eqns[0].params["fn"] == circuit
+        assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(0.5)
         assert len(catalyst_res) == 1
@@ -269,7 +274,7 @@ class TestCatalystCompareJaxpr:
         converted = from_plxpr(plxpr)(phi)
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
-        assert converted.eqns[0].params["fn"] == circuit
+        assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(phi)
         assert len(catalyst_res) == 1
@@ -308,7 +313,7 @@ class TestCatalystCompareJaxpr:
         converted = from_plxpr(plxpr)(np.array(0.724))
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
-        assert converted.eqns[0].params["fn"] == circuit
+        assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x)
         assert len(catalyst_res) == 1
@@ -340,7 +345,7 @@ class TestCatalystCompareJaxpr:
         converted = from_plxpr(plxpr)()
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
-        assert converted.eqns[0].params["fn"] == circuit
+        assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)()
         assert len(catalyst_res) == 1
@@ -374,7 +379,7 @@ class TestCatalystCompareJaxpr:
         converted = from_plxpr(plxpr)(x, y, z)
 
         assert converted.eqns[0].primitive == catalyst.jax_primitives.func_p
-        assert converted.eqns[0].params["fn"] == circuit
+        assert converted.eqns[0].params["fn"] is circuit
 
         catalyst_res = catalyst_execute_jaxpr(converted)(x, y, z)
         assert len(catalyst_res) == 3
