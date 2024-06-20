@@ -44,6 +44,7 @@ from catalyst.jax_extras import (
     jaxpr_pad_consts,
     new_inner_tracer,
     output_type_to_tracers,
+    trace_to_jaxpr,
     unzip2,
     while_loop_expansion_strategy,
 )
@@ -1055,7 +1056,7 @@ class ForLoop(HybridOp):
                 num_implicit_inputs=nimplicit,
                 consts=[inner_trace.full_raise(t) for t in consts],
             )
-            jaxpr, _, _ = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
+            jaxpr, _, _ = trace_to_jaxpr(inner_trace, arg_expanded_tracers, res_expanded_tracers)
 
         operand_tracers = op.in_classical_tracers
         const_tracers = [trace.full_raise(c) for c in consts]
@@ -1114,10 +1115,9 @@ class WhileLoop(HybridOp):
                 consts=[cond_trace.full_raise(t) for t in consts],
             )
             _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
-            cond_jaxpr, out_type2, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
-                (*res_expanded_classical_tracers, *arg_expanded_classical_tracers)
+            cond_jaxpr, out_type2, cond_consts = trace_to_jaxpr(
+                cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
-            del cond_jaxpr._outvars[len(res_expanded_classical_tracers) :]
 
         nimplicit = len(arg_expanded_classical_tracers) - len(self.regions[0].arg_classical_tracers)
         body_trace = self.regions[1].trace
@@ -1141,10 +1141,9 @@ class WhileLoop(HybridOp):
                 expansion_strategy=expansion_strategy,
                 consts=[body_trace.full_raise(t) for t in consts],
             )
-            body_jaxpr, out_type2, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                (*res_expanded_tracers, *arg_expanded_tracers)
+            body_jaxpr, out_type2, body_consts = trace_to_jaxpr(
+                body_trace, arg_expanded_tracers, res_expanded_tracers
             )
-            del body_jaxpr._outvars[len(res_expanded_tracers) :]
 
         in_expanded_tracers = [
             *[trace.full_raise(c) for c in (cond_consts + body_consts)],
