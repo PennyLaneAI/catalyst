@@ -197,7 +197,6 @@ def dynamic_one_shot(qnode, **kwargs):
     mcm_config = kwargs.pop("mcm_config", None)
 
     def transform_to_single_shot(qnode):
-
         if not qnode.device.shots:
             raise qml.QuantumFunctionError("dynamic_one_shot is only supported with finite shots.")
 
@@ -205,7 +204,6 @@ def dynamic_one_shot(qnode, **kwargs):
         def dynamic_one_shot_partial(
             tape: qml.tape.QuantumTape,
         ) -> tuple[Sequence[qml.tape.QuantumTape], Callable]:
-
             nonlocal cpy_tape
             cpy_tape = tape
             nonlocal aux_tapes
@@ -251,7 +249,6 @@ def dynamic_one_shot(qnode, **kwargs):
     single_shot_qnode.device = new_dev
 
     def one_shot_wrapper(*args, **kwargs):
-
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 

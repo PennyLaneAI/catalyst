@@ -26,5 +26,8 @@ void wrapMemRefArgsFunc(func::FuncOp, const TypeConverter *, RewriterBase &, Loc
                         bool = false);
 void wrapMemRefArgsCallsites(func::FuncOp, const TypeConverter *, RewriterBase &, Location,
                              bool = false);
+LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp, Location loc,
+                                          func::FuncOp originalFunc, func::FuncOp augmentedPrimal,
+                                          func::FuncOp gradient);
 } // namespace gradient
 } // namespace catalyst

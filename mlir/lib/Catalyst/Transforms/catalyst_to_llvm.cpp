@@ -27,6 +27,8 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
+#include "Gradient/IR/GradientDialect.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Utils.h"
 
 using namespace mlir;
@@ -490,7 +492,12 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
 
         auto func =
             rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getSymName(), op.getFunctionType());
+        func.setPrivate();
+        auto noinline = rewriter.getStringAttr("noinline");
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+        SmallVector<Attribute> passthrough = {noinline};
+        auto ctx = rewriter.getContext();
+        func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
         auto typeConverter = getTypeConverter();
         gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
         rewriter.eraseOp(op);
@@ -524,6 +531,39 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
     }
 };
 
+struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult match(gradient::CustomGradOp op) const override
+    {
+        // only match after all three are func.func
+        auto callee = op.getCalleeAttr();
+        auto forward = op.getForwardAttr();
+        auto reverse = op.getReverseAttr();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto calleeOp = mod.lookupSymbol<func::FuncOp>(callee);
+        auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
+        auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
+        auto ready = calleeOp && forwardOp && reverseOp;
+        return ready ? success() : failure();
+    }
+
+    void rewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
+                 ConversionPatternRewriter &rewriter) const override
+    {
+        auto loc = op.getLoc();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto callee = op.getCalleeAttr();
+        auto forward = op.getForwardAttr();
+        auto reverse = op.getReverseAttr();
+        auto calleeOp = mod.lookupSymbol<func::FuncOp>(callee);
+        auto forwardOp = mod.lookupSymbol<func::FuncOp>(forward);
+        auto reverseOp = mod.lookupSymbol<func::FuncOp>(reverse);
+        gradient::insertEnzymeCustomGradient(rewriter, mod, loc, calleeOp, forwardOp, reverseOp);
+        rewriter.eraseOp(op);
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -545,10 +585,12 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         patterns.add<DefineCallbackOpPattern>(typeConverter, context);
         patterns.add<ReplaceCallbackOpWithFuncOp>(typeConverter, context);
         patterns.add<CallbackCallOpPattern>(typeConverter, context);
+        patterns.add<CustomGradOpPattern>(typeConverter, context);
 
         LLVMConversionTarget target(*context);
         target.addLegalDialect<func::FuncDialect>();
         target.addIllegalDialect<CatalystDialect>();
+        target.addIllegalDialect<catalyst::gradient::GradientDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

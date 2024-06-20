@@ -115,9 +115,10 @@ func.func @custom_call(%arg0: memref<3x3xf64>) -> memref<3x3xf64> {
 module @test0 {
 
   // Make sure that arguments are !llvm.ptrs.
-  // CHECK-LABEL: func.func @callback_4(
+  // CHECK-LABEL: func.func private @callback_4(
   // CHECK-SAME: [[arg0:%.+]]: !llvm.ptr,
   // CHECK-SAME: [[arg1:%.+]]: !llvm.ptr)
+  // CHECK-SAME: noinline
 
   // Make sure that we pass the constants that we need.
   // CHECK-DAG: [[id:%.+]] = llvm.mlir.constant(4
@@ -158,4 +159,19 @@ module @test1 {
   }
 }
 
+// -----
 
+// CHECK-LABEL: @test2
+module @test2 {
+
+  func.func private @fwd.fwd(memref<f64>, memref<f64>, memref<f64>, memref<f64>) -> memref<f64>
+  func.func private @bwd.rev(memref<f64>, memref<f64>, memref<f64>, memref<f64>)
+  func.func private @foo(memref<f64>, memref<f64>)
+
+  // CHECK-LABEL: llvm.mlir.global external @__enzyme_register_gradient_foo
+  // CHECK-DAG: [[foo:%.+]] = func.constant @foo
+  // CHECK-DAG: [[fwd:%.+]] = func.constant @fwd.fwd
+  // CHECK-DAG: [[rev:%.+]] = func.constant @bwd.rev
+
+  gradient.custom_grad @foo @fwd.fwd @bwd.rev
+}
