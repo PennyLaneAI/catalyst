@@ -36,7 +36,6 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
 )
-from catalyst.jax_tracer import get_device_shots
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.programs.verification import (
     validate_observables,

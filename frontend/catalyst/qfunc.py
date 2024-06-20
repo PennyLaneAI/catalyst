@@ -53,7 +53,7 @@ from catalyst.jax_extras import (
     unzip2,
 )
 from catalyst.jax_primitives import func_p
-from catalyst.jax_tracer import get_device_shots, trace_quantum_function
+from catalyst.jax_tracer import trace_quantum_function
 from catalyst.logging import debug_logger
 from catalyst.utils.toml import DeviceCapabilities, ProgramFeatures
 

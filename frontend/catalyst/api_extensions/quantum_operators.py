@@ -160,7 +160,7 @@ def measure(
     MidCircuitMeasure(
         # Copy, so wires remain unmodified
         wires=wires.copy(),
-        mcm_tracer=m,
+        mv=m,
         reset=reset,
         postselect=postselect,
     )
@@ -320,36 +320,36 @@ class MidCircuitMeasure(MidMeasureMP):
 
     binder = qmeasure_p.bind
 
-    # pylint: disable=too-many-arguments
     @debug_logger_init
-    def __init__(self, wires, mcm_tracer, reset: bool = None, postselect: int = None):
+    def __init__(self, wires, mv, reset: bool = None, postselect: int = None):
         super().__init__(wires=wires, reset=reset, postselect=postselect)
-        self.mcm_tracer = mcm_tracer
+        self.mv = mv
 
     @debug_logger
     def trace_quantum(self, ctx, trace, qrp, postselect_mode=None) -> QRegPromise:
+        """Perform the second, quantum part of the Hybrid operation tracing."""
         qubit = qrp.extract(self.wires)[0]
         kwargs = {} if postselect_mode == "hw-like" else {"postselect": self.postselect}
         qubit2 = self.binder(qubit, **kwargs)[-1]
 
         eqn = ctx.frames[trace].eqns[-1]
-        assert len(eqn.outvars[:-1]) == 1, f"{eqn.outvars=}\n{self.mcm_tracer=}"
+        assert len(eqn.outvars[:-1]) == 1, f"{eqn.outvars=}\n{self.mv=}"
 
-        if trace.getvar(self.mcm_tracer) not in set(
+        if trace.getvar(self.mv) not in set(
             [
                 *sum([e.outvars for e in ctx.frames[trace].eqns[:-1]], []),
                 *ctx.frames[trace].invars,
                 *ctx.frames[trace].constvar_to_val.keys(),
             ]
         ):
-            eqn.outvars[0] = trace.getvar(self.mcm_tracer)
+            eqn.outvars[0] = trace.getvar(self.mv)
 
         qrp.insert(self.wires, [qubit2])
         return qrp
 
     def __hash__(self):
         hsh = super().__hash__()
-        return hash(hsh + hash(self.mcm_tracer))
+        return hash(hsh + hash(self.mv))
 
 
 class AdjointCallable:
