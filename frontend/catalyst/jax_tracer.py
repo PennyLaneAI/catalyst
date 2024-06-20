@@ -62,8 +62,8 @@ from catalyst.jax_extras import (
     wrap_init,
 )
 from catalyst.jax_primitives import (
-    AbstractQreg,
     CALLBACK_OP_CACHE,
+    AbstractQreg,
     compbasis_p,
     cond_p,
     counts_p,
