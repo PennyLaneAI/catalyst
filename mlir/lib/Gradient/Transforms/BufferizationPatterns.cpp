@@ -142,15 +142,28 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
-            loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
-            calleeResults, resShadows, diffArgIndicesAttr);
+            loc, TypeRange{}, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
+            calleeResults, resShadows, diffArgIndicesAttr, op.getKeepValueResultsAttr());
 
         // Fill in the null placeholders.
-        for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
+        for (const auto &[idx, scalarResult] :
+             llvm::enumerate(bufferizedBackpropOp.getGradients())) {
             gradients[scalarIndices[idx]] = scalarResult;
         }
 
-        rewriter.replaceOp(op, gradients);
+        // BackpropOp can return two results for value_and_grad: values and gradients
+        // or only one for grad: gradients
+        SmallVector<Value> results;
+        {
+            // If we are lowering a value_and_grad operation, then take values from the
+            // calleeResults
+            if (!op.getVals().empty()) {
+                results.insert(results.end(), calleeResults.begin(), calleeResults.end());
+            }
+            results.insert(results.end(), gradients.begin(), gradients.end());
+        }
+
+        rewriter.replaceOp(op, results);
         return success();
     }
 };
