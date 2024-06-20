@@ -51,9 +51,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
     returns the default decomposition, unless the operator should decompose to a QubitUnitary.
     Raises a CompileError for MidMeasureMP"""
-    if isinstance(op, MidCircuitMeasure):
-        return []
-    if isinstance(op, MidMeasureMP):
+    if isinstance(op, MidMeasureMP) and not isinstance(op, MidCircuitMeasure):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
     # TODO: remove hardcoded controlled to matrix decomp
     if capabilities.to_matrix_ops.get(op.name) or isinstance(op, qml.ops.Controlled):

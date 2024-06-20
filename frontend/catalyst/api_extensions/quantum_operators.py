@@ -324,13 +324,7 @@ class MidCircuitMeasure(MidMeasureMP):
     @debug_logger_init
     def __init__(self, wires, mcm_tracer, reset: bool = None, postselect: int = None):
         super().__init__(wires=wires, reset=reset, postselect=postselect)
-        # self.wires = wires
         self.mcm_tracer = mcm_tracer
-
-    @property
-    def name(self):
-        """Operator name"""
-        return "MidCircuitMeasure"
 
     @debug_logger
     def trace_quantum(self, ctx, trace, qrp, postselect_mode=None) -> QRegPromise:
