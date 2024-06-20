@@ -241,6 +241,9 @@
 * A new GitHub workflow makes available a binary distribution for Linux Arm64.
   [(#767)](https://github.com/PennyLaneAI/catalyst/pull/767)
 
+* Autograph works when `qjit` is applied to a function decorated with `vmap`.
+  [(#835)](https://github.com/PennyLaneAI/catalyst/pull/835)
+
 <h3>Breaking changes</h3>
 
 * Binary distributions for Linux are now based on `manylinux_2_28` instead of `manylinux_2014`.
