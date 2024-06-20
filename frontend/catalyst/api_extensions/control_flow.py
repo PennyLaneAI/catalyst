@@ -1048,13 +1048,15 @@ class ForLoop(HybridOp):
 
             res_classical_tracers = region.res_classical_tracers
             res_tracers = res_classical_tracers + [qreg_out]
+            _, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_tracers)
             res_expanded_tracers, _ = expand_results(
                 arg_expanded_tracers,
                 res_tracers,
                 expansion_strategy=expansion_strategy,
                 num_implicit_inputs=nimplicit,
+                consts=[inner_trace.full_raise(t) for t in consts]
             )
-            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
+            jaxpr, _, _ = ctx.frames[inner_trace].to_jaxpr2(res_expanded_tracers)
 
         operand_tracers = op.in_classical_tracers
         const_tracers = [trace.full_raise(c) for c in consts]
@@ -1065,10 +1067,11 @@ class ForLoop(HybridOp):
         in_expanded_tracers = [*const_tracers, *operand_expanded_tracers, qreg_tracer]
 
         out_expanded_classical_tracers, _ = expand_results(
-            in_expanded_tracers,
+            [*operand_expanded_tracers, qreg_tracer],
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
             num_implicit_inputs=nimplicit,
+            consts=consts
         )
 
         qrp2 = QRegPromise(

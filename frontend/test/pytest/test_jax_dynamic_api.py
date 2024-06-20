@@ -613,7 +613,7 @@ def test_qnode_forloop_index_indbidx():
     def f(sz):
         a = jnp.ones([sz, 3], dtype=float)
 
-        @for_loop(0, 10, 1)
+        @for_loop(0, 10, 1, experimental_preserve_dimensions=False)
         def loop(i, _):
             b = jnp.ones([i, 3], dtype=float)
             return b

@@ -429,7 +429,6 @@ def deduce_signatures(
     wf = wrap_init(f)
     wf, out_tree_promise = flatten_fun(wf, in_tree)
     wf, out_sig_promise = expanded_fun(wf, (in_type, expansion_strategy))
-    wf = annotate(wf, in_type)
     return (
         wf,
         InputSignature(in_type, in_tree, in_expanded_args),
@@ -833,6 +832,7 @@ def expand_results(
     results: List[TracerLike],
     expansion_strategy: ExpansionStrategy,
     num_implicit_inputs: int | None = None,
+    consts = []
 ) -> Tuple[List[TracerLike], OutputType]:
     """Calculate the expanded list of results of a Python function, based on its input and output
     tracers/variables.
@@ -849,7 +849,7 @@ def expand_results(
         OutputType describing the expanded result
 
     """
-    return infer_output_type([], expanded_inputs, results, expansion_strategy, num_implicit_inputs)
+    return infer_output_type(consts, expanded_inputs, results, expansion_strategy, num_implicit_inputs)
 
 
 def collapse(typ: InputType | OutputType, params: List[TracerLike]) -> List[TracerLike]:
