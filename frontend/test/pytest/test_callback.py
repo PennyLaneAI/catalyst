@@ -24,6 +24,7 @@ import pytest
 
 from catalyst import accelerate, debug, grad, jacobian, pure_callback
 from catalyst.api_extensions.callbacks import base_callback
+from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 
 
@@ -808,6 +809,46 @@ def test_active_grad_inside_qjit(backend, scale):
         return qml.expval(qml.PauliZ(0))
 
     assert np.allclose(wrapper_jit(42.0), wrapper(42.0))
+
+
+def test_error_incomplete_grad_only_forward():
+    """Test error about missing reverse pass"""
+
+    @pure_callback
+    def identity(x) -> float:
+        return x
+
+    @identity.fwd
+    def fwd(x):
+        return identity(x), None
+
+    @qml.qjit
+    @grad
+    def wrapper(x: float):
+        return identity(x)
+
+    with pytest.raises(DifferentiableCompileError, match="missing reverse pass"):
+        wrapper(1.0)
+
+
+def test_error_incomplete_grad_only_reverse():
+    """Test error about missing forward pass"""
+
+    @pure_callback
+    def identity(x) -> float:
+        return x
+
+    @identity.bwd
+    def bwd(_res, cot):
+        return cot
+
+    @qml.qjit
+    @grad
+    def wrapper(x: float):
+        return identity(x)
+
+    with pytest.raises(DifferentiableCompileError, match="missing forward pass"):
+        wrapper(1.0)
 
 
 if __name__ == "__main__":
