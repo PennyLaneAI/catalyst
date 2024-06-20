@@ -581,9 +581,9 @@ class TestDynamicOneShotIntegration:
             results1 = sample_to_counts(results1, meas_obj)
             measure_f = qml.counts
 
-        # TODO: dynamic_one_shot_several_mcms is a flaky test. 
-        # We remove this test for now and revisit in the future. 
-        #validate_measurements(measure_f, shots, results1, results0)
+        # TODO: dynamic_one_shot_several_mcms is a flaky test.
+        # We remove this test for now and revisit in the future.
+        # validate_measurements(measure_f, shots, results1, results0)
 
     # pylint: disable=too-many-arguments
     @pytest.mark.parametrize("shots", [10000])
