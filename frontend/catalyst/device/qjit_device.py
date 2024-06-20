@@ -105,13 +105,11 @@ RUNTIME_OBSERVABLES = [
     "Hadamard",
     "Hermitian",
     "Hamiltonian",
-    "Projector",
-    "SparseHamiltonian",
-    "Exp",
     "LinearCombination",
     "Prod",
     "SProd",
     "Sum",
+    "Tensor"
 ]
 
 # The runtime interface does not care about specific gate properties, so set them all to True.
