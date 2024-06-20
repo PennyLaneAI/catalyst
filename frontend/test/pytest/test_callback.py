@@ -749,7 +749,7 @@ def test_example_from_story(arg0, arg1):
 
     @pure_callback
     def some_func(x, y) -> float:
-        return jnp.sin(x) * y
+        return np.sin(x) * y
 
     @some_func.fwd
     def some_func_fwd(x, y):
@@ -768,6 +768,7 @@ def test_example_from_story(arg0, arg1):
     @jax.jit
     @jax.grad
     def jax_jit_cost(x, y):
+        # This one cannot have np.sin so we just inline it and change it to jnp.sin
         return jnp.sin(jnp.sin(jnp.cos(x)) * y)
 
     assert np.allclose(jax_jit_cost(arg0, arg1), cost(arg0, arg1))

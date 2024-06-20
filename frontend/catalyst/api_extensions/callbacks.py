@@ -73,7 +73,7 @@ class CallbackWithCustomGrad:
         absargs, abskwargs = tree_map(shaped_abstractify, (args, kwargs))
         # Once we have the types, we can call this self.func with the absargs and abskwargs.
         # We don't need the jaxpr representation but the output is the shape of the cotangents.
-        _, cotangents = jax.make_jaxpr(self.func, return_shape=True)(*absargs, **abskwargs)
+        _, cotangents = jax.make_jaxpr(self, return_shape=True)(*absargs, **abskwargs)
 
         # The forward pass must have the same input types as the original function
         self._fwd_jaxpr, shape = jax.make_jaxpr(self._fwd, return_shape=True)(*absargs, **abskwargs)
